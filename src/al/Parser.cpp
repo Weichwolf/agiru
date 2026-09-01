@@ -151,6 +151,14 @@ private:
     }
     if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("event")) { Advance(); }
     procedure.name = ExpectName();
+    // A DotNet event receiver names its trigger through the variable it listens on:
+    // `trigger EventReceiver::OnPermissionCheckEvent(sender: Variant; e: DotNet ...)`. The
+    // qualifier belongs to the SUBSCRIPTION rather than to the signature, so the name kept here is
+    // the event's.
+    while (AtPunctuation("::")) {
+      Advance();
+      procedure.name = ExpectName();
+    }
     Expect("(");
     while (!AtPunctuation(")")) {
       Parameter parameter;
@@ -198,6 +206,12 @@ private:
 
   void SkipSubtypeName() {
     if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return; }
+    // AL names an object by NAME or by NUMBER, and both are legal in a subtype:
+    // `var GLEntry: Record 17` is `Record "G/L Entry"`. Test code uses the number freely.
+    if (Peek().kind == TokenKind::Integer) {
+      Advance();
+      return;
+    }
     (void)ExpectName();
     while (AtPunctuation(".")) {
       Advance();
@@ -223,7 +237,8 @@ private:
     }
     if (AtPunctuation("[")) {
       SkipBracketed();
-    } else if (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier) {
+    } else if (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier ||
+               Peek().kind == TokenKind::Integer) {
       SkipSubtypeName();
     }
     while (AtKeyword("temporary")) { Advance(); }
@@ -242,19 +257,32 @@ private:
     return name;
   }
 
+  // A `var` BLOCK ENDS AT THE NEXT `var` AS WELL AS AT THE NEXT MEMBER. A codeunit may declare
+  // several, separated by nothing but a comment, and `#pragma` lines between them vanish in the
+  // lexer. Without `var` in this list the keyword was read as a variable NAME and the block after
+  // it was lost with the rest of the file.
   void ParseVarsInto(std::vector<LabelDecl> &labels) {
-    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
-           !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
+    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("trigger") &&
+           !AtKeyword("procedure") && !AtKeyword("local") && !AtKeyword("internal") &&
+           !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
         if (!VariableFollowsAttribute()) { return; }
         (void)ReadAttribute();
         continue;
       }
-      const std::string name = ExpectName();
+      // ONE TYPE CAN CARRY SEVERAL NAMES: `HasFileContent, HasTextContent : Boolean;`. Reading one
+      // name and expecting a colon lost 9 codeunits over the tree, all with the same message.
+      std::vector<std::string> names{ExpectName()};
+      while (AtPunctuation(",")) {
+        Advance();
+        names.push_back(ExpectName());
+      }
       Expect(":");
       const std::string type = ExpectName();
       if (SameName(type, "Label") && Peek().kind == TokenKind::String) {
-        labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+        for (const std::string &name : names) {
+          labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+        }
         Advance();
       }
       while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
@@ -353,16 +381,25 @@ private:
   /// 67 of them, invisible because the count came from the same parser that had dropped them.
   [[nodiscard]] bool VariableFollowsAttribute() const {
     std::size_t ahead = 0;
-    int depth = 0;
-    do {
-      if (IsPunctuation(Peek(ahead), "[")) { ++depth; }
-      if (IsPunctuation(Peek(ahead), "]")) { --depth; }
-      ++ahead;
-    } while (depth > 0 && Peek(ahead).kind != TokenKind::EndOfFile);
-    const Token &next = Peek(ahead);
-    const bool named =
-        next.kind == TokenKind::Identifier || next.kind == TokenKind::QuotedIdentifier;
-    return named && IsPunctuation(Peek(ahead + 1), ":");
+    // ATTRIBUTES STACK: `[NonDebuggable] [WithEvents] AzureMLRequest: DotNet ...`. Skipping one
+    // group and looking at the next `[` decided there was no variable and ended the var block.
+    while (IsPunctuation(Peek(ahead), "[")) {
+      int depth = 0;
+      do {
+        if (IsPunctuation(Peek(ahead), "[")) { ++depth; }
+        if (IsPunctuation(Peek(ahead), "]")) { --depth; }
+        ++ahead;
+      } while (depth > 0 && Peek(ahead).kind != TokenKind::EndOfFile);
+    }
+    // AND ONE TYPE CAN CARRY SEVERAL NAMES: `[NonDebuggable] A, B : Text;`. Looking for a single
+    // `name :` after the attributes missed those too.
+    while (Peek(ahead).kind == TokenKind::Identifier ||
+           Peek(ahead).kind == TokenKind::QuotedIdentifier) {
+      if (IsPunctuation(Peek(ahead + 1), ":")) { return true; }
+      if (!IsPunctuation(Peek(ahead + 1), ",")) { return false; }
+      ahead += 2;
+    }
+    return false;
   }
 
   void SkipAttribute() {
@@ -436,10 +473,15 @@ private:
         field.length = ExpectInteger();
         Expect("]");
       } else if (!AtPunctuation(")")) {
-        field.subtype = ExpectName();
-        while (AtPunctuation(".")) {
+        if (Peek().kind == TokenKind::Integer) {
+          field.subtype = Peek().text;
           Advance();
+        } else {
           field.subtype = ExpectName();
+          while (AtPunctuation(".")) {
+            Advance();
+            field.subtype = ExpectName();
+          }
         }
       }
       Expect(")");
@@ -486,18 +528,25 @@ private:
   }
 
   void ParseVars(TableObject &table) {
-    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
-           !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
+    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("trigger") &&
+           !AtKeyword("procedure") && !AtKeyword("local") && !AtKeyword("internal") &&
+           !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
         if (!VariableFollowsAttribute()) { return; }
         SkipAttribute();
         continue;
       }
-      const std::string name = ExpectName();
+      std::vector<std::string> names{ExpectName()};
+      while (AtPunctuation(",")) {
+        Advance();
+        names.push_back(ExpectName());
+      }
       Expect(":");
       const std::string type = ExpectName();
       if (SameName(type, "Label") && Peek().kind == TokenKind::String) {
-        table.labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+        for (const std::string &name : names) {
+          table.labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+        }
         Advance();
       }
       while (!AtEnd() && !AtPunctuation(";")) { Advance(); }

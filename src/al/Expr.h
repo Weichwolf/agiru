@@ -37,6 +37,7 @@ enum class StmtKind : std::uint8_t {
   CaseBranch,
   With,
   Exit,
+  AssertError,
 };
 
 struct Stmt {

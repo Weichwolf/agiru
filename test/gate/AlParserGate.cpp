@@ -1,5 +1,6 @@
 #include "Ast.h"
 #include "Check.h"
+#include "Expr.h"
 #include "Lexer.h"
 #include "Parser.h"
 #include "Token.h"
@@ -18,6 +19,20 @@ using agiru::al::ParseTable;
 using agiru::al::TableObject;
 
 namespace {
+
+/// Parses one procedure body and hands back its statements. The grammar cases below are about
+/// STATEMENTS and EXPRESSIONS, and wrapping each in its own table would bury what they claim.
+std::vector<agiru::al::Stmt> OnlyBody(std::string_view body) {
+  const std::string source =
+      "codeunit 50000 X\n{\n    procedure P()\n    " + std::string(body) + "\n}\n";
+  const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(source);
+  return unit.procedures.at(0).body;
+}
+
+/// The single expression of a one-statement body, which for `X := ...` is the assignment.
+agiru::al::Expr OnlyExpression(std::string_view statement) {
+  return OnlyBody("begin " + std::string(statement) + " end;").at(0).expression;
+}
 
 constexpr std::string_view kSource = R"AL(
 // ------------------------------------------------------------------------------------------------
@@ -286,6 +301,64 @@ codeunit 50000 "Something UT"
   CHECK_TRUE("the var block did not become a procedure", unit.procedures.size() == 3);
 }
 
+/// THE AL PRECEDENCE IS PASCAL'S, NOT C'S, and this parser had C's until it was checked against
+/// `c-al-operators.md`, which states the hierarchy outright:
+///
+///     3. *  /  DIV  MOD  AND  XOR      4. +  -  OR      5. >  <  >=  <=  =  <>  IN
+///
+/// AND binds like multiplication, OR like addition, and the comparisons bind LOOSEST.
+void TheOperatorHierarchyIsTheOneCalDocuments() {
+  // The documentation's own example: this evaluates to 14, not 20.
+  const agiru::al::Expr sum = OnlyExpression("X := 2 + 3 * 4;");
+  CHECK_TEXT("multiplication binds tighter than addition", sum.children[1].text, "+");
+  CHECK_TEXT("so the product is the right operand", sum.children[1].children[1].text, "*");
+
+  // `A = B and C` is `A = (B and C)` in AL and `(A = B) and C` in C. The tree says which.
+  const agiru::al::Expr mixed = OnlyExpression("X := A = B and C;");
+  CHECK_TEXT("the comparison is the outermost operator", mixed.children[1].text, "=");
+  CHECK_TEXT("and the conjunction is beneath it", mixed.children[1].children[1].text, "and");
+
+  // Which is the OPPOSITE of what a C reading gives, and that is the negative control: a parser
+  // that still had C's table would put `and` on top and `=` beneath.
+  CHECK_TRUE("a C reading would have inverted them", mixed.children[1].text != "and");
+
+  const agiru::al::Expr disjunction = OnlyExpression("X := A + B or C;");
+  CHECK_TEXT("OR sits with addition, so it is left-associative with it",
+             disjunction.children[1].text,
+             "or");
+}
+
+/// `xor` is an AL operator and 10 codeunits use it.
+void ExclusiveDisjunctionIsAnOperator() {
+  const agiru::al::Expr e = OnlyExpression("X := (A < 0) xor (B < 0);");
+  CHECK_TEXT("xor parses as a binary operator", e.children[1].text, "xor");
+  CHECK_TRUE("with both sides", e.children[1].children.size() == 2);
+}
+
+/// BC 25 gave AL a conditional operator, and the BaseApp uses it.
+void TheConditionalOperatorParses() {
+  const agiru::al::Expr e = OnlyExpression("X := Setup.Get() ? A : B;");
+  CHECK_TEXT("it is one expression with three parts", e.children[1].text, "?:");
+  CHECK_TRUE("condition, then, else", e.children[1].children.size() == 3);
+  CHECK_TRUE("and it binds loosest, so the condition is the whole call",
+             e.children[1].children[0].kind == agiru::al::ExprKind::Call);
+}
+
+/// `asserterror <statement>` -- one word in front of an ordinary statement, and a test suite is
+/// mostly made of it. Its absence cost 3 codeunits, and it was the last parse failure in BCApps.
+void AssertErrorIsAStatement() {
+  const std::vector<agiru::al::Stmt> body =
+      OnlyBody("begin asserterror Rec.Get(1); Rec.Insert(); end;");
+  CHECK_TRUE("two statements", body.size() == 2);
+  CHECK_TRUE("the first is an asserterror", body[0].kind == agiru::al::StmtKind::AssertError);
+  CHECK_TRUE("carrying the statement it expects to raise", body[0].body.size() == 1);
+  // THE NEGATIVE CONTROL. Without the keyword the same line is an ordinary call, and the parser
+  // must not turn every call into an expectation.
+  const std::vector<agiru::al::Stmt> plain = OnlyBody("begin Rec.Get(1); end;");
+  CHECK_TRUE("a bare call is not an asserterror",
+             plain[0].kind != agiru::al::StmtKind::AssertError);
+}
+
 } // namespace
 
 int main() {
@@ -301,5 +374,9 @@ int main() {
     ThePreprocessorKeepsOneBranch();
     TheRealFileParses();
     AVarBlockDoesNotSwallowTheNextMembersAttribute();
+    TheOperatorHierarchyIsTheOneCalDocuments();
+    ExclusiveDisjunctionIsAnOperator();
+    TheConditionalOperatorParses();
+    AssertErrorIsAStatement();
   });
 }

@@ -29,10 +29,16 @@ constexpr int kComparisonPrecedence = 4;
 constexpr int kUnaryPrecedence = 8;
 constexpr int kPrimaryPrecedence = 9;
 
+// THIS TABLE IS C++'S PRECEDENCE AND THE ONE IN src/al/Statements.cpp IS AL'S. They are DIFFERENT
+// ON PURPOSE and neither is a copy of the other: the parser's table decides what the AL text means,
+// this one decides which parentheses the C++ text needs so that it means the same thing. AL binds
+// AND like multiplication and its comparisons loosest; C++ does neither. Making them agree would
+// break one of the two jobs.
 constexpr std::array kOperators{
     Operator{.al = "or", .cpp = "||", .precedence = 1},
-    Operator{.al = "xor", .cpp = "!=", .precedence = 1},
     Operator{.al = "and", .cpp = "&&", .precedence = 2},
+    // AL `xor` on two booleans is C++ `!=` on two booleans, which sits with `==` and NOT with `||`.
+    Operator{.al = "xor", .cpp = "!=", .precedence = 3},
     Operator{.al = "=", .cpp = "==", .precedence = 3},
     Operator{.al = "<>", .cpp = "!=", .precedence = 3},
     Operator{.al = "<", .cpp = "<", .precedence = 4},
@@ -180,6 +186,14 @@ private:
         throw std::runtime_error("a case branch stands only inside a case");
       case al::StmtKind::With:
         throw std::runtime_error("AL `with` needs the members it opens to be resolved first");
+      // A FAILURE IS LOUD. `asserterror` is not "run the statement and ignore what happens": it
+      // expects the statement to raise, captures the text where GetLastErrorText reads it, and
+      // rolls the write set back to the enclosing boundary. Emitting the statement bare would make
+      // a test that asserts an error pass by not raising one, which is the worst possible way to be
+      // wrong about a test suite. Refused until board:0021 gives it a boundary to roll back to.
+      case al::StmtKind::AssertError:
+        throw std::runtime_error(
+            "AL `asserterror` needs the transaction boundary it reads (board:0021)");
       case al::StmtKind::Exit:
         out = Pad(indent) + "return" +
               (statement.expression.kind == al::ExprKind::Name && statement.expression.text.empty()

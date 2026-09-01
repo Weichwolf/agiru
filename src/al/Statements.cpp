@@ -22,22 +22,41 @@ struct Level {
   const char *word;
 };
 
+// THE AL HIERARCHY IS PASCAL'S AND NOT C'S, and this table was C's until it was checked.
+// `c-al-operators.md` states the order of precedence outright, and AL inherited it from C/AL:
+//
+//     1. . (fields)  [] (indexing)  () (parentheses)  :: (scope)
+//     2. NOT, unary -, unary +
+//     3. *  /  DIV  MOD  AND  XOR
+//     4. +  -  OR
+//     5. >  <  >=  <=  =  <>  IN
+//     6. .. (range)
+//
+// So AND binds like multiplication, OR like addition, and THE COMPARISONS BIND LOOSEST. `A = B and
+// C = D` is `A = (B and C) = D` in AL and `(A = B) and (C = D)` in C. BC code parenthesises heavily
+// because of this, which is why the wrong table cost nothing visible -- and why it would have cost
+// something eventually, silently, in the one place that did not.
+//
+// The numbers here run the other way from the documentation's list: HIGHER BINDS TIGHTER.
 constexpr std::array kLevels{
-    Level{.precedence = 1, .word = "or"},
-    Level{.precedence = 2, .word = "and"},
-    Level{.precedence = 3, .word = "="},
-    Level{.precedence = 3, .word = "<>"},
-    Level{.precedence = 3, .word = "<"},
-    Level{.precedence = 3, .word = "<="},
-    Level{.precedence = 3, .word = ">"},
-    Level{.precedence = 3, .word = ">="},
-    Level{.precedence = 3, .word = "in"},
-    Level{.precedence = 4, .word = "+"},
-    Level{.precedence = 4, .word = "-"},
-    Level{.precedence = 5, .word = "*"},
-    Level{.precedence = 5, .word = "/"},
-    Level{.precedence = 5, .word = "div"},
-    Level{.precedence = 5, .word = "mod"},
+    Level{.precedence = 1, .word = "="},
+    Level{.precedence = 1, .word = "<>"},
+    Level{.precedence = 1, .word = "<"},
+    Level{.precedence = 1, .word = "<="},
+    Level{.precedence = 1, .word = ">"},
+    Level{.precedence = 1, .word = ">="},
+    Level{.precedence = 1, .word = "in"},
+    Level{.precedence = 1, .word = "is"},
+    Level{.precedence = 1, .word = "as"},
+    Level{.precedence = 2, .word = "+"},
+    Level{.precedence = 2, .word = "-"},
+    Level{.precedence = 2, .word = "or"},
+    Level{.precedence = 3, .word = "*"},
+    Level{.precedence = 3, .word = "/"},
+    Level{.precedence = 3, .word = "div"},
+    Level{.precedence = 3, .word = "mod"},
+    Level{.precedence = 3, .word = "and"},
+    Level{.precedence = 3, .word = "xor"},
 };
 
 class Reader {
@@ -100,13 +119,13 @@ private:
                 .otherwise = {},
                 .descending = false};
       Expect("until");
-      loop.expression = ReadExpression(0);
+      loop.expression = ReadTernary();
       return loop;
     }
     if (AtKeyword("while")) {
       Advance();
       Stmt loop{.kind = StmtKind::While,
-                .expression = ReadExpression(0),
+                .expression = ReadTernary(),
                 .labels = {},
                 .body = {},
                 .otherwise = {},
@@ -121,7 +140,7 @@ private:
     if (AtKeyword("with")) {
       Advance();
       Stmt scope{.kind = StmtKind::With,
-                 .expression = ReadExpression(0),
+                 .expression = ReadTernary(),
                  .labels = {},
                  .body = {},
                  .otherwise = {},
@@ -140,19 +159,34 @@ private:
                  .descending = false};
       if (AtPunctuation("(")) {
         Advance();
-        leave.expression = ReadExpression(0);
+        leave.expression = ReadTernary();
         Expect(")");
       }
       return leave;
     }
     if (AtKeyword("if")) { return ReadIf(); }
-    Expr value = ReadExpression(0);
+    // `asserterror <statement>` -- AL's own try/expect. The statement is expected to raise, the
+    // error text lands where GetLastErrorText reads it, and execution carries on with the next
+    // statement. It is one word in front of an ordinary statement, so it parses as one; what it
+    // MEANS is board:0021, and a test suite is mostly made of it.
+    if (AtKeyword("asserterror")) {
+      Advance();
+      Stmt expected{.kind = StmtKind::AssertError,
+                    .expression = {},
+                    .labels = {},
+                    .body = {},
+                    .otherwise = {},
+                    .descending = false};
+      expected.body.push_back(ReadStatement());
+      return expected;
+    }
+    Expr value = ReadTernary();
     for (const std::string_view assignment : {":=", "+=", "-=", "*=", "/="}) {
       if (!AtPunctuation(assignment)) { continue; }
       Advance();
       Expr assign{.kind = ExprKind::Binary, .text = std::string(assignment), .children = {}};
       assign.children.push_back(std::move(value));
-      assign.children.push_back(ReadExpression(0));
+      assign.children.push_back(ReadTernary());
       value = std::move(assign);
       break;
     }
@@ -170,7 +204,7 @@ private:
     Expect(":=");
     Expr start{.kind = ExprKind::Binary, .text = ":=", .children = {}};
     start.children.push_back(std::move(counter));
-    start.children.push_back(ReadExpression(0));
+    start.children.push_back(ReadTernary());
     Stmt loop{.kind = StmtKind::For,
               .expression = std::move(start),
               .labels = {},
@@ -183,7 +217,7 @@ private:
     } else {
       Expect("to");
     }
-    loop.labels.push_back(ReadExpression(0));
+    loop.labels.push_back(ReadTernary());
     Expect("do");
     loop.body.push_back(ReadStatement());
     return loop;
@@ -198,7 +232,7 @@ private:
               .otherwise = {},
               .descending = false};
     Expect("in");
-    loop.labels.push_back(ReadExpression(0));
+    loop.labels.push_back(ReadTernary());
     Expect("do");
     loop.body.push_back(ReadStatement());
     return loop;
@@ -207,7 +241,7 @@ private:
   Stmt ReadCase() {
     Expect("case");
     Stmt selector{.kind = StmtKind::Case,
-                  .expression = ReadExpression(0),
+                  .expression = ReadTernary(),
                   .labels = {},
                   .body = {},
                   .otherwise = {},
@@ -221,12 +255,12 @@ private:
                   .otherwise = {},
                   .descending = false};
       while (!AtEnd() && !AtPunctuation(":")) {
-        Expr label = ReadExpression(0);
+        Expr label = ReadTernary();
         if (AtPunctuation("..")) {
           Advance();
           Expr range{.kind = ExprKind::Range, .text = {}, .children = {}};
           range.children.push_back(std::move(label));
-          range.children.push_back(ReadExpression(0));
+          range.children.push_back(ReadTernary());
           label = std::move(range);
         }
         branch.labels.push_back(std::move(label));
@@ -248,7 +282,7 @@ private:
   Stmt ReadIf() {
     Expect("if");
     Stmt statement{.kind = StmtKind::If,
-                   .expression = ReadExpression(0),
+                   .expression = ReadTernary(),
                    .labels = {},
                    .body = {},
                    .otherwise = {},
@@ -270,6 +304,24 @@ private:
       }
     }
     return 0;
+  }
+
+  /// AL's conditional operator, `cond ? a : b`, which BC 25 added and which binds loosest of all.
+  /// It is read here rather than in the level table because it is right-associative and ternary,
+  /// which a precedence climb over binary levels cannot express.
+  Expr ReadTernary() {
+    Expr condition = ReadExpression(1);
+    if (!AtPunctuation("?")) { return condition; }
+    Advance();
+    Expr whenTrue = ReadTernary();
+    if (!AtPunctuation(":")) { throw ParseError("a conditional expression needs its ':'"); }
+    Advance();
+    Expr whenFalse = ReadTernary();
+    Expr conditional{.kind = ExprKind::Binary, .text = "?:", .children = {}};
+    conditional.children.push_back(std::move(condition));
+    conditional.children.push_back(std::move(whenTrue));
+    conditional.children.push_back(std::move(whenFalse));
+    return conditional;
   }
 
   Expr ReadExpression(int minimum) {
@@ -327,7 +379,7 @@ private:
         Expr index{.kind = ExprKind::Index, .text = {}, .children = {}};
         index.children.push_back(std::move(value));
         while (!AtEnd() && !AtPunctuation("]")) {
-          index.children.push_back(ReadExpression(0));
+          index.children.push_back(ReadTernary());
           if (AtPunctuation(",")) { Advance(); }
         }
         Expect("]");
@@ -339,7 +391,7 @@ private:
         Expr call{.kind = ExprKind::Call, .text = {}, .children = {}};
         call.children.push_back(std::move(value));
         while (!AtEnd() && !AtPunctuation(")")) {
-          call.children.push_back(ReadExpression(0));
+          call.children.push_back(ReadTernary());
           if (AtPunctuation(",")) { Advance(); }
         }
         Expect(")");
@@ -356,12 +408,12 @@ private:
       Advance();
       Expr set{.kind = ExprKind::Set, .text = {}, .children = {}};
       while (!AtEnd() && !AtPunctuation("]")) {
-        Expr item = ReadExpression(0);
+        Expr item = ReadTernary();
         if (AtPunctuation("..")) {
           Advance();
           Expr range{.kind = ExprKind::Range, .text = {}, .children = {}};
           range.children.push_back(std::move(item));
-          range.children.push_back(ReadExpression(0));
+          range.children.push_back(ReadTernary());
           item = std::move(range);
         }
         set.children.push_back(std::move(item));
@@ -372,7 +424,7 @@ private:
     }
     if (AtPunctuation("(")) {
       Advance();
-      Expr inner = ReadExpression(0);
+      Expr inner = ReadTernary();
       Expect(")");
       return inner;
     }
