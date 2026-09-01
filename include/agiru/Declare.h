@@ -1,0 +1,103 @@
+#pragma once
+
+#include "agiru/Decimal.h"
+#include "agiru/Ids.h"
+#include "agiru/Option.h"
+#include "agiru/TableDef.h"
+#include "agiru/Text.h"
+
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <type_traits>
+
+/// \file
+/// \brief What a generated table declares, and what is derived rather than repeated.
+
+namespace agiru {
+
+/// \brief What a field's C++ type says about the field.
+///
+/// \tparam T The member's type.
+///
+/// AL's `field(2; "Code"; Code[20])` states a type, and everything else about the storage follows
+/// from it: the type tag, the declared length, and an option's member names. Those are derived here
+/// rather than repeated in the declaration, so that a table says each thing once.
+template <typename T> struct FieldTypeOf;
+
+/// \brief `Code[N]` -- a code field of declared length N.
+template <std::size_t N> struct FieldTypeOf<Code<N>> {
+  static constexpr FieldType kType = FieldType::Code;                     ///< The AL type tag.
+  static constexpr std::uint16_t kLength = static_cast<std::uint16_t>(N); ///< The declared length.
+  static constexpr std::span<const std::string_view> kMembers{};          ///< Not an option.
+};
+
+/// \brief `Text[N]` -- a text field of declared length N.
+template <std::size_t N> struct FieldTypeOf<Text<N>> {
+  static constexpr FieldType kType = FieldType::Text;                     ///< The AL type tag.
+  static constexpr std::uint16_t kLength = static_cast<std::uint16_t>(N); ///< The declared length.
+  static constexpr std::span<const std::string_view> kMembers{};          ///< Not an option.
+};
+
+/// \brief `Decimal` -- a decimal field.
+template <> struct FieldTypeOf<Decimal> {
+  static constexpr FieldType kType = FieldType::Decimal;         ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;                    ///< A decimal declares no length.
+  static constexpr std::span<const std::string_view> kMembers{}; ///< Not an option.
+};
+
+/// \brief `Option` -- an option field, whose member names come from its enumeration.
+template <typename E> struct FieldTypeOf<Option<E>> {
+  static constexpr FieldType kType = FieldType::Option; ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;           ///< An option declares no length.
+
+  /// The member names, taken from the option's own declaration rather than repeated here.
+  static constexpr std::span<const std::string_view> kMembers{OptionTraits<E>::kMembers};
+};
+
+/// \brief The class a member pointer points into.
+template <typename T> struct MemberOwnerOf;
+
+/// \brief The class a member pointer points into.
+template <typename Class, typename Value> struct MemberOwnerOf<Value Class::*> {
+  using Type = Class;  ///< The class.
+  using Field = Value; ///< The member's type.
+};
+
+/// \brief Builds one field's runtime declaration from its member.
+///
+/// \tparam Member A pointer to the field's member, which is where its TYPE comes from.
+/// \param no      The AL field number.
+/// \param name    The AL name, spaces and all.
+/// \param caption The `Caption` property.
+/// \param offset  `offsetof` the member within the record.
+/// \return The field's declaration.
+///
+/// The type tag, the declared length and an option's member names are DERIVED from the member's
+/// type rather than repeated, so a table states each of them once. What is left is the four things
+/// AL states that no C++ type carries -- the number, the name, the caption -- plus the offset.
+///
+/// \note The identifier appears twice, once as the member and once inside `offsetof`, and no
+///       standard C++ removes that: no member pointer yields a `constexpr` offset. It is not a
+///       defect here, because this file is written by a generator from one AST node and the
+///       compiler checks the pair -- a repetition a machine emits and a compiler verifies is a
+///       checksum rather than a duplication. With C++26 reflection (P2996) it would go; measured
+///       2026-09-01, neither clang-19 nor gcc-14 has it (board:0015).
+template <auto Member>
+constexpr FieldDef
+Declare(FieldNo no, std::string_view name, std::string_view caption, std::size_t offset) {
+  using Value = typename MemberOwnerOf<decltype(Member)>::Field;
+  return FieldDef{
+      .no = no,
+      .name = name,
+      .caption = caption,
+      .type = FieldTypeOf<Value>::kType,
+      .length = FieldTypeOf<Value>::kLength,
+      .offset = offset,
+      .members = FieldTypeOf<Value>::kMembers,
+  };
+}
+
+} // namespace agiru

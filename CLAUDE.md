@@ -232,6 +232,26 @@ decision that is cheap now and a migration later.
 - **A session's connection is pinned for its transaction.** Whatever pool this grows, handing a
   different connection to the same session mid-transaction breaks the transaction (board:0012).
 
+### What a generated file looks like
+
+- **The header carries every DECLARATION, the source carries every BODY.** What AL puts in a
+  `field` or `key` block is a declaration and goes in the `.h`; what it puts in a `trigger` or a
+  `procedure` is code and goes in the `.cpp`. Nothing else lives in either.
+- **Each property is stated once.** A field says its number, its AL name, its caption and its type.
+  The type TAG, the declared LENGTH and an option's MEMBER NAMES are derived from the type
+  (`agiru::Declare`, `agiru::FieldTypeOf`) rather than repeated.
+- **The identifier is the one thing said twice**, as the member and inside `offsetof`, because no
+  standard C++ turns a member pointer into a `constexpr` offset. That is a missing language feature
+  and it is recorded as one (board:0015), not defended as a design.
+- **NO MACROS.** One was built here to remove that last repetition and thrown away: it moved the
+  cost onto the reader, and this tree's reader is a model that has to know how to write the next
+  table from having read one. A macro list is not that. The same sentence already stands in
+  `.clang-tidy` about a macro that generated types -- it applies here with more force, because
+  these files are the examples everything else is written from.
+- **The platform half is in the base class**, where AL keeps it: `Insert`, `Modify`, `Delete`,
+  `Get`, `FieldError`, `TestField`, `FieldCaption`. A generated file names no connection, no row,
+  no column and no `this`, because a `.al` file names none of them.
+
 ## The invariants
 
 Four commitments. Everything else an item may revisit; these it may not.

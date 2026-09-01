@@ -97,8 +97,8 @@ void AMissingKeyIsAnAnswerRatherThanAnError() {
   ResourceCost read;
   CHECK_TRUE("a key that matches nothing returns false",
              !read.Get(agiru::Option<ResourceCostType>{ResourceCostType::All},
-                       agiru::Code<ResourceCost::FieldLength::Code>("NOTHERE"),
-                       agiru::Code<ResourceCost::FieldLength::WorkTypeCode>("")));
+                       agiru::Code<20>("NOTHERE"),
+                       agiru::Code<10>("")));
 }
 
 void ModifyOverwritesTheRowItsKeySelects() {
