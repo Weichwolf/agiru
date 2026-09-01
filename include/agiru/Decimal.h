@@ -1,8 +1,9 @@
 #pragma once
 
+#include "agiru/Error.h"
+
 #include <compare>
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -114,9 +115,9 @@ Decimal Round(const Decimal &number,
               const Decimal &precision,
               RoundDirection direction = RoundDirection::Nearest);
 
-class DecimalError : public std::runtime_error {
+class DecimalError : public Error {
 public:
-  using std::runtime_error::runtime_error;
+  using Error::Error;
 };
 
 } // namespace agiru
