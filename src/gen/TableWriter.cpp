@@ -73,6 +73,10 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
+std::string KeyArrayName(std::size_t position) {
+  return "kKey" + std::to_string(position + 1);
+}
+
 bool IsEnumField(const al::FieldDecl &field) {
   return TypeName(field.type) == "Enum" && !field.subtype.empty();
 }
@@ -188,9 +192,10 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
 
   out += "namespace agiru::app {\n\n";
   for (const OptionField &option : options) {
+    const std::vector<std::string> names = EnumeratorNames(option.members);
     out += "enum class " + option.enumName + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < option.members.size(); ++i) {
-      out += "  " + EnumeratorName(option.members[i]) + " = " + std::to_string(i) + ",\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
     }
     out += "};\n\n";
   }
@@ -220,11 +225,17 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   }
   out += "  };\n\n";
 
-  for (const al::KeyDecl &key : table.keys) {
-    out += "  static constexpr std::array k" + Identifier(key.name) + "{";
-    for (std::size_t i = 0; i < key.fields.size(); ++i) {
-      if (i != 0) { out += ", "; }
-      out += "FieldNumber::" + Identifier(key.fields[i]);
+  // A KEY ARRAY IS NAMED BY ITS POSITION AND NOT BY ITS AL NAME. 19 of the BaseApp's keys are
+  // called `Name`, whose array would be `kName` -- which is already the table's own name constant,
+  // and a duplicate member the compiler refuses (measured 2026-09-01). A position cannot collide:
+  // the class declares exactly two other `k` constants, and no FIELD member can ever start with a
+  // lower-case k, since Identifier() upper-cases the first letter of every AL name. The AL name is
+  // not lost -- it stands beside the array in the KeyDef, which is where a reader looks for it.
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    out += "  static constexpr std::array " + KeyArrayName(i) + "{";
+    for (std::size_t f = 0; f < table.keys[i].fields.size(); ++f) {
+      if (f != 0) { out += ", "; }
+      out += "FieldNumber::" + Identifier(table.keys[i].fields[f]);
     }
     out += "};\n";
   }
@@ -266,10 +277,10 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   out += "};\n\n";
 
   out += "inline constexpr std::array k" + tableIdentifier + "Keys{\n";
-  for (const al::KeyDecl &key : table.keys) {
-    const al::Property *clustered = Find(key.properties, "Clustered");
-    out += "    KeyDef{.name = " + Literal(key.name) + ", .fields = " + tableIdentifier + "::k" +
-           Identifier(key.name) + ", .clustered = " +
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    const al::Property *clustered = Find(table.keys[i].properties, "Clustered");
+    out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableIdentifier +
+           "::" + KeyArrayName(i) + ", .clustered = " +
            (clustered != nullptr && clustered->text == "true" ? "true" : "false") + "},\n";
   }
   out += "};\n\n";

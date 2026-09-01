@@ -1,7 +1,11 @@
 #include "Check.h"
 #include "Names.h"
 
+#include <string>
+#include <vector>
+
 using agiru::gen::EnumeratorName;
+using agiru::gen::EnumeratorNames;
 using agiru::gen::Identifier;
 using agiru::gen::Literal;
 using agiru::gen::OptionEnumName;
@@ -56,6 +60,28 @@ void AlTextSurvivesBecomingACppLiteral() {
   CHECK_TEXT("and a percent sign is not a C++ escape at all", Literal("% Extra"), "\"% Extra\"");
 }
 
+/// TWO AL MEMBERS CAN SCRUB TO ONE IDENTIFIER. `Whse. Cross-Dock Opportunity` declares
+/// `OptionMembers = ,"Sales Order",,,,` -- a blank marking "none" and four reserved ordinals nobody
+/// filled in. Every one becomes `Blank`, and the second is a redefinition the compiler refuses.
+void CollidingEnumeratorsAreSeparatedByTheirOrdinal() {
+  const std::vector<std::string> members{"", "Sales Order", "", "", ""};
+  const std::vector<std::string> names = EnumeratorNames(members);
+
+  CHECK_TRUE("one name per member", names.size() == members.size());
+  CHECK_TEXT("the first blank keeps the bare name", names[0], "Blank");
+  CHECK_TEXT("a member that is a name keeps it", names[1], "SalesOrder");
+  CHECK_TEXT("and every later blank carries the ordinal AL gave it", names[2], "Blank2");
+  CHECK_TEXT("so no two are the same", names[3], "Blank3");
+  CHECK_TRUE("which is what the compiler needs",
+             names[0] != names[2] && names[2] != names[3] && names[3] != names[4]);
+
+  // THE NEGATIVE CONTROL. A rule that renamed unconditionally would also pass the checks above and
+  // would change 1047 option enumerations that have nothing wrong with them.
+  const std::vector<std::string> distinct = EnumeratorNames({"Resource", "Group(Resource)", "All"});
+  CHECK_TEXT("a list with no collision is left alone", distinct[0], "Resource");
+  CHECK_TEXT("and so is the rest of it", distinct[2], "All");
+}
+
 } // namespace
 
 int main() {
@@ -64,5 +90,6 @@ int main() {
     AnOptionMemberBecomesAnEnumerator();
     AnOptionFieldGetsItsOwnEnumeration();
     AlTextSurvivesBecomingACppLiteral();
+    CollidingEnumeratorsAreSeparatedByTheirOrdinal();
   });
 }

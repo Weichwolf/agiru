@@ -199,6 +199,28 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
                      .text.find("static constexpr FieldNo Code{") != std::string::npos);
 }
 
+/// A KEY NAMED `Name` WOULD GIVE `kName`, which is already the table's own name constant. 19 of the
+/// BaseApp's keys are called exactly that.
+void AKeyNamedLikeAClassConstantStillCompiles() {
+  const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
+
+  std::string renamed = original;
+  const std::size_t at = renamed.find("key(Key1;");
+  CHECK_TRUE("the source declares a key to rename", at != std::string::npos);
+  renamed.replace(at, std::string("key(Key1;").size(), "key(Name;");
+
+  const std::string generated =
+      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}).text;
+  CHECK_TRUE("the array is named by its position", generated.find("kKey1{") != std::string::npos);
+  CHECK_TRUE("and never by the AL key name",
+             generated.find("static constexpr std::array kName{") == std::string::npos);
+  CHECK_TRUE("while the AL name still stands beside it in the KeyDef",
+             generated.find(".name = \"Name\", .fields = ResourceCost::kKey1") !=
+                 std::string::npos);
+  CHECK_TRUE("and the table's own name constant is untouched",
+             generated.find("std::string_view kName{\"Resource Cost\"}") != std::string::npos);
+}
+
 } // namespace
 
 int main() {
@@ -208,5 +230,6 @@ int main() {
     AChangedSourceChangesTheOutput();
     AChangedStatementChangesTheBody();
     AFieldThatShadowsARuntimeTypeStillCompiles();
+    AKeyNamedLikeAClassConstantStillCompiles();
   });
 }

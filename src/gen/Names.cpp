@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -62,6 +64,23 @@ std::string Identifier(std::string_view alName) {
 std::string EnumeratorName(std::string_view optionMember) {
   const std::string name = Join(Words(optionMember));
   return name.empty() ? "Blank" : name;
+}
+
+// TWO MEMBERS CAN SCRUB TO ONE IDENTIFIER, AND 24 TABLES DO IT. `OptionMembers = ,"Sales Order",,,`
+// is ordinary in the BaseApp -- a blank member marks "none" and later blanks are reserved ordinals
+// that were never filled in. Every one of them becomes `Blank`, and the second is a redefinition
+// the compiler refuses (measured 2026-09-01). The ORDINAL disambiguates, because it is the one
+// thing that is already unique and already meaningful: the first keeps the bare name and each
+// later collision carries the number AL gave it.
+std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members) {
+  std::vector<std::string> names;
+  names.reserve(members.size());
+  for (std::size_t i = 0; i < members.size(); ++i) {
+    std::string name = EnumeratorName(members[i]);
+    if (std::ranges::find(names, name) != names.end()) { name += std::to_string(i); }
+    names.push_back(std::move(name));
+  }
+  return names;
 }
 
 std::string OptionEnumName(std::string_view tableName, std::string_view fieldName) {

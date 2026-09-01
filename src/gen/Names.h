@@ -2,12 +2,15 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
 
 std::string EnumeratorName(std::string_view optionMember);
+
+std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members);
 
 std::string OptionEnumName(std::string_view tableName, std::string_view fieldName);
 
