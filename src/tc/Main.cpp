@@ -1,6 +1,7 @@
 #include "Apps.h"
 #include "Ast.h"
 #include "BodyWriter.h"
+#include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Parser.h"
@@ -188,6 +189,11 @@ void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
   }
 }
 
+std::string TableHeaderPath(const agiru::al::TableObject &table) {
+  return agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
+         agiru::gen::Identifier(table.name) + ".h";
+}
+
 void WriteTable(Run &run,
                 const agiru::al::TableObject &table,
                 const std::string &relative,
@@ -207,6 +213,7 @@ void WriteTable(Run &run,
 void ScanTables(Run &run,
                 Counts &counts,
                 const agiru::gen::EnumIndex &index,
+                agiru::gen::TableIndex &tables,
                 std::map<std::string, std::size_t> &unresolved) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
     ++counts.files;
@@ -214,6 +221,12 @@ void ScanTables(Run &run,
       const agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++counts.parsed;
       counts.members += table.fields.size();
+      // BY NAME AND BY NUMBER BOTH, because AL names an object either way and test code uses the
+      // number freely: `var GLEntry: Record 17`.
+      const agiru::gen::TableRef ref{.identifier = agiru::gen::Identifier(table.name),
+                                     .header = TableHeaderPath(table)};
+      tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
+      tables.insert_or_assign(std::to_string(table.id), ref);
       if (!run.output.empty()) {
         WriteTable(
             run, table, std::filesystem::relative(path, run.root).string(), index, unresolved);
@@ -254,7 +267,10 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
   return found.tests != 0 ? found : UnitTestPopulation{};
 }
 
-void ScanCodeunits(Run &run, Counts &counts) {
+void ScanCodeunits(Run &run,
+                   Counts &counts,
+                   const agiru::gen::TableIndex &tables,
+                   std::map<std::string, std::size_t> &unresolved) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
     ++counts.files;
     const std::string source = Read(path);
@@ -265,6 +281,14 @@ void ScanCodeunits(Run &run, Counts &counts) {
       const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(source);
       ++counts.parsed;
       counts.members += unit.procedures.size();
+      if (!run.output.empty()) {
+        const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(
+            unit, std::filesystem::relative(path, run.root).string(), tables);
+        for (const std::string &missing : header.unresolvedTables) { ++unresolved[missing]; }
+        Write(Output{.directory = run.output, .relative = agiru::gen::CodeunitHeaderPath(unit)},
+              header.text);
+        ++run.written;
+      }
       std::size_t tests = 0;
       for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
         if (agiru::al::HasAttribute(procedure, "Test")) { ++tests; }
@@ -337,6 +361,7 @@ int Scan(const Job &job) {
 
   std::map<std::string, std::size_t> unresolved;
   agiru::gen::EnumIndex index;
+  agiru::gen::TableIndex objects;
   Counts allEnums;
   Counts allTables;
   Counts allCodeunits;
@@ -358,8 +383,8 @@ int Scan(const Job &job) {
     Counts codeunits;
     ClaimApp(run.output);
     ScanEnums(run, enums, index);
-    ScanTables(run, tables, index, unresolved);
-    ScanCodeunits(run, codeunits);
+    ScanTables(run, tables, index, objects, unresolved);
+    ScanCodeunits(run, codeunits, objects, unresolved);
 
     std::println("{:<11}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
                  app.name,

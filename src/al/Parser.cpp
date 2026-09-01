@@ -88,7 +88,7 @@ public:
       }
       if (AtKeyword("var")) {
         Advance();
-        ParseVarsInto(unit.labels);
+        ParseVarsInto(unit.labels, unit.variables);
         continue;
       }
       if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
@@ -149,6 +149,7 @@ private:
       procedure.isLocal = procedure.isLocal || AtKeyword("local");
       Advance();
     }
+    procedure.isTrigger = AtKeyword("trigger");
     if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("event")) { Advance(); }
     procedure.name = ExpectName();
     // A DotNet event receiver names its trigger through the variable it listens on:
@@ -166,9 +167,13 @@ private:
         parameter.byReference = true;
         Advance();
       }
-      parameter.name = ExpectName();
+      std::string name;
+      name = ExpectName();
       Expect(":");
-      parameter.type = ReadTypeName();
+      const bool byReference = parameter.byReference;
+      parameter = ReadType();
+      parameter.byReference = byReference;
+      parameter.name = std::move(name);
       procedure.parameters.push_back(std::move(parameter));
       if (AtPunctuation(";")) { Advance(); }
     }
@@ -178,10 +183,13 @@ private:
     }
     if (AtPunctuation(":")) {
       Advance();
-      procedure.returnType = ReadTypeName();
+      const VarDecl returned = ReadType();
+      procedure.returnType = returned.type;
+      procedure.returnSubtype = returned.subtype;
     }
     if (AtPunctuation(";")) { Advance(); }
-    procedure.tokens = SkipBeginEnd();
+    std::vector<LabelDecl> locals;
+    procedure.tokens = SkipBeginEnd(locals, procedure.variables);
     procedure.body = ParseStatements(procedure.tokens);
     return procedure;
   }
@@ -204,46 +212,64 @@ private:
     }
   }
 
-  void SkipSubtypeName() {
-    if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return; }
+  std::string ReadSubtypeName() {
+    if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return {}; }
     // AL names an object by NAME or by NUMBER, and both are legal in a subtype:
     // `var GLEntry: Record 17` is `Record "G/L Entry"`. Test code uses the number freely.
     if (Peek().kind == TokenKind::Integer) {
+      std::string number = Peek().text;
       Advance();
-      return;
+      return number;
     }
-    (void)ExpectName();
+    std::string name = ExpectName();
     while (AtPunctuation(".")) {
       Advance();
-      (void)ExpectName();
+      name = ExpectName();
     }
+    return name;
   }
 
-  std::string ReadTypeName() {
+  // ONE READER FOR A TYPE, AND IT KEEPS WHAT IT READS. The subtype is what turns `Record` into a
+  // class and `Codeunit` into another object, the length is what turns `Text` into `Text<N>`, and
+  // `temporary` is what turns a record into one with no database behind it. Discarding them made a
+  // type name enough for counting and not enough for emitting.
+  VarDecl ReadType() {
+    VarDecl declared;
     while (AtKeyword("array")) {
       Advance();
       if (AtPunctuation("[")) { SkipBracketed(); }
       Expect("of");
     }
-    std::string type = ExpectName();
+    declared.type = ExpectName();
     if (AtKeyword("of")) {
       Advance();
       SkipBracketed();
-      return type;
+      return declared;
     }
-    if (SameName(type, "Option")) {
+    if (SameName(declared.type, "Option")) {
       SkipOptionMembers();
-      return type;
+      return declared;
     }
     if (AtPunctuation("[")) {
-      SkipBracketed();
+      Advance();
+      if (Peek().kind == TokenKind::Integer) {
+        declared.length = std::stoi(Peek().text);
+        Advance();
+      }
+      while (!AtEnd() && !AtPunctuation("]")) { Advance(); }
+      Expect("]");
     } else if (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier ||
                Peek().kind == TokenKind::Integer) {
-      SkipSubtypeName();
+      declared.subtype = ReadSubtypeName();
     }
-    while (AtKeyword("temporary")) { Advance(); }
-    return type;
+    while (AtKeyword("temporary")) {
+      declared.temporary = true;
+      Advance();
+    }
+    return declared;
   }
+
+  std::string ReadTypeName() { return ReadType().type; }
 
   std::string ReadAttribute() {
     Expect("[");
@@ -262,9 +288,18 @@ private:
   // lexer. Without `var` in this list the keyword was read as a variable NAME and the block after
   // it was lost with the rest of the file.
   void ParseVarsInto(std::vector<LabelDecl> &labels) {
-    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("trigger") &&
-           !AtKeyword("procedure") && !AtKeyword("local") && !AtKeyword("internal") &&
-           !AtKeyword("protected")) {
+    std::vector<VarDecl> discarded;
+    ParseVarsInto(labels, discarded);
+  }
+
+  void ParseVarsInto(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
+    // AND AT `begin`, because this now reads a PROCEDURE'S OWN var block as well as a codeunit's.
+    // The codeunit-level block never meets one; a local block always does, and without it the
+    // declarations ran straight into the body -- 3877 codeunits down to 380 in one run, which the
+    // population baseline caught on the spot.
+    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("begin") &&
+           !AtKeyword("trigger") && !AtKeyword("procedure") && !AtKeyword("local") &&
+           !AtKeyword("internal") && !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
         if (!VariableFollowsAttribute()) { return; }
         (void)ReadAttribute();
@@ -278,12 +313,23 @@ private:
         names.push_back(ExpectName());
       }
       Expect(":");
-      const std::string type = ExpectName();
-      if (SameName(type, "Label") && Peek().kind == TokenKind::String) {
-        for (const std::string &name : names) {
-          labels.push_back(LabelDecl{.name = name, .text = Peek().text});
-        }
+      // A LABEL IS NOT A VARIABLE, and AL declares them in the same block. A Label is a constant
+      // string with a caption and translations behind it; everything else is state.
+      if (AtKeyword("Label")) {
         Advance();
+        if (Peek().kind == TokenKind::String) {
+          for (const std::string &name : names) {
+            labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+          }
+          Advance();
+        }
+      } else {
+        const VarDecl declared = ReadType();
+        for (const std::string &name : names) {
+          VarDecl one = declared;
+          one.name = name;
+          variables.push_back(std::move(one));
+        }
       }
       while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
       Expect(";");
@@ -417,13 +463,21 @@ private:
     (void)SkipBeginEnd();
   }
 
-  void SkipLocalVars() {
+  void ReadLocalVars(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
     if (!AtKeyword("var")) { return; }
-    while (!AtEnd() && !AtKeyword("begin")) { Advance(); }
+    Advance();
+    ParseVarsInto(labels, variables);
   }
 
+  /// A body whose local declarations are thrown away -- a table trigger, or a member being skipped.
   std::vector<Token> SkipBeginEnd() {
-    SkipLocalVars();
+    std::vector<LabelDecl> labels;
+    std::vector<VarDecl> variables;
+    return SkipBeginEnd(labels, variables);
+  }
+
+  std::vector<Token> SkipBeginEnd(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
+    ReadLocalVars(labels, variables);
     Expect("begin");
     std::vector<Token> body;
     int depth = 1;

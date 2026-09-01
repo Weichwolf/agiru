@@ -42,21 +42,29 @@ struct LabelDecl {
   std::string text;
 };
 
-struct Parameter {
-  bool byReference = false;
+// AL DECLARES A PARAMETER AND A VARIABLE WITH THE SAME GRAMMAR, and the only difference is that a
+// parameter may carry `var`. One shape for both, so that the generator emits them the same way.
+struct VarDecl {
+  bool byReference = false; ///< AL `var` -- only a parameter can be.
+  bool temporary = false;   ///< AL `temporary` -- a record with no database behind it.
   std::string name;
   std::string type;
   std::string subtype;
   int length = 0;
 };
 
+using Parameter = VarDecl;
+
 struct ProcedureDecl {
   std::vector<std::string> attributes;
   bool isLocal = false;
+  bool isTrigger = false; ///< AL `trigger` -- the platform calls it, nobody else does.
   std::string name;
   std::vector<Parameter> parameters;
+  std::vector<VarDecl> variables;
   std::string returnName;
   std::string returnType;
+  std::string returnSubtype;
   std::vector<Token> tokens;
   std::vector<Stmt> body;
 };
@@ -67,6 +75,7 @@ struct CodeunitObject {
   std::string nameSpace;
   std::vector<Property> properties;
   std::vector<ProcedureDecl> procedures;
+  std::vector<VarDecl> variables;
   std::vector<LabelDecl> labels;
 };
 
