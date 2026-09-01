@@ -107,6 +107,13 @@ public:
   /// rather than an oversight.
   void Run(std::string_view sql, std::span<const std::optional<std::string>> params = {}) const;
 
+  /// \return True when a transaction block is open on this connection.
+  ///
+  /// A SAVEPOINT NEEDS ONE AND libpq DOES NOT OPEN IT. Outside a transaction block every statement
+  /// commits on its own, `SAVEPOINT` is an error, and a boundary that rolled back nothing would
+  /// look exactly like one that worked.
+  [[nodiscard]] bool InTransaction() const;
+
 private:
   void *handle_;
 };

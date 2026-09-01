@@ -186,14 +186,13 @@ private:
         throw std::runtime_error("a case branch stands only inside a case");
       case al::StmtKind::With:
         throw std::runtime_error("AL `with` needs the members it opens to be resolved first");
-      // A FAILURE IS LOUD. `asserterror` is not "run the statement and ignore what happens": it
-      // expects the statement to raise, captures the text where GetLastErrorText reads it, and
-      // rolls the write set back to the enclosing boundary. Emitting the statement bare would make
-      // a test that asserts an error pass by not raising one, which is the worst possible way to be
-      // wrong about a test suite. Refused until board:0021 gives it a boundary to roll back to.
+      // `asserterror <stmt>` is the statement inside a boundary that EXPECTS it to raise: the text
+      // is captured where GetLastErrorText reads it, the write set is discarded, and execution
+      // carries on. A lambda is what carries the statement in, and it reads as what it is.
       case al::StmtKind::AssertError:
-        throw std::runtime_error(
-            "AL `asserterror` needs the transaction boundary it reads (board:0021)");
+        out = Pad(indent) + "AssertError([&] {\n" + Statements(statement.body, indent + 2) +
+              Pad(indent) + "});\n";
+        break;
       case al::StmtKind::Exit:
         out = Pad(indent) + "return" +
               (statement.expression.kind == al::ExprKind::Name && statement.expression.text.empty()

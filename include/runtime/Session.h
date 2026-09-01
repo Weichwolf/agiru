@@ -2,6 +2,7 @@
 
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/Transaction.h"
 
 #include <string>
 
@@ -54,8 +55,16 @@ public:
   /// \return The session's database connection.
   [[nodiscard]] const Connection &Database() const { return connection_; }
 
+  /// \return The nested transaction boundaries this session is inside.
+  ///
+  /// \note A SESSION AND ITS BOUNDARIES ARE ONE THING, which is why they live together. A savepoint
+  ///       taken on a connection other than the one the statements run on rolls back nothing
+  ///       (board:0012), and holding both here is what makes handing the wrong one impossible.
+  [[nodiscard]] Boundaries &Transaction() { return boundaries_; }
+
 private:
   Connection connection_;
+  Boundaries boundaries_;
   Session *previous_;
 };
 

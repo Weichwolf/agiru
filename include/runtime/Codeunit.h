@@ -1,21 +1,13 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "runtime/Error.h"
+#include "runtime/Transaction.h"
 
 #include <string_view>
 
 /// \file
 /// \brief The base every generated AL codeunit stands on.
-
-/// \brief The platform half of a codeunit run. Not part of the door's vocabulary.
-namespace agiru::detail {
-
-/// \brief Refuses a run, naming the codeunit and the item that will make it possible.
-/// \param name The codeunit's AL name.
-/// \throws Error always.
-[[noreturn]] void RefuseRun(std::string_view name);
-
-} // namespace agiru::detail
 
 namespace agiru {
 
@@ -64,13 +56,21 @@ public:
   ///
   /// \return True when `OnRun` completed; false when it raised.
   ///
-  /// \warning NOT IMPLEMENTED, AND IT REFUSES RATHER THAN PRETENDING. `Codeunit.Run` is where AL's
-  ///          error handling lives: an error inside rolls the database back to the point the run
-  ///          began and returns false, which is why `if not Codeunit.Run(...) then` is the AL idiom
-  ///          for "try this" and why `asserterror` can read what happened. Returning true after
-  ///          calling `OnRun` directly would make every one of those tests pass for the wrong
-  ///          reason. It needs a nested savepoint on the session's pinned connection (board:0021).
-  [[nodiscard]] bool Run() { detail::RefuseRun(Name()); }
+  /// \warning THE RETURN VALUE IS THE ERROR HANDLING. `Codeunit.Run` does not propagate: an error
+  ///          inside rolls the database back to the point the run began and reports `false`, which
+  ///          is why `if not Codeunit.Run(...) then` is AL's idiom for "try this". The text is left
+  ///          where `GetLastErrorText()` reads it.
+  [[nodiscard]] bool Run() {
+    detail::Scope scope;
+    try {
+      static_cast<Derived *>(this)->OnRun();
+    } catch (const Error &e) {
+      scope.Discard(e.what());
+      return false;
+    }
+    scope.Keep();
+    return true;
+  }
 
   /// \brief AL `Codeunit.Run(Record)` -- the same, with a record handed to the object first.
   ///
@@ -78,10 +78,17 @@ public:
   /// \param  rec    The record.
   /// \return True when `OnRun` completed; false when it raised.
   ///
-  /// \warning Refused for the reason Run() gives (board:0021).
+  /// \warning Reports rather than propagates, for the reason Run() gives.
   template <typename Record> [[nodiscard]] bool Run(Record &rec) {
-    static_cast<void>(rec);
-    detail::RefuseRun(Name());
+    detail::Scope scope;
+    try {
+      static_cast<Derived *>(this)->OnRun(rec);
+    } catch (const Error &e) {
+      scope.Discard(e.what());
+      return false;
+    }
+    scope.Keep();
+    return true;
   }
 
 private:

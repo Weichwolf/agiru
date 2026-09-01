@@ -32,17 +32,17 @@ void TheCodeunitKnowsWhatAlNamedIt() {
   CHECK_TEXT("and so does the name", std::string(codeunit.Name()), "Transfer Old Ext. Text Lines");
 }
 
-/// A REFUSAL IS NOT A STUB, and this is the difference. Both of these are load-bearing AL
-/// mechanisms with nothing behind them yet, and both say so instead of appearing to work.
+/// `Codeunit.Run` OPENS A TRANSACTION BOUNDARY on the session's own pinned connection, so outside
+/// a session there is nothing to open. That is a defect in the HOST rather than in AL code -- an AL
+/// statement can only run inside a session -- which is why it raises rather than reporting false.
 void WhatIsNotBuiltYetRefusesRatherThanPretending() {
   TransferOldExtTextLines codeunit;
   std::string said;
   try {
     (void)codeunit.Run();
   } catch (const Error &e) { said = e.what(); }
-  CHECK_TRUE("Codeunit.Run refuses", !said.empty());
-  CHECK_TRUE("and names the item that will make it work",
-             said.find("board:0021") != std::string::npos);
+  CHECK_TRUE("Codeunit.Run outside a session refuses", !said.empty());
+  CHECK_TRUE("saying it is the session that is missing", said.find("session") != std::string::npos);
 
   said.clear();
   try {

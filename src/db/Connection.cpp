@@ -113,3 +113,12 @@ void Connection::Run(std::string_view sql,
 }
 
 } // namespace agiru
+
+namespace agiru {
+
+bool Connection::InTransaction() const {
+  const PGTransactionStatusType status = PQtransactionStatus(static_cast<PGconn *>(handle_));
+  return status == PQTRANS_INTRANS || status == PQTRANS_INERROR;
+}
+
+} // namespace agiru
