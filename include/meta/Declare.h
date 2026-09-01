@@ -7,11 +7,13 @@
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Enum.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
+#include "type/Time.h"
 
 #include <array>
 #include <cstddef>
@@ -72,6 +74,20 @@ struct FieldTypeOf<T> {
 template <> struct FieldTypeOf<Date> {
   static constexpr FieldType kType = FieldType::Date;       ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;               ///< A date declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Time` -- a time of day, in milliseconds since midnight.
+template <> struct FieldTypeOf<Time> {
+  static constexpr FieldType kType = FieldType::Time;       ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A time declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `DateTime` -- an instant in UTC, in milliseconds.
+template <> struct FieldTypeOf<DateTime> {
+  static constexpr FieldType kType = FieldType::DateTime;   ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A DateTime declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
 };
 

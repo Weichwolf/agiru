@@ -15,6 +15,7 @@
 #include "type/Byte.h"
 #include "type/Code.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
 #include "type/Enum.h"
@@ -22,6 +23,7 @@
 #include "type/Option.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
+#include "type/Time.h"
 
 /// \file
 /// \brief The door. One line, and an app has all of AL.

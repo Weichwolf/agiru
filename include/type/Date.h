@@ -76,6 +76,20 @@ public:
     return IsUndefined() ? *this : FromSerial(serial_ & ~1);
   }
 
+  /// \brief Builds a normal date from its position in the range.
+  /// \param days Days since 1753-01-01.
+  /// \return The date, or the undefined date when the count falls outside the range.
+  /// \note This is what a DateTime splits itself on, and it is why the count is public.
+  [[nodiscard]] static constexpr Date FromDaysSinceFirst(std::int32_t days) {
+    if (days < 0 || days > kLastDayIndex) { return Date{}; }
+    return FromSerial((days + 1) * 2);
+  }
+
+  /// \return Days since 1753-01-01, or -1 when undefined. A closing date answers with its own day.
+  [[nodiscard]] constexpr std::int32_t DaysSinceFirst() const {
+    return IsUndefined() ? -1 : (serial_ / 2) - 1;
+  }
+
   /// \return True for `0D`.
   [[nodiscard]] constexpr bool IsUndefined() const { return serial_ == 0; }
 
@@ -174,6 +188,9 @@ public:
 private:
   static constexpr std::chrono::sys_days kEpoch{std::chrono::year{kFirstYear} /
                                                 std::chrono::January / 1};
+  static constexpr std::int32_t kLastDayIndex = static_cast<std::int32_t>(
+      (std::chrono::sys_days{std::chrono::year{kLastYear} / std::chrono::December / 31} - kEpoch)
+          .count());
   static constexpr int kDaysPerWeek = 7;
   /// Thursday's ISO weekday number, which is the day that decides which year a week belongs to.
   static constexpr int kThursday = 4;

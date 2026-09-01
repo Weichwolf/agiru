@@ -79,6 +79,9 @@ std::string ColumnType(const FieldDef &def) {
     // which is the whole ordering a fiscal-year close depends on. The undefined date is "the
     // earliest valid date in SQL Server", 1753-01-01 00:00:00:000.
     case FieldType::Date: return "timestamp";
+    // A `time` column holds everything an AL Time can, so unlike Date there is nothing to work
+    // around: `time-data-type.md` describes SQL Server storing it in a datetime with the constant
+    // date 01-01-1754, and that constant carries no information.
     case FieldType::Time: return "time";
     case FieldType::DateTime: return "timestamp";
     case FieldType::Guid: return "uuid";

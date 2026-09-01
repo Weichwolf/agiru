@@ -5,7 +5,9 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Time.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -42,6 +44,10 @@ std::string FieldText(const void *record, const FieldDef &def) {
       return reinterpret_cast<const Decimal *>(At(record, def))->ToInvariantString();
     case FieldType::Date:
       return reinterpret_cast<const Date *>(At(record, def))->ToInvariantString();
+    case FieldType::Time:
+      return reinterpret_cast<const Time *>(At(record, def))->ToInvariantString();
+    case FieldType::DateTime:
+      return reinterpret_cast<const DateTime *>(At(record, def))->ToInvariantString();
     case FieldType::Option:
     case FieldType::Enum:
       return detail::MemberText(
@@ -58,6 +64,9 @@ bool IsBlank(const void *record, const FieldDef &def) {
     // `date-data-type.md`: the undefined date IS the blank one, and it is what a date field holds
     // until something writes to it.
     case FieldType::Date: return reinterpret_cast<const Date *>(At(record, def))->IsUndefined();
+    case FieldType::Time: return reinterpret_cast<const Time *>(At(record, def))->IsUndefined();
+    case FieldType::DateTime:
+      return reinterpret_cast<const DateTime *>(At(record, def))->IsUndefined();
     case FieldType::Option:
     case FieldType::Enum:
       return reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger() == 0;
