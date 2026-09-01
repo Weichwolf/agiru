@@ -127,9 +127,9 @@ void AChangedSourceChangesTheOutput() {
   const std::string generated =
       agiru::gen::WriteHeader(agiru::al::ParseTable(widened), std::string(kAlPath), {}).text;
   CHECK_TRUE("a widened field widens its member",
-             generated.find("::agiru::Code<30> Code;") != std::string::npos);
+             generated.find("::agiru::Code<30> Code{};") != std::string::npos);
   CHECK_TRUE("and the old width is gone",
-             generated.find("::agiru::Code<20> Code;") == std::string::npos);
+             generated.find("::agiru::Code<20> Code{};") == std::string::npos);
 
   std::string renamed = original;
   const std::size_t nameAt = renamed.find("\"Work Type Code\"");
@@ -139,7 +139,7 @@ void AChangedSourceChangesTheOutput() {
   const std::string afterRename =
       agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}).text;
   CHECK_TRUE("a renamed field renames its member and its number",
-             afterRename.find("WorkKindCode;") != std::string::npos &&
+             afterRename.find("WorkKindCode{};") != std::string::npos &&
                  afterRename.find("FieldNo WorkKindCode{3}") != std::string::npos);
   CHECK_TRUE("and the AL name follows it into the field table",
              afterRename.find("\"Work Kind Code\"") != std::string::npos);
@@ -191,7 +191,7 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
   const std::string generated =
       agiru::gen::WriteHeader(agiru::al::ParseTable(collided), std::string(kAlPath), {}).text;
   CHECK_TRUE("the field takes the name AL gave it",
-             generated.find("FieldNo;") != std::string::npos);
+             generated.find("FieldNo{};") != std::string::npos);
   CHECK_TRUE("and the field numbers reach past it to the runtime type",
              generated.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
   CHECK_TRUE("while a table with no such field says it plainly",

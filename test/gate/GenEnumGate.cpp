@@ -82,7 +82,8 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
   const agiru::gen::TableHeader header =
       agiru::gen::WriteHeader(table, std::string(kTablePath), IndexOf(object));
 
-  CHECK_TRUE("the field takes the enum type", Has(header.text, "Enum<enums::SalesLineType> Type;"));
+  CHECK_TRUE("the field takes the enum type",
+             Has(header.text, "Enum<enums::SalesLineType> Type{};"));
   CHECK_TRUE("and the header that declares it is included",
              Has(header.text, "#include \"sales/document/enum/SalesLineType.h\""));
   CHECK_TRUE("and the door comes as ONE line, the way an AL file declares no includes at all",

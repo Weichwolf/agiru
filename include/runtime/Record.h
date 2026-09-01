@@ -8,6 +8,7 @@
 #include "type/Option.h"
 #include "type/Text.h"
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -34,6 +35,18 @@ namespace agiru {
 /// Addressing the record as bytes plus an offset is what makes this work for every table without a
 /// virtual call and without the runtime knowing a single AL object.
 [[nodiscard]] std::string FieldText(const void *record, const FieldDef &def);
+
+/// \brief Orders one field of two records of the same table.
+///
+/// \param a   One record.
+/// \param b   The other.
+/// \param def The field, which decides how the two values are compared.
+/// \return The ordering.
+///
+/// \warning BY TYPE AND NEVER BY TEXT. Rendering both sides and comparing the strings orders "10"
+///          before "9", which is the wrong walk order for every table keyed on an entry number --
+///          and wrong silently, because both orders look plausible until the numbers reach ten.
+[[nodiscard]] std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &def);
 
 /// \brief Tests whether a field holds the blank of its type.
 ///

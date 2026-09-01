@@ -49,12 +49,12 @@ public:
   static constexpr TableId kId{202};
   static constexpr std::string_view kName{"Resource Cost"};
 
-  Option<ResourceCostType> Type;
-  ::agiru::Code<20> Code;
-  ::agiru::Code<10> WorkTypeCode;
-  Option<ResourceCostCostType> CostType;
-  Decimal DirectUnitCost;
-  Decimal UnitCost;
+  Option<ResourceCostType> Type{};
+  ::agiru::Code<20> Code{};
+  ::agiru::Code<10> WorkTypeCode{};
+  Option<ResourceCostCostType> CostType{};
+  Decimal DirectUnitCost{};
+  Decimal UnitCost{};
 
   struct FieldNumber {
     static constexpr FieldNo Type{1};

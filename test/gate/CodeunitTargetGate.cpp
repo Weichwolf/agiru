@@ -44,13 +44,14 @@ void WhatIsNotBuiltYetRefusesRatherThanPretending() {
   CHECK_TRUE("Codeunit.Run outside a session refuses", !said.empty());
   CHECK_TRUE("saying it is the session that is missing", said.find("session") != std::string::npos);
 
+  // A TEMPORARY RECORD NEEDS NO SESSION AT ALL, which is the whole point of one: it is the same
+  // table with no database behind it, so the codeunit's own buffer works outside a session where
+  // every other record operation cannot.
   said.clear();
   try {
     codeunit.ClearLineNumbers();
   } catch (const Error &e) { said = e.what(); }
-  CHECK_TRUE("a temporary record refuses too", !said.empty());
-  CHECK_TRUE("and names its own item", said.find("board:0020") != std::string::npos);
-  CHECK_TRUE("saying which AL method it was", said.find("DeleteAll") != std::string::npos);
+  CHECK_SILENT("a temporary record works with no session open", said);
 }
 
 /// The negative control for the refusals: what IS built must not refuse. A procedure that touches
@@ -65,15 +66,21 @@ void WhatIsBuiltDoesNotRefuse() {
 
   // And an event publisher with no subscribers does nothing, which is correct rather than a stub:
   // AL fires subscribers at the CALL SITE, so the publisher's own body has nothing to do.
-  constexpr agiru::Integer kMarker = 7;
+  // AND THE CODEUNIT'S OWN BUFFER WORKS END TO END, which is what a walking skeleton is for: the
+  // hand-written specification is a running object, not a shape.
+  constexpr agiru::Integer kOld = 7;
+  constexpr agiru::Integer kNew = 11;
+  CHECK_TRUE("a line number that was never transferred is 0", codeunit.GetNewLineNumber(kOld) == 0);
+  CHECK_TRUE("transferring one with no attachment answers 0",
+             codeunit.TransferExtendedText(kOld, kNew, 0) == 0);
+  CHECK_TRUE("and the new number can be found by the old one",
+             codeunit.GetNewLineNumber(kOld) == kNew);
+
   agiru::Temporary<LineNumberBuffer> buffer;
-  buffer.OldLineNumber = kMarker;
-  said.clear();
-  try {
-    codeunit.GetLineNoBuffer(buffer);
-  } catch (const Error &e) { said = e.what(); }
-  CHECK_TRUE("reaching a temporary record refuses wherever it happens", !said.empty());
-  CHECK_TRUE("and the record it refused on is untouched", buffer.OldLineNumber == kMarker);
+  codeunit.GetLineNoBuffer(buffer);
+  CHECK_TRUE("the buffer handed out shares the store", buffer.Count() == 1);
+  codeunit.ClearLineNumbers();
+  CHECK_TRUE("so clearing it through the codeunit empties the shared one too", buffer.Count() == 0);
 }
 
 } // namespace

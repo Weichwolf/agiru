@@ -62,15 +62,55 @@ template <typename Body> int Run(const char *suite, Body body) {
 
 } // namespace gate
 
+/// EACH CHECK EVALUATES ITS ARGUMENTS ONCE, and the macros hand them to a FUNCTION rather than
+/// expanding into a block. Written twice -- for the verdict and for the text -- a check whose
+/// condition had a side effect ran it twice: an insert inserted the row, inserted it again, and
+/// reported "the record already exists" from a line that looked correct. Written as a
+/// `do { } while (false)`, every check counted as a loop against the complexity limit and every
+/// string argument was copied. A function does neither.
+namespace gate {
+
+/// Reports a truth claim.
+/// \param claim What the case asserts.
+/// \param held  Whether it holds.
+/// \param file  The source file.
+/// \param line  The source line.
+inline void ReportTruth(std::string_view claim, bool held, const char *file, int line) {
+  Report(held, claim, held ? "true" : "false", "true", file, line);
+}
+
+/// Reports a text comparison.
+/// \param claim  What the case asserts.
+/// \param seen   What was produced.
+/// \param wanted What was expected.
+/// \param file   The source file.
+/// \param line   The source line.
+inline void ReportText(std::string_view claim,
+                       std::string_view seen,
+                       std::string_view wanted,
+                       const char *file,
+                       int line) {
+  Report(seen == wanted, claim, seen, wanted, file, line);
+}
+
+/// Reports that something raised nothing, keeping the message when it did.
+/// \param claim What the case asserts.
+/// \param said  The message, empty when nothing was raised.
+/// \param file  The source file.
+/// \param line  The source line.
+inline void
+ReportSilence(std::string_view claim, std::string_view said, const char *file, int line) {
+  Report(said.empty(), claim, said, "no error", file, line);
+}
+
+} // namespace gate
+
 /// A case states what it CLAIMS, not merely what it compares -- a red line without a claim forces
 /// the reader into the source.
-#define CHECK_TEXT(claim, got, want)                                                               \
-  gate::Report((got) == (want), (claim), (got), (want), __FILE__, __LINE__)
+#define CHECK_TEXT(claim, got, want) gate::ReportText((claim), (got), (want), __FILE__, __LINE__)
 
-#define CHECK_TRUE(claim, cond)                                                                    \
-  gate::Report((cond), (claim), (cond) ? "true" : "false", "true", __FILE__, __LINE__)
+#define CHECK_TRUE(claim, cond) gate::ReportTruth((claim), (cond), __FILE__, __LINE__)
 
 /// For a claim that something raises NOTHING. It keeps the message in the failure output, which a
 /// plain truth check would throw away exactly when it is needed.
-#define CHECK_SILENT(claim, got)                                                                   \
-  gate::Report((got).empty(), (claim), (got), "no error", __FILE__, __LINE__)
+#define CHECK_SILENT(claim, got) gate::ReportSilence((claim), (got), __FILE__, __LINE__)

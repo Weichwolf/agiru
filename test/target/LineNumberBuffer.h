@@ -17,8 +17,8 @@ public:
   static constexpr TableId kId{283};
   static constexpr std::string_view kName{"Line Number Buffer"};
 
-  Integer OldLineNumber;
-  Integer NewLineNumber;
+  Integer OldLineNumber{};
+  Integer NewLineNumber{};
 
   struct FieldNumber {
     static constexpr FieldNo OldLineNumber{1};

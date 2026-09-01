@@ -4,11 +4,17 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "type/Integer.h"
 #include "type/Option.h"
 
+#include <algorithm>
+#include <compare>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 /// \file
 /// \brief The base every generated AL table stands on.
@@ -58,10 +64,35 @@ bool RuntimeGet(void *record, const TableDef &table);
 /// \throws Error when the value does not fit the field, or the type has no reader yet.
 void SetFieldText(void *record, const FieldDef &def, std::string_view text);
 
-/// \brief Refuses an operation on a temporary record.
-/// \param what The AL method name.
-/// \throws Error always.
-[[noreturn]] void RefuseTemporary(std::string_view what);
+/// \brief Orders two records of the same table by their primary key.
+///
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when `a` sorts before `b`.
+///
+/// The key fields are read through the field table, in the order the primary key declares them,
+/// and compared BY TYPE, which is the ordering the database gives and the one AL walks in.
+template <typename T> bool ByKey(const T &a, const T &b) {
+  const TableDef &table = TableTraits<T>::kTable;
+  if (table.keys.empty()) { return false; }
+  for (const FieldNo no : table.keys[0].fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    const std::strong_ordering order = CompareField(&a, &b, *def);
+    if (order != std::strong_ordering::equal) { return order == std::strong_ordering::less; }
+  }
+  return false;
+}
+
+/// \brief Whether two records of the same table carry the same primary key.
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when neither sorts before the other.
+template <typename T> bool SameKey(const T &a, const T &b) {
+  return !ByKey(a, b) && !ByKey(b, a);
+}
 
 } // namespace detail
 
@@ -115,13 +146,8 @@ public:
   /// \return True when the record was found; the record is unchanged otherwise beyond the key.
   /// \throws Error when the argument count does not match the primary key.
   template <typename... Keys> bool Get(const Keys &...keys) {
-    const TableDef &table = TableTraits<Derived>::kTable;
-    if (table.keys.empty() || table.keys[0].fields.size() != sizeof...(Keys)) {
-      throw Error("Get: the argument count does not match the primary key");
-    }
-    std::size_t position = 0;
-    (AssignKey(table, position++, keys), ...);
-    return detail::RuntimeGet(Self(), table);
+    AssignPrimaryKey(keys...);
+    return detail::RuntimeGet(Self(), TableTraits<Derived>::kTable);
   }
 
   /// \brief AL `Record.FieldError(Field [, Text])`, naming the field itself.
@@ -241,6 +267,25 @@ private:
 
   [[nodiscard]] const void *Self() const { return static_cast<const Derived *>(this); }
 
+protected:
+  /// \brief Writes the primary key fields from the values AL's `Get` was handed.
+  ///
+  /// \tparam Keys The key field types, in key order.
+  /// \param  keys The primary key values.
+  /// \throws Error when the argument count does not match the primary key.
+  ///
+  /// \note Shared with the temporary store, which assigns the key the same way and then searches
+  ///       its own rows rather than the database. Doing it twice was the alternative.
+  template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (table.keys.empty() || table.keys[0].fields.size() != sizeof...(Keys)) {
+      throw Error("Get: the argument count does not match the primary key");
+    }
+    std::size_t position = 0;
+    (AssignKey(table, position++, keys), ...);
+  }
+
+private:
   [[nodiscard]] void *Self() { return static_cast<Derived *>(this); }
 
   template <typename Key>
@@ -251,6 +296,20 @@ private:
   }
 };
 
+/// \brief The rows a temporary record holds, and how often they changed.
+///
+/// \tparam T The generated table class.
+///
+/// \note THE VERSION IS NOT BOOKKEEPING, IT IS THE HOT PATH. A `repeat ... until Next() = 0` loop
+///       over a temporary buffer re-filters and re-sorts the whole store on every step unless a
+///       cached view can tell it is still valid. The predecessor measured that as its O(n^2) case
+///       and put the counter on the STORE for a second reason: AL `Copy(src, true)` makes two
+///       record variables share one store, and each must see the other's mutations.
+template <typename T> struct TempStore {
+  std::vector<T> rows;      ///< In primary-key order, which is what AL walks.
+  std::uint64_t version{0}; ///< Rises on every structural change.
+};
+
 /// \brief AL `Record "X" temporary` -- the same table with no database behind it.
 ///
 /// \tparam T The generated table class.
@@ -259,42 +318,110 @@ private:
 /// filters, and its rows live in memory for the length of the session. AL code cannot tell the
 /// difference, which is the point -- a buffer table and a real one are written the same way.
 ///
-/// \note IT REFUSES RATHER THAN REACHING THE DATABASE, and that is not a placeholder. A temporary
-///       record that quietly inserted a row into PostgreSQL would leave data a test never wrote and
-///       never cleans up, and the test that reads it back would pass. The in-memory store is
-///       board:0020; until it stands, every operation says so.
-///
-/// \note It adds NO data member. The type itself is the marker, so `T` stays standard-layout and
-///       its field table keeps addressing fields by `offsetof`.
+/// \note The rows are held SORTED BY PRIMARY KEY, because that is the order AL walks a record in
+///       and the order `Get` searches. Inserting into the middle of a vector is what a buffer table
+///       does rarely and reads often.
 template <typename T> class Temporary : public T {
 public:
+  /// \brief A temporary record with a store of its own.
+  Temporary() : store_(std::make_shared<TempStore<T>>()) {}
+
   /// \brief AL `Record.Insert()` on a temporary record.
-  /// \throws Error always, until board:0020.
-  void Insert() { detail::RefuseTemporary("Insert"); }
+  /// \throws Error when a row already carries this primary key, as AL does.
+  void Insert() {
+    const auto at = LowerBound();
+    if (at != store_->rows.end() && detail::SameKey<T>(*at, *this)) {
+      throw Error("the record already exists");
+    }
+    store_->rows.insert(at, static_cast<const T &>(*this));
+    ++store_->version;
+  }
+
+  /// \brief AL `Record.Get(...)` on a temporary record.
+  /// \tparam Keys The key field types, in key order.
+  /// \param  keys The primary key values.
+  /// \return True when a row carried that key; the record is then that row.
+  template <typename... Keys> bool Get(const Keys &...keys) {
+    this->AssignPrimaryKey(keys...);
+    const auto at = LowerBound();
+    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
+    static_cast<T &>(*this) = *at;
+    return true;
+  }
 
   /// \brief AL `Record.Modify()` on a temporary record.
-  /// \return Never returns.
-  /// \throws Error always, until board:0020.
-  [[nodiscard]] bool Modify() { detail::RefuseTemporary("Modify"); }
+  /// \return True when a row carried this primary key.
+  bool Modify() {
+    const auto at = LowerBound();
+    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
+    *at = static_cast<const T &>(*this);
+    ++store_->version;
+    return true;
+  }
 
   /// \brief AL `Record.Delete()` on a temporary record.
-  /// \return Never returns.
-  /// \throws Error always, until board:0020.
-  [[nodiscard]] bool Delete() { detail::RefuseTemporary("Delete"); }
+  /// \return True when a row carried this primary key.
+  bool Delete() {
+    const auto at = LowerBound();
+    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
+    store_->rows.erase(at);
+    ++store_->version;
+    return true;
+  }
 
   /// \brief AL `Record.DeleteAll()` on a temporary record.
-  /// \throws Error always, until board:0020.
-  void DeleteAll() { detail::RefuseTemporary("DeleteAll"); }
+  void DeleteAll() {
+    store_->rows.clear();
+    ++store_->version;
+  }
+
+  /// \brief AL `Record.Count()`.
+  /// \return How many rows the store holds.
+  [[nodiscard]] Integer Count() const { return static_cast<Integer>(store_->rows.size()); }
+
+  /// \brief AL `Record.IsEmpty()`.
+  /// \return True when the store holds no rows.
+  [[nodiscard]] bool IsEmpty() const { return store_->rows.empty(); }
+
+  /// \brief AL `Record.FindSet()` -- positions on the first row.
+  /// \return True when there is one, which is then this record.
+  bool FindSet() {
+    position_ = 0;
+    return Fetch();
+  }
+
+  /// \brief AL `Record.Next()` -- steps to the row after this one.
+  /// \return True when there was one, which is then this record.
+  bool Next() {
+    ++position_;
+    return Fetch();
+  }
 
   /// \brief AL `Record.Copy(From, true)` -- shares another temporary record's store.
+  ///
   /// \param from  The record to share with.
-  /// \param share True to share the store rather than copy the current row.
-  /// \throws Error always, until board:0020.
+  /// \param share True to share the STORE; false copies the current row only.
+  ///
+  /// \note Sharing is why the version rides on the store rather than on the record: after this,
+  ///       two variables mutate one set of rows and each must see the other's changes.
   void Copy(const Temporary &from, bool share) {
-    static_cast<void>(from);
-    static_cast<void>(share);
-    detail::RefuseTemporary("Copy");
+    static_cast<T &>(*this) = static_cast<const T &>(from);
+    if (share) { store_ = from.store_; }
   }
+
+private:
+  [[nodiscard]] auto LowerBound() {
+    return std::ranges::lower_bound(store_->rows, static_cast<const T &>(*this), detail::ByKey<T>);
+  }
+
+  bool Fetch() {
+    if (position_ >= store_->rows.size()) { return false; }
+    static_cast<T &>(*this) = store_->rows[position_];
+    return true;
+  }
+
+  std::shared_ptr<TempStore<T>> store_;
+  std::size_t position_{0};
 };
 
 } // namespace agiru

@@ -212,9 +212,13 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
          std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
 
+  // A RECORD STARTS BLANK, AND AL GUARANTEES IT. `var Rec: Record X` gives every field its zero --
+  // an empty Code, a zero Decimal, the undefined date -- and AL code reads a fresh record without
+  // writing to it first. C++ default-initialises a member of built-in type to nothing at all, so
+  // without the braces an Integer field of a fresh record holds whatever was on the stack.
   for (const al::FieldDecl &field : table.fields) {
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
-           Identifier(field.name) + ";\n";
+           Identifier(field.name) + "{};\n";
   }
 
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");

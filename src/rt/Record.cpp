@@ -4,13 +4,17 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "type/BigInteger.h"
 #include "type/Blob.h"
+#include "type/Boolean.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Guid.h"
+#include "type/Integer.h"
 #include "type/Time.h"
 
+#include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -53,6 +57,10 @@ std::string FieldText(const void *record, const FieldDef &def) {
     // `guid-data-type.md` gives the standard textual representation WITH its braces, and AL
     // compares a Guid against a Text directly, so this is the text a message shows.
     case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->ToText();
+    case FieldType::Integer: return ToText(*reinterpret_cast<const Integer *>(At(record, def)));
+    case FieldType::BigInteger:
+      return ToText(*reinterpret_cast<const BigInteger *>(At(record, def)));
+    case FieldType::Boolean: return ToText(*reinterpret_cast<const Boolean *>(At(record, def)));
     case FieldType::Option:
     case FieldType::Enum:
       return detail::MemberText(
@@ -73,6 +81,9 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::DateTime:
       return reinterpret_cast<const DateTime *>(At(record, def))->IsUndefined();
     case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->IsNull();
+    case FieldType::Integer: return *reinterpret_cast<const Integer *>(At(record, def)) == 0;
+    case FieldType::BigInteger: return *reinterpret_cast<const BigInteger *>(At(record, def)) == 0;
+    case FieldType::Boolean: return !*reinterpret_cast<const Boolean *>(At(record, def));
     case FieldType::Blob: return !reinterpret_cast<const Blob *>(At(record, def))->HasValue();
     case FieldType::Option:
     case FieldType::Enum:
@@ -157,5 +168,44 @@ std::string SubstituteInto(std::string_view pattern, std::span<const std::string
 }
 
 } // namespace detail
+
+// A KEY IS COMPARED BY ITS TYPE AND NEVER BY ITS TEXT. Rendering both sides and comparing the
+// strings orders "10" before "9", which is the wrong walk order for every buffer keyed on an entry
+// number -- and wrong silently, since both orders look plausible in a small test.
+std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &def) {
+  const auto compare = [](const auto &left, const auto &right) {
+    return left < right   ? std::strong_ordering::less
+           : right < left ? std::strong_ordering::greater
+                          : std::strong_ordering::equal;
+  };
+  switch (def.type) {
+    case FieldType::Integer:
+      return compare(*reinterpret_cast<const Integer *>(At(a, def)),
+                     *reinterpret_cast<const Integer *>(At(b, def)));
+    case FieldType::BigInteger:
+      return compare(*reinterpret_cast<const BigInteger *>(At(a, def)),
+                     *reinterpret_cast<const BigInteger *>(At(b, def)));
+    case FieldType::Boolean:
+      return compare(*reinterpret_cast<const Boolean *>(At(a, def)),
+                     *reinterpret_cast<const Boolean *>(At(b, def)));
+    case FieldType::Option:
+    case FieldType::Enum:
+      return compare(reinterpret_cast<const OrdinalValue *>(At(a, def))->AsInteger(),
+                     reinterpret_cast<const OrdinalValue *>(At(b, def))->AsInteger());
+    case FieldType::Date:
+      return *reinterpret_cast<const Date *>(At(a, def)) <=>
+             *reinterpret_cast<const Date *>(At(b, def));
+    case FieldType::Time:
+      return *reinterpret_cast<const Time *>(At(a, def)) <=>
+             *reinterpret_cast<const Time *>(At(b, def));
+    case FieldType::DateTime:
+      return *reinterpret_cast<const DateTime *>(At(a, def)) <=>
+             *reinterpret_cast<const DateTime *>(At(b, def));
+    case FieldType::Decimal:
+      return compare(*reinterpret_cast<const Decimal *>(At(a, def)),
+                     *reinterpret_cast<const Decimal *>(At(b, def)));
+    default: return compare(FieldText(a, def), FieldText(b, def));
+  }
+}
 
 } // namespace agiru

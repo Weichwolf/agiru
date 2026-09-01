@@ -248,12 +248,3 @@ bool RuntimeGet(void *record, const TableDef &table) {
 }
 
 } // namespace agiru::detail
-
-namespace agiru::detail {
-
-void RefuseTemporary(std::string_view what) {
-  throw Error("Record." + std::string(what) +
-              "() on a temporary record needs the in-memory store (board:0020)");
-}
-
-} // namespace agiru::detail
