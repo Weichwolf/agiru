@@ -92,6 +92,9 @@ set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
     CACHE STRING "Connection string the gate uses")
 set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
     CACHE STRING "The AL source the gate parses")
+# The root the TRANSPILER reads, which is one level up: apps.json names each app's tree beneath it.
+set(AGIRU_BC_SOURCE "$ENV{HOME}/Git/BCApps/src"
+    CACHE STRING "The BCApps src root the transpiler reads apps.json against")
 
 # THE APPS. Each is one BC app -- the unit of deployment, version and dependency -- and becomes one
 # library, so that the LINKER enforces the direction AL declares: the Base Application may not know

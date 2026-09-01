@@ -1,3 +1,4 @@
+#include "Apps.h"
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "EnumWriter.h"
@@ -7,10 +8,12 @@
 #include "TableWriter.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <ios>
 #include <map>
@@ -51,8 +54,10 @@ struct Counts {
   std::size_t parsed = 0;
   std::size_t members = 0;
   std::size_t tests = 0;
-  std::size_t unitFiles = 0;
-  std::size_t unitTests = 0;
+  std::size_t unitFiles = 0;  ///< UT codeunits in the POPULATION, counted from the text.
+  std::size_t unitTests = 0;  ///< Their [Test] methods, likewise.
+  std::size_t unitParsed = 0; ///< How many of those methods came through the parser.
+  std::size_t unitLost = 0;   ///< UT codeunits the parser could not read at all.
 };
 
 bool IsUnitTest(std::string_view name) {
@@ -70,8 +75,12 @@ void Report(std::string_view what, const Counts &counts) {
     if (counts.unitTests != 0) {
       std::println("{:<10}{} codeunits, {} [Test] methods -- the milestone's population",
                    "UT",
-                   counts.unitFiles,
+                   counts.unitFiles + counts.unitLost,
                    counts.unitTests);
+      std::println("{:<10}{} of them reach the parser; {} codeunit(s) do not parse at all",
+                   "",
+                   counts.unitParsed,
+                   counts.unitLost);
     }
     return;
   }
@@ -125,6 +134,7 @@ void Write(const Output &where, const std::string &text) {
 struct Job {
   std::filesystem::path source;
   std::filesystem::path output;
+  std::filesystem::path apps;
 };
 
 /// What every pass shares: where the source is, where the output goes, and what went wrong.
@@ -149,7 +159,7 @@ bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) 
 // `Enum "Item Type"` names an object declared in another file, so neither the type it translates to
 // nor the header that declares it is knowable from the table alone. The index is built over the
 // whole source before the first table is written.
-agiru::gen::EnumIndex ScanEnums(Run &run, Counts &counts) {
+void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Enum.al")) {
@@ -165,19 +175,17 @@ agiru::gen::EnumIndex ScanEnums(Run &run, Counts &counts) {
     }
   }
 
-  agiru::gen::EnumIndex index;
   for (const agiru::al::EnumObject &object : objects) {
     index.insert_or_assign(agiru::gen::LowerKey(object.name),
                            agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
                                                .header = agiru::gen::EnumHeaderPath(object)});
   }
-  if (run.output.empty()) { return index; }
+  if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < objects.size(); ++i) {
     Write(Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(objects[i])},
           agiru::gen::WriteEnum(objects[i], paths[i]));
     ++run.written;
   }
-  return index;
 }
 
 void WriteTable(Run &run,
@@ -216,11 +224,45 @@ void ScanTables(Run &run,
   }
 }
 
+// THE UT POPULATION IS COUNTED FROM THE TEXT AND NOT FROM THE PARSE, and that is the whole point.
+// A codeunit that fails to parse contributes nothing to `unitTests` through the parser, so the
+// milestone's DENOMINATOR would shrink every time the parser lost a file -- the baseline that falls
+// by accident, which CLAUDE.md lists as a trap and which cost exactly 3 codeunits and 67 methods
+// here before it was found. The name and the [Test] count are both recoverable lexically, so they
+// are recovered lexically and the denominator is the population.
+struct UnitTestPopulation {
+  std::size_t files = 0;
+  std::size_t tests = 0;
+};
+
+UnitTestPopulation UnitTestsIn(const std::string &source) {
+  const std::size_t at = source.find("codeunit ");
+  if (at == std::string::npos) { return {}; }
+  const std::size_t eol = source.find('\n', at);
+  std::string header = source.substr(at, eol == std::string::npos ? eol : eol - at);
+  while (!header.empty() && (header.back() == '\r' || header.back() == '"' ||
+                             std::isspace(static_cast<unsigned char>(header.back())) != 0)) {
+    header.pop_back();
+  }
+  if (!IsUnitTest(header)) { return {}; }
+  UnitTestPopulation found;
+  found.files = 1;
+  for (std::size_t cursor = source.find("[Test]"); cursor != std::string::npos;
+       cursor = source.find("[Test]", cursor + 1)) {
+    ++found.tests;
+  }
+  return found.tests != 0 ? found : UnitTestPopulation{};
+}
+
 void ScanCodeunits(Run &run, Counts &counts) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
     ++counts.files;
+    const std::string source = Read(path);
+    const UnitTestPopulation population = UnitTestsIn(source);
+    counts.unitFiles += population.files;
+    counts.unitTests += population.tests;
     try {
-      const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(Read(path));
+      const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(source);
       ++counts.parsed;
       counts.members += unit.procedures.size();
       std::size_t tests = 0;
@@ -228,12 +270,14 @@ void ScanCodeunits(Run &run, Counts &counts) {
         if (agiru::al::HasAttribute(procedure, "Test")) { ++tests; }
       }
       counts.tests += tests;
-      if (tests != 0 && IsUnitTest(unit.name)) {
-        ++counts.unitFiles;
-        counts.unitTests += tests;
-      }
+      if (population.files != 0) { counts.unitParsed += tests; }
     } catch (const std::exception &e) {
-      if (Note(run, path, e)) { --counts.files; }
+      if (Note(run, path, e)) {
+        --counts.files;
+        counts.unitFiles -= population.files;
+        counts.unitTests -= population.tests;
+        if (population.files != 0) { ++counts.unitLost; }
+      }
     }
   }
 }
@@ -257,6 +301,11 @@ void ClaimOutput(const std::filesystem::path &out) {
   if (out.empty()) { return; }
   std::filesystem::remove_all(out);
   std::filesystem::create_directories(out);
+}
+
+void ClaimApp(const std::filesystem::path &out) {
+  if (out.empty()) { return; }
+  std::filesystem::create_directories(out);
   std::ofstream reaches(out / "reaches", std::ios::binary);
   reaches << "# GENERATED. Never by hand.\n#\n"
           << "# An app sees ONLY the door under include/agiru/ and the apps it declares a "
@@ -267,26 +316,73 @@ void ClaimOutput(const std::filesystem::path &out) {
              "every app.\n";
 }
 
+void Add(Counts &into, const Counts &one) {
+  into.files += one.files;
+  into.parsed += one.parsed;
+  into.members += one.members;
+  into.tests += one.tests;
+  into.unitFiles += one.unitFiles;
+  into.unitTests += one.unitTests;
+  into.unitParsed += one.unitParsed;
+  into.unitLost += one.unitLost;
+}
+
+// ONE ENUM INDEX ACROSS THE APPS, FILLED IN DECLARATION ORDER, AND THAT ORDER IS THE ENFORCEMENT.
+// apps.json lists the apps in dependency order, so a table resolves an enum against its own app and
+// everything read before it -- never against an app that comes later. The direction AL declares
+// therefore holds because of the shape of the loop, not because of a second check that could drift.
 int Scan(const Job &job) {
-  Run run{.root = job.source, .output = job.output, .failures = {}, .written = 0};
-  ClaimOutput(run.output);
+  const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
+  ClaimOutput(job.output);
 
   std::map<std::string, std::size_t> unresolved;
-  Counts enums;
-  Counts tables;
-  Counts codeunits;
-  const agiru::gen::EnumIndex index = ScanEnums(run, enums);
-  ScanTables(run, tables, index, unresolved);
-  ScanCodeunits(run, codeunits);
+  agiru::gen::EnumIndex index;
+  Counts allEnums;
+  Counts allTables;
+  Counts allCodeunits;
+  std::vector<Failure> failures;
+  std::size_t written = 0;
 
-  if (!run.output.empty()) {
-    std::println("written   {} objects into {}", run.written, run.output.string());
+  for (const agiru::gen::App &app : apps) {
+    const std::filesystem::path source = job.source / app.source;
+    if (!std::filesystem::is_directory(source)) {
+      std::println("{:<10}{} -- no such tree, skipped", app.name, source.string());
+      continue;
+    }
+    Run run{.root = source,
+            .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
+            .failures = {},
+            .written = 0};
+    Counts enums;
+    Counts tables;
+    Counts codeunits;
+    ClaimApp(run.output);
+    ScanEnums(run, enums, index);
+    ScanTables(run, tables, index, unresolved);
+    ScanCodeunits(run, codeunits);
+
+    std::println("{:<11}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
+                 app.name,
+                 tables.parsed,
+                 codeunits.parsed,
+                 enums.parsed,
+                 codeunits.tests,
+                 run.written != 0 ? std::format(" -- {} written", run.written) : std::string{});
+    Add(allEnums, enums);
+    Add(allTables, tables);
+    Add(allCodeunits, codeunits);
+    written += run.written;
+    failures.insert(failures.end(), run.failures.begin(), run.failures.end());
   }
-  Report("enums", enums);
-  Report("tables", tables);
-  Report("codeunits", codeunits);
+
+  if (!job.output.empty()) {
+    std::println("written   {} objects into {}", written, job.output.string());
+  }
+  Report("enums", allEnums);
+  Report("tables", allTables);
+  Report("codeunits", allCodeunits);
   ReportUnresolved(unresolved);
-  Cluster(run.failures);
+  Cluster(failures);
   return 0;
 }
 
@@ -294,14 +390,15 @@ int Scan(const Job &job) {
 
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
-  if (arguments.size() < 2) {
-    std::fputs("agirutc <al-source-root> [<output-directory>]\n", stderr);
+  if (arguments.size() < 3) {
+    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>]\n", stderr);
     return 2;
   }
   try {
     return Scan(Job{.source = std::filesystem::path(arguments[1]),
-                    .output = arguments.size() > 2 ? std::filesystem::path(arguments[2])
-                                                   : std::filesystem::path{}});
+                    .output = arguments.size() > 3 ? std::filesystem::path(arguments[3])
+                                                   : std::filesystem::path{},
+                    .apps = std::filesystem::path(arguments[2])});
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);

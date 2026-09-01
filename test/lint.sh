@@ -142,8 +142,8 @@ printf '\n== the AL population ==\n'
 # THE COUNT OF TRANSLATED OBJECTS IS A BASELINE THAT MAY ONLY RISE. It is the one number that says
 # how much of BC this tree can read, and it is measured over the WHOLE population rather than a
 # sample -- 1 545 table objects in the BaseApp, every one of them, on every run of the lint.
-if [ -x build/agirutc ] && [ -d "$AGIRU_AL_SOURCE" ]; then
-  scan=$(build/agirutc "$AGIRU_AL_SOURCE")
+if [ -x build/agirutc ] && [ -d "$AGIRU_BC_SOURCE" ]; then
+  scan=$(build/agirutc "$AGIRU_BC_SOURCE" apps.json)
   tables=$(printf '%s' "$scan" | awk '/^tables/{print $2}')
   tableTotal=$(printf '%s' "$scan" | awk '/^tables/{print $4}')
   units=$(printf '%s' "$scan" | awk '/^codeunits/{print $2}')
@@ -153,8 +153,13 @@ if [ -x build/agirutc ] && [ -d "$AGIRU_AL_SOURCE" ]; then
   read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal allowedEnums allowedEnumTotal <<EOT
 $(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0 0 0")
 EOT
+  ut=$(printf '%s' "$scan" | awk '/^UT /{print $4}')
+  utReached=$(printf '%s' "$scan" | awk '/of them reach the parser/{print $1}')
   printf 'lint: %s of %s tables, %s of %s codeunits and %s of %s enums parse\n' \
     "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal"
+  # THE MILESTONE'"'"'S DENOMINATOR IS COUNTED FROM THE TEXT AND NEVER FROM THE PARSE, so that a
+  # parser that loses a file cannot quietly shrink the population it is measured against.
+  printf 'lint: %s of %s UT [Test] methods reach the parser\n' "$utReached" "$ut"
   printf 'lint: the baseline requires %s tables, %s codeunits and %s enums\n' \
     "$allowedTables" "$allowedUnits" "$allowedEnums"
   if [ "$tables" -lt "$allowedTables" ] || [ "$units" -lt "$allowedUnits" ] ||

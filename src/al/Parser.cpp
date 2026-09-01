@@ -246,8 +246,8 @@ private:
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
            !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
+        if (!VariableFollowsAttribute()) { return; }
         (void)ReadAttribute();
-        if (!IsVariableAhead()) { return; }
         continue;
       }
       const std::string name = ExpectName();
@@ -342,6 +342,27 @@ private:
     const bool named =
         Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier;
     return named && IsPunctuation(Peek(1), ":");
+  }
+
+  /// Whether a variable declaration follows the bracket group the cursor sits on, WITHOUT
+  /// consuming it.
+  ///
+  /// A `var` block ends where the next member begins, and the next member usually begins with its
+  /// attributes: `var ... [Test] procedure X()`. Reading the attribute to find that out threw it
+  /// away, and the procedure was then declared without it -- one lost `[Test]` per test codeunit,
+  /// 67 of them, invisible because the count came from the same parser that had dropped them.
+  [[nodiscard]] bool VariableFollowsAttribute() const {
+    std::size_t ahead = 0;
+    int depth = 0;
+    do {
+      if (IsPunctuation(Peek(ahead), "[")) { ++depth; }
+      if (IsPunctuation(Peek(ahead), "]")) { --depth; }
+      ++ahead;
+    } while (depth > 0 && Peek(ahead).kind != TokenKind::EndOfFile);
+    const Token &next = Peek(ahead);
+    const bool named =
+        next.kind == TokenKind::Identifier || next.kind == TokenKind::QuotedIdentifier;
+    return named && IsPunctuation(Peek(ahead + 1), ":");
   }
 
   void SkipAttribute() {
@@ -468,8 +489,8 @@ private:
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
            !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
+        if (!VariableFollowsAttribute()) { return; }
         SkipAttribute();
-        if (!IsVariableAhead()) { return; }
         continue;
       }
       const std::string name = ExpectName();

@@ -21,13 +21,13 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 lint: all          ## format, static analysis, the door, the AL population
-	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} sh $(SELF)/test/lint.sh
+	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} sh $(SELF)/test/lint.sh
 
 test: all          ## the fast gate
 	@sh $(SELF)/test/run.sh
 
-transpile: all     ## the BaseApp through the transpiler into apps/
-	@$(B)/agirutc
+transpile: all     ## every app in apps.json through the transpiler into apps/
+	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
 
 tree: all          ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh

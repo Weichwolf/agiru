@@ -239,6 +239,53 @@ void ThePreprocessorKeepsOneBranch() {
              pragma.size() == 2 && pragma[0].text == "kept");
 }
 
+/// A `var` BLOCK ENDS WHERE THE NEXT MEMBER BEGINS, and the next member usually begins with its
+/// attributes. Reading one to find that out threw it away: every test codeunit in BCApps lost
+/// exactly one `[Test]`, and the loss was invisible because the count came from the same parser
+/// that had dropped it. 1 115 methods across the tree, 67 of them in the milestone's own
+/// population.
+void AVarBlockDoesNotSwallowTheNextMembersAttribute() {
+  const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(R"(
+codeunit 50000 "Something UT"
+{
+    Subtype = Test;
+
+    var
+        Assert: Codeunit Assert;
+        IsInitialized: Boolean;
+
+    [Test]
+    procedure TheFirstOne()
+    begin
+        Assert.IsTrue(true, '');
+    end;
+
+    [Test]
+    [HandlerFunctions('ConfirmHandler')]
+    procedure TheSecondOne()
+    begin
+        Assert.IsTrue(true, '');
+    end;
+
+    procedure NotATest()
+    begin
+        Assert.IsTrue(true, '');
+    end;
+})");
+
+  CHECK_TRUE("all three procedures parse", unit.procedures.size() == 3);
+  CHECK_TRUE("the one right after the var block keeps its [Test]",
+             agiru::al::HasAttribute(unit.procedures[0], "Test"));
+  CHECK_TRUE("and so does the next", agiru::al::HasAttribute(unit.procedures[1], "Test"));
+  CHECK_TRUE("whose second attribute survives too",
+             agiru::al::HasAttribute(unit.procedures[1], "HandlerFunctions"));
+  // THE NEGATIVE CONTROL. A rule that simply kept every attribute would also mark the third.
+  CHECK_TRUE("a procedure with no attribute is not marked",
+             !agiru::al::HasAttribute(unit.procedures[2], "Test"));
+  // And the var block itself is still read: the labels/variables it declares are not members.
+  CHECK_TRUE("the var block did not become a procedure", unit.procedures.size() == 3);
+}
+
 } // namespace
 
 int main() {
@@ -253,5 +300,6 @@ int main() {
     TheLexerReadsWhatBaseAppActuallyContains();
     ThePreprocessorKeepsOneBranch();
     TheRealFileParses();
+    AVarBlockDoesNotSwallowTheNextMembersAttribute();
   });
 }
