@@ -58,6 +58,11 @@ bool RuntimeGet(void *record, const TableDef &table);
 /// \throws Error when the value does not fit the field, or the type has no reader yet.
 void SetFieldText(void *record, const FieldDef &def, std::string_view text);
 
+/// \brief Refuses an operation on a temporary record.
+/// \param what The AL method name.
+/// \throws Error always.
+[[noreturn]] void RefuseTemporary(std::string_view what);
+
 } // namespace detail
 
 /// \brief What every AL table can do, without the generated class saying any of it.
@@ -243,6 +248,52 @@ private:
     const FieldDef *def = Field(table, table.keys[0].fields[position]);
     if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
     *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
+  }
+};
+
+/// \brief AL `Record "X" temporary` -- the same table with no database behind it.
+///
+/// \tparam T The generated table class.
+///
+/// From `SetTemporary` and the `temporary` keyword: the record keeps its fields, its keys and its
+/// filters, and its rows live in memory for the length of the session. AL code cannot tell the
+/// difference, which is the point -- a buffer table and a real one are written the same way.
+///
+/// \note IT REFUSES RATHER THAN REACHING THE DATABASE, and that is not a placeholder. A temporary
+///       record that quietly inserted a row into PostgreSQL would leave data a test never wrote and
+///       never cleans up, and the test that reads it back would pass. The in-memory store is
+///       board:0020; until it stands, every operation says so.
+///
+/// \note It adds NO data member. The type itself is the marker, so `T` stays standard-layout and
+///       its field table keeps addressing fields by `offsetof`.
+template <typename T> class Temporary : public T {
+public:
+  /// \brief AL `Record.Insert()` on a temporary record.
+  /// \throws Error always, until board:0020.
+  void Insert() { detail::RefuseTemporary("Insert"); }
+
+  /// \brief AL `Record.Modify()` on a temporary record.
+  /// \return Never returns.
+  /// \throws Error always, until board:0020.
+  [[nodiscard]] bool Modify() { detail::RefuseTemporary("Modify"); }
+
+  /// \brief AL `Record.Delete()` on a temporary record.
+  /// \return Never returns.
+  /// \throws Error always, until board:0020.
+  [[nodiscard]] bool Delete() { detail::RefuseTemporary("Delete"); }
+
+  /// \brief AL `Record.DeleteAll()` on a temporary record.
+  /// \throws Error always, until board:0020.
+  void DeleteAll() { detail::RefuseTemporary("DeleteAll"); }
+
+  /// \brief AL `Record.Copy(From, true)` -- shares another temporary record's store.
+  /// \param from  The record to share with.
+  /// \param share True to share the store rather than copy the current row.
+  /// \throws Error always, until board:0020.
+  void Copy(const Temporary &from, bool share) {
+    static_cast<void>(from);
+    static_cast<void>(share);
+    detail::RefuseTemporary("Copy");
   }
 };
 

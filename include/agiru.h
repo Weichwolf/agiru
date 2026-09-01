@@ -4,6 +4,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
