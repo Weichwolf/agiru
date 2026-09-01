@@ -1,3 +1,4 @@
+apps/*/
 *.bak
 build/
 .cache/

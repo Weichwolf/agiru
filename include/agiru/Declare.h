@@ -1,7 +1,11 @@
 #pragma once
 
+#include "agiru/BigInteger.h"
+#include "agiru/Boolean.h"
+#include "agiru/Code.h"
 #include "agiru/Decimal.h"
 #include "agiru/Ids.h"
+#include "agiru/Integer.h"
 #include "agiru/Option.h"
 #include "agiru/TableDef.h"
 #include "agiru/Text.h"
@@ -45,6 +49,19 @@ template <std::size_t N> struct FieldTypeOf<Text<N>> {
 template <> struct FieldTypeOf<Decimal> {
   static constexpr FieldType kType = FieldType::Decimal;         ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;                    ///< A decimal declares no length.
+  static constexpr std::span<const std::string_view> kMembers{}; ///< Not an option.
+};
+
+/// \brief A whole number, a truth value or a duration -- a field with no length and no members.
+template <typename T>
+  requires std::is_arithmetic_v<T>
+struct FieldTypeOf<T> {
+  /// \brief The AL type tag, chosen by what the C++ type is.
+  static constexpr FieldType kType = std::is_same_v<T, Boolean>      ? FieldType::Boolean
+                                     : std::is_same_v<T, Integer>    ? FieldType::Integer
+                                     : std::is_same_v<T, BigInteger> ? FieldType::BigInteger
+                                                                     : FieldType::Integer;
+  static constexpr std::uint16_t kLength = 0;                    ///< A number declares no length.
   static constexpr std::span<const std::string_view> kMembers{}; ///< Not an option.
 };
 

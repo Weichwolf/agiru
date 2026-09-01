@@ -301,7 +301,7 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
   const std::string identifier = Identifier(table.name);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "// Written by hand as the specification the generator must reproduce (board:0012).\n\n";
+  out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += "#include \"agiru/Record.h\"\n\n";
   out += "namespace agiru::app {\n\n";

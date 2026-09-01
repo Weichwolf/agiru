@@ -1,5 +1,6 @@
 #pragma once
 
+#include "agiru/Code.h"
 #include "agiru/Decimal.h"
 #include "agiru/Error.h"
 #include "agiru/Ids.h"

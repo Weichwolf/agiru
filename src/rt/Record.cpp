@@ -5,7 +5,6 @@
 #include "agiru/Ids.h"
 #include "agiru/Option.h"
 #include "agiru/TableDef.h"
-#include "agiru/Text.h"
 
 #include <cstddef>
 #include <cstdint>

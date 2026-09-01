@@ -1,5 +1,9 @@
 #include "Ast.h"
+#include "BodyWriter.h"
+#include "Names.h"
 #include "Parser.h"
+#include "Scope.h"
+#include "TableWriter.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -7,6 +11,7 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <map>
 #include <print>
 #include <span>
@@ -99,8 +104,44 @@ std::vector<std::filesystem::path> SourcesEndingIn(const std::filesystem::path &
   return sources;
 }
 
-int Scan(const std::filesystem::path &root) {
+struct Output {
+  std::filesystem::path directory;
+  std::string relative;
+};
+
+void Write(const Output &where, const std::string &text) {
+  const std::filesystem::path path = where.directory / where.relative;
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream file(path, std::ios::binary);
+  file << text;
+}
+
+struct Job {
+  std::filesystem::path source;
+  std::filesystem::path output;
+};
+
+int Scan(const Job &job) {
+  const std::filesystem::path &root = job.source;
+  const std::filesystem::path &out = job.output;
+  // The generator OWNS its output directory. An aborted run must not leave half a tree behind for
+  // the next build to read as if it were whole -- the predecessor records exactly that failure, a
+  // clean step that wiped the tree and an abort that left a partial one the loader took happily.
+  if (!out.empty()) {
+    std::filesystem::remove_all(out);
+    std::filesystem::create_directories(out);
+    std::ofstream reaches(out / "reaches", std::ios::binary);
+    reaches << "# GENERATED. Never by hand.\n#\n"
+            << "# An app sees ONLY the door under include/agiru/ and the apps it declares a "
+               "dependency on in\n"
+            << "# apps.json. It does not see the runtime's internals: with `rt` here, every change "
+               "to an\n"
+            << "# internal runtime header would throw away every generated translation unit in "
+               "every app.\n";
+  }
+
   std::vector<Failure> failures;
+  std::size_t written = 0;
 
   Counts tables;
   for (const std::filesystem::path &path : SourcesEndingIn(root, ".Table.al")) {
@@ -109,6 +150,20 @@ int Scan(const std::filesystem::path &root) {
       const agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++tables.parsed;
       tables.members += table.fields.size();
+      if (!out.empty()) {
+        const std::string relative = std::filesystem::relative(path, root).string();
+        const std::string directory =
+            agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table);
+        const std::string name = agiru::gen::Identifier(table.name);
+        std::string stem = directory;
+        stem += "/";
+        stem += name;
+        Write(Output{.directory = out, .relative = stem + ".h"},
+              agiru::gen::WriteHeader(table, relative));
+        Write(Output{.directory = out, .relative = stem + ".cpp"},
+              agiru::gen::WriteSource(table, relative));
+        ++written;
+      }
     } catch (const std::exception &e) {
       if (Declares(e.what())) {
         --tables.files;
@@ -147,6 +202,7 @@ int Scan(const std::filesystem::path &root) {
     }
   }
 
+  if (!out.empty()) { std::println("written   {} table objects into {}", written, out.string()); }
   Report("tables", tables);
   Report("codeunits", codeunits);
   Cluster(failures);
@@ -158,11 +214,13 @@ int Scan(const std::filesystem::path &root) {
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
   if (arguments.size() < 2) {
-    std::fputs("agirutc <al-source-root>\n", stderr);
+    std::fputs("agirutc <al-source-root> [<output-directory>]\n", stderr);
     return 2;
   }
   try {
-    return Scan(std::filesystem::path(arguments[1]));
+    return Scan(Job{.source = std::filesystem::path(arguments[1]),
+                    .output = arguments.size() > 2 ? std::filesystem::path(arguments[2])
+                                                   : std::filesystem::path{}});
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);

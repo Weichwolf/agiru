@@ -179,10 +179,20 @@ C++ truths rather than decisions about agiru. They do not move.
 - **C++23**, `-Wall -Wextra -Wpedantic -Werror`; a warning IS an error. `clang++-19` is the
   reference compiler, `g++-14` must translate the same tree -- two front ends find different
   defects and the second costs only machine time.
-- **What the compiler can decide is a `static_assert`, never a test case.** Field counts, layout,
-  enum exhaustiveness, catalogue completeness. The transpiler EMITS those assertions: a
-  TableRelation whose target does not exist is a translation error, not a runtime message. This is
-  the main gain over Python and it is not given away.
+- **`constexpr` AND `static_assert` WHEREVER THEY FIT, and that is not a style note.** This tree's
+  whole reason for leaving Python is that a compiler can check what a test run otherwise has to
+  find. So:
+  - **Anything knowable at translation time is `constexpr`** -- field tables, key tables, option
+    member names, captions, every AL declaration. `constexpr` data lands in `.rodata`: paged in on
+    demand, shared between processes, costing nothing at startup. Building it at run time is the
+    gigabyte the predecessor paid per process.
+  - **Anything decidable at translation time is a `static_assert`, never a test case.** Field
+    counts, sort order, layout, enum exhaustiveness, catalogue completeness, a TableRelation whose
+    target does not exist. The transpiler EMITS those assertions beside every object it writes, so
+    a mis-generated table is a translation error rather than a lookup that quietly finds nothing.
+  - **Every construct the type system can carry, it carries** -- strong ids, typed fields, a
+    field's type deciding its SQL column. Each one moves a class of defect from a run to a build,
+    which is the whole trade this project made.
 - **The type system over checkers**: `std::span` / `std::string_view` at boundaries,
   `std::expected` where a refusal carries its reason, strong types instead of `int` for anything
   that means something (`TableId`, `FieldNo`, `EntryNo`). AL swaps them silently otherwise.
@@ -308,6 +318,11 @@ Principles, not a map: a map goes stale the day a directory moves.
 - **An app sees only the door**, never the runtime's internals. That is build time: with `rt` in its
   `reaches`, every change to an internal runtime header would throw away every generated translation
   unit in every app.
+- **ONE DOOR HEADER PER AL TYPE, named as AL names the type.** `agiru/Integer.h`, `agiru/Code.h`,
+  `agiru/Decimal.h` -- the same shape the documentation uses for `methods-auto/<type>/`, so a
+  reader who knows the AL type knows the file without being told. What two types share and AL has
+  no name for is free to be named what it is (`StringValue.h`), and a generated file includes only
+  the types it actually uses.
 - **A header is PUBLIC only if a client cannot use the runtime without it.** `include/agiru/` is
   the door and nothing else stands in it. The door is the AL surface -- what generated code needs.
 - **`make` IS THE ONLY WAY IN.** Nothing is started by reaching past it. That CMake and Ninja work

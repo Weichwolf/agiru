@@ -1,5 +1,7 @@
 #include "agiru/Text.h"
 
+#include "agiru/StringValue.h"
+
 #include <algorithm>
 #include <compare>
 #include <cstddef>

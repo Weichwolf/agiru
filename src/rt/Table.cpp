@@ -1,13 +1,16 @@
 #include "agiru/Table.h"
 
+#include "agiru/BigInteger.h"
+#include "agiru/Boolean.h"
 #include "agiru/Decimal.h"
 #include "agiru/Error.h"
 #include "agiru/Ids.h"
+#include "agiru/Integer.h"
 #include "agiru/Option.h"
 #include "agiru/Record.h"
 #include "agiru/Session.h"
+#include "agiru/StringValue.h"
 #include "agiru/TableDef.h"
-#include "agiru/Text.h"
 
 #include "Rows.h"
 
@@ -79,6 +82,16 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
     }
     case FieldType::Decimal:
       *reinterpret_cast<Decimal *>(At(record, def)) = Decimal::FromInvariantString(text);
+      return;
+    case FieldType::Boolean:
+      *reinterpret_cast<Boolean *>(At(record, def)) = text == "t" || text == "true";
+      return;
+    case FieldType::Integer:
+      *reinterpret_cast<Integer *>(At(record, def)) =
+          static_cast<Integer>(std::stol(std::string(text)));
+      return;
+    case FieldType::BigInteger:
+      *reinterpret_cast<BigInteger *>(At(record, def)) = std::stoll(std::string(text));
       return;
     case FieldType::Option:
     case FieldType::Enum:

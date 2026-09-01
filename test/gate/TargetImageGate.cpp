@@ -1,7 +1,6 @@
 #include "agiru/Decimal.h"
 #include "agiru/Ids.h"
 #include "agiru/TableDef.h"
-#include "agiru/Text.h"
 
 #include "Check.h"
 #include "ResourceCost.h"

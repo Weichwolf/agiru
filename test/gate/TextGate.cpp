@@ -1,3 +1,5 @@
+#include "agiru/Code.h"
+#include "agiru/StringValue.h"
 #include "agiru/Text.h"
 
 #include "Check.h"

@@ -4,7 +4,9 @@
 #include "Names.h"
 #include "Token.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -74,12 +76,19 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
-std::string MemberType(const al::FieldDecl &field, const OptionField *option) {
+bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
+  return std::ranges::any_of(
+      table.fields, [type](const al::FieldDecl &field) { return Identifier(field.name) == type; });
+}
+
+std::string
+MemberType(const al::TableObject &table, const al::FieldDecl &field, const OptionField *option) {
   if (option != nullptr) { return "Option<" + option->enumName + ">"; }
   if (field.type == "Code" || field.type == "Text") {
-    return "::agiru::" + field.type + "<" + std::to_string(field.length) + ">";
+    const std::string bare = field.type + "<" + std::to_string(field.length) + ">";
+    return ShadowedByAField(table, field.type) ? "::agiru::" + bare : bare;
   }
-  return field.type;
+  return ShadowedByAField(table, field.type) ? "::agiru::" + field.type : field.type;
 }
 
 void WriteOptionTraits(std::string &out, const OptionField &option) {
@@ -97,6 +106,24 @@ void WriteOptionTraits(std::string &out, const OptionField &option) {
   out += "};\n";
 }
 
+std::string Includes(const al::TableObject &table, const std::vector<OptionField> &options) {
+  std::set<std::string> headers{
+      "agiru/Declare.h", "agiru/Ids.h", "agiru/Table.h", "agiru/TableDef.h"};
+  for (const al::FieldDecl &field : table.fields) {
+    const std::string type =
+        OptionOf(options, field) != nullptr ? std::string("Option") : field.type;
+    headers.insert("agiru/" + type + ".h");
+  }
+  std::string out;
+  for (const std::string &header : headers) {
+    out += "#include \"";
+    out += header;
+    out += "\"\n";
+  }
+  out += "\n";
+  return out;
+}
+
 } // namespace
 
 std::string WriteHeader(const al::TableObject &table, const std::string &sourcePath) {
@@ -105,13 +132,11 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
 
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "// Written by hand as the specification the generator must reproduce (board:0012).\n\n";
+  out += "\n";
   out += "#pragma once\n\n";
-  out += "#include \"agiru/Decimal.h\"\n#include \"agiru/Declare.h\"\n#include \"agiru/Ids.h\"\n";
-  out += "#include \"agiru/Option.h\"\n#include \"agiru/Table.h\"\n#include \"agiru/TableDef.h\"\n";
-  out += "#include \"agiru/Text.h\"\n\n";
-  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n#include <string_view>\n";
-  out += "#include <type_traits>\n\n";
+  out += Includes(table, options);
+  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
+  out += "#include <string_view>\n#include <type_traits>\n\n";
 
   out += "namespace agiru::app {\n\n";
   for (const OptionField &option : options) {
@@ -134,8 +159,8 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
   out += "  static constexpr std::string_view kName{" + Quoted(table.name) + "};\n\n";
 
   for (const al::FieldDecl &field : table.fields) {
-    out +=
-        "  " + MemberType(field, OptionOf(options, field)) + " " + Identifier(field.name) + ";\n";
+    out += "  " + MemberType(table, field, OptionOf(options, field)) + " " +
+           Identifier(field.name) + ";\n";
   }
 
   out += "\n  struct FieldNumber {\n";

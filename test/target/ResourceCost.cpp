@@ -1,5 +1,4 @@
 // Generated from Projects/Resources/Pricing/ResourceCost.Table.al. Do not edit.
-// Written by hand as the specification the generator must reproduce (board:0012).
 
 #include "ResourceCost.h"
 

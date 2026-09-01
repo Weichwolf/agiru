@@ -1,15 +1,14 @@
 // Generated from Projects/Resources/Pricing/ResourceCost.Table.al. Do not edit.
-// Written by hand as the specification the generator must reproduce (board:0012).
 
 #pragma once
 
+#include "agiru/Code.h"
 #include "agiru/Decimal.h"
 #include "agiru/Declare.h"
 #include "agiru/Ids.h"
 #include "agiru/Option.h"
 #include "agiru/Table.h"
 #include "agiru/TableDef.h"
-#include "agiru/Text.h"
 
 #include <array>
 #include <cstddef>

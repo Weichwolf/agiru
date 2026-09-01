@@ -1,10 +1,10 @@
+#include "agiru/Code.h"
 #include "agiru/Database.h"
 #include "agiru/Decimal.h"
 #include "agiru/Error.h"
 #include "agiru/Option.h"
 #include "agiru/Session.h"
 #include "agiru/Storage.h"
-#include "agiru/Text.h"
 
 #include "Check.h"
 #include "ResourceCost.h"

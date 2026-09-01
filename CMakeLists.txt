@@ -99,13 +99,19 @@ set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
 #
 # An app sees the door and the apps it depends on, never the runtime's internals. An app with no
 # sources yet is skipped rather than declared empty: the generator has not written it.
+# THE GENERATED TREE IS NOT BUILT UNTIL IT COMPILES. Turning it on while the runtime is short of
+# what it uses would make `make` red for a reason that is already measured elsewhere -- the AL
+# surface baseline says how much of AL is reachable, and that is the number that has to rise. The
+# day it is enough, this defaults to ON and the option goes.
+option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
+
 file(GLOB app_dirs RELATIVE "${CMAKE_SOURCE_DIR}/apps" CONFIGURE_DEPENDS "apps/*")
 foreach(app IN LISTS app_dirs)
   if(NOT IS_DIRECTORY "${CMAKE_SOURCE_DIR}/apps/${app}")
     continue()
   endif()
   file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS "apps/${app}/*.cpp")
-  if(NOT app_sources)
+  if(NOT app_sources OR NOT AGIRU_BUILD_APPS)
     continue()
   endif()
   add_library(agiru_app_${app} SHARED ${app_sources})
