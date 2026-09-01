@@ -1,0 +1,33 @@
+#include "agiru/Session.h"
+
+#include "agiru/Database.h"
+
+#include <string>
+
+namespace agiru {
+
+namespace {
+
+thread_local Session *g_current = nullptr;
+
+} // namespace
+
+Session::Session(const std::string &connectionInfo)
+    : connection_(connectionInfo), previous_(g_current) {
+  g_current = this;
+}
+
+Session::~Session() {
+  g_current = previous_;
+}
+
+Session &Session::Current() {
+  if (g_current == nullptr) { throw SessionError("no session is open on this thread"); }
+  return *g_current;
+}
+
+bool Session::HasCurrent() {
+  return g_current != nullptr;
+}
+
+} // namespace agiru

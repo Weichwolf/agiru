@@ -79,16 +79,61 @@ struct TableDef {
 /// \param no    The AL field number.
 /// \return The field, or `nullptr` when the table declares no such number.
 ///
-/// AL addresses fields by NUMBER and never by position: numbers are sparse in real tables, where an
-/// obsoleted field leaves its number behind and nothing fills the gap. A linear walk is right at
-/// these sizes -- the widest BaseApp table has a few hundred fields in one contiguous `.rodata`
-/// run, and a binary search would touch more cache lines than it saves.
+/// \pre The field table is sorted by field number. The generator emits it that way and asserts it
+///      beside every table, so the precondition is checked at compile time rather than trusted.
 ///
-/// \note A free function rather than a method, so that `TableDef`, `FieldDef` and `KeyDef` stay
-///       plain aggregates: the generator writes them with designated initializers.
+/// A binary search rather than a walk, and the numbers say why (measured over the BaseApp,
+/// 2026-09-01): the median table has 9 fields but the widest has 240, and a `FieldDef` is some 70
+/// bytes -- a walk over the widest touches around 17 KB, on a path `Validate` will take for every
+/// field of every record. Sorting costs nothing: AL already declares 1 526 of 1 545 tables in
+/// ascending order.
+///
+/// \note Field numbers are NOT dense and no index array can replace this: the median highest
+///       number is 14 and the largest in the BaseApp is 99 008 500.
 [[nodiscard]] constexpr const FieldDef *Field(const TableDef &table, FieldNo no) {
+  std::size_t low = 0;
+  std::size_t high = table.fields.size();
+  while (low < high) {
+    const std::size_t mid = low + ((high - low) / 2);
+    if (table.fields[mid].no == no) { return &table.fields[mid]; }
+    if (table.fields[mid].no < no) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return nullptr;
+}
+
+/// \brief Whether a field table is sorted by field number.
+///
+/// \param table The table to check.
+/// \return True when Field() may binary-search it.
+///
+/// The generator asserts this beside every table it writes, so a mis-sorted table is a translation
+/// error rather than a lookup that quietly finds nothing.
+[[nodiscard]] constexpr bool FieldsAreSorted(const TableDef &table) {
+  for (std::size_t i = 1; i < table.fields.size(); ++i) {
+    if (!(table.fields[i - 1].no < table.fields[i].no)) { return false; }
+  }
+  return true;
+}
+
+/// \brief Finds a field by where it sits in the record.
+///
+/// \param table  The table to search.
+/// \param offset The field's offset within the record.
+/// \return The field, or `nullptr` when no field sits there.
+///
+/// This is what lets generated code name a FIELD where AL names a field -- `FieldError(Code)`
+/// rather than `FieldError(FieldNumber::Code)` -- because the address of a member is enough to find
+/// its declaration.
+///
+/// \note A walk rather than a search, because offsets have no useful order and this is only ever
+///       reached on an error path, where one pass over a few hundred entries costs nothing.
+[[nodiscard]] constexpr const FieldDef *FieldAtOffset(const TableDef &table, std::size_t offset) {
   for (const FieldDef &f : table.fields) {
-    if (f.no == no) { return &f; }
+    if (f.offset == offset) { return &f; }
   }
   return nullptr;
 }

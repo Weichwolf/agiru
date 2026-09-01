@@ -88,11 +88,12 @@ void CodeOrdersNumericallyWhereBothSidesAreDigits() {
 } // namespace
 
 int main() {
-  CodeNormalisesPerTheDocumentation();
-  LengthIsCheckedAfterTrimming();
-  TheMessageIsTheBcMessage();
-  TextKeepsWhatCodeChanges();
-  LengthCountsTheWayDotNetDoes();
-  CodeOrdersNumericallyWhereBothSidesAreDigits();
-  return gate::Done("Text");
+  return gate::Run("Text", [] {
+    CodeNormalisesPerTheDocumentation();
+    LengthIsCheckedAfterTrimming();
+    TheMessageIsTheBcMessage();
+    TextKeepsWhatCodeChanges();
+    LengthCountsTheWayDotNetDoes();
+    CodeOrdersNumericallyWhereBothSidesAreDigits();
+  });
 }

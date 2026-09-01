@@ -140,6 +140,25 @@ describes, the runtime must do, whether or not a test asks for it.
    it for ALL of its methods. The predecessor allowed `Record`->`Table`, `RecordRef`->`_RecordRefProxy`,
    `List`->`AlList` and lost the check for each of them. Here `Record` is called `Record`.
    Internal classes with no AL counterpart are free to be named anything.
+
+   **AND THERE IS A SECOND REASON, WHICH IS THE STRONGER ONE.** Nobody will write an agiru module
+   by hand. New tables, new codeunits, new extensions will be written by a model -- and AL is in
+   that model's training data while agiru never will be. So the criterion for the generated shape
+   is not fidelity for its own sake: **a reader who knows AL and has never seen agiru must be able
+   to open one file and know how to write the next one.** Every deviation from AL is a place where
+   that reader's priors mislead them, which makes it a defect class rather than a matter of taste.
+
+   Three things follow, and they decide arguments that would otherwise be preference:
+   - **Consistency beats cleverness.** If `FieldError(Code)` names the field, then `TestField`,
+     `FieldCaption` and `Validate` name it the same way. An exception is a trap for anyone
+     generalising from one example to the next, which is exactly how such a reader works.
+   - **Where idiomatic C++ can produce the AL shape, it does.** `FieldError(Code)` rather than
+     `FieldError(FieldNumber::Code)`; `Rec.Insert()` rather than `Insert(connection, table, ...)`.
+     The platform half lives in the base class, where AL keeps it too.
+   - **Where it cannot, the deviation is VISIBLE and uniform rather than clever.** `Code != ""`
+     for `Code <> ''` is fine: it reads as itself. A macro or an operator trick that spelled it
+     `<>` would be worse than the deviation -- that is what "without abusing C++" means, and it
+     is the boundary the two rules meet at.
 2. **A documented behaviour without a gate case is a gap**, even when no AL test touches it.
 3. **The completeness measure is a counter with a baseline** -- documented syntax block against C++
    signature, across all 135 AL types. It does NOT measure whether an existing signature does the
@@ -194,6 +213,24 @@ C++ truths rather than decisions about agiru. They do not move.
 - **Artefacts go to `build/` or the system temp directory**, never into the tree.
   `compile_commands.json` is the exception, because clangd looks for it at the root; it is
   gitignored.
+
+### What the database layer owes AL
+
+Three things about BC's use of SQL are not details and shape `src/db` from the start. They are
+listed here because the generator is about to emit 1 700 tables and each of them is a schema
+decision that is cheap now and a migration later.
+
+- **Isolation is a state machine per table, not a setting.** A read takes `READUNCOMMITTED` until
+  the session writes to that table, then `READCOMMITTED`; `LockTable()` raises it to `UPDLOCK` for
+  the rest of the transaction (`devenv-tri-state-locking.md`, `devenv-read-isolation.md`).
+  **PostgreSQL cannot do the first one** -- it has no dirty read -- so that divergence is named and
+  measured rather than mapped away (board:0012).
+- **Every table carries system fields**, `SystemId` through `SystemRowVersion`
+  (`devenv-table-system-fields.md`). The rowversion is monotonic across the DATABASE, not per
+  table, because `Database.LastUsedRowVersion` is `@@DBTS`; synchronisation and change tracking
+  stand on that, and a rowversion that is merely present is worse than none (board:0013).
+- **A session's connection is pinned for its transaction.** Whatever pool this grows, handing a
+  different connection to the same session mid-transaction breaks the transaction (board:0012).
 
 ## The invariants
 

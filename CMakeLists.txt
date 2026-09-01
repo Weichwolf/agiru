@@ -76,6 +76,13 @@ if(TARGET agiru_db)
   target_link_libraries(agiru_db PUBLIC PostgreSQL::PostgreSQL)
 endif()
 
+
+# NO ENVIRONMENT VARIABLE DECIDES A RESULT. The gate's database is a declared build setting, not
+# something the shell happens to be carrying: a case that reads its target from the environment
+# passes or fails for reasons the tree cannot see.
+set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
+    CACHE STRING "Connection string the gate uses")
+
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one
 # crash.
@@ -90,6 +97,7 @@ foreach(case IN LISTS gate_cases)
   target_include_directories(gate_${name} PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate"
     "${CMAKE_SOURCE_DIR}/test/target")
+  target_compile_definitions(gate_${name} PRIVATE AGIRU_TEST_DSN="${AGIRU_TEST_DSN}")
   foreach(tier IN LISTS TIERS)
     if(TARGET agiru_${tier})
       target_link_libraries(gate_${name} PRIVATE agiru_${tier})

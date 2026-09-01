@@ -32,6 +32,11 @@ public:
 ///       what an error message and a filter string have to say.
 template <typename E> struct OptionTraits;
 
+namespace detail {
+/// \brief Lets the runtime write an ordinal it read from a column.
+class ValueAccess;
+} // namespace detail
+
 /// \brief The part of an option that does not depend on its member list.
 ///
 /// The ordinal is all the runtime needs to read an option through the field table. The member names
@@ -41,6 +46,8 @@ class OptionValue {
 public:
   /// \return The ordinal. AL converts an option to an integer without ceremony; so does this.
   [[nodiscard]] constexpr std::int32_t AsInteger() const { return ordinal_; }
+
+  friend class detail::ValueAccess;
 
 protected:
   /// \brief The zero member.
@@ -116,6 +123,13 @@ public:
   [[nodiscard]] constexpr std::string_view Caption() const {
     return IsDeclared() ? Traits::kCaptions[static_cast<std::size_t>(AsInteger())]
                         : std::string_view{};
+  }
+
+  /// \brief Compares against a named member, the way AL writes `Type = Type::All`.
+  /// \param value The member.
+  /// \return True when this option holds that member.
+  [[nodiscard]] constexpr bool operator==(E value) const {
+    return AsInteger() == static_cast<std::int32_t>(value);
   }
 
   /// \brief Orders two options by ordinal.

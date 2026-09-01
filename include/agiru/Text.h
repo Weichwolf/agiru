@@ -22,6 +22,13 @@ public:
 /// \brief Internals of the string types. Not part of the door.
 namespace detail {
 
+/// \brief Lets the runtime write a value it read from a column.
+///
+/// The storage layer reaches a field as an offset and a type tag, so it cannot use the typed
+/// assignment. This is the one way in, named so that every caller can be found, and it applies
+/// the same rules assignment does.
+class ValueAccess;
+
 /// \brief Counts a UTF-8 string the way .NET counts a string: in UTF-16 code units.
 ///
 /// \param s The UTF-8 text.
@@ -100,6 +107,8 @@ public:
   [[nodiscard]] std::size_t Length() const { return detail::Utf16Length(value_); }
 
 protected:
+  friend class detail::ValueAccess;
+
   /// \brief Stores an already validated value.
   /// \param value The text, checked and normalised by the derived type.
   void Set(std::string value) { value_ = std::move(value); }
@@ -162,6 +171,11 @@ public:
   /// \param o The other text.
   /// \return True when the stored text is identical.
   [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
+
+  /// \brief Compares against a literal, the way AL writes `Code <> ''`.
+  /// \param value The text.
+  /// \return True when the stored text is identical.
+  [[nodiscard]] bool operator==(std::string_view value) const { return Stored() == value; }
 };
 
 /// \brief AL `Code[N]`.
@@ -214,6 +228,11 @@ public:
   /// \param o The other code.
   /// \return True when the stored text is identical, so `"01"` differs from `"1"`.
   [[nodiscard]] bool operator==(const Code &o) const { return Stored() == o.Stored(); }
+
+  /// \brief Compares against a literal, the way AL writes `Code <> ''`.
+  /// \param value The text.
+  /// \return True when the stored text is identical.
+  [[nodiscard]] bool operator==(std::string_view value) const { return Stored() == value; }
 };
 
 /// \brief AL `MaxStrLen(String)`.

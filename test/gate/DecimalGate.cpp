@@ -121,10 +121,11 @@ void FailuresAreLoud() {
 } // namespace
 
 int main() {
-  TextRoundTrip();
-  Arithmetic();
-  Comparison();
-  RoundingPerTheDocumentation();
-  FailuresAreLoud();
-  return gate::Done("Decimal");
+  return gate::Run("Decimal", [] {
+    TextRoundTrip();
+    Arithmetic();
+    Comparison();
+    RoundingPerTheDocumentation();
+    FailuresAreLoud();
+  });
 }

@@ -173,6 +173,19 @@ void TestField(const void *record, const TableDef &table, FieldNo no, const T &e
       record, table, *def, detail::TextOf(expected, *def), FieldText(record, *def));
 }
 
+/// \brief AL `Format(Value)` for an option -- its caption.
+///
+/// \tparam E The option's enumeration.
+/// \param value The option.
+/// \return The caption of the member it holds.
+///
+/// \warning A first step only. AL's `Format` takes a length and a format number and is locale
+///          dependent; the full function is board:0007. What is here covers `Format(<option>)`,
+///          which is what an error message uses.
+template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
+  return std::string(value.Caption());
+}
+
 /// \brief AL `StrSubstNo(Text [, Any,...])`.
 ///
 /// \tparam Args    The argument types, each convertible to a string view.

@@ -83,10 +83,11 @@ void OptionsOrderByOrdinal() {
 } // namespace
 
 int main() {
-  TheTypeIsZeroBasedAndSequential();
-  ItConvertsToAnIntegerBothWays();
-  TheNameKeepsTheAlSpelling();
-  AnUndeclaredOrdinalIsHeldRatherThanRefused();
-  OptionsOrderByOrdinal();
-  return gate::Done("Option");
+  return gate::Run("Option", [] {
+    TheTypeIsZeroBasedAndSequential();
+    ItConvertsToAnIntegerBothWays();
+    TheNameKeepsTheAlSpelling();
+    AnUndeclaredOrdinalIsHeldRatherThanRefused();
+    OptionsOrderByOrdinal();
+  });
 }

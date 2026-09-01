@@ -76,17 +76,25 @@ fi
 
 printf '\n== silent places ==\n'
 # A NOLINT SWITCHES A FINDING OFF AND WOULD OTHERWISE COST NOTHING -- which would make the baseline
-# above a fig leaf. Every place where this tree suppresses a diagnostic or swallows an error carries
+# above a fig leaf. Every place where this tree suppresses a diagnostic or SWALLOWS an error carries
 # a number here, and that number may only fall.
-silent=$(grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.)' src include test --include='*.cpp' \
-  --include='*.h' 2>/dev/null | grep -v '^src/app/' | wc -l | tr -d ' ')
+#
+# WHAT COUNTS AND WHAT DOES NOT, because the first version of this counter measured the wrong thing.
+# It counted every `catch (...)`, which made a handler that REPORTS and returns non-zero cost the
+# same as one that eats the error -- and it counted the word inside a comment about the word. What
+# is silent is an EMPTY handler. A handler that says what went wrong is the opposite of silent, and
+# charging for it pushed the tree toward having none.
+grep_silent() {
+  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.) *{ *}' src include test --include='*.cpp' \
+    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^src/app/'
+}
+silent=$(grep_silent | wc -l | tr -d ' ')
 allowedSilent=$(cat test/todo-baseline 2>/dev/null || echo 0)
 printf 'lint: %s silent place(s), the baseline allows %s\n' "$silent" "$allowedSilent"
 if [ "$silent" -gt "$allowedSilent" ]; then
   printf 'lint: A SILENT PLACE WAS ADDED. It carries its reason in the line above it,\n' >&2
   printf 'lint: or it goes away again. The baseline does not raise itself.\n' >&2
-  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.)' src include test --include='*.cpp' --include='*.h' \
-    2>/dev/null | grep -v '^src/app/' >&2
+  grep_silent >&2
   exit 1
 fi
 if [ "$silent" -lt "$allowedSilent" ]; then
