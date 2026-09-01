@@ -32,8 +32,8 @@ if [ -z "$ours" ]; then
 elif "$FMT" --dry-run --Werror $ours 2>"$REPORT/format.log"; then
   printf 'lint: jede Datei ist formatiert\n'
 else
-  printf 'lint: %s Datei(en) sind nicht formatiert -- `clang-format -i`, oder %s\n' \
-    "$(cut -d: -f1 "$REPORT/format.log" | sort -u | wc -l | tr -d ' ')" "$REPORT/format.log" >&2
+  printf 'lint: %s Formatverletzung(en) -- `clang-format -i`, oder %s\n' \
+    "$(grep -c ': error:' "$REPORT/format.log" | tr -d ' ')" "$REPORT/format.log" >&2
   exit 1
 fi
 
@@ -63,7 +63,7 @@ if [ "$units" -lt "$allowedUnits" ]; then
   printf 'lint: falschen Boden fest. Erst den Build reparieren.\n' >&2
   exit 2
 fi
-grep -o '\[[a-z-]*\]$' "$REPORT/tidy.unique" | sort | uniq -c | sort -rn | head -12
+sed -n 's/.*\t\[\([a-z0-9-]*\).*/\1/p' "$REPORT/tidy.unique" | sort | uniq -c | sort -rn | head -12
 printf '\nlint: %s Fund(e) ueber %s Einheit(en), die Baseline erlaubt %s\n' "$found" "$units" "$allowed"
 if [ "$found" -gt "$allowed" ]; then
   printf 'lint: DIE BASELINE IST GEWACHSEN um %s. Ein Commit senkt sie oder laesst sie; nie hebt er sie.\n' \
@@ -74,4 +74,24 @@ fi
 if [ "$found" -lt "$allowed" ] || [ "$units" -gt "$allowedUnits" ]; then
   printf '%s %s\n' "$found" "$units" > "$BASELINE"
   printf 'lint: Baseline auf "%s %s" gesetzt -- mit der Reparatur committen.\n' "$found" "$units"
+fi
+
+printf '\n== Stille Stellen ==\n'
+# EIN NOLINT SCHALTET EINEN FUND AB UND WUERDE SONST NICHTS KOSTEN -- damit waere die Baseline oben
+# eine Feige. Jede Stelle, an der dieser Baum eine Meldung unterdrueckt oder einen Fehler schluckt,
+# traegt hier eine Zahl, und die darf nur fallen.
+silent=$(grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.)' src include test --include='*.cpp' \
+  --include='*.h' 2>/dev/null | grep -v '^src/app/' | wc -l | tr -d ' ')
+allowedSilent=$(cat test/todo-baseline 2>/dev/null || echo 0)
+printf 'lint: %s stille Stelle(n), die Baseline erlaubt %s\n' "$silent" "$allowedSilent"
+if [ "$silent" -gt "$allowedSilent" ]; then
+  printf 'lint: EINE STILLE STELLE IST DAZUGEKOMMEN. Sie traegt ihren Grund in der Zeile darueber,\n' >&2
+  printf 'lint: oder sie geht wieder weg. Die Baseline hebt sich nicht von selbst.\n' >&2
+  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.)' src include test --include='*.cpp' --include='*.h' \
+    2>/dev/null | grep -v '^src/app/' >&2
+  exit 1
+fi
+if [ "$silent" -lt "$allowedSilent" ]; then
+  printf '%s\n' "$silent" > test/todo-baseline
+  printf 'lint: Baseline auf %s gesenkt -- mit der Reparatur committen.\n' "$silent"
 fi
