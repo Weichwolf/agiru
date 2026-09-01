@@ -70,6 +70,20 @@ struct CodeunitObject {
   std::vector<LabelDecl> labels;
 };
 
+struct EnumValueDecl {
+  int ordinal = 0;
+  std::string name;
+  std::vector<Property> properties;
+};
+
+struct EnumObject {
+  int id = 0;
+  std::string name;
+  std::string nameSpace;
+  std::vector<Property> properties;
+  std::vector<EnumValueDecl> values;
+};
+
 struct TableObject {
   int id = 0;
   std::string name;

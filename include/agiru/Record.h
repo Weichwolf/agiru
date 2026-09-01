@@ -136,10 +136,10 @@ namespace detail {
 ///
 /// \tparam T    The value's type.
 /// \param value The value.
-/// \param def   The field it is compared against, which carries an option's member names.
+/// \param def   The field it is compared against, which carries an enumeration's value names.
 /// \return The rendered text.
 template <typename T> [[nodiscard]] std::string TextOf(const T &value, const FieldDef &def) {
-  if constexpr (std::is_base_of_v<OptionValue, T>) {
+  if constexpr (std::is_base_of_v<OrdinalValue, T>) {
     return MemberText(def, value.AsInteger());
   } else if constexpr (std::is_base_of_v<StringValue, T>) {
     return std::string(value.Value());

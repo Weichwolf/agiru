@@ -1,0 +1,128 @@
+#pragma once
+
+#include "agiru/EnumDef.h"
+
+#include <compare>
+#include <cstdint>
+#include <span>
+#include <string_view>
+
+/// \file
+/// \brief AL's Enum -- a named enumeration whose ordinals are declared rather than counted.
+
+namespace agiru {
+
+/// \brief The declared values of one AL enum object, as static const data.
+///
+/// \tparam E The generated enumeration naming the values.
+///
+/// The generator specialises this once per enum OBJECT, not once per field: `enum 27 "Item Type"`
+/// is one declaration that every field of that type shares, so the value table exists once in
+/// `.rodata` however many tables use it. In the BaseApp that is 462 declarations behind 1 351
+/// fields (measured 2026-09-01).
+template <typename E> struct EnumTraits;
+
+/// \brief AL `Enum`.
+///
+/// \tparam E The generated enumeration naming the values.
+///
+/// \note An Enum is NOT an Option with a different spelling, and the difference is the ordinal.
+///       `enum-frominteger-method.md` documents it outright with
+///       `enum 50130 YesNo { value(0; Yes) value(10; No) }` and the line
+///       `Answer := Enum::YesNo.FromInteger(10); // Ordinal value for 'No'`. The number is
+///       declared, not counted: 103 of the BaseApp's 576 enum objects have gaps and the largest
+///       ordinal in it is 7 003. Everything here therefore looks a value up BY ORDINAL, never by
+///       where it sits.
+///
+/// \note The default is ordinal 0 whether or not the enumeration declares it, which is what an
+///       integer column stores for an unset field. IsDeclared() says which of the two it is.
+///
+/// \note `Names()` and `Ordinals()` are NOT here yet. Both return a `List of [...]` and there is no
+///       List type in the runtime, so writing them would mean inventing a return the platform does
+///       not document. The AL surface baseline counts what is reachable, and it counts them absent.
+template <typename E> class Enum : public OrdinalValue {
+public:
+  /// \brief The generated enumeration.
+  using Enumeration = E;
+
+  /// \brief The value table for that enumeration.
+  using Traits = EnumTraits<E>;
+
+  /// ValueOf() BINARY-SEARCHES, so the order it searches is checked rather than assumed. The
+  /// generator emits the values sorted by ordinal and asserts it beside every enumeration too; this
+  /// is the second lock, on the side that does the reading.
+  static_assert(ValuesAreSorted(std::span<const EnumValueDef>(Traits::kValues)),
+                "the value table is emitted sorted by ordinal, which is what lets ValueOf() "
+                "binary-search it");
+
+  /// \brief The zero ordinal.
+  constexpr Enum() = default;
+
+  /// \brief Holds a named value.
+  /// \param value The value.
+  constexpr explicit Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+
+  /// \brief Returns an enum with the integer value.
+  ///
+  /// \param value The ordinal.
+  /// \return The enum holding that ordinal.
+  ///
+  /// AL's `Enum::"Item Type".FromInteger(2)`. It does not refuse an undeclared ordinal, because the
+  /// platform's own example reaches for a value by a number that no position would give.
+  [[nodiscard]] static constexpr Enum FromInteger(std::int32_t value) {
+    Enum held;
+    held.SetOrdinal(value);
+    return held;
+  }
+
+  /// \brief Assigns a named value.
+  /// \param value The value.
+  /// \return This object.
+  constexpr Enum &operator=(E value) {
+    SetOrdinal(static_cast<std::int32_t>(value));
+    return *this;
+  }
+
+  /// \return The ordinal as the generated enumeration.
+  [[nodiscard]] constexpr E Value() const { return static_cast<E>(AsInteger()); }
+
+  /// \return True when the ordinal is one the enumeration declares.
+  [[nodiscard]] constexpr bool IsDeclared() const {
+    return ValueOf(Traits::kValues, AsInteger()) != nullptr;
+  }
+
+  /// \return The value name as AL spelled it, or empty when the ordinal is undeclared.
+  [[nodiscard]] constexpr std::string_view Name() const {
+    const EnumValueDef *value = ValueOf(Traits::kValues, AsInteger());
+    return value != nullptr ? value->name : std::string_view{};
+  }
+
+  /// \return The display caption, or empty when the ordinal is undeclared.
+  [[nodiscard]] constexpr std::string_view Caption() const {
+    const EnumValueDef *value = ValueOf(Traits::kValues, AsInteger());
+    return value != nullptr ? value->caption : std::string_view{};
+  }
+
+  /// \brief Compares against a named value, the way AL writes `Type = Type::Service`.
+  /// \param value The value.
+  /// \return True when this enum holds that value.
+  [[nodiscard]] constexpr bool operator==(E value) const {
+    return AsInteger() == static_cast<std::int32_t>(value);
+  }
+
+  /// \brief Orders two enums by ordinal.
+  /// \param o The other enum.
+  /// \return The ordering.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const Enum &o) const {
+    return AsInteger() <=> o.AsInteger();
+  }
+
+  /// \brief Compares two enums by ordinal.
+  /// \param o The other enum.
+  /// \return True when the ordinals are equal.
+  [[nodiscard]] constexpr bool operator==(const Enum &o) const {
+    return AsInteger() == o.AsInteger();
+  }
+};
+
+} // namespace agiru

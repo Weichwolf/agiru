@@ -1,5 +1,6 @@
 #include "Ast.h"
 #include "BodyWriter.h"
+#include "EnumWriter.h"
 #include "Names.h"
 #include "Parser.h"
 #include "Scope.h"
@@ -18,6 +19,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -73,8 +75,12 @@ void Report(std::string_view what, const Counts &counts) {
     }
     return;
   }
-  std::println(
-      "{:<10}{} of {} parsed ({} fields)", what, counts.parsed, counts.files, counts.members);
+  std::println("{:<10}{} of {} parsed ({} {})",
+               what,
+               counts.parsed,
+               counts.files,
+               counts.members,
+               what == "enums" ? "values" : "fields");
 }
 
 void Cluster(const std::vector<Failure> &failures) {
@@ -121,91 +127,166 @@ struct Job {
   std::filesystem::path output;
 };
 
-int Scan(const Job &job) {
-  const std::filesystem::path &root = job.source;
-  const std::filesystem::path &out = job.output;
-  // The generator OWNS its output directory. An aborted run must not leave half a tree behind for
-  // the next build to read as if it were whole -- the predecessor records exactly that failure, a
-  // clean step that wiped the tree and an abort that left a partial one the loader took happily.
-  if (!out.empty()) {
-    std::filesystem::remove_all(out);
-    std::filesystem::create_directories(out);
-    std::ofstream reaches(out / "reaches", std::ios::binary);
-    reaches << "# GENERATED. Never by hand.\n#\n"
-            << "# An app sees ONLY the door under include/agiru/ and the apps it declares a "
-               "dependency on in\n"
-            << "# apps.json. It does not see the runtime's internals: with `rt` here, every change "
-               "to an\n"
-            << "# internal runtime header would throw away every generated translation unit in "
-               "every app.\n";
-  }
-
+/// What every pass shares: where the source is, where the output goes, and what went wrong.
+struct Run {
+  std::filesystem::path root;
+  std::filesystem::path output;
   std::vector<Failure> failures;
   std::size_t written = 0;
+};
 
-  Counts tables;
-  for (const std::filesystem::path &path : SourcesEndingIn(root, ".Table.al")) {
-    ++tables.files;
-    try {
-      const agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
-      ++tables.parsed;
-      tables.members += table.fields.size();
-      if (!out.empty()) {
-        const std::string relative = std::filesystem::relative(path, root).string();
-        const std::string directory =
-            agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table);
-        const std::string name = agiru::gen::Identifier(table.name);
-        std::string stem = directory;
-        stem += "/";
-        stem += name;
-        Write(Output{.directory = out, .relative = stem + ".h"},
-              agiru::gen::WriteHeader(table, relative));
-        Write(Output{.directory = out, .relative = stem + ".cpp"},
-              agiru::gen::WriteSource(table, relative));
-        ++written;
-      }
-    } catch (const std::exception &e) {
-      if (Declares(e.what())) {
-        --tables.files;
-        continue;
-      }
-      failures.push_back(Failure{.reason = Normalised(e.what()),
-                                 .path = std::filesystem::relative(path, root).string(),
+/// Records one parse failure, or reports the file as carrying no object of this kind at all.
+/// \return True when the file held no such object and must not count towards the population.
+bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) {
+  if (Declares(e.what())) { return true; }
+  run.failures.push_back(Failure{.reason = Normalised(e.what()),
+                                 .path = std::filesystem::relative(path, run.root).string(),
                                  .detail = e.what()});
+  return false;
+}
+
+// THE ENUMS COME FIRST AND THAT IS NOT AN ORDERING PREFERENCE. A table field spelled
+// `Enum "Item Type"` names an object declared in another file, so neither the type it translates to
+// nor the header that declares it is knowable from the table alone. The index is built over the
+// whole source before the first table is written.
+agiru::gen::EnumIndex ScanEnums(Run &run, Counts &counts) {
+  std::vector<agiru::al::EnumObject> objects;
+  std::vector<std::string> paths;
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Enum.al")) {
+    ++counts.files;
+    try {
+      agiru::al::EnumObject object = agiru::al::ParseEnum(Read(path));
+      ++counts.parsed;
+      counts.members += object.values.size();
+      paths.push_back(std::filesystem::relative(path, run.root).string());
+      objects.push_back(std::move(object));
+    } catch (const std::exception &e) {
+      if (Note(run, path, e)) { --counts.files; }
     }
   }
 
-  Counts codeunits;
-  for (const std::filesystem::path &path : SourcesEndingIn(root, ".Codeunit.al")) {
-    ++codeunits.files;
+  agiru::gen::EnumIndex index;
+  for (const agiru::al::EnumObject &object : objects) {
+    index.insert_or_assign(agiru::gen::LowerKey(object.name),
+                           agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
+                                               .header = agiru::gen::EnumHeaderPath(object)});
+  }
+  if (run.output.empty()) { return index; }
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    Write(Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(objects[i])},
+          agiru::gen::WriteEnum(objects[i], paths[i]));
+    ++run.written;
+  }
+  return index;
+}
+
+void WriteTable(Run &run,
+                const agiru::al::TableObject &table,
+                const std::string &relative,
+                const agiru::gen::EnumIndex &index,
+                std::map<std::string, std::size_t> &unresolved) {
+  const std::string stem =
+      agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
+      agiru::gen::Identifier(table.name);
+  const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index);
+  for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
+  Write(Output{.directory = run.output, .relative = stem + ".h"}, header.text);
+  Write(Output{.directory = run.output, .relative = stem + ".cpp"},
+        agiru::gen::WriteSource(table, relative));
+  ++run.written;
+}
+
+void ScanTables(Run &run,
+                Counts &counts,
+                const agiru::gen::EnumIndex &index,
+                std::map<std::string, std::size_t> &unresolved) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
+    ++counts.files;
+    try {
+      const agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
+      ++counts.parsed;
+      counts.members += table.fields.size();
+      if (!run.output.empty()) {
+        WriteTable(
+            run, table, std::filesystem::relative(path, run.root).string(), index, unresolved);
+      }
+    } catch (const std::exception &e) {
+      if (Note(run, path, e)) { --counts.files; }
+    }
+  }
+}
+
+void ScanCodeunits(Run &run, Counts &counts) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
+    ++counts.files;
     try {
       const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(Read(path));
-      ++codeunits.parsed;
-      codeunits.members += unit.procedures.size();
+      ++counts.parsed;
+      counts.members += unit.procedures.size();
       std::size_t tests = 0;
       for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
         if (agiru::al::HasAttribute(procedure, "Test")) { ++tests; }
       }
-      codeunits.tests += tests;
+      counts.tests += tests;
       if (tests != 0 && IsUnitTest(unit.name)) {
-        ++codeunits.unitFiles;
-        codeunits.unitTests += tests;
+        ++counts.unitFiles;
+        counts.unitTests += tests;
       }
     } catch (const std::exception &e) {
-      if (Declares(e.what())) {
-        --codeunits.files;
-        continue;
-      }
-      failures.push_back(Failure{.reason = Normalised(e.what()),
-                                 .path = std::filesystem::relative(path, root).string(),
-                                 .detail = e.what()});
+      if (Note(run, path, e)) { --counts.files; }
     }
   }
+}
 
-  if (!out.empty()) { std::println("written   {} table objects into {}", written, out.string()); }
+// AN UNRESOLVED ENUM IS REPORTED, NOT SWALLOWED. It is not a defect in the table that names it: the
+// declaration lives in a layer this run was not given, and the count is what says how much the next
+// layer is worth.
+void ReportUnresolved(const std::map<std::string, std::size_t> &unresolved) {
+  if (unresolved.empty()) { return; }
+  std::size_t fields = 0;
+  for (const auto &[name, count] : unresolved) { fields += count; }
+  std::println("unknown   {} enum(s) named by {} field(s) are declared outside this source root",
+               unresolved.size(),
+               fields);
+}
+
+// The generator OWNS its output directory. An aborted run must not leave half a tree behind for the
+// next build to read as if it were whole -- the predecessor records exactly that failure, a clean
+// step that wiped the tree and an abort that left a partial one the loader took happily.
+void ClaimOutput(const std::filesystem::path &out) {
+  if (out.empty()) { return; }
+  std::filesystem::remove_all(out);
+  std::filesystem::create_directories(out);
+  std::ofstream reaches(out / "reaches", std::ios::binary);
+  reaches << "# GENERATED. Never by hand.\n#\n"
+          << "# An app sees ONLY the door under include/agiru/ and the apps it declares a "
+             "dependency on in\n"
+          << "# apps.json. It does not see the runtime's internals: with `rt` here, every change "
+             "to an\n"
+          << "# internal runtime header would throw away every generated translation unit in "
+             "every app.\n";
+}
+
+int Scan(const Job &job) {
+  Run run{.root = job.source, .output = job.output, .failures = {}, .written = 0};
+  ClaimOutput(run.output);
+
+  std::map<std::string, std::size_t> unresolved;
+  Counts enums;
+  Counts tables;
+  Counts codeunits;
+  const agiru::gen::EnumIndex index = ScanEnums(run, enums);
+  ScanTables(run, tables, index, unresolved);
+  ScanCodeunits(run, codeunits);
+
+  if (!run.output.empty()) {
+    std::println("written   {} objects into {}", run.written, run.output.string());
+  }
+  Report("enums", enums);
   Report("tables", tables);
   Report("codeunits", codeunits);
-  Cluster(failures);
+  ReportUnresolved(unresolved);
+  Cluster(run.failures);
   return 0;
 }
 

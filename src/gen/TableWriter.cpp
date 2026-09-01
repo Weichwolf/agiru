@@ -1,6 +1,7 @@
 #include "TableWriter.h"
 
 #include "Ast.h"
+#include "EnumWriter.h"
 #include "Names.h"
 #include "Token.h"
 
@@ -76,43 +77,81 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
+bool IsEnumField(const al::FieldDecl &field) {
+  return TypeName(field.type) == "Enum" && !field.subtype.empty();
+}
+
 bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
   return std::ranges::any_of(
       table.fields, [type](const al::FieldDecl &field) { return Identifier(field.name) == type; });
 }
 
-std::string
-MemberType(const al::TableObject &table, const al::FieldDecl &field, const OptionField *option) {
-  if (option != nullptr) { return "Option<" + option->enumName + ">"; }
-  if (field.type == "Code" || field.type == "Text") {
-    const std::string bare = field.type + "<" + std::to_string(field.length) + ">";
-    return ShadowedByAField(table, field.type) ? "::agiru::" + bare : bare;
+std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
+  return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
+}
+
+std::string MemberType(const al::TableObject &table,
+                       const al::FieldDecl &field,
+                       const OptionField *option,
+                       const EnumIndex &enums) {
+  if (option != nullptr) { return Reach(table, "Option", "Option<" + option->enumName + ">"); }
+  if (IsEnumField(field)) {
+    const auto found = enums.find(LowerKey(field.subtype));
+    const std::string named =
+        found != enums.end() ? found->second.identifier : Identifier(field.subtype);
+    return Reach(table, "Enum", "Enum<enums::" + named + ">");
   }
-  return ShadowedByAField(table, field.type) ? "::agiru::" + field.type : field.type;
+  const std::string type = TypeName(field.type);
+  if (type == "Code" || type == "Text") {
+    return Reach(table, type, type + "<" + std::to_string(field.length) + ">");
+  }
+  return Reach(table, type, type);
+}
+
+// SORTED BY FIELD NUMBER, NOT AS AL DECLARED IT. Field() binary-searches and the emitted
+// static_assert holds it to that, and AL does not always oblige: 19 of the BaseApp's 1 545 tables
+// declare their fields out of order, Sales Line among them (measured 2026-09-01). The MEMBERS keep
+// AL's order, because that is what a reader compares against the .al file and because `offsetof`
+// does not care; only the field table moves.
+std::vector<const al::FieldDecl *> ByNumber(const al::TableObject &table) {
+  std::vector<const al::FieldDecl *> fields;
+  fields.reserve(table.fields.size());
+  for (const al::FieldDecl &field : table.fields) { fields.push_back(&field); }
+  std::ranges::sort(
+      fields, [](const al::FieldDecl *a, const al::FieldDecl *b) { return a->number < b->number; });
+  return fields;
 }
 
 void WriteOptionTraits(std::string &out, const OptionField &option) {
   out += "template <> struct agiru::OptionTraits<agiru::app::" + option.enumName + "> {\n";
-  for (const std::string_view which : {"kMembers", "kCaptions"}) {
-    const std::vector<std::string> &values = which == "kMembers" ? option.members : option.captions;
-    out += "  static constexpr std::array<std::string_view, " + std::to_string(values.size()) +
-           "> " + std::string(which) + "{";
-    for (std::size_t i = 0; i < values.size(); ++i) {
-      if (i != 0) { out += ", "; }
-      out += Quoted(values[i]);
-    }
-    out += "};\n";
+  out += "  static constexpr std::array<EnumValueDef, " + std::to_string(option.members.size()) +
+         "> kValues{{\n";
+  for (std::size_t i = 0; i < option.members.size(); ++i) {
+    out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
+           ", .name = " + Quoted(option.members[i]) + ", .caption = " + Quoted(option.captions[i]) +
+           "},\n";
   }
+  out += "  }};\n";
   out += "};\n";
 }
 
-std::string Includes(const al::TableObject &table, const std::vector<OptionField> &options) {
+std::string Includes(const al::TableObject &table,
+                     const std::vector<OptionField> &options,
+                     const EnumIndex &enums) {
   std::set<std::string> headers{
       "agiru/Declare.h", "agiru/Ids.h", "agiru/Table.h", "agiru/TableDef.h"};
   for (const al::FieldDecl &field : table.fields) {
-    const std::string type =
-        OptionOf(options, field) != nullptr ? std::string("Option") : field.type;
-    headers.insert("agiru/" + type + ".h");
+    if (OptionOf(options, field) != nullptr) {
+      headers.insert("agiru/Option.h");
+      continue;
+    }
+    if (IsEnumField(field)) {
+      headers.insert("agiru/Enum.h");
+      const auto found = enums.find(LowerKey(field.subtype));
+      if (found != enums.end()) { headers.insert(found->second.header); }
+      continue;
+    }
+    headers.insert("agiru/" + TypeName(field.type) + ".h");
   }
   std::string out;
   for (const std::string &header : headers) {
@@ -124,17 +163,31 @@ std::string Includes(const al::TableObject &table, const std::vector<OptionField
   return out;
 }
 
+std::vector<std::string> Unresolved(const al::TableObject &table, const EnumIndex &enums) {
+  std::vector<std::string> missing;
+  for (const al::FieldDecl &field : table.fields) {
+    if (!IsEnumField(field)) { continue; }
+    if (enums.contains(LowerKey(field.subtype))) { continue; }
+    if (std::ranges::find(missing, field.subtype) == missing.end()) {
+      missing.push_back(field.subtype);
+    }
+  }
+  return missing;
+}
+
 } // namespace
 
-std::string WriteHeader(const al::TableObject &table, const std::string &sourcePath) {
+TableHeader
+WriteHeader(const al::TableObject &table, const std::string &sourcePath, const EnumIndex &enums) {
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
+  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
 
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#pragma once\n\n";
-  out += Includes(table, options);
+  out += Includes(table, options, enums);
   out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
   out += "#include <string_view>\n#include <type_traits>\n\n";
 
@@ -159,7 +212,7 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
   out += "  static constexpr std::string_view kName{" + Quoted(table.name) + "};\n\n";
 
   for (const al::FieldDecl &field : table.fields) {
-    out += "  " + MemberType(table, field, OptionOf(options, field)) + " " +
+    out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
            Identifier(field.name) + ";\n";
   }
 
@@ -193,8 +246,8 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
   out += "};\n\n";
 
   out += "inline constexpr std::array k" + tableIdentifier + "Fields{\n";
-  for (const al::FieldDecl &field : table.fields) {
-    const std::string identifier = Identifier(field.name);
+  for (const al::FieldDecl *field : sorted) {
+    const std::string identifier = Identifier(field->name);
     out += "    Declare<&";
     out += tableIdentifier;
     out += "::";
@@ -204,9 +257,9 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
     out += "::FieldNumber::";
     out += identifier;
     out += ", ";
-    out += Quoted(field.name);
+    out += Quoted(field->name);
     out += ", ";
-    out += Quoted(Caption(field));
+    out += Quoted(Caption(*field));
     out += ", offsetof(";
     out += tableIdentifier;
     out += ", ";
@@ -257,7 +310,7 @@ std::string WriteHeader(const al::TableObject &table, const std::string &sourceP
   out += "template <> struct agiru::TableTraits<agiru::app::" + tableIdentifier + "> {\n";
   out += "  static constexpr const TableDef &kTable = agiru::app::k" + tableIdentifier + "Table;\n";
   out += "};\n";
-  return out;
+  return TableHeader{.text = out, .unresolvedEnums = Unresolved(table, enums)};
 }
 
 } // namespace agiru::gen

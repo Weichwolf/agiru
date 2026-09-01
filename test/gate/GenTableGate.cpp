@@ -43,8 +43,10 @@ void TheGeneratorReproducesTheTargetImage() {
   // drifts from it.
   const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
       .source = agiru::gen::WriteHeader(
-          agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
-          std::string(kAlPath)),
+                    agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
+                    std::string(kAlPath),
+                    agiru::gen::EnumIndex{})
+                    .text,
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.h"});
   const std::string target =
@@ -123,7 +125,7 @@ void AChangedSourceChangesTheOutput() {
   widened.replace(at, std::string("Code[20]").size(), "Code[30]");
 
   const std::string generated =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(widened), std::string(kAlPath));
+      agiru::gen::WriteHeader(agiru::al::ParseTable(widened), std::string(kAlPath), {}).text;
   CHECK_TRUE("a widened field widens its member",
              generated.find("::agiru::Code<30> Code;") != std::string::npos);
   CHECK_TRUE("and the old width is gone",
@@ -135,7 +137,7 @@ void AChangedSourceChangesTheOutput() {
   renamed.replace(nameAt, std::string("\"Work Type Code\"").size(), "\"Work Kind Code\"");
 
   const std::string afterRename =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath));
+      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}).text;
   CHECK_TRUE("a renamed field renames its member and its number",
              afterRename.find("WorkKindCode;") != std::string::npos &&
                  afterRename.find("FieldNo WorkKindCode{3}") != std::string::npos);

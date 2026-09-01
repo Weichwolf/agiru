@@ -1,5 +1,6 @@
 #pragma once
 
+#include "agiru/EnumDef.h"
 #include "agiru/Ids.h"
 
 #include <cstddef>
@@ -49,12 +50,13 @@ struct FieldDef {
   std::uint16_t length;     ///< Declared length for Code and Text, 0 otherwise.
   std::size_t offset;       ///< `offsetof` within the generated record.
 
-  /// \brief The member names of an Option or Enum field, empty otherwise.
+  /// \brief The declared values of an Option or Enum field, empty otherwise.
   ///
   /// They live in the metadata rather than in the value because they are the same for every record
   /// of the table: one `.rodata` run for the whole table instead of a copy per instance. An error
-  /// message needs them, since AL renders an option by its member name and never by its ordinal.
-  std::span<const std::string_view> members;
+  /// message needs them, since AL renders either enumeration by its value name and never by its
+  /// ordinal.
+  std::span<const EnumValueDef> values;
 };
 
 /// \brief One key's declaration. The first key of a table is its primary key.

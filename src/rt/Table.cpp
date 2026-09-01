@@ -3,10 +3,10 @@
 #include "agiru/BigInteger.h"
 #include "agiru/Boolean.h"
 #include "agiru/Decimal.h"
+#include "agiru/EnumDef.h"
 #include "agiru/Error.h"
 #include "agiru/Ids.h"
 #include "agiru/Integer.h"
-#include "agiru/Option.h"
 #include "agiru/Record.h"
 #include "agiru/Session.h"
 #include "agiru/StringValue.h"
@@ -27,7 +27,7 @@ class ValueAccess {
 public:
   static void Store(StringValue &target, std::string value) { target.Set(std::move(value)); }
 
-  static void Store(OptionValue &target, std::int32_t ordinal) { target.SetOrdinal(ordinal); }
+  static void Store(OrdinalValue &target, std::int32_t ordinal) { target.SetOrdinal(ordinal); }
 };
 
 namespace {
@@ -40,9 +40,9 @@ std::string StorageText(const void *record, const FieldDef &def) {
   switch (def.type) {
     case FieldType::Option:
     case FieldType::Enum:
-      return std::to_string(
-          reinterpret_cast<const OptionValue *>(static_cast<const std::byte *>(record) + def.offset)
-              ->AsInteger());
+      return std::to_string(reinterpret_cast<const OrdinalValue *>(
+                                static_cast<const std::byte *>(record) + def.offset)
+                                ->AsInteger());
     default: return FieldText(record, def);
   }
 }
@@ -95,7 +95,7 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       return;
     case FieldType::Option:
     case FieldType::Enum:
-      ValueAccess::Store(*reinterpret_cast<OptionValue *>(At(record, def)),
+      ValueAccess::Store(*reinterpret_cast<OrdinalValue *>(At(record, def)),
                          std::stoi(std::string(text)));
       return;
     default: throw Error("no reader for this field type yet");

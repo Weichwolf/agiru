@@ -33,13 +33,19 @@ enum class ResourceCostCostType : std::int32_t {
 } // namespace agiru::app
 
 template <> struct agiru::OptionTraits<agiru::app::ResourceCostType> {
-  static constexpr std::array<std::string_view, 3> kMembers{"Resource", "Group(Resource)", "All"};
-  static constexpr std::array<std::string_view, 3> kCaptions{"Resource", "Group(Resource)", "All"};
+  static constexpr std::array<EnumValueDef, 3> kValues{{
+      EnumValueDef{.ordinal = 0, .name = "Resource", .caption = "Resource"},
+      EnumValueDef{.ordinal = 1, .name = "Group(Resource)", .caption = "Group(Resource)"},
+      EnumValueDef{.ordinal = 2, .name = "All", .caption = "All"},
+  }};
 };
 
 template <> struct agiru::OptionTraits<agiru::app::ResourceCostCostType> {
-  static constexpr std::array<std::string_view, 3> kMembers{"Fixed", "% Extra", "LCY Extra"};
-  static constexpr std::array<std::string_view, 3> kCaptions{"Fixed", "% Extra", "LCY Extra"};
+  static constexpr std::array<EnumValueDef, 3> kValues{{
+      EnumValueDef{.ordinal = 0, .name = "Fixed", .caption = "Fixed"},
+      EnumValueDef{.ordinal = 1, .name = "% Extra", .caption = "% Extra"},
+      EnumValueDef{.ordinal = 2, .name = "LCY Extra", .caption = "LCY Extra"},
+  }};
 };
 
 namespace agiru::app {

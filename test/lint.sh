@@ -136,21 +136,28 @@ if [ -x build/agirutc ] && [ -d "$AGIRU_AL_SOURCE" ]; then
   tableTotal=$(printf '%s' "$scan" | awk '/^tables/{print $4}')
   units=$(printf '%s' "$scan" | awk '/^codeunits/{print $2}')
   unitTotal=$(printf '%s' "$scan" | awk '/^codeunits/{print $4}')
-  read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal <<EOT
-$(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0")
+  enums=$(printf '%s' "$scan" | awk '/^enums/{print $2}')
+  enumTotal=$(printf '%s' "$scan" | awk '/^enums/{print $4}')
+  read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal allowedEnums allowedEnumTotal <<EOT
+$(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0 0 0")
 EOT
-  printf 'lint: %s of %s tables and %s of %s codeunits parse\n' \
-    "$tables" "$tableTotal" "$units" "$unitTotal"
-  printf 'lint: the baseline requires %s tables and %s codeunits\n' "$allowedTables" "$allowedUnits"
-  if [ "$tables" -lt "$allowedTables" ] || [ "$units" -lt "$allowedUnits" ]; then
+  printf 'lint: %s of %s tables, %s of %s codeunits and %s of %s enums parse\n' \
+    "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal"
+  printf 'lint: the baseline requires %s tables, %s codeunits and %s enums\n' \
+    "$allowedTables" "$allowedUnits" "$allowedEnums"
+  if [ "$tables" -lt "$allowedTables" ] || [ "$units" -lt "$allowedUnits" ] ||
+     [ "$enums" -lt "$allowedEnums" ]; then
     printf 'lint: THE POPULATION FELL. A commit raises it or leaves it; it never lowers it.\n' >&2
     exit 1
   fi
   if [ "$tables" -gt "$allowedTables" ] || [ "$units" -gt "$allowedUnits" ] ||
-     [ "$tableTotal" -ne "$allowedTableTotal" ] || [ "$unitTotal" -ne "$allowedUnitTotal" ]; then
-    printf '%s %s %s %s\n' "$tables" "$tableTotal" "$units" "$unitTotal" > test/transpile-baseline
-    printf 'lint: baseline raised to "%s %s %s %s" -- commit it with the widening.\n' \
-      "$tables" "$tableTotal" "$units" "$unitTotal"
+     [ "$enums" -gt "$allowedEnums" ] ||
+     [ "$tableTotal" -ne "$allowedTableTotal" ] || [ "$unitTotal" -ne "$allowedUnitTotal" ] ||
+     [ "$enumTotal" -ne "$allowedEnumTotal" ]; then
+    printf '%s %s %s %s %s %s\n' \
+      "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal" > test/transpile-baseline
+    printf 'lint: baseline raised to "%s %s %s %s %s %s" -- commit it with the widening.\n' \
+      "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal"
   fi
 else
   printf 'lint: agirutc or the AL source is missing, so the population is not measured.\n' >&2

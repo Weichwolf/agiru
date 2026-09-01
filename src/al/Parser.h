@@ -16,4 +16,6 @@ TableObject ParseTable(std::string_view source);
 
 CodeunitObject ParseCodeunit(std::string_view source);
 
+EnumObject ParseEnum(std::string_view source);
+
 } // namespace agiru::al

@@ -103,6 +103,44 @@ public:
     return unit;
   }
 
+  EnumObject ParseEnum() {
+    EnumObject object;
+    object.nameSpace = ReadHeaderNamespace("enum");
+    Expect("enum");
+    object.id = ExpectInteger();
+    object.name = ExpectName();
+    // An enum may implement interfaces, and 28 of the BaseApp's 576 do. The interface list is read
+    // and dropped here rather than skipped past: `implements` is the only thing that may stand
+    // between the name and the brace, so anything else is still an error.
+    if (AtKeyword("implements")) {
+      Advance();
+      while (!AtEnd() && !AtPunctuation("{")) {
+        (void)ExpectName();
+        if (AtPunctuation(",")) { Advance(); }
+      }
+    }
+    Expect("{");
+    while (!AtPunctuation("}")) {
+      if (AtKeyword("value")) {
+        Advance();
+        Expect("(");
+        EnumValueDecl value;
+        value.ordinal = ExpectInteger();
+        Expect(";");
+        value.name = ExpectName();
+        Expect(")");
+        Expect("{");
+        while (!AtPunctuation("}")) { value.properties.push_back(ParseProperty()); }
+        Expect("}");
+        object.values.push_back(std::move(value));
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
 private:
   ProcedureDecl ParseProcedure(const std::vector<std::string> &attributes) {
     ProcedureDecl procedure;
@@ -490,6 +528,10 @@ TableObject ParseTable(std::string_view source) {
 
 CodeunitObject ParseCodeunit(std::string_view source) {
   return Parser(Tokenize(source)).ParseCodeunit();
+}
+
+EnumObject ParseEnum(std::string_view source) {
+  return Parser(Tokenize(source)).ParseEnum();
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

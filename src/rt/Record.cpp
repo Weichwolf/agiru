@@ -1,9 +1,9 @@
 #include "agiru/Record.h"
 
 #include "agiru/Decimal.h"
+#include "agiru/EnumDef.h"
 #include "agiru/Error.h"
 #include "agiru/Ids.h"
-#include "agiru/Option.h"
 #include "agiru/TableDef.h"
 
 #include <cstddef>
@@ -42,7 +42,7 @@ std::string FieldText(const void *record, const FieldDef &def) {
     case FieldType::Option:
     case FieldType::Enum:
       return detail::MemberText(
-          def, reinterpret_cast<const OptionValue *>(At(record, def))->AsInteger());
+          def, reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger());
     default: throw Error("FieldText: no rendering for this field type yet");
   }
 }
@@ -54,7 +54,7 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::Decimal: return reinterpret_cast<const Decimal *>(At(record, def))->IsZero();
     case FieldType::Option:
     case FieldType::Enum:
-      return reinterpret_cast<const OptionValue *>(At(record, def))->AsInteger() == 0;
+      return reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger() == 0;
     default: throw Error("IsBlank: no blank test for this field type yet");
   }
 }
@@ -93,10 +93,8 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
 
 namespace detail {
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
-  if (ordinal < 0 || static_cast<std::size_t>(ordinal) >= def.members.size()) {
-    return std::to_string(ordinal);
-  }
-  return std::string(def.members[static_cast<std::size_t>(ordinal)]);
+  const EnumValueDef *value = ValueOf(def.values, ordinal);
+  return value != nullptr ? std::string(value->name) : std::to_string(ordinal);
 }
 
 void RaiseTestFieldMismatch(const void *record,

@@ -1,3 +1,4 @@
+#include "agiru/EnumDef.h"
 #include "agiru/Option.h"
 
 #include "Check.h"
@@ -23,18 +24,20 @@ enum class ResourceCostType : std::int32_t {
 } // namespace
 
 template <> struct agiru::OptionTraits<ResourceCostType> {
-  static constexpr std::array<std::string_view, 3> kMembers{"Resource", "Group(Resource)", "All"};
-  static constexpr std::array<std::string_view, 3> kCaptions{"Resource", "Group(Resource)", "All"};
+  static constexpr std::array<agiru::EnumValueDef, 3> kValues{{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Resource", .caption = "Resource"},
+      agiru::EnumValueDef{.ordinal = 1, .name = "Group(Resource)", .caption = "Group(Resource)"},
+      agiru::EnumValueDef{.ordinal = 2, .name = "All", .caption = "All"},
+  }};
 };
 
 namespace {
 
 using Type = agiru::Option<ResourceCostType>;
 
-// WHAT THE COMPILER CAN DECIDE IS A static_assert AND NEVER A CASE. The generator emits these
-// beside every option: the two lists agree in length, and the type is zero-based and sequential.
-static_assert(agiru::OptionTraits<ResourceCostType>::kMembers.size() ==
-              agiru::OptionTraits<ResourceCostType>::kCaptions.size());
+// WHAT THE COMPILER CAN DECIDE IS A static_assert AND NEVER A CASE. `Option` itself asserts that
+// the members are zero-based and sequential, so instantiating the type below is already that check.
+static_assert(agiru::ValuesAreDense(agiru::OptionTraits<ResourceCostType>::kValues));
 static_assert(static_cast<std::int32_t>(ResourceCostType::Resource) == 0);
 static_assert(Type{}.AsInteger() == 0);
 static_assert(Type{ResourceCostType::All}.AsInteger() == 2);

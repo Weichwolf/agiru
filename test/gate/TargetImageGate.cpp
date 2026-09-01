@@ -1,4 +1,5 @@
 #include "agiru/Decimal.h"
+#include "agiru/EnumDef.h"
 #include "agiru/Ids.h"
 #include "agiru/TableDef.h"
 
@@ -11,6 +12,7 @@
 
 using agiru::Field;
 using agiru::FieldNo;
+using agiru::ValueOf;
 using agiru::app::ResourceCost;
 using agiru::app::ResourceCostCostType;
 using agiru::app::ResourceCostType;
@@ -78,10 +80,12 @@ void TheOptionsCarryTheirAlSpelling() {
              "Group(Resource)");
   rec.CostType = ResourceCostCostType::PercentExtra;
   CHECK_TEXT("and so does '% Extra'", std::string(rec.CostType.Name()), "% Extra");
-  // The field table carries the same names, which is what an error message reads.
-  CHECK_TEXT("and the field table carries them too",
-             std::string(Field(Table(), ResourceCost::FieldNumber::CostType)->members[1]),
-             "% Extra");
+  // The field table carries the same names, which is what an error message reads, and it reaches
+  // them BY ORDINAL rather than by position -- the same call an Enum field answers.
+  CHECK_TEXT(
+      "and the field table carries them too",
+      std::string(ValueOf(Field(Table(), ResourceCost::FieldNumber::CostType)->values, 1)->name),
+      "% Extra");
 }
 
 void TheDefaultRecordIsBlank() {
