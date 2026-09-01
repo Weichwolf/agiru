@@ -35,6 +35,23 @@ The count of `SetTemporary` and `Temporary` in the BaseApp and its test codeunit
 wall time of ten thousand inserts into a temporary record against the same into a real one, both
 measured, before and after the seam goes in.
 
+## Predecessor
+
+`openerp/runtime/base/table/_temp_table.py` is the whole store in 70 lines, and it carries one
+measured lesson that is not obvious and would be paid for again:
+
+> `_TempStore` carries a monotonic mutation `version` so the `_next_temp` fast-path can tell when a
+> cached filtered+sorted snapshot is still valid without re-scanning the whole store on every
+> `Next()` (the O(n^2) hot-path: a `repeat ... until Next()=0` loop over a large temp buffer
+> re-filtered+re-sorted the entire store on each step).
+
+And a second, about sharing: the version rides on the STORE and not on the record instance, because
+AL `Copy(src, true)` makes two record variables share one store and each must see the other's
+mutations.
+
+Both are about the SAME thing -- that a temporary record is walked in a loop far more often than a
+real one -- which is the argument for giving the memory store the fast path here too.
+
 ## Closed when
 
 A temporary record inserts, gets, modifies, filters and walks in key order with no database

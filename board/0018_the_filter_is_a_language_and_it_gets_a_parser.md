@@ -47,6 +47,24 @@ The BaseApp's own filter strings. They are extractable: every `SetFilter(` liter
 codeunits is a corpus, and the count that parses is a baseline that may only rise -- the same
 mechanism the table and codeunit counts already use.
 
+## Predecessor
+
+`openerp/runtime/base/table/_filters.py` is 370 lines of exactly this, and the split it arrived at
+is worth copying: the parse produces atoms, and then THREE consumers read them -- an in-memory
+matcher (`_atom_matches`), a SQL clause builder (`_atom_clauses`), and FlowField filter coercion
+(`_coerce_flow_filter`). That is the same three-way split a temporary record (board:0020) and a
+FlowField (board:0019) force here, and it is the reason the parse must not be SQL-shaped.
+
+Its most expensive comment is about a CalcFormula CONST rather than a user filter, and it names the
+failure mode this whole item exists to avoid:
+
+> the raw string hit the integer column -> PG `operator does not exist: integer = character varying`
+> (which, swallowed, aborts the transaction and cascades to every later read).
+
+An enum-qualified CONST arrives as `Type"::"Member` with the qualifier still attached, and a blank
+option member arrives as a whitespace string that is ordinal 0. Both had to be resolved to an
+ordinal before reaching the column. Neither is in the documentation.
+
 ## Closed when
 
 That corpus parses whole, and a gate shows each operator above producing the SQL and the result NAV

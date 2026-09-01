@@ -47,6 +47,39 @@ it is written down.
 The three documented examples as a gate, and then the distinct DateFormula literals in the BaseApp
 as a corpus: every one parses, and the count is a baseline that may only rise.
 
+## Predecessor -- which answers every open question above, with its evidence
+
+`openerp/runtime/builtins/_datetime.py` implements the whole grammar and records both its citations
+and its refuted attempts. Taking these as HINTS to confirm, not as verdicts:
+
+| question | its answer | its evidence |
+|---|---|---|
+| `-CM` | the FIRST day of the period; no sign or `+` gives the last | `Date2DMY('<-CM>')=1` in an ERMKPIWebService test |
+| `CY` / `CW` / `CQ` | Jan 1 or Dec 31; Monday or Sunday; quarter bounds | same sign rule throughout |
+| `WDn` signed | next or previous occurrence, EXCLUSIVE of the reference date, so `D` itself moves `D±7` | the `<-WD2>` example this item already quotes |
+| `Dn` / unsigned `WDn` | a selector, where the sign is meaningless | -- |
+
+**And a form neither this item nor the platform page mentions: `<Wn>`.** It is the Monday of ISO
+week n of the base year, first-class grammar, distinct from `<nW>` (n weeks) and `<WDn>` (weekday).
+Its absence was silent-wrong rather than an error:
+
+> Der frühere Regex las `W1` als W(oche)+Quantity-0 -> Ziffer verworfen, Basisdatum unverandert
+> (silent-wrong).
+
+**Three more that only an implementation finds:**
+
+- `<nM>` keeps the day of month and CLAMPS to the target month's length rather than adding 28 or 30:
+  `Dec-31 <1M>` is `Jan-31`.
+- `<nY>` clamps the same way, so `Feb-29 <1Y>` is `Feb-28`.
+- `<nQ>` is `3n` months and shares the month logic.
+
+**Three refuted attempts are recorded there and must not be repeated**: dropping the sign on a
+C-period (which made `<-CM>` the last day), ignoring `WD` entirely (no shift at all), and letting
+`n`-quarter fall through the pattern.
+
+The order the terms are matched in is itself load-bearing: `WD` first, so that it does not split
+into W(eek) + D(ay).
+
 ## Closed when
 
 The three worked examples pass, every open question above is answered with a citation or a measured

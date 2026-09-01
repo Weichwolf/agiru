@@ -42,6 +42,32 @@ absent afterwards and `Run` returned false. Then the same with a `Commit` before
 the row survives. And `asserterror` catching the message, substring-matched the way
 `Assert.ExpectedError` matches it.
 
+## Predecessor
+
+`openerp/runtime/transaction.py` and `openerp/runtime/asserterror.py` did this, and they correct
+this item on the point it got half right.
+
+**What this item said**: a `Commit` releases the boundary, so an error afterwards cannot roll back
+past it. True, and not the whole rule. What the predecessor paid for:
+
+> AL `Commit` ends the current write transaction and STARTS A NEW ONE, so a later error must still
+> roll back -- to the commit point. Releasing the savepoint without replacing it (the earlier
+> behaviour) left the enclosing block with no rollback at all, so everything written after an inner
+> `Commit` survived an `asserterror`.
+
+So a `Commit` does not release the block's savepoint; it SWAPS it for a fresh one taken at the
+commit point. The savepoint is held through an indirection for exactly that reason.
+
+**And a second, which lands on board:0012.** The savepoint must be opened on the SAME connection
+handle the queries run on -- otherwise it opens on an unrelated or absent one and the rollback that
+is supposed to clear an aborted transaction clears nothing. That is the pinned-connection rule
+CLAUDE.md already states, reached from the other direction.
+
+**Where the predecessor is a hint and not a verdict**: its `asserterror` swallows the exception and
+captures the text, and its savepoint stack exists mostly to make a per-test rollback boundary work
+under test isolation. Whether BC's `Codeunit.Run` boundary and the test-runner boundary are the
+same mechanism or two is a question the DOCUMENTATION has to answer here, not that file.
+
 ## Closed when
 
 Both halves pass, nested two deep, against PostgreSQL.

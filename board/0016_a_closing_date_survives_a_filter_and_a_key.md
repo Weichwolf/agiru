@@ -37,6 +37,22 @@ then reads them back through a filter, in key order, and through a `SETRANGE` th
 31 December. The closing row must be present or absent in each exactly as NAV has it, and the
 answers must be quoted from the documentation rather than from what the code happens to do.
 
+## Predecessor
+
+`openerp/runtime/builtins/_datetime.py::_al_closing_date` carries the case that decides whether
+this is worth doing at all, and it is a BaseApp IDIOM rather than a filter:
+
+> BaseApp gates closing-entry-only logic on `if D = ClosingDate(D)` (e.g. GenJnlLine.
+> GetGLBalAccount clears the balance posting groups). Returning `d` unchanged made that test ALWAYS
+> true -> the closing branch fired for every normal posting date (silent wrong data).
+
+So the first gate case is not a filter at all: `Closing(d) != d` for a normal date, and
+`Closing(Closing(d)) == Closing(d)`. `type/Date.h` satisfies both by construction -- the bit is
+either set or it is not -- but nothing asserts the IDIOM, and the idiom is what the BaseApp writes.
+
+The predecessor also treats the empty date and non-dates as passing through unchanged, which this
+implementation does too.
+
 ## Closed when
 
 The gate passes against PostgreSQL, and a `..` filter that ends on a normal date is shown to
