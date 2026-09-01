@@ -1,6 +1,7 @@
 #include "CodeunitWriter.h"
 
 #include "Ast.h"
+#include "BodyWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
@@ -14,6 +15,12 @@
 namespace agiru::gen {
 
 namespace {
+
+bool IsPublisher(const al::ProcedureDecl &procedure) {
+  return al::HasAttribute(procedure, "IntegrationEvent") ||
+         al::HasAttribute(procedure, "BusinessEvent") ||
+         al::HasAttribute(procedure, "InternalEvent");
+}
 
 bool NamesAnObject(const al::VarDecl &declared) {
   const std::string type = TypeName(declared.type);
@@ -99,7 +106,102 @@ std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const TableI
   return missing;
 }
 
+// A PROCEDURE'S SCOPE, INNERMOST FIRST: its own locals, then its parameters, then the codeunit's
+// variables, labels and other procedures. AL resolves a bare name that way and so does C++ once the
+// locals are declared, so every one of them spells itself -- what this settles is that the name IS
+// known, which is what keeps an unknown one from being emitted as if it were.
+class CodeunitNames : public Names {
+public:
+  CodeunitNames(const al::CodeunitObject &unit, const al::ProcedureDecl &procedure)
+      : unit_(unit), procedure_(procedure) {}
+
+  [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    for (const al::VarDecl &declared : procedure_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+    }
+    for (const al::VarDecl &declared : procedure_.parameters) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+    }
+    if (!procedure_.returnName.empty() &&
+        LowerKey(procedure_.returnName) == LowerKey(std::string(name))) {
+      return Identifier(name);
+    }
+    for (const al::VarDecl &declared : unit_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+    }
+    for (const al::LabelDecl &label : unit_.labels) {
+      if (LowerKey(label.name) == LowerKey(std::string(name))) { return Identifier(label.name); }
+    }
+    for (const al::ProcedureDecl &other : unit_.procedures) {
+      if (LowerKey(other.name) == LowerKey(std::string(name))) { return Identifier(other.name); }
+    }
+    return {};
+  }
+
+  /// \note EMPTY UNTIL A VARIABLE'S ENUM CAN BE NAMED. `X::Member` where `X` is an option or enum
+  ///       variable needs the enumeration that declared it, which is an index this writer does not
+  ///       carry yet. Returning nothing emits `X::Member` against a variable, which does not
+  ///       compile -- loud, and at build time, rather than a plausible wrong type.
+  [[nodiscard]] std::string Enumeration(std::string_view name) const override {
+    static_cast<void>(name);
+    return {};
+  }
+
+private:
+  const al::CodeunitObject &unit_;
+  const al::ProcedureDecl &procedure_;
+};
+
+std::string Locals(const al::ProcedureDecl &procedure, const TableIndex &tables) {
+  std::string out;
+  // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
+  // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
+  if (!procedure.returnName.empty()) {
+    out += "  " + Returns(procedure, tables) + " " + Identifier(procedure.returnName) + "{};\n";
+  }
+  for (const al::VarDecl &declared : procedure.variables) {
+    out += "  " + TypeOf(declared, tables) + " " + Identifier(declared.name) + "{};\n";
+  }
+  return out;
+}
+
 } // namespace
+
+std::string WriteCodeunitSource(const al::CodeunitObject &unit,
+                                const std::string &sourcePath,
+                                const TableIndex &tables) {
+  const std::string identifier = Identifier(unit.name);
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#include \"" + identifier + ".h\"\n\n";
+  out += "#include \"agiru.h\"\n\n";
+  out += "namespace agiru::app {\n\n";
+
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    // AN EVENT PUBLISHER'S BODY IS EMPTY BY DESIGN -- the platform fires subscribers at the CALL
+    // SITE -- so its definition has nothing to do with its parameters and drops their names.
+    const bool publisher = IsPublisher(procedure);
+    out += Returns(procedure, tables) + " " + identifier + "::" + Identifier(procedure.name) + "(" +
+           Parameters(procedure, tables, !publisher) + ") {";
+    const std::string locals = publisher ? std::string{} : Locals(procedure, tables);
+    const std::string body =
+        publisher ? std::string{}
+                  : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
+    if (locals.empty() && body.empty()) {
+      out += "}\n\n";
+      continue;
+    }
+    out += "\n";
+    out += locals;
+    if (!locals.empty() && !body.empty()) { out += "\n"; }
+    out += body;
+    out += "}\n\n";
+  }
+
+  out += "} // namespace agiru::app\n";
+  return out;
+}
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
   return OutputDirectory(unit.nameSpace, ObjectKind::Codeunit) + "/" + Identifier(unit.name) + ".h";

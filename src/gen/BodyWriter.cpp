@@ -96,7 +96,7 @@ std::string Quoted(std::string_view text) {
 
 class Writer {
 public:
-  explicit Writer(const al::TableObject &table) : table_(table) {}
+  explicit Writer(const Names &scope) : scope_(scope) {}
 
   std::string Statements(const std::vector<al::Stmt> &body, int indent) {
     std::string out;
@@ -209,15 +209,11 @@ private:
     return out;
   }
 
-  [[nodiscard]] std::string OptionEnum(const al::FieldDecl &field) const {
-    return OptionEnumName(table_.name, field.name);
-  }
-
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Name) {
-      const al::FieldDecl *field = FieldNamed(table_, base.text);
-      if (field != nullptr) { return OptionEnum(*field) + "::" + EnumeratorName(expression.text); }
+      const std::string enumeration = scope_.Enumeration(base.text);
+      if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
     }
     return Expression(base, kPrimaryPrecedence) + "::" + EnumeratorName(expression.text);
   }
@@ -232,12 +228,13 @@ private:
   }
 
   std::string Name(const al::Expr &expression) {
-    const al::FieldDecl *field = FieldNamed(table_, expression.text);
-    if (field != nullptr) { return Identifier(field->name); }
-    for (const al::LabelDecl &label : table_.labels) {
-      if (SameName(label.name, expression.text)) { return label.name; }
-    }
-    return Identifier(expression.text);
+    // AL'S BOOLEAN LITERALS ARE NOT IDENTIFIERS, and treating them as one capitalised them:
+    // `IsHandled := false` became `IsHandled = False`, which is an unknown name in every body that
+    // has one. AL is case-insensitive here and C++ is not.
+    if (SameName(expression.text, "true")) { return "true"; }
+    if (SameName(expression.text, "false")) { return "false"; }
+    const std::string known = scope_.Resolve(expression.text);
+    return known.empty() ? Identifier(expression.text) : known;
   }
 
   std::string Membership(const al::Expr &expression, int outer) {
@@ -300,16 +297,42 @@ private:
     return out;
   }
 
-  const al::TableObject &table_;
+  const Names &scope_;
   int depth_ = 0;
 };
 
 } // namespace
 
-std::string
-WriteStatements(const al::TableObject &table, const std::vector<al::Stmt> &body, int indent) {
-  return Writer(table).Statements(body, indent);
+std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent) {
+  return Writer(scope).Statements(body, indent);
 }
+
+/// A table trigger's scope: the table's own fields, then its labels. AL resolves a bare name in a
+/// trigger against the record it belongs to before anything else, which is why `Code` inside
+/// `Resource Cost` is the field and not a type.
+class TableNames : public Names {
+public:
+  explicit TableNames(const al::TableObject &table) : table_(table) {}
+
+  [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    const al::FieldDecl *field = FieldNamed(table_, name);
+    if (field != nullptr) { return Identifier(field->name); }
+    for (const al::LabelDecl &label : table_.labels) {
+      if (SameName(label.name, name)) { return label.name; }
+    }
+    return {};
+  }
+
+  [[nodiscard]] std::string Enumeration(std::string_view name) const override {
+    const al::FieldDecl *field = FieldNamed(table_, name);
+    return field != nullptr && Find(field->properties, "OptionMembers") != nullptr
+               ? OptionEnumName(table_.name, field->name)
+               : std::string{};
+  }
+
+private:
+  const al::TableObject &table_;
+};
 
 std::string WriteSource(const al::TableObject &table, const std::string &sourcePath) {
   const std::string identifier = Identifier(table.name);
@@ -322,7 +345,7 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
-      out += WriteStatements(table, trigger.body, 2);
+      out += WriteStatements(TableNames(table), trigger.body, 2);
       out += "}\n\n";
     }
   }

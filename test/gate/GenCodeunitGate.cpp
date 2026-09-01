@@ -125,6 +125,43 @@ void AChangedSourceChangesTheOutput() {
              Generated(voided).find("void TransferExtendedText") != std::string::npos);
 }
 
+/// The other half: the procedure bodies, which are AL statements rather than declarations.
+void TheGeneratorReproducesTheProcedureBodies() {
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
+          std::string(kAlPath),
+          Tables()),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "TransferOldExtTextLines.cpp"});
+  const std::string target =
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/TransferOldExtTextLines.cpp");
+
+  {
+    std::ofstream dump("/tmp/agiru-generated-TransferOldExtTextLines.cpp");
+    dump << generated;
+  }
+
+  const std::vector<std::string> left = Lines(generated);
+  const std::vector<std::string> right = Lines(target);
+  const std::size_t shared = left.size() < right.size() ? left.size() : right.size();
+  for (std::size_t i = 0; i < shared; ++i) {
+    if (left[i] != right[i]) {
+      CHECK_TEXT("the generated source matches the target image, line " + std::to_string(i + 1),
+                 left[i],
+                 right[i]);
+      return;
+    }
+  }
+  CHECK_TRUE("the generated source has as many lines as the target image",
+             left.size() == right.size());
+  if (left.size() != right.size()) {
+    CHECK_TEXT("the first line that only one of them has",
+               left.size() > right.size() ? left[shared] : std::string("<end of file>"),
+               right.size() > left.size() ? right[shared] : std::string("<end of file>"));
+  }
+}
+
 /// A codeunit that names a table the run never saw is REPORTED, not emitted against a type that is
 /// not there.
 void ATableTheRunNeverSawIsReported() {
@@ -145,6 +182,7 @@ void ATableTheRunNeverSawIsReported() {
 int main() {
   return gate::Run("GenCodeunit", [] {
     TheGeneratorReproducesTheTargetImage();
+    TheGeneratorReproducesTheProcedureBodies();
     AChangedSourceChangesTheOutput();
     ATableTheRunNeverSawIsReported();
   });

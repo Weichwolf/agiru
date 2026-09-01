@@ -29,6 +29,10 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
                              const TableIndex &tables);
 
+std::string WriteCodeunitSource(const al::CodeunitObject &unit,
+                                const std::string &sourcePath,
+                                const TableIndex &tables);
+
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
 
 } // namespace agiru::gen

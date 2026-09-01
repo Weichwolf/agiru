@@ -18,6 +18,7 @@
 #include <fstream>
 #include <ios>
 #include <map>
+#include <memory>
 #include <print>
 #include <span>
 #include <sstream>
@@ -58,6 +59,7 @@ struct Counts {
   std::size_t unitFiles = 0;  ///< UT codeunits in the POPULATION, counted from the text.
   std::size_t unitTests = 0;  ///< Their [Test] methods, likewise.
   std::size_t unitParsed = 0; ///< How many of those methods came through the parser.
+  std::size_t emitted = 0;    ///< Objects the generator could WRITE, which is the narrower count.
   std::size_t unitLost = 0;   ///< UT codeunits the parser could not read at all.
 };
 
@@ -142,7 +144,8 @@ struct Job {
 struct Run {
   std::filesystem::path root;
   std::filesystem::path output;
-  std::vector<Failure> failures;
+  std::vector<Failure> failures; ///< What could not be READ.
+  std::vector<Failure> refusals; ///< What could be read and not WRITTEN.
   std::size_t written = 0;
 };
 
@@ -214,7 +217,7 @@ void ScanTables(Run &run,
                 Counts &counts,
                 const agiru::gen::EnumIndex &index,
                 agiru::gen::TableIndex &tables,
-                std::map<std::string, std::size_t> &unresolved) {
+                std::map<std::string, std::size_t> &unresolvedEnums) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
     ++counts.files;
     try {
@@ -229,7 +232,7 @@ void ScanTables(Run &run,
       tables.insert_or_assign(std::to_string(table.id), ref);
       if (!run.output.empty()) {
         WriteTable(
-            run, table, std::filesystem::relative(path, run.root).string(), index, unresolved);
+            run, table, std::filesystem::relative(path, run.root).string(), index, unresolvedEnums);
       }
     } catch (const std::exception &e) {
       if (Note(run, path, e)) { --counts.files; }
@@ -270,31 +273,21 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
 void ScanCodeunits(Run &run,
                    Counts &counts,
                    const agiru::gen::TableIndex &tables,
-                   std::map<std::string, std::size_t> &unresolved) {
+                   std::map<std::string, std::size_t> &unresolvedTables) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
     ++counts.files;
     const std::string source = Read(path);
     const UnitTestPopulation population = UnitTestsIn(source);
     counts.unitFiles += population.files;
     counts.unitTests += population.tests;
+    // PARSING AND EMITTING ARE COUNTED APART, and mixing them cost a whole run's numbers: an
+    // emitter that refused a body threw out of the same try, so the codeunit went down as a PARSE
+    // failure and its [Test] methods were never counted. 41 568 became 4 624 in one step. What an
+    // object can be READ is one question and what it can be WRITTEN is another, and the second is
+    // where the runtime's gaps show up.
+    std::unique_ptr<agiru::al::CodeunitObject> unit;
     try {
-      const agiru::al::CodeunitObject unit = agiru::al::ParseCodeunit(source);
-      ++counts.parsed;
-      counts.members += unit.procedures.size();
-      if (!run.output.empty()) {
-        const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(
-            unit, std::filesystem::relative(path, run.root).string(), tables);
-        for (const std::string &missing : header.unresolvedTables) { ++unresolved[missing]; }
-        Write(Output{.directory = run.output, .relative = agiru::gen::CodeunitHeaderPath(unit)},
-              header.text);
-        ++run.written;
-      }
-      std::size_t tests = 0;
-      for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
-        if (agiru::al::HasAttribute(procedure, "Test")) { ++tests; }
-      }
-      counts.tests += tests;
-      if (population.files != 0) { counts.unitParsed += tests; }
+      unit = std::make_unique<agiru::al::CodeunitObject>(agiru::al::ParseCodeunit(source));
     } catch (const std::exception &e) {
       if (Note(run, path, e)) {
         --counts.files;
@@ -302,6 +295,32 @@ void ScanCodeunits(Run &run,
         counts.unitTests -= population.tests;
         if (population.files != 0) { ++counts.unitLost; }
       }
+      continue;
+    }
+    ++counts.parsed;
+    counts.members += unit->procedures.size();
+    std::size_t tests = 0;
+    for (const agiru::al::ProcedureDecl &procedure : unit->procedures) {
+      if (agiru::al::HasAttribute(procedure, "Test")) { ++tests; }
+    }
+    counts.tests += tests;
+    if (population.files != 0) { counts.unitParsed += tests; }
+    if (run.output.empty()) { continue; }
+    try {
+      const std::string relative = std::filesystem::relative(path, run.root).string();
+      const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, tables);
+      for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
+      const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
+      const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, tables);
+      Write(Output{.directory = run.output, .relative = stem}, header.text);
+      Write(Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
+            body);
+      ++counts.emitted;
+      ++run.written;
+    } catch (const std::exception &e) {
+      run.refusals.push_back(Failure{.reason = Normalised(e.what()),
+                                     .path = std::filesystem::relative(path, run.root).string(),
+                                     .detail = e.what()});
     }
   }
 }
@@ -309,13 +328,17 @@ void ScanCodeunits(Run &run,
 // AN UNRESOLVED ENUM IS REPORTED, NOT SWALLOWED. It is not a defect in the table that names it: the
 // declaration lives in a layer this run was not given, and the count is what says how much the next
 // layer is worth.
-void ReportUnresolved(const std::map<std::string, std::size_t> &unresolved) {
+void ReportUnresolved(std::string_view what,
+                      std::string_view by,
+                      const std::map<std::string, std::size_t> &unresolved) {
   if (unresolved.empty()) { return; }
-  std::size_t fields = 0;
-  for (const auto &[name, count] : unresolved) { fields += count; }
-  std::println("unknown   {} enum(s) named by {} field(s) are declared outside this source root",
+  std::size_t uses = 0;
+  for (const auto &[name, count] : unresolved) { uses += count; }
+  std::println("unknown   {} {} named by {} {} are declared outside this source root",
                unresolved.size(),
-               fields);
+               what,
+               uses,
+               by);
 }
 
 // The generator OWNS its output directory. An aborted run must not leave half a tree behind for the
@@ -349,6 +372,7 @@ void Add(Counts &into, const Counts &one) {
   into.unitTests += one.unitTests;
   into.unitParsed += one.unitParsed;
   into.unitLost += one.unitLost;
+  into.emitted += one.emitted;
 }
 
 // ONE ENUM INDEX ACROSS THE APPS, FILLED IN DECLARATION ORDER, AND THAT ORDER IS THE ENFORCEMENT.
@@ -359,13 +383,15 @@ int Scan(const Job &job) {
   const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
   ClaimOutput(job.output);
 
-  std::map<std::string, std::size_t> unresolved;
+  std::map<std::string, std::size_t> unresolvedEnums;
+  std::map<std::string, std::size_t> unresolvedTables;
   agiru::gen::EnumIndex index;
   agiru::gen::TableIndex objects;
   Counts allEnums;
   Counts allTables;
   Counts allCodeunits;
   std::vector<Failure> failures;
+  std::vector<Failure> refusals;
   std::size_t written = 0;
 
   for (const agiru::gen::App &app : apps) {
@@ -377,14 +403,15 @@ int Scan(const Job &job) {
     Run run{.root = source,
             .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
             .failures = {},
+            .refusals = {},
             .written = 0};
     Counts enums;
     Counts tables;
     Counts codeunits;
     ClaimApp(run.output);
     ScanEnums(run, enums, index);
-    ScanTables(run, tables, index, objects, unresolved);
-    ScanCodeunits(run, codeunits, objects, unresolved);
+    ScanTables(run, tables, index, objects, unresolvedEnums);
+    ScanCodeunits(run, codeunits, objects, unresolvedTables);
 
     std::println("{:<11}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
@@ -398,6 +425,7 @@ int Scan(const Job &job) {
     Add(allCodeunits, codeunits);
     written += run.written;
     failures.insert(failures.end(), run.failures.begin(), run.failures.end());
+    refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
   if (!job.output.empty()) {
@@ -406,8 +434,19 @@ int Scan(const Job &job) {
   Report("enums", allEnums);
   Report("tables", allTables);
   Report("codeunits", allCodeunits);
-  ReportUnresolved(unresolved);
+  if (allCodeunits.emitted != 0) {
+    std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
+                 allCodeunits.emitted,
+                 allCodeunits.parsed);
+  }
+  ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
+  ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
   Cluster(failures);
+  if (!refusals.empty()) {
+    std::println("");
+    std::println("refused   what parses and cannot be written yet");
+    Cluster(refusals);
+  }
   return 0;
 }
 

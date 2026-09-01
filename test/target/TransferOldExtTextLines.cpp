@@ -16,7 +16,6 @@ void TransferOldExtTextLines::InsertLineNumbers(Integer OldLineNo, Integer NewLi
 
 Integer TransferOldExtTextLines::GetNewLineNumber(Integer OldLineNo) {
   if (TempLineNumberBuffer.Get(OldLineNo)) { return TempLineNumberBuffer.NewLineNumber; }
-
   return 0;
 }
 
@@ -33,10 +32,8 @@ Integer TransferOldExtTextLines::TransferExtendedText(Integer OldLineNo,
   IsHandled = false;
   OnBeforeTransferExtendedText(OldLineNo, NewLineNo, AttachedLineNo, Result, IsHandled);
   if (IsHandled) { return Result; }
-
   InsertLineNumbers(OldLineNo, NewLineNo);
   if (AttachedLineNo != 0) { return GetNewLineNumber(AttachedLineNo); }
-
   return 0;
 }
 
