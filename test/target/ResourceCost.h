@@ -74,7 +74,6 @@ public:
   static constexpr std::string_view Text000{"cannot be specified when %1 is %2"};
 
   void OnValidateCode();
-
   void OnValidateCostType();
 };
 
@@ -120,7 +119,7 @@ static_assert(FieldsAreSorted(kResourceCostTable),
 static_assert(std::is_standard_layout_v<ResourceCost>,
               "offsetof over the field table requires standard layout. The base carries NO data, "
               "which is what keeps it so");
-static_assert(kResourceCostFields.size() == 6, "table 202 declares six fields");
+static_assert(kResourceCostFields.size() == 6, "table 202 declares 6 fields");
 
 } // namespace agiru::app
 

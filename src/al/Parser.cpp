@@ -32,9 +32,9 @@ public:
   explicit Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
 
   TableObject ParseTable() {
-    SkipHeader();
-    Expect("table");
     TableObject table;
+    table.nameSpace = ReadHeaderNamespace();
+    Expect("table");
     table.id = ExpectInteger();
     table.name = ExpectName();
     Expect("{");
@@ -108,8 +108,20 @@ private:
     return value;
   }
 
-  void SkipHeader() {
-    while (!AtEnd() && !AtKeyword("table")) { Advance(); }
+  std::string ReadHeaderNamespace() {
+    std::string dotted;
+    while (!AtEnd() && !AtKeyword("table")) {
+      if (AtKeyword("namespace")) {
+        Advance();
+        dotted.clear();
+        while (!AtEnd() && !AtPunctuation(";")) {
+          dotted += Peek().text;
+          Advance();
+        }
+      }
+      Advance();
+    }
+    return dotted;
   }
 
   void SkipBracedBlock() {

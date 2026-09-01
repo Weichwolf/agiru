@@ -30,6 +30,13 @@ Checks: >
 WarningsAsErrors: '*'
 
 CheckOptions:
+  # `misc-include-cleaner` maps `popen` and `pclose` to <stdio.h>, and
+  # `modernize-deprecated-headers` forbids naming that header. The two checks contradict each other
+  # and both are right in their own terms: these are POSIX functions and POSIX has no C++ header for
+  # them. Ignoring the one header resolves it at the narrowest point available -- neither check is
+  # switched off, and every other missing include is still a finding.
+  misc-include-cleaner.IgnoreHeaders: 'stdio.h'
+
   # `readability-identifier-length` belongs SET, not switched off. Its default asks for three
   # characters, which is wrong here: the tree carries AL vocabulary, and `i`, `n`, `no` are the
   # clearest names an index, a count and a `No.` will ever have. At one it still refuses the truly

@@ -105,7 +105,8 @@ foreach(case IN LISTS gate_cases)
     target_include_directories(gate_${name} PRIVATE "${CMAKE_SOURCE_DIR}/src/${tier}")
   endforeach()
   target_compile_definitions(gate_${name} PRIVATE AGIRU_TEST_DSN="${AGIRU_TEST_DSN}"
-                                                AGIRU_AL_SOURCE="${AGIRU_AL_SOURCE}")
+                                                AGIRU_AL_SOURCE="${AGIRU_AL_SOURCE}"
+                                                AGIRU_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
   foreach(tier IN LISTS TIERS)
     if(TARGET agiru_${tier})
       target_link_libraries(gate_${name} PRIVATE agiru_${tier})
