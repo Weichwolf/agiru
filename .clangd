@@ -2,7 +2,7 @@
 # build tree) and it is gitignored -- the one exception to artefacts staying out of the tree.
 #
 # What stands here is only what the compilation database cannot say: the generated tree under
-# src/app/ is machine output. clangd should be able to open it but show no diagnostics inside,
+# apps/ is machine output. clangd should be able to open it but show no diagnostics inside,
 # otherwise every jump into a generated file drowns in findings with no address.
 Diagnostics:
   UnusedIncludes: Strict
@@ -10,6 +10,6 @@ Diagnostics:
 
 ---
 If:
-  PathMatch: .*/src/app/.*
+  PathMatch: .*/apps/.*
 Diagnostics:
   Suppress: '*'

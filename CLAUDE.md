@@ -170,7 +170,7 @@ Neither transpiler nor runtime knows any concrete AL object. So no defect can be
 "reservation-specific" or "sales-specific". A failing case shows an incompletely implemented generic
 AL primitive -- a builtin, trigger semantics, event dispatch, a FlowField, a TableRelation. With AL
 implemented generically to 100 %, every case passes. An AL object name appearing in `src/` outside
-`src/app/` is a finding, not a fix.
+`apps/` is a finding, not a fix.
 
 ## The craft
 
@@ -265,7 +265,7 @@ Four commitments. Everything else an item may revisit; these it may not.
   documentation states the mapping outright and gives 2^96-1 with a scale up to 28. A `double` in
   a posting line is a defect, not a rounding issue -- it breaks the balance check every posting
   hangs on. `agiru::Decimal` is that type, and the scale is part of the value.
-- **THE GENERATED TREE IS NEVER TOUCHED BY HAND.** `src/app/` is transpiler output. A fix belongs
+- **THE GENERATED TREE IS NEVER TOUCHED BY HAND.** `apps/` is transpiler output. A fix belongs
   in `src/gen/` or `src/rt/`. A hand edit there does not survive the next run and costs the time
   twice.
 - **THE RUNTIME KNOWS NO AL OBJECT.** Neither transpiler nor runtime ever names a concrete table,
@@ -291,13 +291,23 @@ Principles, not a map: a map goes stale the day a directory moves.
   src/db     <- PostgreSQL over libpq, schema, cursors      reaches: --
   src/gen    <- the generator: AST -> C++                   reaches: al
   src/rt     <- the runtime: Record, Codeunit, Page, events reaches: net db
-  src/app    <- GENERATED. Never by hand.                   reaches: (nothing -- the door only)
-  src/cli    <- the one door outward                        reaches: rt app
+  src/cli    <- the one door outward                        reaches: rt
+  apps/<app> <- GENERATED. One BC app, one library.         reaches: (the door, and its own depends)
 ```
 
-- **`src/app/` sees only the door**, never the runtime's internals. That is build time, not
-  cosmetics: with `rt` in its `reaches`, every change to an internal runtime header would throw
-  away all ~2 000 generated translation units.
+- **AN APP IS A LIBRARY, and that is BC's own unit.** A BC app is what gets deployed, versioned and
+  depended upon, so each becomes one library under `apps/` with its dependencies declared in
+  `apps.json`. The point is not build time but DIRECTION: the linker then enforces what AL declares
+  -- the Base Application may not know an extension, only the other way round and only through
+  events -- and nothing else in this tree checks that.
+  **The limit, because it decides the design:** a `tableextension` that adds fields cannot be a
+  link-time addition, since a C++ class is closed. BC merges extensions at BUILD time as well (the
+  columns land in the same SQL table), so merging them in the transpiler is faithful -- but it means
+  the app boundary is a BUILD boundary and not a runtime plug-in boundary, and which apps are
+  installed is a transpile-time decision.
+- **An app sees only the door**, never the runtime's internals. That is build time: with `rt` in its
+  `reaches`, every change to an internal runtime header would throw away every generated translation
+  unit in every app.
 - **A header is PUBLIC only if a client cannot use the runtime without it.** `include/agiru/` is
   the door and nothing else stands in it. The door is the AL surface -- what generated code needs.
 - **`make` IS THE ONLY WAY IN.** Nothing is started by reaching past it. That CMake and Ninja work
@@ -310,7 +320,7 @@ Principles, not a map: a map goes stale the day a directory moves.
 | `make db` | `compile_commands.json` for clangd and clang-tidy |
 | `make lint` | format, static analysis, the door |
 | `make test` | the fast gate |
-| `make transpile` | the BaseApp through the transpiler into `src/app/` |
+| `make transpile` | the BaseApp through the transpiler into `apps/` |
 | `make provision` | MSSQL container, BC demo `.bak` from the CDN, PostgreSQL master |
 | `make help` | the list |
 
@@ -325,7 +335,7 @@ exception for. Anything above zero here was written in on the day.
 
 | counter | measures |
 |---|---|
-| `test/lint-baseline` | clang-tidy findings over `src/`, excluding `src/app/`, **with the unit count beside it** |
+| `test/lint-baseline` | clang-tidy findings over `src/`, excluding `apps/`, **with the unit count beside it** |
 | `test/doc-baseline` | undocumented public names in `include/` -- doxygen over `doc/Doxyfile` |
 | `test/todo-baseline` | `NOLINT`, `TODO`, `FIXME`, `catch (...)` -- the silent places |
 
@@ -337,7 +347,7 @@ costs a number, and that number may only fall.
 ways: the finding is taste, or the domain already fixes the answer and the check is arguing with AL
 rather than with us. The second kind carries a citation, not an opinion.
 
-**Generated code is not analysed; the generator is.** `src/app/` falls out of `make lint` because a
+**Generated code is not analysed; the generator is.** `apps/` falls out of `make lint` because a
 finding there has no address. It does NOT fall out of the compiler: `-Wall -Wextra -Wpedantic
 -Werror` applies to it like everything else, and that is what holds it.
 

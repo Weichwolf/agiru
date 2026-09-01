@@ -69,7 +69,7 @@ rather than inventing a rule: a guessed rule has already cost the main loop thre
 The tree is NEW. Where a file is named below that does not exist yet, that is where the thing
 belongs -- not a claim that it is there. Say so when you reach into empty space.
 
-- Fixes ONLY in `src/gen/` (codegen) or `src/rt/` (runtime). NEVER in `src/app/` (generated) and
+- Fixes ONLY in `src/gen/` (codegen) or `src/rt/` (runtime). NEVER in `apps/` (generated) and
   never with a hardcoded AL object name.
 - The tiers and what they may see stand in `src/<tier>/reaches`. CMake derives the include path from
   that; a tier break is a compile error.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Expr.h"
 #include "Token.h"
 
 #include <string>
@@ -16,13 +17,15 @@ struct Property {
 
 struct Trigger {
   std::string name;
-  std::string body;
+  std::vector<Token> tokens;
+  std::vector<Stmt> body;
 };
 
 struct FieldDecl {
   int number = 0;
   std::string name;
   std::string type;
+  std::string subtype;
   int length = 0;
   std::vector<Property> properties;
   std::vector<Trigger> triggers;

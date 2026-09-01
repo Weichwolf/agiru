@@ -1,0 +1,25 @@
+{
+  "_doc": "The apps this tree transpiles and links, in dependency order. An app is BC's unit of deployment, version and dependency, and it becomes one library under apps/ so that the LINKER enforces the direction AL declares: the Base Application may not know an extension, only the other way round and only through events. `source` is read under the BCApps `src` root; `depends` names apps that must already be linked. A TEST APP IS A NORMAL APP -- its codeunits are AL like any other, it depends on what it tests, and it is compiled like everything else. That is what makes a full run of the suite affordable, and an affordable full run is what makes its number mean anything.",
+  "apps": [
+    {
+      "name": "system",
+      "source": "System Application/App",
+      "depends": []
+    },
+    {
+      "name": "foundation",
+      "source": "Business Foundation/App",
+      "depends": ["system"]
+    },
+    {
+      "name": "base",
+      "source": "Layers/W1/BaseApp",
+      "depends": ["system", "foundation"]
+    },
+    {
+      "name": "tests",
+      "source": "Layers/W1/Tests",
+      "depends": ["base"]
+    }
+  ]
+}

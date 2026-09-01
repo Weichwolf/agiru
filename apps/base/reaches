@@ -1,0 +1,8 @@
+# GENERATED. Never by hand.
+#
+# An app sees ONLY the door under include/agiru/ and the apps it declares a dependency on in
+# apps.json. It does not see the runtime's internals: with `rt` here, every change to an internal
+# runtime header would throw away every generated translation unit in every app.
+#
+# It fits exactly: what generated AL code needs -- Record, FieldRef, Codeunit, Decimal, the
+# builtins -- IS the door.

@@ -1,5 +1,5 @@
 # agiru -- the transpiler under src/al and src/gen, the runtime under src/rt, the translated BaseApp
-# under src/app. This Makefile is the ONE way in: nothing is started by reaching past it into a
+# under apps/. This Makefile is the ONE way in: nothing is started by reaching past it into a
 # script. That CMake and Ninja work behind it is not a second mechanism, it is what stands behind
 # the door.
 SHELL := /bin/bash
@@ -20,13 +20,13 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER=clang++ \
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-lint: db           ## format, static analysis, the door
-	@sh $(SELF)/test/lint.sh
+lint: all          ## format, static analysis, the door, the AL population
+	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} sh $(SELF)/test/lint.sh
 
 test: all          ## the fast gate
 	@sh $(SELF)/test/run.sh
 
-transpile: all     ## the BaseApp through the transpiler into src/app/
+transpile: all     ## the BaseApp through the transpiler into apps/
 	@$(B)/agirutc
 
 provision:         ## MSSQL container, BC demo .bak from the CDN, PostgreSQL master

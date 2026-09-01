@@ -44,7 +44,8 @@ std::string Formatted(const FormatRequest &request) {
     if (!file) { throw std::runtime_error("gen: cannot write " + path); }
     file << request.source;
   }
-  return Capture(Formatter() + " -style=file:" + request.stylePath + " " + path);
+  return Capture(Formatter() + " -style=file:" + request.stylePath +
+                 " --assume-filename=" + request.assumedName + " < " + path);
 }
 
 } // namespace agiru::gen

@@ -11,6 +11,8 @@ project(agiru CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # A WARNING IS AN ERROR, and that holds for the generated tree as much as the written one.
@@ -29,7 +31,7 @@ endif()
 
 # The tiers in dependency order. The order here is a BUILD order; who may see whom is still said by
 # the `reaches` file alone.
-set(TIERS al net db gen rt app cli)
+set(TIERS al net db gen rt cli tc)
 
 # THE LAYERING IS CHECKED BEFORE ANY SOURCE IS LOOKED AT. A tier without a .cpp is skipped below;
 # its `reaches` would then never have been read, and a typo in it would have slept until its first
@@ -54,8 +56,14 @@ foreach(tier IN LISTS TIERS)
   if(tier STREQUAL cli)
     add_executable(agiru ${sources})
     set(target agiru)
+  elseif(tier STREQUAL tc)
+    add_executable(agirutc ${sources})
+    set(target agirutc)
   else()
-    add_library(agiru_${tier} STATIC ${sources})
+    # SHARED, so that an app can be built without the runtime being rebuilt into it and so that one
+    # copy serves every process. That is what "an app compiles independently of the runtime" means
+    # in practice: an app is bound to the DOOR, and a change inside the runtime relinks the runtime.
+    add_library(agiru_${tier} SHARED ${sources})
     set(target agiru_${tier})
   endif()
 
@@ -84,6 +92,28 @@ set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
     CACHE STRING "Connection string the gate uses")
 set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
     CACHE STRING "The AL source the gate parses")
+
+# THE APPS. Each is one BC app -- the unit of deployment, version and dependency -- and becomes one
+# library, so that the LINKER enforces the direction AL declares: the Base Application may not know
+# an extension, only the other way round and only through events.
+#
+# An app sees the door and the apps it depends on, never the runtime's internals. An app with no
+# sources yet is skipped rather than declared empty: the generator has not written it.
+file(GLOB app_dirs RELATIVE "${CMAKE_SOURCE_DIR}/apps" CONFIGURE_DEPENDS "apps/*")
+foreach(app IN LISTS app_dirs)
+  if(NOT IS_DIRECTORY "${CMAKE_SOURCE_DIR}/apps/${app}")
+    continue()
+  endif()
+  file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS "apps/${app}/*.cpp")
+  if(NOT app_sources)
+    continue()
+  endif()
+  add_library(agiru_app_${app} SHARED ${app_sources})
+  target_include_directories(agiru_app_${app} PRIVATE
+    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/${app}")
+  target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
+  target_link_libraries(agiru PRIVATE agiru_app_${app})
+endforeach()
 
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one

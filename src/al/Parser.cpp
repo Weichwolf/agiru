@@ -2,6 +2,7 @@
 
 #include "Ast.h"
 #include "Lexer.h"
+#include "Statements.h"
 #include "Token.h"
 
 #include <cctype>
@@ -51,7 +52,10 @@ public:
       } else if (AtKeyword("var")) {
         Advance();
         ParseVars(table);
-      } else if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local")) {
+      } else if (AtPunctuation("[")) {
+        SkipAttribute();
+      } else if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+                 AtKeyword("internal") || AtKeyword("protected")) {
         SkipMember();
       } else {
         table.properties.push_back(ParseProperty());
@@ -134,14 +138,36 @@ private:
     }
   }
 
-  void SkipMember() {
-    while (!AtEnd() && !AtKeyword("begin")) { Advance(); }
-    SkipBeginEnd();
+  [[nodiscard]] bool IsVariableAhead() const {
+    const bool named =
+        Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier;
+    return named && IsPunctuation(Peek(1), ":");
   }
 
-  std::string SkipBeginEnd() {
+  void SkipAttribute() {
+    Expect("[");
+    int depth = 1;
+    while (!AtEnd() && depth > 0) {
+      if (AtPunctuation("[")) { ++depth; }
+      if (AtPunctuation("]")) { --depth; }
+      Advance();
+    }
+  }
+
+  void SkipMember() {
+    while (!AtEnd() && !AtKeyword("begin")) { Advance(); }
+    (void)SkipBeginEnd();
+  }
+
+  void SkipLocalVars() {
+    if (!AtKeyword("var")) { return; }
+    while (!AtEnd() && !AtKeyword("begin")) { Advance(); }
+  }
+
+  std::vector<Token> SkipBeginEnd() {
+    SkipLocalVars();
     Expect("begin");
-    std::string body;
+    std::vector<Token> body;
     int depth = 1;
     while (!AtEnd()) {
       if (AtKeyword("begin") || AtKeyword("case")) { ++depth; }
@@ -153,8 +179,7 @@ private:
           return body;
         }
       }
-      if (!body.empty()) { body += ' '; }
-      body += Peek().kind == TokenKind::String ? "'" + Peek().text + "'" : Peek().text;
+      body.push_back(Peek());
       Advance();
     }
     throw ParseError("unterminated begin block");
@@ -189,6 +214,12 @@ private:
         Advance();
         field.length = ExpectInteger();
         Expect("]");
+      } else if (!AtPunctuation(")")) {
+        field.subtype = ExpectName();
+        while (AtPunctuation(".")) {
+          Advance();
+          field.subtype = ExpectName();
+        }
       }
       Expect(")");
       Expect("{");
@@ -199,7 +230,8 @@ private:
           trigger.name = ExpectName();
           Expect("(");
           Expect(")");
-          trigger.body = SkipBeginEnd();
+          trigger.tokens = SkipBeginEnd();
+          trigger.body = ParseStatements(trigger.tokens);
           field.triggers.push_back(std::move(trigger));
         } else {
           field.properties.push_back(ParseProperty());
@@ -233,7 +265,13 @@ private:
   }
 
   void ParseVars(TableObject &table) {
-    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure")) {
+    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
+           !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
+      if (AtPunctuation("[")) {
+        SkipAttribute();
+        if (!IsVariableAhead()) { return; }
+        continue;
+      }
       const std::string name = ExpectName();
       Expect(":");
       const std::string type = ExpectName();

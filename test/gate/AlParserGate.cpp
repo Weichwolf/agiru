@@ -124,10 +124,15 @@ void AnOptionCarriesItsMembers(const TableObject &table) {
 void ATriggerIsCapturedWhole(const TableObject &table) {
   const auto *trigger = Find(table.fields[1].triggers, "OnValidate");
   CHECK_TRUE("the field's OnValidate is found", trigger != nullptr);
-  CHECK_TRUE("its body carries the call", trigger->body.find("FieldError") != std::string::npos);
-  // A string literal keeps its quotes when the body is rebuilt, or an empty comparison would read
-  // as a comparison against nothing.
-  CHECK_TRUE("an empty string literal survives", trigger->body.find("<> ''") != std::string::npos);
+  CHECK_TRUE("its body carries the call", std::ranges::any_of(trigger->tokens, [](const auto &t) {
+               return t.text == "FieldError";
+             }));
+  // An empty string literal is a TOKEN, not nothing: `Code <> ''` compares against the empty
+  // string, and a body kept as text would have lost the difference between '' and absent.
+  CHECK_TRUE("an empty string literal is a token of its own",
+             std::ranges::any_of(trigger->tokens, [](const auto &t) {
+               return t.kind == agiru::al::TokenKind::String && t.text.empty();
+             }));
   CHECK_TRUE("a field without a trigger has none", table.fields[0].triggers.empty());
 }
 

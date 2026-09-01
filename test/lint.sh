@@ -23,7 +23,7 @@ mkdir -p "$REPORT"
 
 # src/app/ is machine output. A finding there has no address: the fix would be in the generator,
 # and the generator is analysed a line further down.
-ours=$(find src include test -name '*.cpp' -o -name '*.h' | grep -v '^src/app/' | sort)
+ours=$(find src include test -name '*.cpp' -o -name '*.h' | sort)
 
 printf '== format ==\n'
 if [ -z "$ours" ]; then
@@ -39,7 +39,7 @@ fi
 printf '\n== analysis ==\n'
 units=$(grep -c '"file"' compile_commands.json || echo 0)
 if [ -n "$RUNTIDY" ]; then
-  "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/src/app/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
+  "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/apps/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
 else
   : > "$REPORT/tidy.log"
   for f in $(echo "$ours" | grep '\.cpp$'); do
@@ -86,7 +86,7 @@ printf '\n== silent places ==\n'
 # charging for it pushed the tree toward having none.
 grep_silent() {
   grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.) *{ *}' src include test --include='*.cpp' \
-    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^src/app/'
+    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^apps/'
 }
 silent=$(grep_silent | wc -l | tr -d ' ')
 allowedSilent=$(cat test/todo-baseline 2>/dev/null || echo 0)
@@ -124,4 +124,30 @@ if command -v doxygen >/dev/null 2>&1; then
   fi
 else
   printf 'lint: doxygen is not installed, so the door is not checked.\n' >&2
+fi
+
+printf '\n== the AL population ==\n'
+# THE COUNT OF TRANSLATED OBJECTS IS A BASELINE THAT MAY ONLY RISE. It is the one number that says
+# how much of BC this tree can read, and it is measured over the WHOLE population rather than a
+# sample -- 1 545 table objects in the BaseApp, every one of them, on every run of the lint.
+if [ -x build/agirutc ] && [ -d "$AGIRU_AL_SOURCE" ]; then
+  line=$(build/agirutc "$AGIRU_AL_SOURCE" | head -1)
+  parsed=$(printf '%s' "$line" | awk '{print $2}')
+  total=$(printf '%s' "$line" | awk '{print $4}')
+  read -r allowed allowedTotal <<EOT
+$(cat test/transpile-baseline 2>/dev/null || echo "0 0")
+EOT
+  printf 'lint: %s of %s table objects parse, the baseline requires %s of %s\n' \
+    "$parsed" "$total" "$allowed" "$allowedTotal"
+  if [ "$parsed" -lt "$allowed" ]; then
+    printf 'lint: THE POPULATION FELL by %s. A commit raises it or leaves it; it never lowers it.\n' \
+      "$((allowed - parsed))" >&2
+    exit 1
+  fi
+  if [ "$parsed" -gt "$allowed" ] || [ "$total" -ne "$allowedTotal" ]; then
+    printf '%s %s\n' "$parsed" "$total" > test/transpile-baseline
+    printf 'lint: baseline raised to "%s %s" -- commit it with the widening.\n' "$parsed" "$total"
+  fi
+else
+  printf 'lint: agirutc or the AL source is missing, so the population is not measured.\n' >&2
 fi

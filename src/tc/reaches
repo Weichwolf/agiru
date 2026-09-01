@@ -1,0 +1,4 @@
+# The transpiler's own door outward. It reads AL and writes C++; it never links the runtime, which
+# is what lets a generated app be built without the runtime being present.
+al
+gen

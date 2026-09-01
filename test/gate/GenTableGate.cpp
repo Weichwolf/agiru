@@ -1,3 +1,4 @@
+#include "BodyWriter.h"
 #include "Check.h"
 #include "Format.h"
 #include "Parser.h"
@@ -44,7 +45,8 @@ void TheGeneratorReproducesTheTargetImage() {
       .source = agiru::gen::WriteHeader(
           agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
           std::string(kAlPath)),
-      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format"});
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "ResourceCost.h"});
   const std::string target =
       Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.h");
 
@@ -76,6 +78,37 @@ void TheGeneratorReproducesTheTargetImage() {
                left.size() > right.size() ? left[shared] : std::string("<end of file>"),
                right.size() > left.size() ? right[shared] : std::string("<end of file>"));
   }
+}
+
+/// The other half: the trigger bodies, which are AL statements rather than declarations.
+void TheGeneratorReproducesTheTriggerBodies() {
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteSource(
+          agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
+          std::string(kAlPath)),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "ResourceCost.cpp"});
+  const std::string target =
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.cpp");
+
+  {
+    std::ofstream dump("/tmp/agiru-generated-ResourceCost.cpp");
+    dump << generated;
+  }
+
+  const std::vector<std::string> left = Lines(generated);
+  const std::vector<std::string> right = Lines(target);
+  const std::size_t shared = left.size() < right.size() ? left.size() : right.size();
+  for (std::size_t i = 0; i < shared; ++i) {
+    if (left[i] != right[i]) {
+      CHECK_TEXT("the generated source matches the target image, line " + std::to_string(i + 1),
+                 left[i],
+                 right[i]);
+      return;
+    }
+  }
+  CHECK_TRUE("the generated source has as many lines as the target image",
+             left.size() == right.size());
 }
 
 /// THE NEGATIVE CONTROL. A comparison that only ever passes proves nothing: what makes the identity
@@ -110,11 +143,44 @@ void AChangedSourceChangesTheOutput() {
              afterRename.find("\"Work Kind Code\"") != std::string::npos);
 }
 
+/// The negative control for the bodies. A statement translator that emitted a constant would pass
+/// the identity above just as well, so a changed STATEMENT has to change the C++.
+void AChangedStatementChangesTheBody() {
+  const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
+
+  std::string flipped = original;
+  const std::size_t at = flipped.find("(Code <> '')");
+  CHECK_TRUE("the trigger compares the code against the empty string", at != std::string::npos);
+  flipped.replace(at, std::string("(Code <> '')").size(), "(Code = '')");
+
+  const std::string generated =
+      agiru::gen::WriteSource(agiru::al::ParseTable(flipped), std::string(kAlPath));
+  CHECK_TRUE("a flipped comparison flips the operator",
+             generated.find("Code == \"\"") != std::string::npos);
+  CHECK_TRUE("and the old one is gone", generated.find("Code != \"\"") == std::string::npos);
+
+  // AL's `and` is not C++'s, and neither is its `=`. Both mappings are asserted, because an
+  // emitter that passed one through untouched would still compile and mean something else.
+  const std::string untouched =
+      agiru::gen::WriteSource(agiru::al::ParseTable(original), std::string(kAlPath));
+  CHECK_TRUE("`and` becomes `&&`", untouched.find(" && ") != std::string::npos);
+  CHECK_TRUE("and no AL operator survives",
+             untouched.find(" and ") == std::string::npos &&
+                 untouched.find(" <> ") == std::string::npos);
+  // The parentheses AL needed are gone, because C++ binds the comparison tighter than the
+  // conjunction. An emitter that parenthesised everything would also be correct and would not
+  // match the target image.
+  CHECK_TRUE("redundant parentheses are not emitted",
+             untouched.find("(Code != \"\") &&") == std::string::npos);
+}
+
 } // namespace
 
 int main() {
   return gate::Run("GenTable", [] {
     TheGeneratorReproducesTheTargetImage();
+    TheGeneratorReproducesTheTriggerBodies();
     AChangedSourceChangesTheOutput();
+    AChangedStatementChangesTheBody();
   });
 }
