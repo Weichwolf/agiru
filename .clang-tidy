@@ -24,7 +24,8 @@ Checks: >
   -modernize-use-trailing-return-type,
   -readability-uppercase-literal-suffix,
   -readability-math-missing-parentheses,
-  -readability-avoid-nested-conditional-operator
+  -readability-avoid-nested-conditional-operator,
+  -performance-enum-size
 WarningsAsErrors: '*'
 
 CheckOptions:
@@ -47,8 +48,11 @@ CheckOptions:
 
 # WHY THESE FOUR ARE OFF, AND WHY NOTHING ELSE IS
 #
-# A check is off for exactly one reason: its finding is TASTE rather than a defect. Everything whose
-# finding is a defect is ON and its counter reads zero.
+# A check is off when its finding is NOT A DEFECT, and there are exactly two ways for that to be
+# true: the finding is a matter of TASTE, or the DOMAIN already fixes the answer and the check is
+# arguing with AL rather than with us. The first four below are taste. The fifth is the second kind,
+# and it is the only one with a citation instead of an opinion. Everything whose finding is a defect
+# is ON and its counter reads zero.
 #
 # `modernize-use-trailing-return-type` wants `auto f() -> int`. This tree writes `int f()`, and so
 #   does the rest of the world.
@@ -58,6 +62,14 @@ CheckOptions:
 #   the parentheses hide the shape of an expression rather than showing it.
 # `readability-avoid-nested-conditional-operator` forbids `a ? b : c ? d : e`. Mapping an AL option
 #   onto a C++ value is exactly that chain, and splitting it into `if` makes it longer, not clearer.
+#
+# `performance-enum-size` would size an enumeration by its largest enumerator. THE DOMAIN FIXES THIS
+#   ONE: `methods-auto/option/option-data-type.md` says the Option type is "a zero-based enumerator
+#   type ... You can convert option data types to integers", and an AL Integer is 32 bits. Every
+#   option enumeration the generator emits is therefore `std::int32_t`, and an option's value round
+#   trips through that enumeration -- narrowing it would truncate an ordinal outside the declared
+#   members, which AL permits and this runtime keeps. The check would save three bytes in a name
+#   table that never leaves `.rodata` and buy a silent truncation for it.
 #
 # WHAT IS DELIBERATELY ON, EVEN THOUGH IT HURTS
 #

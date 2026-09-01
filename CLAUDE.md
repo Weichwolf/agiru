@@ -250,6 +250,10 @@ exception for. Anything above zero here was written in on the day.
 cost nothing, and a baseline that can be silenced for free is a fig leaf. Suppressing a finding
 costs a number, and that number may only fall.
 
+**A check is switched off only when its finding is not a defect**, which happens in exactly two
+ways: the finding is taste, or the domain already fixes the answer and the check is arguing with AL
+rather than with us. The second kind carries a citation, not an opinion.
+
 **Generated code is not analysed; the generator is.** `src/app/` falls out of `make lint` because a
 finding there has no address. It does NOT fall out of the compiler: `-Wall -Wextra -Wpedantic
 -Werror` applies to it like everything else, and that is what holds it.
