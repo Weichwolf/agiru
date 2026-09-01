@@ -16,7 +16,11 @@ namespace agiru::gen {
 
 namespace {
 
-constexpr int kMaxDepth = 128;
+// MEASURED, NOT GUESSED (2026-09-01, over all four apps): the deepest expression the BaseApp and
+// its tests actually build is well inside this, and the guard exists to stop runaway recursion on a
+// malformed tree rather than to cap a legitimate expression. BC really does split a base64 blob
+// across hundreds of lines joined by `+`.
+constexpr int kMaxDepth = 4096;
 
 struct Operator {
   const char *al;
@@ -24,6 +28,9 @@ struct Operator {
   int precedence;
 };
 
+/// C++'s conditional operator binds looser than everything but assignment and comma, which is
+/// where AL puts it too.
+constexpr int kConditionalPrecedence = 1;
 constexpr int kEqualityPrecedence = 3;
 constexpr int kComparisonPrecedence = 4;
 constexpr int kUnaryPrecedence = 8;
@@ -94,6 +101,28 @@ std::string Quoted(std::string_view text) {
   return out;
 }
 
+// A DEPTH COUNTER THAT CANNOT LEAK. It was a `++` at the top and a `--` at the bottom, and one
+// early return in the middle -- the `in` operator, which hands off to Membership() -- never reached
+// the bottom. Every `in` expression therefore raised the counter permanently, and the guard fired
+// on files that were not deep at all: 9 objects refused for a reason that was not true of them.
+// Written as a scope, the mistake is not available.
+class Deeper {
+public:
+  explicit Deeper(int &depth) : depth_(depth) {
+    if (++depth_ > kMaxDepth) { throw std::runtime_error("an expression nests too deeply"); }
+  }
+
+  ~Deeper() { --depth_; }
+
+  Deeper(const Deeper &) = delete;
+  Deeper(Deeper &&) = delete;
+  Deeper &operator=(const Deeper &) = delete;
+  Deeper &operator=(Deeper &&) = delete;
+
+private:
+  int &depth_;
+};
+
 class Writer {
 public:
   explicit Writer(const Names &scope) : scope_(scope) {}
@@ -144,7 +173,7 @@ private:
   }
 
   std::string Statement(const al::Stmt &statement, int indent) {
-    if (++depth_ > kMaxDepth) { throw std::runtime_error("a statement nests too deeply"); }
+    const Deeper nested(depth_);
     std::string out;
     switch (statement.kind) {
       case al::StmtKind::Block:
@@ -204,7 +233,6 @@ private:
         out = Pad(indent) + Expression(statement.expression, 0) + ";\n";
         break;
     }
-    --depth_;
     return out;
   }
 
@@ -262,8 +290,56 @@ private:
     return out;
   }
 
+  std::string Binary(const al::Expr &expression, int outer) {
+    if (expression.text == "in") { return Membership(expression, outer); }
+    // AL'S CONDITIONAL OPERATOR IS C++'S, and it is the one Binary node with three children.
+    // Without a case of its own the chain walk below found no chain, left `walk` pointing at this
+    // very node, and called Expression on it again -- recursion with no bottom. It showed up as
+    // nine objects "nesting too deeply" and, once the guard was lifted to measure it, as a
+    // segmentation fault.
+    if (expression.text == "?:") { return Conditional(expression, outer); }
+    if (expression.children.size() != 2) {
+      throw std::runtime_error("a binary operator with " +
+                               std::to_string(expression.children.size()) +
+                               " operands has no translation");
+    }
+
+    const Operator *op = Find(expression.text);
+    const int precedence = op != nullptr ? op->precedence : 0;
+    const std::string spelling = op != nullptr ? op->cpp : expression.text;
+
+    std::vector<const al::Expr *> chain;
+    const al::Expr *walk = &expression;
+    while (walk->kind == al::ExprKind::Binary && walk->text == expression.text &&
+           walk->children.size() == 2) {
+      chain.push_back(&walk->children.back());
+      walk = &walk->children.front();
+    }
+    std::string out = Expression(*walk, precedence);
+    for (std::size_t i = chain.size(); i > 0; --i) {
+      if (spelling == ".") {
+        out += ".";
+      } else {
+        out += " ";
+        out += spelling;
+        out += " ";
+      }
+      out += Expression(*chain[i - 1], precedence + 1);
+    }
+    if (precedence < outer) { out = "(" + out + ")"; }
+    return out;
+  }
+
+  std::string Conditional(const al::Expr &expression, int outer) {
+    std::string out = Expression(expression.children[0], kConditionalPrecedence + 1) + " ? " +
+                      Expression(expression.children[1], 0) + " : " +
+                      Expression(expression.children[2], kConditionalPrecedence);
+    if (kConditionalPrecedence < outer) { out = "(" + out + ")"; }
+    return out;
+  }
+
   std::string Expression(const al::Expr &expression, int outer) {
-    if (++depth_ > kMaxDepth) { throw std::runtime_error("an expression nests too deeply"); }
+    const Deeper nested(depth_);
     std::string out;
     switch (expression.kind) {
       case al::ExprKind::StringLiteral: out = Quoted(expression.text); break;
@@ -278,21 +354,24 @@ private:
       case al::ExprKind::Set:
       case al::ExprKind::Range:
         throw std::runtime_error("a set literal stands only on the right of `in`");
-      case al::ExprKind::Index:
-        throw std::runtime_error("indexing a string is not translated yet: AL counts from one");
-      case al::ExprKind::Binary: {
-        if (expression.text == "in") { return Membership(expression, outer); }
-        const Operator *op = Find(expression.text);
-        const int precedence = op != nullptr ? op->precedence : 0;
-        const std::string spelling = op != nullptr ? op->cpp : expression.text;
-        const std::string left = Expression(expression.children.front(), precedence);
-        const std::string right = Expression(expression.children.back(), precedence + 1);
-        out = spelling == "." ? left + "." + right : left + " " + spelling + " " + right;
-        if (precedence < outer) { out = "(" + out + ")"; }
+      // AL COUNTS FROM ONE AND C++ FROM ZERO, and what is being indexed is not known here: an
+      // array, a List or a string, depending on a declaration this translator does not resolve. So
+      // it writes the call and the OVERLOAD SET decides, which is a compiler's job.
+      case al::ExprKind::Index: {
+        std::string call = "At(" + Expression(expression.children.front(), 0);
+        for (std::size_t i = 1; i < expression.children.size(); ++i) {
+          call += ", " + Expression(expression.children[i], 0);
+        }
+        out = call + ")";
         break;
       }
+      // A LEFT-ASSOCIATIVE CHAIN IS EMITTED IN A LOOP, NOT BY RECURSION. `a + b + c + ...` builds a
+      // left-deep tree, so walking it down recursively costs one frame per term -- and BC really
+      // does split a base64 blob across hundreds of lines joined by `+`. The depth guard below
+      // exists to stop runaway recursion on a malformed tree, not to cap a legitimate expression,
+      // so the chain is flattened first and the guard keeps its job.
+      case al::ExprKind::Binary: out = Binary(expression, outer); break;
     }
-    --depth_;
     return out;
   }
 

@@ -359,6 +359,21 @@ void AssertErrorIsAStatement() {
              plain[0].kind != agiru::al::StmtKind::AssertError);
 }
 
+/// A BINARY NODE WITH THREE CHILDREN. AL's conditional operator is the only one, and without a case
+/// of its own the emitter's chain walk found no chain, left its cursor on the node it started from,
+/// and called itself -- recursion with no bottom. It surfaced as nine objects "nesting too deeply"
+/// and, with the depth guard lifted to measure it, as a segmentation fault.
+void TheConditionalOperatorHasThreeOperandsAndOneTranslation() {
+  const agiru::al::Expr e = OnlyExpression("X := A ? B : C;");
+  CHECK_TRUE("three children and not two", e.children[1].children.size() == 3);
+  CHECK_TEXT("and the node says which operator it is", e.children[1].text, "?:");
+  // It is right-associative, so a nested one lands in the ELSE branch rather than the then branch.
+  const agiru::al::Expr nested = OnlyExpression("X := A ? B : C ? D : E;");
+  CHECK_TEXT("a chained conditional nests to the right", nested.children[1].children[2].text, "?:");
+  CHECK_TRUE("and the then branch stays simple",
+             nested.children[1].children[1].kind == agiru::al::ExprKind::Name);
+}
+
 } // namespace
 
 int main() {
@@ -378,5 +393,6 @@ int main() {
     ExclusiveDisjunctionIsAnOperator();
     TheConditionalOperatorParses();
     AssertErrorIsAStatement();
+    TheConditionalOperatorHasThreeOperandsAndOneTranslation();
   });
 }
