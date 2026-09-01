@@ -18,9 +18,14 @@ the image cost a gigabyte and why layout could not help. The freedom to decide w
 new here and is not automatically used.
 
 **The mechanism:** a posting run walks Sales-Post, then the ledger codeunits, then dimensions, then
-number series. If those lie scattered across a 200 MB segment, each call touches a fresh 4 KB page
-from a slow microSD. If the generator emits them adjacently, the same run stays inside a few
-hundred pages.
+number series. If those lie scattered across a 200 MB segment, each call touches a fresh page and a
+fresh L3 line. If the generator emits them adjacently, the same run stays inside a few hundred pages
+and a working set that fits.
+
+**The target change weakened this and did not remove it.** On the Pi Zero 2 W with 512 MB and a
+microSD, a scattered layout meant page faults against slow storage. On a Pi 5 with 16 GB and NVMe
+the pages stay resident, so what is left is the 2 MB shared L3 and the instruction cache -- a real
+effect, one order of magnitude smaller, and now something to MEASURE rather than to deduce.
 
 **What is not yet known:** how large the segment actually becomes, and how far apart the objects of
 one run lie under the naive layout. Both are measurable as soon as the generator emits more than one

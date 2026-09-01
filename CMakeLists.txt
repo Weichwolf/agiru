@@ -84,7 +84,8 @@ foreach(case IN LISTS gate_cases)
   get_filename_component(name "${case}" NAME_WE)
   add_executable(gate_${name} "${case}")
   target_include_directories(gate_${name} PRIVATE
-    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate")
+    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate"
+    "${CMAKE_SOURCE_DIR}/test/target")
   foreach(tier IN LISTS TIERS)
     if(TARGET agiru_${tier})
       target_link_libraries(gate_${name} PRIVATE agiru_${tier})

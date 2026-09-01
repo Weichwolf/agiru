@@ -8,39 +8,44 @@ logic and all. The result is a standalone ERP on one process and one PostgreSQL.
 
 ## The target this is built against
 
-**`agiru` and PostgreSQL run on a Raspberry Pi Zero 2 W, and they run FAST.**
-
-That sentence is not an aspiration, it is the specification everything else is measured against:
+**`agiru` and PostgreSQL run on a Raspberry Pi 5 with 16 GB, and they run FAST.**
 
 | | |
 |---|---|
-| SoC | Broadcom BCM2710A1 -- quad-core Cortex-A53 at 1 GHz, in-order, dual-issue |
-| Cache | 32 KB L1-I + 32 KB L1-D per core, 512 KB shared L2 |
-| **RAM** | **512 MB, total, shared with the OS and PostgreSQL** |
-| Storage | microSD -- slow, and it wears |
+| SoC | Broadcom BCM2712 -- quad-core Cortex-A76 at 2.4 GHz, out-of-order |
+| Cache | 64 KB L1-I + 64 KB L1-D per core, 512 KB L2 per core, 2 MB shared L3 |
+| RAM | 16 GB LPDDR4X |
+| Storage | microSD or NVMe over PCIe |
 
-**Memory is the budget; the CPU is not the problem.** A headless OS takes 60-80 MB, PostgreSQL
-wants 100-150 MB with a small `shared_buffers`, which leaves `agiru` roughly **250 MB of resident
-set for a complete ERP with 1 700 tables and 2 300 codeunits**. The predecessor needed 1 GB per
-process for the image alone. This target is the reason the language changed, and it decides
-architecture rather than tuning:
+**This target is not a degraded machine.** Four out-of-order cores at 2.4 GHz and 16 GB are a small
+server, and on memory it matches the development box exactly -- which is what makes a measurement
+here mean something there. What it is NOT is x86: the binary that ships is `aarch64`, and
+"it is fast on the workstation" is still not a measurement.
+
+**The earlier target was a Pi Zero 2 W with 512 MB, and two arguments died when it changed. They
+are written down as dead rather than quietly dropped:**
+
+- *"250 MB of resident set for the whole ERP."* Void. With 16 GB, PostgreSQL gets a real
+  `shared_buffers` and the runtime is not fighting for pages. **What replaces it is a per-SESSION
+  budget rather than a per-image one**: the image is shared, sessions are not, and an ERP is judged
+  on how many it holds at once. That is the number to measure (board:0006).
+- *"Straight-line code beats a clever dispatch table, because a mispredicted branch is not absorbed
+  by an out-of-order window."* Void. The A76 is out-of-order with a deep window and a good
+  predictor; the A53 was neither. Dispatch shape is now a measurement, not a deduction.
+
+**What survives, and now on its own merits rather than on necessity:**
 
 - **Object metadata is STATIC CONST DATA, emitted by the transpiler, never built at startup.**
-  Field descriptors, table relations, key definitions, captions -- all of it is `constexpr` arrays
-  in `.rodata`. Demand-paged by the kernel, shared between processes, zero startup cost, zero heap.
-  Building 9 300 objects' metadata at boot is exactly what cost the predecessor its gigabyte.
-- **The text segment is a measured quantity with a ceiling.** 9 300 compiled objects are a large
-  `.text`; it is fine only because the kernel pages in what is touched. That makes CODE LOCALITY an
-  architectural concern: the generator groups objects so that one posting run walks contiguous
-  pages instead of scattering across the segment (board:0009).
-- **No allocation on the hot path.** A record read that heap-allocates per field is a design error,
-  not a slow spot. Arena per session, fixed layouts, no pointer chasing.
-- **Cortex-A53 is in-order.** A mispredicted branch is not absorbed by an out-of-order window;
-  branch-heavy dispatch costs real cycles. Straight-line generated code beats a clever table.
-- **The SD card wears out.** WAL settings, checkpoints and log volume are decisions, not defaults.
-
-The development box is x86_64 Debian; the target is `aarch64`. **A change is not finished until it
-has been measured on the target**, and "it is fast on the workstation" is not a measurement.
+  Field descriptors, table relations, keys, captions -- `constexpr` arrays in `.rodata`,
+  demand-paged, shared between processes, zero startup cost, zero heap. It is no longer the
+  difference between running and not running; it is the difference between a server that starts in
+  milliseconds and one that spends a second per process assembling 9 300 objects it could have
+  been handed.
+- **No allocation on the hot path.** Arena per session, fixed layouts. That was a memory argument
+  and is now a throughput argument, which is the better one anyway.
+- **Code locality still matters**, with 2 MB of shared L3 and 9 300 compiled objects: a posting run
+  should walk contiguous pages rather than scatter across the segment (board:0009). Less acute over
+  NVMe than over microSD, and not gone.
 
 ## Why C++ and not the language this was already attempted in
 

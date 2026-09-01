@@ -3,8 +3,8 @@
 An AL-to-C++ transpiler and runtime for Microsoft Dynamics 365 Business Central. The BaseApp is not
 wrapped, it is translated: 9 300 AL objects, 2.56 million lines, into C++23.
 
-The target it is built against: **`agiru` and PostgreSQL run on a Raspberry Pi Zero 2 W -- 512 MB of
-RAM for the whole ERP -- and they run fast.**
+The target it is built against: **`agiru` and PostgreSQL run on a Raspberry Pi 5 with 16 GB -- four
+out-of-order cores at 2.4 GHz, aarch64 -- and they run fast.**
 
 The tree is new. `CLAUDE.md` is the constitution, `board/` is the state of the work.
 
