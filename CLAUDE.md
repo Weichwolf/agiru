@@ -77,7 +77,7 @@ Every question about intended behaviour has three sources, in this order:
 | # | Source | answers |
 |---|---|---|
 | 1 | **Platform documentation** `~/Git/dynamics365smb-devitpro-pb/dev-itpro/developer/` (4 386 MD) | what the PLATFORM guarantees -- validate order, trigger lifecycle, transaction behaviour, system fields. Not present in the AL source |
-| 2 | **AL source** `~/Git/BCApps/src/` | what the BaseApp DOES -- the usage, never the guarantee |
+| 2 | **AL source** `~/Git/BCApps/` on `main` | what the BaseApp DOES -- the usage, never the guarantee |
 | 3 | **User documentation** `~/Git/dynamics365smb-docs/` (2 802 MD) | what the user expects -- the functional intent |
 
 Plus `~/Git/openerp/` as a **fourth, measured reference**: the same semantics implemented once,
@@ -99,6 +99,20 @@ Where to find what:
 | attribute (`[EventSubscriber]`, `[TryFunction]`) | `attributes/` (41) |
 | compiler diagnostic | `diagnostics/` (907) |
 | concepts | `devenv-*.md` at the root |
+
+**The transpiler reads `~/Git/BCApps` on `main`, directly.** No copy, no worktree, no checkout --
+the repository is read where it lies and is never switched by this project. The three trees it
+reads are `src/Layers/W1/BaseApp`, `src/System Application/App` and `src/Business Foundation/App`.
+
+**The demo database is 28.4 and the source is 30.0, and that gap is carried openly.** Measured
+2026-09-01: BCApps carries the BaseApp only on `main`, where it landed on 2026-06-29; every release
+branch from 27.x through 28.x holds ZERO BaseApp `.al` files. The newest public on-prem artefact is
+28.4.53241.0 -- there is no 29.x and no 30.x, and the insider feed refuses without a Collaborate
+account. So no pairing exists. Version 30 ships in a few weeks and closes it; until then the
+mismatch surfaces where it can be judged -- as unmapped columns in the CRONUS load (board:0004) --
+rather than being papered over. How large it is, measured on the central table: `Sales Header`
+carries the SAME 183 fields under 28.4 and 30.0, same numbers, same names; the divergence is in
+procedures, not in the schema.
 
 **The overload filenames are the key.** Behaviour often hangs off the ARGUMENT rather than the
 method name. The predecessor paid three reverts for this: the SystemId rule lives in

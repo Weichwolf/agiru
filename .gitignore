@@ -1,6 +1,6 @@
+*.bak
 build/
+.cache/
 compile_commands.json
 work/
-.cache/
-*.bak
 *.zip

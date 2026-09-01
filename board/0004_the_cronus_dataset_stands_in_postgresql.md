@@ -18,8 +18,23 @@ has yet to emit.
 | CDN | `bcartifacts-exdbf9fwegejdqak.b02.azurefd.net`. The blob host answers nothing (`AuthorizationFailure`, network security perimeter); `bcartifacts.azureedge.net` no longer resolves |
 | newest on-prem artefact | `28.4.53241.0/w1`, 372 706 292 B -- there is no 29.x and no 30.x |
 | inside it | `database/Demo Database BC (28-0).bak`, 824 299 520 B |
-| BCApps `main` | carries `30.0.0.0` -- **there is no demo database for that** |
-| BCApps `releases/28.4` | carries `28.4.0.0` -- that is the pair |
+| BCApps `main` | carries `30.0.0.0` and is the ONLY ref with a BaseApp at all |
+| BCApps `releases/27.x` .. `28.x` | **zero** BaseApp `.al` files -- no `Sales Header`, no `Sales-Post` |
+
+**NO PAIRING EXISTS, AND THE SOURCE IS THE REPOSITORY ON `main` BY DECISION.** Pinning the source
+to the demo database's version is not available: no release branch carries the BaseApp at all. The
+artefact does carry it (8 095 `.al` files at 28.4, readable over a range request for 44 MB instead
+of the platform artefact's 1.37 GB) and that route was built and measured here before being
+discarded -- it is in `git log` if it is ever needed. The transpiler reads `~/Git/BCApps` on `main`
+directly, and the repository is never switched.
+
+**It is temporary.** Version 30 ships in a few weeks and closes the gap on its own.
+
+**How large the gap is today, measured rather than feared:** `Sales Header` carries the SAME 183
+fields under 28.4 and 30.0 -- same numbers, same names, none present in only one. The divergence
+sits in procedures (666 against 654). A field that does differ shows up in this item's own mapping
+as an unmapped column, which this item already refuses to drop silently. **That makes this item the
+place where the version gap becomes visible, and the list of unmapped columns its measurement.**
 
 The container listing over Front Door is **cached by path and not by query**: two requests to
 `/onprem?...` with different `prefix` return the same answer. Whoever needs the version list varies
