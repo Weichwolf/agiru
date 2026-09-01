@@ -1,2 +1,9 @@
-# GENERIERT. Nie von Hand. Uebersetzter AL-Code sieht die Runtime und sonst nichts.
-rt
+# GENERATED. Never by hand.
+#
+# THIS FILE IS DELIBERATELY EMPTY. Translated AL code sees only the door under include/agiru/ -- not
+# the runtime's internals. That is not cosmetics but build time: with `rt` here, every change to an
+# internal runtime header would throw away all ~2 000 generated translation units. This way the
+# runtime may be rebuilt inside every day without touching the generated tree.
+#
+# It fits exactly: what generated AL code needs -- Record, FieldRef, Codeunit, Decimal, the
+# builtins -- IS the door. The client needs no header at all; it speaks over the wire.

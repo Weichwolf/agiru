@@ -1,3 +1,3 @@
-# Der Generator liest den AST und schreibt C++. Er sieht die Runtime NICHT: was er emittiert, muss
-# gegen die Runtime uebersetzen, ohne dass er sie kennt.
+# The generator reads the AST and writes C++. It does NOT see the runtime: what it emits must
+# compile against the runtime without the generator knowing it.
 al

@@ -1,14 +1,14 @@
 #!/bin/sh
-# Die PostgreSQL-Instanz und die Master-Datenbank.
+# The PostgreSQL instance and the master database.
 #
-# WARUM EINE MASTER-DATENBANK. Ein Testlauf braucht einen unberuehrten Bestand, und ihn je Lauf neu
-# zu seeden kostet Minuten. `CREATE DATABASE ... TEMPLATE agiru_master` kopiert ihn auf Dateiebene
-# in Sekunden. Der Master wird nach dem Befuellen nicht mehr beschrieben.
+# WHY A MASTER DATABASE. A test run needs an untouched dataset, and re-seeding it per run costs
+# minutes. `CREATE DATABASE ... TEMPLATE agiru_master` copies it at the file level in seconds. The
+# master is not written to again after it is filled.
 #
-# max_locks_per_transaction: das BC-Schema hat rund 1 600 Tabellen und ebenso viele Indizes. Eine
-# All-in-one-Transaktion nimmt ein Lock je Objekt und sprengt den Default von 64 mit
-# "out of shared memory". Der Wert steht als Kommandozeilenargument und nicht in
-# postgresql.auto.conf, weil der die Neuanlage des Containers nicht ueberlebt.
+# max_locks_per_transaction: the BC schema has some 1 600 tables and as many indexes. An all-in-one
+# transaction takes one lock per object and blows the default of 64 with "out of shared memory".
+# The value is a command-line argument rather than postgresql.auto.conf, because that does not
+# survive recreating the container.
 set -eu
 
 CTR=${AGIRU_PG_CTR:-agiru-pg}
@@ -17,7 +17,7 @@ PW=${AGIRU_PG_PASSWORD:-agiru}
 MASTER=${AGIRU_PG_MASTER:-agiru_master}
 
 if ! podman container exists "$CTR" 2>/dev/null; then
-  printf 'pg: lege %s an\n' "$CTR"
+  printf 'pg: creating %s\n' "$CTR"
   podman run -d --name "$CTR" \
     -e POSTGRES_USER=agiru -e POSTGRES_PASSWORD="$PW" -e POSTGRES_DB=agiru \
     -p "$PORT":5432 docker.io/library/postgres:17 \
@@ -26,20 +26,20 @@ else
   podman start "$CTR" >/dev/null
 fi
 
-printf 'pg: warte auf Verbindungen'
+printf 'pg: waiting for connections'
 i=0
 until podman exec "$CTR" pg_isready -U agiru >/dev/null 2>&1; do
-  i=$((i + 1)); [ "$i" -gt 60 ] && { printf '\npg: kommt nicht hoch\n' >&2; exit 1; }
+  i=$((i + 1)); [ "$i" -gt 60 ] && { printf '\npg: does not come up\n' >&2; exit 1; }
   printf '.'; sleep 1
 done
-printf ' nach %ss\n' "$i"
+printf ' after %ss\n' "$i"
 
 locks=$(podman exec "$CTR" psql -U agiru -tAc 'SHOW max_locks_per_transaction')
-[ "$locks" -ge 1024 ] || { printf 'pg: max_locks_per_transaction=%s, gebraucht werden 1024\n' "$locks" >&2; exit 1; }
+[ "$locks" -ge 1024 ] || { printf 'pg: max_locks_per_transaction=%s, 1024 is required\n' "$locks" >&2; exit 1; }
 
 podman exec "$CTR" psql -U agiru -tAc \
   "SELECT 1 FROM pg_database WHERE datname='$MASTER'" | grep -q 1 || \
   podman exec "$CTR" createdb -U agiru "$MASTER"
 
-printf 'pg: %s steht, max_locks_per_transaction=%s\n' "$MASTER" "$locks"
+printf 'pg: %s is up, max_locks_per_transaction=%s\n' "$MASTER" "$locks"
 printf 'pg: DATABASE_URL=postgresql://agiru:%s@localhost:%s/%s\n' "$PW" "$PORT" "$MASTER"

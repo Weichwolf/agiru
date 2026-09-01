@@ -1,7 +1,7 @@
-# agiru -- der Transpiler unter src/al und src/gen, die Runtime unter src/rt, die uebersetzte
-# BaseApp unter src/app. Dieses Makefile ist der EINE Eingang: nichts wird gestartet, indem an ihm
-# vorbei in ein Skript gegriffen wird. Dass darunter CMake und Ninja arbeiten, ist kein zweiter
-# Mechanismus, sondern das, was hinter der Tuer steht.
+# agiru -- the transpiler under src/al and src/gen, the runtime under src/rt, the translated BaseApp
+# under src/app. This Makefile is the ONE way in: nothing is started by reaching past it into a
+# script. That CMake and Ninja work behind it is not a second mechanism, it is what stands behind
+# the door.
 SHELL := /bin/bash
 .DEFAULT_GOAL := all
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -9,10 +9,10 @@ B    := $(SELF)/build
 
 .PHONY: all db lint test transpile provision doc clean spotless help
 
-all: db            ## die Bibliothek, den Transpiler und den Client daneben
+all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
 
-db: $(B)/CMakeCache.txt   ## compile_commands.json fuer clangd und clang-tidy
+db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json
 
 $(B)/CMakeCache.txt:
@@ -20,26 +20,26 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER=clang++ \
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-lint: db           ## Format, statische Analyse, die Tuer
+lint: db           ## format, static analysis, the door
 	@sh $(SELF)/test/lint.sh
 
-test: all          ## das schnelle Gate
+test: all          ## the fast gate
 	@sh $(SELF)/test/run.sh
 
-transpile: all     ## die BaseApp durch den Transpiler nach src/app/
-	@$(B)/agiru transpile
+transpile: all     ## the BaseApp through the transpiler into src/app/
+	@$(B)/agirutc
 
-provision:         ## MSSQL-Container, BC-Demo-.bak vom CDN, PostgreSQL-Master
+provision:         ## MSSQL container, BC demo .bak from the CDN, PostgreSQL master
 	@sh $(SELF)/scripts/provision.sh
 
-doc:               ## die Dokumentation der Tuer -> build/doc
+doc:               ## the door's documentation -> build/doc
 	@doxygen $(SELF)/doc/Doxyfile
 
-clean:             ## Bauartefakte entfernen
+clean:             ## remove build artefacts
 	@rm -rf $(B) $(SELF)/compile_commands.json
 
-spotless: clean    ## und das heruntergeladene Artefakt dazu
+spotless: clean    ## and the downloaded artefact with it
 	@rm -rf $(SELF)/work
 
-help:              ## diese Liste
+help:              ## this list
 	@grep -hE '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t14

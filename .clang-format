@@ -1,10 +1,10 @@
-# EIN VORBILDLICHER STIL, NICHT DIE GEWOHNHEIT DIESES BAUMS. Der Baum ist leer; es gibt keine
-# Gewohnheit, an die anzupassen waere, und das ist der guenstigste Moment, den ein Formatvertrag je
-# hat. Alles hier ist gewaehlt, damit fremder Code gut LIEST.
+# AN EXEMPLARY STYLE, NOT THIS TREE'S HABITS. The tree is empty; there is no habit to fit, and that
+# is the cheapest moment a formatting contract ever gets. Everything here is chosen so that
+# unfamiliar code READS well.
 #
-# WARUM 100 UND NICHT 80. Die Namen dieses Baums sind seine Dokumentation — `Record`,
-# `FieldNo`, `TableRelation`, `ValidateOnAfterValidate` — und eine Grenze, die einen Ausdruck aus
-# zwei Namen umbricht, kostet mehr an gebrochenen Zeilen, als sie an Breite spart.
+# WHY 100 AND NOT 80. This tree's names are its documentation -- `Record`, `FieldNo`,
+# `TableRelation`, `ValidateOnAfterValidate` -- and a limit that wraps a two-name expression costs
+# more in broken lines than it saves in width.
 BasedOnStyle: LLVM
 Standard: c++20
 ColumnLimit: 100
@@ -16,26 +16,23 @@ QualifierAlignment: Left
 LineEnding: LF
 InsertNewlineAtEOF: true
 
-# KLAMMERN IMMER, UND DER FORMATIERER SETZT SIE. Ein klammerloses `if`, das eine zweite Anweisung
-# bekommt, ist eine der wenigen Aenderungen, die Bedeutung still veraendern — mit dieser Zeile ist
-# sie nicht mehr schreibbar.
+# BRACES ALWAYS, AND THE FORMATTER PUTS THEM THERE. A braceless `if` that grows a second statement
+# is one of the few edits that changes meaning silently, and it is unspellable once this is on.
 InsertBraces: true
 
-# UND EIN EINZEILER BLEIBT EINZEILIG, Klammern und alles. `if (!ok) { return false; }` ist eine
-# Wache, die man auf einen Blick liest; ueber drei Zeilen ist sie ein Absatz, und eine Funktion mit
-# sechs Wachen wird eine Seite.
+# AND A ONE-LINE BODY STAYS ON ONE LINE, braces and all. `if (!ok) { return false; }` is a guard
+# read at a glance; spread over three lines it is a paragraph, and a function with six guards
+# becomes a page.
 AllowShortIfStatementsOnASingleLine: AllIfsAndElse
 AllowShortBlocksOnASingleLine: Always
 AllowShortLoopsOnASingleLine: true
 AllowShortCaseLabelsOnASingleLine: true
 
-# EINE FREIE FUNKTION IST NIE EINZEILIG. Ein Accessor in einer Klasse ist ein Name fuer ein Member
-# und liest sich als einer; eine Definition auf Namespace-Ebene ist etwas, das ein Leser SUCHT, und
-# er findet sie an ihrer Zeile.
+# A FREE FUNCTION IS NEVER ONE LINE. An accessor inside a class is a name for a member and reads as
+# one; a definition at namespace scope is a thing a reader looks for, and it is found by its line.
 AllowShortFunctionsOnASingleLine: Inline
 
-# EINE LEERZEILE ZWISCHEN DEFINITIONEN, immer, damit das Auge eine Grenze findet, ohne Klammern zu
-# zaehlen.
+# ONE BLANK LINE BETWEEN DEFINITIONS, always, so the eye finds a boundary without counting braces.
 SeparateDefinitionBlocks: Always
 MaxEmptyLinesToKeep: 1
 
@@ -44,16 +41,16 @@ SpacesBeforeTrailingComments: 1
 IndentCaseLabels: true
 IndentPPDirectives: None
 
-# ARGUMENTE WERDEN NICHT GEPACKT. Ein Aufruf, der nicht passt, setzt EIN Argument je Zeile — eines
-# hinzuzufuegen ist dann ein Einzeiler-Diff statt eines umflossenen Absatzes.
+# ARGUMENTS ARE NOT PACKED. A call that does not fit puts ONE argument per line, so adding one is a
+# one-line diff instead of a reflowed paragraph.
 BinPackArguments: false
 BinPackParameters: false
 AlignAfterOpenBracket: Align
 PackConstructorInitializers: NextLine
 
-# DIE INCLUDES WERDEN SORTIERT, weil der Baum neu ist. In einem gewachsenen Baum findet eine
-# Neusortierung Header, die nicht selbststaendig sind, und ist deshalb eine Reparatur und kein
-# Format; hier gibt es die noch nicht, also kostet die Regel ab heute nichts.
+# INCLUDES ARE SORTED, because the tree is new. In a grown tree a regroup finds headers that are
+# not self-contained and is therefore a repair rather than a format; here there are none yet, so the
+# rule costs nothing from today on.
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 IncludeCategories:

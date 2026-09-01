@@ -1,10 +1,9 @@
-# clangd liest `compile_commands.json` an der Wurzel. `make db` legt es dort ab (ein Symlink auf
-# den Build-Baum), und es ist gitignored -- die einzige Ausnahme von der Regel, dass Artefakte
-# nicht im Baum liegen.
+# clangd reads `compile_commands.json` at the root. `make db` puts it there (a symlink into the
+# build tree) and it is gitignored -- the one exception to artefacts staying out of the tree.
 #
-# Hier steht deshalb NUR das, was die Kompilierdatenbank nicht sagen kann: der generierte Baum
-# unter src/app/ ist Maschinenausgabe. clangd soll ihn oeffnen koennen, aber keine Diagnose darin
-# anzeigen, sonst ertrinkt jeder Sprung in eine generierte Datei in Meldungen ohne Adresse.
+# What stands here is only what the compilation database cannot say: the generated tree under
+# src/app/ is machine output. clangd should be able to open it but show no diagnostics inside,
+# otherwise every jump into a generated file drowns in findings with no address.
 Diagnostics:
   UnusedIncludes: Strict
   MissingIncludes: Strict

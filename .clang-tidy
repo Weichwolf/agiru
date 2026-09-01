@@ -1,16 +1,14 @@
-# STRENG, UND AB TAG EINS. Jeder Check unten ist einer, dessen Fund ein DEFEKT oder eine nicht
-# strittige Verbesserung ist. Was abgeschaltet ist, ist es mit einem Grund daneben — ein
-# abgeschalteter Check ohne Grund ist einer, den in einem Jahr jemand einschaltet und wieder
-# abschaltet.
+# STRICT, AND FROM DAY ONE. Every check below is one whose finding is a DEFECT or an unarguable
+# improvement. What is switched off is switched off with a reason beside it -- a disabled check with
+# no reason is a check somebody re-enables next year and disables again.
 #
-# DIESER BAUM IST NEU, UND DAS IST DER GANZE UNTERSCHIED. Eine strenge Analyse über einen
-# gewachsenen Baum findet Tausende und wird deshalb in Stufen eingeführt; hier gibt es nichts zu
-# staffeln. Die Baseline ist 0, weil sie es sein kann. Es gibt keine "Stufe zwei": eine Stufe ohne
-# Datum ist ein Versprechen.
+# THIS TREE IS NEW, AND THAT IS THE WHOLE DIFFERENCE. A strict analysis over a grown tree finds
+# thousands and is therefore introduced in stages; here there is nothing to stage. The baseline is 0
+# because it can be. There is no "stage two": a stage without a date is a promise.
 #
-# ES STEHEN KEINE FUNDZAHLEN NEBEN DEN AUSNAHMEN, weil hier noch nichts zu zählen war. Jede
-# Ausnahme unten steht also NICHT auf einer Messung, sondern auf der Aussage, dass ihr Fund
-# Geschmack ist. Wird eine davon je auf eine Messung gestellt, kommt die Zahl daneben.
+# NO FINDING COUNTS STAND BESIDE THE EXCEPTIONS, because there was nothing to count yet. Each
+# exception below therefore rests NOT on a measurement but on the claim that its finding is taste.
+# When one is put on a measurement, the number goes beside it (board:0005).
 HeaderFilterRegex: '.*/(include|src)/.*\.h$'
 FormatStyle: file
 Checks: >
@@ -30,48 +28,49 @@ Checks: >
 WarningsAsErrors: '*'
 
 CheckOptions:
-  # `readability-identifier-length` gehoert GESETZT und nicht abgeschaltet. Der Default fordert drei
-  # Zeichen, was hier falsch ist: der Transpiler traegt AL-Vokabeln, und `i`, `n`, `no` sind die
-  # klarsten Namen, die ein Index, eine Anzahl und eine `No.` je haben werden. Auf eins gesetzt
-  # verweigert er weiterhin das wirklich Namenlose und hoert auf, ueber Schleifenzaehler zu streiten.
+  # `readability-identifier-length` belongs SET, not switched off. Its default asks for three
+  # characters, which is wrong here: the tree carries AL vocabulary, and `i`, `n`, `no` are the
+  # clearest names an index, a count and a `No.` will ever have. At one it still refuses the truly
+  # nameless and stops arguing about loop counters.
   readability-identifier-length.MinimumVariableNameLength: 1
   readability-identifier-length.MinimumParameterNameLength: 1
   readability-identifier-length.MinimumLoopCounterNameLength: 1
 
-  # SHAPE, NICHT KORREKTHEIT — der einzige Waechter hier, der die FORM misst. Der Default ist 25 und
-  # er bleibt es. Ein Transpiler-Emitter, der darueber kommt, ist eine Funktion, die in drei zerfaellt.
+  # SHAPE RATHER THAN CORRECTNESS -- the only guard here that measures FORM. The default is 25 and
+  # it stays. A generator emitter above it is one function that wants to be three.
   readability-function-cognitive-complexity.Threshold: 25
 
-  # CLAUDE.md: jede Zahl traegt ihre Herkunft. Erlaubt bleiben die Zahlen, die keine Herkunft haben
-  # KOENNEN, weil sie die Identitaeten der Arithmetik sind.
+  # CLAUDE.md: every number carries its origin. What stays allowed are the numbers that CANNOT have
+  # an origin, because they are the identities of arithmetic.
   readability-magic-numbers.IgnoredIntegerValues: '0;1;2;3;4;10;100'
   readability-magic-numbers.IgnoredFloatingPointValues: '0.0;1.0;100.0'
 
-# WARUM DIESE VIER AUS SIND, UND WARUM SONST NICHTS
+# WHY THESE FOUR ARE OFF, AND WHY NOTHING ELSE IS
 #
-# Ein Check ist aus fuer genau einen Grund: sein Fund ist GESCHMACK und kein Defekt. Alles, dessen
-# Fund ein Defekt ist, ist AN und sein Zaehler steht auf null.
+# A check is off for exactly one reason: its finding is TASTE rather than a defect. Everything whose
+# finding is a defect is ON and its counter reads zero.
 #
-# `modernize-use-trailing-return-type` will `auto f() -> int`. Dieser Baum schreibt `int f()`, und
-#   der Rest der Welt auch.
-# `readability-uppercase-literal-suffix` will `1.0F` statt `1.0f`. LLVMs Hausgeschmack, er kauft
-#   keinem Leser etwas.
-# `readability-math-missing-parentheses` klammert `a * b + c`. Vorrang ist kein Defekt, und die
-#   Klammern verbergen die Form eines Ausdrucks, statt sie zu zeigen.
-# `readability-avoid-nested-conditional-operator` verbietet `a ? b : c ? d : e`. Eine AL-Option auf
-#   einen C++-Wert abzubilden ist genau diese Kette, und sie in `if` zu zerlegen macht sie laenger,
-#   nicht klarer.
+# `modernize-use-trailing-return-type` wants `auto f() -> int`. This tree writes `int f()`, and so
+#   does the rest of the world.
+# `readability-uppercase-literal-suffix` wants `1.0F` over `1.0f`. LLVM house taste; it buys no
+#   reader anything.
+# `readability-math-missing-parentheses` parenthesises `a * b + c`. Precedence is not a defect, and
+#   the parentheses hide the shape of an expression rather than showing it.
+# `readability-avoid-nested-conditional-operator` forbids `a ? b : c ? d : e`. Mapping an AL option
+#   onto a C++ value is exactly that chain, and splitting it into `if` makes it longer, not clearer.
 #
-# WAS ABSICHTLICH AN IST, OBWOHL ES WEHTUT
+# WHAT IS DELIBERATELY ON, EVEN THOUGH IT HURTS
 #
-# `misc-non-private-member-variables-in-classes` — CLAUDE.mds eigener Satz: ein oeffentliches
-#   Datenmember ist eine Invariante, die niemand halten kann. Er trifft generierte Record-Klassen
-#   NICHT, weil `src/app/` gar nicht analysiert wird.
-# `readability-magic-numbers` — CLAUDE.mds Regel, dass jede Zahl ihre Herkunft traegt.
-# `bugprone-easily-swappable-parameters` — `TableId`/`FieldNo`/`EntryNo` sind alle `int32`, und AL
-#   vertauscht sie still. Genau dafuer stehen die starken Typen in CLAUDE.md; dieser Check ist ihr
-#   Waechter.
-# `misc-include-cleaner` — er ist bei der Standardbibliothek scharf und daneben oft daneben. Er
-#   bleibt VOLL an, bis eine Messung an diesem Baum das Gegenteil zeigt; dann kommt die Zahl in die
-#   Zeile darueber und `IgnoreHeaders` darunter. Eine Ausnahme vor der Messung waere geraten.
-# `modernize-avoid-c-arrays` und `modernize-avoid-c-style-cast` — in einem neuen Baum kostenlos.
+# `misc-non-private-member-variables-in-classes` -- CLAUDE.md's own sentence: a public data member
+#   is an invariant nobody can hold. It does not reach generated Record classes, because `src/app/`
+#   is not analysed at all.
+# `readability-magic-numbers` -- CLAUDE.md's rule that every number carries its origin. It has
+#   already paid for itself: chasing a bare `32` out of the Decimal divider exposed a silent lost
+#   carry in the wide multiply.
+# `bugprone-easily-swappable-parameters` -- `TableId`/`FieldNo`/`EntryNo` are all `int32`, and AL
+#   swaps them silently. That is what the strong types in CLAUDE.md are for; this check is their
+#   guard. It has twice been answered with better structure rather than an exception.
+# `misc-include-cleaner` -- sharp on the standard library and often wrong beside it. It stays fully
+#   on until a measurement on THIS tree shows otherwise; then the number goes in the line above and
+#   `IgnoreHeaders` below it, in that order. An exception before the measurement would be a guess.
+# `modernize-avoid-c-arrays` and `modernize-avoid-c-style-cast` -- free in a new tree.

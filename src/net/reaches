@@ -1,1 +1,2 @@
-# Diese Stufe sieht nichts ausser der Standardbibliothek und ihren eigenen Dateien.
+# THE VALUE LAYER: AL value types and the rebuilt .NET classes. Everything that is a VALUE and knows
+# neither table nor database. It sees nothing but the standard library.

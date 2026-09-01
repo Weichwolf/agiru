@@ -1,276 +1,328 @@
 # agiru
 
-AL→C++-Transpiler und Runtime für Business Central. Die BaseApp wird nicht angebunden, sie wird
-ÜBERSETZT: 9 300 AL-Objekte, 2,56 Mio. Zeilen AL aus `~/Git/BCApps/`, nach C++23, mitsamt der
-Geschäftslogik. Ergebnis ist ein eigenständiges ERP auf einem Prozess und einer PostgreSQL.
+An AL-to-C++ transpiler and runtime for Business Central. The BaseApp is not wrapped, it is
+TRANSLATED: 9 300 AL objects, 2.56 million lines of AL from `~/Git/BCApps/`, into C++23, business
+logic and all. The result is a standalone ERP on one process and one PostgreSQL.
 
-## Warum C++ und nicht die Sprache, in der das schon einmal versucht wurde
+**The repository speaks English.** Source, comments, board items, commit messages, documentation.
 
-`~/Git/openerp/` ist derselbe Versuch in Python: 63 k Zeilen Runtime, 3,3 Mio. Zeilen generiert,
-ein Backlog mit gemessenen Reverts. Er ist die dritte Referenz dieses Baums und seine Niederlagen
-sind bezahlte Tage. Drei davon sind der Grund für den Sprachwechsel:
+## The target this is built against
 
-- **AL ist statisch getypt und Python ist es nicht.** Ein AL-`Record` ist ein Satz benannter Felder
-  fester Typen; in Python wurde er ein Descriptor-Dict, und jeder Typfehler fiel erst zur Laufzeit
-  auf — in einem Testlauf von Stunden. In C++ ist eine Tabelle eine generierte Klasse mit
-  getypten Feldern; derselbe Fehler ist ein Compilerfehler in Sekunden.
-- **Die .NET-Typen sind Klassen, keine Brücken.** AL spricht `System.Text.StringBuilder`,
-  `System.IO.MemoryStream`, `System.Xml.XmlDocument`. openerp hat sie als `dotnet_*.py`-Brücken
-  auf Python-Bibliotheken abgebildet und an der Semantik-Differenz geblutet. Hier werden sie
-  NACHGEBAUT — eine C++-Klasse je .NET-Klasse, mit dem Verhalten, das die .NET-Doku beschreibt.
-  Das ist mehr Arbeit einmal und keine Arbeit danach.
-- **Ein Prozess kostete ein Gigabyte.** openerps App-Image ist ~1 GB je Prozess, was Fork
-  ausschloss, Threads erzwang und die Testparallelität auf zwei Worker deckelte. Ein übersetztes
-  Programm trägt seinen Code im Textsegment und teilt ihn zwischen Prozessen ohne Zutun.
+**`agiru` and PostgreSQL run on a Raspberry Pi Zero 2 W, and they run FAST.**
 
-Was von openerp ÜBERNOMMEN wird, steht unten unter „Die Doku ist die Spezifikation" und
-„Jeder Fehler ist ein generischer Gap". Beides ist dort gemessen worden und gilt hier unverändert.
-
-## Stand
-
-Der Baum ist LEER. Es gibt einen Bauplan, ein Gate, ein Board und keinen Transpiler. Was hier steht,
-ist die Verfassung, gegen die der erste Code geschrieben wird — nicht die Beschreibung von etwas
-Bestehendem. Wo eine Zahl fehlt, steht kein Platzhalter, sondern ein Board-Item.
-
-## Die Referenzen
-
-Jede Frage nach Soll-Verhalten hat drei Quellen, in dieser Reihenfolge:
-
-| # | Quelle | beantwortet |
-|---|---|---|
-| 1 | **Plattform-Doku** `~/Git/dynamics365smb-devitpro-pb/dev-itpro/developer/` (4 386 MD) | was die PLATTFORM garantiert — Validate-Reihenfolge, Trigger-Lebenszyklus, Transaktionsverhalten, Systemfelder. Steht im AL-Quelltext NICHT |
-| 2 | **AL-Quelltext** `~/Git/BCApps/src/` | was die BaseApp TUT — die Verwendung, nie die Garantie |
-| 3 | **Anwender-Doku** `~/Git/dynamics365smb-docs/` (2 802 MD) | was der Anwender erwartet — das fachliche Soll |
-
-Dazu `~/Git/openerp/` als **vierte, gemessene Referenz**: dieselbe Semantik einmal implementiert,
-mit Backlog-Kommentaren zu widerlegten Hypothesen. Vor jeder nicht-trivialen Semantik dort greppen.
-
-Wo was steht:
-
-| gesucht | Ort |
-|---|---|
-| Methode eines Typs | `methods-auto/<typ>/<typ>-<methode>[-<argtypen>]-method.md` (1 876 Dateien, 135 Typen) |
-| Überladungen | eigene Datei je Signatur — `record-insert--method.md`, `record-insert-boolean-method.md`, `record-insert-boolean-boolean-method.md` |
-| Objekt-/Feld-Eigenschaft | `properties/devenv-<name>-property.md` (349) |
-| Trigger | `triggers-auto/` (152) |
-| Attribut (`[EventSubscriber]`, `[TryFunction]`) | `attributes/` (41) |
-| Compiler-Diagnose | `diagnostics/` (907) |
-| Konzepte | `devenv-*.md` im Wurzelverzeichnis |
-
-**Die Überladungs-Dateinamen sind der Schlüssel.** Ein Verhalten hängt oft am ARGUMENT, nicht am
-Methodennamen. openerp hat daran drei Reverts bezahlt: die SystemId-Regel steht in
-`record-insert-boolean-boolean-method.md`, nicht in der Datei daneben.
-
-### Die Doku ist die Spezifikation
-
-Die Abdeckung der BC-Testsuite ist unbekannt, die Doku ist vollständig. Was die Doku beschreibt,
-muss die Runtime können, unabhängig davon, ob ein Test es abfragt.
-
-1. **Namensgleichheit mit AL ist Architektur-Invariante.** Typ, Methode und Parameter heißen wie in
-   AL. Nur so ist der Doku-Abgleich mechanisch: ein Typ, der anders heißt, bricht ihn für ALLE
-   seine Methoden. openerp hat sich `Record`→`Table`, `RecordRef`→`_RecordRefProxy`, `List`→`AlList`
-   geleistet und den Abgleich damit für jede dieser Klassen verloren. Hier heißt `Record` `Record`.
-2. **Ein dokumentiertes Verhalten ohne Gate-Test ist eine Lücke**, auch wenn kein AL-Test darauf
-   fällt.
-3. **Der Vollständigkeitsmesser ist ein Zähler mit Baseline** — Doku-Syntaxblock gegen C++-Signatur
-   über alle 135 AL-Typen. Er misst NICHT, ob eine vorhandene Signatur das Richtige tut.
-
-### Jeder Fehler ist ein generischer Gap
-
-Transpiler und Runtime kennen **keine** konkreten AL-Objekte. Also kann kein Fehler
-„reservierungs-" oder „verkaufsspezifisch" sein. Ein scheiternder Test zeigt ein unvollständig
-implementiertes generisches AL-Primitiv — Builtin, Trigger-Semantik, Event-Dispatch, FlowField,
-TableRelation. Ist AL zu 100 % generisch implementiert, passen alle Tests. Ein AL-Objektname, der
-in `src/` außerhalb von `src/app/` auftaucht, ist ein Befund und kein Fix.
-
-## Die Handwerksregeln
-
-C++-Wahrheiten, keine agiru-Entscheidungen. Sie bewegen sich nicht.
-
-- **C++23**, `-Wall -Werror -Wpedantic`; eine Warnung IST ein Fehler. `clang++-19` ist der
-  Referenz-Compiler, `g++-14` muss denselben Baum übersetzen — zwei Frontends finden verschiedene
-  Fehler, und der zweite kostet nur Rechenzeit
-- **Was der Compiler entscheiden kann, ist ein `static_assert`, nie ein Testfall.** Feldzahl,
-  Layout, Enum-Vollständigkeit, Vollständigkeit eines Katalogs. Der Transpiler EMITTIERT diese
-  Zusicherungen: eine TableRelation, deren Ziel nicht existiert, ist ein Übersetzungsfehler und
-  keine Laufzeitmeldung. Das ist der Hauptgewinn gegenüber Python und wird nicht verschenkt
-- **Das Typsystem vor Prüfern**: `std::span`/`std::string_view` an Grenzen, `std::expected` wo eine
-  Verweigerung ihren Grund trägt, starke Typen statt `int` für alles, was eine Bedeutung hat
-  (`TableId`, `FieldNo`, `EntryNo`). AL vertauscht sie sonst still
-- **`private` ist Default**, eine breitere Tür begründet sich. Ein öffentliches Datenmember ist eine
-  Invariante, die niemand halten kann
-- **Kein Kommentar, der WAS sagt.** Code und Name erklären sich selbst; ein Kommentar, der die
-  Zeile daneben wiederholt, ist dieselbe Aussage in zwei Sprachen und driftet weg. Nur ein
-  nicht-offensichtliches WARUM rechtfertigt einen, dann eine Zeile. `include/` ist die Tür und
-  trägt Doxygen; der Rest von `src/` trägt Prosa nur im Beweis
-- **Ein Name ist ein Versprechen.** Ein Wort, das in AL etwas anderes heißt, gibt das Wissen des
-  Lesers gegen ihn aus. Die AL-Vokabeln sind Gesetz — Record, FieldRef, Codeunit, Trigger, Validate,
-  Filter, Key, Flowfield, Dimension
-- **Jede Zahl trägt ihre Herkunft** (`abgeleitet` · `gemessen` · `[GESETZT]`) mit Einheit und
-  Population. Eine nackte Konstante im Code ist ein Befund
-- **Eine Diagnose ist ein deklariertes Label**, nie ein freies Literal — die Fehlermeldungen einer
-  Datei stehen oben beisammen und lesen sich als Liste. AL-Fehlertexte sind Teil des
-  Soll-Verhaltens: Tests vergleichen sie
-- **Ein Fehlschlag ist laut.** Eine Deklaration anzunehmen und nichts damit zu tun ist schlimmer
-  als sie abzulehnen. `catch (...) {}` ist ein Befund mit Zähler
-- **Artefakte nach `build/` oder ins System-Temp**, nie in den Baum. `compile_commands.json` ist die
-  Ausnahme, weil clangd es an der Wurzel sucht; es ist gitignored
-
-## Die Invarianten
-
-Vier Festlegungen. Alles andere darf ein Item revidieren, diese nicht.
-
-- **KEIN BINÄRER FLIESSKOMMATYP TRÄGT EINEN BETRAG.** AL-`Decimal` ist .NET-`decimal`, BC speichert
-  `decimal(38,20)`. Ein `double` in einer Buchungszeile ist ein Defekt, kein Rundungsproblem — er
-  bricht die Summenprobe, an der jede Buchung hängt. `Decimal` ist ein Projekttyp mit eigenem
-  Beweis; welche Darstellung ihn trägt, ist gemessen zu entscheiden und nicht zu raten (board:0002)
-- **DER GENERIERTE BAUM WIRD NIE VON HAND ANGEFASST.** `src/app/` ist Transpiler-Ausgabe. Ein Fix
-  gehört in `src/gen/` oder `src/rt/`. Eine Hand-Änderung dort überlebt den nächsten Lauf nicht und
-  kostet die Zeit zweimal
-- **DIE RUNTIME KENNT KEIN AL-OBJEKT.** Weder Transpiler noch Runtime nennen je eine konkrete
-  Tabelle, Codeunit oder Library-Methode. Jede AL-App muss durch beide laufen. Ein hartcodierter
-  AL-Name ist der Fix, der die nächsten zehn Fälle verhindert hat und den elften bricht
-- **DETERMINISMUS IST PFLICHT.** Dieselbe Buchung über denselben Datenbestand erzeugt dieselben
-  Posten, byteweise, zweimal. Alles, was aus nebenläufiger Arbeit zusammengesetzt wird, wird in
-  DEKLARIERTER Reihenfolge kombiniert, nie in Fertigstellungsreihenfolge. Der Beweis ist ein
-  Digest über den Postenbestand nach einem Lauf — dieselbe Mechanik, mit der ein Renderer seine
-  Bilder prüft
-
-## Wie der Baum geordnet ist
-
-Grundsätze, keine Karte — eine Karte veraltet an dem Tag, an dem ein Verzeichnis umzieht.
-
-- **Ein Verzeichnis IST eine Abhängigkeitsstufe** und trägt eine `reaches`-Datei, die nennt, was es
-  sehen darf. Der Include-Pfad wird DARAUS abgeleitet, also scheitert ein Stufenbruch am `#include`
-  mit Datei und Zeile statt hinterher im Linker
-
-```
-  src/al     ← Lexer, Parser, AST der AL-Sprache            reaches: —
-  src/net    ← die .NET-Klassen, nachgebaut                 reaches: —
-  src/db     ← PostgreSQL über libpq, Schema, Cursor        reaches: —
-  src/gen    ← der Generator: AST → C++                     reaches: al
-  src/rt     ← die Runtime: Record, Codeunit, Page, Events  reaches: net db
-  src/app    ← GENERIERT. Nie von Hand.                     reaches: rt
-  src/cli    ← die eine Tür nach außen                      reaches: rt app
-```
-
-- **Ein Header ist ÖFFENTLICH nur, wenn ein Client die Runtime ohne ihn nicht benutzen kann.**
-  `include/agiru/` ist die Tür und nichts sonst steht darin
-- **ES GIBT EINEN CLIENT.** Ein zweites Programm wäre eine zweite Tür
-- **`make` IST DER EINZIGE EINGANG.** Nichts wird gestartet, indem an ihm vorbeigegriffen wird.
-  Dass darunter CMake und Ninja arbeiten, ändert das nicht: eine Tür vor einem Generator ist keine
-  zweite Mechanik, sondern die Tür
+That sentence is not an aspiration, it is the specification everything else is measured against:
 
 | | |
 |---|---|
-| `make` | die Bibliothek, den Transpiler und den Client daneben |
-| `make db` | `compile_commands.json` für clangd und clang-tidy |
-| `make lint` | Format · statische Analyse · die Tür |
-| `make test` | das schnelle Gate |
-| `make transpile` | die BaseApp durch den Transpiler nach `src/app/` |
-| `make provision` | MSSQL-Container, BC-Demo-`.bak` vom CDN, PostgreSQL-Master |
-| `make help` | die Liste |
+| SoC | Broadcom BCM2710A1 -- quad-core Cortex-A53 at 1 GHz, in-order, dual-issue |
+| Cache | 32 KB L1-I + 32 KB L1-D per core, 512 KB shared L2 |
+| **RAM** | **512 MB, total, shared with the OS and PostgreSQL** |
+| Storage | microSD -- slow, and it wears |
 
-## Was was beweist
+**Memory is the budget; the CPU is not the problem.** A headless OS takes 60-80 MB, PostgreSQL
+wants 100-150 MB with a small `shared_buffers`, which leaves `agiru` roughly **250 MB of resident
+set for a complete ERP with 1 700 tables and 2 300 codeunits**. The predecessor needed 1 GB per
+process for the image alone. This target is the reason the language changed, and it decides
+architecture rather than tuning:
 
-**Jede Baseline darf nur SCHRUMPFEN.** Eine strenge Analyse über einen gewachsenen Baum ist an Tag
-eins rot und in Woche eins abgeschaltet; ein aufgezeichneter Zähler, den ein Commit senken und nie
-heben darf, hält neuen Code auf null und lässt alten reparieren, wenn er angefasst wird.
+- **Object metadata is STATIC CONST DATA, emitted by the transpiler, never built at startup.**
+  Field descriptors, table relations, key definitions, captions -- all of it is `constexpr` arrays
+  in `.rodata`. Demand-paged by the kernel, shared between processes, zero startup cost, zero heap.
+  Building 9 300 objects' metadata at boot is exactly what cost the predecessor its gigabyte.
+- **The text segment is a measured quantity with a ceiling.** 9 300 compiled objects are a large
+  `.text`; it is fine only because the kernel pages in what is touched. That makes CODE LOCALITY an
+  architectural concern: the generator groups objects so that one posting run walks contiguous
+  pages instead of scattering across the segment (board:0009).
+- **No allocation on the hot path.** A record read that heap-allocates per field is a design error,
+  not a slow spot. Arena per session, fixed layouts, no pointer chasing.
+- **Cortex-A53 is in-order.** A mispredicted branch is not absorbed by an out-of-order window;
+  branch-heavy dispatch costs real cycles. Straight-line generated code beats a clever table.
+- **The SD card wears out.** WAL settings, checkpoints and log volume are decisions, not defaults.
 
-**Dieser Baum ist neu, also ist jede Baseline heute 0 und bleibt es.** Es gibt keine Altlast, für
-die eine Ausnahme zu machen wäre. Was hier je über null steht, ist an dem Tag hineingeschrieben
-worden — nicht geerbt.
+The development box is x86_64 Debian; the target is `aarch64`. **A change is not finished until it
+has been measured on the target**, and "it is fast on the workstation" is not a measurement.
 
-| Zähler | misst |
-|---|---|
-| `test/lint-baseline` | clang-tidy-Funde über `src/`, ohne `src/app/` |
-| `test/doc-baseline` | undokumentierte öffentliche Namen in `include/` |
-| `test/todo-baseline` | `TODO`/`FIXME`/`catch (...) {}` — stille Schlucker |
+## Why C++ and not the language this was already attempted in
 
-**Generierter Code wird nicht analysiert, der Generator wird es.** `src/app/` fällt aus `make lint`
-heraus, weil ein Befund dort keine Adresse hat. Er fällt NICHT aus dem Compiler heraus:
-`-Wall -Werror -Wpedantic` gilt für ihn wie für alles andere, und das ist der Halt.
+`~/Git/openerp/` is the same undertaking in Python: 63 k lines of runtime, 3.3 million generated,
+a backlog full of measured reverts, and **97.0 % of the UT subset green (2 234 of 2 303 methods)**.
+It is the fourth reference of this tree and its defeats are days already paid for. Three of them are
+why the language changed:
 
-**Ein Haken ist verdient, wenn sein Beweis steht UND seine Gegenprobe rot wird.** Eine Gegenprobe,
-die durchgeht, beweist nichts. Das ist die Falle, die hier am meisten kostet.
+- **AL is statically typed and Python is not.** An AL `Record` is a set of named fields of fixed
+  type; in Python it became a dictionary of descriptors, and every type error surfaced at runtime --
+  inside a test run measured in hours. In C++ a table is a generated class with typed fields and the
+  same error is a compiler error in seconds.
+- **The .NET types are classes, not bridges.** AL speaks `System.Text.StringBuilder`,
+  `System.IO.MemoryStream`, `System.Xml.XmlDocument`. The predecessor mapped them onto Python
+  libraries as `dotnet_*.py` bridges and bled on the semantic difference. Here they are REBUILT --
+  one C++ class per .NET class, with the behaviour the .NET documentation describes. More work
+  once, and no work afterwards.
+- **A process cost a gigabyte.** See the target above. This is not a performance note, it is the
+  difference between running and not running.
 
-## Der Board
+What IS carried over stands under "The documentation is the specification" and "Every defect is a
+generic gap". Both were measured there and hold here unchanged.
 
-`board/` ist ein flaches Verzeichnis von Arbeits-Items als Markdown. Es enthält nur, was OFFEN ist.
+**Do not port the predecessor's session and threading apparatus.** The `ContextVar` conversion, the
+snapshot/restore of event bindings, the rejected fork+CoW with its refcount argument, free-threaded
+CPython -- all of it solves PYTHON problems: the GIL, refcount churn eroding copy-on-write, a
+gigabyte of image per process. None of those exist here. Likewise most of `scripts/analysis/`:
+those thirty tools answer questions a compiler answers earlier.
 
-**Drei Konventionen stehen hier, weil sie zu brechen still und unumkehrbar ist.** Alles andere über
-den Board ist aus dem Board selbst lesbar.
+## The references
 
-- **Eine Nummer wird EINMAL vergeben und nie wieder**, und die nächste kommt aus der HISTORY, die
-  jede je vergebene ID kennt — nicht aus dem Verzeichnis, das nur das Offene kennt. Aus dem
-  Verzeichnis genommen wäre sie die Nummer eines Geschlossenen, und zwei Dinge teilten dauerhaft
-  eine Identität
-- **Ein Item schließen heißt die DATEI LÖSCHEN.** Was es sagte, steht im Commit, und `git log` ist
-  das Logbuch. Ein zurückgelassenes `State: closed` nimmt dem Verzeichnis seine Aussage
-- **`active` steht im Commit des Items selbst, VOR der Arbeit** — die einzige Besitzmarkierung.
-  Mehrere dürfen auf einer Kette stehen, jedes nennt, worauf es wartet
+Every question about intended behaviour has three sources, in this order:
 
-**Jedes Item nennt seine Referenz und seine Wahl** — was die Plattform-Doku sagt, was der
-AL-Quelltext tut, was openerp daraus gemacht hat und was es gekostet hat, welcher Weg genommen wird
-und warum. Ein Item, das das nicht sagen kann, ist noch nicht verstanden, und diese Zeile zu
-schreiben ist der größere Teil des Denkens.
-
-**Titel sagen, was WAHR SEIN WIRD.** Einer im Präsens ist eine Beschwerde, einer im Futur ist ein
-Ziel, auf das jemand zielen kann.
-
-**Vor dem Anlegen die History greppen**: eine Entfernung war eine Entscheidung, und dasselbe erneut
-anzulegen hebt sie versehentlich auf.
-
-**Ein Defekt, der bei anderer Arbeit gefunden wird, wird in derselben Runde ein Item**, auch wenn er
-in derselben Runde schließt: die Alternative ist ein Defekt, den nur eine Person je kannte.
-
-## Wie hier gearbeitet wird
-
-**Reihenfolge: erst das Fundament auf das Ziel bringen, dann darauf bauen, dann die Lücken
-schließen.** Ein Umbau auf ein zu kurzes Ziel kommt irgendwo an, das wieder verlassen werden muss.
-
-**Autonom durcharbeiten.** Bei Unklarheit die naheliegendste generische Option wählen, messen, bei
-net-negativ zurücknehmen und den Grund in den Board schreiben. Eine widerlegte Hypothese wird
-kommentiert, nicht gelöscht — der teuerste Fehler ist, eine bereits widerlegte Ursache erneut zu
-verfolgen.
-
-**Fix-Klassifikation vor jedem Fix:**
-
-- **silent-wrong-data** — läuft durch, liefert einen falschen Wert, wirft nicht. Net-positiv und
-  regressionsarm
-- **activation** — ein bisher toter Pfad läuft jetzt. Oft net-negativ, weil Tests über den No-op
-  grün waren. Immer volles A/B. Bei net-negativ nicht verwerfen: die Verlustliste nennt die
-  tieferen Roots, diese zuerst
-
-## Was schiefgeht
-
-Gemessene Fehlerarten. Die ersten fünf sind aus openerp geerbt und dort bezahlt worden.
-
-| Falle | wie sie aussieht | die Wache |
+| # | Source | answers |
 |---|---|---|
-| **nie geschriebener Ausgabeparameter** | eine Builtin mit `var`-Parameter, die den Wert nur lokal setzt | `var` ist eine Referenz und der Compiler prüft sie — in C++ ist diese Falle geschlossen, sofern der Generator nie kopiert |
-| **Wertkontext** | AL entscheidet an Verbrauch-gegen-Verwurf, ob ein Misserfolg wirft oder `false` liefert | die Kontexte sind benannt: Zuweisung, `if`/`while`, `exit`, Argument, `case`-Selektor |
-| **Bezeichner-Casing** | AL ist case-insensitiv, divergierendes Casing erzeugt zwei Symbole | Collapse-Match, einmal, im Generator |
-| **lokale Option-Enums** | derselbe nackte Feldname in zwei Objekten löst falsche Ordinale auf | synthetische, eindeutige Namen |
-| **Plattform-Ereignisse** | feuern unabhängig davon, ob das Objekt den Trigger deklariert | die Runtime feuert, nicht das Objekt |
-| **ein blindes Gate** | die Analyse findet nichts und meldet Erfolg, weil sie gar nicht lief | ein Zähler von 0 über N Units ist ein ABBRUCH, kein Bestehen |
-| **eine grüne Gegenprobe** | die Gegenprobe besteht, also beweist der Beweis nichts | die Behauptung neu fassen oder löschen; nie einen falschen Beweis behalten |
-| **eine Baseline, die aus Versehen fällt** | weniger Units übersetzt, also weniger Funde, also ein falscher Boden | die Baseline trägt die Unit-Zahl neben dem Zähler; schrumpft die, ist es ein Abbruch |
+| 1 | **Platform documentation** `~/Git/dynamics365smb-devitpro-pb/dev-itpro/developer/` (4 386 MD) | what the PLATFORM guarantees -- validate order, trigger lifecycle, transaction behaviour, system fields. Not present in the AL source |
+| 2 | **AL source** `~/Git/BCApps/src/` | what the BaseApp DOES -- the usage, never the guarantee |
+| 3 | **User documentation** `~/Git/dynamics365smb-docs/` (2 802 MD) | what the user expects -- the functional intent |
 
-## Die Umgebung
+Plus `~/Git/openerp/` as a **fourth, measured reference**: the same semantics implemented once,
+with backlog comments on refuted hypotheses. Grep there before deriving any non-trivial semantics
+from scratch.
 
-Debian 13 (trixie), x86_64, 2 Kerne, 16 GB. Zwei Kerne sind das knappe Gut: ein Volllauf über 2,56
-Mio. Zeilen AL ist hier eine Sache von Minuten bis Stunden, nicht von Sekunden. Deshalb `ccache`,
-deshalb `lld`, deshalb ist die Übersetzungszeit eine gemessene Größe mit Board-Item und keine
-Nebensache.
+**WHERE THEY DISAGREE, THE DOCUMENTATION WINS.** The predecessor's implementation is a hint about
+where to look and what it cost, never a verdict on what is correct. It is 97 % green on a subset,
+which means it is also wrong somewhere.
 
-- **`libstdc++`-14 hat kein `mdspan` und kein `flat_map`** (gemessen, `__cpp_lib_*` beide
-  undefiniert unter g++-14 UND clang++-19). Vorhanden und benutzt: `expected`, `print`, `format`,
-  `ranges::to`. Wer eines der beiden fehlenden braucht, schreibt es hin oder begründet libc++
-- **PostgreSQL und SQL Server laufen als Podman-Container**, nie als Systemdienst
-- **`max_locks_per_transaction = 1024`** auf der PG-Instanz. Das BC-Schema hat rund 1 600 Tabellen;
-  eine All-in-one-Transaktion nimmt ein Lock je Objekt und sprengt den Default von 64. Bei
-  Container-Neuanlage erneut setzen — `postgresql.auto.conf` überlebt `podman rm` nicht
-- **Die Demo-Datenbank MUSS zur BCApps-Version passen.** Ein Schema aus der einen Version und Daten
-  aus der anderen ist ein Fehlerbild, das wie ein Runtime-Defekt aussieht und keiner ist. Die
-  gepinnte Version steht in `BC_VERSION`, und `make provision` verweigert bei Abweichung
+Where to find what:
+
+| wanted | location |
+|---|---|
+| a type's method | `methods-auto/<type>/<type>-<method>[-<argtypes>]-method.md` (1 876 files, 135 types) |
+| overloads | one file per signature -- `record-insert--method.md`, `record-insert-boolean-method.md`, `record-insert-boolean-boolean-method.md` |
+| object or field property | `properties/devenv-<name>-property.md` (349) |
+| trigger | `triggers-auto/` (152) |
+| attribute (`[EventSubscriber]`, `[TryFunction]`) | `attributes/` (41) |
+| compiler diagnostic | `diagnostics/` (907) |
+| concepts | `devenv-*.md` at the root |
+
+**The overload filenames are the key.** Behaviour often hangs off the ARGUMENT rather than the
+method name. The predecessor paid three reverts for this: the SystemId rule lives in
+`record-insert-boolean-boolean-method.md`, not in the file next to it.
+
+### The documentation is the specification
+
+The coverage of the BC test suite is unknown; the documentation is complete. What the documentation
+describes, the runtime must do, whether or not a test asks for it.
+
+1. **Name equality with AL is an architectural invariant.** Types, methods and parameters carry
+   their AL names. Only then is the documentation check mechanical: a type named differently breaks
+   it for ALL of its methods. The predecessor allowed `Record`->`Table`, `RecordRef`->`_RecordRefProxy`,
+   `List`->`AlList` and lost the check for each of them. Here `Record` is called `Record`.
+   Internal classes with no AL counterpart are free to be named anything.
+2. **A documented behaviour without a gate case is a gap**, even when no AL test touches it.
+3. **The completeness measure is a counter with a baseline** -- documented syntax block against C++
+   signature, across all 135 AL types. It does NOT measure whether an existing signature does the
+   right thing.
+
+### Every defect is a generic gap
+
+Neither transpiler nor runtime knows any concrete AL object. So no defect can be
+"reservation-specific" or "sales-specific". A failing case shows an incompletely implemented generic
+AL primitive -- a builtin, trigger semantics, event dispatch, a FlowField, a TableRelation. With AL
+implemented generically to 100 %, every case passes. An AL object name appearing in `src/` outside
+`src/app/` is a finding, not a fix.
+
+## The craft
+
+C++ truths rather than decisions about agiru. They do not move.
+
+- **C++23**, `-Wall -Wextra -Wpedantic -Werror`; a warning IS an error. `clang++-19` is the
+  reference compiler, `g++-14` must translate the same tree -- two front ends find different
+  defects and the second costs only machine time.
+- **What the compiler can decide is a `static_assert`, never a test case.** Field counts, layout,
+  enum exhaustiveness, catalogue completeness. The transpiler EMITS those assertions: a
+  TableRelation whose target does not exist is a translation error, not a runtime message. This is
+  the main gain over Python and it is not given away.
+- **The type system over checkers**: `std::span` / `std::string_view` at boundaries,
+  `std::expected` where a refusal carries its reason, strong types instead of `int` for anything
+  that means something (`TableId`, `FieldNo`, `EntryNo`). AL swaps them silently otherwise.
+- **`private` is the default**; a wider door justifies itself. A public data member is an invariant
+  nobody can hold.
+- **No comment that says WHAT.** Code and names speak for themselves; a comment repeating the line
+  beside it is the same statement in two languages and drifts away from it. Only a non-obvious WHY
+  earns one, and then one line. `include/` is the door and carries Doxygen; the rest of `src/`
+  carries prose only in a proof.
+- **A name is a promise.** A word that means something else in AL spends the reader's knowledge
+  against them. The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger, Validate, Filter,
+  Key, FlowField, Dimension.
+- **Every number carries its origin** (`derived` / `measured` / `[SET]`) with unit and population.
+  A bare constant in the code is a finding, and `readability-magic-numbers` enforces it.
+- **A diagnostic is a declared label**, never a free literal: a file's ways of refusing read as a
+  list. AL error texts are part of intended behaviour -- tests compare them.
+- **A failure is loud.** Accepting a declaration and doing nothing with it is worse than refusing
+  it. `catch (...) {}` is a finding with a counter.
+- **Artefacts go to `build/` or the system temp directory**, never into the tree.
+  `compile_commands.json` is the exception, because clangd looks for it at the root; it is
+  gitignored.
+
+## The invariants
+
+Four commitments. Everything else an item may revisit; these it may not.
+
+- **NO BINARY FLOATING-POINT TYPE CARRIES AN AMOUNT.** AL `Decimal` is .NET `decimal`; the
+  documentation states the mapping outright and gives 2^96-1 with a scale up to 28. A `double` in
+  a posting line is a defect, not a rounding issue -- it breaks the balance check every posting
+  hangs on. `agiru::Decimal` is that type, and the scale is part of the value.
+- **THE GENERATED TREE IS NEVER TOUCHED BY HAND.** `src/app/` is transpiler output. A fix belongs
+  in `src/gen/` or `src/rt/`. A hand edit there does not survive the next run and costs the time
+  twice.
+- **THE RUNTIME KNOWS NO AL OBJECT.** Neither transpiler nor runtime ever names a concrete table,
+  codeunit or library method. Any AL app must pass through both. A hardcoded AL name is the fix
+  that prevented the next ten cases and breaks the eleventh.
+- **DETERMINISM IS COMPULSORY.** The same posting over the same data produces the same entries,
+  byte for byte, twice. Anything assembled from concurrent work is combined in a DECLARED order,
+  never in completion order. The proof is a digest over the entry tables after a run -- the same
+  mechanism a renderer uses to check its pictures.
+
+## How the tree is arranged
+
+Principles, not a map: a map goes stale the day a directory moves.
+
+- **A directory IS a dependency tier** and carries a `reaches` file naming what it may see. The
+  include path is DERIVED from that, so a tier break fails at the `#include` with a file and a line.
+  CMake reads those files and refuses a tier that does not exist.
+
+```
+  src/al     <- lexer, parser, AST of the AL language      reaches: --
+  src/net    <- the value layer: AL value types and the
+                rebuilt .NET classes                       reaches: --
+  src/db     <- PostgreSQL over libpq, schema, cursors      reaches: --
+  src/gen    <- the generator: AST -> C++                   reaches: al
+  src/rt     <- the runtime: Record, Codeunit, Page, events reaches: net db
+  src/app    <- GENERATED. Never by hand.                   reaches: (nothing -- the door only)
+  src/cli    <- the one door outward                        reaches: rt app
+```
+
+- **`src/app/` sees only the door**, never the runtime's internals. That is build time, not
+  cosmetics: with `rt` in its `reaches`, every change to an internal runtime header would throw
+  away all ~2 000 generated translation units.
+- **A header is PUBLIC only if a client cannot use the runtime without it.** `include/agiru/` is
+  the door and nothing else stands in it. The door is the AL surface -- what generated code needs.
+- **`make` IS THE ONLY WAY IN.** Nothing is started by reaching past it. That CMake and Ninja work
+  behind it changes nothing: a door in front of a generator is not a second mechanism, it is the
+  door.
+
+| | |
+|---|---|
+| `make` | the library, the transpiler, and the client beside them |
+| `make db` | `compile_commands.json` for clangd and clang-tidy |
+| `make lint` | format, static analysis, the door |
+| `make test` | the fast gate |
+| `make transpile` | the BaseApp through the transpiler into `src/app/` |
+| `make provision` | MSSQL container, BC demo `.bak` from the CDN, PostgreSQL master |
+| `make help` | the list |
+
+## What proves what
+
+**Every baseline may only SHRINK.** A strict analysis over a grown tree is red on day one and
+switched off in the first week; a recorded count a commit may lower and never raise holds new code
+to zero and lets old code be repaired at the pace it is touched.
+
+**This tree is new, so every baseline is 0 today and stays there.** There is no legacy to make an
+exception for. Anything above zero here was written in on the day.
+
+| counter | measures |
+|---|---|
+| `test/lint-baseline` | clang-tidy findings over `src/`, excluding `src/app/`, **with the unit count beside it** |
+| `test/doc-baseline` | undocumented public names in `include/` |
+| `test/todo-baseline` | `NOLINT`, `TODO`, `FIXME`, `catch (...)` -- the silent places |
+
+**The silent-places counter is what keeps the first baseline honest.** A `NOLINT` would otherwise
+cost nothing, and a baseline that can be silenced for free is a fig leaf. Suppressing a finding
+costs a number, and that number may only fall.
+
+**Generated code is not analysed; the generator is.** `src/app/` falls out of `make lint` because a
+finding there has no address. It does NOT fall out of the compiler: `-Wall -Wextra -Wpedantic
+-Werror` applies to it like everything else, and that is what holds it.
+
+**A tick is earned when its proof stands AND its negative control goes red.** A control that passes
+proves nothing. That is the trap that costs most here -- and one already went green in this tree for
+a good reason, which is why the rule reads: check that the control tests the right thing before
+concluding the gate is blind.
+
+## The board
+
+`board/` is one flat directory of work items as Markdown. It holds only what is OPEN.
+
+**Three conventions are written down because breaking them is silent and irreversible.** Everything
+else about the board is legible from the board itself.
+
+- **A number is issued ONCE and never again**, and the next one comes from the HISTORY, which knows
+  every id ever filed -- not from the directory, which knows only what is still open. Taken from the
+  directory it would be the number of something closed, and two things would share an identity for
+  good.
+- **Closing an item is DELETING the file.** What it said is in the commit and `git log` is the
+  logbook. A `State: closed` left behind takes the directory's meaning away.
+- **`active` is said in the item's own commit BEFORE the work** -- the only ownership mark. Several
+  may stand on one chain, each naming what it waits on.
+
+**Every item names its reference and its choice** -- what the platform documentation says, what the
+AL source does, what the predecessor made of it and what that cost, which way is taken and why. An
+item that cannot say this is not understood yet, and writing that line is most of the thinking.
+
+**Titles say what WILL BE TRUE.** One in the present tense is a complaint; one in the future is a
+target somebody can aim at.
+
+**Grep the history before filing**: a removal was a decision, and filing the same thing again
+overrules it by accident.
+
+**A defect found while working on something else becomes an item in the same round**, even if it
+closes in that round: the alternative is a defect only one person ever knew about.
+
+## How the work goes
+
+**Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild
+toward a target that is too short arrives somewhere that has to be left again.
+
+**Work autonomously.** Where something is unclear, take the most obvious generic option, measure,
+and on a net negative take it back and write the reason into the board. A refuted hypothesis is
+commented, not deleted -- the most expensive mistake is to pursue a cause that has already been
+ruled out.
+
+**Classify every fix before making it:**
+
+- **silent-wrong-data** -- runs through, returns a wrong value, does not throw. Net positive and
+  low regression risk.
+- **activation** -- a previously dead path now runs. Often net negative, because cases were green
+  over the no-op. Always a full A/B. On a net negative do not discard it: the loss list names the
+  deeper roots, and those come first.
+
+## What goes wrong
+
+Measured failure modes. The first five are inherited from the predecessor and were paid for there.
+
+| trap | what it looks like | the guard |
+|---|---|---|
+| **an out parameter never written** | a builtin with a `var` parameter that sets the value only locally | `var` is a reference and the compiler checks it -- closed in C++, provided the generator never copies |
+| **value context** | AL decides at consumption-versus-discard whether a failure throws or yields `false` | the contexts are named: assignment, `if`/`while`, `exit`, argument, `case` selector |
+| **identifier casing** | AL is case-insensitive; diverging casing produces two symbols | collapse match, once, in the generator |
+| **local option enums** | the same bare field name in two objects resolves to wrong ordinals | synthetic, unique names |
+| **platform events** | fire whether or not the object declares the trigger | the runtime fires, not the object |
+| **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
+| **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
+| **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
+| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | verify that every replacement applied; rewrite the file rather than patch it blind |
+
+## The environment
+
+Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: a full run over 2.56
+million lines of AL is minutes to hours here. Hence `ccache`, hence `lld`, hence translation time is
+a measured quantity with a board item.
+
+- **libstdc++-14 has no `mdspan` and no `flat_map`** (measured; `__cpp_lib_*` undefined under both
+  g++-14 and clang++-19). Present and used: `expected`, `print`, `format`, `ranges::to`.
+- **`__int128` is a GNU extension** that `-Wpedantic` rejects on g++ and accepts on clang. Written
+  as `__extension__ using U128 = unsigned __int128;`, which silences exactly that one diagnostic on
+  both.
+- **PostgreSQL and SQL Server run as Podman containers**, never as system services.
+- **`max_locks_per_transaction = 1024`** on the PG instance. The BC schema has some 1 600 tables; an
+  all-in-one transaction takes one lock per object and blows the default of 64. Set it again when
+  the container is recreated -- `postgresql.auto.conf` does not survive `podman rm`.
+- **The demo database MUST match the BCApps version.** A schema from one version with data from
+  another produces a picture that looks like a runtime defect and is not one. The pinned version is
+  in `BC_VERSION` and `make provision` refuses on a mismatch.

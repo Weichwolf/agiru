@@ -1,10 +1,10 @@
-# DIE SCHICHTUNG IST DER BUILD UND SIE IST EINMAL DEKLARIERT -- in src/<stufe>/reaches. Diese Datei
-# LIEST sie und haelt keine zweite Karte: eine zweite veraltet, laesst eine Stufe aus dem Archiv
-# fallen und bricht den Build an einer Stelle, die nichts damit zu tun hat.
+# THE LAYERING IS THE BUILD AND IT IS DECLARED ONCE -- in src/<tier>/reaches. This file READS those
+# and keeps no second map: a second one goes stale, drops a tier out of the archive and breaks the
+# build somewhere that has nothing to do with it.
 #
-# Der Include-Pfad einer Stufe ist ihr eigenes Verzeichnis plus die Verzeichnisse, die ihre
-# `reaches` nennt -- und sonst nichts. Ein Stufenbruch scheitert deshalb am `#include` mit Datei und
-# Zeile, nicht spaeter im Linker.
+# A tier's include path is its own directory plus the directories its `reaches` names, and nothing
+# else. A tier break therefore fails at the `#include` with a file and a line rather than later in
+# the linker.
 cmake_minimum_required(VERSION 3.28)
 project(agiru CXX)
 
@@ -13,9 +13,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# EINE WARNUNG IST EIN FEHLER, und das gilt fuer den generierten Baum wie fuer den geschriebenen.
-# `src/app/` faellt aus der statischen Analyse heraus, weil ein Fund dort keine Adresse hat; aus dem
-# Compiler faellt es NICHT, und das ist der Halt, der es ersetzt.
+# A WARNING IS AN ERROR, and that holds for the generated tree as much as the written one.
+# `src/app/` falls out of the static analysis because a finding there has no address; it does NOT
+# fall out of the compiler, and that is the hold which replaces it.
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -27,21 +27,21 @@ if(LLD)
   add_link_options(-fuse-ld=lld)
 endif()
 
-# Die Stufen in Abhaengigkeitsreihenfolge. Die Reihenfolge hier ist eine BAUREIHENFOLGE; wer wen
-# sehen darf, sagt weiterhin allein die `reaches`-Datei.
+# The tiers in dependency order. The order here is a BUILD order; who may see whom is still said by
+# the `reaches` file alone.
 set(TIERS al net db gen rt app cli)
 
-# DIE SCHICHTUNG WIRD GEPRUEFT, BEVOR EINE QUELLE ANGESEHEN WIRD. Eine Stufe ohne .cpp wird unten
-# uebersprungen; ihre `reaches` waere damit nie gelesen worden, und ein Tippfehler darin haette bis
-# zu ihrer ersten Datei geschlafen.
+# THE LAYERING IS CHECKED BEFORE ANY SOURCE IS LOOKED AT. A tier without a .cpp is skipped below;
+# its `reaches` would then never have been read, and a typo in it would have slept until its first
+# file arrived.
 foreach(tier IN LISTS TIERS)
   if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches")
-    message(FATAL_ERROR "src/${tier}/ traegt keine reaches-Datei.")
+    message(FATAL_ERROR "src/${tier}/ carries no reaches file.")
   endif()
   file(STRINGS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches" reached REGEX "^[a-z]+$")
   foreach(dep IN LISTS reached)
     if(NOT IS_DIRECTORY "${CMAKE_SOURCE_DIR}/src/${dep}")
-      message(FATAL_ERROR "src/${tier}/reaches nennt '${dep}' -- diese Stufe gibt es nicht.")
+      message(FATAL_ERROR "src/${tier}/reaches names '${dep}' -- no such tier.")
     endif()
   endforeach()
 endforeach()
@@ -59,7 +59,7 @@ foreach(tier IN LISTS TIERS)
     set(target agiru_${tier})
   endif()
 
-  # Die eigene Stufe, die Tuer, und genau das, was `reaches` nennt.
+  # Its own tier, the door, and exactly what `reaches` names.
   target_include_directories(${target} PRIVATE
     "${CMAKE_SOURCE_DIR}/src/${tier}" "${CMAKE_SOURCE_DIR}/include")
   file(STRINGS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches" reached REGEX "^[a-z]+$")
@@ -75,3 +75,19 @@ if(TARGET agiru_db)
   find_package(PostgreSQL REQUIRED)
   target_link_libraries(agiru_db PUBLIC PostgreSQL::PostgreSQL)
 endif()
+
+# THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
+# green -- no framework, no registration, no collected binary that takes everything down with one
+# crash.
+file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
+foreach(case IN LISTS gate_cases)
+  get_filename_component(name "${case}" NAME_WE)
+  add_executable(gate_${name} "${case}")
+  target_include_directories(gate_${name} PRIVATE
+    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate")
+  foreach(tier IN LISTS TIERS)
+    if(TARGET agiru_${tier})
+      target_link_libraries(gate_${name} PRIVATE agiru_${tier})
+    endif()
+  endforeach()
+endforeach()

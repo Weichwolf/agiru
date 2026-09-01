@@ -1,4 +1,4 @@
-# Die Runtime steht auf den nachgebauten .NET-Klassen und der Datenbank. Sie sieht den Parser und
-# den Generator NICHT -- AL-Quelltext ist zur Laufzeit kein Begriff mehr.
+# The runtime stands on the rebuilt .NET classes and the database. It does NOT see the parser or the
+# generator -- at run time AL source text is no longer a notion.
 net
 db

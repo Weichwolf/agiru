@@ -1,17 +1,20 @@
 # agiru
 
-AL→C++-Transpiler und Runtime für Microsoft Dynamics 365 Business Central. Die BaseApp wird nicht
-angebunden, sondern übersetzt: 9 300 AL-Objekte, 2,56 Mio. Zeilen, nach C++23.
+An AL-to-C++ transpiler and runtime for Microsoft Dynamics 365 Business Central. The BaseApp is not
+wrapped, it is translated: 9 300 AL objects, 2.56 million lines, into C++23.
 
-Der Baum ist neu. `CLAUDE.md` ist die Verfassung, `board/` der Arbeitsstand.
+The target it is built against: **`agiru` and PostgreSQL run on a Raspberry Pi Zero 2 W -- 512 MB of
+RAM for the whole ERP -- and they run fast.**
+
+The tree is new. `CLAUDE.md` is the constitution, `board/` is the state of the work.
 
 ```
-make provision   # BC-Demo-Datenbank vom Microsoft-CDN, SQL Server, PostgreSQL
-make             # Bibliothek, Transpiler, Client
-make lint        # Format und statische Analyse, Baseline 0
-make test        # das Gate
-make help        # die Liste
+make provision   # BC demo database from the Microsoft CDN, SQL Server, PostgreSQL
+make             # library, transpiler, client
+make lint        # format and static analysis, baseline 0
+make test        # the gate
+make help        # the list
 ```
 
-Voraussetzungen: siehe `scripts/install.sh`. Die BC-Version ist in `BC_VERSION` gepinnt und muss
-zur ausgecheckten BCApps-Quelle passen — `make provision` verweigert sonst.
+Prerequisites: see `scripts/install.sh`. The BC version is pinned in `BC_VERSION` and must match the
+checked-out BCApps source -- `make provision` refuses otherwise.
