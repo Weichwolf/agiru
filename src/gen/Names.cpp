@@ -68,6 +68,30 @@ std::string OptionEnumName(std::string_view tableName, std::string_view fieldNam
   return Identifier(tableName) + Identifier(fieldName);
 }
 
+// AL HAS NO ESCAPE CHARACTER AND C++ DOES. A Label may read
+// `The Total Cubage %1 ... exceeds %3 %4.\\Do you still want to enter this %3?` -- in AL that
+// backslash is a line break in the message and nothing more, and copied into a C++ literal it
+// becomes `\\D`, which is an unknown escape sequence and therefore an error under -Werror. 196
+// emitted strings in 69 of the BaseApp's tables carry one, and 16 carry a quote that would close
+// the literal early (measured 2026-09-01).
+std::string Literal(std::string_view text) {
+  std::string out;
+  out.reserve(text.size() + 2);
+  out += '"';
+  for (const char c : text) {
+    switch (c) {
+      case '\\': out += "\\\\"; break;
+      case '"': out += "\\\""; break;
+      case '\n': out += "\\n"; break;
+      case '\r': out += "\\r"; break;
+      case '\t': out += "\\t"; break;
+      default: out += c;
+    }
+  }
+  out += '"';
+  return out;
+}
+
 // AL TYPE NAMES ARE CASE-INSENSITIVE AND THE BASEAPP USES THAT. The same field type is written
 // `Guid` 822 times and `GUID` 209 times, `BLOB` 163 times and `Blob` 54, `Enum` 1 351 times and
 // `enum` 41 (measured 2026-09-01). Passing the spelling through would ask for eight door headers

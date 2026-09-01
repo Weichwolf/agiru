@@ -3,6 +3,7 @@
 #include "agiru/BigInteger.h"
 #include "agiru/Boolean.h"
 #include "agiru/Code.h"
+#include "agiru/Date.h"
 #include "agiru/Decimal.h"
 #include "agiru/Enum.h"
 #include "agiru/EnumDef.h"
@@ -64,6 +65,13 @@ struct FieldTypeOf<T> {
                                      : std::is_same_v<T, BigInteger> ? FieldType::BigInteger
                                                                      : FieldType::Integer;
   static constexpr std::uint16_t kLength = 0;               ///< A number declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Date` -- a calendar day, its undefined value and its closing twin in four bytes.
+template <> struct FieldTypeOf<Date> {
+  static constexpr FieldType kType = FieldType::Date;       ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A date declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
 };
 

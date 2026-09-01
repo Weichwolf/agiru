@@ -13,4 +13,6 @@ std::string OptionEnumName(std::string_view tableName, std::string_view fieldNam
 
 std::string TypeName(std::string_view alType);
 
+std::string Literal(std::string_view text);
+
 } // namespace agiru::gen

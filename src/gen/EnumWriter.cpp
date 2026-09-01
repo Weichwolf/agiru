@@ -14,10 +14,6 @@ namespace agiru::gen {
 
 namespace {
 
-std::string Quoted(std::string_view text) {
-  return "\"" + std::string(text) + "\"";
-}
-
 std::string Caption(const al::EnumValueDecl &value) {
   const al::Property *property = Find(value.properties, "Caption");
   return property != nullptr ? property->text : value.name;
@@ -87,7 +83,7 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
            "> kValues{{\n";
     for (const al::EnumValueDecl *value : sorted) {
       out += "      EnumValueDef{.ordinal = " + std::to_string(value->ordinal) +
-             ", .name = " + Quoted(value->name) + ", .caption = " + Quoted(Caption(*value)) +
+             ", .name = " + Literal(value->name) + ", .caption = " + Literal(Caption(*value)) +
              "},\n";
     }
     out += "  }};\n";

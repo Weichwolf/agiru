@@ -1,5 +1,6 @@
 #include "agiru/Record.h"
 
+#include "agiru/Date.h"
 #include "agiru/Decimal.h"
 #include "agiru/EnumDef.h"
 #include "agiru/Error.h"
@@ -39,6 +40,8 @@ std::string FieldText(const void *record, const FieldDef &def) {
       return std::string(reinterpret_cast<const StringValue *>(At(record, def))->Value());
     case FieldType::Decimal:
       return reinterpret_cast<const Decimal *>(At(record, def))->ToInvariantString();
+    case FieldType::Date:
+      return reinterpret_cast<const Date *>(At(record, def))->ToInvariantString();
     case FieldType::Option:
     case FieldType::Enum:
       return detail::MemberText(
@@ -52,6 +55,9 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::Code:
     case FieldType::Text: return reinterpret_cast<const StringValue *>(At(record, def))->IsEmpty();
     case FieldType::Decimal: return reinterpret_cast<const Decimal *>(At(record, def))->IsZero();
+    // `date-data-type.md`: the undefined date IS the blank one, and it is what a date field holds
+    // until something writes to it.
+    case FieldType::Date: return reinterpret_cast<const Date *>(At(record, def))->IsUndefined();
     case FieldType::Option:
     case FieldType::Enum:
       return reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger() == 0;

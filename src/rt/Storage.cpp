@@ -73,7 +73,13 @@ std::string ColumnType(const FieldDef &def) {
     case FieldType::Decimal: return "numeric(38,20)";
     case FieldType::Code:
     case FieldType::Text: return "varchar(" + std::to_string(def.length) + ")";
-    case FieldType::Date: return "date";
+    // NOT `date`, AND THE DOCUMENTATION IS WHY. `date-data-type.md`: "For date fields, Business
+    // Central uses only the date and uses a constant value for the time. For a normal date, this
+    // constant value contains 00:00:00:000. For a closing date, it contains 23:59:59:000." A `date`
+    // column has nowhere to put that, and a closing date would collapse onto its normal date --
+    // which is the whole ordering a fiscal-year close depends on. The undefined date is "the
+    // earliest valid date in SQL Server", 1753-01-01 00:00:00:000.
+    case FieldType::Date: return "timestamp";
     case FieldType::Time: return "time";
     case FieldType::DateTime: return "timestamp";
     case FieldType::Guid: return "uuid";

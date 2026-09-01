@@ -24,10 +24,6 @@ struct OptionField {
   std::vector<std::string> captions;
 };
 
-std::string Quoted(std::string_view text) {
-  return "\"" + std::string(text) + "\"";
-}
-
 std::string Caption(const al::FieldDecl &field) {
   const al::Property *property = Find(field.properties, "Caption");
   return property != nullptr ? property->text : field.name;
@@ -128,8 +124,8 @@ void WriteOptionTraits(std::string &out, const OptionField &option) {
          "> kValues{{\n";
   for (std::size_t i = 0; i < option.members.size(); ++i) {
     out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
-           ", .name = " + Quoted(option.members[i]) + ", .caption = " + Quoted(option.captions[i]) +
-           "},\n";
+           ", .name = " + Literal(option.members[i]) +
+           ", .caption = " + Literal(option.captions[i]) + "},\n";
   }
   out += "  }};\n";
   out += "};\n";
@@ -209,7 +205,7 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   out += "namespace agiru::app {\n\n";
   out += "class " + tableIdentifier + " : public Table<" + tableIdentifier + "> {\npublic:\n";
   out += "  static constexpr TableId kId{" + std::to_string(table.id) + "};\n";
-  out += "  static constexpr std::string_view kName{" + Quoted(table.name) + "};\n\n";
+  out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
 
   for (const al::FieldDecl &field : table.fields) {
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
@@ -234,7 +230,7 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
 
   if (!table.labels.empty()) { out += "\n"; }
   for (const al::LabelDecl &label : table.labels) {
-    out += "  static constexpr std::string_view " + label.name + "{" + Quoted(label.text) + "};\n";
+    out += "  static constexpr std::string_view " + label.name + "{" + Literal(label.text) + "};\n";
   }
 
   out += "\n";
@@ -257,9 +253,9 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
     out += "::FieldNumber::";
     out += identifier;
     out += ", ";
-    out += Quoted(field->name);
+    out += Literal(field->name);
     out += ", ";
-    out += Quoted(Caption(*field));
+    out += Literal(Caption(*field));
     out += ", offsetof(";
     out += tableIdentifier;
     out += ", ";
@@ -271,7 +267,7 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   out += "inline constexpr std::array k" + tableIdentifier + "Keys{\n";
   for (const al::KeyDecl &key : table.keys) {
     const al::Property *clustered = Find(key.properties, "Clustered");
-    out += "    KeyDef{.name = " + Quoted(key.name) + ", .fields = " + tableIdentifier + "::k" +
+    out += "    KeyDef{.name = " + Literal(key.name) + ", .fields = " + tableIdentifier + "::k" +
            Identifier(key.name) + ", .clustered = " +
            (clustered != nullptr && clustered->text == "true" ? "true" : "false") + "},\n";
   }

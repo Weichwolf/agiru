@@ -3,6 +3,7 @@
 
 using agiru::gen::EnumeratorName;
 using agiru::gen::Identifier;
+using agiru::gen::Literal;
 using agiru::gen::OptionEnumName;
 
 namespace {
@@ -38,6 +39,23 @@ void AnOptionFieldGetsItsOwnEnumeration() {
   CHECK_TEXT("and again", OptionEnumName("Resource Cost", "Cost Type"), "ResourceCostCostType");
 }
 
+/// AL text goes into a C++ literal, and the two do not agree on what a backslash is.
+void AlTextSurvivesBecomingACppLiteral() {
+  // AL's backslash is a line break in a message and NOT an escape. Bin Creation Worksheet Line
+  // writes `...exceeds the entered %3 %4.\\Do you still want to enter this %3?`, which lands in the
+  // C++ literal as `\\D` -- an unknown escape sequence, and an error under -Werror.
+  CHECK_TEXT("a backslash is escaped rather than handed to the C++ compiler",
+             Literal("%4.\\Do you still"),
+             "\"%4.\\\\Do you still\"");
+  // The one that is not a warning but a broken file: a quote closes the literal early and
+  // everything after it is read as C++.
+  CHECK_TEXT("and so is a quote", Literal("say \"no\""), "\"say \\\"no\\\"\"");
+  CHECK_TEXT("a plain caption is left exactly as AL wrote it",
+             Literal("Group(Resource)"),
+             "\"Group(Resource)\"");
+  CHECK_TEXT("and a percent sign is not a C++ escape at all", Literal("% Extra"), "\"% Extra\"");
+}
+
 } // namespace
 
 int main() {
@@ -45,5 +63,6 @@ int main() {
     AnAlNameBecomesAnIdentifier();
     AnOptionMemberBecomesAnEnumerator();
     AnOptionFieldGetsItsOwnEnumeration();
+    AlTextSurvivesBecomingACppLiteral();
   });
 }
