@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all db lint test transpile provision doc clean spotless help
+.PHONY: all db lint test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -28,6 +28,9 @@ test: all          ## the fast gate
 
 transpile: all     ## the BaseApp through the transpiler into apps/
 	@$(B)/agirutc
+
+tree: all          ## how much of the generated tree the compiler accepts
+	@sh $(SELF)/scripts/tree_syntax.sh
 
 provision:         ## MSSQL container, BC demo .bak from the CDN, PostgreSQL master
 	@sh $(SELF)/scripts/provision.sh
