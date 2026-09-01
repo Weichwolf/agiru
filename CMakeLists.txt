@@ -79,10 +79,14 @@ endif()
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one
 # crash.
+# The target image is compiled INTO every case, because it is the thing under test: it is what
+# `src/app/` shall look like, and a specification that does not compile is not one.
+file(GLOB target_image CONFIGURE_DEPENDS "test/target/*.cpp")
+
 file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
 foreach(case IN LISTS gate_cases)
   get_filename_component(name "${case}" NAME_WE)
-  add_executable(gate_${name} "${case}")
+  add_executable(gate_${name} "${case}" ${target_image})
   target_include_directories(gate_${name} PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate"
     "${CMAKE_SOURCE_DIR}/test/target")

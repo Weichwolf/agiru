@@ -45,6 +45,13 @@ struct FieldDef {
   FieldType type;
   std::uint16_t length; ///< declared length for Code and Text, 0 otherwise
   std::size_t offset;   ///< offsetof within the record
+
+  /// The member names of an Option or Enum field, empty otherwise.
+  ///
+  /// They sit in the metadata rather than in the value because they are the same for every record
+  /// of the table: one `.rodata` run for the whole table instead of a copy per instance. An error
+  /// message needs them -- AL renders an option by its member name, never by its ordinal.
+  std::span<const std::string_view> members;
 };
 
 /// One key's declaration. The first key is the primary key and AL calls it Key1 by convention.

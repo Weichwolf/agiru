@@ -45,3 +45,8 @@ inline int Done(const char *suite) {
 
 #define CHECK_TRUE(claim, cond)                                                                    \
   gate::Report((cond), (claim), (cond) ? "true" : "false", "true", __FILE__, __LINE__)
+
+/// For a claim that something raises NOTHING. It keeps the message in the failure output, which a
+/// plain truth check would throw away exactly when it is needed.
+#define CHECK_SILENT(claim, got)                                                                   \
+  gate::Report((got).empty(), (claim), (got), "no error", __FILE__, __LINE__)
