@@ -82,6 +82,11 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
       table.fields, [type](const al::FieldDecl &field) { return Identifier(field.name) == type; });
 }
 
+// A FIELD NAME CAN SHADOW A RUNTIME TYPE, AND NOT ONLY ITS OWN. `Change Log Setup (Field)` declares
+// a field called `Field No.`, whose member is `FieldNo` -- and from that member onward `FieldNo`
+// names the member rather than `agiru::FieldNo`, so every entry of the FieldNumber struct below it
+// fails to compile. 122 of the BaseApp's 1 545 tables hit this (measured 2026-09-01). Every runtime
+// name the class body uses after its members therefore goes through here, not just the field types.
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
 }
@@ -198,7 +203,8 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
 
   out += "namespace agiru::app {\n\n";
   out += "class " + tableIdentifier + " : public Table<" + tableIdentifier + "> {\npublic:\n";
-  out += "  static constexpr TableId kId{" + std::to_string(table.id) + "};\n";
+  out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
+         std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
 
   for (const al::FieldDecl &field : table.fields) {
@@ -206,9 +212,10 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
            Identifier(field.name) + ";\n";
   }
 
+  const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
   out += "\n  struct FieldNumber {\n";
   for (const al::FieldDecl &field : table.fields) {
-    out += "    static constexpr FieldNo " + Identifier(field.name) + "{" +
+    out += "    static constexpr " + fieldNo + " " + Identifier(field.name) + "{" +
            std::to_string(field.number) + "};\n";
   }
   out += "  };\n\n";
