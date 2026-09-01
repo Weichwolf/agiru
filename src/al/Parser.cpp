@@ -5,6 +5,7 @@
 #include "Statements.h"
 #include "Token.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <string>
@@ -34,7 +35,7 @@ public:
 
   TableObject ParseTable() {
     TableObject table;
-    table.nameSpace = ReadHeaderNamespace();
+    table.nameSpace = ReadHeaderNamespace("table");
     Expect("table");
     table.id = ExpectInteger();
     table.name = ExpectName();
@@ -65,7 +66,164 @@ public:
     return table;
   }
 
+  CodeunitObject ParseCodeunit() {
+    CodeunitObject unit;
+    unit.nameSpace = ReadHeaderNamespace("codeunit");
+    Expect("codeunit");
+    unit.id = ExpectInteger();
+    unit.name = ExpectName();
+    if (AtKeyword("implements")) {
+      Advance();
+      while (!AtEnd() && !AtPunctuation("{")) {
+        (void)ExpectName();
+        if (AtPunctuation(",")) { Advance(); }
+      }
+    }
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}")) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(unit.labels);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        unit.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      unit.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return unit;
+  }
+
 private:
+  ProcedureDecl ParseProcedure(const std::vector<std::string> &attributes) {
+    ProcedureDecl procedure;
+    procedure.attributes = attributes;
+    while (AtKeyword("local") || AtKeyword("internal") || AtKeyword("protected")) {
+      procedure.isLocal = procedure.isLocal || AtKeyword("local");
+      Advance();
+    }
+    if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("event")) { Advance(); }
+    procedure.name = ExpectName();
+    Expect("(");
+    while (!AtPunctuation(")")) {
+      Parameter parameter;
+      if (AtKeyword("var")) {
+        parameter.byReference = true;
+        Advance();
+      }
+      parameter.name = ExpectName();
+      Expect(":");
+      parameter.type = ReadTypeName();
+      procedure.parameters.push_back(std::move(parameter));
+      if (AtPunctuation(";")) { Advance(); }
+    }
+    Expect(")");
+    if (!AtPunctuation(":") && !AtKeyword("var") && !AtKeyword("begin") && !AtPunctuation(";")) {
+      procedure.returnName = ExpectName();
+    }
+    if (AtPunctuation(":")) {
+      Advance();
+      procedure.returnType = ReadTypeName();
+    }
+    if (AtPunctuation(";")) { Advance(); }
+    procedure.tokens = SkipBeginEnd();
+    procedure.body = ParseStatements(procedure.tokens);
+    return procedure;
+  }
+
+  void SkipBracketed() {
+    Expect("[");
+    int depth = 1;
+    while (!AtEnd() && depth > 0) {
+      if (AtPunctuation("[")) { ++depth; }
+      if (AtPunctuation("]")) { --depth; }
+      Advance();
+    }
+  }
+
+  void SkipOptionMembers() {
+    while (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier ||
+           AtPunctuation(",")) {
+      if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return; }
+      Advance();
+    }
+  }
+
+  void SkipSubtypeName() {
+    if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return; }
+    (void)ExpectName();
+    while (AtPunctuation(".")) {
+      Advance();
+      (void)ExpectName();
+    }
+  }
+
+  std::string ReadTypeName() {
+    while (AtKeyword("array")) {
+      Advance();
+      if (AtPunctuation("[")) { SkipBracketed(); }
+      Expect("of");
+    }
+    std::string type = ExpectName();
+    if (AtKeyword("of")) {
+      Advance();
+      SkipBracketed();
+      return type;
+    }
+    if (SameName(type, "Option")) {
+      SkipOptionMembers();
+      return type;
+    }
+    if (AtPunctuation("[")) {
+      SkipBracketed();
+    } else if (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier) {
+      SkipSubtypeName();
+    }
+    while (AtKeyword("temporary")) { Advance(); }
+    return type;
+  }
+
+  std::string ReadAttribute() {
+    Expect("[");
+    const std::string name = Peek().text;
+    int depth = 1;
+    while (!AtEnd() && depth > 0) {
+      if (AtPunctuation("[")) { ++depth; }
+      if (AtPunctuation("]")) { --depth; }
+      Advance();
+    }
+    return name;
+  }
+
+  void ParseVarsInto(std::vector<LabelDecl> &labels) {
+    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("trigger") && !AtKeyword("procedure") &&
+           !AtKeyword("local") && !AtKeyword("internal") && !AtKeyword("protected")) {
+      if (AtPunctuation("[")) {
+        (void)ReadAttribute();
+        if (!IsVariableAhead()) { return; }
+        continue;
+      }
+      const std::string name = ExpectName();
+      Expect(":");
+      const std::string type = ExpectName();
+      if (SameName(type, "Label") && Peek().kind == TokenKind::String) {
+        labels.push_back(LabelDecl{.name = name, .text = Peek().text});
+        Advance();
+      }
+      while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
+      Expect(";");
+    }
+  }
+
   [[nodiscard]] const Token &Peek(std::size_t ahead = 0) const {
     const std::size_t index = position_ + ahead;
     return index < tokens_.size() ? tokens_[index] : tokens_.back();
@@ -112,9 +270,10 @@ private:
     return value;
   }
 
-  std::string ReadHeaderNamespace() {
+  std::string ReadHeaderNamespace(std::string_view objectWord) {
     std::string dotted;
-    while (!AtEnd() && !AtKeyword("table")) {
+    while (!AtEnd() && !AtKeyword(objectWord)) {
+      if (AtEnd()) { break; }
       if (AtKeyword("namespace")) {
         Advance();
         dotted.clear();
@@ -124,6 +283,9 @@ private:
         }
       }
       Advance();
+    }
+    if (AtEnd()) {
+      throw ParseError("this file declares no " + std::string(objectWord) + " object");
     }
     return dotted;
   }
@@ -324,6 +486,15 @@ std::vector<std::string> ListValue(const Property &property) {
 
 TableObject ParseTable(std::string_view source) {
   return Parser(Tokenize(source)).ParseTable();
+}
+
+CodeunitObject ParseCodeunit(std::string_view source) {
+  return Parser(Tokenize(source)).ParseCodeunit();
+}
+
+bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {
+  return std::ranges::any_of(procedure.attributes,
+                             [name](const std::string &a) { return SameName(a, name); });
 }
 
 } // namespace agiru::al

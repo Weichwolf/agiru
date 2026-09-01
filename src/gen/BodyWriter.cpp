@@ -31,6 +31,7 @@ constexpr int kPrimaryPrecedence = 9;
 
 constexpr std::array kOperators{
     Operator{.al = "or", .cpp = "||", .precedence = 1},
+    Operator{.al = "xor", .cpp = "!=", .precedence = 1},
     Operator{.al = "and", .cpp = "&&", .precedence = 2},
     Operator{.al = "=", .cpp = "==", .precedence = 3},
     Operator{.al = "<>", .cpp = "!=", .precedence = 3},
@@ -45,6 +46,11 @@ constexpr std::array kOperators{
     Operator{.al = "div", .cpp = "/", .precedence = 6},
     Operator{.al = "mod", .cpp = "%", .precedence = 6},
     Operator{.al = ".", .cpp = ".", .precedence = kPrimaryPrecedence},
+    Operator{.al = ":=", .cpp = "=", .precedence = 0},
+    Operator{.al = "+=", .cpp = "+=", .precedence = 0},
+    Operator{.al = "-=", .cpp = "-=", .precedence = 0},
+    Operator{.al = "*=", .cpp = "*=", .precedence = 0},
+    Operator{.al = "/=", .cpp = "/=", .precedence = 0},
 };
 
 const Operator *Find(std::string_view al) {
@@ -99,6 +105,38 @@ private:
     return pad;
   }
 
+  std::string CaseChain(const al::Stmt &statement, int indent) {
+    const std::string subject = Expression(statement.expression, kPrimaryPrecedence);
+    std::string out;
+    for (const al::Stmt &branch : statement.body) {
+      std::string condition;
+      for (const al::Expr &label : branch.labels) {
+        if (!condition.empty()) { condition += " || "; }
+        if (label.kind == al::ExprKind::Range) {
+          condition += subject;
+          condition += " >= ";
+          condition += Expression(label.children.front(), kComparisonPrecedence);
+          condition += " && ";
+          condition += subject;
+          condition += " <= ";
+          condition += Expression(label.children.back(), kComparisonPrecedence);
+          continue;
+        }
+        condition += subject;
+        condition += " == ";
+        condition += Expression(label, kEqualityPrecedence);
+      }
+      out += out.empty() ? Pad(indent) + "if (" : " else if (";
+      out += condition + ") {\n" + Statements(branch.body, indent + 2) + Pad(indent) + "}";
+      if (&branch == &statement.body.back() && statement.otherwise.empty()) { out += "\n"; }
+    }
+    if (!statement.otherwise.empty()) {
+      out += out.empty() ? Pad(indent) + "{\n" : " else {\n";
+      out += Statements(statement.otherwise, indent + 2) + Pad(indent) + "}\n";
+    }
+    return out;
+  }
+
   std::string Statement(const al::Stmt &statement, int indent) {
     if (++depth_ > kMaxDepth) { throw std::runtime_error("a statement nests too deeply"); }
     std::string out;
@@ -117,6 +155,37 @@ private:
       case al::StmtKind::Repeat:
         out = Pad(indent) + "do {\n" + Statements(statement.body, indent + 2) + Pad(indent) +
               "} while (!(" + Expression(statement.expression, 0) + "));\n";
+        break;
+      case al::StmtKind::While:
+        out = Pad(indent) + "while (" + Expression(statement.expression, 0) + ") {\n" +
+              Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+        break;
+      case al::StmtKind::For: {
+        const std::string counter = Expression(statement.expression.children.front(), 0);
+        const std::string first = Expression(statement.expression.children.back(), 0);
+        const std::string last = Expression(statement.labels.front(), 0);
+        out = Pad(indent) + "for (" + counter + " = " + first + "; " + counter +
+              (statement.descending ? " >= " : " <= ") + last + "; " +
+              (statement.descending ? "--" : "++") + counter + ") {\n" +
+              Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+        break;
+      }
+      case al::StmtKind::ForEach:
+        out = Pad(indent) + "for (auto &" + Expression(statement.expression, 0) + " : " +
+              Expression(statement.labels.front(), 0) + ") {\n" +
+              Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+        break;
+      case al::StmtKind::Case: out = CaseChain(statement, indent); break;
+      case al::StmtKind::CaseBranch:
+        throw std::runtime_error("a case branch stands only inside a case");
+      case al::StmtKind::With:
+        throw std::runtime_error("AL `with` needs the members it opens to be resolved first");
+      case al::StmtKind::Exit:
+        out = Pad(indent) + "return" +
+              (statement.expression.kind == al::ExprKind::Name && statement.expression.text.empty()
+                   ? ""
+                   : " " + Expression(statement.expression, 0)) +
+              ";\n";
         break;
       case al::StmtKind::Expression:
         out = Pad(indent) + Expression(statement.expression, 0) + ";\n";

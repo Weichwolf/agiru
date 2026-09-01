@@ -30,13 +30,22 @@ enum class StmtKind : std::uint8_t {
   If,
   Block,
   Repeat,
+  While,
+  For,
+  ForEach,
+  Case,
+  CaseBranch,
+  With,
+  Exit,
 };
 
 struct Stmt {
   StmtKind kind = StmtKind::Expression;
   Expr expression;
+  std::vector<Expr> labels;
   std::vector<Stmt> body;
   std::vector<Stmt> otherwise;
+  bool descending = false;
 };
 
 } // namespace agiru::al

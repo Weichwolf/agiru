@@ -82,26 +82,177 @@ private:
   Stmt ReadStatement() {
     if (AtKeyword("begin")) {
       Advance();
-      Stmt block{.kind = StmtKind::Block, .expression = {}, .body = ReadBlock(), .otherwise = {}};
+      Stmt block{.kind = StmtKind::Block,
+                 .expression = {},
+                 .labels = {},
+                 .body = ReadBlock(),
+                 .otherwise = {},
+                 .descending = false};
       Expect("end");
       return block;
     }
     if (AtKeyword("repeat")) {
       Advance();
-      Stmt loop{.kind = StmtKind::Repeat, .expression = {}, .body = ReadBlock(), .otherwise = {}};
+      Stmt loop{.kind = StmtKind::Repeat,
+                .expression = {},
+                .labels = {},
+                .body = ReadBlock(),
+                .otherwise = {},
+                .descending = false};
       Expect("until");
       loop.expression = ReadExpression(0);
       return loop;
     }
+    if (AtKeyword("while")) {
+      Advance();
+      Stmt loop{.kind = StmtKind::While,
+                .expression = ReadExpression(0),
+                .labels = {},
+                .body = {},
+                .otherwise = {},
+                .descending = false};
+      Expect("do");
+      loop.body.push_back(ReadStatement());
+      return loop;
+    }
+    if (AtKeyword("for")) { return ReadFor(); }
+    if (AtKeyword("foreach")) { return ReadForEach(); }
+    if (AtKeyword("case")) { return ReadCase(); }
+    if (AtKeyword("with")) {
+      Advance();
+      Stmt scope{.kind = StmtKind::With,
+                 .expression = ReadExpression(0),
+                 .labels = {},
+                 .body = {},
+                 .otherwise = {},
+                 .descending = false};
+      Expect("do");
+      scope.body.push_back(ReadStatement());
+      return scope;
+    }
+    if (AtKeyword("exit")) {
+      Advance();
+      Stmt leave{.kind = StmtKind::Exit,
+                 .expression = {},
+                 .labels = {},
+                 .body = {},
+                 .otherwise = {},
+                 .descending = false};
+      if (AtPunctuation("(")) {
+        Advance();
+        leave.expression = ReadExpression(0);
+        Expect(")");
+      }
+      return leave;
+    }
     if (AtKeyword("if")) { return ReadIf(); }
-    return Stmt{
-        .kind = StmtKind::Expression, .expression = ReadExpression(0), .body = {}, .otherwise = {}};
+    Expr value = ReadExpression(0);
+    for (const std::string_view assignment : {":=", "+=", "-=", "*=", "/="}) {
+      if (!AtPunctuation(assignment)) { continue; }
+      Advance();
+      Expr assign{.kind = ExprKind::Binary, .text = std::string(assignment), .children = {}};
+      assign.children.push_back(std::move(value));
+      assign.children.push_back(ReadExpression(0));
+      value = std::move(assign);
+      break;
+    }
+    return Stmt{.kind = StmtKind::Expression,
+                .expression = std::move(value),
+                .labels = {},
+                .body = {},
+                .otherwise = {},
+                .descending = false};
+  }
+
+  Stmt ReadFor() {
+    Expect("for");
+    Expr counter = ReadPostfix();
+    Expect(":=");
+    Expr start{.kind = ExprKind::Binary, .text = ":=", .children = {}};
+    start.children.push_back(std::move(counter));
+    start.children.push_back(ReadExpression(0));
+    Stmt loop{.kind = StmtKind::For,
+              .expression = std::move(start),
+              .labels = {},
+              .body = {},
+              .otherwise = {},
+              .descending = false};
+    if (AtKeyword("downto")) {
+      loop.descending = true;
+      Advance();
+    } else {
+      Expect("to");
+    }
+    loop.labels.push_back(ReadExpression(0));
+    Expect("do");
+    loop.body.push_back(ReadStatement());
+    return loop;
+  }
+
+  Stmt ReadForEach() {
+    Expect("foreach");
+    Stmt loop{.kind = StmtKind::ForEach,
+              .expression = ReadPostfix(),
+              .labels = {},
+              .body = {},
+              .otherwise = {},
+              .descending = false};
+    Expect("in");
+    loop.labels.push_back(ReadExpression(0));
+    Expect("do");
+    loop.body.push_back(ReadStatement());
+    return loop;
+  }
+
+  Stmt ReadCase() {
+    Expect("case");
+    Stmt selector{.kind = StmtKind::Case,
+                  .expression = ReadExpression(0),
+                  .labels = {},
+                  .body = {},
+                  .otherwise = {},
+                  .descending = false};
+    Expect("of");
+    while (!AtEnd() && !AtKeyword("end") && !AtKeyword("else")) {
+      Stmt branch{.kind = StmtKind::CaseBranch,
+                  .expression = {},
+                  .labels = {},
+                  .body = {},
+                  .otherwise = {},
+                  .descending = false};
+      while (!AtEnd() && !AtPunctuation(":")) {
+        Expr label = ReadExpression(0);
+        if (AtPunctuation("..")) {
+          Advance();
+          Expr range{.kind = ExprKind::Range, .text = {}, .children = {}};
+          range.children.push_back(std::move(label));
+          range.children.push_back(ReadExpression(0));
+          label = std::move(range);
+        }
+        branch.labels.push_back(std::move(label));
+        if (AtPunctuation(",")) { Advance(); }
+      }
+      Expect(":");
+      branch.body.push_back(ReadStatement());
+      while (AtPunctuation(";")) { Advance(); }
+      selector.body.push_back(std::move(branch));
+    }
+    if (AtKeyword("else")) {
+      Advance();
+      selector.otherwise = ReadBlock();
+    }
+    Expect("end");
+    return selector;
   }
 
   Stmt ReadIf() {
     Expect("if");
-    Stmt statement{
-        .kind = StmtKind::If, .expression = ReadExpression(0), .body = {}, .otherwise = {}};
+    Stmt statement{.kind = StmtKind::If,
+                   .expression = ReadExpression(0),
+                   .labels = {},
+                   .body = {},
+                   .otherwise = {},
+                   .descending = false};
     Expect("then");
     statement.body.push_back(ReadStatement());
     while (AtPunctuation(";")) { Advance(); }
@@ -175,7 +326,10 @@ private:
         Advance();
         Expr index{.kind = ExprKind::Index, .text = {}, .children = {}};
         index.children.push_back(std::move(value));
-        index.children.push_back(ReadExpression(0));
+        while (!AtEnd() && !AtPunctuation("]")) {
+          index.children.push_back(ReadExpression(0));
+          if (AtPunctuation(",")) { Advance(); }
+        }
         Expect("]");
         value = std::move(index);
         continue;

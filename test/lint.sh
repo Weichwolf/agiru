@@ -131,23 +131,55 @@ printf '\n== the AL population ==\n'
 # how much of BC this tree can read, and it is measured over the WHOLE population rather than a
 # sample -- 1 545 table objects in the BaseApp, every one of them, on every run of the lint.
 if [ -x build/agirutc ] && [ -d "$AGIRU_AL_SOURCE" ]; then
-  line=$(build/agirutc "$AGIRU_AL_SOURCE" | head -1)
-  parsed=$(printf '%s' "$line" | awk '{print $2}')
-  total=$(printf '%s' "$line" | awk '{print $4}')
-  read -r allowed allowedTotal <<EOT
-$(cat test/transpile-baseline 2>/dev/null || echo "0 0")
+  scan=$(build/agirutc "$AGIRU_AL_SOURCE")
+  tables=$(printf '%s' "$scan" | awk '/^tables/{print $2}')
+  tableTotal=$(printf '%s' "$scan" | awk '/^tables/{print $4}')
+  units=$(printf '%s' "$scan" | awk '/^codeunits/{print $2}')
+  unitTotal=$(printf '%s' "$scan" | awk '/^codeunits/{print $4}')
+  read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal <<EOT
+$(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0")
 EOT
-  printf 'lint: %s of %s table objects parse, the baseline requires %s of %s\n' \
-    "$parsed" "$total" "$allowed" "$allowedTotal"
-  if [ "$parsed" -lt "$allowed" ]; then
-    printf 'lint: THE POPULATION FELL by %s. A commit raises it or leaves it; it never lowers it.\n' \
-      "$((allowed - parsed))" >&2
+  printf 'lint: %s of %s tables and %s of %s codeunits parse\n' \
+    "$tables" "$tableTotal" "$units" "$unitTotal"
+  printf 'lint: the baseline requires %s tables and %s codeunits\n' "$allowedTables" "$allowedUnits"
+  if [ "$tables" -lt "$allowedTables" ] || [ "$units" -lt "$allowedUnits" ]; then
+    printf 'lint: THE POPULATION FELL. A commit raises it or leaves it; it never lowers it.\n' >&2
     exit 1
   fi
-  if [ "$parsed" -gt "$allowed" ] || [ "$total" -ne "$allowedTotal" ]; then
-    printf '%s %s\n' "$parsed" "$total" > test/transpile-baseline
-    printf 'lint: baseline raised to "%s %s" -- commit it with the widening.\n' "$parsed" "$total"
+  if [ "$tables" -gt "$allowedTables" ] || [ "$units" -gt "$allowedUnits" ] ||
+     [ "$tableTotal" -ne "$allowedTableTotal" ] || [ "$unitTotal" -ne "$allowedUnitTotal" ]; then
+    printf '%s %s %s %s\n' "$tables" "$tableTotal" "$units" "$unitTotal" > test/transpile-baseline
+    printf 'lint: baseline raised to "%s %s %s %s" -- commit it with the widening.\n' \
+      "$tables" "$tableTotal" "$units" "$unitTotal"
   fi
 else
   printf 'lint: agirutc or the AL source is missing, so the population is not measured.\n' >&2
+fi
+
+printf '\n== the AL surface ==\n'
+# HOW MUCH OF AL THIS RUNTIME CAN DO, over the WHOLE documented surface rather than a sample: 1 253
+# methods across 93 types, read from methods-auto/ because the documentation is the specification
+# and it is complete. The predecessor implements 1 174 of them and is 97 % green on the UT subset,
+# which makes its set the ORDER to work in rather than the target.
+#
+# The count comes from doxygen's XML -- what the DOOR declares, since a method that generated code
+# cannot reach is not implemented. It may only rise.
+if [ -f doc/al-surface.json ] && [ -d build/doc/xml ]; then
+  surface=$(python3 scripts/al_surface.py --count)
+  read -r allowedSurface surfaceTotal <<EOT
+$(cat test/surface-baseline 2>/dev/null || echo "0 0")
+EOT
+  printf 'lint: %s of %s documented AL methods reachable, the baseline requires %s\n' \
+    "$surface" "$surfaceTotal" "$allowedSurface"
+  if [ "$surface" -lt "$allowedSurface" ]; then
+    printf 'lint: THE SURFACE SHRANK by %s. A commit widens it or leaves it; it never narrows it.\n' \
+      "$((allowedSurface - surface))" >&2
+    exit 1
+  fi
+  if [ "$surface" -gt "$allowedSurface" ]; then
+    printf '%s %s\n' "$surface" "$surfaceTotal" > test/surface-baseline
+    printf 'lint: surface baseline raised to %s -- commit it with the widening.\n' "$surface"
+  fi
+else
+  printf 'lint: the AL surface is not measured (doc/al-surface.json or build/doc/xml missing).\n' >&2
 fi

@@ -27,5 +27,10 @@ WARN_LOGFILE           = build/doc/warnings.txt
 QUIET                  = YES
 
 GENERATE_HTML          = YES
+
+# XML so that the AL-surface counter can ask doxygen what the door actually declares, instead of
+# guessing from a regular expression over the headers.
+GENERATE_XML           = YES
+XML_PROGRAMLISTING     = NO
 GENERATE_LATEX         = NO
 HAVE_DOT               = NO
