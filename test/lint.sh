@@ -21,13 +21,17 @@ BASELINE=test/lint-baseline
 [ -f compile_commands.json ] || { echo "lint: no compile_commands.json -- run \`make db\`" >&2; exit 2; }
 mkdir -p "$REPORT"
 
-# src/app/ is machine output. A finding there has no address: the fix would be in the generator,
-# and the generator is analysed a line further down.
+# apps/ IS MACHINE OUTPUT AND NOTHING HERE LOOKS AT IT -- not the formatter, not clang-tidy. A
+# finding there has no address: nobody edits the file, so the repair would be in the generator, and
+# the generator is analysed a line further down. The formatter never reaches it because the roots
+# below do not include it; clang-tidy never reaches it because of the pattern below; and the
+# generated tree carries its own formatting already, since the emitter pipes every file through
+# clang-format on the way out.
 ours=$(find src include test -name '*.cpp' -o -name '*.h' | sort)
 
 printf '== format ==\n'
 if [ -z "$ours" ]; then
-  printf 'lint: no source outside src/app/ -- nothing to format\n'
+  printf 'lint: no hand-written source -- nothing to format\n'
 elif "$FMT" --dry-run --Werror $ours 2>"$REPORT/format.log"; then
   printf 'lint: every file is formatted\n'
 else
@@ -37,7 +41,10 @@ else
 fi
 
 printf '\n== analysis ==\n'
-units=$(grep -c '"file"' compile_commands.json || echo 0)
+# THE UNIT COUNT COMES FROM compile_commands.json, WHICH WILL ONE DAY CARRY apps/ TOO. The day
+# AGIRU_BUILD_APPS defaults on, this number jumps by some thousands while the analysis still skips
+# them -- so it is counted the same way it is analysed, and the two cannot drift apart.
+units=$(grep '"file"' compile_commands.json | grep -cv '/apps/' || echo 0)
 # test/target/ IS GENERATED CODE, written by hand only because the gate needs a fixed image to
 # compare the generator against. It falls out of the analysis for the same reason apps/ does: a
 # finding there has no address, since nobody edits the file -- the emitter is what would have to

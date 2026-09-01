@@ -4,9 +4,11 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "type/Blob.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Guid.h"
 #include "type/Time.h"
 
 #include <cstddef>
@@ -48,6 +50,9 @@ std::string FieldText(const void *record, const FieldDef &def) {
       return reinterpret_cast<const Time *>(At(record, def))->ToInvariantString();
     case FieldType::DateTime:
       return reinterpret_cast<const DateTime *>(At(record, def))->ToInvariantString();
+    // `guid-data-type.md` gives the standard textual representation WITH its braces, and AL
+    // compares a Guid against a Text directly, so this is the text a message shows.
+    case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->ToText();
     case FieldType::Option:
     case FieldType::Enum:
       return detail::MemberText(
@@ -67,6 +72,8 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::Time: return reinterpret_cast<const Time *>(At(record, def))->IsUndefined();
     case FieldType::DateTime:
       return reinterpret_cast<const DateTime *>(At(record, def))->IsUndefined();
+    case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->IsNull();
+    case FieldType::Blob: return !reinterpret_cast<const Blob *>(At(record, def))->HasValue();
     case FieldType::Option:
     case FieldType::Enum:
       return reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger() == 0;

@@ -12,6 +12,7 @@
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
@@ -147,6 +148,11 @@ std::string StorageText(const void *record, const FieldDef &def) {
     case FieldType::DateTime:
       return DateTimeStorageText(
           *reinterpret_cast<const DateTime *>(static_cast<const std::byte *>(record) + def.offset));
+    // A `uuid` column writes and reads the hyphenated form WITHOUT braces. The braces belong to
+    // AL's text and not to the value, so they go on and come off at this boundary.
+    case FieldType::Guid:
+      return reinterpret_cast<const Guid *>(static_cast<const std::byte *>(record) + def.offset)
+          ->ToStorageText();
     default: return FieldText(record, def);
   }
 }
@@ -211,6 +217,7 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
     case FieldType::DateTime:
       *reinterpret_cast<DateTime *>(At(record, def)) = DateTimeFromStorageText(text);
       return;
+    case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid::FromText(text); return;
     default: throw Error("no reader for this field type yet");
   }
 }

@@ -4,12 +4,14 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Enum.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
@@ -88,6 +90,20 @@ template <> struct FieldTypeOf<Time> {
 template <> struct FieldTypeOf<DateTime> {
   static constexpr FieldType kType = FieldType::DateTime;   ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;               ///< A DateTime declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Guid` -- sixteen bytes.
+template <> struct FieldTypeOf<Guid> {
+  static constexpr FieldType kType = FieldType::Guid;       ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A GUID declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Blob` -- bytes of no declared length.
+template <> struct FieldTypeOf<Blob> {
+  static constexpr FieldType kType = FieldType::Blob;       ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A BLOB declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
 };
 
