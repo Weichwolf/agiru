@@ -1,6 +1,6 @@
-#include "agiru/BigInteger.h"
-#include "agiru/Boolean.h"
-#include "agiru/Integer.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
 
 #include <string>
 

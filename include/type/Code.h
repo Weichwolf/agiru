@@ -1,6 +1,6 @@
 #pragma once
 
-#include "agiru/StringValue.h"
+#include "type/StringValue.h"
 
 #include <compare>
 #include <cstddef>

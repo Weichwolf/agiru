@@ -303,7 +303,7 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += "#include \"agiru/Record.h\"\n\n";
+  out += "#include \"agiru.h\"\n\n";
   out += "namespace agiru::app {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {

@@ -57,7 +57,7 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#pragma once\n\n";
-  out += "#include \"agiru/Enum.h\"\n#include \"agiru/EnumDef.h\"\n\n";
+  out += "#include \"agiru.h\"\n\n";
   out += "#include <array>\n#include <cstdint>\n\n";
 
   // ENUM OBJECTS GET A NAMESPACE OF THEIR OWN AND TABLES DO NOT. AL tells an object's kind apart at

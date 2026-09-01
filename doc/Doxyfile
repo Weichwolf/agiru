@@ -1,4 +1,4 @@
-# The door's documentation. `include/agiru/` only: those headers ARE the public interface, and a
+# The door's documentation. `include/` only: those headers ARE the public interface, and a
 # public name without documentation is a door with no sign on it.
 #
 # `make lint` counts what doxygen warns about and holds the number to a baseline that may only

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "agiru/Error.h"
-#include "agiru/Ids.h"
-#include "agiru/Option.h"
-#include "agiru/Record.h"
-#include "agiru/TableDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "runtime/Record.h"
+#include "type/Option.h"
 
 #include <cstddef>
 #include <string_view>

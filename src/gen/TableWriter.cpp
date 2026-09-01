@@ -131,25 +131,19 @@ void WriteOptionTraits(std::string &out, const OptionField &option) {
   out += "};\n";
 }
 
+// ONE LINE FOR THE DOOR AND ONE PER APP HEADER IT NEEDS. An AL file declares no includes, so the
+// translation writes none either beyond what the C++ compiler cannot do without: `agiru.h`, and the
+// enum objects this table's fields name, which live in other files of this same app.
 std::string Includes(const al::TableObject &table,
                      const std::vector<OptionField> &options,
                      const EnumIndex &enums) {
-  std::set<std::string> headers{
-      "agiru/Declare.h", "agiru/Ids.h", "agiru/Table.h", "agiru/TableDef.h"};
+  std::set<std::string> headers;
   for (const al::FieldDecl &field : table.fields) {
-    if (OptionOf(options, field) != nullptr) {
-      headers.insert("agiru/Option.h");
-      continue;
-    }
-    if (IsEnumField(field)) {
-      headers.insert("agiru/Enum.h");
-      const auto found = enums.find(LowerKey(field.subtype));
-      if (found != enums.end()) { headers.insert(found->second.header); }
-      continue;
-    }
-    headers.insert("agiru/" + TypeName(field.type) + ".h");
+    if (OptionOf(options, field) != nullptr || !IsEnumField(field)) { continue; }
+    const auto found = enums.find(LowerKey(field.subtype));
+    if (found != enums.end()) { headers.insert(found->second.header); }
   }
-  std::string out;
+  std::string out = "#include \"agiru.h\"\n";
   for (const std::string &header : headers) {
     out += "#include \"";
     out += header;

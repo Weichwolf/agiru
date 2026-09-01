@@ -1,7 +1,7 @@
 #pragma once
 
-#include "agiru/Database.h"
-#include "agiru/Error.h"
+#include "runtime/Database.h"
+#include "runtime/Error.h"
 
 #include <string>
 

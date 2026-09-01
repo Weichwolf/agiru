@@ -1,7 +1,6 @@
-#include "agiru/EnumDef.h"
-#include "agiru/Option.h"
-
 #include "Check.h"
+#include "meta/EnumDef.h"
+#include "type/Option.h"
 
 #include <array>
 #include <cstdint>

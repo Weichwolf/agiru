@@ -1,4 +1,4 @@
-#include "agiru/Decimal.h"
+#include "type/Decimal.h"
 
 #include <algorithm>
 #include <array>

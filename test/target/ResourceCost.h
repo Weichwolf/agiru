@@ -2,13 +2,7 @@
 
 #pragma once
 
-#include "agiru/Code.h"
-#include "agiru/Decimal.h"
-#include "agiru/Declare.h"
-#include "agiru/Ids.h"
-#include "agiru/Option.h"
-#include "agiru/Table.h"
-#include "agiru/TableDef.h"
+#include "agiru.h"
 
 #include <array>
 #include <cstddef>

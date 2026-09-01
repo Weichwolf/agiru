@@ -1,6 +1,5 @@
-#include "agiru/Decimal.h"
-
 #include "Check.h"
+#include "type/Decimal.h"
 
 #include <string>
 

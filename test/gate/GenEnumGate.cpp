@@ -85,8 +85,8 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
   CHECK_TRUE("the field takes the enum type", Has(header.text, "Enum<enums::SalesLineType> Type;"));
   CHECK_TRUE("and the header that declares it is included",
              Has(header.text, "#include \"sales/document/enum/SalesLineType.h\""));
-  CHECK_TRUE("the door header for Enum comes with it",
-             Has(header.text, "#include \"agiru/Enum.h\""));
+  CHECK_TRUE("and the door comes as ONE line, the way an AL file declares no includes at all",
+             Has(header.text, "#include \"agiru.h\"") && !Has(header.text, "#include \"type/"));
 }
 
 /// THE NEGATIVE CONTROL. Without the index the reference cannot be resolved, and the generator has

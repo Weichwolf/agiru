@@ -1,6 +1,6 @@
 #pragma once
 
-#include "agiru/Error.h"
+#include "runtime/Error.h"
 
 #include <compare>
 #include <cstdint>

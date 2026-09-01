@@ -38,11 +38,16 @@ fi
 
 printf '\n== analysis ==\n'
 units=$(grep -c '"file"' compile_commands.json || echo 0)
+# test/target/ IS GENERATED CODE, written by hand only because the gate needs a fixed image to
+# compare the generator against. It falls out of the analysis for the same reason apps/ does: a
+# finding there has no address, since nobody edits the file -- the emitter is what would have to
+# change, and the emitter is analysed. What holds it instead is the compiler, which builds it into
+# every gate.
 if [ -n "$RUNTIDY" ]; then
-  "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/apps/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
+  "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/(apps|test/target)/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
 else
   : > "$REPORT/tidy.log"
-  for f in $(echo "$ours" | grep '\.cpp$'); do
+  for f in $(echo "$ours" | grep '\.cpp$' | grep -v '/test/target/'); do
     "$TIDY" -p . --quiet "$f" >> "$REPORT/tidy.log" 2>&1 || true
   done
 fi
@@ -103,7 +108,7 @@ if [ "$silent" -lt "$allowedSilent" ]; then
 fi
 
 printf '\n== the door ==\n'
-# EVERY PUBLIC NAME IS DOCUMENTED OR IT IS A WARNING. `include/agiru/` is the public interface, and
+# EVERY PUBLIC NAME IS DOCUMENTED OR IT IS A WARNING. `include/` is the public interface, and
 # a public name without a sign on it is the one thing a reader cannot recover from the code.
 if command -v doxygen >/dev/null 2>&1; then
   mkdir -p build/doc

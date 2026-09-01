@@ -1,7 +1,7 @@
 #pragma once
 
-#include "agiru/Database.h"
-#include "agiru/TableDef.h"
+#include "meta/TableDef.h"
+#include "runtime/Database.h"
 
 #include <string>
 

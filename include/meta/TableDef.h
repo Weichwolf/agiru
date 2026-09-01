@@ -1,7 +1,7 @@
 #pragma once
 
-#include "agiru/EnumDef.h"
-#include "agiru/Ids.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
 
 #include <cstddef>
 #include <cstdint>

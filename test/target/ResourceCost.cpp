@@ -2,7 +2,7 @@
 
 #include "ResourceCost.h"
 
-#include "agiru/Record.h"
+#include "agiru.h"
 
 namespace agiru::app {
 

@@ -1,6 +1,6 @@
-#include "agiru/Text.h"
+#include "type/Text.h"
 
-#include "agiru/StringValue.h"
+#include "type/StringValue.h"
 
 #include <algorithm>
 #include <compare>

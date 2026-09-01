@@ -1,17 +1,17 @@
 #pragma once
 
-#include "agiru/BigInteger.h"
-#include "agiru/Boolean.h"
-#include "agiru/Code.h"
-#include "agiru/Date.h"
-#include "agiru/Decimal.h"
-#include "agiru/Enum.h"
-#include "agiru/EnumDef.h"
-#include "agiru/Ids.h"
-#include "agiru/Integer.h"
-#include "agiru/Option.h"
-#include "agiru/TableDef.h"
-#include "agiru/Text.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Code.h"
+#include "type/Date.h"
+#include "type/Decimal.h"
+#include "type/Enum.h"
+#include "type/Integer.h"
+#include "type/Option.h"
+#include "type/Text.h"
 
 #include <array>
 #include <cstddef>

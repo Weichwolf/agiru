@@ -1,6 +1,6 @@
 #pragma once
 
-#include "agiru/EnumDef.h"
+#include "meta/EnumDef.h"
 
 #include <compare>
 #include <cstddef>

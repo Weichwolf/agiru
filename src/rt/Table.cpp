@@ -1,19 +1,18 @@
-#include "agiru/Table.h"
-
-#include "agiru/BigInteger.h"
-#include "agiru/Boolean.h"
-#include "agiru/Date.h"
-#include "agiru/Decimal.h"
-#include "agiru/EnumDef.h"
-#include "agiru/Error.h"
-#include "agiru/Ids.h"
-#include "agiru/Integer.h"
-#include "agiru/Record.h"
-#include "agiru/Session.h"
-#include "agiru/StringValue.h"
-#include "agiru/TableDef.h"
+#include "runtime/Table.h"
 
 #include "Rows.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "runtime/Record.h"
+#include "runtime/Session.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Date.h"
+#include "type/Decimal.h"
+#include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <cstddef>
 #include <cstdint>

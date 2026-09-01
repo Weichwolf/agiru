@@ -1,6 +1,6 @@
-#include "agiru/Session.h"
+#include "runtime/Session.h"
 
-#include "agiru/Database.h"
+#include "runtime/Database.h"
 
 #include <string>
 

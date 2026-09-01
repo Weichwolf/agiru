@@ -1,7 +1,6 @@
-#include "agiru/Enum.h"
-#include "agiru/EnumDef.h"
-
 #include "Check.h"
+#include "meta/EnumDef.h"
+#include "type/Enum.h"
 
 #include <array>
 #include <cstdint>

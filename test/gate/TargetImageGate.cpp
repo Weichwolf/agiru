@@ -1,10 +1,9 @@
-#include "agiru/Decimal.h"
-#include "agiru/EnumDef.h"
-#include "agiru/Ids.h"
-#include "agiru/TableDef.h"
-
 #include "Check.h"
 #include "ResourceCost.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "type/Decimal.h"
 
 #include <cstddef>
 #include <cstdint>

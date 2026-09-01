@@ -1,11 +1,11 @@
-#include "agiru/Record.h"
+#include "runtime/Record.h"
 
-#include "agiru/Date.h"
-#include "agiru/Decimal.h"
-#include "agiru/EnumDef.h"
-#include "agiru/Error.h"
-#include "agiru/Ids.h"
-#include "agiru/TableDef.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "type/Date.h"
+#include "type/Decimal.h"
 
 #include <cstddef>
 #include <cstdint>

@@ -84,7 +84,7 @@ def implemented_here() -> set[str]:
 
     Read from DOXYGEN'S XML rather than from a regular expression over the headers: doxygen has
     already parsed the door and knows what is a declaration and what is a word inside a comment.
-    Only `include/agiru/` is in that XML, which is the point -- a method that exists in `src/` and
+    Only `include/` is in that XML, which is the point -- a method that exists in `src/` and
     not in the door cannot be reached by generated code and does not count as implemented."""
     names: set[str] = set()
     xml = ROOT / "build" / "doc" / "xml"

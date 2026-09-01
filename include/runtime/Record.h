@@ -1,12 +1,12 @@
 #pragma once
 
-#include "agiru/Code.h"
-#include "agiru/Decimal.h"
-#include "agiru/Error.h"
-#include "agiru/Ids.h"
-#include "agiru/Option.h"
-#include "agiru/TableDef.h"
-#include "agiru/Text.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "type/Code.h"
+#include "type/Decimal.h"
+#include "type/Option.h"
+#include "type/Text.h"
 
 #include <cstddef>
 #include <cstdint>
