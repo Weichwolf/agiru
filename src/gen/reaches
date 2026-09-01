@@ -1,0 +1,3 @@
+# Der Generator liest den AST und schreibt C++. Er sieht die Runtime NICHT: was er emittiert, muss
+# gegen die Runtime uebersetzen, ohne dass er sie kennt.
+al

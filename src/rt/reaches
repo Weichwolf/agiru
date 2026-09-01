@@ -1,0 +1,4 @@
+# Die Runtime steht auf den nachgebauten .NET-Klassen und der Datenbank. Sie sieht den Parser und
+# den Generator NICHT -- AL-Quelltext ist zur Laufzeit kein Begriff mehr.
+net
+db

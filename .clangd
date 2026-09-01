@@ -1,0 +1,16 @@
+# clangd liest `compile_commands.json` an der Wurzel. `make db` legt es dort ab (ein Symlink auf
+# den Build-Baum), und es ist gitignored -- die einzige Ausnahme von der Regel, dass Artefakte
+# nicht im Baum liegen.
+#
+# Hier steht deshalb NUR das, was die Kompilierdatenbank nicht sagen kann: der generierte Baum
+# unter src/app/ ist Maschinenausgabe. clangd soll ihn oeffnen koennen, aber keine Diagnose darin
+# anzeigen, sonst ertrinkt jeder Sprung in eine generierte Datei in Meldungen ohne Adresse.
+Diagnostics:
+  UnusedIncludes: Strict
+  MissingIncludes: Strict
+
+---
+If:
+  PathMatch: .*/src/app/.*
+Diagnostics:
+  Suppress: '*'

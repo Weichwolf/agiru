@@ -1,0 +1,77 @@
+# STRENG, UND AB TAG EINS. Jeder Check unten ist einer, dessen Fund ein DEFEKT oder eine nicht
+# strittige Verbesserung ist. Was abgeschaltet ist, ist es mit einem Grund daneben — ein
+# abgeschalteter Check ohne Grund ist einer, den in einem Jahr jemand einschaltet und wieder
+# abschaltet.
+#
+# DIESER BAUM IST NEU, UND DAS IST DER GANZE UNTERSCHIED. Eine strenge Analyse über einen
+# gewachsenen Baum findet Tausende und wird deshalb in Stufen eingeführt; hier gibt es nichts zu
+# staffeln. Die Baseline ist 0, weil sie es sein kann. Es gibt keine "Stufe zwei": eine Stufe ohne
+# Datum ist ein Versprechen.
+#
+# ES STEHEN KEINE FUNDZAHLEN NEBEN DEN AUSNAHMEN, weil hier noch nichts zu zählen war. Jede
+# Ausnahme unten steht also NICHT auf einer Messung, sondern auf der Aussage, dass ihr Fund
+# Geschmack ist. Wird eine davon je auf eine Messung gestellt, kommt die Zahl daneben.
+HeaderFilterRegex: '.*/(include|src)/.*\.h$'
+FormatStyle: file
+Checks: >
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  modernize-*,
+
+  -modernize-use-trailing-return-type,
+  -readability-uppercase-literal-suffix,
+  -readability-math-missing-parentheses,
+  -readability-avoid-nested-conditional-operator
+WarningsAsErrors: '*'
+
+CheckOptions:
+  # `readability-identifier-length` gehoert GESETZT und nicht abgeschaltet. Der Default fordert drei
+  # Zeichen, was hier falsch ist: der Transpiler traegt AL-Vokabeln, und `i`, `n`, `no` sind die
+  # klarsten Namen, die ein Index, eine Anzahl und eine `No.` je haben werden. Auf eins gesetzt
+  # verweigert er weiterhin das wirklich Namenlose und hoert auf, ueber Schleifenzaehler zu streiten.
+  readability-identifier-length.MinimumVariableNameLength: 1
+  readability-identifier-length.MinimumParameterNameLength: 1
+  readability-identifier-length.MinimumLoopCounterNameLength: 1
+
+  # SHAPE, NICHT KORREKTHEIT — der einzige Waechter hier, der die FORM misst. Der Default ist 25 und
+  # er bleibt es. Ein Transpiler-Emitter, der darueber kommt, ist eine Funktion, die in drei zerfaellt.
+  readability-function-cognitive-complexity.Threshold: 25
+
+  # CLAUDE.md: jede Zahl traegt ihre Herkunft. Erlaubt bleiben die Zahlen, die keine Herkunft haben
+  # KOENNEN, weil sie die Identitaeten der Arithmetik sind.
+  readability-magic-numbers.IgnoredIntegerValues: '0;1;2;3;4;10;100'
+  readability-magic-numbers.IgnoredFloatingPointValues: '0.0;1.0;100.0'
+
+# WARUM DIESE VIER AUS SIND, UND WARUM SONST NICHTS
+#
+# Ein Check ist aus fuer genau einen Grund: sein Fund ist GESCHMACK und kein Defekt. Alles, dessen
+# Fund ein Defekt ist, ist AN und sein Zaehler steht auf null.
+#
+# `modernize-use-trailing-return-type` will `auto f() -> int`. Dieser Baum schreibt `int f()`, und
+#   der Rest der Welt auch.
+# `readability-uppercase-literal-suffix` will `1.0F` statt `1.0f`. LLVMs Hausgeschmack, er kauft
+#   keinem Leser etwas.
+# `readability-math-missing-parentheses` klammert `a * b + c`. Vorrang ist kein Defekt, und die
+#   Klammern verbergen die Form eines Ausdrucks, statt sie zu zeigen.
+# `readability-avoid-nested-conditional-operator` verbietet `a ? b : c ? d : e`. Eine AL-Option auf
+#   einen C++-Wert abzubilden ist genau diese Kette, und sie in `if` zu zerlegen macht sie laenger,
+#   nicht klarer.
+#
+# WAS ABSICHTLICH AN IST, OBWOHL ES WEHTUT
+#
+# `misc-non-private-member-variables-in-classes` — CLAUDE.mds eigener Satz: ein oeffentliches
+#   Datenmember ist eine Invariante, die niemand halten kann. Er trifft generierte Record-Klassen
+#   NICHT, weil `src/app/` gar nicht analysiert wird.
+# `readability-magic-numbers` — CLAUDE.mds Regel, dass jede Zahl ihre Herkunft traegt.
+# `bugprone-easily-swappable-parameters` — `TableId`/`FieldNo`/`EntryNo` sind alle `int32`, und AL
+#   vertauscht sie still. Genau dafuer stehen die starken Typen in CLAUDE.md; dieser Check ist ihr
+#   Waechter.
+# `misc-include-cleaner` — er ist bei der Standardbibliothek scharf und daneben oft daneben. Er
+#   bleibt VOLL an, bis eine Messung an diesem Baum das Gegenteil zeigt; dann kommt die Zahl in die
+#   Zeile darueber und `IgnoreHeaders` darunter. Eine Ausnahme vor der Messung waere geraten.
+# `modernize-avoid-c-arrays` und `modernize-avoid-c-style-cast` — in einem neuen Baum kostenlos.

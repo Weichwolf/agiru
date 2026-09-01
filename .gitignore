@@ -1,0 +1,6 @@
+build/
+compile_commands.json
+work/
+.cache/
+*.bak
+*.zip
