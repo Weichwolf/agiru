@@ -7,9 +7,7 @@
 #include <string_view>
 
 namespace agiru::detail {
-
 namespace {
-
 constexpr unsigned char kContinuationMask = 0xC0;
 constexpr unsigned char kContinuationMark = 0x80;
 constexpr unsigned char kFourByteMark = 0xF0;
@@ -25,8 +23,6 @@ std::size_t Utf16Length(std::string_view s) {
   for (const char c : s) {
     const auto b = static_cast<unsigned char>(c);
     if ((b & kContinuationMask) == kContinuationMark) { continue; }
-    // A four-byte sequence is one code point outside the BMP, which .NET stores as a surrogate
-    // pair and therefore counts as two.
     units += (b >= kFourByteMark) ? 2 : 1;
   }
   return units;
@@ -56,9 +52,6 @@ std::string NormaliseCode(std::string_view s) {
 
 std::strong_ordering CompareCode(std::string_view a, std::string_view b) {
   if (IsAsciiDigits(a) && IsAsciiDigits(b)) {
-    // Compare as numbers without converting: fewer digits is smaller once leading zeros are gone,
-    // and equal digit counts compare lexicographically. That avoids an overflow on a Code[250]
-    // full of digits, which no integer type would hold.
     const std::string_view lhs = a.substr(std::min(a.find_first_not_of('0'), a.size()));
     const std::string_view rhs = b.substr(std::min(b.find_first_not_of('0'), b.size()));
     if (lhs.size() != rhs.size()) {

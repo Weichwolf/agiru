@@ -33,6 +33,13 @@ are written down as dead rather than quietly dropped:**
   by an out-of-order window."* Void. The A76 is out-of-order with a deep window and a good
   predictor; the A53 was neither. Dispatch shape is now a measurement, not a deduction.
 
+**THE ZERO 2 W STAYS AS AN AMBITION.** 512 MB is no longer the specification, and it is still the
+thing worth being able to do: a complete BC on a machine that costs fifteen euros is a different
+claim about this architecture than a complete BC on a small server. Nothing is built for it and no
+decision is justified by it -- board:0006 measures the Pi 5 -- but a design that would make it
+impossible is worth noticing before it lands, and the day the per-session number is small enough to
+try, it gets tried.
+
 **What survives, and now on its own merits rather than on necessity:**
 
 - **Object metadata is STATIC CONST DATA, emitted by the transpiler, never built at startup.**
@@ -162,10 +169,19 @@ C++ truths rather than decisions about agiru. They do not move.
   that means something (`TableId`, `FieldNo`, `EntryNo`). AL swaps them silently otherwise.
 - **`private` is the default**; a wider door justifies itself. A public data member is an invariant
   nobody can hold.
-- **No comment that says WHAT.** Code and names speak for themselves; a comment repeating the line
-  beside it is the same statement in two languages and drifts away from it. Only a non-obvious WHY
-  earns one, and then one line. `include/` is the door and carries Doxygen; the rest of `src/`
-  carries prose only in a proof.
+- **`include/` IS DOCUMENTED AND `src/` IS NOT.** The two halves have different jobs and different
+  rules, and neither is a matter of taste:
+  - **`include/agiru/` is the public interface and every public name carries Doxygen** -- `\brief`,
+    `\param`, `\return`, `\throws`, and a `\warning` on anything load-bearing. `make lint` counts
+    what doxygen cannot document and holds it at zero. A public name without a sign on it is the
+    one thing a reader cannot recover from the code.
+  - **`src/` carries no comments.** Code and names speak for themselves; a comment repeating the
+    line beside it is the same statement in two languages and drifts away from it. What is left is
+    a `NOLINT` directive with its reason, and that costs a number in the silent-places baseline.
+  - **Where does the WHY go, then?** Into the door if it is part of the contract -- BC's exact
+    message wording, a rounding rule, a trap somebody will otherwise tidy away. Into the GATE CASE
+    if it is a fact about behaviour: a case states what it claims, and that is prose which cannot
+    drift, because it fails when it stops being true. Into the BOARD if it is a decision.
 - **A name is a promise.** A word that means something else in AL spends the reader's knowledge
   against them. The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger, Validate, Filter,
   Key, FlowField, Dimension.
@@ -248,7 +264,7 @@ exception for. Anything above zero here was written in on the day.
 | counter | measures |
 |---|---|
 | `test/lint-baseline` | clang-tidy findings over `src/`, excluding `src/app/`, **with the unit count beside it** |
-| `test/doc-baseline` | undocumented public names in `include/` |
+| `test/doc-baseline` | undocumented public names in `include/` -- doxygen over `doc/Doxyfile` |
 | `test/todo-baseline` | `NOLINT`, `TODO`, `FIXME`, `catch (...)` -- the silent places |
 
 **The silent-places counter is what keeps the first baseline honest.** A `NOLINT` would otherwise
@@ -329,7 +345,7 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
 | **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
 | **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
-| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | verify that every replacement applied; rewrite the file rather than patch it blind |
+| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **REWRITE THE FILE. Do not patch it.** This has happened four times in one session, each time after `clang-format` folded a line the anchor spanned, each time silently. Writing the rule down did not stop it; only refusing to patch does |
 
 ## The environment
 

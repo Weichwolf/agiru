@@ -10,9 +10,6 @@
 #include <string_view>
 
 namespace agiru {
-
-/// The private constructor, for the arithmetic in this file. It is not in the door because
-/// (mantissa, scale, sign) is not an AL notion.
 class DecimalAccess {
 public:
   __extension__ using U128 = unsigned __int128;
@@ -25,25 +22,18 @@ public:
 };
 
 namespace {
-
 __extension__ using U128 = unsigned __int128;
 
 constexpr std::uint8_t kMaxScale = 28;
 constexpr unsigned kMantissaBits = 96;
 constexpr U128 kMaxUnits = (static_cast<U128>(1) << kMantissaBits) - 1;
 
-/// Every number below carries its origin: the limb width of the wide integer, the index of its top
-/// bit, how many limbs make 192 bits, and the digit at which AL's '=' rounds away from zero
-/// ("Values of 5 or greater are rounded up", system-round-method.md).
 constexpr unsigned kLimbBits = 64;
 constexpr unsigned kTopBit = kLimbBits - 1;
 constexpr std::size_t kLimbs = 3;
 constexpr unsigned kWideBits = kLimbBits * kLimbs;
 constexpr std::uint64_t kRoundUpAtDigit = 5;
 
-/// 192 bits as three limbs, least significant first. The product of two 96-bit mantissas fits.
-/// Deliberately the simplest correct shape: speed is not yet a question here, correctness is the
-/// whole question (board:0008).
 class U192 {
 public:
   U192() = default;
@@ -78,11 +68,6 @@ public:
     }
   }
 
-  /// Times ten. `Multiply` takes a 128-bit operand, so this walks the limbs instead.
-  ///
-  /// IT REPORTS ITS OWN OVERFLOW. The first version dropped the final carry silently and the
-  /// callers guarded with a hand-picked bound on the top limb -- a guess where an exact answer was
-  /// available. `false` means the result did not fit 192 bits and `out` is not usable.
   [[nodiscard]] bool TimesTen(U192 &out) const {
     U128 carry = 0;
     for (std::size_t i = 0; i < kLimbs; ++i) {
@@ -93,7 +78,6 @@ public:
     return carry == 0;
   }
 
-  /// Divides by a small number and returns the remainder. Carries the scale reduction.
   std::uint64_t DivModSmall(std::uint64_t d) {
     U128 rem = 0;
     for (std::size_t i = kLimbs; i-- > 0;) {
@@ -104,8 +88,6 @@ public:
     return static_cast<std::uint64_t>(rem);
   }
 
-  /// Bitwise long division by `divisor`: 192 rounds, obviously correct, slow -- wanted in that
-  /// order (board:0008). `*this` is the dividend; the remainder is written to `rem`.
   [[nodiscard]] U192 DividedBy(const U192 &divisor, U192 &rem) const {
     U192 q;
     rem = U192{};
@@ -153,7 +135,6 @@ public:
     return *this;
   }
 
-  /// 96 x 96 bits -> 192 bits, schoolbook over four 64-bit halves.
   [[nodiscard]] U192 MultipliedBy(U128 b) const {
     const U128 a = ToU128();
     const auto a0 = static_cast<std::uint64_t>(a);
@@ -180,15 +161,11 @@ private:
   std::array<std::uint64_t, kLimbs> w_{{0, 0, 0}};
 };
 
-/// Lowers the scale by one, rounding away from zero -- the rule the documentation states for '=':
-/// "Values of 5 or greater are rounded up."
 void ReduceScale(U192 &v, std::uint8_t &scale) {
   if (v.DivModSmall(10) >= kRoundUpAtDigit) { v.Increment(); }
   --scale;
 }
 
-/// Brings a magnitude down to 96 bits by lowering the scale. If it does not fit even at scale 0
-/// it is an overflow -- and an overflow is LOUD.
 U128 FitToUnits(U192 v, std::uint8_t &scale) {
   while (scale > kMaxScale) { ReduceScale(v, scale); }
   while (!v.FitsU128() || v.ToU128() > kMaxUnits) {
@@ -198,7 +175,6 @@ U128 FitToUnits(U192 v, std::uint8_t &scale) {
   return v.ToU128();
 }
 
-/// Strips trailing zeros. Division is the one operation CLR normalises: 1/2 is 0.5, not 0.5000...
 void StripTrailingZeros(U128 &units, std::uint8_t &scale) {
   while (scale > 0 && units % 10 == 0) {
     units /= 10;
@@ -207,8 +183,6 @@ void StripTrailingZeros(U128 &units, std::uint8_t &scale) {
   if (units == 0) { scale = 0; }
 }
 
-/// Brings two values to a common scale. Where the mantissa will not stretch, the common scale
-/// drops.
 void Align(U192 &a, std::uint8_t &sa, U192 &b, std::uint8_t &sb) {
   while (sa < sb) {
     U192 t;
@@ -237,13 +211,10 @@ std::string U128ToString(U128 v) {
   return s;
 }
 
-/// One half: the threshold '=' compares against, built from the documented rule rather than
-/// written as a bare literal.
 Decimal kHalf() {
   return DecimalAccess::Make(kRoundUpAtDigit, 1, false);
 }
 
-/// Truncates the fractional digits without rounding -- the magnitude, never mathematically.
 Decimal TruncateMagnitude(const Decimal &d) {
   U128 u = DecimalAccess::Units(d);
   for (std::uint8_t i = 0; i < d.Scale(); ++i) { u /= 10; }
@@ -316,7 +287,6 @@ Decimal Decimal::FromInvariantString(std::string_view text) {
     }
   }
   if (!seenDigit) { throw DecimalError("Decimal: no digit"); }
-  // No stripping: CLR parsing preserves the written scale, so `1.2300` keeps four places.
   return DecimalAccess::Make(units, scale, neg && units != 0);
 }
 
@@ -356,7 +326,6 @@ Decimal &Decimal::operator*=(const Decimal &o) {
   auto scale = static_cast<std::uint8_t>(scale_ + o.scale_);
   units_ = FitToUnits(p, scale);
   scale_ = scale;
-  // No stripping: CLR multiplication carries scale s1 + s2, so 2.50 * 2 is 5.00.
   negative_ = (negative_ != o.negative_) && units_ != 0;
   return *this;
 }
@@ -365,7 +334,6 @@ Decimal &Decimal::operator/=(const Decimal &o) {
   if (o.units_ == 0) { throw DecimalError("Decimal: division by zero"); }
   if (units_ == 0) { return *this; }
 
-  // Scale up as far as 28 decimal places and 192 bits allow, then round.
   U192 num = U192::From(units_);
   int scale = static_cast<int>(scale_) - static_cast<int>(o.scale_);
   const U192 den = U192::From(o.units_);

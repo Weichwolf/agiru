@@ -93,3 +93,27 @@ if [ "$silent" -lt "$allowedSilent" ]; then
   printf '%s\n' "$silent" > test/todo-baseline
   printf 'lint: baseline lowered to %s -- commit it with the repair.\n' "$silent"
 fi
+
+printf '\n== the door ==\n'
+# EVERY PUBLIC NAME IS DOCUMENTED OR IT IS A WARNING. `include/agiru/` is the public interface, and
+# a public name without a sign on it is the one thing a reader cannot recover from the code.
+if command -v doxygen >/dev/null 2>&1; then
+  mkdir -p build/doc
+  doxygen doc/Doxyfile >/dev/null 2>&1 || true
+  undocumented=$(wc -l < build/doc/warnings.txt 2>/dev/null | tr -d ' ')
+  allowedDoc=$(cat test/doc-baseline 2>/dev/null || echo 0)
+  printf 'lint: %s undocumented public entit(ies), the baseline allows %s\n' \
+    "$undocumented" "$allowedDoc"
+  if [ "$undocumented" -gt "$allowedDoc" ]; then
+    printf 'lint: THE DOOR BASELINE GREW by %s -- a public name arrived without a sign.\n' \
+      "$((undocumented - allowedDoc))" >&2
+    printf 'lint: they are named in build/doc/warnings.txt\n' >&2
+    exit 1
+  fi
+  if [ "$undocumented" -lt "$allowedDoc" ]; then
+    printf '%s\n' "$undocumented" > test/doc-baseline
+    printf 'lint: door baseline lowered to %s -- commit it with the repair.\n' "$undocumented"
+  fi
+else
+  printf 'lint: doxygen is not installed, so the door is not checked.\n' >&2
+fi

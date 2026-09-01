@@ -1,0 +1,31 @@
+# The door's documentation. `include/agiru/` only: those headers ARE the public interface, and a
+# public name without documentation is a door with no sign on it.
+#
+# `make lint` counts what doxygen warns about and holds the number to a baseline that may only
+# fall, the same way the analysis baseline works.
+PROJECT_NAME           = agiru
+PROJECT_BRIEF          = "AL to C++ transpiler and runtime for Business Central"
+OUTPUT_DIRECTORY       = build/doc
+INPUT                  = include
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h
+
+# The prose in these headers is written as sentences; the first one is the brief.
+JAVADOC_AUTOBRIEF      = YES
+AUTOLINK_SUPPORT       = YES
+MARKDOWN_SUPPORT       = YES
+
+# EVERY public name is documented or it is a warning. That is the whole point of the counter.
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = NO
+WARN_LOGFILE           = build/doc/warnings.txt
+QUIET                  = YES
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+HAVE_DOT               = NO

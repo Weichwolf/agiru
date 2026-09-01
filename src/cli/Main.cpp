@@ -8,9 +8,6 @@
 #include <system_error>
 
 namespace {
-
-// DIE VIER REFERENZEN AUS CLAUDE.md, an ihren Pfaden. Fehlt eine, ist jede Aussage ueber
-// AL-Semantik in diesem Lauf eine Vermutung -- deshalb sagt der Client es, statt es zu ertragen.
 struct Reference {
   std::string_view what;
   std::string_view path;
@@ -24,7 +21,7 @@ constexpr std::array kReferences = {
 };
 
 std::filesystem::path GitRoot() {
-  // NOLINTNEXTLINE(concurrency-mt-unsafe): einmal in main, bevor der erste Thread existiert.
+  // NOLINTNEXTLINE(concurrency-mt-unsafe): once in main, before the first thread exists.
   const char *const home = std::getenv("HOME");
   return std::filesystem::path(home != nullptr ? home : ".") / "Git";
 }
@@ -44,9 +41,6 @@ int Report() {
 } // namespace
 
 int main() {
-  // EIN FEHLSCHLAG IST LAUT. `main` darf nichts entkommen lassen, sonst endet der Prozess ueber
-  // std::terminate ohne die Meldung, die sagt, was fehlschlug. Der Handler selbst darf nicht
-  // werfen -- std::println kann es, std::fputs nicht.
   try {
     return Report();
   } catch (const std::exception &e) {
@@ -55,8 +49,6 @@ int main() {
     std::fputs("\n", stderr);
     return 1;
   } catch (...) {
-    // Nicht geschluckt, sondern gemeldet: was nicht von std::exception kommt, traegt keinen Text,
-    // aber einen Rueckgabewert. Diese Stelle zaehlt unten in der Baseline der stillen Stellen.
     std::fputs("agiru: unbekannte Ausnahme\n", stderr);
     return 1;
   }

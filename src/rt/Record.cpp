@@ -14,23 +14,11 @@
 #include <string_view>
 
 namespace agiru {
-
 namespace {
-
 const std::byte *At(const void *record, const FieldDef &def) {
   return static_cast<const std::byte *>(record) + def.offset;
 }
 
-/// THE TWO MESSAGES RENDER THE PRIMARY KEY DIFFERENTLY, and that is not a slip.
-///
-/// `FieldError` writes ` No.='NEW 3500'` -- a leading space, fields joined by a comma with no space
-/// after it -- which is what the documentation's own examples show
-/// (`... in Customer No.='NEW 3500'.`).
-///
-/// `TestField` writes `: No.='NEW 3500', Code='X'` -- a colon, and a comma WITH a space. That form
-/// is not in any document; it comes from the predecessor, where it was verified against the
-/// official BC test suite (openerp `runtime/base/table/_table.py`, `_test_field_pk_suffix`), and
-/// it matters because test code matches the message text.
 std::string PrimaryKeyText(const void *record, const TableDef &table, std::string_view separator) {
   if (table.keys.empty()) { return {}; }
   std::string out;
@@ -56,11 +44,7 @@ std::string FieldText(const void *record, const FieldDef &def) {
     case FieldType::Enum:
       return detail::MemberText(
           def, reinterpret_cast<const OptionValue *>(At(record, def))->AsInteger());
-    default:
-      // A type the generator can emit but this reader cannot render yet is LOUD. A silent empty
-      // string here would turn into an error message missing its value, which reads as a runtime
-      // defect somewhere else entirely.
-      throw Error("FieldText: no rendering for this field type yet");
+    default: throw Error("FieldText: no rendering for this field type yet");
   }
 }
 
@@ -109,7 +93,6 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
 }
 
 namespace detail {
-
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
   if (ordinal < 0 || static_cast<std::size_t>(ordinal) >= def.members.size()) {
     return std::to_string(ordinal);
@@ -123,9 +106,6 @@ void RaiseTestFieldMismatch(const void *record,
                             std::string_view expected,
                             std::string_view actual) {
   const std::string key = PrimaryKeyText(record, table, ", ");
-  // The DOUBLE SPACE before "in" is BC-faithful, taken from the predecessor where it was verified
-  // against the official test suite. It looks like a typo and is not one; removing it would make
-  // an Assert.ExpectedError substring stop matching.
   throw Error(std::string(def.caption) + " must be equal to '" + std::string(expected) + "'  in " +
               std::string(table.caption) + (key.empty() ? std::string{} : ": " + key) +
               ". Current value is '" + std::string(actual) + "'.");
@@ -147,8 +127,6 @@ std::string SubstituteInto(std::string_view pattern, std::span<const std::string
       continue;
     }
     const auto index = static_cast<std::size_t>(digit - '1');
-    // AL leaves a placeholder with no argument standing rather than blanking it, which is how a
-    // message with a missing parameter is visible instead of merely wrong.
     if (index >= values.size()) {
       out += c;
       continue;

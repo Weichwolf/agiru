@@ -15,53 +15,128 @@
 #include <string_view>
 #include <type_traits>
 
+/// \file
+/// \brief The AL record operations that raise the platform's own error messages.
+
 namespace agiru {
 
-/// Reads one field of a record as the text AL would put in a message.
+/// \brief Reads one field of a record as the text AL would put in a message.
 ///
-/// The record is addressed as bytes plus the field's offset, which is what makes this work for
-/// every table without a virtual call and without the runtime knowing a single AL object -- the
-/// invariant in CLAUDE.md that the runtime names no AL object.
+/// \param record The record, addressed as raw storage.
+/// \param def    The field to read.
+/// \return The value as AL renders it: a string as itself, a decimal in invariant notation, an
+///         option by its member name.
+/// \throws Error when the field's type has no rendering yet. That is loud on purpose -- a silent
+///         empty string here becomes an error message missing its value, which reads as a defect
+///         somewhere else entirely.
+///
+/// Addressing the record as bytes plus an offset is what makes this work for every table without a
+/// virtual call and without the runtime knowing a single AL object.
 [[nodiscard]] std::string FieldText(const void *record, const FieldDef &def);
 
-/// True when the field holds the blank of its type: an empty string, a zero number, ordinal zero.
-/// `record-testfield-joker-method.md`: "If you omit this parameter and the contents of Field is
-/// zero or blank (empty string), then an error message is displayed."
+/// \brief Tests whether a field holds the blank of its type.
+///
+/// \param record The record, addressed as raw storage.
+/// \param def    The field to test.
+/// \return True for an empty string, a zero number, or ordinal zero.
+///
+/// From `record-testfield-joker-method.md`: "If you omit this parameter and the contents of Field
+/// is zero or blank (empty string), then an error message is displayed."
 [[nodiscard]] bool IsBlank(const void *record, const FieldDef &def);
 
-/// AL `Record.FieldCaption(Field)` -- `record-fieldcaption-method.md`.
+/// \brief AL `Record.FieldCaption(Field)`.
+///
+/// \param table The record's table.
+/// \param no    The field number.
+/// \return The field's `Caption` property.
+/// \throws Error when the table declares no such field.
+/// \see `record-fieldcaption-method.md`
 [[nodiscard]] std::string_view FieldCaption(const TableDef &table, FieldNo no);
 
-/// AL `Record.FieldError(Field [, Text])` -- `record-fielderror-joker-string-method.md`.
+/// \brief AL `Record.FieldError(Field [, Text])` -- raises an error naming a field.
 ///
-/// The three forms are the documentation's own three examples, and the trailing period is added by
-/// the platform ("Note that a period is automatically inserted at the end of a FieldError"):
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field the message is about.
+/// \param text   Optional replacement for the default wording.
+/// \throws Error always.
 ///
-///     FieldError("No.")            empty  -> You must specify No. in Customer No.=''.
-///     FieldError("No.")            valued -> No. must not be NEW 3500 in Customer No.='NEW 3500'.
-///     FieldError("No.", 'is not valid')   -> No. is not valid in Customer No.='NEW 3500'.
+/// The three forms are the documentation's own worked examples, and the trailing full stop is the
+/// platform's ("Note that a period is automatically inserted at the end of a FieldError"):
+///
+/// \verbatim
+/// FieldError("No.")                  blank  -> You must specify No. in Customer No.=''.
+/// FieldError("No.")                  valued -> No. must not be NEW 3500 in Customer No.='NEW
+/// 3500'. FieldError("No.", 'is not valid')         -> No. is not valid in Customer No.='NEW 3500'.
+/// \endverbatim
+///
+/// \warning The primary key is rendered with one leading space and commas with NO space after
+///          them. TestField() renders it differently, and that difference is load-bearing rather
+///          than a slip.
+/// \see `record-fielderror-joker-string-method.md`
 [[noreturn]] void
 FieldError(const void *record, const TableDef &table, FieldNo no, std::string_view text = {});
 
-/// AL `Record.TestField(Field)` -- raises when the field holds its type's blank.
+/// \brief AL `Record.TestField(Field)` -- raises when the field holds its type's blank.
+///
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field to test.
+/// \throws Error when the field is blank, with the message
+///
+/// \verbatim
+/// Code must have a value in Resource Cost: Type='Resource', Code=''. It cannot be zero or empty.
+/// \endverbatim
+///
+/// \warning The primary key is rendered after a COLON, with commas that DO carry a space. That is
+///          not what FieldError() does. The form is in no document; it comes from the predecessor,
+///          where it was verified against the official BC test suite, and it matters because BC
+///          test code matches the message text.
+/// \see `record-testfield-joker-method.md`
 void TestField(const void *record, const TableDef &table, FieldNo no);
 
+/// \brief Internals of the record operations. Not part of the door.
 namespace detail {
 
+/// \brief Raises TestField's mismatch message.
+///
+/// \param record   The record whose primary key the message quotes.
+/// \param table    The record's table.
+/// \param def      The field that did not match.
+/// \param expected The expected value, already rendered.
+/// \param actual   The stored value, already rendered.
+/// \throws Error always.
+///
+/// \warning The DOUBLE SPACE before the word "in" is BC-faithful and not a typo. It comes from the
+///          predecessor, verified there against the official test suite; removing it stops an
+///          `Assert.ExpectedError` substring from matching.
 [[noreturn]] void RaiseTestFieldMismatch(const void *record,
                                          const TableDef &table,
                                          const FieldDef &def,
                                          std::string_view expected,
                                          std::string_view actual);
 
-/// An option is rendered by its member NAME, and the names live in the field's metadata rather than
-/// in the value -- so rendering an expected option needs the field it is compared against.
+/// \brief Renders an option ordinal through its field's member table.
+///
+/// \param def     The field, which carries the member names.
+/// \param ordinal The zero-based member number.
+/// \return The member name, or the ordinal as digits when it is undeclared.
 [[nodiscard]] std::string MemberText(const FieldDef &def, std::int32_t ordinal);
 
+/// \brief Replaces the numbered placeholders in a pattern.
+///
+/// \param pattern The text carrying the placeholders.
+/// \param values  The replacements, in order.
+/// \return The substituted text.
 [[nodiscard]] std::string SubstituteInto(std::string_view pattern,
                                          std::span<const std::string_view> values);
 
-/// The text of a value that is about to appear in a message, chosen by what the value IS.
+/// \brief Renders a value about to appear in a message, choosing by what the value is.
+///
+/// \tparam T    The value's type.
+/// \param value The value.
+/// \param def   The field it is compared against, which carries an option's member names.
+/// \return The rendered text.
 template <typename T> [[nodiscard]] std::string TextOf(const T &value, const FieldDef &def) {
   if constexpr (std::is_base_of_v<OptionValue, T>) {
     return MemberText(def, value.AsInteger());
@@ -76,11 +151,17 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
 
 } // namespace detail
 
-/// AL `Record.TestField(Field, Value)` -- `record-testfield-joker-joker-method.md`.
+/// \brief AL `Record.TestField(Field, Value)` -- raises when the field does not hold that value.
 ///
-/// The value is typed to the FIELD's type at the call site, which is what lets the comparison be
-/// the type's own: a Code literal is Code-normalised before it is compared, because handing it to a
-/// `Code<N>` parameter is what AL does.
+/// \tparam T       The field's own type, which is what makes the comparison the type's own: a Code
+///                 literal is Code-normalised before it is compared, because handing it to a
+///                 `Code<N>` parameter is what AL does with the argument.
+/// \param record   The record whose primary key the message quotes.
+/// \param table    The record's table.
+/// \param no       The field to test.
+/// \param expected The value it must hold.
+/// \throws Error when the values differ, or when the table declares no such field.
+/// \see `record-testfield-joker-joker-method.md`, detail::RaiseTestFieldMismatch
 template <typename T>
 void TestField(const void *record, const TableDef &table, FieldNo no, const T &expected) {
   const FieldDef *def = Field(table, no);
@@ -92,8 +173,16 @@ void TestField(const void *record, const TableDef &table, FieldNo no, const T &e
       record, table, *def, detail::TextOf(expected, *def), FieldText(record, *def));
 }
 
-/// AL `StrSubstNo(Text [, Any,...])` -- `text-strsubstno-method.md`: "Replaces %1, %2, %3... and
-/// #1, #2, #3... fields in a string with the values you provide as optional parameters."
+/// \brief AL `StrSubstNo(Text [, Any,...])`.
+///
+/// \tparam Args    The argument types, each convertible to a string view.
+/// \param pattern  The text carrying `%1` to `%9` or `#1` to `#9`.
+/// \param args     The replacements, in order.
+/// \return The substituted text.
+///
+/// \note A placeholder with no argument is LEFT STANDING, so a message missing a parameter is
+///       visible rather than merely wrong.
+/// \see `text-strsubstno-method.md`
 template <typename... Args>
 [[nodiscard]] std::string StrSubstNo(std::string_view pattern, const Args &...args) {
   const std::initializer_list<std::string_view> values{std::string_view(args)...};
