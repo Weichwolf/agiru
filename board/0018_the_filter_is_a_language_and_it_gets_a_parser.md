@@ -65,7 +65,35 @@ An enum-qualified CONST arrives as `Type"::"Member` with the qualifier still att
 option member arrives as a whitespace string that is ordinal 0. Both had to be resolved to an
 ordinal before reaching the column. Neither is in the documentation.
 
+## What is done, and the constraint the rest ran into
+
+**The LANGUAGE is done and gated** -- `src/rt/Filter.{h,cpp}`, 42 checks. One parse into a
+disjunction of conjunctions, because `&` binds tighter than `|`; whitespace insignificant; `=`
+optional; `@` a modifier; ranges with either end open; wildcards that are wildcards and not regular
+expressions; quoted operands not split on the operators inside them; and numbers compared as
+numbers, since `"10" < "9"` lexically would drop every row from ten upward and look like a correct
+empty result. Each of those has a negative control, and each of the first three is a defect the
+predecessor records paying for.
+
+**Hanging it on the record is where it stopped, and the reason is an invariant.** `SetFilter` has to
+put the parsed expression somewhere, and the obvious place -- a member of `Table<Derived>` -- is
+closed: **the base holds NO data, because a class with data in both the base and the derived class
+is not standard-layout, and `offsetof` over the field table is how every field is addressed.** A map
+of filters in the base would silently cost that.
+
+Three ways out, none of them free, and the choice wants measuring rather than picking:
+
+- **The generated class carries them.** Standard-layout survives, since all the data members stay in
+  one class. It puts runtime state into what is otherwise a transcription of the `.al`, in all
+  1 767 tables.
+- **The session carries them, keyed by the record.** The record stays exactly what it is and a
+  record that never filters costs nothing. `Copy` and assignment then have to carry the filters
+  across by hand, which AL does do.
+- **`offsetof` goes.** C++26 reflection removes the need for it entirely (board:0015), and with it
+  this constraint. Not available in clang-19 or gcc-14.
+
 ## Closed when
 
-That corpus parses whole, and a gate shows each operator above producing the SQL and the result NAV
-produces, with the value-escaping cases (`%`, `_`, `&`, `'`) among them.
+The corpus of the BaseApp's own filter strings parses whole; `SetFilter` and `SetRange` reach a
+record without costing it its standard layout; and a gate shows each operator producing the SQL and
+the result NAV produces, with the value-escaping cases (`%`, `_`, `&`, `'`) among them.
