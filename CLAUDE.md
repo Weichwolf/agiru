@@ -248,6 +248,11 @@ decision that is cheap now and a migration later.
   table from having read one. A macro list is not that. The same sentence already stands in
   `.clang-tidy` about a macro that generated types -- it applies here with more force, because
   these files are the examples everything else is written from.
+- **A GENERATED FILE CARRIES NO COMMENTS**, only a two-line provenance header naming the `.al` it
+  came from. It is `src/` and the `src/` rule holds: quoting the AL above each trigger reads well
+  and carries nothing -- the C++ already reads like the AL, the source is one path away, and 9 300
+  objects' worth of quoted AL is bytes the compiler and the repository pay for. Where the mapping
+  needs teaching, the door's Doxygen teaches it and a gate case proves it.
 - **The platform half is in the base class**, where AL keeps it: `Insert`, `Modify`, `Delete`,
   `Get`, `FieldError`, `TestField`, `FieldCaption`. A generated file names no connection, no row,
   no column and no `this`, because a `.al` file names none of them.

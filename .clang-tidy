@@ -25,7 +25,8 @@ Checks: >
   -readability-uppercase-literal-suffix,
   -readability-math-missing-parentheses,
   -readability-avoid-nested-conditional-operator,
-  -performance-enum-size
+  -performance-enum-size,
+  -misc-no-recursion
 WarningsAsErrors: '*'
 
 CheckOptions:
@@ -50,9 +51,9 @@ CheckOptions:
 #
 # A check is off when its finding is NOT A DEFECT, and there are exactly two ways for that to be
 # true: the finding is a matter of TASTE, or the DOMAIN already fixes the answer and the check is
-# arguing with AL rather than with us. The first four below are taste. The fifth is the second kind,
-# and it is the only one with a citation instead of an opinion. Everything whose finding is a defect
-# is ON and its counter reads zero.
+# arguing with AL rather than with us. The first four below are taste. The last two are the second
+# kind, and each carries its reason and its compensating guard rather than an opinion. Everything
+# whose finding is a defect is ON and its counter reads zero.
 #
 # `modernize-use-trailing-return-type` wants `auto f() -> int`. This tree writes `int f()`, and so
 #   does the rest of the world.
@@ -62,6 +63,14 @@ CheckOptions:
 #   the parentheses hide the shape of an expression rather than showing it.
 # `readability-avoid-nested-conditional-operator` forbids `a ? b : c ? d : e`. Mapping an AL option
 #   onto a C++ value is exactly that chain, and splitting it into `if` makes it longer, not clearer.
+#
+# `misc-no-recursion` reports every function in a recursive call chain. THE DOMAIN FIXES THIS ONE
+#   TOO: recursive descent IS the shape of a parser, and this tree will grow one over AL expressions
+#   that nest by construction. What the check is really about is UNBOUNDED depth, and that is
+#   answered where it belongs -- every recursive reader here carries an explicit depth limit and
+#   raises when it is crossed, rather than growing the stack until the process dies. Rewriting a
+#   parser iteratively to satisfy a name would trade a checked bound for an explicit stack nobody
+#   reads.
 #
 # `performance-enum-size` would size an enumeration by its largest enumerator. THE DOMAIN FIXES THIS
 #   ONE: `methods-auto/option/option-data-type.md` says the Option type is "a zero-based enumerator

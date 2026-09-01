@@ -82,6 +82,8 @@ endif()
 # passes or fails for reasons the tree cannot see.
 set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
     CACHE STRING "Connection string the gate uses")
+set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
+    CACHE STRING "The AL source the gate parses")
 
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one
@@ -94,10 +96,16 @@ file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
 foreach(case IN LISTS gate_cases)
   get_filename_component(name "${case}" NAME_WE)
   add_executable(gate_${name} "${case}" ${target_image})
+  # A CASE MAY SEE EVERY TIER. It is not a client: it exists to test the tiers themselves, and a
+  # parser or a generator has no public door to be tested through.
   target_include_directories(gate_${name} PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate"
     "${CMAKE_SOURCE_DIR}/test/target")
-  target_compile_definitions(gate_${name} PRIVATE AGIRU_TEST_DSN="${AGIRU_TEST_DSN}")
+  foreach(tier IN LISTS TIERS)
+    target_include_directories(gate_${name} PRIVATE "${CMAKE_SOURCE_DIR}/src/${tier}")
+  endforeach()
+  target_compile_definitions(gate_${name} PRIVATE AGIRU_TEST_DSN="${AGIRU_TEST_DSN}"
+                                                AGIRU_AL_SOURCE="${AGIRU_AL_SOURCE}")
   foreach(tier IN LISTS TIERS)
     if(TARGET agiru_${tier})
       target_link_libraries(gate_${name} PRIVATE agiru_${tier})
