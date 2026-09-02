@@ -122,12 +122,10 @@ std::vector<std::filesystem::path> SourcesEndingIn(const std::filesystem::path &
     // extension -- not missing, just not looked at.
     const std::string path = entry.path().string();
     if (entry.is_regular_file() && path.size() >= suffix.size() &&
-        std::ranges::equal(path.substr(path.size() - suffix.size()),
-                           suffix,
-                           [](char a, char b) {
-                             return std::tolower(static_cast<unsigned char>(a)) ==
-                                    std::tolower(static_cast<unsigned char>(b));
-                           })) {
+        std::ranges::equal(path.substr(path.size() - suffix.size()), suffix, [](char a, char b) {
+          return std::tolower(static_cast<unsigned char>(a)) ==
+                 std::tolower(static_cast<unsigned char>(b));
+        })) {
       sources.push_back(entry.path());
     }
   }

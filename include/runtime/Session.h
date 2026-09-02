@@ -3,6 +3,7 @@
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
+#include "type/Boolean.h"
 #include "type/Guid.h"
 
 #include <string>
@@ -67,6 +68,20 @@ public:
   ///       session and a hardcoded GUID inside a call could never become one.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
 
+  /// \brief Whether this session runs as the service rather than a self-hosted instance.
+  ///
+  /// \return False unless the host said otherwise.
+  ///
+  /// \note IT IS A PROPERTY OF THE SESSION AND NOT OF A CODEUNIT, because the runtime may not know
+  ///       an AL object -- `Codeunit "Environment Information"` reads THIS rather than the other
+  ///       way round. The test libraries switch it with
+  ///       `EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(true)`, which lands here.
+  [[nodiscard]] Boolean IsSaaS() const { return saas_; }
+
+  /// \brief Says whether this session runs as the service.
+  /// \param saas True for the service.
+  void SetSaaS(Boolean saas) { saas_ = saas; }
+
   /// \return The nested transaction boundaries this session is inside.
   ///
   /// \note A SESSION AND ITS BOUNDARIES ARE ONE THING, which is why they live together. A savepoint
@@ -79,6 +94,7 @@ private:
   Boundaries boundaries_;
   Session *previous_;
   Guid userSecurityId_;
+  Boolean saas_ = false;
 };
 
 } // namespace agiru

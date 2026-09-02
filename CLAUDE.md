@@ -257,6 +257,12 @@ C++ truths rather than decisions about agiru. They do not move.
   list. AL error texts are part of intended behaviour -- tests compare them.
 - **A failure is loud.** Accepting a declaration and doing nothing with it is worse than refusing
   it. `catch (...) {}` is a finding with a counter.
+- **A C++ LIBRARY IS ALLOWED WHERE THE STANDARD LIBRARY IS NOT ENOUGH.** Minimising is the rule, not
+  abstinence: XML, JSON, HTTP and PDF are not written from scratch here, and the predecessor did not
+  write them either. What a dependency must be is JUSTIFIED -- named with what it replaces -- and
+  reachable on `aarch64`, because the binary that ships is the Pi's.
+- **Reporting is XSL-FO through Apache FOP to PDF**, which is the route `~/Git/openerp` takes and
+  the one BC's own RDL layouts translate into most directly.
 - **Artefacts go to `build/` or the system temp directory**, never into the tree.
   `compile_commands.json` is the exception, because clangd looks for it at the root; it is
   gitignored.
