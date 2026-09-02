@@ -4,6 +4,7 @@
 #include "EnumWriter.h"
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -19,10 +20,18 @@ struct TableRef {
 /// as text beside it -- AL names an object either way and test code uses both.
 using TableIndex = std::map<std::string, TableRef>;
 
+/// What one .NET type is asked to do, gathered from the AL that uses it.
+using DotNetUse = std::map<std::string, std::set<std::string>>;
+
 /// One translated codeunit, and what it needed that the run did not have.
 struct CodeunitHeader {
   std::string text;
   std::vector<std::string> unresolvedTables;
+
+  /// Every `.NET type -> member` the codeunit's bodies call. The .NET surface is not declared
+  /// anywhere -- a `dotnet` package names a type and no members -- so the only place it exists is
+  /// the call sites (board:0035).
+  DotNetUse dotnet;
 };
 
 /// EVERY OBJECT KIND GETS ITS OWN INDEX, because AL lets a table and a codeunit carry one name and

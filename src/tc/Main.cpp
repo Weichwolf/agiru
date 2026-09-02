@@ -326,6 +326,7 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
 
 void ScanCodeunits(Run &run,
                    Counts &counts,
+                   agiru::gen::DotNetUse &dotnet,
                    agiru::gen::Objects &objects,
                    std::map<std::string, std::size_t> &unresolvedTables) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
@@ -364,6 +365,9 @@ void ScanCodeunits(Run &run,
       const std::string relative = std::filesystem::relative(path, run.root).string();
       const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, objects);
       for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
+      for (const auto &[type, members] : header.dotnet) {
+        dotnet[type].insert(members.begin(), members.end());
+      }
       const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
       const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
       Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
@@ -384,6 +388,53 @@ void ScanCodeunits(Run &run,
 // declaration lives in a layer this run was not given, and the count is what says how much the next
 // layer is worth.
 constexpr std::size_t kUnresolvedShown = 10;
+
+// THE .NET TYPES THIS TREE HAS REBUILT BY HAND. They live behind the door with real behaviour, so
+// the generated stubs must not declare them a second time. The list is the platform's own
+// vocabulary in the same sense `TypeName()`'s list of AL types is (board:0035).
+const std::set<std::string> &Rebuilt() {
+  static const std::set<std::string> kRebuilt{"ALConfigSettings",
+                                              "GenericDictionary2",
+                                              "GenericList1",
+                                              "NavTenantSettingsHelper",
+                                              "UserInfo"};
+  return kRebuilt;
+}
+
+// ONE FILE FOR EVERY .NET TYPE THE CORPUS NAMES, and its members are exactly the ones the corpus
+// asks for. .NET's own API is thousands of members that nobody here needs; this is the set that is
+// actually reached, which makes it a worklist with a denominator rather than a port.
+void WriteDotNet(const std::filesystem::path &out, const agiru::gen::DotNetUse &dotnet) {
+  if (out.empty()) { return; }
+  std::string text = "// Generated from every AL body that names a DotNet variable. Do not edit.\n";
+  text += "\n#pragma once\n\n#include \"agiru.h\"\n\nnamespace agiru::dotnet {\n";
+  std::size_t types = 0;
+  std::size_t members = 0;
+  for (const auto &[type, named] : dotnet) {
+    if (Rebuilt().contains(type)) { continue; }
+    ++types;
+    text += "\nstruct " + type + " {\n";
+    for (const std::string &member : named) {
+      ++members;
+      text += "  Refused ";
+      text += member;
+      text += "{\"";
+      text += type;
+      text += "\", \"";
+      text += member;
+      text += "\"};\n";
+    }
+    text += "};\n";
+  }
+  text += "\n} // namespace agiru::dotnet\n";
+
+  const std::filesystem::path path = out / "dotnet" / "dotnet" / "Types.h";
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream file(path, std::ios::binary);
+  file << text;
+  std::println(
+      "dotnet    {} type(s) with {} member(s), from the call sites that name them", types, members);
+}
 
 void ReportUnresolved(std::string_view what,
                       std::string_view by,
@@ -465,6 +516,7 @@ int Scan(const Job &job) {
 
   std::map<std::string, std::size_t> unresolvedEnums;
   std::map<std::string, std::size_t> unresolvedTables;
+  agiru::gen::DotNetUse dotnet;
   agiru::gen::EnumIndex index;
   agiru::gen::Objects objects;
   Counts allEnums;
@@ -509,7 +561,7 @@ int Scan(const Job &job) {
     // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
     ScanTables(run, tables, index, objects, unresolvedEnums);
-    ScanCodeunits(run, codeunits, objects, unresolvedTables);
+    ScanCodeunits(run, codeunits, dotnet, objects, unresolvedTables);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
@@ -546,6 +598,7 @@ int Scan(const Job &job) {
                  allCodeunits.parsed);
   }
   ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
+  WriteDotNet(job.output, dotnet);
   ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
   Cluster(failures);
   if (!refusals.empty()) {

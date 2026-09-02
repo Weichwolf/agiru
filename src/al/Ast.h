@@ -71,6 +71,12 @@ struct ProcedureDecl {
   std::string returnName;
   std::string returnType;
   std::string returnSubtype;
+
+  /// The return's WHOLE declaration. `returnType` and `returnSubtype` are two of its fields, and
+  /// rebuilding a `VarDecl` from just those two dropped the length of a `Text[50]`, the members of
+  /// an inline `Option` and the arguments of a `Dictionary of [Text, Text]` -- which is a class
+  /// template with no arguments, and not a type.
+  VarDecl returned;
   std::vector<Token> tokens;
   std::vector<Stmt> body;
 };

@@ -5,11 +5,14 @@
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
+#include "Token.h"
 
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -41,14 +44,16 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 // one: the codeunit, the procedure it stands in, and the variable. A table does the same for its
 // own inline options, and the alternative -- an Integer -- would compile and lose the vocabulary
 // `Type::All` is written in.
+std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
+  const TableRef *ref = Reach(declared, objects);
+  const std::string named = ref != nullptr ? ref->identifier : Identifier(declared.subtype);
+  return declared.temporary ? "Temporary<" + named + ">" : named;
+}
+
 std::string
 TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
   std::string type = TypeName(declared.type);
-  if (type == "Record" || type == "Codeunit") {
-    const TableRef *ref = Reach(declared, objects);
-    const std::string named = ref != nullptr ? ref->identifier : Identifier(declared.subtype);
-    return declared.temporary ? "Temporary<" + named + ">" : named;
-  }
+  if (type == "Record" || type == "Codeunit") { return ObjectType(declared, objects); }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
   // arguments -- which is not a type at all. The index is the same one a table field uses.
   // A DotNet VARIABLE IS TYPED BY ITS SUBTYPE, and the subtype was being thrown away: every one of
@@ -175,21 +180,24 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
 
 std::string Returns(const al::ProcedureDecl &procedure, const Objects &objects) {
   if (procedure.returnType.empty()) { return "void"; }
-  const al::VarDecl returned{.byReference = false,
-                             .temporary = false,
-                             .name = {},
-                             .type = procedure.returnType,
-                             .subtype = procedure.returnSubtype,
-                             .length = 0,
-                             .members = {},
-                             .arguments = {}};
-  return TypeOf(returned, objects);
+  return TypeOf(procedure.returned, objects);
 }
 
 std::string
 Declaration(const al::ProcedureDecl &procedure, const Objects &objects, const std::string &unit) {
   return "  " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
          Parameters(procedure, objects, true, unit) + ");\n";
+}
+
+bool NamesDotNet(const al::CodeunitObject &unit) {
+  const auto dotnet = [](const al::VarDecl &declared) {
+    return TypeName(declared.type) == "DotNet";
+  };
+  if (std::ranges::any_of(unit.variables, dotnet)) { return true; }
+  return std::ranges::any_of(unit.procedures, [&dotnet](const al::ProcedureDecl &procedure) {
+    return std::ranges::any_of(procedure.parameters, dotnet) ||
+           std::ranges::any_of(procedure.variables, dotnet);
+  });
 }
 
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
@@ -223,10 +231,54 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
     if (TypeName(procedure.returnType) == "Enum") { reachEnum(procedure.returnSubtype); }
   }
+  // A CODEUNIT THAT NAMES A .NET TYPE INCLUDES THE GENERATED SURFACE. It is one file for all of
+  // them, because the stubs reference nothing but `Refused` and splitting them would be 499 headers
+  // for no reader's benefit.
   std::string out = "#include \"agiru.h\"\n";
+  if (NamesDotNet(unit)) { out += "#include \"dotnet/Types.h\"\n"; }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   out += "\n";
   return out;
+}
+
+// THE .NET SURFACE EXISTS ONLY AT THE CALL SITES. A `dotnet` package declares an assembly and a
+// type alias and no members at all, so nothing in the AL source says what `XmlDocument` can do --
+// only what this corpus ASKS it to do. That set is gathered here, per type, from the tokens of
+// every body: a name that is a DotNet variable, a dot, and the member after it (board:0035).
+//
+// TOKENS AND NOT THE EXPRESSION TREE, because a property read and a call are the same thing here
+// and the token pair is the same for both -- `UserInfo.ObjectId` and `Doc.SelectNodes(x)` differ
+// only in what follows, which this does not need.
+using DotNetNames = std::map<std::string, std::string>;
+
+void NoteDotNet(const al::VarDecl &declared, DotNetNames &named) {
+  if (TypeName(declared.type) == "DotNet" && !declared.subtype.empty()) {
+    named.insert_or_assign(LowerKey(declared.name), Identifier(declared.subtype));
+  }
+}
+
+void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, DotNetUse &use) {
+  for (std::size_t i = 0; i + 2 < procedure.tokens.size(); ++i) {
+    if (procedure.tokens[i].kind != al::TokenKind::Identifier) { continue; }
+    if (procedure.tokens[i + 1].text != ".") { continue; }
+    if (procedure.tokens[i + 2].kind != al::TokenKind::Identifier) { continue; }
+    const auto found = named.find(LowerKey(procedure.tokens[i].text));
+    if (found != named.end()) {
+      use[found->second].insert(Identifier(procedure.tokens[i + 2].text));
+    }
+  }
+}
+
+void GatherDotNet(const al::CodeunitObject &unit, DotNetUse &use) {
+  DotNetNames named;
+  for (const al::VarDecl &declared : unit.variables) { NoteDotNet(declared, named); }
+
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    DotNetNames inner = named;
+    for (const al::VarDecl &declared : procedure.parameters) { NoteDotNet(declared, inner); }
+    for (const al::VarDecl &declared : procedure.variables) { NoteDotNet(declared, inner); }
+    GatherCalls(procedure, inner, use);
+  }
 }
 
 std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const Objects &objects) {
@@ -415,7 +467,10 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "};\n";
-  return CodeunitHeader{.text = out, .unresolvedTables = Unresolved(unit, objects)};
+  DotNetUse dotnet;
+  GatherDotNet(unit, dotnet);
+  return CodeunitHeader{
+      .text = out, .unresolvedTables = Unresolved(unit, objects), .dotnet = std::move(dotnet)};
 }
 
 } // namespace agiru::gen

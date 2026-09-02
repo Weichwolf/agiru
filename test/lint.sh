@@ -87,9 +87,18 @@ if [ -z "$FULL" ]; then
   printf 'lint: THIS IS NOT THE BASELINE. `make lint FULL=1` reads the whole tree and writes it.\n'
   [ "$found" -eq 0 ] || { cat "$REPORT/tidy.unique" >&2; exit 1; }
 fi
+# A SUPPRESSION IS A DIRECTIVE, NOT A WORD IN A COMMENT, and the difference is what this counter
+# got wrong. It dropped every line whose content began with `/` or `*` -- to skip the prose that
+# EXPLAINS the rule -- and `NOLINTNEXTLINE` is written on a comment line of its own, which is how
+# clang-tidy wants it and how all seven suppressions in this tree are written. So the counter saw
+# one of seven and reported zero for months of them. Matching the DIRECTIVE form instead
+# (`NOLINT`, `NOLINTNEXTLINE`, `NOLINTBEGIN`, `NOLINTEND`, each followed by `(`, a space or the end
+# of the line) counts a suppression wherever it stands, and a backticked mention in prose is
+# excluded by what it is rather than by where it sits.
 grep_silent() {
-  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.) *{ *}' src include test --include='*.cpp' \
-    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^apps/'
+  grep -rnE 'NOLINT(NEXTLINE|BEGIN|END)?(\(|$| )|TODO|FIXME|catch \(\.\.\.\) *\{ *\}' \
+    src include test --include='*.cpp' --include='*.h' 2>/dev/null |
+    grep -v '`NOLINT' | grep -v '`TODO' | grep -v '`FIXME' | grep -v '^apps/'
 }
 
 if [ -z "$FULL" ]; then

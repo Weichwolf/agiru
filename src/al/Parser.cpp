@@ -186,6 +186,7 @@ private:
       const VarDecl returned = ReadType();
       procedure.returnType = returned.type;
       procedure.returnSubtype = returned.subtype;
+      procedure.returned = returned;
     }
     if (AtPunctuation(";")) { Advance(); }
     std::vector<LabelDecl> locals;
