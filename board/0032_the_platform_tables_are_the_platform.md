@@ -149,6 +149,41 @@ is the AL Date type, so the platform tables cannot share that namespace: they li
 Nothing in the record layer branches on which table it holds; the only thing that knows is the SQL
 builder, at the one point where a FROM clause is written.
 
+## MOST OF THESE TABLES ARE USED AS TEMPORARY RECORDS, and that re-ranks the work
+
+Measured over BCApps on 2026-09-02, counting `Record <name>` declarations and how many carry
+`temporary`:
+
+| table | declarations | temporary | fixed |
+|---|---|---|---|
+| `Field` | 1 069 | 282 | 787 |
+| `User` | 726 | 51 | 675 |
+| **`Integer`** | 625 | **441 (71 %)** | 184 |
+| `Date` | 604 | 3 | 601 |
+| `AllObj` | 328 | 49 | 279 |
+| `Company` | 309 | 24 | 285 |
+| `AllObjWithCaption` | 293 | 69 | 224 |
+| `Table Metadata` | 156 | 28 | 128 |
+
+**`Record Integer temporary` is the single most common use of the single table the sequence design
+applies to.** AL uses it as a lightweight set of integers: declare it temporary, `Number := 5`,
+`Insert`, iterate. The computed rows have nothing to do with it -- a temporary record starts EMPTY
+and holds what was put in it.
+
+**A DECLARATION ALONE BUYS 947 OF THESE DECLARATIONS**, because `Temporary<T>` shadows `Insert`,
+`Modify`, `Delete`, `DeleteAll`, `Get`, `Count`, `IsEmpty`, `FindSet` and `Next` against its own
+store and touches no database at all. So the order is: DECLARE the platform tables first, and the
+computed behaviour after -- the reverse of what the row counts suggested.
+
+**And the two seams turn out to be one.** The refusal that makes a virtual table read-only belongs
+in `RuntimeInsert`, `RuntimeModify` and `RuntimeDelete`; `Temporary<T>` never calls any of them. So
+a temporary `Integer` is writable and a database-backed one is not, without either half knowing
+about the other. Read-only is a property of the TABLE-BEHIND-THE-RECORD, not of the record class,
+and that is what makes it fall out rather than be arranged.
+
+The interval set is not wasted by this: 184 fixed `Record Integer` declarations still need it, and
+it is a function of the filter language that an index-range decision will want anyway.
+
 ## What has to be decided, and it is not decided yet
 
 - ~~**How a row source is chosen.**~~ ANSWERED above: they are PostgreSQL relations, so there is no
