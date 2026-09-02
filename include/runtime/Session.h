@@ -2,6 +2,7 @@
 
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/Tenant.h"
 #include "runtime/Transaction.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
@@ -76,11 +77,17 @@ public:
   ///       an AL object -- `Codeunit "Environment Information"` reads THIS rather than the other
   ///       way round. The test libraries switch it with
   ///       `EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(true)`, which lands here.
-  [[nodiscard]] Boolean IsSaaS() const { return saas_; }
+  [[nodiscard]] Boolean IsSaaS() const { return tenant_.saas; }
 
   /// \brief Says whether this session runs as the service.
   /// \param saas True for the service.
-  void SetSaaS(Boolean saas) { saas_ = saas; }
+  void SetSaaS(Boolean saas) { tenant_.saas = saas; }
+
+  /// \return What the tenant says about its own deployment.
+  [[nodiscard]] const TenantSettings &Tenant() const { return tenant_; }
+
+  /// \return The tenant's settings, to be changed by the host or a test library.
+  [[nodiscard]] TenantSettings &Tenant() { return tenant_; }
 
   /// \return The nested transaction boundaries this session is inside.
   ///
@@ -94,7 +101,7 @@ private:
   Boundaries boundaries_;
   Session *previous_;
   Guid userSecurityId_;
-  Boolean saas_ = false;
+  TenantSettings tenant_;
 };
 
 } // namespace agiru

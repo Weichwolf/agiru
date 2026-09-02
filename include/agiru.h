@@ -1,6 +1,9 @@
 #pragma once
 
 #include "dotnet/ALConfigSettings.h"
+#include "dotnet/Generic.h"
+#include "dotnet/NavTenantSettingsHelper.h"
+#include "dotnet/UserInfo.h"
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
@@ -31,6 +34,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/Media.h"
+#include "type/Notification.h"
 #include "type/MediaSet.h"
 #include "type/ModuleInfo.h"
 #include "type/Option.h"
