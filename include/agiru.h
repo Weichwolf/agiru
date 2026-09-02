@@ -29,9 +29,11 @@
 #include "type/List.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
+#include "type/SecretText.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Time.h"
+#include "type/Variant.h"
 
 /// \file
 /// \brief The door. One line, and an app has all of AL.

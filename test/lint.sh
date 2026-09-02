@@ -50,9 +50,11 @@ printf '\n== analysis ==\n'
 # over a subset is a false floor -- CLAUDE.md names it as a trap -- and the whole point of the
 # counters is that they cannot be lowered by looking at less.
 if [ -z "$FULL" ]; then
-  changed=$(git diff --name-only HEAD -- 'src/*' 'include/*' 'test/*' 2>/dev/null |
-    grep -E '\.(cpp|h)$' | grep -v '^test/target/' || true)
-  ours=$changed
+  # `git diff` DOES NOT SEE A FILE THAT IS NOT TRACKED YET, so a brand-new source -- exactly the
+  # kind most likely to carry a finding -- would never be checked. `git status --porcelain` lists
+  # modified and untracked alike, which is what "changed" has to mean here.
+  ours=$(git status --porcelain -- 'src/*' 'include/*' 'test/*' 2>/dev/null |
+    sed 's/^...//' | grep -E '\.(cpp|h)$' | grep -v '^test/target/' || true)
 fi
 # THE UNIT COUNT COMES FROM compile_commands.json, WHICH WILL ONE DAY CARRY apps/ TOO. The day
 # AGIRU_BUILD_APPS defaults on, this number jumps by some thousands while the analysis still skips
