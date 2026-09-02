@@ -20,6 +20,7 @@
 /// IS, `platform/` is what BC PROVIDES. `TenantSettings` moved across it -- a tenant's deployment
 /// facts are something the platform states, not machinery agiru runs on.
 
+#include "Builtins.h"
 #include "dotnet/ALConfigSettings.h"
 #include "dotnet/Generic.h"
 #include "dotnet/NavTenantSettingsHelper.h"

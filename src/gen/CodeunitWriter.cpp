@@ -491,12 +491,13 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
 
 /// What a declaration needs the header to KNOW: a name for an object, a name for an interface --
 /// which is a pointer -- and the enumeration itself, which is a template argument and not a name.
-template <typename Ahead, typename Enum, typename Page>
+template <typename Ahead, typename Enum, typename Page, typename Element>
 void Declared(const al::VarDecl &declared,
               const Objects &objects,
               Ahead ahead,
               Enum reachEnum,
-              Page reachPage) {
+              Page reachPage,
+              Element reachElement) {
   if (NamesAPage(TypeName(declared.type))) { reachPage(declared.subtype); }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
@@ -513,8 +514,16 @@ void Declared(const al::VarDecl &declared,
   // A GENERIC CARRIES ITS ELEMENT TYPES AND THEY ARE DECLARATIONS TOO. `List of [Enum "Image
   // Analysis Type"]` names an enumeration that nothing else in the file mentions, and the walk
   // stopped at the outer `List`.
+  //
+  // AND AN ELEMENT IS A MEMBER, not a mention: `Dictionary of [Integer, Codeunit "Temp Blob"]`
+  // instantiates `std::pair<Integer, TempBlob>`, which needs the LAYOUT. The handle rule does not
+  // reach inside a generic -- what it makes a handle of is the Dictionary, not what the Dictionary
+  // holds -- so the element's header is included rather than named. It was the last root of the
+  // tree: 9 598 of 9 600 headers compiled and these two did not.
   for (const al::VarDecl &argument : declared.arguments) {
-    Declared(argument, objects, ahead, reachEnum, reachPage);
+    Declared(argument, objects, ahead, reachEnum, reachPage, reachElement);
+    const TableRef *element = ReachObject(argument, objects);
+    if (element != nullptr && !element->header.empty()) { reachElement(element->header); }
   }
 }
 
@@ -562,8 +571,9 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   const auto reachPage = [&](const std::string &subtype) {
     IndexedHeader(objects.pages, subtype, headers);
   };
+  const auto reachElement = [&](const std::string &header) { headers.insert(header); };
   const auto both = [&](const al::VarDecl &declared) {
-    Declared(declared, objects, ahead, reachEnum, reachPage);
+    Declared(declared, objects, ahead, reachEnum, reachPage, reachElement);
   };
   // A MEMBER IS A GLOBAL, so this is the containment graph and nothing else.
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
