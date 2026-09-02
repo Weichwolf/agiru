@@ -45,6 +45,7 @@ struct CodeunitHeader {
 struct Objects {
   TableIndex tables;
   TableIndex codeunits;
+  TableIndex interfaces;
   EnumIndex enums;
 };
 
@@ -59,6 +60,24 @@ struct Objects {
 /// written down once. An app that declared a table of the same name would overwrite the entry,
 /// which is the right precedence -- its own object wins in its own tree.
 [[nodiscard]] TableIndex PlatformTables();
+
+/// One translated interface: an abstract class and nothing else.
+struct InterfaceHeader {
+  std::string text;
+
+  /// The types its SIGNATURES name that this run does not have. A parameter is a declaration, and
+  /// an interface is where the platform's bare enums show up most.
+  DotNetUse absent;
+};
+
+/// \brief Translates an AL interface into an abstract class.
+///
+/// It is the one AL object kind that needs no deviation: procedure SIGNATURES become pure virtual
+/// functions and `implements` becomes inheritance, so a codeunit missing one is a COMPILER error
+/// rather than a lookup that finds nothing (board:0027).
+InterfaceHeader WriteInterface(const al::InterfaceObject &object,
+                               const std::string &sourcePath,
+                               const Objects &objects);
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,

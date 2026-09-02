@@ -44,6 +44,25 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 // one: the codeunit, the procedure it stands in, and the variable. A table does the same for its
 // own inline options, and the alternative -- an Integer -- would compile and lose the vocabulary
 // `Type::All` is written in.
+std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
+  const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+  return (found != objects.interfaces.end() ? found->second.identifier
+                                            : "absent::" + Identifier(declared.subtype)) +
+         " *";
+}
+
+/// Whether a declaration names a type that is neither AL's nor an object -- a bare platform enum.
+///
+/// AL writes the platform's own enums as bare type names: `Verbosity: Verbosity`,
+/// `DataClassification: DataClassification`. Emitting the word unchanged put it beside the door,
+/// where nothing declares it.
+bool NamesAbsentType(const al::VarDecl &declared) {
+  // AN EMPTY TYPE IS NOT A TYPE. A procedure with no return has one, and calling it absent named a
+  // struct with no name at all.
+  return !declared.type.empty() && !IsAlTypeName(declared.type) && declared.subtype.empty() &&
+         declared.members.empty() && declared.arguments.empty();
+}
+
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
   // AN OBJECT THIS RUN DOES NOT HAVE IS NAMED AS ABSENT. It used to be emitted as a bare
@@ -54,7 +73,21 @@ std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
 }
 
 std::string
-TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
+TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {});
+
+/// A generic's element types, each read by the same function that read the generic.
+std::string Generic(const std::string &type,
+                    const std::vector<al::VarDecl> &arguments,
+                    const Objects &objects) {
+  std::string out = type + "<";
+  for (std::size_t i = 0; i < arguments.size(); ++i) {
+    if (i != 0) { out += ", "; }
+    out += TypeOf(arguments[i], objects);
+  }
+  return out + ">";
+}
+
+std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   std::string type = TypeName(declared.type);
   if (type == "Record" || type == "Codeunit") { return ObjectType(declared, objects); }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
@@ -83,6 +116,10 @@ TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &o
   // AN OPTION WITH NO MEMBERS IS AL'S OWN DECLARATION AND NOT A GAP. `procedure P(ChangeType:
   // Option)` takes any option value at all, and the BaseApp calls it with a member of some other
   // enumeration entirely. `Option<>` is that: the ordinal, without a vocabulary.
+  // AN INTERFACE VARIABLE HOLDS A POINTER TO THE ABSTRACT CLASS. AL writes `I.Method()` and C++
+  // writes `I->Method()`, which is the deviation board:0027 names: an interface variable IS a
+  // handle to something else, and 822 signatures cannot be forwarded by a wrapper.
+  if (type == "Interface") { return InterfaceType(declared, objects); }
   if (type == "Option") {
     return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
   }
@@ -91,14 +128,13 @@ TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &o
   // read by this same function, so an inner generic, an enum's subtype and a `Text[50]`'s length
   // all survive.
   if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
-    std::string out = type + "<";
-    for (std::size_t i = 0; i < declared.arguments.size(); ++i) {
-      if (i != 0) { out += ", "; }
-      out += TypeOf(declared.arguments[i], objects);
-    }
-    return out + ">";
+    return Generic(type, declared.arguments, objects);
   }
 
+  // A NAME THAT IS NEITHER AN AL TYPE NOR AN OBJECT THIS RUN READ IS ABSENT. AL writes the
+  // platform's own enums as bare type names -- `Verbosity: Verbosity` -- and emitting the word
+  // unchanged put it beside the door, where nothing declares it.
+  if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
   // A BARE `Text` IS UNBOUNDED, and it lands here as a length of zero -- which the string types
   // read as no limit rather than a limit of nothing. `Text[50]` carries its 50.
   if (type == "Code" || type == "Text") {
@@ -206,6 +242,15 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
   });
 }
 
+/// Adds the header an index holds for a name, when there is one.
+void Named(const TableIndex &index, const std::string &name, std::set<std::string> &headers) {
+  if (name.empty()) { return; }
+  const auto found = index.find(LowerKey(name));
+  if (found != index.end() && !found->second.header.empty()) {
+    headers.insert(found->second.header);
+  }
+}
+
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
@@ -225,8 +270,13 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
       headers.insert(found->second.header);
     }
   };
+  // AN INTERFACE NEEDS ITS HEADER TOO, and it is the third kind this walk has had to learn: a
+  // variable names it, the abstract class is somewhere else, and nothing else pulls it in.
   const auto both = [&](const al::VarDecl &declared) {
     reach(declared);
+    Named(objects.interfaces,
+          TypeName(declared.type) == "Interface" ? declared.subtype : "",
+          headers);
     if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
   };
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
@@ -282,11 +332,25 @@ void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, D
 // Language"` names a platform table no source root declares, so the generator emitted the bare
 // identifier and the file stopped. What the corpus asks of it is in the call sites, exactly as it
 // is for `DotNet` -- so it is gathered by the same walk and answered by the same shape.
-void NoteAbsent(const al::VarDecl &declared, const Objects &objects, DotNetNames &named) {
+// A TYPE THAT IS NAMED BUT NEVER ASKED ANYTHING STILL NEEDS TO EXIST. `Verbosity` appears as a
+// parameter type and nothing is ever called on it, so gathering only members would leave the
+// declaration pointing at nothing. The entry is created empty and filled if a member turns up.
+void NoteAbsent(const al::VarDecl &declared,
+                const Objects &objects,
+                DotNetNames &named,
+                DotNetUse &use) {
+  if (NamesAbsentType(declared)) {
+    const std::string bare = Identifier(declared.type);
+    named.insert_or_assign(LowerKey(declared.name), bare);
+    use.try_emplace(bare);
+    return;
+  }
   const std::string type = TypeName(declared.type);
   if (type != "Record" && type != "Codeunit") { return; }
   if (declared.subtype.empty() || Reach(declared, objects) != nullptr) { return; }
-  named.insert_or_assign(LowerKey(declared.name), Identifier(declared.subtype));
+  const std::string subtype = Identifier(declared.subtype);
+  named.insert_or_assign(LowerKey(declared.name), subtype);
+  use.try_emplace(subtype);
 }
 
 void GatherDotNet(const al::CodeunitObject &unit,
@@ -297,7 +361,7 @@ void GatherDotNet(const al::CodeunitObject &unit,
   DotNetNames missing;
   for (const al::VarDecl &declared : unit.variables) {
     NoteDotNet(declared, named);
-    NoteAbsent(declared, objects, missing);
+    NoteAbsent(declared, objects, missing, absent);
   }
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -305,11 +369,11 @@ void GatherDotNet(const al::CodeunitObject &unit,
     DotNetNames innerMissing = missing;
     for (const al::VarDecl &declared : procedure.parameters) {
       NoteDotNet(declared, inner);
-      NoteAbsent(declared, objects, innerMissing);
+      NoteAbsent(declared, objects, innerMissing, absent);
     }
     for (const al::VarDecl &declared : procedure.variables) {
       NoteDotNet(declared, inner);
-      NoteAbsent(declared, objects, innerMissing);
+      NoteAbsent(declared, objects, innerMissing, absent);
     }
     GatherCalls(procedure, inner, use);
     GatherCalls(procedure, innerMissing, absent);
@@ -439,6 +503,56 @@ TableIndex PlatformTables() {
   tables.insert_or_assign("field", TableRef{.identifier = "platform::Field", .header = {}});
   tables.insert_or_assign("2000000041", TableRef{.identifier = "platform::Field", .header = {}});
   return tables;
+}
+
+InterfaceHeader WriteInterface(const al::InterfaceObject &object,
+                               const std::string &sourcePath,
+                               const Objects &objects) {
+  const std::string identifier = Identifier(object.name);
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n#pragma once\n\n#include \"agiru.h\"\n";
+  // AN INTERFACE INCLUDES WHAT ITS SIGNATURES NAME, exactly as a codeunit includes what its
+  // declarations name -- a signature is a declaration and a `Verbosity` in one is an enum the file
+  // has to have seen.
+  std::set<std::string> headers;
+  const auto reach = [&](const al::VarDecl &declared) {
+    if (NamesAnObject(declared)) {
+      const TableRef *ref = Reach(declared, objects);
+      if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+    }
+    if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
+      const auto found = objects.enums.find(LowerKey(declared.subtype));
+      if (found != objects.enums.end() && !found->second.header.empty()) {
+        headers.insert(found->second.header);
+      }
+    }
+  };
+  for (const al::ProcedureDecl &procedure : object.procedures) {
+    for (const al::VarDecl &declared : procedure.parameters) { reach(declared); }
+    reach(procedure.returned);
+  }
+  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  out += "\nnamespace agiru::app::interfaces {\n\n";
+  out += "class " + identifier + " {\n";
+  out += "public:\n";
+  // A CLASS SOMEBODY DERIVES FROM NEEDS A VIRTUAL DESTRUCTOR, and an interface is only ever
+  // derived from.
+  out += "  virtual ~" + identifier + "() = default;\n\n";
+  for (const al::ProcedureDecl &procedure : object.procedures) {
+    out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
+           Parameters(procedure, objects, true, object.name) + ") = 0;\n";
+  }
+  out += "};\n\n} // namespace agiru::app::interfaces\n";
+  DotNetUse missing;
+  DotNetNames named;
+  for (const al::ProcedureDecl &procedure : object.procedures) {
+    for (const al::VarDecl &declared : procedure.parameters) {
+      NoteAbsent(declared, objects, named, missing);
+    }
+    NoteAbsent(procedure.returned, objects, named, missing);
+  }
+  return InterfaceHeader{.text = out, .absent = std::move(missing)};
 }
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,

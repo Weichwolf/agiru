@@ -18,4 +18,6 @@ CodeunitObject ParseCodeunit(std::string_view source);
 
 EnumObject ParseEnum(std::string_view source);
 
+InterfaceObject ParseInterface(std::string_view source);
+
 } // namespace agiru::al

@@ -120,26 +120,74 @@ std::string Literal(std::string_view text) {
 // per type and would let `enum "Item Type"` slip past the enum path entirely. The canonical
 // spelling is the one the platform documentation gives its data-type page -- `RecordId`, not
 // `RecordID`.
-std::string TypeName(std::string_view alType) {
-  static constexpr std::array kCanonical{
-      std::string_view{"BigInteger"},  std::string_view{"Blob"},
-      std::string_view{"Boolean"},     std::string_view{"Byte"},
-      std::string_view{"Code"},        std::string_view{"Date"},
-      std::string_view{"DateFormula"}, std::string_view{"DateTime"},
-      std::string_view{"Decimal"},     std::string_view{"Duration"},
-      std::string_view{"Enum"},        std::string_view{"Guid"},
-      std::string_view{"Integer"},     std::string_view{"Media"},
-      std::string_view{"MediaSet"},    std::string_view{"Option"},
-      std::string_view{"RecordId"},    std::string_view{"TableFilter"},
-      std::string_view{"Text"},        std::string_view{"Time"},
-  };
-  const auto *const found = std::ranges::find_if(kCanonical, [alType](std::string_view known) {
+namespace {
+
+// AL'S OWN TYPE NAMES, AND THE LIST IS THE DOOR'S. A name that is not here and not an object this
+// run read is a type nobody defines, so it goes to `absent::` -- which means every type the door
+// gains has to arrive here too. It fell behind once already: `ModuleInfo`, `Version`,
+// `Notification` and `Variant` were built, were not listed, and were sent to the absent as a
+// result.
+constexpr std::array kCanonicalTypes{
+    std::string_view{"BigInteger"},
+    std::string_view{"Blob"},
+    std::string_view{"Boolean"},
+    std::string_view{"Byte"},
+    std::string_view{"Char"},
+    std::string_view{"Code"},
+    std::string_view{"Codeunit"},
+    std::string_view{"Date"},
+    std::string_view{"DateFormula"},
+    std::string_view{"DateTime"},
+    std::string_view{"Decimal"},
+    std::string_view{"Dictionary"},
+    std::string_view{"DotNet"},
+    std::string_view{"Duration"},
+    std::string_view{"Enum"},
+    std::string_view{"FieldRef"},
+    std::string_view{"Guid"},
+    std::string_view{"InStream"},
+    std::string_view{"Integer"},
+    std::string_view{"Interface"},
+    std::string_view{"KeyRef"},
+    std::string_view{"List"},
+    std::string_view{"Media"},
+    std::string_view{"MediaSet"},
+    std::string_view{"ModuleDependencyInfo"},
+    std::string_view{"ModuleInfo"},
+    std::string_view{"Notification"},
+    std::string_view{"Option"},
+    std::string_view{"OutStream"},
+    std::string_view{"Record"},
+    std::string_view{"RecordId"},
+    std::string_view{"RecordRef"},
+    std::string_view{"SecretText"},
+    std::string_view{"TableFilter"},
+    std::string_view{"Text"},
+    std::string_view{"TextBuilder"},
+    std::string_view{"Time"},
+    std::string_view{"Variant"},
+    std::string_view{"Version"},
+};
+
+const std::string_view *CanonicalType(std::string_view alType) {
+  const auto *const found = std::ranges::find_if(kCanonicalTypes, [alType](std::string_view known) {
     return known.size() == alType.size() &&
            std::ranges::equal(known, alType, [](char a, char b) { return Lower(a) == Lower(b); });
   });
+  return found != kCanonicalTypes.end() ? found : nullptr;
+}
+
+} // namespace
+
+std::string TypeName(std::string_view alType) {
+  const std::string_view *const found = CanonicalType(alType);
   // An unknown type keeps its AL spelling, so that it fails at the `#include` under the name AL
   // gave it rather than under one this table invented.
-  return found != kCanonical.end() ? std::string(*found) : std::string(alType);
+  return found != nullptr ? std::string(*found) : std::string(alType);
+}
+
+bool IsAlTypeName(std::string_view alType) {
+  return CanonicalType(alType) != nullptr;
 }
 
 namespace {

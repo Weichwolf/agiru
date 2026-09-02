@@ -105,6 +105,17 @@ struct EnumObject {
   std::vector<EnumValueDecl> values;
 };
 
+/// AL `interface` -- procedure SIGNATURES and no bodies.
+///
+/// It is the one AL object kind that maps onto C++ without a deviation: an abstract class with
+/// pure virtual functions, and `codeunit X implements I` as inheritance (board:0027).
+struct InterfaceObject {
+  int id = 0;
+  std::string name;
+  std::string nameSpace;
+  std::vector<ProcedureDecl> procedures;
+};
+
 struct TableObject {
   int id = 0;
   std::string name;

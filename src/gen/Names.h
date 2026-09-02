@@ -18,6 +18,16 @@ std::string OptionEnumName(std::string_view tableName, std::string_view fieldNam
 
 std::string TypeName(std::string_view alType);
 
+/// \brief Whether a name is one of AL's own type names.
+///
+/// \param alType The name as AL wrote it.
+/// \return True when `TypeName` recognised it.
+///
+/// A name that is NEITHER an AL type NOR an object this run has read is a type nobody here defines:
+/// AL writes the platform's own enums as bare type names -- `Verbosity`, `DataClassification`,
+/// `TelemetryScope` -- and they belong with the absent rather than beside the door.
+bool IsAlTypeName(std::string_view alType);
+
 std::string Literal(std::string_view text);
 
 /// What an AL source file declares at its top level: the object's name and the namespace above it.

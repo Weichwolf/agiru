@@ -142,6 +142,76 @@ public:
   }
 
 private:
+public:
+  // AN INTERFACE'S PROCEDURE IS A SIGNATURE AND NOTHING ELSE -- no `begin`, no `var`, no body. It
+  // is the same header a codeunit's procedure has, which is why the two share this and only the
+  // BODY is read separately.
+  ProcedureDecl ParseSignature() {
+    ProcedureDecl procedure;
+    while (AtKeyword("local") || AtKeyword("internal") || AtKeyword("protected")) {
+      procedure.isLocal = procedure.isLocal || AtKeyword("local");
+      Advance();
+    }
+    procedure.isTrigger = AtKeyword("trigger");
+    if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("event")) { Advance(); }
+    procedure.name = ExpectName();
+    while (AtPunctuation("::")) {
+      Advance();
+      procedure.name = ExpectName();
+    }
+    Expect("(");
+    while (!AtPunctuation(")")) {
+      Parameter parameter;
+      if (AtKeyword("var")) {
+        parameter.byReference = true;
+        Advance();
+      }
+      std::string name = ExpectName();
+      Expect(":");
+      const bool byReference = parameter.byReference;
+      parameter = ReadType();
+      parameter.byReference = byReference;
+      parameter.name = std::move(name);
+      procedure.parameters.push_back(std::move(parameter));
+      if (AtPunctuation(";")) { Advance(); }
+    }
+    Expect(")");
+    if (!AtPunctuation(":") && !AtKeyword("var") && !AtKeyword("begin") && !AtPunctuation(";") &&
+        !AtKeyword("procedure") && !AtPunctuation("}")) {
+      procedure.returnName = ExpectName();
+    }
+    if (AtPunctuation(":")) {
+      Advance();
+      const VarDecl returned = ReadType();
+      procedure.returnType = returned.type;
+      procedure.returnSubtype = returned.subtype;
+      procedure.returned = returned;
+    }
+    if (AtPunctuation(";")) { Advance(); }
+    return procedure;
+  }
+
+  InterfaceObject ParseInterface() {
+    InterfaceObject object;
+    object.nameSpace = ReadHeaderNamespace("interface");
+    Expect("interface");
+    // AN INTERFACE MAY CARRY NO NUMBER. `interface "No. Series - Single"` is how BCApps writes
+    // them, and the id is optional where every other object kind requires one.
+    if (Peek().kind == TokenKind::Integer) { object.id = ExpectInteger(); }
+    object.name = ExpectName();
+    Expect("{");
+    while (!AtEnd() && !AtPunctuation("}")) {
+      if (AtKeyword("procedure")) {
+        object.procedures.push_back(ParseSignature());
+        continue;
+      }
+      Advance();
+    }
+    Expect("}");
+    return object;
+  }
+
+private:
   ProcedureDecl ParseProcedure(const std::vector<std::string> &attributes) {
     ProcedureDecl procedure;
     procedure.attributes = attributes;
@@ -683,6 +753,10 @@ CodeunitObject ParseCodeunit(std::string_view source) {
 
 EnumObject ParseEnum(std::string_view source) {
   return Parser(Tokenize(source)).ParseEnum();
+}
+
+InterfaceObject ParseInterface(std::string_view source) {
+  return Parser(Tokenize(source)).ParseInterface();
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

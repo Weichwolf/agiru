@@ -193,6 +193,45 @@ bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) 
 // `Enum "Item Type"` names an object declared in another file, so neither the type it translates to
 // nor the header that declares it is knowable from the table alone. The index is built over the
 // whole source before the first table is written.
+// AN INTERFACE IS READ BEFORE THE CODEUNITS THAT IMPLEMENT IT, for the reason the enums are: a
+// codeunit's variable of interface type resolves through this index, and an index filled after the
+// fact resolves nothing (board:0027).
+/// What a run gathers beside its objects: the members of every type it does not have.
+struct Gathered {
+  agiru::gen::DotNetUse dotnet; ///< Per .NET type, the members the corpus calls.
+  agiru::gen::DotNetUse absent; ///< Per AL object no source root declares, the same.
+};
+
+void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
+  for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
+}
+
+void ScanInterfaces(Run &run, Counts &counts, Gathered &gathered, agiru::gen::Objects &objects) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Interface.al")) {
+    ++counts.files;
+    try {
+      const agiru::al::InterfaceObject object = agiru::al::ParseInterface(Read(path));
+      ++counts.parsed;
+      counts.members += object.procedures.size();
+      const std::string identifier = agiru::gen::Identifier(object.name);
+      const std::string header =
+          agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) + "/" +
+          identifier + ".h";
+      objects.interfaces.insert_or_assign(
+          agiru::gen::LowerKey(object.name),
+          agiru::gen::TableRef{.identifier = "interfaces::" + identifier, .header = header});
+      if (run.output.empty()) { continue; }
+      const agiru::gen::InterfaceHeader written = agiru::gen::WriteInterface(
+          object, std::filesystem::relative(path, run.root).string(), objects);
+      Absorb(gathered.absent, written.absent);
+      Keep(run, Output{.directory = run.output, .relative = header}, written.text);
+      ++run.written;
+    } catch (const std::exception &e) {
+      if (Note(run, path, e)) { --counts.files; }
+    }
+  }
+}
+
 void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
@@ -326,16 +365,6 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h"});
   }
-}
-
-/// What a run gathers beside its objects: the members of every type it does not have.
-struct Gathered {
-  agiru::gen::DotNetUse dotnet; ///< Per .NET type, the members the corpus calls.
-  agiru::gen::DotNetUse absent; ///< Per AL object no source root declares, the same.
-};
-
-void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
-  for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
 }
 
 void ScanCodeunits(Run &run,
@@ -592,6 +621,7 @@ int Scan(const Job &job) {
             .changed = 0,
             .kept = {}};
     Counts enums;
+    Counts interfaces;
     Counts tables;
     Counts codeunits;
     ClaimApp(run.output);
@@ -601,6 +631,10 @@ int Scan(const Job &job) {
     // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
     ScanTables(run, tables, index, objects, unresolvedEnums);
+    // AFTER the tables and BEFORE the codeunits: an interface's SIGNATURE names records and enums,
+    // and a codeunit's variable names an interface. Read in any other order, one of the two
+    // resolves nothing.
+    ScanInterfaces(run, interfaces, gathered, objects);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
