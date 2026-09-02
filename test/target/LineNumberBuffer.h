@@ -10,7 +10,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace agiru::app {
+namespace agiru::app::tables {
 
 class LineNumberBuffer : public Table<LineNumberBuffer> {
 public:
@@ -59,8 +59,8 @@ static_assert(std::is_standard_layout_v<LineNumberBuffer>,
               "which is what keeps it so");
 static_assert(kLineNumberBufferFields.size() == 2, "table 283 declares 2 fields");
 
-} // namespace agiru::app
+} // namespace agiru::app::tables
 
-template <> struct agiru::TableTraits<agiru::app::LineNumberBuffer> {
-  static constexpr const TableDef &kTable = agiru::app::kLineNumberBufferTable;
+template <> struct agiru::TableTraits<agiru::app::tables::LineNumberBuffer> {
+  static constexpr const TableDef &kTable = agiru::app::tables::kLineNumberBufferTable;
 };

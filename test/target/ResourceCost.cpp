@@ -4,7 +4,7 @@
 
 #include "agiru.h"
 
-namespace agiru::app {
+namespace agiru::app::tables {
 
 void ResourceCost::OnValidateCode() {
   if (Code != "" && Type == ResourceCostType::All) {
@@ -16,4 +16,4 @@ void ResourceCost::OnValidateCostType() {
   if (WorkTypeCode == "") { TestField(CostType, ResourceCostCostType::Fixed); }
 }
 
-} // namespace agiru::app
+} // namespace agiru::app::tables

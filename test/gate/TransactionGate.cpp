@@ -12,8 +12,8 @@
 
 using agiru::Error;
 using agiru::Session;
-using agiru::app::ResourceCost;
-using agiru::app::ResourceCostType;
+using agiru::app::tables::ResourceCost;
+using agiru::app::tables::ResourceCostType;
 
 namespace {
 

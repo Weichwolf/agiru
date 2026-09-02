@@ -11,8 +11,8 @@
 
 using agiru::CodeunitId;
 using agiru::Error;
-using agiru::app::LineNumberBuffer;
-using agiru::app::TransferOldExtTextLines;
+using agiru::app::codeunits::TransferOldExtTextLines;
+using agiru::app::tables::LineNumberBuffer;
 
 namespace {
 

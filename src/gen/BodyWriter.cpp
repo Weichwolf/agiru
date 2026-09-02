@@ -430,7 +430,7 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += "#include \"agiru.h\"\n\n";
-  out += "namespace agiru::app {\n\n";
+  out += "namespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
@@ -438,7 +438,7 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
       out += "}\n\n";
     }
   }
-  out += "} // namespace agiru::app\n";
+  out += "} // namespace agiru::app::tables\n";
   return out;
 }
 

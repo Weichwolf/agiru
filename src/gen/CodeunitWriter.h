@@ -32,6 +32,11 @@ struct CodeunitHeader {
   /// anywhere -- a `dotnet` package names a type and no members -- so the only place it exists is
   /// the call sites (board:0035).
   DotNetUse dotnet;
+
+  /// The same, for AL OBJECTS this run does not have: a `Record "Windows Language"` whose table no
+  /// source root declares. One mechanism rather than two, because the question is the same -- what
+  /// does the corpus ask of a type nobody here defines.
+  DotNetUse absent;
 };
 
 /// EVERY OBJECT KIND GETS ITS OWN INDEX, because AL lets a table and a codeunit carry one name and

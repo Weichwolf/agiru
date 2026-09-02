@@ -46,8 +46,11 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 // `Type::All` is written in.
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
-  const std::string named = ref != nullptr ? ref->identifier : Identifier(declared.subtype);
-  return declared.temporary ? "Temporary<" + named + ">" : named;
+  // AN OBJECT THIS RUN DOES NOT HAVE IS NAMED AS ABSENT. It used to be emitted as a bare
+  // identifier, which named nothing; and putting the stub beside the real objects shadowed the AL
+  // TYPES, because the virtual table `Integer` and the AL type `Integer` are one word.
+  if (ref == nullptr) { return "absent::" + Identifier(declared.subtype); }
+  return declared.temporary ? "Temporary<" + ref->identifier + ">" : ref->identifier;
 }
 
 std::string
@@ -154,12 +157,12 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
     if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
     const std::string name = OptionName(unit.name, within, declared.name);
     const std::vector<std::string> names = EnumeratorNames(declared.members);
-    out += "namespace agiru::app {\n\nenum class " + name + " : std::int32_t {\n";
+    out += "namespace agiru::app::codeunits {\n\nenum class " + name + " : std::int32_t {\n";
     for (std::size_t i = 0; i < names.size(); ++i) {
       out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
     }
-    out += "};\n\n} // namespace agiru::app\n\n";
-    out += "template <> struct agiru::OptionTraits<agiru::app::" + name + "> {\n";
+    out += "};\n\n} // namespace agiru::app::codeunits\n\n";
+    out += "template <> struct agiru::OptionTraits<agiru::app::codeunits::" + name + "> {\n";
     out += "  static constexpr std::array<EnumValueDef, " +
            std::to_string(declared.members.size()) + "> kValues{{\n";
     for (std::size_t i = 0; i < declared.members.size(); ++i) {
@@ -189,14 +192,17 @@ Declaration(const al::ProcedureDecl &procedure, const Objects &objects, const st
          Parameters(procedure, objects, true, unit) + ");\n";
 }
 
-bool NamesDotNet(const al::CodeunitObject &unit) {
-  const auto dotnet = [](const al::VarDecl &declared) {
-    return TypeName(declared.type) == "DotNet";
+bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
+  const auto absent = [&objects](const al::VarDecl &declared) {
+    const std::string type = TypeName(declared.type);
+    if (type == "DotNet") { return true; }
+    return (type == "Record" || type == "Codeunit") && !declared.subtype.empty() &&
+           Reach(declared, objects) == nullptr;
   };
-  if (std::ranges::any_of(unit.variables, dotnet)) { return true; }
-  return std::ranges::any_of(unit.procedures, [&dotnet](const al::ProcedureDecl &procedure) {
-    return std::ranges::any_of(procedure.parameters, dotnet) ||
-           std::ranges::any_of(procedure.variables, dotnet);
+  if (std::ranges::any_of(unit.variables, absent)) { return true; }
+  return std::ranges::any_of(unit.procedures, [&absent](const al::ProcedureDecl &procedure) {
+    return std::ranges::any_of(procedure.parameters, absent) ||
+           std::ranges::any_of(procedure.variables, absent);
   });
 }
 
@@ -235,7 +241,10 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   // them, because the stubs reference nothing but `Refused` and splitting them would be 499 headers
   // for no reader's benefit.
   std::string out = "#include \"agiru.h\"\n";
-  if (NamesDotNet(unit)) { out += "#include \"dotnet/Types.h\"\n"; }
+  // ONLY WHERE SOMETHING IS ACTUALLY ABSENT. An unconditional include would make every generated
+  // codeunit depend on a file that exists because something is MISSING, which is the wrong way
+  // round -- and it would make the hand-written target image depend on a transpiler run.
+  if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   out += "\n";
   return out;
@@ -269,15 +278,41 @@ void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, D
   }
 }
 
-void GatherDotNet(const al::CodeunitObject &unit, DotNetUse &use) {
+// AN AL OBJECT THIS RUN DOES NOT HAVE IS THE SAME QUESTION AS A .NET TYPE. `Record "Windows
+// Language"` names a platform table no source root declares, so the generator emitted the bare
+// identifier and the file stopped. What the corpus asks of it is in the call sites, exactly as it
+// is for `DotNet` -- so it is gathered by the same walk and answered by the same shape.
+void NoteAbsent(const al::VarDecl &declared, const Objects &objects, DotNetNames &named) {
+  const std::string type = TypeName(declared.type);
+  if (type != "Record" && type != "Codeunit") { return; }
+  if (declared.subtype.empty() || Reach(declared, objects) != nullptr) { return; }
+  named.insert_or_assign(LowerKey(declared.name), Identifier(declared.subtype));
+}
+
+void GatherDotNet(const al::CodeunitObject &unit,
+                  const Objects &objects,
+                  DotNetUse &use,
+                  DotNetUse &absent) {
   DotNetNames named;
-  for (const al::VarDecl &declared : unit.variables) { NoteDotNet(declared, named); }
+  DotNetNames missing;
+  for (const al::VarDecl &declared : unit.variables) {
+    NoteDotNet(declared, named);
+    NoteAbsent(declared, objects, missing);
+  }
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     DotNetNames inner = named;
-    for (const al::VarDecl &declared : procedure.parameters) { NoteDotNet(declared, inner); }
-    for (const al::VarDecl &declared : procedure.variables) { NoteDotNet(declared, inner); }
+    DotNetNames innerMissing = missing;
+    for (const al::VarDecl &declared : procedure.parameters) {
+      NoteDotNet(declared, inner);
+      NoteAbsent(declared, objects, innerMissing);
+    }
+    for (const al::VarDecl &declared : procedure.variables) {
+      NoteDotNet(declared, inner);
+      NoteAbsent(declared, objects, innerMissing);
+    }
     GatherCalls(procedure, inner, use);
+    GatherCalls(procedure, innerMissing, absent);
   }
 }
 
@@ -368,7 +403,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += "#include \"agiru.h\"\n\n";
-  out += "namespace agiru::app {\n\n";
+  out += "namespace agiru::app::codeunits {\n\n";
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     // AN EVENT PUBLISHER'S BODY IS EMPTY BY DESIGN -- the platform fires subscribers at the CALL
@@ -391,7 +426,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "}\n\n";
   }
 
-  out += "} // namespace agiru::app\n";
+  out += "} // namespace agiru::app::codeunits\n";
   return out;
 }
 
@@ -419,7 +454,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
   out += InlineOptions(unit);
 
-  out += "namespace agiru::app {\n\n";
+  out += "namespace agiru::app::codeunits {\n\n";
   out += "class " + identifier + " : public Codeunit<" + identifier + "> {\npublic:\n";
 
   // PUBLIC BEFORE PRIVATE, AND `local` IS WHAT DECIDES IT. AL's `local procedure` is exactly C++'s
@@ -461,16 +496,19 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += locals;
   }
   out += "};\n\n";
-  out += "} // namespace agiru::app\n\n";
+  out += "} // namespace agiru::app::codeunits\n\n";
 
-  out += "template <> struct agiru::CodeunitTraits<agiru::app::" + identifier + "> {\n";
+  out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "};\n";
   DotNetUse dotnet;
-  GatherDotNet(unit, dotnet);
-  return CodeunitHeader{
-      .text = out, .unresolvedTables = Unresolved(unit, objects), .dotnet = std::move(dotnet)};
+  DotNetUse absent;
+  GatherDotNet(unit, objects, dotnet, absent);
+  return CodeunitHeader{.text = out,
+                        .unresolvedTables = Unresolved(unit, objects),
+                        .dotnet = std::move(dotnet),
+                        .absent = std::move(absent)};
 }
 
 } // namespace agiru::gen

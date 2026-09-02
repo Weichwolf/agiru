@@ -258,7 +258,11 @@ void ScanTables(Run &run,
       counts.members += table.fields.size();
       // BY NAME AND BY NUMBER BOTH, because AL names an object either way and test code uses the
       // number freely: `var GLEntry: Record 17`.
-      const agiru::gen::TableRef ref{.identifier = agiru::gen::Identifier(table.name),
+      // THE KIND IS PART OF THE NAME. 51 objects in the read roots are a table AND a codeunit at
+      // once -- `Language`, `Default Dimension`, `Currency` -- because AL tells them apart by the
+      // keyword and C++ has no keyword to tell them apart by. `enums::` already did this; the other
+      // two kinds follow it rather than inventing a second answer.
+      const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
@@ -318,15 +322,25 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
     objects.codeunits.insert_or_assign(
         agiru::gen::LowerKey(name),
         agiru::gen::TableRef{
-            .identifier = identifier,
+            .identifier = "codeunits::" + identifier,
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h"});
   }
 }
 
+/// What a run gathers beside its objects: the members of every type it does not have.
+struct Gathered {
+  agiru::gen::DotNetUse dotnet; ///< Per .NET type, the members the corpus calls.
+  agiru::gen::DotNetUse absent; ///< Per AL object no source root declares, the same.
+};
+
+void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
+  for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
+}
+
 void ScanCodeunits(Run &run,
                    Counts &counts,
-                   agiru::gen::DotNetUse &dotnet,
+                   Gathered &gathered,
                    agiru::gen::Objects &objects,
                    std::map<std::string, std::size_t> &unresolvedTables) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
@@ -365,9 +379,8 @@ void ScanCodeunits(Run &run,
       const std::string relative = std::filesystem::relative(path, run.root).string();
       const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, objects);
       for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
-      for (const auto &[type, members] : header.dotnet) {
-        dotnet[type].insert(members.begin(), members.end());
-      }
+      Absorb(gathered.dotnet, header.dotnet);
+      Absorb(gathered.absent, header.absent);
       const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
       const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
       Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
@@ -404,36 +417,63 @@ const std::set<std::string> &Rebuilt() {
 // ONE FILE FOR EVERY .NET TYPE THE CORPUS NAMES, and its members are exactly the ones the corpus
 // asks for. .NET's own API is thousands of members that nobody here needs; this is the set that is
 // actually reached, which makes it a worklist with a denominator rather than a port.
-void WriteDotNet(const std::filesystem::path &out, const agiru::gen::DotNetUse &dotnet) {
-  if (out.empty()) { return; }
-  std::string text = "// Generated from every AL body that names a DotNet variable. Do not edit.\n";
-  text += "\n#pragma once\n\n#include \"agiru.h\"\n\nnamespace agiru::dotnet {\n";
+struct Counted {
   std::size_t types = 0;
   std::size_t members = 0;
-  for (const auto &[type, named] : dotnet) {
-    if (Rebuilt().contains(type)) { continue; }
-    ++types;
-    text += "\nstruct " + type + " {\n";
+};
+
+Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebuilt) {
+  Counted counted;
+  for (const auto &[type, named] : use) {
+    if (skipRebuilt && Rebuilt().contains(type)) { continue; }
+    ++counted.types;
+    text += "\nstruct ";
+    text += type;
+    text += " {\n";
     for (const std::string &member : named) {
-      ++members;
-      text += "  Refused ";
+      ++counted.members;
+      text += "  ::agiru::dotnet::Refused ";
       text += member;
-      text += "{\"";
+      text += "{{.type = \"";
       text += type;
-      text += "\", \"";
+      text += "\", .member = \"";
       text += member;
-      text += "\"};\n";
+      text += "\"}};\n";
     }
     text += "};\n";
   }
-  text += "\n} // namespace agiru::dotnet\n";
+  return counted;
+}
 
-  const std::filesystem::path path = out / "dotnet" / "dotnet" / "Types.h";
+// ONE FILE FOR EVERY TYPE THE CORPUS NAMES AND THIS RUN DOES NOT HAVE, and its members are exactly
+// the ones the corpus asks for. .NET's own API is thousands of members nobody here needs, and a
+// platform table's field list is the platform's; this is the set actually reached, which makes it a
+// worklist with a denominator rather than a port (board:0035).
+void WriteAbsent(const std::filesystem::path &out,
+                 const agiru::gen::DotNetUse &dotnet,
+                 const agiru::gen::DotNetUse &absent) {
+  if (out.empty()) { return; }
+  std::string text = "// Generated from every AL body that names a type this run does not have.\n";
+  text += "// Do not edit.\n\n#pragma once\n\n#include \"agiru.h\"\n";
+  text += "\nnamespace agiru::dotnet {\n";
+  const Counted net = Stubs(text, dotnet, true);
+  // A NAMESPACE OF THEIR OWN, because an absent AL object may carry a name the AL TYPE system
+  // already uses: the virtual table `Integer` is one, and declaring `agiru::app::Integer` shadowed
+  // `agiru::Integer` for every generated table that has an Integer field. `absent::` also says at
+  // the use site what the type is -- something this run does not have.
+  text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::app::absent {\n";
+  const Counted objects = Stubs(text, absent, false);
+  text += "\n} // namespace agiru::app::absent\n";
+
+  const std::filesystem::path path = out / "absent" / "absent" / "Types.h";
   std::filesystem::create_directories(path.parent_path());
   std::ofstream file(path, std::ios::binary);
   file << text;
-  std::println(
-      "dotnet    {} type(s) with {} member(s), from the call sites that name them", types, members);
+  std::println("absent    {} .NET type(s) with {} member(s), {} AL object(s) with {}",
+               net.types,
+               net.members,
+               objects.types,
+               objects.members);
 }
 
 void ReportUnresolved(std::string_view what,
@@ -516,7 +556,7 @@ int Scan(const Job &job) {
 
   std::map<std::string, std::size_t> unresolvedEnums;
   std::map<std::string, std::size_t> unresolvedTables;
-  agiru::gen::DotNetUse dotnet;
+  Gathered gathered;
   agiru::gen::EnumIndex index;
   agiru::gen::Objects objects;
   Counts allEnums;
@@ -561,7 +601,7 @@ int Scan(const Job &job) {
     // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
     ScanTables(run, tables, index, objects, unresolvedEnums);
-    ScanCodeunits(run, codeunits, dotnet, objects, unresolvedTables);
+    ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
@@ -598,7 +638,7 @@ int Scan(const Job &job) {
                  allCodeunits.parsed);
   }
   ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
-  WriteDotNet(job.output, dotnet);
+  WriteAbsent(job.output, gathered.dotnet, gathered.absent);
   ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
   Cluster(failures);
   if (!refusals.empty()) {

@@ -10,7 +10,7 @@
 #include <string_view>
 #include <type_traits>
 
-namespace agiru::app {
+namespace agiru::app::tables {
 
 enum class ResourceCostType : std::int32_t {
   Resource = 0,
@@ -24,9 +24,9 @@ enum class ResourceCostCostType : std::int32_t {
   LCYExtra = 2,
 };
 
-} // namespace agiru::app
+} // namespace agiru::app::tables
 
-template <> struct agiru::OptionTraits<agiru::app::ResourceCostType> {
+template <> struct agiru::OptionTraits<agiru::app::tables::ResourceCostType> {
   static constexpr std::array<EnumValueDef, 3> kValues{{
       EnumValueDef{.ordinal = 0, .name = "Resource", .caption = "Resource"},
       EnumValueDef{.ordinal = 1, .name = "Group(Resource)", .caption = "Group(Resource)"},
@@ -34,7 +34,7 @@ template <> struct agiru::OptionTraits<agiru::app::ResourceCostType> {
   }};
 };
 
-template <> struct agiru::OptionTraits<agiru::app::ResourceCostCostType> {
+template <> struct agiru::OptionTraits<agiru::app::tables::ResourceCostCostType> {
   static constexpr std::array<EnumValueDef, 3> kValues{{
       EnumValueDef{.ordinal = 0, .name = "Fixed", .caption = "Fixed"},
       EnumValueDef{.ordinal = 1, .name = "% Extra", .caption = "% Extra"},
@@ -42,7 +42,7 @@ template <> struct agiru::OptionTraits<agiru::app::ResourceCostCostType> {
   }};
 };
 
-namespace agiru::app {
+namespace agiru::app::tables {
 
 class ResourceCost : public Table<ResourceCost> {
 public:
@@ -126,8 +126,8 @@ static_assert(std::is_standard_layout_v<ResourceCost>,
 static_assert(kResourceCostFields.size() == 6 + kSystemFieldCount,
               "table 202 declares 6 fields, and the platform adds its own");
 
-} // namespace agiru::app
+} // namespace agiru::app::tables
 
-template <> struct agiru::TableTraits<agiru::app::ResourceCost> {
-  static constexpr const TableDef &kTable = agiru::app::kResourceCostTable;
+template <> struct agiru::TableTraits<agiru::app::tables::ResourceCost> {
+  static constexpr const TableDef &kTable = agiru::app::tables::kResourceCostTable;
 };

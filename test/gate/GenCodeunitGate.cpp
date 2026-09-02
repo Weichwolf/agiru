@@ -1,5 +1,6 @@
 #include "Check.h"
 #include "CodeunitWriter.h"
+#include "EnumWriter.h"
 #include "Format.h"
 #include "Parser.h"
 
@@ -39,7 +40,10 @@ agiru::gen::Objects Tables() {
   agiru::gen::Objects objects;
   objects.tables.insert_or_assign(
       "line number buffer",
-      agiru::gen::TableRef{.identifier = "LineNumberBuffer", .header = "LineNumberBuffer.h"});
+      // THE KIND IS PART OF THE NAME, as it is in the transpiler's own index: 51 objects in the
+      // read roots are a table AND a codeunit at once, and `enums::` already told them apart.
+      agiru::gen::TableRef{.identifier = "tables::LineNumberBuffer",
+                           .header = "LineNumberBuffer.h"});
   objects.enums.insert_or_assign(
       "sales line type",
       agiru::gen::EnumRef{.identifier = "SalesLineType", .header = "SalesLineType.h"});
@@ -239,15 +243,19 @@ void AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives() {
   CHECK_TRUE("a door type is qualified into agiru",
              generated.find("agiru::RecordRef &RecordRef") != std::string::npos);
   CHECK_TRUE("and so is a value type", generated.find("agiru::Date Date") != std::string::npos);
-  CHECK_TRUE("an AL object is qualified into agiru::app",
-             generated.find("agiru::app::LineNumberBuffer &LineNumberBuffer") != std::string::npos);
+  // AN AL OBJECT NEEDS NO QUALIFICATION ANY MORE, because its KIND carries it: a parameter named
+  // `LineNumberBuffer` cannot shadow `tables::LineNumberBuffer`, which is a qualified name. The
+  // kind namespace solved the collision the qualification was invented for, and it solved the
+  // table-against-codeunit collision with it.
+  CHECK_TRUE("an AL object is reached through its kind",
+             generated.find("tables::LineNumberBuffer &LineNumberBuffer") != std::string::npos);
 
   // THE NEGATIVE CONTROL, and it is the whole point: a rule that sent everything to one namespace
   // would pass one of the three lines above and fail the tree. Neither wrong form may appear.
   CHECK_TRUE("a door type never lands in agiru::app",
              generated.find("agiru::app::RecordRef") == std::string::npos);
   CHECK_TRUE("and an AL object never lands beside the door",
-             generated.find("agiru::LineNumberBuffer") == std::string::npos);
+             generated.find("agiru::tables::LineNumberBuffer") == std::string::npos);
 }
 
 /// A CODEUNIT INCLUDES WHAT IT NAMES, AND IT NAMED THREE KINDS WITHOUT ASKING FOR TWO OF THEM.

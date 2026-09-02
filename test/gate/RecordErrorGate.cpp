@@ -9,9 +9,9 @@
 
 using agiru::Error;
 using agiru::StrSubstNo;
-using agiru::app::ResourceCost;
-using agiru::app::ResourceCostCostType;
-using agiru::app::ResourceCostType;
+using agiru::app::tables::ResourceCost;
+using agiru::app::tables::ResourceCostCostType;
+using agiru::app::tables::ResourceCostType;
 
 namespace {
 

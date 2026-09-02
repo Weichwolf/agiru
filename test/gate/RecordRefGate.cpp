@@ -22,8 +22,8 @@
 using agiru::Error;
 using agiru::FieldRef;
 using agiru::RecordRef;
-using agiru::app::ResourceCost;
-using agiru::app::ResourceCostType;
+using agiru::app::tables::ResourceCost;
+using agiru::app::tables::ResourceCostType;
 
 namespace {
 

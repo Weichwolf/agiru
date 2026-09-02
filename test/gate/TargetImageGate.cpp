@@ -12,9 +12,9 @@
 using agiru::Field;
 using agiru::FieldNo;
 using agiru::ValueOf;
-using agiru::app::ResourceCost;
-using agiru::app::ResourceCostCostType;
-using agiru::app::ResourceCostType;
+using agiru::app::tables::ResourceCost;
+using agiru::app::tables::ResourceCostCostType;
+using agiru::app::tables::ResourceCostType;
 
 namespace {
 

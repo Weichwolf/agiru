@@ -4,7 +4,7 @@
 
 #include "agiru.h"
 
-namespace agiru::app {
+namespace agiru::app::codeunits {
 
 void TransferOldExtTextLines::OnRun() {}
 
@@ -38,11 +38,11 @@ Integer TransferOldExtTextLines::TransferExtendedText(Integer OldLineNo,
 }
 
 void TransferOldExtTextLines::GetLineNoBuffer(
-    Temporary<LineNumberBuffer> &OutTempLineNumberBuffer) {
+    Temporary<tables::LineNumberBuffer> &OutTempLineNumberBuffer) {
   OutTempLineNumberBuffer.Copy(TempLineNumberBuffer, true);
 }
 
 void TransferOldExtTextLines::OnBeforeTransferExtendedText(
     Integer, Integer, Integer, Integer &, Boolean &) {}
 
-} // namespace agiru::app
+} // namespace agiru::app::codeunits

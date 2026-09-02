@@ -10,7 +10,7 @@
 
 using agiru::Error;
 using agiru::Temporary;
-using agiru::app::LineNumberBuffer;
+using agiru::app::tables::LineNumberBuffer;
 
 namespace {
 

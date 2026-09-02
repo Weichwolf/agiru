@@ -146,7 +146,7 @@ std::vector<const al::FieldDecl *> ByNumber(const al::TableObject &table) {
 }
 
 void WriteOptionTraits(std::string &out, const OptionField &option) {
-  out += "template <> struct agiru::OptionTraits<agiru::app::" + option.enumName + "> {\n";
+  out += "template <> struct agiru::OptionTraits<agiru::app::tables::" + option.enumName + "> {\n";
   out += "  static constexpr std::array<EnumValueDef, " + std::to_string(option.members.size()) +
          "> kValues{{\n";
   for (std::size_t i = 0; i < option.members.size(); ++i) {
@@ -270,7 +270,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
   out += "#include <string_view>\n#include <type_traits>\n\n";
 
-  out += "namespace agiru::app {\n\n";
+  out += "namespace agiru::app::tables {\n\n";
   for (const OptionField &option : options) {
     const std::vector<std::string> names = EnumeratorNames(option.members);
     out += "enum class " + option.enumName + " : std::int32_t {\n";
@@ -279,14 +279,14 @@ TableHeader WriteHeader(const al::TableObject &declared,
     }
     out += "};\n\n";
   }
-  out += "} // namespace agiru::app\n\n";
+  out += "} // namespace agiru::app::tables\n\n";
 
   for (const OptionField &option : options) {
     WriteOptionTraits(out, option);
     out += "\n";
   }
 
-  out += "namespace agiru::app {\n\n";
+  out += "namespace agiru::app::tables {\n\n";
   out += "class " + tableIdentifier + " : public Table<" + tableIdentifier + "> {\npublic:\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";
@@ -379,10 +379,11 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += " declares ";
   out += std::to_string(sorted.size() - kSystemFieldCount);
   out += " fields, and the platform adds its own\");\n\n";
-  out += "} // namespace agiru::app\n\n";
+  out += "} // namespace agiru::app::tables\n\n";
 
-  out += "template <> struct agiru::TableTraits<agiru::app::" + tableIdentifier + "> {\n";
-  out += "  static constexpr const TableDef &kTable = agiru::app::k" + tableIdentifier + "Table;\n";
+  out += "template <> struct agiru::TableTraits<agiru::app::tables::" + tableIdentifier + "> {\n";
+  out += "  static constexpr const TableDef &kTable = agiru::app::tables::k" + tableIdentifier +
+         "Table;\n";
   out += "};\n";
   return TableHeader{.text = out, .unresolvedEnums = Unresolved(table, enums)};
 }
