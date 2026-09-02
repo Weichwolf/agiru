@@ -94,10 +94,21 @@ OptionName(const std::string &unit, const std::string &within, const std::string
   return Identifier(unit) + Identifier(within) + Identifier(name);
 }
 
+// THE NAMESPACE IS DECIDED BY WHAT THE TYPE IS, and getting it wrong cost more than anything else
+// in this tree: `agiru::app::RecordRef` was the FIRST diagnostic of 1 375 of 3 123 failing headers,
+// measured 2026-09-02, because `LibraryAssert` writes `RecordRef: RecordRef` and one bad
+// qualification in it stops every header that includes it. An AL object -- a Record or a Codeunit
+// -- becomes a class in `agiru::app`; every other AL type is a DOOR type and lives in `agiru`.
+std::string Qualified(const al::VarDecl &declared, const std::string &type) {
+  const std::string alType = TypeName(declared.type);
+  const bool object = alType == "Record" || alType == "Codeunit";
+  return (object ? "agiru::app::" : "agiru::") + type;
+}
+
 std::string
 Signature(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
-  if (type == Identifier(declared.name)) { type = "agiru::app::" + type; }
+  if (type == Identifier(declared.name)) { type = Qualified(declared, type); }
   return type + (declared.byReference ? " &" : " ");
 }
 

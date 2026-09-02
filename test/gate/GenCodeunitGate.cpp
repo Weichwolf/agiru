@@ -215,6 +215,38 @@ void AnInlineOptionGetsAnEnumerationOfItsOwn() {
              generated.find("SomeThingCheckKind") != generated.find("SomeThingCheckStep"));
 }
 
+/// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide
+/// the type, so the declaration has to qualify it -- and WHICH namespace it qualifies with is
+/// decided by what the type IS. An AL object becomes a class in `agiru::app`; every other AL type
+/// is a door type in `agiru`.
+///
+/// This rule had no case, and that is why one wrong qualification could stand: `LibraryAssert`
+/// writes `RecordRef: RecordRef`, the generator wrote `agiru::app::RecordRef`, and that single line
+/// was the FIRST diagnostic of 1 375 of 3 123 failing headers -- 44 % of the tree stopped on a file
+/// nothing in the gate looked at.
+void AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives() {
+  const std::string source = R"(codeunit 50000 "Some Thing"
+{
+    procedure Check(var RecordRef: RecordRef; var LineNumberBuffer: Record "Line Number Buffer"; Date: Date)
+    begin
+    end;
+})";
+  const std::string generated = Generated(source);
+
+  CHECK_TRUE("a door type is qualified into agiru",
+             generated.find("agiru::RecordRef &RecordRef") != std::string::npos);
+  CHECK_TRUE("and so is a value type", generated.find("agiru::Date Date") != std::string::npos);
+  CHECK_TRUE("an AL object is qualified into agiru::app",
+             generated.find("agiru::app::LineNumberBuffer &LineNumberBuffer") != std::string::npos);
+
+  // THE NEGATIVE CONTROL, and it is the whole point: a rule that sent everything to one namespace
+  // would pass one of the three lines above and fail the tree. Neither wrong form may appear.
+  CHECK_TRUE("a door type never lands in agiru::app",
+             generated.find("agiru::app::RecordRef") == std::string::npos);
+  CHECK_TRUE("and an AL object never lands beside the door",
+             generated.find("agiru::LineNumberBuffer") == std::string::npos);
+}
+
 } // namespace
 
 int main() {
@@ -224,5 +256,6 @@ int main() {
     AChangedSourceChangesTheOutput();
     ATableTheRunNeverSawIsReported();
     AnInlineOptionGetsAnEnumerationOfItsOwn();
+    AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
   });
 }
