@@ -20,4 +20,9 @@ EnumObject ParseEnum(std::string_view source);
 
 InterfaceObject ParseInterface(std::string_view source);
 
+/// \brief Parses one AL `page` object.
+/// \param source The whole `.al` file.
+/// \return The page.
+PageObject ParsePage(std::string_view source);
+
 } // namespace agiru::al

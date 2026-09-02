@@ -107,7 +107,16 @@ FieldError(const void *record, const TableDef &table, FieldNo no, std::string_vi
 ///          where it was verified against the official BC test suite, and it matters because BC
 ///          test code matches the message text.
 /// \see `record-testfield-joker-method.md`
+/// \note IT LIVES IN `detail` BECAUSE `TestField` IS ALSO AN AL TYPE. The test framework's
+///       `TestField` is one control of a page, and a class and a function of the same name in one
+///       namespace make every use of the class ambiguous. The door keeps the TYPE, because that is
+///       what AL code writes; this is the platform half behind `Record::TestField`, which no
+///       generated file ever names.
+namespace detail {
+
 void TestField(const void *record, const TableDef &table, FieldNo no);
+
+} // namespace detail
 
 /// \brief Internals of the record operations. Not part of the door.
 namespace detail {
@@ -176,8 +185,9 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
 /// \param expected The value it must hold.
 /// \throws Error when the values differ, or when the table declares no such field.
 /// \see `record-testfield-joker-joker-method.md`, detail::RaiseTestFieldMismatch
+/// \note Named apart from the AL type `TestField`, for the reason the blank form gives above.
 template <typename T>
-void TestField(const void *record, const TableDef &table, FieldNo no, const T &expected) {
+void TestFieldValue(const void *record, const TableDef &table, FieldNo no, const T &expected) {
   const FieldDef *def = Field(table, no);
   if (def == nullptr) { throw Error("TestField: the table declares no such field"); }
   const auto *actual =

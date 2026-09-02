@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/NotificationScope.h"
+
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
 #include "type/Guid.h"
@@ -15,14 +17,6 @@
 
 namespace agiru {
 
-/// \brief AL `NotificationScope` -- where a notification appears.
-///
-/// `notificationscope-option.md` gives two members and says of the first: "GlobalScope is currently
-/// not supported, so do not use this value", and of the second: "This is the default value".
-enum class NotificationScope : std::int32_t {
-  GlobalScope = 0, ///< Not related to the current task. The page says not to use it.
-  LocalScope = 1,  ///< In context of the current task. The default.
-};
 
 /// \brief AL `Notification`.
 ///

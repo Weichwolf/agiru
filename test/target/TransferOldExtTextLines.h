@@ -7,7 +7,8 @@
 #include "LineNumberBuffer.h"
 
 namespace agiru::app::tables {
-class LineNumberBuffer;
+class LineNumberBuffer_Table;
+using LineNumberBuffer = LineNumberBuffer_Table;
 } // namespace agiru::app::tables
 
 #include <array>
@@ -16,7 +17,7 @@ class LineNumberBuffer;
 
 namespace agiru::app::codeunits {
 
-class TransferOldExtTextLines : public Codeunit<TransferOldExtTextLines> {
+class TransferOldExtTextLines_Codeunit : public Codeunit<TransferOldExtTextLines_Codeunit> {
 public:
   void OnRun();
 
@@ -35,6 +36,8 @@ private:
                                     Integer &Result,
                                     Boolean &IsHandled);
 };
+
+using TransferOldExtTextLines = TransferOldExtTextLines_Codeunit;
 
 } // namespace agiru::app::codeunits
 

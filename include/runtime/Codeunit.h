@@ -32,6 +32,87 @@ namespace agiru {
 /// a table's field and key tables do.
 template <typename T> struct CodeunitTraits;
 
+/// \brief One codeunit held by another, created the first time it is used.
+///
+/// \tparam T The generated codeunit class, which may be INCOMPLETE here.
+///
+/// \note IT IS LAZY BECAUSE AL IS. `Background Error Handling Mgt.` holds an
+///       `Item Journal Errors Mgt.` and that codeunit holds the first one back -- ordinary AL, and
+///       an eager pairing that would not terminate. So a codeunit variable is not a value that
+///       exists when its holder does; it is an instance the platform makes on demand, and this is
+///       that (board:0037).
+///
+/// \note THE FREEING FUNCTION IS CAPTURED WHERE THE INSTANCE IS MADE, which is what lets the
+///       destructor work on an incomplete type. `delete` needs the definition; a function pointer
+///       taken in `operator->` -- instantiated only where `T` is complete -- does not. That is the
+///       whole reason a generated header can forward declare what it holds and the include cycle
+///       disappears with the containment cycle.
+///
+/// \warning IT IS NOT COPYABLE. Two codeunit variables in AL are two instances, and a copy that
+///          shared one pointer would free it twice.
+template <typename T> class Instance {
+public:
+  /// \brief An instance that has not been made yet.
+  Instance() = default;
+
+  Instance(const Instance &) = delete;
+  Instance &operator=(const Instance &) = delete;
+
+  /// \brief Takes over another's instance.
+  /// \param other The one to take from.
+  Instance(Instance &&other) noexcept : held_(other.held_), free_(other.free_) {
+    other.held_ = nullptr;
+    other.free_ = nullptr;
+  }
+
+  /// \brief Takes over another's instance.
+  /// \param other The one to take from.
+  /// \return This one.
+  Instance &operator=(Instance &&other) noexcept {
+    if (this != &other) {
+      Release();
+      held_ = other.held_;
+      free_ = other.free_;
+      other.held_ = nullptr;
+      other.free_ = nullptr;
+    }
+    return *this;
+  }
+
+  /// \brief Frees the instance, if one was ever made.
+  ~Instance() { Release(); }
+
+  /// \brief The instance, made on the first call.
+  /// \return A pointer to it.
+  T *operator->() { return Made(); }
+
+  /// \brief The instance, made on the first call.
+  /// \return A pointer to it.
+  const T *operator->() const { return const_cast<Instance *>(this)->Made(); }
+
+  /// \brief The instance, made on the first call.
+  /// \return A reference to it.
+  T &operator*() { return *Made(); }
+
+private:
+  T *Made() {
+    if (held_ == nullptr) {
+      held_ = new T();
+      free_ = [](void *held) { delete static_cast<T *>(held); };
+    }
+    return held_;
+  }
+
+  void Release() {
+    if (free_ != nullptr) { free_(held_); }
+    held_ = nullptr;
+    free_ = nullptr;
+  }
+
+  T *held_ = nullptr;
+  void (*free_)(void *) = nullptr;
+};
+
 /// \brief What every AL codeunit can do, without the generated class saying any of it.
 ///
 /// \tparam Derived The generated codeunit class.
@@ -92,12 +173,6 @@ public:
   }
 
 private:
-  /// \brief Only the generated codeunit itself may construct the base.
-  ///
-  /// Private rather than protected, and the friend is the reason: a protected constructor would let
-  /// any class name `Codeunit<Something>` as a base, including one that is not that Something. The
-  /// CRTP then reaches into a type it is not part of. This way the pairing is checked.
-  constexpr Codeunit() = default;
   friend Derived;
 };
 

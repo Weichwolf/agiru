@@ -128,6 +128,8 @@ void FieldError(const void *record, const TableDef &table, FieldNo no, std::stri
   throw Error(std::string(def->caption) + " must not be " + FieldText(record, *def) + where + ".");
 }
 
+namespace detail {
+
 void TestField(const void *record, const TableDef &table, FieldNo no) {
   const FieldDef *def = Field(table, no);
   if (def == nullptr) { throw Error("TestField: the table declares no such field"); }
@@ -136,6 +138,8 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
   throw Error(std::string(def->caption) + " must have a value in " + std::string(table.caption) +
               (key.empty() ? std::string{} : ": " + key) + ". It cannot be zero or empty.");
 }
+
+} // namespace detail
 
 namespace detail {
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {

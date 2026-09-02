@@ -2,6 +2,7 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
+#include "PageWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Parser.h"
@@ -229,6 +230,48 @@ void ScanInterfaces(Run &run, Counts &counts, Gathered &gathered, agiru::gen::Ob
     } catch (const std::exception &e) {
       if (Note(run, path, e)) { --counts.files; }
     }
+  }
+}
+
+/// A PAGE IS INDEXED BEFORE THE CODEUNITS AND WRITTEN AFTER THEM, and both halves are forced.
+/// A codeunit takes `Page "Item Tracking Lines"` as a parameter, so the index has to exist before
+/// the codeunits are written; a page names tables, enums and codeunits in its own variables, so it
+/// cannot be written before they are. Parsing once and keeping the objects settles both.
+struct Pages {
+  std::vector<agiru::al::PageObject> objects;
+  std::vector<std::string> paths;
+};
+
+Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
+  Pages pages;
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Page.al")) {
+    ++counts.files;
+    try {
+      agiru::al::PageObject object = agiru::al::ParsePage(Read(path));
+      ++counts.parsed;
+      counts.members += object.procedures.size();
+      objects.pages.insert_or_assign(
+          agiru::gen::LowerKey(object.name),
+          agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
+                               .header = agiru::gen::PageHeaderPath(object)});
+      pages.paths.push_back(std::filesystem::relative(path, run.root).string());
+      pages.objects.push_back(std::move(object));
+    } catch (const std::exception &e) {
+      if (Note(run, path, e)) { --counts.files; }
+    }
+  }
+  return pages;
+}
+
+void WritePages(Run &run, const Pages &pages, const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (std::size_t i = 0; i < pages.objects.size(); ++i) {
+    const agiru::gen::PageHeader written =
+        agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
+    Keep(run,
+         Output{.directory = run.output, .relative = agiru::gen::PageHeaderPath(pages.objects[i])},
+         written.text);
+    ++run.written;
   }
 }
 
@@ -591,6 +634,7 @@ int Scan(const Job &job) {
   Counts allEnums;
   Counts allTables;
   Counts allCodeunits;
+  Counts allPages;
   std::vector<Failure> failures;
   std::vector<Failure> refusals;
   std::size_t written = 0;
@@ -624,6 +668,7 @@ int Scan(const Job &job) {
     Counts interfaces;
     Counts tables;
     Counts codeunits;
+    Counts pages;
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
     ScanEnums(run, enums, index);
@@ -635,19 +680,23 @@ int Scan(const Job &job) {
     // and a codeunit's variable names an interface. Read in any other order, one of the two
     // resolves nothing.
     ScanInterfaces(run, interfaces, gathered, objects);
+    const Pages parsed = IndexPages(run, pages, objects);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
+    WritePages(run, parsed, objects);
 
-    std::println("{:<{}}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
+    std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
                  column,
                  tables.parsed,
                  codeunits.parsed,
+                 pages.parsed,
                  enums.parsed,
                  codeunits.tests,
                  run.written != 0 ? std::format(" -- {} written", run.written) : std::string{});
     Add(allEnums, enums);
     Add(allTables, tables);
     Add(allCodeunits, codeunits);
+    Add(allPages, pages);
     written += run.written;
     changed += run.changed;
     kept.merge(run.kept);
@@ -666,6 +715,7 @@ int Scan(const Job &job) {
   Report("enums", allEnums);
   Report("tables", allTables);
   Report("codeunits", allCodeunits);
+  Report("pages", allPages);
   if (allCodeunits.emitted != 0) {
     std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
                  allCodeunits.emitted,

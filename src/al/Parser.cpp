@@ -86,6 +86,12 @@ public:
         attributes.push_back(ReadAttribute());
         continue;
       }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(unit.labels, unit.variables);
+        continue;
+      }
       if (AtKeyword("var")) {
         Advance();
         ParseVarsInto(unit.labels, unit.variables);
@@ -199,6 +205,14 @@ public:
     // them, and the id is optional where every other object kind requires one.
     if (Peek().kind == TokenKind::Integer) { object.id = ExpectInteger(); }
     object.name = ExpectName();
+    // AL 26 lets an interface EXTEND another, and the base is a name like any other.
+    if (AtKeyword("extends")) {
+      Advance();
+      while (!AtEnd() && !AtPunctuation("{")) {
+        (void)ExpectName();
+        if (AtPunctuation(",")) { Advance(); }
+      }
+    }
     Expect("{");
     while (!AtEnd() && !AtPunctuation("}")) {
       if (AtKeyword("procedure")) {
@@ -209,6 +223,112 @@ public:
     }
     Expect("}");
     return object;
+  }
+
+  PageObject ParsePage() {
+    PageObject object;
+    object.nameSpace = ReadHeaderNamespace("page");
+    Expect("page");
+    object.id = ExpectInteger();
+    object.name = ExpectName();
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("layout")) {
+        Advance();
+        ParseControlsInto(object.layout);
+        continue;
+      }
+      if (AtKeyword("actions")) {
+        Advance();
+        ParseControlsInto(object.actions);
+        continue;
+      }
+      // A BLOCK THIS PARSER HAS NO USE FOR IS SKIPPED BY SHAPE RATHER THAN BY NAME. `views`,
+      // `analysisviews` and whatever a later platform version adds all read as `<word> { ... }`,
+      // where a property reads as `<word> = ...;`. The token after the word decides, so a new
+      // block kind costs nothing and a new property is still parsed.
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        object.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
+  void ParseControlsInto(std::vector<PageControl> &into) {
+    Expect("{");
+    while (!AtPunctuation("}") && !AtEnd()) { into.push_back(ParseControl()); }
+    Expect("}");
+  }
+
+  PageControl ParseControl() {
+    PageControl control;
+    control.kind = Peek().text;
+    Advance();
+    if (AtPunctuation("(")) {
+      Advance();
+      if (!AtPunctuation(")")) { control.name = ExpectName(); }
+      if (AtPunctuation(";")) {
+        Advance();
+        int depth = 0;
+        while (!AtEnd() && !(depth == 0 && AtPunctuation(")"))) {
+          if (AtPunctuation("(")) { ++depth; }
+          if (AtPunctuation(")")) { --depth; }
+          control.source.push_back(Peek());
+          Advance();
+        }
+      }
+      Expect(")");
+    }
+    // `separator;` and `systemaction(X);` carry no block at all.
+    if (AtPunctuation(";")) {
+      Advance();
+      return control;
+    }
+    if (!AtPunctuation("{")) { return control; }
+    Expect("{");
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        control.triggers.push_back(ParseProcedure({}));
+        continue;
+      }
+      // A CONTROL OPENS WITH `(` AND A PROPERTY WITH `=`, which is the whole distinction and the
+      // reason no keyword list is needed. `Visible = true;` against `field(Name; Rec.Name)`.
+      if (Peek(1).kind == TokenKind::Punctuation &&
+          (Peek(1).text == "(" || Peek(1).text == "{")) {
+        control.children.push_back(ParseControl());
+        continue;
+      }
+      control.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return control;
   }
 
 private:
@@ -436,6 +556,13 @@ private:
   [[nodiscard]] const Token &Peek(std::size_t ahead = 0) const {
     const std::size_t index = position_ + ahead;
     return index < tokens_.size() ? tokens_[index] : tokens_.back();
+  }
+
+  /// AL writes `protected var` and `local var` on pages, tables and codeunits alike, and the word
+  /// in front makes it look like the start of a procedure to anything reading one token.
+  [[nodiscard]] bool AtProtectedVar() const {
+    return (AtKeyword("protected") || AtKeyword("internal") || AtKeyword("local")) &&
+           IsKeyword(Peek(1), "var");
   }
 
   void Advance() {
@@ -757,6 +884,10 @@ EnumObject ParseEnum(std::string_view source) {
 
 InterfaceObject ParseInterface(std::string_view source) {
   return Parser(Tokenize(source)).ParseInterface();
+}
+
+PageObject ParsePage(std::string_view source) {
+  return Parser(Tokenize(source)).ParsePage();
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

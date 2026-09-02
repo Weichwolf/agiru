@@ -28,7 +28,7 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
 
 bool NamesAnObject(const al::VarDecl &declared) {
   const std::string type = TypeName(declared.type);
-  return (type == "Record" || type == "Codeunit") && !declared.subtype.empty();
+  return (type == "Record" || type == "Codeunit" || type == "Page") && !declared.subtype.empty();
 }
 
 // A type as it stands in a DECLARATION. `Record "X"` is the generated class, `Record "X" temporary`
@@ -36,7 +36,9 @@ bool NamesAnObject(const al::VarDecl &declared) {
 // the door's own name for the AL type.
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
-  const TableIndex &index = type == "Codeunit" ? objects.codeunits : objects.tables;
+  const TableIndex &index = type == "Codeunit" ? objects.codeunits
+                           : type == "Page"     ? objects.pages
+                                                : objects.tables;
   const auto found = index.find(LowerKey(declared.subtype));
   return found != index.end() ? &found->second : nullptr;
 }
@@ -90,7 +92,12 @@ std::string Generic(const std::string &type,
 
 std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   std::string type = TypeName(declared.type);
-  if (type == "Record" || type == "Codeunit") { return ObjectType(declared, objects); }
+  // A `Page` VARIABLE IS THE PAGE, the way a `Record` variable is the table: AL writes
+  // `SalesOrderPage.RunModal()` on an instance. Only `TestPage` is a template, because the headless
+  // page is a DIFFERENT type that wraps the page rather than being one.
+  if (type == "Record" || type == "Codeunit" || type == "Page") {
+    return ObjectType(declared, objects);
+  }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
   // arguments -- which is not a type at all. The index is the same one a table field uses.
   // A DotNet VARIABLE IS TYPED BY ITS SUBTYPE, and the subtype was being thrown away: every one of
@@ -121,6 +128,15 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
   // writes `I->Method()`, which is the deviation board:0027 names: an interface variable IS a
   // handle to something else, and 822 signatures cannot be forwarded by a wrapper.
   if (type == "Interface") { return InterfaceType(declared, objects); }
+  // A PAGE VARIABLE NAMES ITS PAGE, and `TestPage` is a class template that takes it: AL's
+  // `TestPage "Payment Journal"` is the headless page and not a page-shaped thing, so the argument
+  // is what makes `PaymentJournal."No.".SetValue(...)` resolve to a control at all. A page this run
+  // never saw leaves the template empty, the way an unresolved enumeration does.
+  if (type == "TestPage" || type == "TestRequestPage") {
+    if (declared.subtype.empty()) { return type + "<>"; }
+    const auto found = objects.pages.find(LowerKey(declared.subtype));
+    return found != objects.pages.end() ? type + "<" + found->second.identifier + ">" : type + "<>";
+  }
   if (type == "Option") {
     return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
   }
@@ -186,9 +202,14 @@ std::string Parameters(const al::ProcedureDecl &procedure,
   return out;
 }
 
-/// Every inline option a codeunit declares, as its own enumeration with its own traits.
-std::string InlineOptions(const al::CodeunitObject &unit) {
-  const std::string identifier = Identifier(unit.name);
+/// Every inline option an object declares, as its own enumeration with its own traits.
+///
+/// A PAGE DECLARES THEM THE SAME WAY A CODEUNIT DOES, so the object's name and the namespace its
+/// enumerations live in are arguments rather than assumptions.
+std::string InlineOptionsIn(const std::string &owner,
+                            const std::string &space,
+                            const std::vector<al::VarDecl> &variables,
+                            const std::vector<al::ProcedureDecl> &procedures) {
   std::string out;
   // AN OVERLOAD DECLARES THE SAME INLINE OPTION TWICE. `UserPermissionsImpl` has two
   // `GetEffectivePermission`, both taking `PermissionObjectType: Option "Table Data",...` -- one
@@ -202,25 +223,24 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
   std::map<std::string, std::vector<std::string>> emitted;
   const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
-    const std::string name = OptionName(unit.name, within, declared.name);
+    const std::string name = OptionName(owner, within, declared.name);
     const auto seen = emitted.find(name);
     if (seen != emitted.end()) {
       if (seen->second != declared.members) {
-        throw std::runtime_error("codeunit \"" + unit.name +
-                                 "\" declares two different options "
-                                 "under the name " +
+        throw std::runtime_error("\"" + owner + "\" declares two different options under the name " +
                                  name);
       }
       return;
     }
     emitted.insert_or_assign(name, declared.members);
     const std::vector<std::string> names = EnumeratorNames(declared.members);
-    out += "namespace agiru::app::codeunits {\n\nenum class " + name + " : std::int32_t {\n";
+    out += "namespace agiru::app::" + space + " {\n\nenum class " + name +
+           " : std::int32_t {\n";
     for (std::size_t i = 0; i < names.size(); ++i) {
       out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
     }
-    out += "};\n\n} // namespace agiru::app::codeunits\n\n";
-    out += "template <> struct agiru::OptionTraits<agiru::app::codeunits::" + name + "> {\n";
+    out += "};\n\n} // namespace agiru::app::" + space + "\n\n";
+    out += "template <> struct agiru::OptionTraits<agiru::app::" + space + "::" + name + "> {\n";
     out += "  static constexpr std::array<EnumValueDef, " +
            std::to_string(declared.members.size()) + "> kValues{{\n";
     for (std::size_t i = 0; i < declared.members.size(); ++i) {
@@ -230,13 +250,16 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
     }
     out += "  }};\n};\n\n";
   };
-  static_cast<void>(identifier);
-  for (const al::VarDecl &declared : unit.variables) { declare(std::string{}, declared); }
-  for (const al::ProcedureDecl &procedure : unit.procedures) {
+  for (const al::VarDecl &declared : variables) { declare(std::string{}, declared); }
+  for (const al::ProcedureDecl &procedure : procedures) {
     for (const al::VarDecl &declared : procedure.parameters) { declare(procedure.name, declared); }
     for (const al::VarDecl &declared : procedure.variables) { declare(procedure.name, declared); }
   }
   return out;
+}
+
+std::string InlineOptions(const al::CodeunitObject &unit) {
+  return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
 }
 
 std::string Returns(const al::ProcedureDecl &procedure, const Objects &objects) {
@@ -264,6 +287,29 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
   });
 }
 
+/// A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so its header is INCLUDED and never forward
+/// declared: `TestPage<pages::PaymentJournal>` derives from the page to reach its controls.
+/// A CODEUNIT MEMBER IS A HANDLE AND A RECORD MEMBER IS A VALUE, and the difference is AL's own:
+/// two codeunits may name each other and two tables may not, so only the first can be a cycle
+/// (board:0037).
+bool NamesACodeunit(const al::VarDecl &declared) {
+  return TypeName(declared.type) == "Codeunit";
+}
+
+bool NamesAPage(std::string_view type) {
+  return type == "TestPage" || type == "Page" || type == "TestRequestPage";
+}
+
+/// Adds the header an index holds for a subtype, when the run translated one.
+template <typename Index>
+void IndexedHeader(const Index &index, const std::string &subtype, std::set<std::string> &headers) {
+  if (subtype.empty()) { return; }
+  const auto found = index.find(LowerKey(subtype));
+  if (found != index.end() && !found->second.header.empty()) {
+    headers.insert(found->second.header);
+  }
+}
+
 std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
@@ -281,6 +327,9 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
   const auto named = [&](const al::VarDecl &declared) {
     reach(declared);
     reachInterface(declared);
+    if (NamesAPage(TypeName(declared.type))) {
+      IndexedHeader(objects.pages, declared.subtype, headers);
+    }
   };
   for (const al::VarDecl &declared : unit.variables) { named(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -295,8 +344,13 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
 
 /// What a declaration needs the header to KNOW: a name for an object, a name for an interface --
 /// which is a pointer -- and the enumeration itself, which is a template argument and not a name.
-template <typename Ahead, typename Enum>
-void Declared(const al::VarDecl &declared, const Objects &objects, Ahead ahead, Enum reachEnum) {
+template <typename Ahead, typename Enum, typename Page>
+void Declared(const al::VarDecl &declared,
+              const Objects &objects,
+              Ahead ahead,
+              Enum reachEnum,
+              Page reachPage) {
+  if (NamesAPage(TypeName(declared.type))) { reachPage(declared.subtype); }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
     if (ref != nullptr) { ahead(ref->identifier); }
@@ -316,17 +370,13 @@ void Declared(const al::VarDecl &declared, const Objects &objects, Ahead ahead, 
 void EnumHeader(const EnumIndex &enums,
                 const std::string &subtype,
                 std::set<std::string> &headers) {
-  if (subtype.empty()) { return; }
-  const auto found = enums.find(LowerKey(subtype));
-  if (found != enums.end() && !found->second.header.empty()) {
-    headers.insert(found->second.header);
-  }
+  IndexedHeader(enums, subtype, headers);
 }
 
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
-    if (!NamesAnObject(declared)) { return; }
+    if (!NamesAnObject(declared) || NamesACodeunit(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
     // A PLATFORM TABLE HAS NO HEADER OF ITS OWN TO NAME: it arrives with the door, so its entry
     // carries an empty path and an empty path would emit `#include ""`.
@@ -352,8 +402,11 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   // graph far larger than the containment graph and produced cycles the containment graph does not
   // have: `Language` holds `LanguageImpl` and `LanguageImpl` holds no codeunit at all, yet their
   // headers included each other because a parameter named the other.
+  const auto reachPage = [&](const std::string &subtype) {
+    IndexedHeader(objects.pages, subtype, headers);
+  };
   const auto both = [&](const al::VarDecl &declared) {
-    Declared(declared, objects, ahead, reachEnum);
+    Declared(declared, objects, ahead, reachEnum, reachPage);
   };
   // A MEMBER IS A GLOBAL, so this is the containment graph and nothing else.
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
@@ -594,6 +647,27 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   return out;
 }
 
+std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
+                                 const Objects &objects,
+                                 const std::string &owner) {
+  return Declaration(procedure, objects, owner);
+}
+
+std::string DeclaredType(const al::VarDecl &declared, const Objects &objects) {
+  return TypeOf(declared, objects);
+}
+
+const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects) {
+  return NamesAnObject(declared) ? Reach(declared, objects) : nullptr;
+}
+
+std::string InlineOptionsOf(const std::string &owner,
+                            const std::string &space,
+                            const std::vector<al::VarDecl> &variables,
+                            const std::vector<al::ProcedureDecl> &procedures) {
+  return InlineOptionsIn(owner, space, variables, procedures);
+}
+
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
   return OutputDirectory(unit.nameSpace, ObjectKind::Codeunit) + "/" + Identifier(unit.name) + ".h";
 }
@@ -693,8 +767,10 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
 
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    hidden += "  " + TypeOf(declared, objects, OptionName(unit.name, {}, declared.name)) + " " +
-              Identifier(declared.name) + ";\n";
+    const std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    const bool handle = NamesACodeunit(declared) && Reach(declared, objects) != nullptr;
+    hidden += "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) +
+              ";\n";
   }
   if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
   for (const al::LabelDecl &label : unit.labels) {

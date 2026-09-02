@@ -186,7 +186,7 @@ public:
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, FieldNo>)
   void TestField(const FieldType &member) const {
-    ::agiru::TestField(Self(), TableTraits<Derived>::kTable, NumberOf(&member));
+    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, NumberOf(&member));
   }
 
   /// \brief AL `Record.TestField(Field, Value)`, naming the field itself.
@@ -200,9 +200,9 @@ public:
   void TestField(const FieldType &member, const Value &expected) const {
     const FieldNo no = NumberOf(&member);
     if constexpr (std::is_enum_v<Value>) {
-      ::agiru::TestField(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
     } else {
-      ::agiru::TestField(Self(), TableTraits<Derived>::kTable, no, expected);
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
     }
   }
 
@@ -229,7 +229,9 @@ public:
   /// \brief AL `Record.TestField(Field)`.
   /// \param no The field to test.
   /// \throws Error when the field holds its type's blank.
-  void TestField(FieldNo no) const { ::agiru::TestField(Self(), TableTraits<Derived>::kTable, no); }
+  void TestField(FieldNo no) const {
+    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, no);
+  }
 
   /// \brief AL `Record.TestField(Field, Value)`.
   /// \tparam Value The field's own type.
@@ -239,7 +241,7 @@ public:
   template <typename Value>
     requires(!std::is_enum_v<Value>)
   void TestField(FieldNo no, const Value &expected) const {
-    ::agiru::TestField(Self(), TableTraits<Derived>::kTable, no, expected);
+    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
   }
 
   /// \brief AL `Record.TestField(Field, Value)` against a named option member.
@@ -255,7 +257,7 @@ public:
   template <typename E>
     requires std::is_enum_v<E>
   void TestField(FieldNo no, E expected) const {
-    ::agiru::TestField(Self(), TableTraits<Derived>::kTable, no, Option<E>{expected});
+    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<E>{expected});
   }
 
   /// \brief AL `Record.FieldCaption(Field)`.
@@ -268,8 +270,6 @@ public:
 private:
   friend Derived;
 
-  Table() = default;
-
   /// The AL field number of a member of this record, found by where it sits.
   [[nodiscard]] FieldNo NumberOf(const void *member) const {
     const auto offset = static_cast<std::size_t>(static_cast<const std::byte *>(member) -
@@ -279,7 +279,17 @@ private:
     return def->no;
   }
 
-  [[nodiscard]] const void *Self() const { return static_cast<const Derived *>(this); }
+  /// \note THE CRTP PAIRING IS CHECKED HERE AND NOT BY A PRIVATE CONSTRUCTOR. A private default
+  ///       constructor with `friend Derived` is the usual guard, and it makes the generated class a
+  ///       NON-INITIALISABLE AGGREGATE: a table has no user-declared constructor, so `X Rec{}` is
+  ///       aggregate initialisation, which initialises this base from the CALLER's context and is
+  ///       refused there. Every page and every local record hit it. The assertion below catches the
+  ///       same misuse -- `class Wrong : public Table<Right>` -- the moment any method is used, and
+  ///       costs nothing at run time.
+  [[nodiscard]] const void *Self() const {
+    static_assert(std::is_base_of_v<Table, Derived>, "a table must derive from Table of itself");
+    return static_cast<const Derived *>(this);
+  }
 
 protected:
   /// \brief Writes the primary key fields from the values AL's `Get` was handed.

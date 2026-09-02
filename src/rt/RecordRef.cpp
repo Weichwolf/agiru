@@ -103,7 +103,7 @@ void FieldRef::SetValue(std::string_view text) {
 }
 
 void FieldRef::TestField() const {
-  agiru::TestField(record_, *table_, def_->no);
+  agiru::detail::TestField(record_, *table_, def_->no);
 }
 
 void RecordRef::Open(Integer tableNo) {

@@ -46,6 +46,7 @@ struct Objects {
   TableIndex tables;
   TableIndex codeunits;
   TableIndex interfaces;
+  TableIndex pages;
   EnumIndex enums;
 };
 
@@ -88,5 +89,43 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                 const Objects &objects);
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
+
+/// \brief Every inline option an object declares, as its own enumeration with its own traits.
+///
+/// \param owner      The declaring object's AL name, which the generated enumeration name carries.
+/// \param space      The namespace under `agiru::app` the enumerations go into.
+/// \param variables  The object's own variables.
+/// \param procedures Its procedures, whose parameters and locals declare options too.
+/// \return The enumerations and their traits.
+std::string InlineOptionsOf(const std::string &owner,
+                            const std::string &space,
+                            const std::vector<al::VarDecl> &variables,
+                            const std::vector<al::ProcedureDecl> &procedures);
+
+/// \brief One procedure's C++ declaration, indented and terminated.
+///
+/// \param procedure The AL procedure.
+/// \param objects   Everything the run has translated so far.
+/// \param owner     The declaring object's AL name, which decides a local option's enumeration.
+/// \return The declaration line.
+///
+/// \note EVERY OBJECT KIND DECLARES A PROCEDURE THE SAME WAY. A page, a report, a query and an
+///       xmlport all carry `procedure` and `trigger` blocks with AL's own signature grammar, so
+///       they share this rather than each growing a copy that drifts.
+std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
+                                 const Objects &objects,
+                                 const std::string &owner);
+
+/// \brief The C++ type an AL declaration becomes.
+/// \param declared The AL declaration.
+/// \param objects  Everything the run has translated so far.
+/// \return The type.
+std::string DeclaredType(const al::VarDecl &declared, const Objects &objects);
+
+/// \brief The object an AL declaration names, when the run has translated it.
+/// \param declared The AL declaration.
+/// \param objects  Everything the run has translated so far.
+/// \return The object, or nullptr when nothing of that name was translated.
+const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects);
 
 } // namespace agiru::gen

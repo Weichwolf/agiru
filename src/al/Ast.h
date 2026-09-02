@@ -116,6 +116,34 @@ struct InterfaceObject {
   std::vector<ProcedureDecl> procedures;
 };
 
+/// AL page layout and actions -- one node of the control tree.
+///
+/// THE TREE IS ONE SHAPE AND NOT TWENTY-FOUR. `field`, `group`, `area`, `part`, `repeater`,
+/// `action`, `actionref`, `systempart`, `cuegroup`, `addafter` -- every one of them is
+/// `<kind>(<name>[; <source>]) { <properties> <triggers> <children> }`, so the parser reads that
+/// shape and records the KIND rather than growing a case per keyword. What separates a control from
+/// a property is the token after the name: `(` opens a control, `=` opens a property.
+struct PageControl {
+  std::string kind;
+  std::string name;
+  std::vector<Token> source; ///< What follows the `;` inside the parentheses, verbatim.
+  std::vector<Property> properties;
+  std::vector<ProcedureDecl> triggers;
+  std::vector<PageControl> children;
+};
+
+struct PageObject {
+  int id = 0;
+  std::string name;
+  std::string nameSpace;
+  std::vector<Property> properties;
+  std::vector<PageControl> layout;
+  std::vector<PageControl> actions;
+  std::vector<ProcedureDecl> procedures;
+  std::vector<VarDecl> variables;
+  std::vector<LabelDecl> labels;
+};
+
 struct TableObject {
   int id = 0;
   std::string name;
