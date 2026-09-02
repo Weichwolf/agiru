@@ -51,6 +51,15 @@ TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &o
   }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
   // arguments -- which is not a type at all. The index is the same one a table field uses.
+  // A DotNet VARIABLE IS TYPED BY ITS SUBTYPE, and the subtype was being thrown away: every one of
+  // the 7 117 declarations came out as the bare word `DotNet`, so the compiler said "unknown type
+  // name 'DotNet'" 1 971 times and named none of the 577 classes actually wanted. A .NET class
+  // cannot be papered over the way an enum ordinal can -- it is used by CALLING it, and no
+  // placeholder carries 577 method sets -- so what this buys is not a compile, it is a MEASUREMENT:
+  // the roots now name `dotnet::XmlDocument` and the classes can be ranked by what they stop.
+  if (type == "DotNet") {
+    return declared.subtype.empty() ? "dotnet::Unnamed" : "dotnet::" + Identifier(declared.subtype);
+  }
   // AN ENUMERATION THIS RUN NEVER SAW BECOMES `Enum<>`, which carries the ordinal and names no
   // member. `Copilot Capability` exists in BCApps only as enumextensions of something that is not
   // there -- the platform declares it. Emitting `Enum<enums::CopilotCapability>` named a type

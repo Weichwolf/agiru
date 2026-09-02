@@ -6,6 +6,28 @@ logic and all. The result is a standalone ERP on one process and one PostgreSQL.
 
 **The repository speaks English.** Source, comments, board items, commit messages, documentation.
 
+## What "complete" means, because it decides every scope argument
+
+**THE COMPLETE BC BUSINESS FUNCTIONALITY, NOT A SUBSET.** The predecessor states it the same way and
+it is the one sentence that settles arguments about scope before they start: this is a standalone
+ERP a normal BC user can work in, not a demonstration that AL can be translated.
+
+- **EVERY AL OBJECT KIND IS TRANSPILED AND REPRESENTED IN THE RUNTIME.** All twelve, no exceptions:
+  Table, Codeunit, Enum, Page, Report, Query, XmlPort, Interface, PermissionSet, Profile,
+  ControlAddIn, Entitlement -- and their extensions. A kind with no generator is a HOLE with a
+  count, never a decision (board:0034, board:0033).
+- **The UI is a core expectation and not polish.** BC's user works in pages: role centers with cues,
+  Tell Me, card/list/document layout, lookups, drilldowns, confirm dialogs with BC's own wording,
+  OnValidate updating live. A deviation from BC's behaviour is a finding that has to be argued for.
+- **The UT suite is the PROOF, not the target.** 2 392 green is how the runtime demonstrates it is
+  right about what it already does. It is the milestone; the reserve is 111 526 tests and the target
+  is the whole application.
+
+Scope follows from that rather than from taste. Events and `OnValidate` are not optional -- the
+BaseApp wires hundreds of `[EventSubscriber]`s inside itself, so without dispatch it is missing real
+BC logic and not merely extension paths. `DotNet` and streams block reports, imports and e-documents,
+which are core function. Permissions and dimensions are compulsory for more than one user.
+
 ## The target this is built against
 
 **`agiru` and PostgreSQL run on a Raspberry Pi 5 with 16 GB, and they run FAST.**
