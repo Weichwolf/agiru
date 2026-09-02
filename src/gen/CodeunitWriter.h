@@ -34,6 +34,18 @@ struct Objects {
   EnumIndex enums;
 };
 
+/// The tables the PLATFORM provides, which no `.al` file declares.
+///
+/// They are not AL objects; they only look like AL objects to AL code, and internally they do what
+/// generated code cannot -- `Field` produces a row per field of every table in the catalogue
+/// (board:0032). The generator needs them here for one reason: `Record Field` must resolve into
+/// `agiru::platform` and not into `agiru::app`, where nothing will ever declare it.
+///
+/// This is the same kind of list as `TypeName()`'s AL type names: the platform's own vocabulary,
+/// written down once. An app that declared a table of the same name would overwrite the entry,
+/// which is the right precedence -- its own object wins in its own tree.
+[[nodiscard]] TableIndex PlatformTables();
+
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
                              const Objects &objects);

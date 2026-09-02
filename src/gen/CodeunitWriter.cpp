@@ -183,7 +183,9 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr) { headers.insert(ref->header); }
+    // A PLATFORM TABLE HAS NO HEADER OF ITS OWN TO NAME: it arrives with the door, so its entry
+    // carries an empty path and an empty path would emit `#include ""`.
+    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
   };
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -311,6 +313,13 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
   return OutputDirectory(unit.nameSpace, ObjectKind::Codeunit) + "/" + Identifier(unit.name) + ".h";
+}
+
+TableIndex PlatformTables() {
+  TableIndex tables;
+  tables.insert_or_assign("field", TableRef{.identifier = "platform::Field", .header = {}});
+  tables.insert_or_assign("2000000041", TableRef{.identifier = "platform::Field", .header = {}});
+  return tables;
 }
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,

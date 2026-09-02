@@ -472,6 +472,11 @@ int Scan(const Job &job) {
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
+  // THE PLATFORM'S OWN TABLES ARE THERE BEFORE THE FIRST APP IS READ, so `Record Field` resolves
+  // where it lives. An app that declares a table of the same name overwrites the entry, which is
+  // the precedence AL itself has.
+  objects.tables = agiru::gen::PlatformTables();
+
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
     if (!std::filesystem::is_directory(source)) {
