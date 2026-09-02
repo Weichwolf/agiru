@@ -73,6 +73,19 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
+// AL IS CASE-INSENSITIVE AND A KEY MAY SPELL A FIELD DIFFERENTLY FROM THE FIELD ITSELF. `Default
+// Dimension` declares `field(8000; ParentId; Guid)` and then `key(Key3; "Parent Type", ParentID)`:
+// one AL field, two C++ identifiers, and the second names nothing. The key is therefore resolved
+// against the DECLARED fields rather than spelled out as written, which is the collapse-match the
+// generator already does for type names.
+std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
+  const std::string wanted = LowerKey(Identifier(name));
+  for (const al::FieldDecl &field : table.fields) {
+    if (LowerKey(Identifier(field.name)) == wanted) { return Identifier(field.name); }
+  }
+  return Identifier(name);
+}
+
 std::string KeyArrayName(std::size_t position) {
   return "kKey" + std::to_string(position + 1);
 }
@@ -162,6 +175,34 @@ std::string Includes(const al::TableObject &table,
   return out;
 }
 
+// EVERY TABLE CARRIES THE SYSTEM FIELDS AND THE PLATFORM PUTS THEM THERE, not the AL author.
+// `devenv-table-system-fields.md` names five with their numbers, says the range 2000000000-
+// 2147483647 is reserved for them, and says "system fields are fields that are automatically
+// included in every table object by the platform". The BaseApp KEYS on them -- 121 keys name
+// SystemModifiedAt, 26 name SystemId, 15 name SystemCreatedAt -- so a table without them has keys
+// that name nothing, and that is what blocked those files.
+//
+// SystemRowVersion IS NOT HERE. AL exposes the SQL rowversion under that name and the page gives it
+// no field NUMBER, unlike the five it tabulates. Inventing one would put a number in the metadata
+// that nothing can check, and the rowversion needs its database half anyway (board:0013).
+al::TableObject WithSystemFields(al::TableObject table) {
+  const auto add = [&table](int number, const char *name, const char *type) {
+    table.fields.push_back(al::FieldDecl{.number = number,
+                                         .name = name,
+                                         .type = type,
+                                         .subtype = {},
+                                         .length = 0,
+                                         .properties = {},
+                                         .triggers = {}});
+  };
+  add(2000000000, "SystemId", "Guid");
+  add(2000000001, "SystemCreatedAt", "DateTime");
+  add(2000000002, "SystemCreatedBy", "Guid");
+  add(2000000003, "SystemModifiedAt", "DateTime");
+  add(2000000004, "SystemModifiedBy", "Guid");
+  return table;
+}
+
 std::vector<std::string> Unresolved(const al::TableObject &table, const EnumIndex &enums) {
   std::vector<std::string> missing;
   for (const al::FieldDecl &field : table.fields) {
@@ -177,7 +218,8 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
 } // namespace
 
 TableHeader
-WriteHeader(const al::TableObject &table, const std::string &sourcePath, const EnumIndex &enums) {
+WriteHeader(const al::TableObject &declared, const std::string &sourcePath, const EnumIndex &enums) {
+  const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
@@ -240,7 +282,7 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
            "> " + KeyArrayName(i) + "{{";
     for (std::size_t f = 0; f < table.keys[i].fields.size(); ++f) {
       if (f != 0) { out += ", "; }
-      out += "FieldNumber::" + Identifier(table.keys[i].fields[f]);
+      out += "FieldNumber::" + FieldIdentifier(table, table.keys[i].fields[f]);
     }
     out += "}};\n";
   }
