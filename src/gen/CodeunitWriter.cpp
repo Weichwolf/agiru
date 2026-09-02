@@ -187,9 +187,27 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     // carries an empty path and an empty path would emit `#include ""`.
     if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
   };
-  for (const al::VarDecl &declared : unit.variables) { reach(declared); }
+  // AN ENUM NEEDS ITS HEADER TOO, and it was the only kind of object this did not ask for:
+  // `LibraryNoSeries` names `Enum<enums::NoSeriesImplementation>` and included the table beside it
+  // but not the enumeration, which made it the FIRST diagnostic of 1 159 failing headers.
+  const auto reachEnum = [&](const std::string &subtype) {
+    if (subtype.empty()) { return; }
+    const auto found = objects.enums.find(LowerKey(subtype));
+    if (found != objects.enums.end() && !found->second.header.empty()) {
+      headers.insert(found->second.header);
+    }
+  };
+  const auto both = [&](const al::VarDecl &declared) {
+    reach(declared);
+    if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
+  };
+  for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) { reach(declared); }
+    for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
+    // AND A PROCEDURE'S OWN VARIABLES, which were never walked at all: a local `Record` or `Enum`
+    // is as much a declaration as a parameter is.
+    for (const al::VarDecl &declared : procedure.variables) { both(declared); }
+    if (TypeName(procedure.returnType) == "Enum") { reachEnum(procedure.returnSubtype); }
   }
   std::string out = "#include \"agiru.h\"\n";
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }

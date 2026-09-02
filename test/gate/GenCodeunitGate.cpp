@@ -40,6 +40,9 @@ agiru::gen::Objects Tables() {
   objects.tables.insert_or_assign(
       "line number buffer",
       agiru::gen::TableRef{.identifier = "LineNumberBuffer", .header = "LineNumberBuffer.h"});
+  objects.enums.insert_or_assign(
+      "sales line type",
+      agiru::gen::EnumRef{.identifier = "SalesLineType", .header = "SalesLineType.h"});
   return objects;
 }
 
@@ -247,6 +250,32 @@ void AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives() {
              generated.find("agiru::LineNumberBuffer") == std::string::npos);
 }
 
+/// A CODEUNIT INCLUDES WHAT IT NAMES, AND IT NAMED THREE KINDS WITHOUT ASKING FOR TWO OF THEM.
+/// `LibraryNoSeries` declares `Enum<enums::NoSeriesImplementation>` and included the table beside
+/// it but not the enumeration; that one missing line was the FIRST diagnostic of 1 159 failing
+/// headers in the locked run. A procedure's own LOCAL variables were not walked at all.
+void ACodeunitIncludesEveryObjectItNames() {
+  const std::string source = R"(codeunit 50000 "Some Thing"
+{
+    procedure Check(Kind: Option " ",Item,Resource)
+    var
+        Sorting: Enum "Sales Line Type";
+    begin
+    end;
+})";
+  const std::string generated = Generated(source);
+
+  CHECK_TRUE("the enumeration a LOCAL variable names is included",
+             generated.find("#include \"SalesLineType.h\"") != std::string::npos);
+
+  // THE NEGATIVE CONTROL: an include list that carried only what the old walk saw would still pass
+  // the second line, because a global table was always reached. The enumeration and the local are
+  // the two it missed, and the local is why the count of includes matters rather than their
+  // presence -- a set collapses the duplicate, so this asserts the file compiles as a whole.
+  CHECK_TRUE("the enumeration is included exactly once, however many places name it",
+             generated.find("SalesLineType.h") == generated.rfind("SalesLineType.h"));
+}
+
 } // namespace
 
 int main() {
@@ -257,5 +286,6 @@ int main() {
     ATableTheRunNeverSawIsReported();
     AnInlineOptionGetsAnEnumerationOfItsOwn();
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
+    ACodeunitIncludesEveryObjectItNames();
   });
 }
