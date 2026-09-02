@@ -82,6 +82,7 @@ total=$(wc -l < "$OUT/files" | tr -d ' ')
 : > "$OUT/passed"
 : > "$OUT/failed"
 : > "$OUT/errors"
+: > "$OUT/roots"
 xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
   err=$(mktemp)
   if clang++ -std=c++23 $4 -fsyntax-only -Wall -Wextra -Wpedantic $2 "$1" 2>"$err"; then
@@ -89,6 +90,15 @@ xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
   else
     printf "%s\n" "$1" >> "$3/failed" || exit 1
     cat "$err" >> "$3/errors"
+    # THE FIRST DIAGNOSTIC IS THE ROOT AND THE REST IS THE CASCADE. clang reports the deepest
+    # include first, so a header that fails because something it includes fails names the OTHER
+    # file here. Counting how often a type is MENTIONED ranked symptoms as causes twice in one
+    # session: `LibraryVariableStorage` looked like the third-largest gap and was a missing source
+    # root, and `LibraryLowerPermissions` looked like a gap and is `DotNet` two includes down.
+    first=$(grep -m1 -E "error: " "$err")
+    printf "%s\t%s\t%s\n" "$1" \
+      "$(printf "%s" "$first" | sed -E "s/:[0-9]+:[0-9]+: (fatal )?error: .*//")" \
+      "$(printf "%s" "$first" | sed -E "s/^.*: (fatal )?error: //")" >> "$3/roots"
   fi
   rm -f "$err"
 ' _ {} "$includes" "$OUT" "$OPT"
@@ -118,6 +128,12 @@ printf 'tree: %s of %s generated headers compile\n' "$passed" "$total"
 printf '\ntree: what is missing, by how many headers name it\n'
 grep -oE "unknown type name '[^']+'" "$OUT/errors" | sed "s/unknown type name //" | sort | uniq -c |
   sort -rn | head -20
+printf '\ntree: the ROOT of each failure -- its FIRST diagnostic, by how many headers it stops\n'
+awk -F'\t' '{print $3}' "$OUT/roots" | sed -E "s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -10
+printf '\ntree: what those roots NAME, by how many headers stop on it\n'
+awk -F'\t' '{print $3}' "$OUT/roots" | grep -oE "'[^']+'" | sort | uniq -c | sort -rn | head -14
+printf '\ntree: the single FILE each failure starts in, by how many others it stops\n'
+awk -F'\t' '$1 != $2 {print $2}' "$OUT/roots" | sort | uniq -c | sort -rn | head -10
 printf '\ntree: everything else, by kind\n'
 grep -E 'error:' "$OUT/errors" | grep -v 'unknown type name' |
   sed -E "s/^[^ ]+: //; s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -10
