@@ -127,14 +127,23 @@ endforeach()
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one
 # crash.
-# The target image is compiled INTO every case, because it is the thing under test: it is what
-# `src/app/` shall look like, and a specification that does not compile is not one.
+# The target image is LINKED INTO every case, because it is the thing under test: it is what
+# `apps/` shall look like, and a specification that does not compile is not one.
+#
+# IT IS A LIBRARY AND NOT A SOURCE LIST, and the difference is measured: compiled into each case it
+# was translated once PER GATE -- 30 copies of `ResourceCost.cpp.o` for two source files, each one
+# parsing the whole door again. The image does not depend on which case links it, so translating it
+# per case bought nothing at all.
 file(GLOB target_image CONFIGURE_DEPENDS "test/target/*.cpp")
+add_library(gate_image STATIC ${target_image})
+target_include_directories(gate_image PUBLIC
+  "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/target")
 
 file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
 foreach(case IN LISTS gate_cases)
   get_filename_component(name "${case}" NAME_WE)
-  add_executable(gate_${name} "${case}" ${target_image})
+  add_executable(gate_${name} "${case}")
+  target_link_libraries(gate_${name} PRIVATE gate_image)
   # A CASE MAY SEE EVERY TIER. It is not a client: it exists to test the tiers themselves, and a
   # parser or a generator has no public door to be tested through.
   target_include_directories(gate_${name} PRIVATE
