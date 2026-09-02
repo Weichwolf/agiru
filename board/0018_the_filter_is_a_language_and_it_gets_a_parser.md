@@ -81,7 +81,8 @@ closed: **the base holds NO data, because a class with data in both the base and
 is not standard-layout, and `offsetof` over the field table is how every field is addressed.** A map
 of filters in the base would silently cost that.
 
-Three ways out, none of them free, and the choice wants measuring rather than picking:
+Four ways out, none of them free. The first three were written down before the predecessor was
+read; the fourth came out of reading it and is the one recommended below.
 
 - **The generated class carries them.** Standard-layout survives, since all the data members stay in
   one class. It puts runtime state into what is otherwise a transcription of the `.al`, in all
@@ -91,6 +92,32 @@ Three ways out, none of them free, and the choice wants measuring rather than pi
   across by hand, which AL does do.
 - **`offsetof` goes.** C++26 reflection removes the need for it entirely (board:0015), and with it
   this constraint. Not available in clang-19 or gcc-14.
+
+## What the predecessor settles, and what it does not, measured 2026-09-02
+
+`~/Git/openerp` puts the filters ON THE RECORD INSTANCE -- `self._filters` in
+`runtime/base/table/_table.py`, initialised at line 3178 and 4597, and COPIED in
+`Rec.Copy(Source)` at line 4079: `self._filters = dict(getattr(source, '_filters', None) or {})`.
+That settles the SEMANTICS and nothing else: filters belong to the record variable, they travel with
+`Copy`, and they die with it. Python could hang a dict on an object for free; here the same
+semantics have to be bought.
+
+**A fourth way out, and it is the one to take.** The generated class carries ONE POINTER as its
+FIRST data member, null until something filters:
+
+- Standard-layout holds -- all data members stay in the derived class, which is the whole
+  requirement.
+- A standard-layout object's address IS its first member's address, so `Table<Derived>` reaches the
+  pointer through `Self()` without the generator emitting an accessor. That is guaranteed by the
+  language rather than by a layout guess.
+- A record that never filters costs 8 bytes and no allocation, which matters because
+  `Temporary<T>` holds rows by value and a per-session budget is what board:0006 measures.
+- `Copy` copies the filters because it copies the record's own state, which is exactly AL's rule and
+  exactly what the predecessor does.
+
+What it costs, and both belong in the item rather than in a commit message: one member of runtime
+state in a file that is otherwise a transcription of the `.al`, and a non-trivial destructor on
+every record, which `TempStore` and any arena have to respect.
 
 ## Closed when
 
