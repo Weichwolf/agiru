@@ -3,7 +3,7 @@ State: open
 Area: gen, rt
 Tags: active
 
-# A codeunit member is a lazy handle, and the containment cycle stops being a cycle
+# An object member is a lazy handle, and the containment cycle stops being a cycle
 
 `Background Error Handling Mgt.` declares `ItemJournalErrorsMgt: Codeunit "Item Journal Errors
 Mgt."` and `Item Journal Errors Mgt.` declares `BackgroundErrorHandlingMgt: Codeunit "Background
@@ -28,11 +28,20 @@ what decides this rather than the compiler's complaint.
 never meets the question. It pays for it elsewhere -- nothing tells it whether two variables are the
 same instance -- which is the thing to keep right here.
 
+**AND THE RULE IS WIDER THAN THE FIRST FORM SAID.** It was filed for CODEUNIT members, on the
+argument that two codeunits may name each other and two tables may not. The tables disproved that
+the same day: `Currency Exchange Rate` declares a variable of its OWN type, and `Currency` holds a
+`Currency Exchange Rate` that holds one back. A Record member recurses exactly as a codeunit member
+does. So the rule is one rule -- a member of OBJECT type is a handle -- and the narrow form is
+recorded here as refuted rather than quietly widened.
+
 ## How
 
-- A codeunit MEMBER becomes `Instance<T>`: a pointer that news `T` on first use and frees it with a
+- An object MEMBER becomes `Instance<T>`: a pointer that news `T` on first use and frees it with a
   function pointer captured at that moment, so the destructor never needs `T` complete. The header
   then needs only a forward declaration and the cycle is gone from the include graph as well.
+- `Instance<T>` converts implicitly to `T&`. The handle is how agiru DECLARES the member, not
+  something AL code mentions, so it disappears at every use but the one C++ cannot hide.
 - A procedure LOCAL stays by value. It lives inside a body, where every type is complete and no
   cycle can form, and by value is the shape a reader expects.
 - The call site becomes `->`, the same visible deviation an interface variable already carries
@@ -41,7 +50,7 @@ same instance -- which is the thing to keep right here.
 
 ## What will be true
 
-- [ ] `apps/` holds no codeunit member by value, and the two codeunits above compile.
+- [x] `apps/` holds no object member by value, and the two codeunits above compile.
 - [ ] A gate case states the pairing: two codeunits naming each other translate and run.
 - [ ] `Instance<T>` frees what it made, proven by a counter rather than by reading the code.
 - [ ] **Negative control**: emit the members by value again and require the gate to go red.

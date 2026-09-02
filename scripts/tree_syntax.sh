@@ -78,6 +78,11 @@ includes="$includes -include-pch $PCH"
 # happened. The lock above stops two RUNS from colliding; this stops a run from colliding with an
 # edit, which is the same mistake wearing different clothes.
 DOORPRINT=$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)
+# AND THE TREE ITSELF, because a transpile during the run changes what is being measured and the
+# door fingerprint would not notice. The list of files and their sizes is enough and costs a
+# fraction of hashing 9 600 headers: a re-transpile rewrites files, and a rewritten file that is
+# byte-identical did not change the measurement.
+TREEPRINT=$(find "$APPS" -name '*.h' -printf '%p %s\n' 2>/dev/null | sort | sha1sum | cut -d' ' -f1)
 
 find "$APPS" -name '*.h' | sort > "$OUT/files"
 
@@ -165,6 +170,11 @@ done
 # one that never does, and this one turned a four-minute measurement into an abort.
 if [ "$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)" != "$DOORPRINT" ]; then
   printf 'tree: the door changed while the run was measuring it. ABORT, not a number.\n' >&2
+  exit 1
+fi
+if [ "$(find "$APPS" -name '*.h' -printf '%p %s\n' 2>/dev/null | sort | sha1sum | cut -d' ' -f1)" \
+     != "$TREEPRINT" ]; then
+  printf 'tree: the tree changed while the run was measuring it. ABORT, not a number.\n' >&2
   exit 1
 fi
 passed=$(wc -l < "$OUT/passed" | tr -d ' ')

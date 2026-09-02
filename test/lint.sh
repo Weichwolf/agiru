@@ -197,31 +197,34 @@ if [ -x build/agirutc ] && [ -d "$AGIRU_BC_SOURCE" ]; then
   unitTotal=$(printf '%s' "$scan" | awk '/^codeunits/{print $4}')
   enums=$(printf '%s' "$scan" | awk '/^enums/{print $2}')
   enumTotal=$(printf '%s' "$scan" | awk '/^enums/{print $4}')
-  read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal allowedEnums allowedEnumTotal <<EOT
-$(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0 0 0")
+  pages=$(printf '%s' "$scan" | awk '/^pages/{print $2}')
+  pageTotal=$(printf '%s' "$scan" | awk '/^pages/{print $4}')
+  read -r allowedTables allowedTableTotal allowedUnits allowedUnitTotal allowedEnums \
+    allowedEnumTotal allowedPages allowedPageTotal <<EOT
+$(cat test/transpile-baseline 2>/dev/null || echo "0 0 0 0 0 0 0 0")
 EOT
   ut=$(printf '%s' "$scan" | awk '/^UT /{print $4}')
   utReached=$(printf '%s' "$scan" | awk '/of them reach the parser/{print $1}')
-  printf 'lint: %s of %s tables, %s of %s codeunits and %s of %s enums parse\n' \
-    "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal"
+  printf 'lint: %s of %s tables, %s of %s codeunits, %s of %s pages and %s of %s enums parse\n' \
+    "$tables" "$tableTotal" "$units" "$unitTotal" "$pages" "$pageTotal" "$enums" "$enumTotal"
   # THE MILESTONE'"'"'S DENOMINATOR IS COUNTED FROM THE TEXT AND NEVER FROM THE PARSE, so that a
   # parser that loses a file cannot quietly shrink the population it is measured against.
   printf 'lint: %s of %s UT [Test] methods reach the parser\n' "$utReached" "$ut"
-  printf 'lint: the baseline requires %s tables, %s codeunits and %s enums\n' \
-    "$allowedTables" "$allowedUnits" "$allowedEnums"
+  printf 'lint: the baseline requires %s tables, %s codeunits, %s pages and %s enums\n' \
+    "$allowedTables" "$allowedUnits" "$allowedPages" "$allowedEnums"
   if [ "$tables" -lt "$allowedTables" ] || [ "$units" -lt "$allowedUnits" ] ||
-     [ "$enums" -lt "$allowedEnums" ]; then
+     [ "$pages" -lt "$allowedPages" ] || [ "$enums" -lt "$allowedEnums" ]; then
     printf 'lint: THE POPULATION FELL. A commit raises it or leaves it; it never lowers it.\n' >&2
     exit 1
   fi
   if [ "$tables" -gt "$allowedTables" ] || [ "$units" -gt "$allowedUnits" ] ||
-     [ "$enums" -gt "$allowedEnums" ] ||
+     [ "$pages" -gt "$allowedPages" ] || [ "$enums" -gt "$allowedEnums" ] ||
      [ "$tableTotal" -ne "$allowedTableTotal" ] || [ "$unitTotal" -ne "$allowedUnitTotal" ] ||
-     [ "$enumTotal" -ne "$allowedEnumTotal" ]; then
-    printf '%s %s %s %s %s %s\n' \
-      "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal" > test/transpile-baseline
-    printf 'lint: baseline raised to "%s %s %s %s %s %s" -- commit it with the widening.\n' \
-      "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal"
+     [ "$pageTotal" -ne "$allowedPageTotal" ] || [ "$enumTotal" -ne "$allowedEnumTotal" ]; then
+    printf '%s %s %s %s %s %s %s %s\n' "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" \
+      "$enumTotal" "$pages" "$pageTotal" > test/transpile-baseline
+    printf 'lint: baseline raised to "%s %s %s %s %s %s %s %s" -- commit it with the widening.\n' \
+      "$tables" "$tableTotal" "$units" "$unitTotal" "$enums" "$enumTotal" "$pages" "$pageTotal"
   fi
 else
   printf 'lint: agirutc or the AL source is missing, so the population is not measured.\n' >&2

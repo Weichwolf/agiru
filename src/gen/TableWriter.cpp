@@ -353,6 +353,14 @@ TableHeader WriteHeader(const al::TableObject &declared,
   // ALWAYS INCLUDED: `Enum<enums::X>` is a template argument and a template argument is complete.
   std::set<std::string> memberHeaders;
   const auto named = [&](const al::VarDecl &declared) {
+    // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
+    if (TypeName(declared.type) == "Interface") {
+      const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+      if (found != objects.interfaces.end()) {
+        ahead["interfaces"].insert(found->second.identifier.substr(std::size("interfaces::") - 1));
+      }
+      return;
+    }
     if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
       const auto found = objects.enums.find(LowerKey(declared.subtype));
       if (found != objects.enums.end() && !found->second.header.empty()) {

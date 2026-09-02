@@ -14,20 +14,27 @@ Measured over BCApps and over both trees on 2026-09-02:
 | AL object | files in BCApps | agiru | openerp |
 |---|---|---|---|
 | Codeunit | 14 417 | yes | yes |
-| **Page** | **6 967** | no | yes (`page_gen`, 1 553 lines) |
+| Page | 6 967 | **yes** | yes (`page_gen`, 1 553 lines) |
 | Table | 4 720 | yes | yes |
 | **Report** | **2 142** | no | yes (`report_gen`, 995) |
 | Enum | 1 470 | yes | yes |
 | **PermissionSet** | **1 127** | no | no |
 | **Query** | **464** | no | yes (`query_gen`, 465) |
 | **XmlPort** | **384** | no | yes (`xmlport_gen`, 550) |
-| **Interface** | **209** | no | yes (`interface_gen`) -- board:0027 |
+| Interface | 209 | **yes** | yes (`interface_gen`) -- board:0027 |
 | **Entitlement** | 206 | no | no |
 | **Profile** | 59 | no | no |
 | **ControlAddIn** | 20 | no | no |
 
-**Three of twelve kinds, and the missing ones are not the tail**: Page is the second largest object
-kind in BC and Report the fourth.
+**Five of twelve kinds.** Page landed on 2026-09-02 -- 2 962 of 2 962 in the read roots, parsed and
+written -- and Interface with it. What is left is not the tail either: Report is the largest of the
+seven and PermissionSet the second.
+
+**The layout grammar is done and the rest inherits it.** A page's `layout` and `actions` turned out
+to be ONE shape -- `<kind>(<name>[; <source>]) { properties triggers children }` -- read by kind
+rather than by a case per keyword, with `(` versus `=` separating a control from a property. A
+report's `dataset`, a query's `elements` and an xmlport's `schema` are the same shape, so the
+parser for each is a header and a writer rather than a grammar.
 
 ## And the body is the bigger half
 
