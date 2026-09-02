@@ -264,10 +264,7 @@ private:
           Advance();
           continue;
         }
-        const VarDecl argument = ReadType();
-        declared.arguments.push_back(
-            argument.length != 0 ? argument.type + "[" + std::to_string(argument.length) + "]"
-                                 : argument.type);
+        declared.arguments.push_back(ReadType());
       }
       Expect("]");
       return declared;

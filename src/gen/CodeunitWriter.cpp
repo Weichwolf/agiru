@@ -41,17 +41,6 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 // one: the codeunit, the procedure it stands in, and the variable. A table does the same for its
 // own inline options, and the alternative -- an Integer -- would compile and lose the vocabulary
 // `Type::All` is written in.
-/// One element type of a generic, as the parser recorded it: `Text[50]`, `Code[20]` or a bare name.
-std::string Generic(const std::string &argument) {
-  const std::size_t bracket = argument.find('[');
-  if (bracket == std::string::npos) {
-    const std::string type = TypeName(argument);
-    return type == "Text" || type == "Code" ? type + "<0>" : type;
-  }
-  return TypeName(argument.substr(0, bracket)) + "<" +
-         argument.substr(bracket + 1, argument.size() - bracket - 2) + ">";
-}
-
 std::string
 TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
   std::string type = TypeName(declared.type);
@@ -69,13 +58,21 @@ TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &o
                                          : Identifier(declared.subtype)) +
            ">";
   }
-  if (type == "Option" && !declared.members.empty()) { return "Option<" + owner + ">"; }
-  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them.
+  // AN OPTION WITH NO MEMBERS IS AL'S OWN DECLARATION AND NOT A GAP. `procedure P(ChangeType:
+  // Option)` takes any option value at all, and the BaseApp calls it with a member of some other
+  // enumeration entirely. `Option<>` is that: the ordinal, without a vocabulary.
+  if (type == "Option") {
+    return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
+  }
+  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them, AND
+  // THOSE NEST: `Dictionary of [Integer, List of [Text]]` is one the BaseApp writes. An argument is
+  // read by this same function, so an inner generic, an enum's subtype and a `Text[50]`'s length
+  // all survive.
   if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
     std::string out = type + "<";
     for (std::size_t i = 0; i < declared.arguments.size(); ++i) {
       if (i != 0) { out += ", "; }
-      out += Generic(declared.arguments[i]);
+      out += TypeOf(declared.arguments[i], objects);
     }
     return out + ">";
   }
