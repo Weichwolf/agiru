@@ -87,6 +87,13 @@ Variant FieldRef::Value() const {
     case FieldType::Enum: return Variant{Integer{As<OrdinalValue>(record_, *def_).AsInteger()}};
     case FieldType::Blob:
       throw Error("a Blob is not read with its record, so it has no value here (board:0017)");
+    // A Media AND A MediaSet ARE OBJECT TYPES, and `Variant` holds none of those yet -- the same
+    // sentence its own door carries about Record, RecordRef and InStream. The identifier is in the
+    // row and handing it back as a Guid would be a GUESS at what the platform answers here, which
+    // is the one thing this tree does not do with an unread page.
+    case FieldType::Media:
+    case FieldType::MediaSet:
+      throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
   }
   throw Error("that field type has no value yet");
 }

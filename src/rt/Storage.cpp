@@ -97,6 +97,11 @@ std::string ColumnType(const FieldDef &def) {
     // server's own unit rules, and a Duration has exactly one unit.
     case FieldType::Duration: return "bigint";
     case FieldType::Blob: return "bytea";
+    // A Media FIELD HOLDS AN IDENTIFIER AND NOT BYTES. The media object lives in the tenant media
+    // table and the row carries the GUID that finds it, which is why this column is the same shape
+    // as SystemId's and not the same shape as a BLOB's (board:0031).
+    case FieldType::Media:
+    case FieldType::MediaSet: return "uuid";
   }
   throw Error("ColumnType: no SQL type for this field type yet");
 }

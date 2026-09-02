@@ -28,6 +28,8 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/List.h"
+#include "type/Media.h"
+#include "type/MediaSet.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/SecretText.h"

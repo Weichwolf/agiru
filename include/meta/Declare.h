@@ -15,6 +15,8 @@
 #include "type/Enum.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Media.h"
+#include "type/MediaSet.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/Text.h"
@@ -155,6 +157,20 @@ template <> struct FieldTypeOf<Guid> {
   static constexpr FieldType kType = FieldType::Guid;       ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;               ///< A GUID declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Media` -- one media object, stored as the identifier that finds it.
+template <> struct FieldTypeOf<Media> {
+  static constexpr FieldType kType = FieldType::Media;      ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A Media declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< It names no members.
+};
+
+/// \brief `MediaSet` -- a collection of media objects, stored as the set's identifier.
+template <> struct FieldTypeOf<MediaSet> {
+  static constexpr FieldType kType = FieldType::MediaSet;   ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A MediaSet declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< It names no members.
 };
 
 /// \brief `Blob` -- bytes of no declared length.

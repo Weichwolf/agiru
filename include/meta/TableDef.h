@@ -34,6 +34,8 @@ enum class FieldType : std::uint8_t {
   DateFormula,
   RecordId,
   Duration,
+  Media,
+  MediaSet,
 };
 
 /// \brief One field's declaration, as static const data.

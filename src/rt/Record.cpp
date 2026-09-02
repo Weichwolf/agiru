@@ -13,6 +13,8 @@
 #include "type/Decimal.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Media.h"
+#include "type/MediaSet.h"
 #include "type/RecordId.h"
 #include "type/Time.h"
 
@@ -93,6 +95,9 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::BigInteger: return *reinterpret_cast<const BigInteger *>(At(record, def)) == 0;
     case FieldType::Boolean: return !*reinterpret_cast<const Boolean *>(At(record, def));
     case FieldType::Blob: return !reinterpret_cast<const Blob *>(At(record, def))->HasValue();
+    case FieldType::Media: return !reinterpret_cast<const Media *>(At(record, def))->HasValue();
+    case FieldType::MediaSet:
+      return reinterpret_cast<const MediaSet *>(At(record, def))->MediaId().IsNull();
     case FieldType::Option:
     case FieldType::Enum:
       return reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger() == 0;
