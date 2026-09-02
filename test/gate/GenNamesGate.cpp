@@ -91,14 +91,14 @@ void CollidingEnumeratorsAreSeparatedByTheirOrdinal() {
 /// blocked 111 headers.
 ///
 /// THE STRUCT IS THEREFORE CALLED `Field_No`, AND THE INTERIOR UNDERSCORE IS THE GUARANTEE RATHER
-/// THAN A DECORATION. `Identifier` keeps only alphanumerics and prepends an underscore only when the
-/// result would start with a digit, so no AL name -- of any table, in any app, ever -- can produce
-/// an identifier with an underscore anywhere but in front. A `k` prefix or a rarer word would have
-/// been a bet on AL not using it; this is a proof that it cannot.
+/// THAN A DECORATION. `Identifier` keeps only alphanumerics and prepends an underscore only when
+/// the result would start with a digit, so no AL name -- of any table, in any app, ever -- can
+/// produce an identifier with an underscore anywhere but in front. A `k` prefix or a rarer word
+/// would have been a bet on AL not using it; this is a proof that it cannot.
 void AGeneratorOwnedNameCannotCollideWithAnAlName() {
   CHECK_TEXT("the collision that cost 111 headers", Identifier("Field Number"), "FieldNumber");
-  CHECK_TEXT("and the name it can never reach", Identifier("Field No") == "Field_No" ? "yes" : "no",
-             "no");
+  CHECK_TEXT(
+      "and the name it can never reach", Identifier("Field No") == "Field_No" ? "yes" : "no", "no");
   CHECK_TEXT("nor by spelling the underscore", Identifier("Field_No"), "FieldNo");
   CHECK_TEXT("nor through punctuation", Identifier("Field-No."), "FieldNo");
   // The one underscore the generator does emit leads, and a digit always follows it.

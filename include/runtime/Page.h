@@ -57,10 +57,12 @@ public:
   /// \throws Error when it holds something else, and until a page can be opened.
   void AssertEquals(std::string_view expected) const;
 
-  /// \brief AL `TestField.AsInteger()`. \return The value as an Integer. \throws Error as Value does.
+  /// \brief AL `TestField.AsInteger()`. \return The value as an Integer. \throws Error as Value
+  /// does.
   [[nodiscard]] Integer AsInteger() const;
 
-  /// \brief AL `TestField.AsBoolean()`. \return The value as a Boolean. \throws Error as Value does.
+  /// \brief AL `TestField.AsBoolean()`. \return The value as a Boolean. \throws Error as Value
+  /// does.
   [[nodiscard]] Boolean AsBoolean() const;
 
   /// \brief AL `TestField.Activate()` -- puts the focus on the control.
@@ -145,6 +147,8 @@ public:
   Boolean Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
 };
 
+/// \brief What every AL page can do, without the generated class saying any of it.
+/// \tparam Derived The generated page class.
 template <typename Derived> class Page {
 public:
   /// \brief The page's AL number.

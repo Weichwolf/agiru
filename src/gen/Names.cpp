@@ -60,6 +60,8 @@ std::string Join(const std::vector<std::string> &words) {
 
 } // namespace
 
+namespace {
+
 std::string_view KindSuffix(ObjectKind kind) {
   switch (kind) {
     case ObjectKind::Table: return "Table";
@@ -74,6 +76,8 @@ std::string_view KindSuffix(ObjectKind kind) {
   }
   return "Object";
 }
+
+} // namespace
 
 std::string ClassName(std::string_view identifier, ObjectKind kind) {
   return std::string(identifier) + "_" + std::string(KindSuffix(kind));

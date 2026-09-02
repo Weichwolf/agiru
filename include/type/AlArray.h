@@ -37,9 +37,7 @@ public:
   /// \param index The ONE-BASED position.
   /// \return The element.
   /// \throws Error when the index is outside 1..N.
-  const T &operator[](Integer index) const {
-    return const_cast<AlArray *>(this)->At(index);
-  }
+  const T &operator[](Integer index) const { return const_cast<AlArray *>(this)->At(index); }
 
   /// \brief AL `ArrayLen(A)`.
   /// \return How many elements the declaration gave it.

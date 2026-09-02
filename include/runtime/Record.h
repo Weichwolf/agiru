@@ -114,6 +114,11 @@ FieldError(const void *record, const TableDef &table, FieldNo no, std::string_vi
 ///       generated file ever names.
 namespace detail {
 
+/// \brief The platform half of `Record.TestField(Field)` -- raises when the field holds its blank.
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field to test.
+/// \throws Error with BC's own wording when the field holds its type's zero.
 void TestField(const void *record, const TableDef &table, FieldNo no);
 
 } // namespace detail

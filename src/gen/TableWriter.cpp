@@ -1,15 +1,17 @@
 #include "TableWriter.h"
 
 #include "Ast.h"
+#include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
+#include "Scope.h"
 #include "Token.h"
 #include "meta/Declare.h"
 #include "meta/TableDef.h"
 
 #include <algorithm>
-#include <functional>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <set>
 #include <string>
@@ -90,7 +92,8 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
 // tell them apart.
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
   // THE PLATFORM'S FIVE KEEP THEIR NAMES AND THE AL FIELD YIELDS, which is the opposite of the
-  // order the fields are walked in. `Cost Adjmt. Action Message` declares `field(6; SystemID; Guid)`
+  // order the fields are walked in. `Cost Adjmt. Action Message` declares `field(6; SystemID;
+  // Guid)`
   // -- one letter of case away from the platform's `SystemId` -- and letting the AL field win left
   // the table with no `SystemId` at all, which `WithSystemFields<T>` addresses by name and the door
   // promises to every client.
@@ -338,65 +341,68 @@ std::string ProcedureIdentifier(const al::TableObject &table, const std::string 
   return Disambiguated(Identifier(name), "_Proc", taken);
 }
 
-TableHeader WriteHeader(const al::TableObject &declared,
-                        const std::string &sourcePath,
-                        const EnumIndex &enums,
-                        const Objects &objects) {
-  const al::TableObject table = WithSystemFields(declared);
-  const std::string tableIdentifier = Identifier(table.name);
-  const std::vector<OptionField> options = OptionFields(table);
-  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
+/// What a table's own header must include and what it may merely name.
+///
+/// A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME. Including everything a signature
+/// mentions would put two tables in a cycle the moment each names the other, which AL allows.
+namespace {
 
-  std::string out;
-  out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "\n";
-  out += "#pragma once\n\n";
-  out += Includes(table, options, enums);
-  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
-  out += "#include <string_view>\n#include <type_traits>\n\n";
-  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
-    out += "#include \"absent/Types.h\"\n\n";
+/// Adds the header an index holds for a subtype, when the run translated one.
+template <typename Index>
+void Indexed(const Index &index, const std::string &subtype, std::set<std::string> &headers) {
+  if (subtype.empty()) { return; }
+  const auto found = index.find(LowerKey(subtype));
+  if (found != index.end() && !found->second.header.empty()) {
+    headers.insert(found->second.header);
   }
+}
+
+/// What one declaration in a table needs the header to have: a header for anything that is a
+/// template argument or a member, a NAME for anything that is only mentioned.
+struct Reached {
+  std::set<std::string> headers;
+  std::map<std::string, std::set<std::string>> ahead;
+};
+
+void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects) {
+  for (const al::VarDecl &argument : declared.arguments) { Name(reached, argument, objects); }
+  const std::string alType = TypeName(declared.type);
+  // A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so `TestPage<pages::X>` needs the header.
+  if (alType == "TestPage" || alType == "TestRequestPage") {
+    Indexed(objects.pages, declared.subtype, reached.headers);
+    return;
+  }
+  // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
+  if (alType == "Interface") {
+    const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+    if (found != objects.interfaces.end()) {
+      reached.ahead["interfaces"].insert(
+          found->second.identifier.substr(std::size("interfaces::") - 1));
+    }
+    return;
+  }
+  if (alType == "Enum") {
+    Indexed(objects.enums, declared.subtype, reached.headers);
+    return;
+  }
+  const TableRef *ref = ReachObject(declared, objects);
+  if (ref == nullptr || ref->header.empty()) { return; }
+  const std::size_t colons = ref->identifier.find("::");
+  if (colons == std::string::npos) { return; }
+  reached.ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));
+}
+
+std::string Declarations(const al::TableObject &table, const Objects &objects) {
+  std::string out;
   // A TABLE'S PROCEDURES NAME OBJECTS, and a declaration needs the NAME and not the layout:
   // `Currency.GetGainLossAccount` takes a `Record "Detailed CV Ledg. Entry Buffer"`. Including it
   // would put two tables' headers in a cycle the moment each names the other, which AL allows.
-  std::map<std::string, std::set<std::string>> ahead;
-  // A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME -- the same rule the codeunits
-  // follow. An object member is the exception, because it is a handle (board:0037). AN ENUM IS
-  // ALWAYS INCLUDED: `Enum<enums::X>` is a template argument and a template argument is complete.
-  std::set<std::string> memberHeaders;
-  const std::function<void(const al::VarDecl &)> named = [&](const al::VarDecl &declared) {
-    for (const al::VarDecl &argument : declared.arguments) { named(argument); }
-    // A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so `TestPage<pages::X>` needs the header.
-    const std::string alType = TypeName(declared.type);
-    if (alType == "TestPage" || alType == "TestRequestPage") {
-      const auto found = objects.pages.find(LowerKey(declared.subtype));
-      if (found != objects.pages.end() && !found->second.header.empty()) {
-        memberHeaders.insert(found->second.header);
-      }
-      return;
-    }
-    // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
-    if (TypeName(declared.type) == "Interface") {
-      const auto found = objects.interfaces.find(LowerKey(declared.subtype));
-      if (found != objects.interfaces.end()) {
-        ahead["interfaces"].insert(found->second.identifier.substr(std::size("interfaces::") - 1));
-      }
-      return;
-    }
-    if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
-      const auto found = objects.enums.find(LowerKey(declared.subtype));
-      if (found != objects.enums.end() && !found->second.header.empty()) {
-        memberHeaders.insert(found->second.header);
-      }
-      return;
-    }
-    const TableRef *ref = ReachObject(declared, objects);
-    if (ref == nullptr || ref->header.empty()) { return; }
-    const std::size_t colons = ref->identifier.find("::");
-    if (colons == std::string::npos) { return; }
-    ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));
-  };
+  // A MEMBER IS THE EXCEPTION, because it needs the layout -- unless it is an object, which is a
+  // handle (board:0037).
+  Reached reached;
+  const std::map<std::string, std::set<std::string>> &ahead = reached.ahead;
+  std::set<std::string> &memberHeaders = reached.headers;
+  const auto named = [&](const al::VarDecl &declared) { Name(reached, declared, objects); };
   for (const al::VarDecl &declared : table.variables) {
     if (DeclaresAnObject(declared)) {
       named(declared);
@@ -422,46 +428,15 @@ TableHeader WriteHeader(const al::TableObject &declared,
     out += "} // namespace agiru::app::" + space + "\n";
   }
   if (!ahead.empty()) { out += "\n"; }
+  return out;
+}
 
-  // A TABLE'S PROCEDURES DECLARE INLINE OPTIONS TOO, the same way a codeunit's do.
-  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
-
-  out += "namespace agiru::app::tables {\n\n";
-  for (const OptionField &option : options) {
-    const std::vector<std::string> names = EnumeratorNames(option.members);
-    out += "enum class " + option.enumName + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
-    }
-    out += "};\n\n";
-  }
-  out += "} // namespace agiru::app::tables\n\n";
-
-  for (const OptionField &option : options) {
-    WriteOptionTraits(out, option);
-    out += "\n";
-  }
-
-  out += "namespace agiru::app::tables {\n\n";
-  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
-  // THE ALIAS COMES BEFORE THE CLASS, because a member may name the object's own type: a codeunit
-  // returns `Codeunit "Http Request Message Impl."` and a table holds a filter on itself. Declared
-  // after the class, the AL name is not yet known inside it.
-  out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
-  out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
-  out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
-         std::to_string(table.id) + "};\n";
-  out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
-
-  // A RECORD STARTS BLANK, AND AL GUARANTEES IT. `var Rec: Record X` gives every field its zero --
-  // an empty Code, a zero Decimal, the undefined date -- and AL code reads a fresh record without
-  // writing to it first. C++ default-initialises a member of built-in type to nothing at all, so
-  // without the braces an Integer field of a fresh record holds whatever was on the stack.
-  for (const al::FieldDecl &field : table.fields) {
-    out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
-           FieldIdentifier(table, field.name) + "{};\n";
-  }
-
+/// The class itself: its identity, its fields, its field numbers, its captions, its variables
+/// and its procedures -- everything AL puts between the braces of a `table`.
+/// The constants a table declares beside its fields: the field NUMBERS, the key arrays and the
+/// labels. None of them is data, so none of them touches the standard layout.
+std::string ClassConstants(const al::TableObject &table) {
+  std::string out;
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
   out += "\n  struct Field_No : SystemFieldNumbers {\n";
   for (const al::FieldDecl &field : table.fields) {
@@ -491,6 +466,36 @@ TableHeader WriteHeader(const al::TableObject &declared,
   for (const al::LabelDecl &label : table.labels) {
     out += "  static constexpr std::string_view " + label.name + "{" + Literal(label.text) + "};\n";
   }
+  return out;
+}
+
+std::string ClassBody(const al::TableObject &table,
+                      const std::string &tableIdentifier,
+                      const std::vector<OptionField> &options,
+                      const EnumIndex &enums,
+                      const Objects &objects) {
+  std::string out;
+  out += "namespace agiru::app::tables {\n\n";
+  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  // THE ALIAS COMES BEFORE THE CLASS, because a member may name the object's own type: a codeunit
+  // returns `Codeunit "Http Request Message Impl."` and a table holds a filter on itself. Declared
+  // after the class, the AL name is not yet known inside it.
+  out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
+  out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
+  out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
+         std::to_string(table.id) + "};\n";
+  out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
+
+  // A RECORD STARTS BLANK, AND AL GUARANTEES IT. `var Rec: Record X` gives every field its zero --
+  // an empty Code, a zero Decimal, the undefined date -- and AL code reads a fresh record without
+  // writing to it first. C++ default-initialises a member of built-in type to nothing at all, so
+  // without the braces an Integer field of a fresh record holds whatever was on the stack.
+  for (const al::FieldDecl &field : table.fields) {
+    out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
+           FieldIdentifier(table, field.name) + "{};\n";
+  }
+
+  out += ClassConstants(table);
 
   out += "\n";
   for (const al::FieldDecl &field : table.fields) {
@@ -507,7 +512,9 @@ TableHeader WriteHeader(const al::TableObject &declared,
   for (const al::FieldDecl &field : table.fields) {
     shadowed.insert(FieldIdentifier(table, field.name));
   }
-  for (const al::VarDecl &declared : table.variables) { shadowed.insert(Identifier(declared.name)); }
+  for (const al::VarDecl &declared : table.variables) {
+    shadowed.insert(Identifier(declared.name));
+  }
   for (const al::ProcedureDecl &procedure : table.procedures) {
     shadowed.insert(Identifier(procedure.name));
   }
@@ -525,16 +532,16 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
   // A TABLE'S VARIABLES LIVE BEHIND ONE POINTER, AND THE STANDARD-LAYOUT INVARIANT DECIDES IT.
   // `offsetof` over the field table requires standard layout, which requires every member to be
-  // standard-layout too -- and `Item Application Entry` declares `Dictionary of [Integer, Boolean]`,
-  // whose std::map is not. Fields are the class; everything AL puts in the table's `var` block goes
-  // into one nested struct reached through `Var_Block`, which is two pointers and standard-layout.
-  // The interior underscore is the seam no AL name can reach.
+  // standard-layout too -- and `Item Application Entry` declares `Dictionary of [Integer,
+  // Boolean]`, whose std::map is not. Fields are the class; everything AL puts in the table's `var`
+  // block goes into one nested struct reached through `Var_Block`, which is two pointers and
+  // standard-layout. The interior underscore is the seam no AL name can reach.
   if (!table.variables.empty()) {
     out += "\n  struct Variables {\n";
     for (const al::VarDecl &declared : table.variables) {
       // The nested struct is inside the class, so a field name hides a type here as well.
       std::string type = QualifiedType(DeclaredType(declared, objects), shadowed);
-      if (DeclaresAnObject(declared)) { type = "Instance<" + type + ">"; }
+      if (DeclaresAnObject(declared)) { type.insert(0, "Instance<").append(">"); }
       out += "    " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
     }
     out += "  };\n\n  Instance<Variables> Var_Block;\n";
@@ -542,6 +549,52 @@ TableHeader WriteHeader(const al::TableObject &declared,
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
   out += "};\n\n";
+  return out;
+}
+
+} // namespace
+
+TableHeader WriteHeader(const al::TableObject &declared,
+                        const std::string &sourcePath,
+                        const EnumIndex &enums,
+                        const Objects &objects) {
+  const al::TableObject table = WithSystemFields(declared);
+  const std::string tableIdentifier = Identifier(table.name);
+  const std::vector<OptionField> options = OptionFields(table);
+  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
+
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#pragma once\n\n";
+  out += Includes(table, options, enums);
+  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
+  out += "#include <string_view>\n#include <type_traits>\n\n";
+  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
+    out += "#include \"absent/Types.h\"\n\n";
+  }
+  out += Declarations(table, objects);
+
+  // A TABLE'S PROCEDURES DECLARE INLINE OPTIONS TOO, the same way a codeunit's do.
+  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
+
+  out += "namespace agiru::app::tables {\n\n";
+  for (const OptionField &option : options) {
+    const std::vector<std::string> names = EnumeratorNames(option.members);
+    out += "enum class " + option.enumName + " : std::int32_t {\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
+    }
+    out += "};\n\n";
+  }
+  out += "} // namespace agiru::app::tables\n\n";
+
+  for (const OptionField &option : options) {
+    WriteOptionTraits(out, option);
+    out += "\n";
+  }
+
+  out += ClassBody(table, tableIdentifier, options, enums, objects);
 
   out += FieldTable(table, sorted, tableIdentifier);
 
@@ -592,10 +645,8 @@ TableHeader WriteHeader(const al::TableObject &declared,
   DotNetUse dotnet;
   DotNetUse absent;
   GatherAbsentIn(table.variables, table.procedures, objects, dotnet, absent);
-  return TableHeader{.text = out,
-                     .unresolvedEnums = Unresolved(table, enums),
-                     .dotnet = dotnet,
-                     .absent = absent};
+  return TableHeader{
+      .text = out, .unresolvedEnums = Unresolved(table, enums), .dotnet = dotnet, .absent = absent};
 }
 
 } // namespace agiru::gen

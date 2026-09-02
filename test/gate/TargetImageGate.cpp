@@ -45,8 +45,7 @@ void TheTableDeclaresWhatTheAlSourceDeclares() {
   CHECK_TRUE("Code[20] carries its length",
              Field(Table(), ResourceCost::Field_No::Code)->length == kCodeLength);
   CHECK_TRUE("Code[10] carries its length",
-             Field(Table(), ResourceCost::Field_No::WorkTypeCode)->length ==
-                 kWorkTypeCodeLength);
+             Field(Table(), ResourceCost::Field_No::WorkTypeCode)->length == kWorkTypeCodeLength);
   CHECK_TRUE("a Decimal carries no length",
              Field(Table(), ResourceCost::Field_No::UnitCost)->length == 0);
   CHECK_TRUE("a number nothing declares has no field",

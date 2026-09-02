@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <functional>
 #include <cstddef>
 #include <map>
 #include <set>
@@ -103,13 +102,61 @@ std::string Element(const al::VarDecl &declared, const Objects &objects, const s
 std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   std::string inner = Element(declared, objects, owner);
   for (std::size_t i = declared.dimensions.size(); i > 0; --i) {
-    inner = "AlArray<" + inner + ", " + std::to_string(declared.dimensions[i - 1]) + ">";
+    std::string wrapped = "AlArray<";
+    wrapped += inner;
+    wrapped += ", ";
+    wrapped += std::to_string(declared.dimensions[i - 1]);
+    wrapped += ">";
+    inner = std::move(wrapped);
   }
   return inner;
 }
 
+/// What a type is being read FOR: the canonical AL type name, and the object that declares it.
+struct Named {
+  std::string type;  ///< What `Element` canonicalised the AL type name to.
+  std::string owner; ///< The enclosing object, which names an inline option's enumeration.
+};
+
+/// The half of the type map that carries a TEMPLATE ARGUMENT or a length: the headless page, an
+/// inline option, a generic, an absent type and the sized strings.
+std::string Parameterised(const al::VarDecl &declared, const Objects &objects, const Named &named) {
+  const std::string &type = named.type;
+  const std::string &owner = named.owner;
+  // A PAGE VARIABLE NAMES ITS PAGE, and `TestPage` is a class template that takes it: AL's
+  // `TestPage "Payment Journal"` is the headless page and not a page-shaped thing, so the argument
+  // is what makes `PaymentJournal."No.".SetValue(...)` resolve to a control at all. A page this run
+  // never saw leaves the template empty, the way an unresolved enumeration does.
+  if (type == "TestPage" || type == "TestRequestPage") {
+    if (declared.subtype.empty()) { return type + "<>"; }
+    const auto found = objects.pages.find(LowerKey(declared.subtype));
+    return found != objects.pages.end() ? type + "<" + found->second.identifier + ">" : type + "<>";
+  }
+  if (type == "Option") {
+    return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
+  }
+  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them, AND
+  // THOSE NEST: `Dictionary of [Integer, List of [Text]]` is one the BaseApp writes. An argument is
+  // read by this same function, so an inner generic, an enum's subtype and a `Text[50]`'s length
+  // all survive.
+  if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
+    return Generic(type, declared.arguments, objects);
+  }
+
+  // A NAME THAT IS NEITHER AN AL TYPE NOR AN OBJECT THIS RUN READ IS ABSENT. AL writes the
+  // platform's own enums as bare type names -- `Verbosity: Verbosity` -- and emitting the word
+  // unchanged put it beside the door, where nothing declares it.
+  if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
+  // A BARE `Text` IS UNBOUNDED, and it lands here as a length of zero -- which the string types
+  // read as no limit rather than a limit of nothing. `Text[50]` carries its 50.
+  if (type == "Code" || type == "Text") {
+    return type + "<" + std::to_string(declared.length) + ">";
+  }
+  return type;
+}
+
 std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
-  std::string type = TypeName(declared.type);
+  const std::string type = TypeName(declared.type);
   // A `Page` VARIABLE IS THE PAGE, the way a `Record` variable is the table: AL writes
   // `SalesOrderPage.RunModal()` on an instance. Only `TestPage` is a template, because the headless
   // page is a DIFFERENT type that wraps the page rather than being one.
@@ -144,36 +191,7 @@ std::string Element(const al::VarDecl &declared, const Objects &objects, const s
   // writes `I->Method()`, which is the deviation board:0027 names: an interface variable IS a
   // handle to something else, and 822 signatures cannot be forwarded by a wrapper.
   if (type == "Interface") { return InterfaceType(declared, objects); }
-  // A PAGE VARIABLE NAMES ITS PAGE, and `TestPage` is a class template that takes it: AL's
-  // `TestPage "Payment Journal"` is the headless page and not a page-shaped thing, so the argument
-  // is what makes `PaymentJournal."No.".SetValue(...)` resolve to a control at all. A page this run
-  // never saw leaves the template empty, the way an unresolved enumeration does.
-  if (type == "TestPage" || type == "TestRequestPage") {
-    if (declared.subtype.empty()) { return type + "<>"; }
-    const auto found = objects.pages.find(LowerKey(declared.subtype));
-    return found != objects.pages.end() ? type + "<" + found->second.identifier + ">" : type + "<>";
-  }
-  if (type == "Option") {
-    return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
-  }
-  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them, AND
-  // THOSE NEST: `Dictionary of [Integer, List of [Text]]` is one the BaseApp writes. An argument is
-  // read by this same function, so an inner generic, an enum's subtype and a `Text[50]`'s length
-  // all survive.
-  if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
-    return Generic(type, declared.arguments, objects);
-  }
-
-  // A NAME THAT IS NEITHER AN AL TYPE NOR AN OBJECT THIS RUN READ IS ABSENT. AL writes the
-  // platform's own enums as bare type names -- `Verbosity: Verbosity` -- and emitting the word
-  // unchanged put it beside the door, where nothing declares it.
-  if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
-  // A BARE `Text` IS UNBOUNDED, and it lands here as a length of zero -- which the string types
-  // read as no limit rather than a limit of nothing. `Text[50]` carries its 50.
-  if (type == "Code" || type == "Text") {
-    return type + "<" + std::to_string(declared.length) + ">";
-  }
-  return type;
+  return Parameterised(declared, objects, Named{.type = type, .owner = owner});
 }
 
 // A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly: `Item: Record Item`,
@@ -198,7 +216,7 @@ std::string OptionNameOf(const std::string &owner,
                          const std::string &within,
                          const al::VarDecl &declared,
                          const std::vector<al::ProcedureDecl> &procedures) {
-  const std::string base = OptionName(owner, within, declared.name);
+  std::string base = OptionName(owner, within, declared.name);
   if (declared.members.empty()) { return base; }
   const auto clashes = [&](const al::ProcedureDecl &procedure, const al::VarDecl &other) {
     return !other.members.empty() && other.members != declared.members &&
@@ -757,8 +775,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
   for (const al::VarDecl &declared : procedure.variables) {
-    out += "  " + TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all)) + " " +
-           Identifier(declared.name) + "{};\n";
+    out += "  " + TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all)) +
+           " " + Identifier(declared.name) + "{};\n";
   }
   return out;
 }
@@ -788,7 +806,8 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     const bool publisher = IsPublisher(procedure);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
            "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures) + ") {";
-    const std::string locals = publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures);
+    const std::string locals =
+        publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures);
     const std::string body =
         publisher ? std::string{}
                   : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
@@ -844,7 +863,7 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const std::set<std::string> &shadowed,
                                  const std::vector<al::ProcedureDecl> &all,
                                  const std::string &spelled) {
-  const std::string line = Declaration(procedure, objects, owner, shadowed, all);
+  std::string line = Declaration(procedure, objects, owner, shadowed, all);
   if (spelled.empty() || spelled == Identifier(procedure.name)) { return line; }
   const std::string wanted = " " + Identifier(procedure.name) + "(";
   const std::size_t at = line.find(wanted);
@@ -906,50 +925,55 @@ TableIndex PlatformTables() {
   return tables;
 }
 
-InterfaceHeader WriteInterface(const al::InterfaceObject &object,
-                               const std::string &sourcePath,
-                               const Objects &objects) {
-  const std::string identifier = Identifier(object.name);
+/// The headers and the forward declarations an interface needs. A SIGNATURE IS A DECLARATION, so
+/// what it names is reached the way a codeunit reaches its own -- and an interface variable is a
+/// pointer, so another interface is only named (board:0027).
+namespace {
+
+void FaceReach(const al::VarDecl &declared,
+               const Objects &objects,
+               std::set<std::string> &headers,
+               std::map<std::string, std::set<std::string>> &forward) {
+  for (const al::VarDecl &argument : declared.arguments) {
+    FaceReach(argument, objects, headers, forward);
+  }
+  // AN INTERFACE NAMES ANOTHER INTERFACE, and that one is a POINTER: `Price Calculation` takes a
+  // `Line With Price`. A declaration needs the name, so it is forward declared and the two files do
+  // not include each other.
+  if (TypeName(declared.type) == "Interface") {
+    const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+    if (found != objects.interfaces.end()) {
+      forward["interfaces"].insert(found->second.identifier.substr(std::size("interfaces::") - 1));
+    }
+    return;
+  }
+  if (NamesAnObject(declared)) {
+    const TableRef *ref = Reach(declared, objects);
+    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+  }
+  if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
+    const auto found = objects.enums.find(LowerKey(declared.subtype));
+    if (found != objects.enums.end() && !found->second.header.empty()) {
+      headers.insert(found->second.header);
+    }
+  }
+}
+
+std::string FaceDeclarations(const al::InterfaceObject &object, const Objects &objects) {
   std::string out;
-  out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "\n#pragma once\n\n#include \"agiru.h\"\n";
   // AN INTERFACE INCLUDES WHAT ITS SIGNATURES NAME, exactly as a codeunit includes what its
   // declarations name -- a signature is a declaration and a `Verbosity` in one is an enum the file
   // has to have seen.
   std::set<std::string> headers;
   std::map<std::string, std::set<std::string>> forward;
-  const std::function<void(const al::VarDecl &)> reach = [&](const al::VarDecl &declared) {
-    for (const al::VarDecl &argument : declared.arguments) { reach(argument); }
-    // AN INTERFACE NAMES ANOTHER INTERFACE, and that one is a POINTER: `Price Calculation` takes a
-    // `Line With Price`. A declaration needs the name, so it is forward declared and the two files
-    // do not include each other.
-    if (TypeName(declared.type) == "Interface") {
-      const auto found = objects.interfaces.find(LowerKey(declared.subtype));
-      if (found != objects.interfaces.end()) {
-        forward["interfaces"].insert(
-            found->second.identifier.substr(std::size("interfaces::") - 1));
-      }
-      return;
-    }
-    if (NamesAnObject(declared)) {
-      const TableRef *ref = Reach(declared, objects);
-      if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
-    }
-    if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
-      const auto found = objects.enums.find(LowerKey(declared.subtype));
-      if (found != objects.enums.end() && !found->second.header.empty()) {
-        headers.insert(found->second.header);
-      }
-    }
-  };
   for (const al::ProcedureDecl &procedure : object.procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) { reach(declared); }
-    reach(procedure.returned);
+    for (const al::VarDecl &declared : procedure.parameters) {
+      FaceReach(declared, objects, headers, forward);
+    }
+    FaceReach(procedure.returned, objects, headers, forward);
   }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
-  if (NamesAbsentIn({}, object.procedures, objects)) {
-    out += "#include \"absent/Types.h\"\n";
-  }
+  if (NamesAbsentIn({}, object.procedures, objects)) { out += "#include \"absent/Types.h\"\n"; }
   for (const auto &[space, named] : forward) {
     out += "\nnamespace agiru::app::" + space + " {\n";
     for (const std::string &one : named) {
@@ -958,6 +982,19 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
     }
     out += "} // namespace agiru::app::" + space + "\n";
   }
+  return out;
+}
+
+} // namespace
+
+InterfaceHeader WriteInterface(const al::InterfaceObject &object,
+                               const std::string &sourcePath,
+                               const Objects &objects) {
+  const std::string identifier = Identifier(object.name);
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n#pragma once\n\n#include \"agiru.h\"\n";
+  out += FaceDeclarations(object, objects);
   out += "\nnamespace agiru::app::interfaces {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
   out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";

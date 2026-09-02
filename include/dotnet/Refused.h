@@ -32,6 +32,8 @@ struct Named {
   std::string_view member; ///< The member's name.
 };
 
+/// \brief A .NET member this runtime has not rebuilt, callable in any shape and refusing all of
+///        them.
 class Refused {
 public:
   /// \brief A member of a .NET type that is not rebuilt.
@@ -40,9 +42,13 @@ public:
 
   /// \brief Refuses a call of any shape.
   /// \tparam Arguments Whatever the caller passed.
+  /// \param arguments The arguments, read only to be discarded -- what is refused is the CALL.
   /// \return Never.
   /// \throws Error always.
-  template <typename... Arguments> Refused operator()(Arguments &&.../*unused*/) const { Throw(); }
+  template <typename... Arguments> Refused operator()(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    Throw();
+  }
 
   /// \brief Refuses to become a value of any type.
   /// \tparam T The type the caller wants.

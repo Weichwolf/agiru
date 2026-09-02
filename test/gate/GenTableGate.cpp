@@ -223,8 +223,6 @@ void AKeyNamedLikeAClassConstantStillCompiles() {
              generated.find("std::string_view kName{\"Resource Cost\"}") != std::string::npos);
 }
 
-} // namespace
-
 /// TWO DIFFERENT AL NAMES MAY COLLAPSE INTO ONE C++ IDENTIFIER, and the rule is one rule: the FIELD
 /// keeps its spelling, because the field table addresses it by `offsetof` and AL code names it far
 /// more often. What yields carries a seam no AL name can reach -- an interior underscore.
@@ -262,6 +260,8 @@ void ACollidingNameCarriesASeam() {
   CHECK_TRUE("and the AL field of that name carries its number",
              generated.find("SystemId_3{};") != std::string::npos);
 }
+
+} // namespace
 
 int main() {
   return gate::Run("GenTable", [] {

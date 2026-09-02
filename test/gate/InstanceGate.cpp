@@ -1,25 +1,36 @@
 #include "Check.h"
 #include "runtime/Codeunit.h"
 
-#include <string>
 #include <utility>
 
 namespace {
 
 /// A stand-in for a generated object: it counts what the handle does to it, which is the only way
 /// to prove laziness at all -- an eager handle and a lazy one are indistinguishable from outside.
+constexpr int kInitial = 7;
+constexpr int kWritten = 9;
+
 struct Counted {
   static int made;
   static int gone;
 
   Counted() { ++made; }
+
   Counted(const Counted &) = delete;
   Counted(Counted &&) = delete;
   Counted &operator=(const Counted &) = delete;
   Counted &operator=(Counted &&) = delete;
+
   ~Counted() { ++gone; }
 
-  int value = 7;
+  /// What the handle reads and writes through, so that the gate can tell one instance from another.
+  [[nodiscard]] int Value() const { return value_; }
+
+  /// \param value What to write.
+  void Value(int value) { value_ = value; }
+
+private:
+  int value_ = kInitial;
 };
 
 int Counted::made = 0;
@@ -41,10 +52,10 @@ void AHandleIsMadeOnFirstUse() {
   {
     agiru::Instance<Counted> handle;
     CHECK_TRUE("declaring it makes nothing", Counted::made == 0);
-    CHECK_TRUE("and reaching through it makes one", handle->value == 7);
+    CHECK_TRUE("and reaching through it makes one", handle->Value() == kInitial);
     CHECK_TRUE("exactly one", Counted::made == 1);
-    handle->value = 9;
-    CHECK_TRUE("which is the same one every time after", handle->value == 9);
+    handle->Value(kWritten);
+    CHECK_TRUE("which is the same one every time after", handle->Value() == kWritten);
     CHECK_TRUE("still one", Counted::made == 1);
   }
   CHECK_TRUE("and it is freed when the holder goes", Counted::gone == 1);
@@ -64,7 +75,7 @@ void AnUnusedHandleFreesNothing() {
 }
 
 int Twice(Counted &counted) {
-  return counted.value * 2;
+  return counted.Value() * 2;
 }
 
 /// IT DISAPPEARS AT EVERY USE BUT THE ONE C++ CANNOT HIDE. The handle is how agiru DECLARES the
@@ -72,7 +83,7 @@ int Twice(Counted &counted) {
 void AHandleConvertsToTheObject() {
   Reset();
   agiru::Instance<Counted> handle;
-  CHECK_TRUE("passing it as the object works", Twice(handle) == 14);
+  CHECK_TRUE("passing it as the object works", Twice(handle) == kInitial * 2);
   CHECK_TRUE("and that is what made it", Counted::made == 1);
 }
 
@@ -82,9 +93,9 @@ void MovingTakesTheInstance() {
   Reset();
   {
     agiru::Instance<Counted> from;
-    from->value = 3;
+    from->Value(kWritten);
     agiru::Instance<Counted> to = std::move(from);
-    CHECK_TRUE("the instance moved with it", to->value == 3);
+    CHECK_TRUE("the instance moved with it", to->Value() == kWritten);
     CHECK_TRUE("and no second one was made", Counted::made == 1);
   }
   CHECK_TRUE("it is freed once", Counted::gone == 1);

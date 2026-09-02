@@ -106,6 +106,12 @@ template <typename T> bool SameKey(const T &a, const T &b) {
 ///
 /// \note The base holds NO data. That is what leaves a generated record standard-layout, which is
 ///       what lets the field table address a field by `offsetof`.
+// The check wants a private constructor with `friend Derived`, and that makes every generated table
+// a NON-INITIALISABLE AGGREGATE -- a table has no user-declared constructor, so `X Rec{}` is
+// aggregate initialisation, which initialises this base from the caller's context and is refused
+// there. Every page and every local record hit it. `Self()` asserts the pairing instead, on first
+// use and at no run-time cost.
+// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see above.
 template <typename Derived> class Table {
 public:
   /// \brief AL `Record.Insert()`.

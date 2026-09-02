@@ -59,7 +59,12 @@ fi
 # THE UNIT COUNT COMES FROM compile_commands.json, WHICH WILL ONE DAY CARRY apps/ TOO. The day
 # AGIRU_BUILD_APPS defaults on, this number jumps by some thousands while the analysis still skips
 # them -- so it is counted the same way it is analysed, and the two cannot drift apart.
-units=$(grep '"file"' compile_commands.json | grep -cv '/apps/' || echo 0)
+# UNIQUE FILES, because a source compiled into two targets is one unit of analysis and not two.
+# The count was 116 against 62 files once, and when the gates stopped recompiling the same sources
+# it fell to the file count -- which read as a SHRINKING DENOMINATOR and aborted a run that had lost
+# nothing. A number that moves when the build's shape changes cannot guard against a tree that lost
+# a file.
+units=$(grep '"file"' compile_commands.json | grep -v '/apps/' | sort -u | wc -l | tr -d ' ')
 # test/target/ IS GENERATED CODE, written by hand only because the gate needs a fixed image to
 # compare the generator against. It falls out of the analysis for the same reason apps/ does: a
 # finding there has no address, since nobody edits the file -- the emitter is what would have to

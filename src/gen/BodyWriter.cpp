@@ -1,10 +1,11 @@
 #include "BodyWriter.h"
 
-#include "TableWriter.h"
-
 #include "Ast.h"
+#include "CodeunitWriter.h"
+#include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "TableWriter.h"
 
 #include <array>
 #include <cctype>
@@ -319,8 +320,8 @@ private:
     }
     // A HANDLE IS REACHED THROUGH WITH `->`, AND ONLY ON THE FIRST LINK. `A.B.C` where `A` is a
     // member object is `A->B.C`: what `A` yields is a value like any other.
-    const bool handle = spelling == "." && walk->kind == al::ExprKind::Name &&
-                        scope_.IsHandle(walk->text);
+    const bool handle =
+        spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
       if (spelling == ".") {
@@ -446,9 +447,8 @@ private:
   const al::TableObject &table_;
 };
 
-std::string WriteSource(const al::TableObject &table,
-                        const std::string &sourcePath,
-                        const Objects &objects) {
+std::string
+WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects) {
   const std::string identifier = Identifier(table.name);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
@@ -467,13 +467,14 @@ std::string WriteSource(const al::TableObject &table,
   // A TABLE CARRIES CODE, and its procedures are written the way a codeunit's are.
   for (const al::ProcedureDecl &procedure : table.procedures) {
     out += ProcedureSignature(procedure,
-                               objects,
-                               table.name,
-                               identifier,
-                               true,
-                               {},
-                               table.procedures,
-                               ProcedureIdentifier(table, procedure.name)) + " {";
+                              objects,
+                              table.name,
+                              identifier,
+                              true,
+                              {},
+                              table.procedures,
+                              ProcedureIdentifier(table, procedure.name)) +
+           " {";
     const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures);
     const std::string body = WriteStatements(TableNames(table), procedure.body, 2);
     if (locals.empty() && body.empty()) {

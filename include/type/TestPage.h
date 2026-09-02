@@ -39,6 +39,8 @@ template <> struct agiru::PageTraits<agiru::UnknownPage> {
 
 namespace agiru {
 
+/// \brief AL `TestPage <Page>` -- the page, headless, with its controls reachable by name.
+/// \tparam P The generated page class.
 template <typename P = UnknownPage> class TestPage : public PageTraits<P>::Controls {
 public:
   /// \brief AL `TestPage.OpenNew()` -- opens the page ready to insert.

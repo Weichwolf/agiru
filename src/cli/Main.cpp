@@ -83,6 +83,9 @@ int Version() {
 
 } // namespace
 
+/// A FAILURE IS LOUD AND IT IS ALSO A RETURN CODE. The handler prints and returns; what the checker
+/// sees is that PRINTING can itself throw, which would leave `main` -- so the handler is wrapped in
+/// one of its own, and the last resort says nothing and returns 1.
 int main(int argc, char **argv) {
   try {
     std::vector<std::string_view> arguments;
@@ -99,7 +102,12 @@ int main(int argc, char **argv) {
     Usage();
     return kUsage;
   } catch (const std::exception &e) {
-    std::println(stderr, "agiru: {}", e.what());
+    try {
+      std::println(stderr, "agiru: {}", e.what());
+    } catch (...) {
+      // Reporting itself failed; the return code is the report.
+      return 1;
+    }
     return 1;
-  }
+  } catch (...) { return 1; }
 }

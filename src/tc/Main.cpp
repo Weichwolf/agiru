@@ -2,9 +2,9 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
-#include "PageWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
+#include "PageWriter.h"
 #include "Parser.h"
 #include "Scope.h"
 #include "TableWriter.h"
@@ -226,11 +226,10 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
       const std::string identifier = agiru::gen::Identifier(object.name);
       objects.interfaces.insert_or_assign(
           agiru::gen::LowerKey(object.name),
-          agiru::gen::TableRef{
-              .identifier = "interfaces::" + identifier,
-              .header = agiru::gen::OutputDirectory(object.nameSpace,
-                                                    agiru::gen::ObjectKind::Interface) +
-                        "/" + identifier + ".h"});
+          agiru::gen::TableRef{.identifier = "interfaces::" + identifier,
+                               .header = agiru::gen::OutputDirectory(
+                                             object.nameSpace, agiru::gen::ObjectKind::Interface) +
+                                         "/" + identifier + ".h"});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -296,7 +295,8 @@ struct Extensions {
 std::string Overload(const agiru::al::ProcedureDecl &procedure) {
   std::string key = agiru::gen::LowerKey(procedure.name);
   for (const agiru::al::VarDecl &parameter : procedure.parameters) {
-    key += "|" + agiru::gen::LowerKey(parameter.type) + " " + agiru::gen::LowerKey(parameter.subtype);
+    key +=
+        "|" + agiru::gen::LowerKey(parameter.type) + " " + agiru::gen::LowerKey(parameter.subtype);
   }
   return key;
 }
@@ -353,7 +353,9 @@ void NoteTargets(const Extensions &store) {
 
 /// Reads every extension in every app, in the order the file walk finds them, which is sorted by
 /// path -- determinism is compulsory and the merge appends in this order.
-Extensions ReadExtensions(Run &run, Counts &counts, const std::vector<agiru::gen::App> &apps,
+Extensions ReadExtensions(Run &run,
+                          Counts &counts,
+                          const std::vector<agiru::gen::App> &apps,
                           const std::filesystem::path &source) {
   Extensions store;
   for (const agiru::gen::App &app : apps) {
@@ -446,10 +448,7 @@ void WritePages(Run &run,
   }
 }
 
-void ScanEnums(Run &run,
-               Counts &counts,
-               const Extensions &store,
-               agiru::gen::EnumIndex &index) {
+void ScanEnums(Run &run, Counts &counts, const Extensions &store, agiru::gen::EnumIndex &index) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Enum.al")) {
@@ -477,7 +476,6 @@ void ScanEnums(Run &run,
       ++store.consumed["enum " + found->first];
     }
   }
-
 
   for (const agiru::al::EnumObject &object : objects) {
     index.insert_or_assign(agiru::gen::LowerKey(object.name),
@@ -528,9 +526,7 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
-Tables IndexTables(Run &run,
-                   Counts &counts,
-                   agiru::gen::Objects &objects) {
+Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Tables kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
     ++counts.files;
@@ -556,7 +552,6 @@ Tables IndexTables(Run &run,
   }
   return kept;
 }
-
 
 /// EVERY `tableextension` IS MERGED INTO ITS TABLE BEFORE THE TABLE IS WRITTEN, and BC merges them
 /// at build time as well -- the added columns land in the SAME SQL table. A C++ class is closed, so

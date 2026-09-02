@@ -50,8 +50,7 @@ public:
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent);
 
-std::string WriteSource(const al::TableObject &table,
-                        const std::string &sourcePath,
-                        const Objects &objects);
+std::string
+WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects);
 
 } // namespace agiru::gen

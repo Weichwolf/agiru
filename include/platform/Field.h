@@ -103,11 +103,13 @@ inline constexpr std::array<Named, 17> kFieldTypeNames{{
 
 } // namespace agiru::detail
 
+/// \brief The vocabulary of AL `FieldType`, which the virtual table reports as an option.
 template <> struct agiru::OptionTraits<agiru::FieldType> {
   /// \brief Every ordinal from 0 to 40, named where AL names one.
   static constexpr auto kValues = agiru::detail::Sparse<41>(agiru::detail::kFieldTypeNames);
 };
 
+/// \brief The vocabulary of AL `FieldClass`.
 template <> struct agiru::OptionTraits<agiru::platform::FieldClass> {
   /// \brief The three classes, which are dense already.
   static constexpr std::array<agiru::EnumValueDef, 3> kValues{{
@@ -117,6 +119,7 @@ template <> struct agiru::OptionTraits<agiru::platform::FieldClass> {
   }};
 };
 
+/// \brief The vocabulary of AL `ObsoleteState`.
 template <> struct agiru::OptionTraits<agiru::platform::ObsoleteState> {
   /// \brief The five states.
   static constexpr std::array<agiru::EnumValueDef, 5> kValues{{
@@ -149,29 +152,49 @@ namespace agiru::platform {
 ///       field table can exist at all, and the origin is written down rather than implied.
 class Field : public Table<Field> {
 public:
+  /// \brief The AL table number of the virtual `Field` table.
   static constexpr TableId kId{2000000041};
+  /// \brief The AL name.
   static constexpr std::string_view kName{"Field"};
 
   /// \brief The declared lengths, which are AL's and not this file's.
   static constexpr std::size_t kNameLength = 30;
+  /// \brief The declared length of `FieldCaption`.
   static constexpr std::size_t kCaptionLength = 80;
+  /// \brief The declared length of `ObsoleteReason`.
   static constexpr std::size_t kReasonLength = 248;
+  /// \brief The declared length of `OptionString`.
   static constexpr std::size_t kOptionStringLength = 250;
 
+  /// \brief AL `Field."TableNo"`.
   Integer TableNo{};
+  /// \brief AL `Field."No."`.
   Integer No{};
+  /// \brief AL `Field."TableName"`.
   Text<kNameLength> TableName;
+  /// \brief AL `Field."FieldName"`.
   Text<kNameLength> FieldName;
+  /// \brief AL `Field."Type"`.
   Option<agiru::FieldType> Type;
+  /// \brief AL `Field."Len"`.
   Integer Len{};
+  /// \brief AL `Field."Class"`.
   Option<FieldClass> Class;
+  /// \brief AL `Field."RelationTableNo"`.
   Integer RelationTableNo{};
+  /// \brief AL `Field."RelationFieldNo"`.
   Integer RelationFieldNo{};
+  /// \brief AL `Field."OptionString"`.
   Text<kOptionStringLength> OptionString;
+  /// \brief AL `Field."ObsoleteState"`.
   Option<ObsoleteState> ObsoleteState;
+  /// \brief AL `Field."ObsoleteReason"`.
   Text<kReasonLength> ObsoleteReason;
+  /// \brief AL `Field."Field Caption"`.
   Text<kCaptionLength> FieldCaption;
+  /// \brief AL `Field."Enabled"`.
   Boolean Enabled{};
+  /// \brief AL `Field."Is Part of Primary Key"`.
   Boolean IsPartOfPrimaryKey{};
 
   /// \note NO SYSTEM FIELDS. A virtual table is not stored, so there is no row to carry a SystemId
@@ -179,26 +202,43 @@ public:
   ///       database, but are computed at runtime". This is why it does not derive from
   ///       `SystemFieldNumbers` the way a generated table does.
   struct Field_No {
+    /// \brief The AL field number of `TableNo`.
     static constexpr FieldNo TableNo{1};
+    /// \brief The AL field number of `No.`.
     static constexpr FieldNo No{2};
+    /// \brief The AL field number of `TableName`.
     static constexpr FieldNo TableName{3};
+    /// \brief The AL field number of `FieldName`.
     static constexpr FieldNo FieldName{4};
+    /// \brief The AL field number of `Type`.
     static constexpr FieldNo Type{5};
+    /// \brief The AL field number of `Len`.
     static constexpr FieldNo Len{6};
+    /// \brief The AL field number of `Class`.
     static constexpr FieldNo Class{7};
+    /// \brief The AL field number of `RelationTableNo`.
     static constexpr FieldNo RelationTableNo{8};
+    /// \brief The AL field number of `RelationFieldNo`.
     static constexpr FieldNo RelationFieldNo{9};
+    /// \brief The AL field number of `OptionString`.
     static constexpr FieldNo OptionString{10};
+    /// \brief The AL field number of `ObsoleteState`.
     static constexpr FieldNo ObsoleteState{11};
+    /// \brief The AL field number of `ObsoleteReason`.
     static constexpr FieldNo ObsoleteReason{12};
+    /// \brief The AL field number of `Field Caption`.
     static constexpr FieldNo FieldCaption{20};
+    /// \brief The AL field number of `Enabled`.
     static constexpr FieldNo Enabled{21};
+    /// \brief The AL field number of `Is Part of Primary Key`.
     static constexpr FieldNo IsPartOfPrimaryKey{22};
   };
 
+  /// \brief The primary key: the table and the field within it.
   static constexpr std::array<FieldNo, 2> kKey1{{Field_No::TableNo, Field_No::No}};
 };
 
+/// \brief The field table of the virtual `Field` table, as static const data.
 inline constexpr std::array<FieldDef, 15> kFieldFields{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
@@ -242,10 +282,12 @@ inline constexpr std::array<FieldDef, 15> kFieldFields{{
                                         offsetof(Field, IsPartOfPrimaryKey)),
 }};
 
+/// \brief The keys of the virtual `Field` table.
 inline constexpr std::array<KeyDef, 1> kFieldKeys{{
     KeyDef{.name = "Key1", .fields = Field::kKey1, .clustered = true},
 }};
 
+/// \brief The declaration of the virtual `Field` table.
 inline constexpr TableDef kFieldTable{.id = Field::kId,
                                       .name = Field::kName,
                                       .caption = Field::kName,
@@ -259,6 +301,8 @@ static_assert(std::is_standard_layout_v<Field>,
 
 } // namespace agiru::platform
 
+/// \brief What the runtime reaches the virtual `Field` table through.
 template <> struct agiru::TableTraits<agiru::platform::Field> {
+  /// \brief The table declaration.
   static constexpr const agiru::TableDef &kTable = agiru::platform::kFieldTable;
 };

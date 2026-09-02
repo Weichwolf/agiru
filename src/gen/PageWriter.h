@@ -25,8 +25,8 @@ struct PageHeader {
 ///       `SalesOrder."No.".SetValue('X')` names the control and never the group it sits in. The
 ///       nesting decides the LAYOUT, which is a property of the running page rather than of its
 ///       declaration, so it is carried by the control table and not by the class.
-PageHeader WritePage(const al::PageObject &object, const std::string &source,
-                     const Objects &objects);
+PageHeader
+WritePage(const al::PageObject &object, const std::string &source, const Objects &objects);
 
 /// \brief Where a page's header goes, relative to an app root.
 /// \param object The parsed page.

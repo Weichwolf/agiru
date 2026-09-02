@@ -74,9 +74,6 @@ public:
       } else if (AtKeyword("keys")) {
         Advance();
         ParseKeys(table);
-      } else if (AtKeyword("fieldgroups")) {
-        Advance();
-        SkipBracedBlock();
       } else if (AtKeyword("var")) {
         Advance();
         ParseVarsInto(table.labels, table.variables);
@@ -91,8 +88,8 @@ public:
         table.procedures.push_back(ParseProcedure(attributes));
         attributes.clear();
       } else if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
-        // A block this parser has no use for -- `modify(...)` in an extension, and whatever a later
-        // platform version adds -- is skipped by SHAPE, the way a page's are.
+        // A block this parser has no use for -- `fieldgroups`, `modify(...)` in an extension, and
+        // whatever a later platform version adds -- is skipped by SHAPE, the way a page's are.
         Advance();
         SkipBracedBlock();
       } else {
@@ -365,25 +362,29 @@ public:
     Expect("}");
   }
 
+  /// `field("No."; Rec."No.")` -- the name, and then whatever follows the semicolon, verbatim.
+  void ParseControlHead(PageControl &control) {
+    if (!AtPunctuation("(")) { return; }
+    Advance();
+    if (!AtPunctuation(")")) { control.name = ExpectName(); }
+    if (AtPunctuation(";")) {
+      Advance();
+      int depth = 0;
+      while (!AtEnd() && (depth != 0 || !AtPunctuation(")"))) {
+        if (AtPunctuation("(")) { ++depth; }
+        if (AtPunctuation(")")) { --depth; }
+        control.source.push_back(Peek());
+        Advance();
+      }
+    }
+    Expect(")");
+  }
+
   PageControl ParseControl() {
     PageControl control;
     control.kind = Peek().text;
     Advance();
-    if (AtPunctuation("(")) {
-      Advance();
-      if (!AtPunctuation(")")) { control.name = ExpectName(); }
-      if (AtPunctuation(";")) {
-        Advance();
-        int depth = 0;
-        while (!AtEnd() && !(depth == 0 && AtPunctuation(")"))) {
-          if (AtPunctuation("(")) { ++depth; }
-          if (AtPunctuation(")")) { --depth; }
-          control.source.push_back(Peek());
-          Advance();
-        }
-      }
-      Expect(")");
-    }
+    ParseControlHead(control);
     // `separator;` and `systemaction(X);` carry no block at all.
     if (AtPunctuation(";")) {
       Advance();
@@ -399,8 +400,7 @@ public:
       }
       // A CONTROL OPENS WITH `(` AND A PROPERTY WITH `=`, which is the whole distinction and the
       // reason no keyword list is needed. `Visible = true;` against `field(Name; Rec.Name)`.
-      if (Peek(1).kind == TokenKind::Punctuation &&
-          (Peek(1).text == "(" || Peek(1).text == "{")) {
+      if (Peek(1).kind == TokenKind::Punctuation && (Peek(1).text == "(" || Peek(1).text == "{")) {
         control.children.push_back(ParseControl());
         continue;
       }
@@ -516,20 +516,28 @@ private:
   // class and `Codeunit` into another object, the length is what turns `Text` into `Text<N>`, and
   // `temporary` is what turns a record into one with no database behind it. Discarding them made a
   // type name enough for counting and not enough for emitting.
-  VarDecl ReadType() {
-    VarDecl declared;
+  /// `array[6] of` and `array[3, 4] of` -- the dimensions, outermost first.
+  void ReadDimensions(VarDecl &declared) {
     while (AtKeyword("array")) {
       Advance();
       if (AtPunctuation("[")) {
         Advance();
         while (!AtEnd() && !AtPunctuation("]")) {
-          if (Peek().kind == TokenKind::Integer) { declared.dimensions.push_back(ExpectInteger()); }
-          else { Advance(); }
+          if (Peek().kind == TokenKind::Integer) {
+            declared.dimensions.push_back(ExpectInteger());
+          } else {
+            Advance();
+          }
         }
         Expect("]");
       }
       Expect("of");
     }
+  }
+
+  VarDecl ReadType() {
+    VarDecl declared;
+    ReadDimensions(declared);
     declared.type = ExpectName();
     // `List of [Text]` AND `Dictionary of [Text, Integer]` NAME THEIR ELEMENT TYPES, and they were
     // being skipped. A generic with its arguments thrown away is a class template with none.
@@ -824,8 +832,8 @@ private:
   void ParseFields(TableObject &table) {
     Expect("{");
     while (!AtPunctuation("}")) {
-      // A `tableextension` MODIFIES a field it did not declare: `modify("No.") { Editable = false; }`
-      // carries the name, the changed properties and any added trigger, and no type at all.
+      // A `tableextension` MODIFIES a field it did not declare: `modify("No.") { Editable = false;
+      // }` carries the name, the changed properties and any added trigger, and no type at all.
       if (AtKeyword("modify")) {
         Advance();
         Expect("(");
@@ -906,7 +914,6 @@ private:
     }
     Expect("}");
   }
-
 
   std::vector<Token> tokens_;
   std::size_t position_ = 0;

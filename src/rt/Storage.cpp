@@ -91,9 +91,11 @@ std::string ColumnType(const FieldDef &def) {
     case FieldType::DateFormula: return "varchar(32)";
     // A RecordId is stored as its TEXT, which is what AL code already reads it as: the BaseApp
     // splits `Format(RecordID)` on `': '` to get the primary key back out of it.
-    case FieldType::RecordId: return "text";
     // A TableFilter IS its expression, and only the Permission table stores one: what a row holds
-    // is the filter text, and where it applies is decided by the row (board:0018).
+    // is the filter text, and where it applies is decided by the row (board:0018). It reaches the
+    // same column type as a RecordId by a different argument, so the two are named together rather
+    // than looking like one rule.
+    case FieldType::RecordId:
     case FieldType::TableFilter: return "text";
     // A Duration IS a count of milliseconds -- `duration-data-type.md` says so outright -- so the
     // column holds the count and not an interval. An interval would round-trip through the

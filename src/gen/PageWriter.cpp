@@ -1,12 +1,18 @@
 #include "PageWriter.h"
-#include <cctype>
 
+#include "Ast.h"
+#include "CodeunitWriter.h"
+#include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
+#include "Token.h"
 
+#include <cctype>
+#include <cstddef>
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace agiru::gen {
@@ -25,7 +31,9 @@ bool IsAction(const std::string &kind) {
 
 std::string Lowered(std::string_view text) {
   std::string out;
-  for (const char c : text) { out += static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+  for (const char c : text) {
+    out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
   return out;
 }
 
@@ -150,8 +158,8 @@ std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
 }
 
-PageHeader WritePage(const al::PageObject &object, const std::string &source,
-                     const Objects &objects) {
+PageHeader
+WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
   const std::string identifier = Identifier(object.name);
   const std::string pageClass = ClassName(identifier, ObjectKind::Page);
   const std::string controlsClass = identifier + "_Controls";
@@ -193,7 +201,8 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
   std::string publics;
   std::string locals;
   for (const al::ProcedureDecl &procedure : object.procedures) {
-    (procedure.isLocal ? locals : publics) += ProcedureDeclaration(procedure, objects, object.name, {}, object.procedures);
+    (procedure.isLocal ? locals : publics) +=
+        ProcedureDeclaration(procedure, objects, object.name, {}, object.procedures);
   }
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
