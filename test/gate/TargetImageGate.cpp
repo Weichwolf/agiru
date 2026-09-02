@@ -26,14 +26,18 @@ const agiru::TableDef &Table() {
 constexpr std::int32_t kTableId = 202;
 constexpr std::uint16_t kCodeLength = 20;
 constexpr std::uint16_t kWorkTypeCodeLength = 10;
-constexpr std::size_t kFieldCount = 6;
+// THE AL NUMBER AND THE PLATFORM'S ADDITION ARE SAID APART, so that the first can be checked
+// against `ResourceCost.Table.al` and the second against `devenv-table-system-fields.md`.
+constexpr std::size_t kDeclaredFields = 6;
+constexpr std::size_t kFieldCount = kDeclaredFields + agiru::kSystemFieldCount;
 constexpr std::size_t kKeyCount = 2;
 constexpr std::int32_t kUndeclaredFieldNumber = 99;
 
 void TheTableDeclaresWhatTheAlSourceDeclares() {
   CHECK_TRUE("table 202", Table().id.Value() == kTableId);
   CHECK_TEXT("the AL name, spaces and all", std::string(Table().name), "Resource Cost");
-  CHECK_TRUE("six fields", Table().fields.size() == kFieldCount);
+  CHECK_TRUE("six declared fields, and the platform's own after them",
+             Table().fields.size() == kFieldCount);
   CHECK_TRUE("two keys", Table().keys.size() == kKeyCount);
   CHECK_TEXT("a field name keeps its spaces",
              std::string(Field(Table(), ResourceCost::FieldNumber::WorkTypeCode)->name),

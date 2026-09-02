@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief AL's Option -- a zero-based enumerator carrying a name table.
@@ -26,6 +27,10 @@ namespace agiru {
 ///       renamed by the generator, and the member name here stays what AL wrote, because that is
 ///       what an error message and a filter string have to say.
 template <typename E> struct OptionTraits;
+
+/// \brief AL `Option`, either with a vocabulary or without one.
+/// \tparam E The generated enumeration naming the members, or `void` when AL declared none.
+template <typename E = void> class Option;
 
 /// \brief AL `Option`.
 ///
@@ -111,6 +116,70 @@ public:
 
   /// \brief Compares two options by ordinal.
   /// \param o The other option.
+  /// \return True when the ordinals are equal.
+  [[nodiscard]] constexpr bool operator==(const Option &o) const {
+    return AsInteger() == o.AsInteger();
+  }
+};
+
+/// \brief AL `Option` with no members declared.
+///
+/// AL writes this and means it: `local procedure ProcessSubscriptions(var RecRef: RecordRef;
+/// ChangeType: Option)` takes an option value from ANY enumeration, and
+/// `APIWebhookNotificationMgt` calls it with a member of `ChangeTypeOption`, which the parameter
+/// has never heard of. The page's own sentence is what makes that legal -- "the Option type is a
+/// zero-based enumerator type ... you can convert option data types to integers" -- so an option
+/// without members is the integer with the vocabulary left off.
+///
+/// \note THE `<>` IS THE DEVIATION AND IT IS MEANT TO BE SEEN. C++ has no way to spell a class
+///       template with no arguments as a type, so the AL word `Option` survives and the empty
+///       argument list says what AL said by writing nothing: this option names no members. The
+///       alternative was to emit `OrdinalValue`, which is correct and does not read like AL.
+template <> class Option<void> : public OrdinalValue {
+public:
+  /// \brief The zero ordinal.
+  constexpr Option() = default;
+
+  /// \brief Holds an ordinal.
+  /// \param ordinal The zero-based member number.
+  constexpr explicit Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
+
+  /// \brief Takes a member of any generated enumeration.
+  /// \tparam E The enumeration.
+  /// \param value The member.
+  /// \note IMPLICIT, because AL passes `ChangeTypeOption::Created` to a bare `Option` parameter
+  ///       directly and the generated call site has to read the same way.
+  template <typename E>
+    requires std::is_enum_v<E>
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- see the note above.
+  constexpr Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+
+  /// \brief Takes any option or enum value, keeping its ordinal.
+  /// \param value The value.
+  /// \note IMPLICIT for the same reason: AL passes a typed `Option` variable to an untyped
+  ///       parameter without saying anything.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- see the note above.
+  constexpr Option(const OrdinalValue &value) : OrdinalValue(value) {}
+
+  /// \brief Compares against a member of any enumeration.
+  /// \tparam E The enumeration.
+  /// \param value The member.
+  /// \return True when this option holds that ordinal.
+  template <typename E>
+    requires std::is_enum_v<E>
+  [[nodiscard]] constexpr bool operator==(E value) const {
+    return AsInteger() == static_cast<std::int32_t>(value);
+  }
+
+  /// \brief Orders two untyped options by ordinal.
+  /// \param o The other.
+  /// \return The ordering.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const Option &o) const {
+    return AsInteger() <=> o.AsInteger();
+  }
+
+  /// \brief Compares two untyped options by ordinal.
+  /// \param o The other.
   /// \return True when the ordinals are equal.
   [[nodiscard]] constexpr bool operator==(const Option &o) const {
     return AsInteger() == o.AsInteger();

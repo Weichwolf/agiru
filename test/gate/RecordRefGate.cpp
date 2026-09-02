@@ -1,12 +1,23 @@
 #include "Check.h"
 #include "ResourceCost.h"
+#include "meta/Declare.h"
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Table.h"
 #include "type/Decimal.h"
+#include "type/Enum.h"
 #include "type/Integer.h"
+#include "type/Option.h"
 #include "type/Variant.h"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 using agiru::Error;
 using agiru::FieldRef;
@@ -28,7 +39,9 @@ void ItReachesTheTableWithoutNamingIt() {
   constexpr agiru::Integer kResourceCost = 202;
   CHECK_TRUE("it answers the AL table number", ref.Number() == kResourceCost);
   CHECK_TEXT("and the AL name", std::string(ref.Name()), "Resource Cost");
-  CHECK_TRUE("and how many fields the table declares", ref.FieldCount() == 6);
+  CHECK_TRUE("and how many fields it carries -- the six AL declares and the five the platform "
+             "adds",
+             ref.FieldCount() == 6 + agiru::kSystemFieldCount);
   CHECK_TRUE("and how many keys", ref.KeyCount() == 2);
 }
 
@@ -137,6 +150,100 @@ void TheEnumAccessorsAnswerByPositionAndByOrdinal() {
   CHECK_TRUE("an option field is not an enum field", !type.IsEnum());
 }
 
+// A TABLE WITH BOTH KINDS OF ENUMERATION, because `Resource Cost` declares two Options and no Enum
+// -- AL table 202 has `field(1; Type; Option)` and `field(4; "Cost Type"; Option)` -- and the
+// question below is what an ENUM field answers.
+enum class Kind : std::int32_t { Yes = 0, No = 10 };
+enum class Shade : std::int32_t { Pale = 0, Deep = 1 };
+
+struct Painted;
+
+} // namespace
+
+template <> struct agiru::EnumTraits<Kind> {
+  static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Yes", .caption = "Yes"},
+      agiru::EnumValueDef{.ordinal = 10, .name = "No", .caption = "No"},
+  }};
+};
+
+template <> struct agiru::OptionTraits<Shade> {
+  static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Pale", .caption = "Pale"},
+      agiru::EnumValueDef{.ordinal = 1, .name = "Deep", .caption = "Deep"},
+  }};
+};
+
+namespace {
+
+struct Painted : agiru::Table<Painted> {
+  static constexpr agiru::TableId kId{50000};
+  static constexpr std::string_view kName{"Painted"};
+
+  agiru::Enum<Kind> Kind;
+  agiru::Option<Shade> Shade;
+
+  struct FieldNumber {
+    static constexpr agiru::FieldNo Kind{1};
+    static constexpr agiru::FieldNo Shade{2};
+  };
+
+  static constexpr std::array<agiru::FieldNo, 1> kKey1{{FieldNumber::Kind}};
+};
+
+inline constexpr std::array<agiru::FieldDef, 2> kPaintedFields{{
+    agiru::Declare<&Painted::Kind>(
+        Painted::FieldNumber::Kind, "Kind", "Kind", offsetof(Painted, Kind)),
+    agiru::Declare<&Painted::Shade>(
+        Painted::FieldNumber::Shade, "Shade", "Shade", offsetof(Painted, Shade)),
+}};
+
+inline constexpr std::array<agiru::KeyDef, 1> kPaintedKeys{{
+    agiru::KeyDef{.name = "Key1", .fields = Painted::kKey1, .clustered = true},
+}};
+
+inline constexpr agiru::TableDef kPaintedTable{.id = Painted::kId,
+                                               .name = Painted::kName,
+                                               .caption = Painted::kName,
+                                               .fields = kPaintedFields,
+                                               .keys = kPaintedKeys};
+
+} // namespace
+
+template <> struct agiru::TableTraits<Painted> {
+  static constexpr const agiru::TableDef &kTable = kPaintedTable;
+};
+
+namespace {
+
+/// AN ENUM FIELD REPORTS `Option`, AND THAT IS THE PLATFORM'S ANSWER RATHER THAN A SIMPLIFICATION.
+/// `fieldtype-option.md` tabulates every member of the FieldType that `FieldRef.Type()` returns and
+/// there is no `Enum` among them. `BankPmtApplRuleUT` stands on it: it reads `Field.Type` from the
+/// virtual Field table, leaves the procedure unless it is `Option`, and then asks the field for
+/// `OptionMembers` -- on `Sales Header."Document Type"`, which has been an Enum for years.
+void AnEnumFieldReportsOption() {
+  Painted rec;
+  RecordRef ref;
+  ref.GetTable(rec);
+
+  const FieldRef declared = ref.Field(1);
+  const FieldRef option = ref.Field(2);
+
+  CHECK_TRUE("an enum field reports Option", declared.Type() == agiru::FieldType::Option);
+  CHECK_TRUE("and so does an option field", option.Type() == agiru::FieldType::Option);
+
+  // THE NEGATIVE CONTROL: they are still two different things, and IsEnum is the one place BC puts
+  // that difference. A Type() that answered Option for both while IsEnum() also answered the same
+  // for both would pass the two checks above and prove nothing.
+  CHECK_TRUE("only the enum answers IsEnum", declared.IsEnum());
+  CHECK_TRUE("the option does not", !option.IsEnum());
+
+  // AND BOTH HAND OUT THEIR MEMBERS, which is the half `BankPmtApplRuleUT` reaches after the type
+  // check: `OptionMembers` on an enum field must not be empty.
+  CHECK_TRUE("the enum names its values", declared.OptionMembers().Count() == 2);
+  CHECK_TRUE("and so does the option", option.OptionMembers().Count() == 2);
+  CHECK_TRUE("the enum keeps its declared ordinal", declared.GetEnumValueOrdinal(2) == 10);
+}
 } // namespace
 
 int main() {
@@ -145,6 +252,7 @@ int main() {
     OneThatIsNotOpenRefusesRatherThanAnsweringZero();
     AFieldIsReachedByNumberAndByPosition();
     AValueCarriesItsType();
+    AnEnumFieldReportsOption();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
   });
 }

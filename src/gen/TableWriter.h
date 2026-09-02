@@ -15,6 +15,6 @@ struct TableHeader {
 };
 
 TableHeader
-WriteHeader(const al::TableObject &table, const std::string &sourcePath, const EnumIndex &enums);
+WriteHeader(const al::TableObject &declared, const std::string &sourcePath, const EnumIndex &enums);
 
 } // namespace agiru::gen

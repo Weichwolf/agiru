@@ -4,6 +4,8 @@
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Token.h"
+#include "meta/Declare.h"
+#include "meta/TableDef.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -185,22 +187,54 @@ std::string Includes(const al::TableObject &table,
 // SystemRowVersion IS NOT HERE. AL exposes the SQL rowversion under that name and the page gives it
 // no field NUMBER, unlike the five it tabulates. Inventing one would put a number in the metadata
 // that nothing can check, and the rowversion needs its database half anyway (board:0013).
+bool IsSystemField(const al::FieldDecl &field) {
+  return field.number >= kSystemFields.front().no.Value();
+}
+
 al::TableObject WithSystemFields(al::TableObject table) {
-  const auto add = [&table](int number, const char *name, const char *type) {
-    table.fields.push_back(al::FieldDecl{.number = number,
-                                         .name = name,
-                                         .type = type,
+  for (const SystemFieldDecl &system : kSystemFields) {
+    table.fields.push_back(al::FieldDecl{.number = system.no.Value(),
+                                         .name = std::string(system.name),
+                                         .type = std::string(system.alType),
                                          .subtype = {},
                                          .length = 0,
                                          .properties = {},
                                          .triggers = {}});
-  };
-  add(2000000000, "SystemId", "Guid");
-  add(2000000001, "SystemCreatedAt", "DateTime");
-  add(2000000002, "SystemCreatedBy", "Guid");
-  add(2000000003, "SystemModifiedAt", "DateTime");
-  add(2000000004, "SystemModifiedBy", "Guid");
+  }
   return table;
+}
+
+// AN EMPTY BRACED LIST CANNOT DEDUCE ITS ELEMENT TYPE, and a table with no fields is legal AL --
+// BC declares several as pure event containers. `std::array k{}` is not a declaration the compiler
+// can complete, so the element type is named when there is nothing to deduce it from.
+std::string FieldTable(const std::vector<const al::FieldDecl *> &sorted,
+                       const std::string &tableIdentifier) {
+  const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
+  std::string out = "inline constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
+                    tableIdentifier + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
+                    ">{{\n";
+  for (const al::FieldDecl *field : sorted) {
+    if (IsSystemField(*field)) { continue; }
+    const std::string identifier = Identifier(field->name);
+    out += "    Declare<&";
+    out += tableIdentifier;
+    out += "::";
+    out += identifier;
+    out += ">(";
+    out += tableIdentifier;
+    out += "::FieldNumber::";
+    out += identifier;
+    out += ", ";
+    out += Literal(field->name);
+    out += ", ";
+    out += Literal(Caption(*field));
+    out += ", offsetof(";
+    out += tableIdentifier;
+    out += ", ";
+    out += identifier;
+    out += ")),\n";
+  }
+  return out + "}});\n\n";
 }
 
 std::vector<std::string> Unresolved(const al::TableObject &table, const EnumIndex &enums) {
@@ -217,8 +251,9 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
 
 } // namespace
 
-TableHeader
-WriteHeader(const al::TableObject &declared, const std::string &sourcePath, const EnumIndex &enums) {
+TableHeader WriteHeader(const al::TableObject &declared,
+                        const std::string &sourcePath,
+                        const EnumIndex &enums) {
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
@@ -264,8 +299,9 @@ WriteHeader(const al::TableObject &declared, const std::string &sourcePath, cons
   }
 
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
-  out += "\n  struct FieldNumber {\n";
+  out += "\n  struct FieldNumber : SystemFieldNumbers {\n";
   for (const al::FieldDecl &field : table.fields) {
+    if (IsSystemField(field)) { continue; }
     out += "    static constexpr " + fieldNo + " " + Identifier(field.name) + "{" +
            std::to_string(field.number) + "};\n";
   }
@@ -300,32 +336,7 @@ WriteHeader(const al::TableObject &declared, const std::string &sourcePath, cons
   }
   out += "};\n\n";
 
-  // AN EMPTY BRACED LIST CANNOT DEDUCE ITS ELEMENT TYPE, and a table with no fields is legal AL --
-  // BC declares several as pure event containers. `std::array k{}` is not a declaration the
-  // compiler can complete, so the element type is named when there is nothing to deduce it from.
-  out += "inline constexpr std::array<FieldDef, " + std::to_string(sorted.size()) + "> k" +
-         tableIdentifier + "Fields{{\n";
-  for (const al::FieldDecl *field : sorted) {
-    const std::string identifier = Identifier(field->name);
-    out += "    Declare<&";
-    out += tableIdentifier;
-    out += "::";
-    out += identifier;
-    out += ">(";
-    out += tableIdentifier;
-    out += "::FieldNumber::";
-    out += identifier;
-    out += ", ";
-    out += Literal(field->name);
-    out += ", ";
-    out += Literal(Caption(*field));
-    out += ", offsetof(";
-    out += tableIdentifier;
-    out += ", ";
-    out += identifier;
-    out += ")),\n";
-  }
-  out += "}};\n\n";
+  out += FieldTable(sorted, tableIdentifier);
 
   out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
@@ -359,12 +370,12 @@ WriteHeader(const al::TableObject &declared, const std::string &sourcePath, cons
   out += "static_assert(k";
   out += tableIdentifier;
   out += "Fields.size() == ";
-  out += std::to_string(table.fields.size());
-  out += ", \"table ";
+  out += std::to_string(sorted.size() - kSystemFieldCount);
+  out += " + kSystemFieldCount, \"table ";
   out += std::to_string(table.id);
   out += " declares ";
-  out += std::to_string(table.fields.size());
-  out += " fields\");\n\n";
+  out += std::to_string(sorted.size() - kSystemFieldCount);
+  out += " fields, and the platform adds its own\");\n\n";
   out += "} // namespace agiru::app\n\n";
 
   out += "template <> struct agiru::TableTraits<agiru::app::" + tableIdentifier + "> {\n";

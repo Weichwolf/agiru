@@ -55,8 +55,13 @@ public:
   Option<ResourceCostCostType> CostType{};
   Decimal DirectUnitCost{};
   Decimal UnitCost{};
+  Guid SystemId{};
+  DateTime SystemCreatedAt{};
+  Guid SystemCreatedBy{};
+  DateTime SystemModifiedAt{};
+  Guid SystemModifiedBy{};
 
-  struct FieldNumber {
+  struct FieldNumber : SystemFieldNumbers {
     static constexpr FieldNo Type{1};
     static constexpr FieldNo Code{2};
     static constexpr FieldNo WorkTypeCode{3};
@@ -76,7 +81,7 @@ public:
   void OnValidateCostType();
 };
 
-inline constexpr std::array<FieldDef, 6> kResourceCostFields{{
+inline constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::array<FieldDef, 6>{{
     Declare<&ResourceCost::Type>(
         ResourceCost::FieldNumber::Type, "Type", "Type", offsetof(ResourceCost, Type)),
     Declare<&ResourceCost::Code>(
@@ -97,7 +102,7 @@ inline constexpr std::array<FieldDef, 6> kResourceCostFields{{
                                      "Unit Cost",
                                      "Unit Cost",
                                      offsetof(ResourceCost, UnitCost)),
-}};
+}});
 
 inline constexpr std::array<KeyDef, 2> kResourceCostKeys{{
     KeyDef{.name = "Key1", .fields = ResourceCost::kKey1, .clustered = true},
@@ -118,7 +123,8 @@ static_assert(FieldsAreSorted(kResourceCostTable),
 static_assert(std::is_standard_layout_v<ResourceCost>,
               "offsetof over the field table requires standard layout. The base carries NO data, "
               "which is what keeps it so");
-static_assert(kResourceCostFields.size() == 6, "table 202 declares 6 fields");
+static_assert(kResourceCostFields.size() == 6 + kSystemFieldCount,
+              "table 202 declares 6 fields, and the platform adds its own");
 
 } // namespace agiru::app
 

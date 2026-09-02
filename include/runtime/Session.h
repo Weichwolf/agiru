@@ -3,6 +3,7 @@
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
+#include "type/Guid.h"
 
 #include <string>
 
@@ -55,6 +56,17 @@ public:
   /// \return The session's database connection.
   [[nodiscard]] const Connection &Database() const { return connection_; }
 
+  /// \brief AL `UserSecurityId()`.
+  ///
+  /// \return The security ID of the user this session runs as.
+  ///
+  /// \note IT IS THE BLANK GUID UNTIL THERE IS AN AUTHENTICATION STORY, and that is a measured
+  ///       decision rather than a placeholder: the predecessor returned exactly this constant and
+  ///       reached 97.0 % of the UT subset over it (`~/Git/openerp`, `builtins/_system.py:409`). It
+  ///       lives on the SESSION rather than in a function, because a user is a property of a
+  ///       session and a hardcoded GUID inside a call could never become one.
+  [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
+
   /// \return The nested transaction boundaries this session is inside.
   ///
   /// \note A SESSION AND ITS BOUNDARIES ARE ONE THING, which is why they live together. A savepoint
@@ -66,6 +78,7 @@ private:
   Connection connection_;
   Boundaries boundaries_;
   Session *previous_;
+  Guid userSecurityId_;
 };
 
 } // namespace agiru

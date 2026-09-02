@@ -135,4 +135,14 @@ private:
   std::int64_t milliseconds_{0};
 };
 
+/// \brief AL `CurrentDateTime` -- the instant this call happens.
+///
+/// \return The wall clock, in UTC, to the millisecond.
+///
+/// \note `system-currentdatetime-method.md` says "Gets the current date and time from the operating
+///       system", and `datetime-data-type.md` says a DateTime "is stored in the database as
+///       Coordinated Universal Time (UTC)". There is no work date here and no session offset: this
+///       is the clock, and AL's `WorkDate` is a different thing that a session carries.
+[[nodiscard]] DateTime CurrentDateTime();
+
 } // namespace agiru

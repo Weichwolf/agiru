@@ -47,8 +47,18 @@ public:
   [[nodiscard]] Integer Length() const { return def_->length; }
 
   /// \brief AL `FieldRef.Type()`.
-  /// \return The field's AL data type.
-  [[nodiscard]] FieldType Type() const { return def_->type; }
+  ///
+  /// \return The field's AL data type, as the platform reports it.
+  ///
+  /// \warning AN ENUM FIELD REPORTS `Option`, AND THAT IS THE PLATFORM'S OWN ANSWER RATHER THAN A
+  ///          simplification. `fieldtype-option.md` lists every member of the FieldType this
+  ///          returns -- Boolean, Integer, BigInteger, Decimal, Option, Text, Code, DateTime, Time,
+  ///          Date, DateFormula, Duration, Guid, RecordId, TableFilter, Blob, Media, MediaSet --
+  ///          and there is NO `Enum` among them. BC tells the two apart through `IsEnum()` and
+  ///          nowhere else. `BankPmtApplRuleUT` stands on it: it reads `Field.Type` from the
+  ///          virtual Field table, leaves the procedure unless it is `Option`, and then asks for
+  ///          `OptionMembers` -- on `Sales Header."Document Type"`, which is an Enum.
+  [[nodiscard]] FieldType Type() const;
 
   /// \brief AL `FieldRef.IsEnum()`.
   /// \return True when the field is an enum rather than an option or anything else.

@@ -1,6 +1,7 @@
 #include "runtime/Table.h"
 
 #include "Rows.h"
+#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
@@ -222,12 +223,52 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
   }
 }
 
-void RuntimeInsert(const void *record, const TableDef &table) {
+namespace {
+
+template <typename T> T *SystemField(void *record, const TableDef &table, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  return def != nullptr ? reinterpret_cast<T *>(static_cast<std::byte *>(record) + def->offset)
+                        : nullptr;
+}
+
+void StampModified(void *record, const TableDef &table, const DateTime &now, const Guid &user) {
+  if (auto *at = SystemField<DateTime>(record, table, SystemFieldNumbers::SystemModifiedAt);
+      at != nullptr) {
+    *at = now;
+  }
+  if (auto *by = SystemField<Guid>(record, table, SystemFieldNumbers::SystemModifiedBy);
+      by != nullptr) {
+    *by = user;
+  }
+}
+
+void StampInserted(void *record, const TableDef &table) {
+  const DateTime now = CurrentDateTime();
+  const Guid &user = Session::Current().UserSecurityId();
+  if (auto *id = SystemField<Guid>(record, table, SystemFieldNumbers::SystemId); id != nullptr) {
+    *id = Guid::Create();
+  }
+  if (auto *at = SystemField<DateTime>(record, table, SystemFieldNumbers::SystemCreatedAt);
+      at != nullptr) {
+    *at = now;
+  }
+  if (auto *by = SystemField<Guid>(record, table, SystemFieldNumbers::SystemCreatedBy);
+      by != nullptr) {
+    *by = user;
+  }
+  StampModified(record, table, now, user);
+}
+
+} // namespace
+
+void RuntimeInsert(void *record, const TableDef &table) {
+  StampInserted(record, table);
   const FieldValues values = ValuesOf(record, table);
   InsertRow(Session::Current().Database(), table, values);
 }
 
-bool RuntimeModify(const void *record, const TableDef &table) {
+bool RuntimeModify(void *record, const TableDef &table) {
+  StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   return ModifyRow(Session::Current().Database(), table, values);
 }

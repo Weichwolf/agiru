@@ -51,7 +51,7 @@ struct VarDecl {
   std::string type;
   std::string subtype;
   int length = 0;
-  std::vector<std::string> members;   ///< An inline `Option A,B,C` declares its own.
+  std::vector<std::string> members; ///< An inline `Option A,B,C` declares its own.
   /// `List of [Text]`, `Dictionary of [Text, Integer]` -- and they NEST: the BaseApp writes
   /// `Dictionary of [Integer, List of [Text]]` and `Dictionary of [Enum "X", Text]`. An argument is
   /// therefore a declaration and not a name, because a name cannot carry the inner arguments, the

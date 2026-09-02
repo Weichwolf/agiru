@@ -39,6 +39,39 @@ namespace agiru {
 /// AL's `field(2; "Code"; Code[20])` states a type, and everything else about the storage follows
 /// from it: the type tag, the declared length, and an enumeration's values. Those are derived here
 /// rather than repeated in the declaration, so that a table says each thing once.
+/// \brief One system field, as `devenv-table-system-fields.md` tabulates it.
+struct SystemFieldDecl {
+  FieldNo no;              ///< The reserved field number.
+  std::string_view name;   ///< The AL name, which is also the caption.
+  std::string_view alType; ///< The AL data type, which the generated member is declared with.
+};
+
+/// \brief The system fields, in field-number order.
+///
+/// \note THIS IS THE ONLY PLACE IN THE TREE THAT SPELLS THEM. The generator writes the members from
+///       it, `SystemFieldNumbers` takes its constants from it, and `WithSystemFields` builds their
+///       declarations from it -- so a name, a number and a type are each said once.
+inline constexpr std::array<SystemFieldDecl, kSystemFieldCount> kSystemFields{{
+    {.no = FieldNo{2000000000}, .name = "SystemId", .alType = "Guid"},
+    {.no = FieldNo{2000000001}, .name = "SystemCreatedAt", .alType = "DateTime"},
+    {.no = FieldNo{2000000002}, .name = "SystemCreatedBy", .alType = "Guid"},
+    {.no = FieldNo{2000000003}, .name = "SystemModifiedAt", .alType = "DateTime"},
+    {.no = FieldNo{2000000004}, .name = "SystemModifiedBy", .alType = "Guid"},
+}};
+
+/// \brief The field numbers the platform gives every table.
+///
+/// A generated table's `FieldNumber` struct DERIVES from this, so the five numbers are said once in
+/// the door instead of once per table. They are static constants, so inheriting them costs no
+/// layout -- which the storage they belong to cannot say for itself (see `WithSystemFields`).
+struct SystemFieldNumbers {
+  static constexpr FieldNo SystemId = kSystemFields[0].no;        ///< The row's immutable identity.
+  static constexpr FieldNo SystemCreatedAt = kSystemFields[1].no; ///< The instant it was written.
+  static constexpr FieldNo SystemCreatedBy = kSystemFields[2].no; ///< The SID that wrote it.
+  static constexpr FieldNo SystemModifiedAt = kSystemFields[3].no; ///< The instant it last changed.
+  static constexpr FieldNo SystemModifiedBy = kSystemFields[4].no; ///< The SID that changed it.
+};
+
 template <typename T> struct FieldTypeOf;
 
 /// \brief `Code[N]` -- a code field of declared length N.
@@ -190,6 +223,52 @@ Declare(FieldNo no, std::string_view name, std::string_view caption, std::size_t
       .offset = offset,
       .values = FieldTypeOf<Value>::kValues,
   };
+}
+
+/// \brief The declared field table with the platform's own five appended.
+///
+/// \tparam T The generated table class.
+/// \tparam N How many fields the `.al` file declares.
+/// \param declared The fields the AL source names, in ascending field number.
+/// \return All of them, followed by the system fields.
+///
+/// \note THE FIVE `Declare` CALLS LIVE HERE AND NOT IN 1 767 GENERATED FILES. Their numbers, names,
+///       captions and offsets are the same in every table, so a generated file states them nowhere
+///       and this one call carries them.
+///
+/// \note THE STORAGE CANNOT FOLLOW THEM HERE, and that is a language rule rather than a decision:
+///       a standard-layout class has all its non-static data members in ONE class of its hierarchy,
+///       so system fields in `Table<Derived>` and AL fields in the generated class would leave the
+///       record non-standard-layout -- and `offsetof`, which is how the field table reaches every
+///       field, is only conditionally supported there. The five members therefore stay in the
+///       generated class, and everything about them that is not storage stays here.
+///
+/// \note The result stays SORTED, which `FieldsAreSorted` asserts beside every table: the reserved
+///       range starts at 2000000000 and the largest field number in the BaseApp is 99 008 500.
+template <typename T, std::size_t N>
+[[nodiscard]] constexpr std::array<FieldDef, N + kSystemFieldCount>
+WithSystemFields(const std::array<FieldDef, N> &declared) {
+  std::array<FieldDef, N + kSystemFieldCount> all{};
+  for (std::size_t i = 0; i < N; ++i) { all[i] = declared[i]; }
+  all[N] = Declare<&T::SystemId>(
+      kSystemFields[0].no, kSystemFields[0].name, kSystemFields[0].name, offsetof(T, SystemId));
+  all[N + 1] = Declare<&T::SystemCreatedAt>(kSystemFields[1].no,
+                                            kSystemFields[1].name,
+                                            kSystemFields[1].name,
+                                            offsetof(T, SystemCreatedAt));
+  all[N + 2] = Declare<&T::SystemCreatedBy>(kSystemFields[2].no,
+                                            kSystemFields[2].name,
+                                            kSystemFields[2].name,
+                                            offsetof(T, SystemCreatedBy));
+  all[N + 3] = Declare<&T::SystemModifiedAt>(kSystemFields[3].no,
+                                             kSystemFields[3].name,
+                                             kSystemFields[3].name,
+                                             offsetof(T, SystemModifiedAt));
+  all[N + 4] = Declare<&T::SystemModifiedBy>(kSystemFields[4].no,
+                                             kSystemFields[4].name,
+                                             kSystemFields[4].name,
+                                             offsetof(T, SystemModifiedBy));
+  return all;
 }
 
 } // namespace agiru

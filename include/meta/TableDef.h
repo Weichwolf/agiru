@@ -69,6 +69,22 @@ struct KeyDef {
   bool clustered;                  ///< The `Clustered` property.
 };
 
+/// \brief How many system fields the platform adds to every table.
+///
+/// `devenv-table-system-fields.md` tabulates five with their numbers -- SystemId 2000000000,
+/// SystemCreatedAt 2000000001, SystemCreatedBy 2000000002, SystemModifiedAt 2000000003,
+/// SystemModifiedBy 2000000004 -- and says they are "automatically included in every table object
+/// by the platform".
+///
+/// \note IT IS NAMED SO THAT A GENERATED ASSERTION CAN KEEP THE AL NUMBER VISIBLE. A table's field
+///       count is asserted as `declared + kSystemFieldCount`, so a reader checks the first number
+///       against the `.al` file and the second against this page. Folding them into one total would
+///       leave nothing that either source can be compared with.
+///
+/// \note SystemRowVersion is NOT among them. AL exposes the SQL rowversion under that name and the
+///       page gives it no field number, unlike the five it tabulates (board:0013).
+inline constexpr std::size_t kSystemFieldCount = 5;
+
 /// \brief One table's declaration.
 struct TableDef {
   TableId id;                       ///< The AL table number.

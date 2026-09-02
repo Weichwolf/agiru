@@ -3,6 +3,9 @@
 #include "type/DateTime.h"
 #include "type/Time.h"
 
+#include <cstdint>
+#include <ctime>
+
 using agiru::Date;
 using agiru::DateTime;
 using agiru::Time;
@@ -98,6 +101,33 @@ void InstantsOrderAcrossTheDayBoundary() {
                  Time::kMillisecondsPerDay);
 }
 
+/// THE AL EPOCH IS 1753-01-01 AND THE UNIX EPOCH IS 1970-01-01, and getting that offset wrong puts
+/// every audit timestamp 217 years out without anything raising. The check is against `<chrono>`'s
+/// OWN calendar rather than against agiru's, so the two paths are independent: an error in
+/// `calendar::CivilFromDays` cannot hide itself by making both sides agree.
+void TheClockAgreesWithTheCalendarItDoesNotShare() {
+  const DateTime now = agiru::CurrentDateTime();
+  CHECK_TRUE("the clock is not the undefined DateTime", !now.IsUndefined());
+
+  const std::time_t seconds = std::time(nullptr);
+  std::tm utc{};
+  gmtime_r(&seconds, &utc);
+  const Date said = now.Date();
+  CHECK_TRUE("the year is the one the operating system gives", said.Year() == utc.tm_year + 1900);
+  CHECK_TRUE("and the month", said.Month() == utc.tm_mon + 1);
+  CHECK_TRUE("and the day", said.Day() == utc.tm_mday);
+  // THE NEGATIVE CONTROL: the checks above would still pass if `Date()` and the offset were both
+  // wrong in cancelling ways only if the milliseconds meant nothing. They do mean something -- the
+  // count is against 1753-01-01, so it is larger than a quarter of a million days of milliseconds
+  // and smaller than half a million. A Unix-epoch count would fail the first.
+  constexpr std::int64_t kDaysFrom1753To2020 = 97519;
+  constexpr std::int64_t kDaysFrom1753To2200 = 163263;
+  CHECK_TRUE("the count is against 1753 and not against 1970",
+             now.AsMilliseconds() > kDaysFrom1753To2020 * Time::kMillisecondsPerDay);
+  CHECK_TRUE("and it is this era rather than a far one",
+             now.AsMilliseconds() < kDaysFrom1753To2200 * Time::kMillisecondsPerDay);
+}
+
 } // namespace
 
 int main() {
@@ -109,5 +139,6 @@ int main() {
     TheUndefinedDateTimeIsTheEarliestInstant();
     ADateTimeHasNoClosingDate();
     InstantsOrderAcrossTheDayBoundary();
+    TheClockAgreesWithTheCalendarItDoesNotShare();
   });
 }
