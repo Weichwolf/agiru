@@ -17,25 +17,40 @@ namespace agiru {
 ///
 /// This list grows as the generator learns types. A type it cannot emit is a translation error
 /// rather than a silent fallback to Text.
+///
+/// \warning THE NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. `FieldRef.Type()` and
+///          `Field.Type` return this, and AL compares the result against `Field.Type::Code`
+///          directly -- so a dense 0, 1, 2 ... of this tree's own invention would make every such
+///          comparison quietly false. The sparse values are BC's: measured from
+///          `~/Git/openerp/openerp/runtime/al_system_enums.py`, which mirrors AL's `FieldType`
+///          system type, and cross-checked against `fieldtype-option.md`, whose eighteen documented
+///          members are exactly a subset of them.
 enum class FieldType : std::uint8_t {
-  Boolean,
-  Integer,
-  BigInteger,
-  Decimal,
-  Code,
-  Text,
-  Date,
-  Time,
-  DateTime,
-  Option,
-  Enum,
-  Guid,
-  Blob,
-  DateFormula,
-  RecordId,
-  Duration,
-  Media,
-  MediaSet,
+  Boolean = 3,      ///< AL `Boolean`.
+  Option = 5,       ///< AL `Option`, and what an Enum field reports too.
+  Integer = 7,      ///< AL `Integer`.
+  Decimal = 9,      ///< AL `Decimal`.
+  Date = 11,        ///< AL `Date`.
+  Time = 12,        ///< AL `Time`.
+  Blob = 14,        ///< AL `Blob`.
+  DateFormula = 15, ///< AL `DateFormula`.
+  BigInteger = 18,  ///< AL `BigInteger`.
+  Duration = 20,    ///< AL `Duration`.
+  Guid = 21,        ///< AL `Guid`.
+  DateTime = 22,    ///< AL `DateTime`.
+  RecordId = 23,    ///< AL `RecordId`.
+  Text = 31,        ///< AL `Text`.
+  Code = 33,        ///< AL `Code`.
+  MediaSet = 39,    ///< AL `MediaSet`.
+  Media = 40,       ///< AL `Media`.
+
+  /// \brief An enum field, which the PLATFORM does not distinguish and this metadata does.
+  ///
+  /// It is deliberately outside the platform's own range: `FieldRef::Type()` reports `Option` for
+  /// a field declared this way, because `fieldtype-option.md` has no `Enum` member at all, and
+  /// `IsEnum()` is the one place BC puts the difference. So this value never leaves the metadata,
+  /// and giving it a platform number would let it escape looking like one.
+  Enum = 200,
 };
 
 /// \brief One field's declaration, as static const data.

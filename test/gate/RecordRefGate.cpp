@@ -244,6 +244,40 @@ void AnEnumFieldReportsOption() {
   CHECK_TRUE("and so does the option", option.OptionMembers().Count() == 2);
   CHECK_TRUE("the enum keeps its declared ordinal", declared.GetEnumValueOrdinal(2) == 10);
 }
+
+/// THE FIELD TYPE'S NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. AL compares the result of
+/// `FieldRef.Type()` against `Field.Type::Code` directly, so a dense 0, 1, 2 ... of this tree's own
+/// invention would make every such comparison quietly false -- the silent-wrong-data class, and one
+/// that no other case here would catch, because every check inside agiru compares the enum against
+/// itself and agrees whatever the numbers are.
+void TheFieldTypeCarriesThePlatformsOwnNumbers() {
+  CHECK_TRUE("Boolean is 3", static_cast<int>(agiru::FieldType::Boolean) == 3);
+  CHECK_TRUE("Option is 5", static_cast<int>(agiru::FieldType::Option) == 5);
+  CHECK_TRUE("Integer is 7", static_cast<int>(agiru::FieldType::Integer) == 7);
+  CHECK_TRUE("Decimal is 9", static_cast<int>(agiru::FieldType::Decimal) == 9);
+  CHECK_TRUE("Date is 11", static_cast<int>(agiru::FieldType::Date) == 11);
+  CHECK_TRUE("Blob is 14", static_cast<int>(agiru::FieldType::Blob) == 14);
+  CHECK_TRUE("BigInteger is 18", static_cast<int>(agiru::FieldType::BigInteger) == 18);
+  CHECK_TRUE("Guid is 21", static_cast<int>(agiru::FieldType::Guid) == 21);
+  CHECK_TRUE("DateTime is 22", static_cast<int>(agiru::FieldType::DateTime) == 22);
+  CHECK_TRUE("Text is 31", static_cast<int>(agiru::FieldType::Text) == 31);
+  CHECK_TRUE("Code is 33", static_cast<int>(agiru::FieldType::Code) == 33);
+  CHECK_TRUE("Media is 40", static_cast<int>(agiru::FieldType::Media) == 40);
+
+  // THE GAPS ARE THE POINT. A counter cannot produce them, so their presence is what says these
+  // numbers were taken from somewhere rather than assigned here.
+  CHECK_TRUE("nothing sits at 4",
+             static_cast<int>(agiru::FieldType::Option) -
+                     static_cast<int>(agiru::FieldType::Boolean) ==
+                 2);
+  CHECK_TRUE("and the range is wider than the member count",
+             static_cast<int>(agiru::FieldType::Media) > 17);
+
+  // AN ENUM FIELD'S TAG STAYS OUT OF THE PLATFORM'S RANGE, so it cannot escape looking like one.
+  CHECK_TRUE("the internal Enum tag is above every platform number",
+             static_cast<int>(agiru::FieldType::Enum) > static_cast<int>(agiru::FieldType::Media));
+}
+
 } // namespace
 
 int main() {
@@ -253,6 +287,7 @@ int main() {
     AFieldIsReachedByNumberAndByPosition();
     AValueCarriesItsType();
     AnEnumFieldReportsOption();
+    TheFieldTypeCarriesThePlatformsOwnNumbers();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
   });
 }
