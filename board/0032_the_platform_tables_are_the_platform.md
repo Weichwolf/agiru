@@ -98,6 +98,57 @@ numbers". An unbounded scan of it is meaningless in BC too, so it refuses here a
 the declaration and a refusal in `RuntimeInsert`, `RuntimeModify` and `RuntimeDelete` -- generic,
 and the only thing about a virtual table the record layer needs to know.
 
+## How `Integer` works, and why none of it is a special case in the record layer
+
+Measured over BCApps on 2026-09-02, because the design follows the use and not the other way round:
+
+| | |
+|---|---|
+| the field is called `Number` | 33 x `Integer.Number`, 0 x `Integer.Integer`. The page's table column reads `Integer`, but it is DESCRIBING the contents; the source names the field and wins here |
+| `dataitem(...; Integer)` | 297 |
+| `SetRange(Number, 1, <count>)` | the dominant idiom, and BOUNDED |
+| `DataItemTableView = SORTING(Number)` with no WHERE | present, so UNBOUNDED scans exist -- stopped from inside by `MaxIteration` (234 uses) or `CurrReport.Break` |
+
+So laziness is compulsory: an unbounded dataitem must not touch two billion rows.
+
+**1. The rows come from the DECLARATION, not from the class.** `TableDef` gains a source: `Stored`
+for a PostgreSQL relation, `Sequence` for an interval of integers. That is one enum in `constexpr`
+metadata, which is this tree's own thesis -- data decides behaviour, not virtual dispatch, and a
+generated record has no virtuals to dispatch through anyway. `Date`, `Field`, `AllObj` and the rest
+are `Stored` and therefore need NOTHING new. `Integer` is the only `Sequence`.
+
+**2. The FROM clause is built from the filter.** A `Sequence` table becomes
+`FROM (SELECT generate_series($lo, $hi)::int AS "Number" UNION ALL ...) AS "Integer"`, one series per
+interval, clipped to the documented domain -1 000 000 000 .. 1 000 000 000. Everything the filter
+says beyond the intervals stays in the WHERE clause, so `<>5` still works.
+
+**3. What that needs is worth having anyway: the INTERVAL SET of a filter on one integer field.**
+The filter AST is already a disjunction of conjunctions; over a single field each conjunction is an
+interval and the disjunction is their union. It is a small exact analysis over an AST that exists,
+and it is what an index-range decision would want later. It is a function of the filter language,
+not a prop for one table.
+
+**4. Laziness comes from PostgreSQL.** `generate_series` is an executor node that produces rows on
+demand, and a cursor is how a client takes as many as it wants. An unbounded dataitem that stops
+after twenty rows costs twenty rows -- no windowing, no chunking, no guessed bound. And a cursor is
+what `FindSet` over ANY large table wants, so this builds the general thing rather than a prop.
+
+**5. `Count()` needs no query at all.** The interval set gives it by arithmetic, exactly, in the
+number of intervals. It falls out of 3 for free.
+
+**6. Descending is `generate_series(hi, lo, -1)`**, not an `ORDER BY` over two billion rows.
+
+**7. The namespace is forced and useful.** `agiru::Integer` is the AL Integer TYPE and `agiru::Date`
+is the AL Date type, so the platform tables cannot share that namespace: they live in
+`agiru::platform`. AL disambiguates the same two names by context (`Record Integer` against
+`x: Integer`); C++ needs the namespace to do it, and the generator emits the qualified name, so
+`apps/` never sees the difference.
+
+**IT IS TRANSPARENT TO `apps/`.** A generated file writes `Rec.SetRange(Number, 1, 10)` and
+`Rec.FindSet()` over `agiru::platform::Integer` exactly as it writes them over `agiru::app::Item`.
+Nothing in the record layer branches on which table it holds; the only thing that knows is the SQL
+builder, at the one point where a FROM clause is written.
+
 ## What has to be decided, and it is not decided yet
 
 - ~~**How a row source is chosen.**~~ ANSWERED above: they are PostgreSQL relations, so there is no
