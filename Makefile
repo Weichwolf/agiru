@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all db lint test transpile tree provision doc clean spotless help
+.PHONY: all cronus db lint test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -31,6 +31,11 @@ transpile: all     ## every app in apps.json through the transpiler into apps/
 
 tree: all          ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh
+
+cronus:            ## the demo database from the CDN into PostgreSQL, one to one
+	@sh $(SELF)/scripts/fetch_artifact.sh
+	@sh $(SELF)/scripts/mssql_restore.sh
+	@python3 $(SELF)/scripts/cronus_to_pg.py
 
 provision:         ## MSSQL container, BC demo .bak from the CDN, PostgreSQL master
 	@sh $(SELF)/scripts/provision.sh
