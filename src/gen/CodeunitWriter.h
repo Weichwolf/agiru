@@ -69,6 +69,7 @@ struct InterfaceHeader {
   /// The types its SIGNATURES name that this run does not have. A parameter is a declaration, and
   /// an interface is where the platform's bare enums show up most.
   DotNetUse absent;
+  DotNetUse dotnet;
 };
 
 /// \brief Translates an AL interface into an abstract class.
@@ -154,6 +155,12 @@ std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
                              const std::vector<al::ProcedureDecl> &procedures,
                              const Objects &objects);
 
+/// \brief Qualifies every identifier in a type that a name in the object's own scope hides.
+/// \param type  The C++ type as generated.
+/// \param names Every name declared in the object's scope.
+/// \return The type, with `agiru::` in front of each hidden identifier.
+std::string QualifiedType(const std::string &type, const std::set<std::string> &names);
+
 /// \brief The C++ type an AL declaration becomes.
 /// \param declared The AL declaration.
 /// \param objects  Everything the run has translated so far.
@@ -168,6 +175,17 @@ std::string DeclaredType(const al::VarDecl &declared, const Objects &objects);
 /// \param procedures Its procedures.
 /// \param objects    Everything the run has translated so far.
 /// \return True when the file needs `absent/Types.h`.
+/// \brief Collects, per absent AL object, the members the declarations here call on it.
+/// \param variables  The object's own variables.
+/// \param procedures Its procedures.
+/// \param objects    Everything the run has translated so far.
+/// \param absent     Receives the entries; an object with no call still gets an empty one.
+void GatherAbsentIn(const std::vector<al::VarDecl> &variables,
+                    const std::vector<al::ProcedureDecl> &procedures,
+                    const Objects &objects,
+                    DotNetUse &dotnet,
+                    DotNetUse &absent);
+
 bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
                    const std::vector<al::ProcedureDecl> &procedures,
                    const Objects &objects);

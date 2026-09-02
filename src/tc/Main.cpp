@@ -72,25 +72,25 @@ bool IsUnitTest(std::string_view name) {
 
 void Report(std::string_view what, const Counts &counts) {
   if (what == "codeunits") {
-    std::println("{:<10}{} of {} parsed ({} procedures, {} [Test] methods)",
+    std::println("{:<10} {} of {} parsed ({} procedures, {} [Test] methods)",
                  what,
                  counts.parsed,
                  counts.files,
                  counts.members,
                  counts.tests);
     if (counts.unitTests != 0) {
-      std::println("{:<10}{} codeunits, {} [Test] methods -- the milestone's population",
+      std::println("{:<10} {} codeunits, {} [Test] methods -- the milestone's population",
                    "UT",
                    counts.unitFiles + counts.unitLost,
                    counts.unitTests);
-      std::println("{:<10}{} of them reach the parser; {} codeunit(s) do not parse at all",
+      std::println("{:<10} {} of them reach the parser; {} codeunit(s) do not parse at all",
                    "",
                    counts.unitParsed,
                    counts.unitLost);
     }
     return;
   }
-  std::println("{:<10}{} of {} parsed ({} {})",
+  std::println("{:<10} {} of {} parsed ({} {})",
                what,
                counts.parsed,
                counts.files,
@@ -207,29 +207,57 @@ void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
   for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
 }
 
-void ScanInterfaces(Run &run, Counts &counts, Gathered &gathered, agiru::gen::Objects &objects) {
+/// AN INTERFACE NAMES ANOTHER INTERFACE, so all of them are indexed before any is written --
+/// `Price Calculation` takes a `Line With Price`, and writing in walk order made whichever came
+/// second an absent type.
+struct Interfaces {
+  std::vector<agiru::al::InterfaceObject> objects;
+  std::vector<std::string> paths;
+};
+
+Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &objects) {
+  Interfaces kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Interface.al")) {
     ++counts.files;
     try {
-      const agiru::al::InterfaceObject object = agiru::al::ParseInterface(Read(path));
+      agiru::al::InterfaceObject object = agiru::al::ParseInterface(Read(path));
       ++counts.parsed;
       counts.members += object.procedures.size();
       const std::string identifier = agiru::gen::Identifier(object.name);
-      const std::string header =
-          agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) + "/" +
-          identifier + ".h";
       objects.interfaces.insert_or_assign(
           agiru::gen::LowerKey(object.name),
-          agiru::gen::TableRef{.identifier = "interfaces::" + identifier, .header = header});
-      if (run.output.empty()) { continue; }
-      const agiru::gen::InterfaceHeader written = agiru::gen::WriteInterface(
-          object, std::filesystem::relative(path, run.root).string(), objects);
-      Absorb(gathered.absent, written.absent);
-      Keep(run, Output{.directory = run.output, .relative = header}, written.text);
-      ++run.written;
+          agiru::gen::TableRef{
+              .identifier = "interfaces::" + identifier,
+              .header = agiru::gen::OutputDirectory(object.nameSpace,
+                                                    agiru::gen::ObjectKind::Interface) +
+                        "/" + identifier + ".h"});
+      kept.paths.push_back(std::filesystem::relative(path, run.root).string());
+      kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
       if (Note(run, path, e)) { --counts.files; }
     }
+  }
+  return kept;
+}
+
+void WriteInterfaces(Run &run,
+                     const Interfaces &kept,
+                     Gathered &gathered,
+                     const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (std::size_t i = 0; i < kept.objects.size(); ++i) {
+    const agiru::gen::InterfaceHeader written =
+        agiru::gen::WriteInterface(kept.objects[i], kept.paths[i], objects);
+    Absorb(gathered.dotnet, written.dotnet);
+    Absorb(gathered.absent, written.absent);
+    const std::string identifier = agiru::gen::Identifier(kept.objects[i].name);
+    Keep(run,
+         Output{.directory = run.output,
+                .relative = agiru::gen::OutputDirectory(kept.objects[i].nameSpace,
+                                                        agiru::gen::ObjectKind::Interface) +
+                            "/" + identifier + ".h"},
+         written.text);
+    ++run.written;
   }
 }
 
@@ -237,6 +265,119 @@ void ScanInterfaces(Run &run, Counts &counts, Gathered &gathered, agiru::gen::Ob
 /// A codeunit takes `Page "Item Tracking Lines"` as a parameter, so the index has to exist before
 /// the codeunits are written; a page names tables, enums and codeunits in its own variables, so it
 /// cannot be written before they are. Parsing once and keeping the objects settles both.
+/// EVERY EXTENSION IN EVERY APP, KEYED BY WHAT IT EXTENDS.
+///
+/// AN EXTENSION CROSSES THE APP BOUNDARY IN THE DIRECTION THE BOUNDARY FORBIDS FOR EVERYTHING ELSE.
+/// `base` extends `Accessible Companies`, which `system` declares -- and the app loop reads system
+/// first and writes it before base is even opened. Merging per app therefore lost 70 of 267
+/// extensions, each with a named refusal.
+///
+/// The answer is not to hold every parsed object until the end: that is 9 600 ASTs with every
+/// procedure's tokens in them. It is to read the EXTENSIONS first -- 267 files, all of them small
+/// -- and let each app consume what belongs to the objects it declares. Which apps are installed is
+/// a transpile-time decision either way (board:0033).
+struct Extensions {
+  std::map<std::string, std::vector<agiru::al::TableExtensionObject>> tables;
+  std::map<std::string, std::vector<agiru::al::EnumExtensionObject>> enums;
+  std::map<std::string, std::vector<agiru::al::PageExtensionObject>> pages;
+  /// What each key ADDS UP TO, and what was actually merged. An extension whose target no app in
+  /// this run declares is a hole with a name, not something to pass over: `Copilot Capability`
+  /// exists in BCApps only as extensions of something the platform declares.
+  mutable std::map<std::string, std::size_t> held;
+  mutable std::map<std::string, std::size_t> consumed;
+};
+
+/// A procedure's identity for the purpose of NOT declaring it twice: the name and the parameter
+/// types, which is what C++ overloads on.
+///
+/// A PAGE AND ITS EXTENSION MAY BOTH DECLARE THE SAME EVENT PUBLISHER. `Error Messages` declares
+/// `OnAfterGetCurrRecord` and so does the extension that adds to it -- legal AL, because the
+/// extension's is its own object's -- and appending both gives one C++ class two identical members.
+std::string Overload(const agiru::al::ProcedureDecl &procedure) {
+  std::string key = agiru::gen::LowerKey(procedure.name);
+  for (const agiru::al::VarDecl &parameter : procedure.parameters) {
+    key += "|" + agiru::gen::LowerKey(parameter.type) + " " + agiru::gen::LowerKey(parameter.subtype);
+  }
+  return key;
+}
+
+/// TWO EXTENSIONS MAY ADD THE SAME FIELD, and so may an extension and the table it extends: BC
+/// installs one of them and agiru merges all of them, which is the price of the build-time boundary
+/// (board:0033). A field already declared -- by NAME or by NUMBER -- is not added twice.
+void TakeFields(std::vector<agiru::al::FieldDecl> &into,
+                const std::vector<agiru::al::FieldDecl> &from) {
+  std::set<std::string> names;
+  std::set<int> numbers;
+  for (const agiru::al::FieldDecl &field : into) {
+    names.insert(agiru::gen::LowerKey(field.name));
+    numbers.insert(field.number);
+  }
+  for (const agiru::al::FieldDecl &field : from) {
+    if (!names.insert(agiru::gen::LowerKey(field.name)).second) { continue; }
+    if (!numbers.insert(field.number).second) { continue; }
+    into.push_back(field);
+  }
+}
+
+/// A TABLE AND ITS EXTENSION MAY DECLARE THE SAME VARIABLE, for the same reason they declare the
+/// same publisher: each is its own object in AL. `Item Journal Line` and the manufacturing
+/// extension both keep a `UOMMgt`, and one C++ class cannot have two.
+void TakeVariables(std::vector<agiru::al::VarDecl> &into,
+                   const std::vector<agiru::al::VarDecl> &from) {
+  std::set<std::string> declared;
+  for (const agiru::al::VarDecl &variable : into) {
+    declared.insert(agiru::gen::LowerKey(variable.name));
+  }
+  for (const agiru::al::VarDecl &variable : from) {
+    if (declared.insert(agiru::gen::LowerKey(variable.name)).second) { into.push_back(variable); }
+  }
+}
+
+void TakeProcedures(std::vector<agiru::al::ProcedureDecl> &into,
+                    const std::vector<agiru::al::ProcedureDecl> &from) {
+  std::set<std::string> declared;
+  for (const agiru::al::ProcedureDecl &procedure : into) { declared.insert(Overload(procedure)); }
+  for (const agiru::al::ProcedureDecl &procedure : from) {
+    if (declared.insert(Overload(procedure)).second) { into.push_back(procedure); }
+  }
+}
+
+/// Records every target the store holds, so that whatever is left after the run can be named.
+void NoteTargets(const Extensions &store) {
+  // THE KEY CARRIES THE KIND, because a table and a page may share a name -- 51 objects in the read
+  // roots are two kinds at once -- and one counter for both would go negative.
+  for (const auto &[name, list] : store.tables) { store.held["table " + name] += list.size(); }
+  for (const auto &[name, list] : store.enums) { store.held["enum " + name] += list.size(); }
+  for (const auto &[name, list] : store.pages) { store.held["page " + name] += list.size(); }
+}
+
+/// Reads every extension in every app, in the order the file walk finds them, which is sorted by
+/// path -- determinism is compulsory and the merge appends in this order.
+Extensions ReadExtensions(Run &run, Counts &counts, const std::vector<agiru::gen::App> &apps,
+                          const std::filesystem::path &source) {
+  Extensions store;
+  for (const agiru::gen::App &app : apps) {
+    run.root = source / app.source;
+    if (!std::filesystem::is_directory(run.root)) { continue; }
+    const auto read = [&](std::string_view suffix, auto parse, auto &into) {
+      for (const std::filesystem::path &path : SourcesEndingIn(run.root, suffix)) {
+        ++counts.files;
+        try {
+          auto extension = parse(Read(path));
+          ++counts.parsed;
+          into[agiru::gen::LowerKey(extension.extends)].push_back(std::move(extension));
+        } catch (const std::exception &e) {
+          if (Note(run, path, e)) { --counts.files; }
+        }
+      }
+    };
+    read(".TableExt.al", agiru::al::ParseTableExtension, store.tables);
+    read(".EnumExt.al", agiru::al::ParseEnumExtension, store.enums);
+    read(".PageExt.al", agiru::al::ParsePageExtension, store.pages);
+  }
+  return store;
+}
+
 struct Pages {
   std::vector<agiru::al::PageObject> objects;
   std::vector<std::string> paths;
@@ -263,11 +404,41 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   return pages;
 }
 
-void WritePages(Run &run, const Pages &pages, const agiru::gen::Objects &objects) {
+/// EVERY `pageextension` IS MERGED INTO ITS PAGE BEFORE THE PAGE IS WRITTEN, for the reason a
+/// tableextension is (board:0033). The added controls are appended, which is enough for the class:
+/// a control is reached by NAME and the nesting decides the layout of a running page rather than
+/// the declaration.
+std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
+  std::size_t merged = 0;
+  const auto take = [](auto &into, auto &from) {
+    into.insert(into.end(), from.begin(), from.end());
+  };
+  for (agiru::al::PageObject &page : pages.objects) {
+    const auto found = store.pages.find(agiru::gen::LowerKey(page.name));
+    if (found == store.pages.end()) { continue; }
+    for (const agiru::al::PageExtensionObject &extension : found->second) {
+      take(page.layout, extension.layout);
+      take(page.actions, extension.actions);
+      TakeProcedures(page.procedures, extension.procedures);
+      TakeVariables(page.variables, extension.variables);
+      take(page.labels, extension.labels);
+      ++merged;
+      ++store.consumed["page " + found->first];
+    }
+  }
+  return merged;
+}
+
+void WritePages(Run &run,
+                const Pages &pages,
+                const agiru::gen::Objects &objects,
+                Gathered &gathered) {
   if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < pages.objects.size(); ++i) {
     const agiru::gen::PageHeader written =
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
+    Absorb(gathered.dotnet, written.dotnet);
+    Absorb(gathered.absent, written.absent);
     Keep(run,
          Output{.directory = run.output, .relative = agiru::gen::PageHeaderPath(pages.objects[i])},
          written.text);
@@ -275,7 +446,10 @@ void WritePages(Run &run, const Pages &pages, const agiru::gen::Objects &objects
   }
 }
 
-void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
+void ScanEnums(Run &run,
+               Counts &counts,
+               const Extensions &store,
+               agiru::gen::EnumIndex &index) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Enum.al")) {
@@ -290,6 +464,20 @@ void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
       if (Note(run, path, e)) { --counts.files; }
     }
   }
+
+  // EVERY `enumextension` IS MERGED INTO ITS ENUMERATION BEFORE IT IS WRITTEN, for the reason a
+  // tableextension is: BC merges them at build time and a C++ enumeration is closed (board:0033).
+  // The added values carry their own ordinals, so the order is AL's and the merge is an append.
+  for (agiru::al::EnumObject &object : objects) {
+    const auto found = store.enums.find(agiru::gen::LowerKey(object.name));
+    if (found == store.enums.end()) { continue; }
+    for (const agiru::al::EnumExtensionObject &extension : found->second) {
+      object.values.insert(object.values.end(), extension.values.begin(), extension.values.end());
+      ++counts.emitted;
+      ++store.consumed["enum " + found->first];
+    }
+  }
+
 
   for (const agiru::al::EnumObject &object : objects) {
     index.insert_or_assign(agiru::gen::LowerKey(object.name),
@@ -315,11 +503,14 @@ void WriteTable(Run &run,
                 const std::string &relative,
                 const agiru::gen::EnumIndex &index,
                 const agiru::gen::Objects &objects,
+                Gathered &gathered,
                 std::map<std::string, std::size_t> &unresolved) {
   const std::string stem =
       agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
       agiru::gen::Identifier(table.name);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
+  Absorb(gathered.dotnet, header.dotnet);
+  Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
   Keep(run, Output{.directory = run.output, .relative = stem + ".h"}, header.text);
   Keep(run,
@@ -366,14 +557,54 @@ Tables IndexTables(Run &run,
   return kept;
 }
 
+
+/// EVERY `tableextension` IS MERGED INTO ITS TABLE BEFORE THE TABLE IS WRITTEN, and BC merges them
+/// at build time as well -- the added columns land in the SAME SQL table. A C++ class is closed, so
+/// there is no run-time alternative, which is what makes which apps are installed a transpile-time
+/// decision (board:0033).
+///
+/// The order inside the merged table is AL's: the base declaration first, then each extension in
+/// the order the file walk found them, which is sorted by path. Determinism is compulsory.
+std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
+  std::size_t merged = 0;
+  const auto take = [](auto &into, const auto &from) {
+    into.insert(into.end(), from.begin(), from.end());
+  };
+  for (agiru::al::TableObject &table : tables.objects) {
+    const auto found = store.tables.find(agiru::gen::LowerKey(table.name));
+    if (found == store.tables.end()) { continue; }
+    for (const agiru::al::TableExtensionObject &extension : found->second) {
+      // A MODIFIED FIELD IS THE BASE FIELD WITH MORE ON IT: the extension carries no type, so what
+      // it brings is properties and triggers, and they go onto the declaration that is there.
+      for (const agiru::al::FieldDecl &change : extension.modified) {
+        for (agiru::al::FieldDecl &field : table.fields) {
+          if (agiru::gen::LowerKey(field.name) != agiru::gen::LowerKey(change.name)) { continue; }
+          take(field.properties, change.properties);
+          take(field.triggers, change.triggers);
+          break;
+        }
+      }
+      TakeFields(table.fields, extension.fields);
+      take(table.keys, extension.keys);
+      take(table.labels, extension.labels);
+      TakeVariables(table.variables, extension.variables);
+      TakeProcedures(table.procedures, extension.procedures);
+      ++merged;
+      ++store.consumed["table " + found->first];
+    }
+  }
+  return merged;
+}
+
 void WriteTables(Run &run,
                  const Tables &kept,
                  const agiru::gen::EnumIndex &index,
                  const agiru::gen::Objects &objects,
+                 Gathered &gathered,
                  std::map<std::string, std::size_t> &unresolvedEnums) {
   if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < kept.objects.size(); ++i) {
-    WriteTable(run, kept.objects[i], kept.paths[i], index, objects, unresolvedEnums);
+    WriteTable(run, kept.objects[i], kept.paths[i], index, objects, gathered, unresolvedEnums);
   }
 }
 
@@ -645,6 +876,17 @@ int Scan(const Job &job) {
   const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
   ClaimOutput(job.output);
 
+  Counts allExtensionsRead;
+  Run reader{.root = job.source,
+             .output = {},
+             .failures = {},
+             .refusals = {},
+             .written = 0,
+             .changed = 0,
+             .kept = {}};
+  const Extensions store = ReadExtensions(reader, allExtensionsRead, apps, job.source);
+  NoteTargets(store);
+
   std::map<std::string, std::size_t> unresolvedEnums;
   std::map<std::string, std::size_t> unresolvedTables;
   Gathered gathered;
@@ -654,6 +896,7 @@ int Scan(const Job &job) {
   Counts allTables;
   Counts allCodeunits;
   Counts allPages;
+  Counts allExtensions;
   std::vector<Failure> failures;
   std::vector<Failure> refusals;
   std::size_t written = 0;
@@ -673,7 +916,7 @@ int Scan(const Job &job) {
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
     if (!std::filesystem::is_directory(source)) {
-      std::println("{:<10}{} -- no such tree, skipped", app.name, source.string());
+      std::println("{:<10} {} -- no such tree, skipped", app.name, source.string());
       continue;
     }
     Run run{.root = source,
@@ -688,21 +931,25 @@ int Scan(const Job &job) {
     Counts tables;
     Counts codeunits;
     Counts pages;
+    Counts extensions;
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
-    ScanEnums(run, enums, index);
+    ScanEnums(run, enums, store, index);
     // AFTER the enums are read, not before: a codeunit variable of enum type resolves through the
     // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
-    const Tables parsedTables = IndexTables(run, tables, objects);
+    Tables parsedTables = IndexTables(run, tables, objects);
+    extensions.emitted += MergeExtensions(store, parsedTables);
     // AFTER the tables and BEFORE the codeunits: an interface's SIGNATURE names records and enums,
     // and a codeunit's variable names an interface. Read in any other order, one of the two
     // resolves nothing.
-    ScanInterfaces(run, interfaces, gathered, objects);
-    const Pages parsed = IndexPages(run, pages, objects);
+    const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
+    Pages parsed = IndexPages(run, pages, objects);
+    extensions.emitted += MergePageExtensions(store, parsed);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
-    WriteTables(run, parsedTables, index, objects, unresolvedEnums);
-    WritePages(run, parsed, objects);
+    WriteInterfaces(run, parsedInterfaces, gathered, objects);
+    WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
+    WritePages(run, parsed, objects, gathered);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
@@ -717,6 +964,7 @@ int Scan(const Job &job) {
     Add(allTables, tables);
     Add(allCodeunits, codeunits);
     Add(allPages, pages);
+    Add(allExtensions, extensions);
     written += run.written;
     changed += run.changed;
     kept.merge(run.kept);
@@ -736,6 +984,17 @@ int Scan(const Job &job) {
   Report("tables", allTables);
   Report("codeunits", allCodeunits);
   Report("pages", allPages);
+  Report("extensions", allExtensionsRead);
+  std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
+  // AN APP MAY DECLARE A NAME ANOTHER APP ALSO DECLARES, so an extension can be consumed more than
+  // once. What is asked here is only whether it was consumed AT ALL: an extension nobody took is a
+  // hole with a name.
+  std::map<std::string, std::size_t> orphans;
+  for (const auto &[name, total] : store.held) {
+    const auto taken = store.consumed.find(name);
+    if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
+  }
+  ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
   if (allCodeunits.emitted != 0) {
     std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
                  allCodeunits.emitted,

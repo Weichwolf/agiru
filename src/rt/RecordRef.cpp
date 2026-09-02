@@ -94,6 +94,8 @@ Variant FieldRef::Value() const {
     case FieldType::Media:
     case FieldType::MediaSet:
       throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
+    case FieldType::TableFilter:
+      throw Error("a TableFilter is a filter rather than a value (board:0018)");
   }
   throw Error("that field type has no value yet");
 }

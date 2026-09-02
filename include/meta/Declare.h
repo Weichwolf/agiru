@@ -19,6 +19,7 @@
 #include "type/MediaSet.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
+#include "type/TableFilter.h"
 #include "type/Text.h"
 #include "type/Time.h"
 
@@ -121,6 +122,13 @@ template <> struct FieldTypeOf<Date> {
 template <> struct FieldTypeOf<DateFormula> {
   static constexpr FieldType kType = FieldType::DateFormula; ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;                ///< A formula declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{};  ///< Not an enumeration.
+};
+
+/// \brief `TableFilter` -- a filter stored in a field and applied to another table.
+template <> struct FieldTypeOf<TableFilter> {
+  static constexpr FieldType kType = FieldType::TableFilter; ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;                ///< A filter declares no length.
   static constexpr std::span<const EnumValueDef> kValues{};  ///< Not an enumeration.
 };
 

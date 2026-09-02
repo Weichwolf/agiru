@@ -10,6 +10,7 @@ namespace agiru::gen {
 /// \brief What one translated page produced.
 struct PageHeader {
   std::string text;
+  DotNetUse dotnet;
   DotNetUse absent;
 };
 

@@ -400,7 +400,9 @@ public:
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     for (const al::VarDecl &declared : table_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return DeclaresAnObject(declared); }
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return DeclaresAnObject(declared);
+      }
     }
     return false;
   }
@@ -408,7 +410,7 @@ public:
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return VariableIdentifier(table_, declared.name);
+        return "Var_Block->" + VariableIdentifier(table_, declared.name);
       }
     }
     const al::FieldDecl *field = FieldNamed(table_, name);

@@ -19,6 +19,7 @@
 #include "type/JsonObject.h"
 #include "type/JsonToken.h"
 #include "type/JsonValue.h"
+#include "type/KeyRef.h"
 #include "type/Label.h"
 #include "type/NavApp.h"
 #include "type/NumberSequence.h"
@@ -4552,6 +4553,23 @@ std::string XmlText::Value(std::string_view NewValue) {
 ::agiru::Boolean XmlWriteOptions::PreserveWhitespace(::agiru::Boolean NewValue) {
   static_cast<void>(NewValue);
   detail::RefuseDoor("XmlWriteOptions.PreserveWhitespace(Boolean)");
+}
+
+::agiru::Boolean KeyRef::Active() {
+  detail::RefuseDoor("KeyRef.Active()");
+}
+
+::agiru::Integer KeyRef::FieldCount() {
+  detail::RefuseDoor("KeyRef.FieldCount()");
+}
+
+::agiru::FieldRef KeyRef::FieldIndex(::agiru::Integer Index) {
+  static_cast<void>(Index);
+  detail::RefuseDoor("KeyRef.FieldIndex(Integer)");
+}
+
+::agiru::RecordRef KeyRef::Record() {
+  detail::RefuseDoor("KeyRef.Record()");
 }
 
 } // namespace agiru

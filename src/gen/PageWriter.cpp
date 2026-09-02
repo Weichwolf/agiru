@@ -75,11 +75,20 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
       reached.headers.insert(found->second.header);
     }
   }
+  // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
+  if (type == "Interface") {
+    const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+    if (found != objects.interfaces.end()) { Ahead(reached, found->second.identifier); }
+    return;
+  }
   if (type == "TestPage" || type == "TestRequestPage") {
     const auto found = objects.pages.find(LowerKey(declared.subtype));
     if (found != objects.pages.end() && !found->second.header.empty()) {
       reached.headers.insert(found->second.header);
     }
+  }
+  for (const al::VarDecl &argument : declared.arguments) {
+    Named(reached, argument, objects, complete);
   }
   const TableRef *ref = ReachObject(declared, objects);
   // A PLATFORM TABLE ARRIVES WITH THE DOOR: no header to include and nothing to declare ahead,
@@ -196,7 +205,10 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
   out += "  using Controls = agiru::app::pages::" + controlsClass + ";\n";
   out += "};\n";
-  return PageHeader{.text = out, .absent = {}};
+  DotNetUse dotnet;
+  DotNetUse absent;
+  GatherAbsentIn(object.variables, object.procedures, objects, dotnet, absent);
+  return PageHeader{.text = out, .dotnet = dotnet, .absent = absent};
 }
 
 } // namespace agiru::gen

@@ -39,6 +39,32 @@ public:
     Expect("table");
     table.id = ExpectInteger();
     table.name = ExpectName();
+    ParseTableBody(table);
+    return table;
+  }
+
+  /// A `tableextension` HAS THE SAME BODY AS A TABLE, which is why one routine reads both: fields,
+  /// keys, variables and code, in AL's own grammar. What differs is only the header.
+  TableExtensionObject ParseTableExtension() {
+    TableExtensionObject extension;
+    extension.nameSpace = ReadHeaderNamespace("tableextension");
+    Expect("tableextension");
+    extension.id = ExpectInteger();
+    extension.name = ExpectName();
+    Expect("extends");
+    extension.extends = ExpectName();
+    TableObject body;
+    ParseTableBody(body);
+    extension.fields = std::move(body.fields);
+    extension.modified = std::move(body.modified);
+    extension.keys = std::move(body.keys);
+    extension.labels = std::move(body.labels);
+    extension.variables = std::move(body.variables);
+    extension.procedures = std::move(body.procedures);
+    return extension;
+  }
+
+  void ParseTableBody(TableObject &table) {
     Expect("{");
     std::vector<std::string> attributes;
     while (!AtPunctuation("}") && !AtEnd()) {
@@ -64,12 +90,16 @@ public:
                  AtKeyword("internal") || AtKeyword("protected")) {
         table.procedures.push_back(ParseProcedure(attributes));
         attributes.clear();
+      } else if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        // A block this parser has no use for -- `modify(...)` in an extension, and whatever a later
+        // platform version adds -- is skipped by SHAPE, the way a page's are.
+        Advance();
+        SkipBracedBlock();
       } else {
         table.properties.push_back(ParseProperty());
       }
     }
     Expect("}");
-    return table;
   }
 
   CodeunitObject ParseCodeunit() {
@@ -131,8 +161,27 @@ public:
         if (AtPunctuation(",")) { Advance(); }
       }
     }
+    ParseEnumBody(object.values, object.properties);
+    return object;
+  }
+
+  /// An `enumextension` HAS THE SAME BODY AS AN ENUM: a list of values. What differs is the header.
+  EnumExtensionObject ParseEnumExtension() {
+    EnumExtensionObject extension;
+    extension.nameSpace = ReadHeaderNamespace("enumextension");
+    Expect("enumextension");
+    extension.id = ExpectInteger();
+    extension.name = ExpectName();
+    Expect("extends");
+    extension.extends = ExpectName();
+    std::vector<Property> properties;
+    ParseEnumBody(extension.values, properties);
+    return extension;
+  }
+
+  void ParseEnumBody(std::vector<EnumValueDecl> &values, std::vector<Property> &properties) {
     Expect("{");
-    while (!AtPunctuation("}")) {
+    while (!AtPunctuation("}") && !AtEnd()) {
       if (AtKeyword("value")) {
         Advance();
         Expect("(");
@@ -144,13 +193,12 @@ public:
         Expect("{");
         while (!AtPunctuation("}")) { value.properties.push_back(ParseProperty()); }
         Expect("}");
-        object.values.push_back(std::move(value));
+        values.push_back(std::move(value));
         continue;
       }
-      object.properties.push_back(ParseProperty());
+      properties.push_back(ParseProperty());
     }
     Expect("}");
-    return object;
   }
 
 private:
@@ -237,6 +285,32 @@ public:
     Expect("page");
     object.id = ExpectInteger();
     object.name = ExpectName();
+    ParsePageBody(object);
+    return object;
+  }
+
+  /// A `pageextension` HAS THE SAME BODY AS A PAGE -- `layout`, `actions`, `var` and code, with the
+  /// operations `addafter`, `addlast` and `modify` reading as controls like everything else,
+  /// because the layout grammar is one shape. What differs is the header.
+  PageExtensionObject ParsePageExtension() {
+    PageExtensionObject extension;
+    extension.nameSpace = ReadHeaderNamespace("pageextension");
+    Expect("pageextension");
+    extension.id = ExpectInteger();
+    extension.name = ExpectName();
+    Expect("extends");
+    extension.extends = ExpectName();
+    PageObject body;
+    ParsePageBody(body);
+    extension.layout = std::move(body.layout);
+    extension.actions = std::move(body.actions);
+    extension.procedures = std::move(body.procedures);
+    extension.variables = std::move(body.variables);
+    extension.labels = std::move(body.labels);
+    return extension;
+  }
+
+  void ParsePageBody(PageObject &object) {
     Expect("{");
     std::vector<std::string> attributes;
     while (!AtPunctuation("}") && !AtEnd()) {
@@ -283,7 +357,6 @@ public:
       object.properties.push_back(ParseProperty());
     }
     Expect("}");
-    return object;
   }
 
   void ParseControlsInto(std::vector<PageControl> &into) {
@@ -447,7 +520,14 @@ private:
     VarDecl declared;
     while (AtKeyword("array")) {
       Advance();
-      if (AtPunctuation("[")) { SkipBracketed(); }
+      if (AtPunctuation("[")) {
+        Advance();
+        while (!AtEnd() && !AtPunctuation("]")) {
+          if (Peek().kind == TokenKind::Integer) { declared.dimensions.push_back(ExpectInteger()); }
+          else { Advance(); }
+        }
+        Expect("]");
+      }
       Expect("of");
     }
     declared.type = ExpectName();
@@ -744,6 +824,18 @@ private:
   void ParseFields(TableObject &table) {
     Expect("{");
     while (!AtPunctuation("}")) {
+      // A `tableextension` MODIFIES a field it did not declare: `modify("No.") { Editable = false; }`
+      // carries the name, the changed properties and any added trigger, and no type at all.
+      if (AtKeyword("modify")) {
+        Advance();
+        Expect("(");
+        FieldDecl changed;
+        changed.name = ExpectName();
+        Expect(")");
+        ParseFieldBody(changed);
+        table.modified.push_back(std::move(changed));
+        continue;
+      }
       Expect("field");
       Expect("(");
       FieldDecl field;
@@ -769,23 +861,27 @@ private:
         }
       }
       Expect(")");
-      Expect("{");
-      while (!AtPunctuation("}")) {
-        if (AtKeyword("trigger")) {
-          Advance();
-          Trigger trigger;
-          trigger.name = ExpectName();
-          Expect("(");
-          Expect(")");
-          trigger.tokens = SkipBeginEnd();
-          trigger.body = ParseStatements(trigger.tokens);
-          field.triggers.push_back(std::move(trigger));
-        } else {
-          field.properties.push_back(ParseProperty());
-        }
-      }
-      Expect("}");
+      ParseFieldBody(field);
       table.fields.push_back(std::move(field));
+    }
+    Expect("}");
+  }
+
+  void ParseFieldBody(FieldDecl &field) {
+    Expect("{");
+    while (!AtPunctuation("}")) {
+      if (AtKeyword("trigger")) {
+        Advance();
+        Trigger trigger;
+        trigger.name = ExpectName();
+        Expect("(");
+        Expect(")");
+        trigger.tokens = SkipBeginEnd();
+        trigger.body = ParseStatements(trigger.tokens);
+        field.triggers.push_back(std::move(trigger));
+      } else {
+        field.properties.push_back(ParseProperty());
+      }
     }
     Expect("}");
   }
@@ -868,6 +964,18 @@ InterfaceObject ParseInterface(std::string_view source) {
 
 PageObject ParsePage(std::string_view source) {
   return Parser(Tokenize(source)).ParsePage();
+}
+
+TableExtensionObject ParseTableExtension(std::string_view source) {
+  return Parser(Tokenize(source)).ParseTableExtension();
+}
+
+EnumExtensionObject ParseEnumExtension(std::string_view source) {
+  return Parser(Tokenize(source)).ParseEnumExtension();
+}
+
+PageExtensionObject ParsePageExtension(std::string_view source) {
+  return Parser(Tokenize(source)).ParsePageExtension();
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

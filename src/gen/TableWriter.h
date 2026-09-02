@@ -13,6 +13,8 @@ namespace agiru::gen {
 struct TableHeader {
   std::string text;
   std::vector<std::string> unresolvedEnums;
+  DotNetUse dotnet;
+  DotNetUse absent;
 };
 
 /// \brief The C++ member name for one of a table's own variables.

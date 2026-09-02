@@ -396,6 +396,71 @@ void AnElseAfterASemicolonBelongsToTheCase() {
   CHECK_TRUE("an if with no semicolon keeps its else", !plain[0].otherwise.empty());
 }
 
+/// AN EXTENSION HAS THE SAME BODY AS THE OBJECT IT EXTENDS, which is why one routine reads both.
+///
+/// BC merges an extension at BUILD time -- the added columns land in the same SQL table -- so
+/// merging it in the transpiler is faithful rather than a shortcut, and a C++ class is closed
+/// anyway (board:0033).
+void AnExtensionCarriesWhatItAdds() {
+  const agiru::al::TableExtensionObject table = agiru::al::ParseTableExtension(
+      R"(tableextension 50000 "More Item" extends Item
+{
+    fields
+    {
+        field(50000; "Shelf Depth"; Decimal) { Caption = 'Shelf Depth'; }
+        modify("No.") { Editable = false; }
+    }
+    keys { key(Extra; "Shelf Depth") { } }
+    procedure Deeper(): Decimal
+    begin
+        exit("Shelf Depth");
+    end;
+})");
+  CHECK_TEXT("it names the table it extends", table.extends, "Item");
+  CHECK_TRUE("one field is added", table.fields.size() == 1);
+  CHECK_TEXT("with its own number", std::to_string(table.fields[0].number), "50000");
+  // A MODIFIED FIELD IS NOT AN ADDED ONE. It carries no type, only what it changes, and merging it
+  // as a field would give the table a second `No.` with number 0.
+  CHECK_TRUE("and the modified one is kept apart", table.modified.size() == 1);
+  CHECK_TEXT("naming the field it changes", table.modified[0].name, "No.");
+  CHECK_TRUE("a key is added", table.keys.size() == 1);
+  CHECK_TRUE("and so is code", table.procedures.size() == 1);
+
+  const agiru::al::EnumExtensionObject values = agiru::al::ParseEnumExtension(
+      R"(enumextension 50000 "More Types" extends "Item Type"
+{
+    value(50000; Rental) { Caption = 'Rental'; }
+    value(50001; Leased) { Caption = 'Leased'; }
+})");
+  CHECK_TEXT("an enumextension names its enumeration", values.extends, "Item Type");
+  CHECK_TRUE("and carries its values with their own ordinals", values.values.size() == 2);
+  CHECK_TEXT("the first of them", values.values[0].name, "Rental");
+  CHECK_TEXT("with the ordinal AL wrote", std::to_string(values.values[0].ordinal), "50000");
+
+  const agiru::al::PageExtensionObject page = agiru::al::ParsePageExtension(
+      R"(pageextension 50000 "More Item Card" extends "Item Card"
+{
+    layout
+    {
+        addafter(Description)
+        {
+            field("Shelf Depth"; Rec."Shelf Depth") { ApplicationArea = All; }
+        }
+    }
+    actions { addlast(processing) { action(Measure) { trigger OnAction() begin end; } } }
+    procedure Measured(): Boolean
+    begin
+        exit(true);
+    end;
+})");
+  CHECK_TEXT("a pageextension names its page", page.extends, "Item Card");
+  CHECK_TRUE("the layout operation reads as a control", page.layout.size() == 1);
+  CHECK_TEXT("and says which one it is", page.layout[0].kind, "addafter");
+  CHECK_TRUE("carrying the control it adds", page.layout[0].children.size() == 1);
+  CHECK_TRUE("the actions likewise", page.actions.size() == 1);
+  CHECK_TRUE("and the code comes with it", page.procedures.size() == 1);
+}
+
 } // namespace
 
 int main() {
@@ -416,6 +481,7 @@ int main() {
     TheConditionalOperatorParses();
     AssertErrorIsAStatement();
     AnElseAfterASemicolonBelongsToTheCase();
+    AnExtensionCarriesWhatItAdds();
     TheConditionalOperatorHasThreeOperandsAndOneTranslation();
   });
 }

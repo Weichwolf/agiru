@@ -89,11 +89,20 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
 // deviation rather than a silently dropped field, and the number is what AL itself would use to
 // tell them apart.
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
+  // THE PLATFORM'S FIVE KEEP THEIR NAMES AND THE AL FIELD YIELDS, which is the opposite of the
+  // order the fields are walked in. `Cost Adjmt. Action Message` declares `field(6; SystemID; Guid)`
+  // -- one letter of case away from the platform's `SystemId` -- and letting the AL field win left
+  // the table with no `SystemId` at all, which `WithSystemFields<T>` addresses by name and the door
+  // promises to every client.
   std::set<std::string> taken;
+  for (const SystemFieldDecl &system : kSystemFields) {
+    taken.insert(LowerKey(std::string(system.name)));
+  }
   std::string collapsed;
   for (const al::FieldDecl &field : table.fields) {
     const std::string bare = Identifier(field.name);
-    const bool collides = !taken.insert(LowerKey(bare)).second;
+    const bool platform = field.number >= kSystemFields.front().no.Value();
+    const bool collides = !taken.insert(LowerKey(bare)).second && !platform;
     const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
     if (LowerKey(field.name) == LowerKey(name)) { return spelled; }
     if (collapsed.empty() && LowerKey(bare) == LowerKey(Identifier(name))) { collapsed = spelled; }
@@ -223,7 +232,8 @@ al::TableObject WithSystemFields(al::TableObject table) {
 // AN EMPTY BRACED LIST CANNOT DEDUCE ITS ELEMENT TYPE, and a table with no fields is legal AL --
 // BC declares several as pure event containers. `std::array k{}` is not a declaration the compiler
 // can complete, so the element type is named when there is nothing to deduce it from.
-std::string FieldTable(const std::vector<const al::FieldDecl *> &sorted,
+std::string FieldTable(const al::TableObject &table,
+                       const std::vector<const al::FieldDecl *> &sorted,
                        const std::string &tableIdentifier) {
   const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
   std::string out = "inline constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
@@ -231,7 +241,10 @@ std::string FieldTable(const std::vector<const al::FieldDecl *> &sorted,
                     ">{{\n";
   for (const al::FieldDecl *field : sorted) {
     if (IsSystemField(*field)) { continue; }
-    const std::string identifier = Identifier(field->name);
+    // THE SAME SPELLING THE CLASS USES, and not `Identifier` again: a field whose name collapses
+    // onto another's carries a seam, and a row that named the bare form pointed at a different
+    // field's number -- which the sortedness assertion caught, three files away from the cause.
+    const std::string identifier = FieldIdentifier(table, field->name);
     out += "    Declare<&";
     out += tableIdentifier;
     out += "::";
@@ -352,7 +365,17 @@ TableHeader WriteHeader(const al::TableObject &declared,
   // follow. An object member is the exception, because it is a handle (board:0037). AN ENUM IS
   // ALWAYS INCLUDED: `Enum<enums::X>` is a template argument and a template argument is complete.
   std::set<std::string> memberHeaders;
-  const auto named = [&](const al::VarDecl &declared) {
+  const std::function<void(const al::VarDecl &)> named = [&](const al::VarDecl &declared) {
+    for (const al::VarDecl &argument : declared.arguments) { named(argument); }
+    // A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so `TestPage<pages::X>` needs the header.
+    const std::string alType = TypeName(declared.type);
+    if (alType == "TestPage" || alType == "TestRequestPage") {
+      const auto found = objects.pages.find(LowerKey(declared.subtype));
+      if (found != objects.pages.end() && !found->second.header.empty()) {
+        memberHeaders.insert(found->second.header);
+      }
+      return;
+    }
     // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
     if (TypeName(declared.type) == "Interface") {
       const auto found = objects.interfaces.find(LowerKey(declared.subtype));
@@ -500,21 +523,27 @@ TableHeader WriteHeader(const al::TableObject &declared,
                              table.procedures,
                              ProcedureIdentifier(table, procedure.name));
   }
-  // A TABLE'S VARIABLES ARE PUBLIC, AND THAT IS THE STANDARD-LAYOUT INVARIANT RATHER THAN A CHOICE.
-  // All non-static data members must share one access control, or the class is not standard-layout
-  // and `offsetof` over the field table is undefined -- which is what every generated field
-  // descriptor stands on. AL gives a table variable no access control anyway.
-  if (!table.variables.empty()) { out += "\n"; }
-  for (const al::VarDecl &declared : table.variables) {
-    std::string type = DeclaredType(declared, objects);
-    if (DeclaresAnObject(declared)) { type = "Instance<" + type + ">"; }
-    out += "  " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
+  // A TABLE'S VARIABLES LIVE BEHIND ONE POINTER, AND THE STANDARD-LAYOUT INVARIANT DECIDES IT.
+  // `offsetof` over the field table requires standard layout, which requires every member to be
+  // standard-layout too -- and `Item Application Entry` declares `Dictionary of [Integer, Boolean]`,
+  // whose std::map is not. Fields are the class; everything AL puts in the table's `var` block goes
+  // into one nested struct reached through `Var_Block`, which is two pointers and standard-layout.
+  // The interior underscore is the seam no AL name can reach.
+  if (!table.variables.empty()) {
+    out += "\n  struct Variables {\n";
+    for (const al::VarDecl &declared : table.variables) {
+      // The nested struct is inside the class, so a field name hides a type here as well.
+      std::string type = QualifiedType(DeclaredType(declared, objects), shadowed);
+      if (DeclaresAnObject(declared)) { type = "Instance<" + type + ">"; }
+      out += "    " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
+    }
+    out += "  };\n\n  Instance<Variables> Var_Block;\n";
   }
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
   out += "};\n\n";
 
-  out += FieldTable(sorted, tableIdentifier);
+  out += FieldTable(table, sorted, tableIdentifier);
 
   out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
@@ -560,7 +589,13 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "  static constexpr const TableDef &kTable = agiru::app::tables::k" + tableIdentifier +
          "Table;\n";
   out += "};\n";
-  return TableHeader{.text = out, .unresolvedEnums = Unresolved(table, enums)};
+  DotNetUse dotnet;
+  DotNetUse absent;
+  GatherAbsentIn(table.variables, table.procedures, objects, dotnet, absent);
+  return TableHeader{.text = out,
+                     .unresolvedEnums = Unresolved(table, enums),
+                     .dotnet = dotnet,
+                     .absent = absent};
 }
 
 } // namespace agiru::gen

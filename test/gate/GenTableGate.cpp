@@ -225,6 +225,44 @@ void AKeyNamedLikeAClassConstantStillCompiles() {
 
 } // namespace
 
+/// TWO DIFFERENT AL NAMES MAY COLLAPSE INTO ONE C++ IDENTIFIER, and the rule is one rule: the FIELD
+/// keeps its spelling, because the field table addresses it by `offsetof` and AL code names it far
+/// more often. What yields carries a seam no AL name can reach -- an interior underscore.
+void ACollidingNameCarriesASeam() {
+  const std::string source = R"(table 50000 "Colliding"
+{
+    fields
+    {
+        field(1; "No. Series"; Code[20]) { }
+        field(2; "Use Concurrent Posting"; Boolean) { }
+        field(3; "System Id"; Guid) { }
+    }
+    keys { key(PK; "No. Series") { Clustered = true; } }
+
+    var
+        NoSeries: Codeunit "No. Series";
+
+    procedure UseConcurrentPosting(): Boolean
+    begin
+        exit(true);
+    end;
+})";
+  const std::string generated =
+      agiru::gen::WriteHeader(agiru::al::ParseTable(source), std::string(kAlPath), {}, {}).text;
+  CHECK_TRUE("the field keeps its own name",
+             generated.find("Code<20> NoSeries{};") != std::string::npos);
+  CHECK_TRUE("and the variable of the same name yields",
+             generated.find("NoSeries_Var;") != std::string::npos);
+  CHECK_TRUE("a procedure named like a field yields too",
+             generated.find("UseConcurrentPosting_Proc(") != std::string::npos);
+  // THE PLATFORM'S FIVE ARE THE EXCEPTION AND IT IS NOT ARBITRARY: `WithSystemFields<T>` addresses
+  // them by name and the door promises them, so an AL field of the same name is the one that moves.
+  CHECK_TRUE("the platform's SystemId keeps its name",
+             generated.find("Guid SystemId{};") != std::string::npos);
+  CHECK_TRUE("and the AL field of that name carries its number",
+             generated.find("SystemId_3{};") != std::string::npos);
+}
+
 int main() {
   return gate::Run("GenTable", [] {
     TheGeneratorReproducesTheTargetImage();
@@ -233,5 +271,6 @@ int main() {
     AChangedStatementChangesTheBody();
     AFieldThatShadowsARuntimeTypeStillCompiles();
     AKeyNamedLikeAClassConstantStillCompiles();
+    ACollidingNameCarriesASeam();
   });
 }

@@ -39,6 +39,7 @@ enum class FieldType : std::uint8_t {
   Guid = 21,        ///< AL `Guid`.
   DateTime = 22,    ///< AL `DateTime`.
   RecordId = 23,    ///< AL `RecordId`.
+  TableFilter = 24, ///< AL `TableFilter`, which only the Permission table uses.
   Text = 31,        ///< AL `Text`.
   Code = 33,        ///< AL `Code`.
   MediaSet = 39,    ///< AL `MediaSet`.

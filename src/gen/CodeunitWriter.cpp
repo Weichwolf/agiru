@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <functional>
 #include <cstddef>
 #include <map>
 #include <set>
@@ -96,7 +97,18 @@ std::string Generic(const std::string &type,
   return out + ">";
 }
 
+std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner);
+
+/// AN ARRAY WRAPS WHAT IT HOLDS, outermost dimension first, and it is indexed from ONE.
 std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
+  std::string inner = Element(declared, objects, owner);
+  for (std::size_t i = declared.dimensions.size(); i > 0; --i) {
+    inner = "AlArray<" + inner + ", " + std::to_string(declared.dimensions[i - 1]) + ">";
+  }
+  return inner;
+}
+
+std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   std::string type = TypeName(declared.type);
   // A `Page` VARIABLE IS THE PAGE, the way a `Record` variable is the table: AL writes
   // `SalesOrderPage.RunModal()` on an instance. Only `TestPage` is a template, because the headless
@@ -480,6 +492,12 @@ void Declared(const al::VarDecl &declared,
     if (found != objects.interfaces.end()) { ahead(found->second.identifier); }
   }
   if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
+  // A GENERIC CARRIES ITS ELEMENT TYPES AND THEY ARE DECLARATIONS TOO. `List of [Enum "Image
+  // Analysis Type"]` names an enumeration that nothing else in the file mentions, and the walk
+  // stopped at the outer `List`.
+  for (const al::VarDecl &argument : declared.arguments) {
+    Declared(argument, objects, ahead, reachEnum, reachPage);
+  }
 }
 
 /// Adds the header of an enumeration, when the run has one.
@@ -834,8 +852,23 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
   return line.substr(0, at) + " " + spelled + "(" + line.substr(at + wanted.size());
 }
 
+std::string QualifiedType(const std::string &type, const std::set<std::string> &names) {
+  return Hidden(type, names) ? Qualified(type, names) : type;
+}
+
 std::string DeclaredType(const al::VarDecl &declared, const Objects &objects) {
   return TypeOf(declared, objects);
+}
+
+void GatherAbsentIn(const std::vector<al::VarDecl> &variables,
+                    const std::vector<al::ProcedureDecl> &procedures,
+                    const Objects &objects,
+                    DotNetUse &dotnet,
+                    DotNetUse &absent) {
+  al::CodeunitObject unit;
+  unit.variables = variables;
+  unit.procedures = procedures;
+  GatherDotNet(unit, objects, dotnet, absent);
 }
 
 bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
@@ -884,7 +917,20 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   // declarations name -- a signature is a declaration and a `Verbosity` in one is an enum the file
   // has to have seen.
   std::set<std::string> headers;
-  const auto reach = [&](const al::VarDecl &declared) {
+  std::map<std::string, std::set<std::string>> forward;
+  const std::function<void(const al::VarDecl &)> reach = [&](const al::VarDecl &declared) {
+    for (const al::VarDecl &argument : declared.arguments) { reach(argument); }
+    // AN INTERFACE NAMES ANOTHER INTERFACE, and that one is a POINTER: `Price Calculation` takes a
+    // `Line With Price`. A declaration needs the name, so it is forward declared and the two files
+    // do not include each other.
+    if (TypeName(declared.type) == "Interface") {
+      const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+      if (found != objects.interfaces.end()) {
+        forward["interfaces"].insert(
+            found->second.identifier.substr(std::size("interfaces::") - 1));
+      }
+      return;
+    }
     if (NamesAnObject(declared)) {
       const TableRef *ref = Reach(declared, objects);
       if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
@@ -904,6 +950,14 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   if (NamesAbsentIn({}, object.procedures, objects)) {
     out += "#include \"absent/Types.h\"\n";
   }
+  for (const auto &[space, named] : forward) {
+    out += "\nnamespace agiru::app::" + space + " {\n";
+    for (const std::string &one : named) {
+      out += "class " + ClassName(one, ObjectKind::Interface) + ";\n" +
+             ClassAlias(one, ObjectKind::Interface);
+    }
+    out += "} // namespace agiru::app::" + space + "\n";
+  }
   out += "\nnamespace agiru::app::interfaces {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
   out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";
@@ -917,15 +971,12 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
   }
   out += "};\n\n} // namespace agiru::app::interfaces\n";
+  // AN INTERFACE'S SIGNATURES NAME .NET TYPES TOO, and gathering only the absent ones left the
+  // dotnet surface short of what the declarations need.
   DotNetUse missing;
-  DotNetNames named;
-  for (const al::ProcedureDecl &procedure : object.procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) {
-      NoteAbsent(declared, objects, named, missing);
-    }
-    NoteAbsent(procedure.returned, objects, named, missing);
-  }
-  return InterfaceHeader{.text = out, .absent = std::move(missing)};
+  DotNetUse dotnet;
+  GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
+  return InterfaceHeader{.text = out, .absent = std::move(missing), .dotnet = std::move(dotnet)};
 }
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,

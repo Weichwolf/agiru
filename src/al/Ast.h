@@ -57,6 +57,12 @@ struct VarDecl {
   /// therefore a declaration and not a name, because a name cannot carry the inner arguments, the
   /// enum's subtype or a `Text[50]`'s length.
   std::vector<VarDecl> arguments;
+  /// AL `array[6] of Record "Dimension Value"` -- the dimensions, outermost first.
+  ///
+  /// \note THEY ARE PART OF THE SIGNATURE. `ERMDimensionShortcuts` declares `CreateDimSet` twice,
+  ///       once over an `array[6] of Record "Dimension Value"` and once over one record; dropping
+  ///       the dimension made them the same C++ member declared twice.
+  std::vector<int> dimensions;
 };
 
 using Parameter = VarDecl;
@@ -144,12 +150,56 @@ struct PageObject {
   std::vector<LabelDecl> labels;
 };
 
+/// AL `pageextension` -- controls, actions and code ADDED to a page that is declared elsewhere.
+struct PageExtensionObject {
+  int id = 0;
+  std::string name;
+  std::string extends;
+  std::string nameSpace;
+  std::vector<PageControl> layout;
+  std::vector<PageControl> actions;
+  std::vector<ProcedureDecl> procedures;
+  std::vector<VarDecl> variables;
+  std::vector<LabelDecl> labels;
+};
+
+/// AL `enumextension` -- values ADDED to an enumeration that is declared elsewhere.
+struct EnumExtensionObject {
+  int id = 0;
+  std::string name;
+  std::string extends;
+  std::string nameSpace;
+  std::vector<EnumValueDecl> values;
+};
+
+/// AL `tableextension` -- fields, keys and code ADDED to a table that is declared elsewhere.
+///
+/// \note IT IS MERGED AT TRANSLATION TIME, NOT LINKED AT RUN TIME, and BC does the same: the added
+///       columns land in the SAME SQL table. A C++ class is closed, so the alternative does not
+///       exist -- which is what makes which apps are installed a transpile-time decision
+///       (board:0033).
+struct TableExtensionObject {
+  int id = 0;
+  std::string name;
+  std::string extends;
+  std::string nameSpace;
+  std::vector<FieldDecl> fields;
+  std::vector<FieldDecl> modified;
+  std::vector<KeyDecl> keys;
+  std::vector<LabelDecl> labels;
+  std::vector<VarDecl> variables;
+  std::vector<ProcedureDecl> procedures;
+};
+
 struct TableObject {
   int id = 0;
   std::string name;
   std::string nameSpace;
   std::vector<Property> properties;
   std::vector<FieldDecl> fields;
+  /// What a `tableextension` MODIFIES rather than adds -- the field's own declaration is elsewhere,
+  /// so only its name, its changed properties and its added triggers are here.
+  std::vector<FieldDecl> modified;
   std::vector<KeyDecl> keys;
   std::vector<LabelDecl> labels;
   /// A TABLE CARRIES CODE, and AL says so: `Tracking Specification` declares
