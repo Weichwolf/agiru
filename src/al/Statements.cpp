@@ -289,8 +289,25 @@ private:
                    .descending = false};
     Expect("then");
     statement.body.push_back(ReadStatement());
-    while (AtPunctuation(";")) { Advance(); }
-    if (AtKeyword("else")) {
+    // A SEMICOLON ENDS THE `if`, SO THE `else` AFTER ONE IS NOT ITS OWN. `Incoming Document` writes
+    //
+    //     case true of
+    //         SalesCrMemoHeader.Get(DocNo):
+    //             if SalesCrMemoHeader."Posting Date" = PostingDate then
+    //                 exit("Document Type"::"Sales Credit Memo");
+    //         else
+    //             ...
+    //
+    // and taking that `else` for the `if` swallowed the case's own branch: the branch parser then
+    // ran off the end of the tokens looking for the next label, which is where
+    // "expected ':' but found ''" came from. AL's own `if ... then ... else` never carries a
+    // semicolon in front of the `else`, so the presence of one is the signal.
+    bool terminated = false;
+    while (AtPunctuation(";")) {
+      Advance();
+      terminated = true;
+    }
+    if (!terminated && AtKeyword("else")) {
       Advance();
       statement.otherwise.push_back(ReadStatement());
     }

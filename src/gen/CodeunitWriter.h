@@ -114,7 +114,40 @@ std::string InlineOptionsOf(const std::string &owner,
 ///       they share this rather than each growing a copy that drifts.
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
-                                 const std::string &owner);
+                                 const std::string &owner,
+                                 const std::set<std::string> &shadowed = {});
+
+/// \brief One procedure's definition head -- return type, qualified name and parameters.
+/// \param procedure The AL procedure.
+/// \param objects   Everything the run has translated so far.
+/// \param owner     The declaring object's AL name.
+/// \param qualifier The C++ class name the definition belongs to.
+/// \param named     Whether the parameters carry their names.
+/// \return The signature, without a trailing brace.
+std::string ProcedureSignature(const al::ProcedureDecl &procedure,
+                               const Objects &objects,
+                               const std::string &owner,
+                               const std::string &qualifier,
+                               bool named,
+                               const std::set<std::string> &shadowed = {});
+
+/// \brief One procedure's local declarations, named return value first.
+/// \param procedure The AL procedure.
+/// \param objects   Everything the run has translated so far.
+/// \param owner     The declaring object's AL name.
+/// \return The declarations, one per line.
+std::string ProcedureLocals(const al::ProcedureDecl &procedure,
+                            const Objects &objects,
+                            const std::string &owner);
+
+/// \brief The includes a SOURCE file needs -- everything its bodies call, layout and all.
+/// \param variables  The object's own variables.
+/// \param procedures Its procedures.
+/// \param objects    Everything the run has translated so far.
+/// \return The include lines.
+std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
+                             const std::vector<al::ProcedureDecl> &procedures,
+                             const Objects &objects);
 
 /// \brief The C++ type an AL declaration becomes.
 /// \param declared The AL declaration.

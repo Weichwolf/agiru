@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ast.h"
+#include "CodeunitWriter.h"
 #include "EnumWriter.h"
 
 #include <string>
@@ -14,7 +15,9 @@ struct TableHeader {
   std::vector<std::string> unresolvedEnums;
 };
 
-TableHeader
-WriteHeader(const al::TableObject &declared, const std::string &sourcePath, const EnumIndex &enums);
+TableHeader WriteHeader(const al::TableObject &declared,
+                        const std::string &sourcePath,
+                        const EnumIndex &enums,
+                        const Objects &objects);
 
 } // namespace agiru::gen

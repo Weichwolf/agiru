@@ -374,6 +374,28 @@ void TheConditionalOperatorHasThreeOperandsAndOneTranslation() {
              nested.children[1].children[1].kind == agiru::al::ExprKind::Name);
 }
 
+/// A SEMICOLON ENDS THE `if`, AND THE `else` AFTER ONE BELONGS TO THE ENCLOSING `case`.
+///
+/// `Incoming Document.GetRelatedDocType` is the case that found it: the last branch before the
+/// case's `else` ends in `if ... then exit(...);`, the `if` took the else for itself, and the
+/// branch parser then ran off the end of the tokens looking for the next label. One table of 1 809
+/// stopped parsing, and it was a CODEUNIT defect that had never surfaced because no codeunit in the
+/// read roots writes the shape.
+void AnElseAfterASemicolonBelongsToTheCase() {
+  const std::vector<agiru::al::Stmt> body =
+      OnlyBody("begin case true of A: if B then exit(1); else exit(2); end; end;");
+  CHECK_TRUE("one statement, the case", body.size() == 1);
+  CHECK_TRUE("which is a case", body[0].kind == agiru::al::StmtKind::Case);
+  CHECK_TRUE("and it carries the else", !body[0].otherwise.empty());
+  const agiru::al::Stmt &branch = body[0].body.front();
+  CHECK_TRUE("the branch holds the if", branch.body.front().kind == agiru::al::StmtKind::If);
+  CHECK_TRUE("and the if did NOT take the else", branch.body.front().otherwise.empty());
+  // THE NEGATIVE CONTROL. Without the semicolon the else is the if's own, and the rule must not
+  // take every else away from every if.
+  const std::vector<agiru::al::Stmt> plain = OnlyBody("begin if B then exit(1) else exit(2); end;");
+  CHECK_TRUE("an if with no semicolon keeps its else", !plain[0].otherwise.empty());
+}
+
 } // namespace
 
 int main() {
@@ -393,6 +415,7 @@ int main() {
     ExclusiveDisjunctionIsAnOperator();
     TheConditionalOperatorParses();
     AssertErrorIsAStatement();
+    AnElseAfterASemicolonBelongsToTheCase();
     TheConditionalOperatorHasThreeOperandsAndOneTranslation();
   });
 }

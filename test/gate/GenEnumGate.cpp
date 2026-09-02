@@ -81,7 +81,7 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
   const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
   const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
   const agiru::gen::TableHeader header =
-      agiru::gen::WriteHeader(table, std::string(kTablePath), IndexOf(object));
+      agiru::gen::WriteHeader(table, std::string(kTablePath), IndexOf(object), {});
 
   CHECK_TRUE("the field takes the enum type",
              Has(header.text, "Enum<enums::SalesLineType> Type{};"));
@@ -96,7 +96,7 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
 void AnEnumTheRunNeverSawIsReported() {
   const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
   const agiru::gen::TableHeader header =
-      agiru::gen::WriteHeader(table, std::string(kTablePath), agiru::gen::EnumIndex{});
+      agiru::gen::WriteHeader(table, std::string(kTablePath), agiru::gen::EnumIndex{}, {});
 
   CHECK_TRUE("an unresolved enum is reported", !header.unresolvedEnums.empty());
   bool named = false;
@@ -129,7 +129,7 @@ void TheTypeNameIsCanonicalWhateverAlWrote() {
 void AnEnumFieldScopesThroughItsEnumeration() {
   const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
   const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
-  const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath));
+  const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath), {});
 
   CHECK_TRUE("the enum object parses", !object.values.empty());
   CHECK_TRUE("a comparison against a member names the ENUMERATION",

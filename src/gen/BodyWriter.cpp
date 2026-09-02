@@ -423,14 +423,17 @@ private:
   const al::TableObject &table_;
 };
 
-std::string WriteSource(const al::TableObject &table, const std::string &sourcePath) {
+std::string WriteSource(const al::TableObject &table,
+                        const std::string &sourcePath,
+                        const Objects &objects) {
   const std::string identifier = Identifier(table.name);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += "#include \"agiru.h\"\n\n";
-  out += "namespace agiru::app::tables {\n\n";
+  out += SourceIncludesOf(table.variables, table.procedures, objects);
+  out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
@@ -438,6 +441,20 @@ std::string WriteSource(const al::TableObject &table, const std::string &sourceP
       out += "}\n\n";
     }
   }
+  // A TABLE CARRIES CODE, and its procedures are written the way a codeunit's are.
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    out += ProcedureSignature(procedure, objects, table.name, identifier, true) + " {";
+    const std::string locals = ProcedureLocals(procedure, objects, table.name);
+    const std::string body = WriteStatements(TableNames(table), procedure.body, 2);
+    if (locals.empty() && body.empty()) {
+      out += "}\n\n";
+      continue;
+    }
+    out += "\n" + locals;
+    if (!locals.empty() && !body.empty()) { out += "\n"; }
+    out += body + "}\n\n";
+  }
+
   out += "} // namespace agiru::app::tables\n";
   return out;
 }

@@ -40,7 +40,8 @@ public:
     table.id = ExpectInteger();
     table.name = ExpectName();
     Expect("{");
-    while (!AtPunctuation("}")) {
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
       if (AtKeyword("fields")) {
         Advance();
         ParseFields(table);
@@ -52,12 +53,17 @@ public:
         SkipBracedBlock();
       } else if (AtKeyword("var")) {
         Advance();
-        ParseVars(table);
+        ParseVarsInto(table.labels, table.variables);
       } else if (AtPunctuation("[")) {
-        SkipAttribute();
+        attributes.push_back(ReadAttribute());
+      } else if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(table.labels, table.variables);
       } else if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
                  AtKeyword("internal") || AtKeyword("protected")) {
-        SkipMember();
+        table.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
       } else {
         table.properties.push_back(ParseProperty());
       }
@@ -805,32 +811,6 @@ private:
     Expect("}");
   }
 
-  void ParseVars(TableObject &table) {
-    while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("trigger") &&
-           !AtKeyword("procedure") && !AtKeyword("local") && !AtKeyword("internal") &&
-           !AtKeyword("protected")) {
-      if (AtPunctuation("[")) {
-        if (!VariableFollowsAttribute()) { return; }
-        SkipAttribute();
-        continue;
-      }
-      std::vector<std::string> names{ExpectName()};
-      while (AtPunctuation(",")) {
-        Advance();
-        names.push_back(ExpectName());
-      }
-      Expect(":");
-      const std::string type = ExpectName();
-      if (SameName(type, "Label") && Peek().kind == TokenKind::String) {
-        for (const std::string &name : names) {
-          table.labels.push_back(LabelDecl{.name = name, .text = Peek().text});
-        }
-        Advance();
-      }
-      while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
-      Expect(";");
-    }
-  }
 
   std::vector<Token> tokens_;
   std::size_t position_ = 0;

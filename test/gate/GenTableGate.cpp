@@ -45,7 +45,8 @@ void TheGeneratorReproducesTheTargetImage() {
       .source = agiru::gen::WriteHeader(
                     agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
                     std::string(kAlPath),
-                    agiru::gen::EnumIndex{})
+                    agiru::gen::EnumIndex{},
+                    {})
                     .text,
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.h"});
@@ -87,7 +88,8 @@ void TheGeneratorReproducesTheTriggerBodies() {
   const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
       .source = agiru::gen::WriteSource(
           agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
-          std::string(kAlPath)),
+          std::string(kAlPath),
+          {}),
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.cpp"});
   const std::string target =
@@ -125,7 +127,7 @@ void AChangedSourceChangesTheOutput() {
   widened.replace(at, std::string("Code[20]").size(), "Code[30]");
 
   const std::string generated =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(widened), std::string(kAlPath), {}).text;
+      agiru::gen::WriteHeader(agiru::al::ParseTable(widened), std::string(kAlPath), {}, {}).text;
   CHECK_TRUE("a widened field widens its member",
              generated.find("::agiru::Code<30> Code{};") != std::string::npos);
   CHECK_TRUE("and the old width is gone",
@@ -137,7 +139,7 @@ void AChangedSourceChangesTheOutput() {
   renamed.replace(nameAt, std::string("\"Work Type Code\"").size(), "\"Work Kind Code\"");
 
   const std::string afterRename =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}).text;
+      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}, {}).text;
   CHECK_TRUE("a renamed field renames its member and its number",
              afterRename.find("WorkKindCode{};") != std::string::npos &&
                  afterRename.find("FieldNo WorkKindCode{3}") != std::string::npos);
@@ -156,7 +158,7 @@ void AChangedStatementChangesTheBody() {
   flipped.replace(at, std::string("(Code <> '')").size(), "(Code = '')");
 
   const std::string generated =
-      agiru::gen::WriteSource(agiru::al::ParseTable(flipped), std::string(kAlPath));
+      agiru::gen::WriteSource(agiru::al::ParseTable(flipped), std::string(kAlPath), {});
   CHECK_TRUE("a flipped comparison flips the operator",
              generated.find("Code == \"\"") != std::string::npos);
   CHECK_TRUE("and the old one is gone", generated.find("Code != \"\"") == std::string::npos);
@@ -164,7 +166,7 @@ void AChangedStatementChangesTheBody() {
   // AL's `and` is not C++'s, and neither is its `=`. Both mappings are asserted, because an
   // emitter that passed one through untouched would still compile and mean something else.
   const std::string untouched =
-      agiru::gen::WriteSource(agiru::al::ParseTable(original), std::string(kAlPath));
+      agiru::gen::WriteSource(agiru::al::ParseTable(original), std::string(kAlPath), {});
   CHECK_TRUE("`and` becomes `&&`", untouched.find(" && ") != std::string::npos);
   CHECK_TRUE("and no AL operator survives",
              untouched.find(" and ") == std::string::npos &&
@@ -189,13 +191,13 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
   collided.replace(at, std::string("\"Work Type Code\"").size(), "\"Field No.\"");
 
   const std::string generated =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(collided), std::string(kAlPath), {}).text;
+      agiru::gen::WriteHeader(agiru::al::ParseTable(collided), std::string(kAlPath), {}, {}).text;
   CHECK_TRUE("the field takes the name AL gave it",
              generated.find("FieldNo{};") != std::string::npos);
   CHECK_TRUE("and the field numbers reach past it to the runtime type",
              generated.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
   CHECK_TRUE("while a table with no such field says it plainly",
-             agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {})
+             agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {}, {})
                      .text.find("static constexpr FieldNo Code{") != std::string::npos);
 }
 
@@ -210,7 +212,7 @@ void AKeyNamedLikeAClassConstantStillCompiles() {
   renamed.replace(at, std::string("key(Key1;").size(), "key(Name;");
 
   const std::string generated =
-      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}).text;
+      agiru::gen::WriteHeader(agiru::al::ParseTable(renamed), std::string(kAlPath), {}, {}).text;
   CHECK_TRUE("the array is named by its position", generated.find("kKey1{") != std::string::npos);
   CHECK_TRUE("and never by the AL key name",
              generated.find("static constexpr std::array kName{") == std::string::npos);

@@ -164,8 +164,9 @@ public:
   /// \throws Error until the UI runs (board:0030).
   static Integer RunModal() { throw Error("Page.RunModal needs a running UI (board:0030)"); }
 
-protected:
-  ~Page() = default;
+  /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
+  ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate
+  ///       initialisation and both of those make it fail from the caller's context.
 };
 
 } // namespace agiru

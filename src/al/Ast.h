@@ -152,6 +152,10 @@ struct TableObject {
   std::vector<FieldDecl> fields;
   std::vector<KeyDecl> keys;
   std::vector<LabelDecl> labels;
+  /// A TABLE CARRIES CODE, and AL says so: `Tracking Specification` declares
+  /// `procedure SetSourceFilter(...)` beside its fields, and the BaseApp calls it on a record.
+  std::vector<VarDecl> variables;
+  std::vector<ProcedureDecl> procedures;
 };
 
 const Property *Find(const std::vector<Property> &properties, std::string_view name);

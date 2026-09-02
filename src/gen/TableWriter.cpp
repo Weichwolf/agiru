@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -267,7 +268,8 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
 
 TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
-                        const EnumIndex &enums) {
+                        const EnumIndex &enums,
+                        const Objects &objects) {
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
@@ -280,6 +282,44 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += Includes(table, options, enums);
   out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
   out += "#include <string_view>\n#include <type_traits>\n\n";
+  // A TABLE'S PROCEDURES NAME OBJECTS, and a declaration needs the NAME and not the layout:
+  // `Currency.GetGainLossAccount` takes a `Record "Detailed CV Ledg. Entry Buffer"`. Including it
+  // would put two tables' headers in a cycle the moment each names the other, which AL allows.
+  std::map<std::string, std::set<std::string>> ahead;
+  const auto named = [&](const al::VarDecl &declared) {
+    const TableRef *ref = ReachObject(declared, objects);
+    if (ref == nullptr || ref->header.empty()) { return; }
+    const std::size_t colons = ref->identifier.find("::");
+    if (colons == std::string::npos) { return; }
+    ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));
+  };
+  // A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME -- the same rule the codeunits
+  // follow. A codeunit-typed member is the exception, because it is a handle (board:0037).
+  std::set<std::string> memberHeaders;
+  for (const al::VarDecl &declared : table.variables) {
+    if (TypeName(declared.type) == "Codeunit") {
+      named(declared);
+      continue;
+    }
+    const TableRef *ref = ReachObject(declared, objects);
+    if (ref != nullptr && !ref->header.empty()) { memberHeaders.insert(ref->header); }
+  }
+  for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
+  if (!memberHeaders.empty()) { out += "\n"; }
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    for (const al::VarDecl &declared : procedure.parameters) { named(declared); }
+    for (const al::VarDecl &declared : procedure.variables) { named(declared); }
+    named(procedure.returned);
+  }
+  for (const auto &[space, objectNames] : ahead) {
+    const ObjectKind kind = KindOfNamespace(space);
+    out += "namespace agiru::app::" + space + " {\n";
+    for (const std::string &one : objectNames) {
+      out += "class " + ClassName(one, kind) + ";\n" + ClassAlias(one, kind);
+    }
+    out += "} // namespace agiru::app::" + space + "\n";
+  }
+  if (!ahead.empty()) { out += "\n"; }
 
   out += "namespace agiru::app::tables {\n\n";
   for (const OptionField &option : options) {
@@ -353,6 +393,37 @@ TableHeader WriteHeader(const al::TableObject &declared,
       out += "  void " + trigger.name + FieldIdentifier(table, field.name) + "();\n";
     }
   }
+  // A TABLE CARRIES CODE. `Tracking Specification` declares `procedure SetSourceFilter(...)` beside
+  // its fields and the BaseApp calls it on a record; skipping them made every such call name a
+  // member that is not there.
+  // A FIELD NAME HIDES A TYPE FOR THE WHOLE CLASS, and a table's procedures sit below its fields:
+  // `Currency` has a field `Code` and a procedure returning `Code[20]`.
+  std::set<std::string> shadowed;
+  for (const al::FieldDecl &field : table.fields) {
+    shadowed.insert(FieldIdentifier(table, field.name));
+  }
+  for (const al::VarDecl &declared : table.variables) { shadowed.insert(Identifier(declared.name)); }
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    shadowed.insert(Identifier(procedure.name));
+  }
+  for (const al::LabelDecl &label : table.labels) { shadowed.insert(Identifier(label.name)); }
+  std::string publics;
+  std::string locals;
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    (procedure.isLocal ? locals : publics) +=
+        ProcedureDeclaration(procedure, objects, table.name, shadowed);
+  }
+  if (!publics.empty()) { out += "\n" + publics; }
+  if (!table.variables.empty() || !locals.empty()) { out += "\nprivate:\n"; }
+  for (const al::VarDecl &declared : table.variables) {
+    std::string type = DeclaredType(declared, objects);
+    if (TypeName(declared.type) == "Codeunit" && ReachObject(declared, objects) != nullptr) {
+      type = "Instance<" + type + ">";
+    }
+    out += "  " + type + " " + Identifier(declared.name) + ";\n";
+  }
+  if (!table.variables.empty() && !locals.empty()) { out += "\n"; }
+  out += locals;
   out += "};\n\n";
 
   out += FieldTable(sorted, tableIdentifier);

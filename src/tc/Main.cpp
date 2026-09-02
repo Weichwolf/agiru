@@ -314,28 +314,37 @@ void WriteTable(Run &run,
                 const agiru::al::TableObject &table,
                 const std::string &relative,
                 const agiru::gen::EnumIndex &index,
+                const agiru::gen::Objects &objects,
                 std::map<std::string, std::size_t> &unresolved) {
   const std::string stem =
       agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
       agiru::gen::Identifier(table.name);
-  const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index);
+  const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
   Keep(run, Output{.directory = run.output, .relative = stem + ".h"}, header.text);
   Keep(run,
        Output{.directory = run.output, .relative = stem + ".cpp"},
-       agiru::gen::WriteSource(table, relative));
+       agiru::gen::WriteSource(table, relative, objects));
   ++run.written;
 }
 
-void ScanTables(Run &run,
-                Counts &counts,
-                const agiru::gen::EnumIndex &index,
-                agiru::gen::Objects &objects,
-                std::map<std::string, std::size_t> &unresolvedEnums) {
+/// A TABLE IS INDEXED BEFORE THE CODEUNITS AND WRITTEN AFTER THEM, for the reason a page is
+/// (board:0034): AL lets a table declare `procedure SetSourceFilter(var Rec: Record ...)`, so
+/// writing one needs every object resolved -- and every codeunit needs the table index to exist
+/// before it is written. Parsing once and keeping the objects settles both directions.
+struct Tables {
+  std::vector<agiru::al::TableObject> objects;
+  std::vector<std::string> paths;
+};
+
+Tables IndexTables(Run &run,
+                   Counts &counts,
+                   agiru::gen::Objects &objects) {
+  Tables kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
     ++counts.files;
     try {
-      const agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
+      agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++counts.parsed;
       counts.members += table.fields.size();
       // BY NAME AND BY NUMBER BOTH, because AL names an object either way and test code uses the
@@ -348,13 +357,23 @@ void ScanTables(Run &run,
                                      .header = TableHeaderPath(table)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
-      if (!run.output.empty()) {
-        WriteTable(
-            run, table, std::filesystem::relative(path, run.root).string(), index, unresolvedEnums);
-      }
+      kept.paths.push_back(std::filesystem::relative(path, run.root).string());
+      kept.objects.push_back(std::move(table));
     } catch (const std::exception &e) {
       if (Note(run, path, e)) { --counts.files; }
     }
+  }
+  return kept;
+}
+
+void WriteTables(Run &run,
+                 const Tables &kept,
+                 const agiru::gen::EnumIndex &index,
+                 const agiru::gen::Objects &objects,
+                 std::map<std::string, std::size_t> &unresolvedEnums) {
+  if (run.output.empty()) { return; }
+  for (std::size_t i = 0; i < kept.objects.size(); ++i) {
+    WriteTable(run, kept.objects[i], kept.paths[i], index, objects, unresolvedEnums);
   }
 }
 
@@ -675,13 +694,14 @@ int Scan(const Job &job) {
     // AFTER the enums are read, not before: a codeunit variable of enum type resolves through the
     // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
-    ScanTables(run, tables, index, objects, unresolvedEnums);
+    const Tables parsedTables = IndexTables(run, tables, objects);
     // AFTER the tables and BEFORE the codeunits: an interface's SIGNATURE names records and enums,
     // and a codeunit's variable names an interface. Read in any other order, one of the two
     // resolves nothing.
     ScanInterfaces(run, interfaces, gathered, objects);
     const Pages parsed = IndexPages(run, pages, objects);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
+    WriteTables(run, parsedTables, index, objects, unresolvedEnums);
     WritePages(run, parsed, objects);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",

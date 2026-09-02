@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Ast.h"
+#include "CodeunitWriter.h"
 #include "Expr.h"
 
 #include <string>
@@ -34,6 +35,8 @@ public:
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent);
 
-std::string WriteSource(const al::TableObject &table, const std::string &sourcePath);
+std::string WriteSource(const al::TableObject &table,
+                        const std::string &sourcePath,
+                        const Objects &objects);
 
 } // namespace agiru::gen

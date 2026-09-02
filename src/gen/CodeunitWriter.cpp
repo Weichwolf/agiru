@@ -717,10 +717,38 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   return out;
 }
 
+std::string ProcedureSignature(const al::ProcedureDecl &procedure,
+                               const Objects &objects,
+                               const std::string &owner,
+                               const std::string &qualifier,
+                               bool named,
+                               const std::set<std::string> &shadowed) {
+  std::set<std::string> hiding = shadowed;
+  hiding.insert(Identifier(procedure.name));
+  return Returns(procedure, objects, hiding) + " " + qualifier + "::" + Identifier(procedure.name) +
+         "(" + Parameters(procedure, objects, named, owner, hiding) + ")";
+}
+
+std::string ProcedureLocals(const al::ProcedureDecl &procedure,
+                            const Objects &objects,
+                            const std::string &owner) {
+  return Locals(procedure, objects, owner);
+}
+
+std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
+                             const std::vector<al::ProcedureDecl> &procedures,
+                             const Objects &objects) {
+  al::CodeunitObject unit;
+  unit.variables = variables;
+  unit.procedures = procedures;
+  return SourceIncludes(unit, objects);
+}
+
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
-                                 const std::string &owner) {
-  return Declaration(procedure, objects, owner);
+                                 const std::string &owner,
+                                 const std::set<std::string> &shadowed) {
+  return Declaration(procedure, objects, owner, shadowed);
 }
 
 std::string DeclaredType(const al::VarDecl &declared, const Objects &objects) {
