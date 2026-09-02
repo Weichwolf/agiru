@@ -473,6 +473,11 @@ int Scan(const Job &job) {
   std::size_t changed = 0;
   std::set<std::filesystem::path> kept;
 
+  // THE COLUMN IS AS WIDE AS THE WIDEST APP NAME. A fixed width was 11, which fits `foundation`
+  // and truncates nothing but runs `library_variable_storage` straight into its own count.
+  std::size_t column = 0;
+  for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
+
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
     if (!std::filesystem::is_directory(source)) {
@@ -498,8 +503,9 @@ int Scan(const Job &job) {
     ScanTables(run, tables, index, objects, unresolvedEnums);
     ScanCodeunits(run, codeunits, objects, unresolvedTables);
 
-    std::println("{:<11}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
+    std::println("{:<{}}{} table(s), {} codeunit(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
+                 column,
                  tables.parsed,
                  codeunits.parsed,
                  enums.parsed,

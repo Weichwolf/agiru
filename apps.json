@@ -1,5 +1,5 @@
 {
-  "_doc": "The apps this tree transpiles and links, in dependency order. An app is BC's unit of deployment, version and dependency, and it becomes one library under apps/ so that the LINKER enforces the direction AL declares: the Base Application may not know an extension, only the other way round and only through events. `source` is read under the BCApps `src` root; `depends` names apps that must already be linked. A TEST APP IS A NORMAL APP -- its codeunits are AL like any other, it depends on what it tests, and it is compiled like everything else. That is what makes a full run of the suite affordable, and an affordable full run is what makes its number mean anything.",
+  "_doc": "The apps this tree transpiles and links, in dependency order. An app is BC's unit of deployment, version and dependency, and it becomes one library under apps/ so that the LINKER enforces the direction AL declares: the Base Application may not know an extension, only the other way round and only through events. `source` is read under the BCApps `src` root; `depends` names apps that must already be linked. A TEST APP IS A NORMAL APP -- its codeunits are AL like any other, it depends on what it tests, and it is compiled like everything else. That is what makes a full run of the suite affordable, and an affordable full run is what makes its number mean anything. THE TEST FRAMEWORK IS ITS OWN SET OF APPS and lives outside the four layer roots -- `Tools/Test Framework` carries the Test Runner and the Assert, Variable Storage, Any and Permissions Mock libraries, and `System Application` and `Business Foundation` each carry a Test Library beside their App. The W1 test codeunits depend on all of them, so a tree without them reports 'unknown type name LibraryVariableStorage' in 63 generated files and the reader chases a missing codeunit that was never read.",
   "apps": [
     {
       "name": "system",
@@ -9,17 +9,87 @@
     {
       "name": "foundation",
       "source": "Business Foundation/App",
-      "depends": ["system"]
+      "depends": [
+        "system"
+      ]
     },
     {
       "name": "base",
       "source": "Layers/W1/BaseApp",
-      "depends": ["system", "foundation"]
+      "depends": [
+        "system",
+        "foundation"
+      ]
+    },
+    {
+      "name": "library_assert",
+      "source": "Tools/Test Framework/Test Libraries/Assert",
+      "depends": [
+        "system"
+      ]
+    },
+    {
+      "name": "library_any",
+      "source": "Tools/Test Framework/Test Libraries/Any",
+      "depends": [
+        "system"
+      ]
+    },
+    {
+      "name": "library_variable_storage",
+      "source": "Tools/Test Framework/Test Libraries/Variable Storage",
+      "depends": [
+        "system",
+        "library_assert"
+      ]
+    },
+    {
+      "name": "permissions_mock",
+      "source": "Tools/Test Framework/Test Libraries/Permissions Mock",
+      "depends": [
+        "system"
+      ]
+    },
+    {
+      "name": "test_runner",
+      "source": "Tools/Test Framework/Test Runner",
+      "depends": [
+        "system"
+      ]
+    },
+    {
+      "name": "system_test_library",
+      "source": "System Application/Test Library",
+      "depends": [
+        "system",
+        "library_assert",
+        "library_any",
+        "permissions_mock",
+        "test_runner"
+      ]
+    },
+    {
+      "name": "foundation_test_library",
+      "source": "Business Foundation/Test Library",
+      "depends": [
+        "system",
+        "foundation",
+        "library_assert"
+      ]
     },
     {
       "name": "tests",
       "source": "Layers/W1/Tests",
-      "depends": ["base"]
+      "depends": [
+        "base",
+        "library_assert",
+        "library_any",
+        "library_variable_storage",
+        "permissions_mock",
+        "test_runner",
+        "system_test_library",
+        "foundation_test_library"
+      ]
     }
   ]
 }
