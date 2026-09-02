@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all apps cronus db gap lint test transpile tree provision doc clean spotless help
+.PHONY: all apps cronus db gap lint schema test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -45,6 +45,9 @@ apps: all          ## the generated tree, stopping at the first error
 
 tree: all          ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh
+
+schema:            ## how much of the CRONUS dataset the transpiled schema can hold
+	@python3 $(SELF)/scripts/schema_gap.py
 
 cronus:            ## the demo database from the CDN into PostgreSQL, one to one
 	@sh $(SELF)/scripts/fetch_artifact.sh

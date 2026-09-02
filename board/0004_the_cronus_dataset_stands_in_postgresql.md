@@ -9,6 +9,29 @@ Tags: provision, owner
 last step is missing: the data is not across yet, because the target schema is what the transpiler
 has yet to emit.
 
+## Measured, 2026-09-02, by `make schema`
+
+| | |
+|---|---:|
+| relations in CRONUS | 2 129 |
+| of them the platform's own `$ndo$...` storage, which no `.al` declares | 44 |
+| matched against a generated table | **1 450** |
+| with no generated counterpart | 635 |
+| columns landing on a declared field | **30 654 of 30 818 -- 99.47 %** |
+
+**The 164 columns that do not land are one cause and not a hundred.** `Capacity Ledger Entry` alone
+carries 17 of them -- `Routing No_`, `Work Center No_`, `Setup Time`, `Run Time` -- and they are
+fields a `tableextension` adds. board:0033 merges those at translation time, and this is the
+measurement that says how much it is worth: about 0.5 % of the dataset's columns.
+
+**The 635 unmatched tables are apps that are not in the read roots**, not gaps in the three that
+are: `AIT Column Mapping`, `AIT Log Entry` and the rest are the test toolkit's own tables, and one
+is a bare GUID -- an extension's storage.
+
+**So the 28.4-against-30.0 gap is not what is standing in the way.** It was the open question and
+the number answers it: the schema divergence between the demo database and the source is smaller
+than the extension gap by an order of magnitude.
+
 ## Reference
 
 **Measured 2026-09-01, without downloading** -- over a range request on the zip's central directory:
