@@ -44,6 +44,16 @@ public:
   /// \param bytes The new content.
   void Set(std::vector<std::uint8_t> bytes) { bytes_ = std::move(bytes); }
 
+  /// \brief AL `Blob.CreateOutStream(OutStream)` -- points a stream at this BLOB to write into.
+  /// \return The stream.
+  /// \note The stream writes into THIS BLOB and does not own a copy of it, which is what makes
+  ///       `Rec.Blob.CreateOutStream(Out); Out.WriteText(x)` leave the value in the record.
+  [[nodiscard]] class OutStream CreateOutStream();
+
+  /// \brief AL `Blob.CreateInStream(InStream)` -- points a stream at this BLOB to read from.
+  /// \return The stream.
+  [[nodiscard]] class InStream CreateInStream() const;
+
   /// \brief Compares two BLOBs.
   /// \param o The other BLOB.
   /// \return True when they hold the same bytes.

@@ -31,6 +31,7 @@
 #include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/SecretText.h"
+#include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
 #include "type/Time.h"
