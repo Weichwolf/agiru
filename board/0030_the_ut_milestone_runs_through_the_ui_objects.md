@@ -46,6 +46,31 @@ files need.
 holds the generated pages. **Grep there before deriving any of this from scratch** -- in particular
 how a `[PageHandler]` is bound to the page it answers, which is the part with no obvious C++ shape.
 
+## What the predecessor already answered, measured 2026-09-02
+
+`~/Git/openerp/openerp/runtime/base/test_page.py` is 4 740 lines and `page.py` is 1 367, and the
+module docstring of the first states the dependency that decides the order here:
+
+> field access ... `set_value(v)` / `value(v)` -> `record.validate(field, v)` -- drives the real
+> `OnValidate` trigger and its error path.
+
+**A TestPage field write IS a Validate**, which is trigger dispatch (board:0029). So the UI half of
+this item cannot start before that one, and the 41 files do not need a page renderer -- they need
+`Validate` plus navigation over a record set.
+
+The same file names its own scope boundary, and it is a MEASURED one rather than an opinion: v1 left
+"ModalPageHandler dispatch and real action-`OnAction` execution" out, `<action>.invoke()` was a
+no-op, and the suite still reached 97.0 %. So the handler machinery is not what most of the 41 files
+are waiting for.
+
+**One thing there is NOT to be copied.** That module degrades everything it cannot resolve -- a page
+out of scope, a control with no matching field -- to a silent no-op handle, and says so outright:
+"activating this wrapper never *removes* a code path that previously survived." That is the
+`activation` trade taken in the other direction, and it is why a 97 % number can hide a wrong one:
+CLAUDE.md's "a failure is loud" and "accepting a declaration and doing nothing with it is worse than
+refusing it" both point the opposite way. Here an unresolvable control is an ERROR naming the page
+and the control.
+
 ## What is true when this closes
 
 - A `page` object translates, with its source table, its fields and its actions.
