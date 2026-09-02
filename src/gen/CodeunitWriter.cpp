@@ -44,14 +44,34 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects) {
     const std::string named = ref != nullptr ? ref->identifier : Identifier(declared.subtype);
     return declared.temporary ? "Temporary<" + named + ">" : named;
   }
+  // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
+  // arguments -- which is not a type at all. The index is the same one a table field uses.
+  if (type == "Enum" && !declared.subtype.empty()) {
+    const auto found = objects.enums.find(LowerKey(declared.subtype));
+    return "Enum<enums::" +
+           (found != objects.enums.end() ? found->second.identifier
+                                         : Identifier(declared.subtype)) +
+           ">";
+  }
+  // AN INLINE `Option A,B,C` DECLARES ITS OWN MEMBERS AND HAS NO NAME. A table's version becomes a
+  // generated enumeration beside the table; a procedure's has nowhere to live yet, so it is left as
+  // the bare template -- which does not compile, loudly, rather than becoming an Integer that
+  // silently loses the member names.
+
   if (type == "Code" || type == "Text") {
     return type + "<" + std::to_string(declared.length) + ">";
   }
   return type;
 }
 
+// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly: `Item: Record Item`,
+// `SalesLine: Record "Sales Line"`. In C++ the name then hides the class and the declaration needs
+// an elaborated specifier or a qualification. Qualified, because `class Item &Item` reads like a
+// C++ puzzle and `agiru::app::Item &Item` reads like what it is.
 std::string Signature(const al::VarDecl &declared, const Objects &objects) {
-  return TypeOf(declared, objects) + (declared.byReference ? " &" : " ");
+  std::string type = TypeOf(declared, objects);
+  if (type == Identifier(declared.name)) { type = "agiru::app::" + type; }
+  return type + (declared.byReference ? " &" : " ");
 }
 
 std::string Parameters(const al::ProcedureDecl &procedure, const Objects &objects, bool named) {

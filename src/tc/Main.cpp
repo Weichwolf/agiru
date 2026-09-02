@@ -449,8 +449,11 @@ int Scan(const Job &job) {
     Counts tables;
     Counts codeunits;
     ClaimApp(run.output);
-    ScanEnums(run, enums, index);
     IndexCodeunits(run, objects);
+    ScanEnums(run, enums, index);
+    // AFTER the enums are read, not before: a codeunit variable of enum type resolves through the
+    // same index a table field does, and the index is filled by the pass above.
+    objects.enums = index;
     ScanTables(run, tables, index, objects, unresolvedEnums);
     ScanCodeunits(run, codeunits, objects, unresolvedTables);
 

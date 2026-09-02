@@ -31,6 +31,7 @@ struct CodeunitHeader {
 struct Objects {
   TableIndex tables;
   TableIndex codeunits;
+  EnumIndex enums;
 };
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
