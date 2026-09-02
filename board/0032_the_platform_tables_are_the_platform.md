@@ -59,11 +59,52 @@ that can be used to control looping". It has no dependencies -- no catalogue, no
 database -- so it proves the mechanism alone. `Field` needs the table catalogue (board:0025) and
 comes after it.
 
+## The storage question, and it dissolves most of the design
+
+**Nothing forbids a virtual table from being a real PostgreSQL relation**, and once one is, there is
+no seam to design: filters, keys, `FindSet`, `RecordRef.Open` and the SQL builder all work unchanged
+because there is nothing special left about it. That answers the first open question below rather
+than deciding it, and it is the better answer than a row-provider mechanism, which would have been a
+second path through the record layer for eight tables.
+
+The row counts decide which shape each one takes (derived 2026-09-02):
+
+| table | rows | shape |
+|---|---|---|
+| `AllObj`, `AllObjWithCaption` | 6 524, one per object | a table the runtime fills |
+| `Field` | 40 399 = 31 379 declared + 1 804 x 5 system | a table the runtime fills |
+| `Table Metadata`, `Page Metadata`, `Table Relations Metadata` | thousands | a table the runtime fills |
+| `Date` | 3 582 660 over 1753-9999 -- 3 012 154 days, 430 307 weeks, 98 964 months, 32 988 quarters, 8 247 years | a table over a DECLARED range |
+| `Integer` | 2 000 000 001 | NOT a table |
+
+**They are `UNLOGGED`.** Every one of them is DERIVED from `constexpr` metadata, so the write-ahead
+log protects nothing that cannot be rebuilt: a crash costs a regeneration of 40 000 rows, not data.
+PostgreSQL has no in-memory storage engine -- `TEMPORARY` is session-local and therefore wrong for
+shared platform metadata, and a tablespace on tmpfs leaves the cluster complaining after a crash --
+but at these sizes the question is moot anyway: `shared_buffers` holds five megabytes after the
+first read, and board:0006 gives PostgreSQL a real `shared_buffers` on the 16 GB target.
+
+**`Date` is the one where storage actually bites**, at roughly 145 MB, and the answer is the RANGE
+rather than the medium: BC uses the table for accounting periods, not for the year 9999. A declared
+bound with its origin beside it beats materialising rows nobody reads.
+
+**`Integer` is not a storage problem and no medium fixes it.** Two billion rows is a function, not a
+table -- `generate_series` with its bounds taken FROM THE FILTER, which is what the platform itself
+does: "by applying a filter to the Integer virtual table, you can easily get a subset or range of
+numbers". An unbounded scan of it is meaningless in BC too, so it refuses here and says so.
+
+**Read-only stays a runtime rule**, because a real relation would otherwise accept a write:
+`devenv-virtual-tables.md` says "You can't change the data in virtual tables". That is one flag on
+the declaration and a refusal in `RuntimeInsert`, `RuntimeModify` and `RuntimeDelete` -- generic,
+and the only thing about a virtual table the record layer needs to know.
+
 ## What has to be decided, and it is not decided yet
 
-- **How a row source is chosen.** A generated record has no virtual functions, so a virtual table
-  cannot simply override `Get`. The seam is in the metadata or in the class, and which one it is
-  decides whether `RecordRef.Open(2000000026)` reaches the same rows as `Rec: Record Integer` does.
+- ~~**How a row source is chosen.**~~ ANSWERED above: they are PostgreSQL relations, so there is no
+  row source to choose. What is left of it is `Integer` alone, whose bounds come from the filter.
+- **When the derived tables are filled.** At provision time, at first read, or on a version stamp --
+  and the answer has to survive a schema that changed since the rows were written, which is the same
+  question the CRONUS load asks (board:0004).
 - **Where the generator learns the names.** `Record "Field"` must resolve into `agiru::` and not
   `agiru::app::` -- the same discrimination a parameter named after its type already needs. A list
   of platform table names belongs beside `TypeName()`'s list of AL type names, which is the same
