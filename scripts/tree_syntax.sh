@@ -37,10 +37,39 @@ trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
 # second JSON reader in shell; every app directory is added instead, which is a SUPERSET of what
 # each app may see. The linker enforces the real direction, and the transpiler already enforces it
 # by the order it resolves names in.
+# THE SAME FLAGS THE BUILD WILL USE, so that what this measures is what the build will do. -O2
+# costs 2 % over -O0 here (measured 2026-09-02: 502 ms against 493 ms without a precompiled door),
+# because the front end dominates entirely -- and the test suite has to RUN fast, which is what the
+# optimiser is for. Measuring something cheaper than the build would answer a different question.
+OPT=-O2
 includes="-Iinclude"
 for d in "$APPS"/*/; do
   [ -d "$d" ] && includes="$includes -I${d%/}"
 done
+
+# THE DOOR IS PARSED ONCE AND NOT 6 398 TIMES. Measured 2026-09-02: a generated table costs 502 ms
+# with the door re-parsed and 77 ms with it precompiled, and an EMPTY translation unit costs 53 ms
+# of that -- so the door was five sixths of every file. The PCH is rebuilt on every run because it
+# takes about two seconds and a stale one is worse than no measurement at all.
+#
+# THE FLAGS MUST MATCH. A PCH built with -O2 and used without it is rejected, and clang reports that
+# in 13 ms -- which looks exactly like a very fast compile. It was measured as one before the
+# negative control caught it.
+PCH=$OUT/agiru.pch
+# shellcheck disable=SC2086
+clang++ -std=c++23 $OPT $includes -x c++-header -o "$PCH" include/agiru.h 2>"$OUT/pch.log" || {
+  printf 'tree: the door does not precompile -- see %s
+' "$OUT/pch.log" >&2
+  exit 1
+}
+includes="$includes -include-pch $PCH"
+
+# AND THE TREE MUST NOT MOVE WHILE IT IS BEING MEASURED. Editing a door header mid-run invalidates
+# the precompiled header, and clang then reports "file has been modified since the precompiled
+# header was built" -- which lands in the failure count and looks like 1 701 broken objects. That
+# happened. The lock above stops two RUNS from colliding; this stops a run from colliding with an
+# edit, which is the same mistake wearing different clothes.
+DOORPRINT=$(cat include/agiru.h include/*/*.h | cksum)
 
 find "$APPS" -name '*.h' | sort > "$OUT/files"
 total=$(wc -l < "$OUT/files" | tr -d ' ')
@@ -55,14 +84,14 @@ total=$(wc -l < "$OUT/files" | tr -d ' ')
 : > "$OUT/errors"
 xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
   err=$(mktemp)
-  if clang++ -std=c++23 -fsyntax-only -Wall -Wextra -Wpedantic $2 "$1" 2>"$err"; then
+  if clang++ -std=c++23 $4 -fsyntax-only -Wall -Wextra -Wpedantic $2 "$1" 2>"$err"; then
     printf "%s\n" "$1" >> "$3/passed" || exit 1
   else
     printf "%s\n" "$1" >> "$3/failed" || exit 1
     cat "$err" >> "$3/errors"
   fi
   rm -f "$err"
-' _ {} "$includes" "$OUT"
+' _ {} "$includes" "$OUT" "$OPT"
 
 # BOTH TALLIES ARE READ, NEITHER IS DERIVED, AND THEY MUST ADD UP.
 for f in passed failed; do
@@ -71,6 +100,10 @@ for f in passed failed; do
     exit 1
   }
 done
+if [ "$(cat include/agiru.h include/*/*.h | cksum)" != "$DOORPRINT" ]; then
+  printf 'tree: the door changed while the run was measuring it. ABORT, not a number.\n' >&2
+  exit 1
+fi
 passed=$(wc -l < "$OUT/passed" | tr -d ' ')
 failed=$(wc -l < "$OUT/failed" | tr -d ' ')
 if [ "$((passed + failed))" -ne "$total" ]; then

@@ -20,6 +20,7 @@
 #include <map>
 #include <memory>
 #include <print>
+#include <set>
 #include <span>
 #include <sstream>
 #include <string>
@@ -127,11 +128,23 @@ struct Output {
   std::string relative;
 };
 
-void Write(const Output &where, const std::string &text) {
+// A FILE THAT DID NOT CHANGE IS NOT WRITTEN, and that is what makes verifying a change affordable.
+// A generator change usually rewrites a few hundred of the 6 398 objects; rewriting all of them
+// gives every one a new timestamp, and the build then recompiles the whole ERP to find out that
+// 6 000 of them are byte for byte what they were. Compared before writing, the rest keep their
+// timestamps and the build skips them.
+bool WriteFile(const Output &where, const std::string &text) {
   const std::filesystem::path path = where.directory / where.relative;
+  if (std::filesystem::exists(path)) {
+    const std::ifstream existing(path, std::ios::binary);
+    std::ostringstream held;
+    held << existing.rdbuf();
+    if (held.str() == text) { return false; }
+  }
   std::filesystem::create_directories(path.parent_path());
   std::ofstream file(path, std::ios::binary);
   file << text;
+  return true;
 }
 
 struct Job {
@@ -144,10 +157,17 @@ struct Job {
 struct Run {
   std::filesystem::path root;
   std::filesystem::path output;
-  std::vector<Failure> failures; ///< What could not be READ.
-  std::vector<Failure> refusals; ///< What could be read and not WRITTEN.
-  std::size_t written = 0;
+  std::vector<Failure> failures;        ///< What could not be READ.
+  std::vector<Failure> refusals;        ///< What could be read and not WRITTEN.
+  std::size_t written = 0;              ///< Objects emitted.
+  std::size_t changed = 0;              ///< Files whose bytes actually differ from what was there.
+  std::set<std::filesystem::path> kept; ///< Every path this run stands behind.
 };
+
+void Keep(Run &run, const Output &where, const std::string &text) {
+  if (WriteFile(where, text)) { ++run.changed; }
+  run.kept.insert(where.directory / where.relative);
+}
 
 /// Records one parse failure, or reports the file as carrying no object of this kind at all.
 /// \return True when the file held no such object and must not count towards the population.
@@ -186,8 +206,9 @@ void ScanEnums(Run &run, Counts &counts, agiru::gen::EnumIndex &index) {
   }
   if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < objects.size(); ++i) {
-    Write(Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(objects[i])},
-          agiru::gen::WriteEnum(objects[i], paths[i]));
+    Keep(run,
+         Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(objects[i])},
+         agiru::gen::WriteEnum(objects[i], paths[i]));
     ++run.written;
   }
 }
@@ -207,9 +228,10 @@ void WriteTable(Run &run,
       agiru::gen::Identifier(table.name);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
-  Write(Output{.directory = run.output, .relative = stem + ".h"}, header.text);
-  Write(Output{.directory = run.output, .relative = stem + ".cpp"},
-        agiru::gen::WriteSource(table, relative));
+  Keep(run, Output{.directory = run.output, .relative = stem + ".h"}, header.text);
+  Keep(run,
+       Output{.directory = run.output, .relative = stem + ".cpp"},
+       agiru::gen::WriteSource(table, relative));
   ++run.written;
 }
 
@@ -352,9 +374,10 @@ void ScanCodeunits(Run &run,
       for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
       const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
       const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
-      Write(Output{.directory = run.output, .relative = stem}, header.text);
-      Write(Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
-            body);
+      Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
+      Keep(run,
+           Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
+           body);
       ++counts.emitted;
       ++run.written;
     } catch (const std::exception &e) {
@@ -381,13 +404,27 @@ void ReportUnresolved(std::string_view what,
                by);
 }
 
-// The generator OWNS its output directory. An aborted run must not leave half a tree behind for the
-// next build to read as if it were whole -- the predecessor records exactly that failure, a clean
-// step that wiped the tree and an abort that left a partial one the loader took happily.
+// THE GENERATOR STILL OWNS ITS OUTPUT DIRECTORY, and it owns it by SWEEPING rather than by wiping.
+// An aborted run must not leave half a tree behind for the next build to read as if it were whole
+// -- the predecessor records exactly that failure. Wiping up front achieved that and cost every
+// unchanged file its timestamp; sweeping at the end achieves the same and costs nothing, because a
+// run that aborts sweeps nothing and leaves the previous tree intact rather than a fragment.
 void ClaimOutput(const std::filesystem::path &out) {
   if (out.empty()) { return; }
-  std::filesystem::remove_all(out);
   std::filesystem::create_directories(out);
+}
+
+/// Removes every generated file the run did not write or keep.
+std::size_t Sweep(const std::filesystem::path &out, const std::set<std::filesystem::path> &kept) {
+  if (out.empty() || !std::filesystem::is_directory(out)) { return 0; }
+  std::vector<std::filesystem::path> stale;
+  for (const auto &entry : std::filesystem::recursive_directory_iterator(out)) {
+    if (!entry.is_regular_file()) { continue; }
+    if (entry.path().filename() == "reaches") { continue; }
+    if (!kept.contains(entry.path())) { stale.push_back(entry.path()); }
+  }
+  for (const std::filesystem::path &path : stale) { std::filesystem::remove(path); }
+  return stale.size();
 }
 
 void ClaimApp(const std::filesystem::path &out) {
@@ -433,6 +470,8 @@ int Scan(const Job &job) {
   std::vector<Failure> failures;
   std::vector<Failure> refusals;
   std::size_t written = 0;
+  std::size_t changed = 0;
+  std::set<std::filesystem::path> kept;
 
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
@@ -444,7 +483,9 @@ int Scan(const Job &job) {
             .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
             .failures = {},
             .refusals = {},
-            .written = 0};
+            .written = 0,
+            .changed = 0,
+            .kept = {}};
     Counts enums;
     Counts tables;
     Counts codeunits;
@@ -468,12 +509,19 @@ int Scan(const Job &job) {
     Add(allTables, tables);
     Add(allCodeunits, codeunits);
     written += run.written;
+    changed += run.changed;
+    kept.merge(run.kept);
     failures.insert(failures.end(), run.failures.begin(), run.failures.end());
     refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
   if (!job.output.empty()) {
-    std::println("written   {} objects into {}", written, job.output.string());
+    const std::size_t swept = Sweep(job.output, kept);
+    std::println("written   {} objects into {}; {} changed, {} swept",
+                 written,
+                 job.output.string(),
+                 changed,
+                 swept);
   }
   Report("enums", allEnums);
   Report("tables", allTables);

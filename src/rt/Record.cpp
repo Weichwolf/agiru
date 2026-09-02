@@ -8,10 +8,12 @@
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/RecordId.h"
 #include "type/Time.h"
 
 #include <compare>
@@ -57,6 +59,9 @@ std::string FieldText(const void *record, const FieldDef &def) {
     // `guid-data-type.md` gives the standard textual representation WITH its braces, and AL
     // compares a Guid against a Text directly, so this is the text a message shows.
     case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->ToText();
+    case FieldType::RecordId: return reinterpret_cast<const RecordId *>(At(record, def))->ToText();
+    case FieldType::DateFormula:
+      return reinterpret_cast<const DateFormula *>(At(record, def))->ToText();
     case FieldType::Integer: return ToText(*reinterpret_cast<const Integer *>(At(record, def)));
     case FieldType::BigInteger:
       return ToText(*reinterpret_cast<const BigInteger *>(At(record, def)));
@@ -81,6 +86,9 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::DateTime:
       return reinterpret_cast<const DateTime *>(At(record, def))->IsUndefined();
     case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->IsNull();
+    case FieldType::RecordId: return reinterpret_cast<const RecordId *>(At(record, def))->IsEmpty();
+    case FieldType::DateFormula:
+      return reinterpret_cast<const DateFormula *>(At(record, def))->IsEmpty();
     case FieldType::Integer: return *reinterpret_cast<const Integer *>(At(record, def)) == 0;
     case FieldType::BigInteger: return *reinterpret_cast<const BigInteger *>(At(record, def)) == 0;
     case FieldType::Boolean: return !*reinterpret_cast<const Boolean *>(At(record, def));

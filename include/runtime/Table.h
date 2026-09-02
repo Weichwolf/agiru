@@ -11,7 +11,6 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string_view>
 #include <type_traits>
 #include <vector>
@@ -308,6 +307,7 @@ private:
 template <typename T> struct TempStore {
   std::vector<T> rows;      ///< In primary-key order, which is what AL walks.
   std::uint64_t version{0}; ///< Rises on every structural change.
+  std::size_t held{0};      ///< How many records share it.
 };
 
 /// \brief AL `Record "X" temporary` -- the same table with no database behind it.
@@ -324,7 +324,46 @@ template <typename T> struct TempStore {
 template <typename T> class Temporary : public T {
 public:
   /// \brief A temporary record with a store of its own.
-  Temporary() : store_(std::make_shared<TempStore<T>>()) {}
+  Temporary() : store_(new TempStore<T>{.rows = {}, .version = 0, .held = 1}) {}
+
+  /// \brief Copies a record, and with it whichever store that record was on.
+  /// \param o The record to copy.
+  Temporary(const Temporary &o) : T(o), store_(o.store_), position_(o.position_) { ++store_->held; }
+
+  /// \brief Takes over a record's store.
+  /// \param o The record to move from.
+  Temporary(Temporary &&o) noexcept
+      : T(std::move(static_cast<T &>(o))), store_(o.store_), position_(o.position_) {
+    o.store_ = nullptr;
+  }
+
+  /// \brief Assigns a record, and with it whichever store that record is on.
+  /// \param o The record to copy.
+  /// \return This record.
+  Temporary &operator=(const Temporary &o) {
+    if (this == &o) { return *this; }
+    T::operator=(o);
+    Release();
+    store_ = o.store_;
+    position_ = o.position_;
+    ++store_->held;
+    return *this;
+  }
+
+  /// \brief Takes over a record's store.
+  /// \param o The record to move from.
+  /// \return This record.
+  Temporary &operator=(Temporary &&o) noexcept {
+    if (this == &o) { return *this; }
+    T::operator=(std::move(static_cast<T &>(o)));
+    Release();
+    store_ = o.store_;
+    position_ = o.position_;
+    o.store_ = nullptr;
+    return *this;
+  }
+
+  ~Temporary() { Release(); }
 
   /// \brief AL `Record.Insert()` on a temporary record.
   /// \throws Error when a row already carries this primary key, as AL does.
@@ -406,7 +445,10 @@ public:
   ///       two variables mutate one set of rows and each must see the other's changes.
   void Copy(const Temporary &from, bool share) {
     static_cast<T &>(*this) = static_cast<const T &>(from);
-    if (share) { store_ = from.store_; }
+    if (!share || store_ == from.store_) { return; }
+    Release();
+    store_ = from.store_;
+    ++store_->held;
   }
 
 private:
@@ -420,7 +462,17 @@ private:
     return true;
   }
 
-  std::shared_ptr<TempStore<T>> store_;
+  /// A COUNT RATHER THAN A `shared_ptr`, AND THE REASON IS THE DOOR'S SIZE. `<memory>` pulls
+  /// `<format>` with it in libstdc++-14 -- 143 000 preprocessed lines together -- and the door is
+  /// included by all 6 398 generated files. Measured 2026-09-02: dropping the runtime half of the
+  /// door takes an empty translation unit from 306 ms to 53 ms. Twenty lines of counting buy that
+  /// back, and the temporary-record gate's checks on sharing are what stand behind them.
+  void Release() {
+    if (store_ != nullptr && --store_->held == 0) { delete store_; }
+    store_ = nullptr;
+  }
+
+  TempStore<T> *store_;
   std::size_t position_{0};
 };
 

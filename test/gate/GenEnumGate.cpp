@@ -1,4 +1,5 @@
 #include "Ast.h"
+#include "BodyWriter.h"
 #include "Check.h"
 #include "EnumWriter.h"
 #include "Names.h"
@@ -121,6 +122,23 @@ void TheTypeNameIsCanonicalWhateverAlWrote() {
              "Nowhere");
 }
 
+/// AN ENUM FIELD SCOPES THROUGH ITS ENUMERATION AND NOT THROUGH ITSELF. AL writes the same words on
+/// both sides of `"SEPA Partner Type" = "SEPA Partner Type"::Blank` -- the field on the left, the
+/// enum object on the right -- and answering only for inline OPTIONS left the right-hand side
+/// spelled as the field, which is not a scope.
+void AnEnumFieldScopesThroughItsEnumeration() {
+  const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
+  const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
+  const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath));
+
+  CHECK_TRUE("the enum object parses", !object.values.empty());
+  CHECK_TRUE("a comparison against a member names the ENUMERATION",
+             body.find("enums::SalesLineType::") != std::string::npos);
+  // THE NEGATIVE CONTROL. Spelling it as the field is what the defect looked like, and it is what
+  // an emitter that answered only for inline options produces.
+  CHECK_TRUE("and never the field it compares", body.find("Type == Type::") == std::string::npos);
+}
+
 } // namespace
 
 int main() {
@@ -130,5 +148,6 @@ int main() {
     ATableReachesTheEnumObjectByNameAndByHeader();
     AnEnumTheRunNeverSawIsReported();
     TheTypeNameIsCanonicalWhateverAlWrote();
+    AnEnumFieldScopesThroughItsEnumeration();
   });
 }

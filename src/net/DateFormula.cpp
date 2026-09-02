@@ -3,7 +3,6 @@
 #include "type/Date.h"
 
 #include <cctype>
-#include <chrono>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -87,10 +86,8 @@ Date AddMonths(const Date &d, int months) {
   const int total = ((d.Year() * kMonthsPerYear) + d.Month() - 1) + months;
   const int year = total / kMonthsPerYear;
   const int month = (total % kMonthsPerYear) + 1;
-  const std::chrono::year_month_day_last last{std::chrono::year{year} /
-                                              std::chrono::month{static_cast<unsigned>(month)} /
-                                              std::chrono::last};
-  const auto length = static_cast<int>(static_cast<unsigned>(last.day()));
+  const auto length =
+      static_cast<int>(calendar::LastDayOfMonth(year, static_cast<unsigned>(month)));
   return Date::FromYmd(year,
                        static_cast<unsigned>(month),
                        static_cast<unsigned>(d.Day() < length ? d.Day() : length));
@@ -188,10 +185,7 @@ Date DateFormula::CalcDate(const Date &from) const {
       case Kind::Period: d = Boundary(d, term.unit, term.negative); break;
       case Kind::Weekday: d = Weekday(d, term.count, term.negative); break;
       case Kind::Week: {
-        const std::chrono::sys_days monday{std::chrono::year{d.Year()} / std::chrono::January /
-                                           std::chrono::day{4}};
         const Date january4 = Date::FromYmd(d.Year(), 1, 4);
-        static_cast<void>(monday);
         const Date firstMonday =
             Date::FromDaysSinceFirst(january4.DaysSinceFirst() - (january4.DayOfWeek() - 1));
         d = Date::FromDaysSinceFirst(firstMonday.DaysSinceFirst() +

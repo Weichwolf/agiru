@@ -15,6 +15,7 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
+#include "type/RecordId.h"
 #include "type/Text.h"
 #include "type/Time.h"
 
@@ -85,6 +86,13 @@ template <> struct FieldTypeOf<DateFormula> {
   static constexpr FieldType kType = FieldType::DateFormula; ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;                ///< A formula declares no length.
   static constexpr std::span<const EnumValueDef> kValues{};  ///< Not an enumeration.
+};
+
+/// \brief `RecordId` -- which table, and which row of it.
+template <> struct FieldTypeOf<RecordId> {
+  static constexpr FieldType kType = FieldType::RecordId;   ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A RecordId declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
 };
 
 /// \brief `Time` -- a time of day, in milliseconds since midnight.

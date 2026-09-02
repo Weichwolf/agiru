@@ -401,11 +401,22 @@ public:
     return {};
   }
 
+  /// \note AN ENUM FIELD SCOPES THROUGH ITS ENUMERATION AND NOT THROUGH ITSELF. AL writes
+  ///       `"SEPA Partner Type" = "SEPA Partner Type"::Blank` -- the same words on both sides, the
+  ///       field on the left and the enum object on the right. Answering only for inline OPTIONS
+  ///       left the right-hand side spelled as the field, which is not a scope and does not
+  ///       compile. It is the same question with two answers depending on how the field was
+  ///       declared.
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::FieldDecl *field = FieldNamed(table_, name);
-    return field != nullptr && Find(field->properties, "OptionMembers") != nullptr
-               ? OptionEnumName(table_.name, field->name)
-               : std::string{};
+    if (field == nullptr) { return {}; }
+    if (Find(field->properties, "OptionMembers") != nullptr) {
+      return OptionEnumName(table_.name, field->name);
+    }
+    if (TypeName(field->type) == "Enum" && !field->subtype.empty()) {
+      return "enums::" + Identifier(field->subtype);
+    }
+    return {};
   }
 
 private:

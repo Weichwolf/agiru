@@ -41,6 +41,19 @@ else
 fi
 
 printf '\n== analysis ==\n'
+# ONLY WHAT CHANGED, UNLESS THE WHOLE TREE IS ASKED FOR. clang-tidy costs 16 times what the
+# compiler costs on the same file -- measured 2026-09-02 on src/rt/Table.cpp: 2.0 s to parse it,
+# 32.6 s to check it, of which 20.8 s is the path-sensitive analyzer alone. Over 97 units that is
+# minutes, and a check nobody runs finds nothing, so the default is the one that gets run.
+#
+# THE FAST RUN NEVER WRITES A BASELINE, and it says so on every line it prints. A baseline measured
+# over a subset is a false floor -- CLAUDE.md names it as a trap -- and the whole point of the
+# counters is that they cannot be lowered by looking at less.
+if [ -z "$FULL" ]; then
+  changed=$(git diff --name-only HEAD -- 'src/*' 'include/*' 'test/*' 2>/dev/null |
+    grep -E '\.(cpp|h)$' | grep -v '^test/target/' || true)
+  ours=$changed
+fi
 # THE UNIT COUNT COMES FROM compile_commands.json, WHICH WILL ONE DAY CARRY apps/ TOO. The day
 # AGIRU_BUILD_APPS defaults on, this number jumps by some thousands while the analysis still skips
 # them -- so it is counted the same way it is analysed, and the two cannot drift apart.
@@ -50,7 +63,12 @@ units=$(grep '"file"' compile_commands.json | grep -cv '/apps/' || echo 0)
 # finding there has no address, since nobody edits the file -- the emitter is what would have to
 # change, and the emitter is analysed. What holds it instead is the compiler, which builds it into
 # every gate.
-if [ -n "$RUNTIDY" ]; then
+if [ -z "$FULL" ]; then
+  : > "$REPORT/tidy.log"
+  for f in $(printf '%s\n' "$ours" | grep '\.cpp$' || true); do
+    "$TIDY" -p . --quiet "$f" >> "$REPORT/tidy.log" 2>&1 || true
+  done
+elif [ -n "$RUNTIDY" ]; then
   "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/(apps|test/target)/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
 else
   : > "$REPORT/tidy.log"
@@ -60,6 +78,28 @@ else
 fi
 grep 'warning:\|error:' "$REPORT/tidy.log" | sed 's/ \[/\t[/' | sort -u > "$REPORT/tidy.unique"
 found=$(wc -l < "$REPORT/tidy.unique" | tr -d ' ')
+
+if [ -z "$FULL" ]; then
+  printf 'lint: %s finding(s) over %s changed file(s)\n' \
+    "$found" "$(printf '%s\n' "$ours" | grep -c . || echo 0)"
+  printf 'lint: THIS IS NOT THE BASELINE. `make lint FULL=1` reads the whole tree and writes it.\n'
+  [ "$found" -eq 0 ] || { cat "$REPORT/tidy.unique" >&2; exit 1; }
+fi
+grep_silent() {
+  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.) *{ *}' src include test --include='*.cpp' \
+    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^apps/'
+}
+
+if [ -z "$FULL" ]; then
+  printf '\n== silent places ==\n'
+  # THE SAME COUNTER THE FULL RUN USES, and not a second one that looks like it. Written twice, the
+  # two disagreed on the first try -- 3 against 0 -- because the copy counted every `catch (...)`
+  # including one that REPORTS, and counted the word inside the comment explaining the word. Two
+  # counters that disagree are worse than one that is slow.
+  printf 'lint: %s silent place(s) in the tree\n' "$(grep_silent | wc -l | tr -d ' ')"
+  printf '\nlint: the door, the AL population and the AL surface need FULL=1.\n'
+  exit 0
+fi
 
 # AN ANALYSIS THAT FINDS NOTHING IS BROKEN, NOT PASSED -- as long as there is something to find.
 # In an empty tree there is not, so the guard hangs off the unit count rather than the findings.
@@ -96,10 +136,6 @@ printf '\n== silent places ==\n'
 # same as one that eats the error -- and it counted the word inside a comment about the word. What
 # is silent is an EMPTY handler. A handler that says what went wrong is the opposite of silent, and
 # charging for it pushed the tree toward having none.
-grep_silent() {
-  grep -rn 'NOLINT\|TODO\|FIXME\|catch (\.\.\.) *{ *}' src include test --include='*.cpp' \
-    --include='*.h' 2>/dev/null | grep -v '^[^:]*:[0-9]*: *[/*]' | grep -v '^apps/'
-}
 silent=$(grep_silent | wc -l | tr -d ' ')
 allowedSilent=$(cat test/todo-baseline 2>/dev/null || echo 0)
 printf 'lint: %s silent place(s), the baseline allows %s\n' "$silent" "$allowedSilent"

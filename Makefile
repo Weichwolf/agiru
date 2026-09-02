@@ -20,8 +20,8 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER=clang++ \
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-lint: all          ## format, static analysis, the door, the AL population
-	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} sh $(SELF)/test/lint.sh
+lint: all          ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
+	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} FULL=$(FULL) sh $(SELF)/test/lint.sh
 
 test: all          ## the fast gate
 	@sh $(SELF)/test/run.sh

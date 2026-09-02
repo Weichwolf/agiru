@@ -89,6 +89,9 @@ std::string ColumnType(const FieldDef &def) {
     // formula in a field "is converted to a generic, nonlanguage dependent format" -- the invariant
     // spelling -- and read back into the current language when it is shown. The text IS the value.
     case FieldType::DateFormula: return "varchar(32)";
+    // A RecordId is stored as its TEXT, which is what AL code already reads it as: the BaseApp
+    // splits `Format(RecordID)` on `': '` to get the primary key back out of it.
+    case FieldType::RecordId: return "text";
     case FieldType::Blob: return "bytea";
   }
   throw Error("ColumnType: no SQL type for this field type yet");
