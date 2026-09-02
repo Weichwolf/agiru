@@ -56,7 +56,10 @@ std::size_t Utf16Length(std::string_view s);
 
 /// \brief Raises when a value is longer than a declared length.
 /// \param s   The text to measure.
-/// \param max The declared maximum, in UTF-16 code units.
+/// \param max The declared maximum, in UTF-16 code units; 0 means UNBOUNDED.
+///
+/// \note Zero is no limit rather than a limit of nothing, because that is what AL means by a bare
+///       `Text` with no brackets after it.
 void CheckLength(std::string_view s, std::size_t max);
 
 /// \brief Applies AL's Code normalisation.

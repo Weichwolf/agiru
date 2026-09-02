@@ -36,7 +36,12 @@ void RaiseTooLong(std::string_view value, std::size_t actual, std::size_t max) {
                     " characters. Value: '" + std::string(value) + "'.");
 }
 
+// A DECLARED LENGTH OF ZERO IS NO LENGTH AT ALL, which is what AL means by a bare `Text`. The page
+// gives `Text[50]` a maximum and `Text` none -- a variable declared without brackets holds up to
+// the platform's own limit, not up to nothing. Treating 0 as "refuse everything" would have made
+// every unbounded Text variable in the BaseApp raise on its first assignment.
 void CheckLength(std::string_view s, std::size_t max) {
+  if (max == 0) { return; }
   const std::size_t actual = Utf16Length(s);
   if (actual > max) { RaiseTooLong(s, actual, max); }
 }

@@ -177,6 +177,44 @@ void ATableTheRunNeverSawIsReported() {
              header.text.find("LineNumberBuffer.h") == std::string::npos);
 }
 
+/// AN INLINE `Option A,B,C` HAS NO NAME AND DECLARES ITS OWN MEMBERS. A table's version becomes an
+/// enumeration beside the table; a procedure's needs one too, or `Type::All` in the body has no
+/// vocabulary and the declaration is an Integer that lost it.
+void AnInlineOptionGetsAnEnumerationOfItsOwn() {
+  const std::string source = R"(codeunit 50000 "Some Thing"
+{
+    var
+        Mode: Option Draft,Posted;
+
+    procedure Check(Kind: Option " ",Item,Resource)
+    var
+        Step: Option First,Second;
+    begin
+    end;
+})";
+  const std::string generated = Generated(source);
+
+  CHECK_TRUE("a codeunit variable gets an enumeration named after the codeunit and itself",
+             generated.find("enum class SomeThingMode") != std::string::npos);
+  CHECK_TRUE("a parameter gets one named after its procedure too",
+             generated.find("enum class SomeThingCheckKind") != std::string::npos);
+  CHECK_TRUE("and so does a local",
+             generated.find("enum class SomeThingCheckStep") != std::string::npos);
+  CHECK_TRUE("the member names are kept as AL wrote them",
+             generated.find("\"Draft\"") != std::string::npos &&
+                 generated.find("\"Posted\"") != std::string::npos);
+  CHECK_TRUE("a member that is no identifier is renamed and its ordinal kept",
+             generated.find("Blank = 0,") != std::string::npos);
+  CHECK_TRUE("the variable's type names its own enumeration",
+             generated.find("Option<SomeThingMode> Mode") != std::string::npos);
+  CHECK_TRUE("and so does the parameter",
+             generated.find("Option<SomeThingCheckKind> Kind") != std::string::npos);
+
+  // THE NEGATIVE CONTROL. A rule that named every option the same would pass every check above.
+  CHECK_TRUE("two options in one codeunit do not share an enumeration",
+             generated.find("SomeThingCheckKind") != generated.find("SomeThingCheckStep"));
+}
+
 } // namespace
 
 int main() {
@@ -185,5 +223,6 @@ int main() {
     TheGeneratorReproducesTheProcedureBodies();
     AChangedSourceChangesTheOutput();
     ATableTheRunNeverSawIsReported();
+    AnInlineOptionGetsAnEnumerationOfItsOwn();
   });
 }

@@ -37,7 +37,23 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   return found != index.end() ? &found->second : nullptr;
 }
 
-std::string TypeOf(const al::VarDecl &declared, const Objects &objects) {
+// AN INLINE `Option A,B,C` DECLARES ITS OWN MEMBERS AND HAS NO NAME, so the generator gives it
+// one: the codeunit, the procedure it stands in, and the variable. A table does the same for its
+// own inline options, and the alternative -- an Integer -- would compile and lose the vocabulary
+// `Type::All` is written in.
+/// One element type of a generic, as the parser recorded it: `Text[50]`, `Code[20]` or a bare name.
+std::string Generic(const std::string &argument) {
+  const std::size_t bracket = argument.find('[');
+  if (bracket == std::string::npos) {
+    const std::string type = TypeName(argument);
+    return type == "Text" || type == "Code" ? type + "<0>" : type;
+  }
+  return TypeName(argument.substr(0, bracket)) + "<" +
+         argument.substr(bracket + 1, argument.size() - bracket - 2) + ">";
+}
+
+std::string
+TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
   std::string type = TypeName(declared.type);
   if (type == "Record" || type == "Codeunit") {
     const TableRef *ref = Reach(declared, objects);
@@ -53,11 +69,19 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects) {
                                          : Identifier(declared.subtype)) +
            ">";
   }
-  // AN INLINE `Option A,B,C` DECLARES ITS OWN MEMBERS AND HAS NO NAME. A table's version becomes a
-  // generated enumeration beside the table; a procedure's has nowhere to live yet, so it is left as
-  // the bare template -- which does not compile, loudly, rather than becoming an Integer that
-  // silently loses the member names.
+  if (type == "Option" && !declared.members.empty()) { return "Option<" + owner + ">"; }
+  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them.
+  if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
+    std::string out = type + "<";
+    for (std::size_t i = 0; i < declared.arguments.size(); ++i) {
+      if (i != 0) { out += ", "; }
+      out += Generic(declared.arguments[i]);
+    }
+    return out + ">";
+  }
 
+  // A BARE `Text` IS UNBOUNDED, and it lands here as a length of zero -- which the string types
+  // read as no limit rather than a limit of nothing. `Text[50]` carries its 50.
   if (type == "Code" || type == "Text") {
     return type + "<" + std::to_string(declared.length) + ">";
   }
@@ -68,18 +92,61 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects) {
 // `SalesLine: Record "Sales Line"`. In C++ the name then hides the class and the declaration needs
 // an elaborated specifier or a qualification. Qualified, because `class Item &Item` reads like a
 // C++ puzzle and `agiru::app::Item &Item` reads like what it is.
-std::string Signature(const al::VarDecl &declared, const Objects &objects) {
-  std::string type = TypeOf(declared, objects);
+std::string
+OptionName(const std::string &unit, const std::string &within, const std::string &name) {
+  return Identifier(unit) + Identifier(within) + Identifier(name);
+}
+
+std::string
+Signature(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
+  std::string type = TypeOf(declared, objects, owner);
   if (type == Identifier(declared.name)) { type = "agiru::app::" + type; }
   return type + (declared.byReference ? " &" : " ");
 }
 
-std::string Parameters(const al::ProcedureDecl &procedure, const Objects &objects, bool named) {
+std::string Parameters(const al::ProcedureDecl &procedure,
+                       const Objects &objects,
+                       bool named,
+                       const std::string &unit) {
   std::string out;
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
-    out += Signature(procedure.parameters[i], objects);
+    out += Signature(procedure.parameters[i],
+                     objects,
+                     OptionName(unit, procedure.name, procedure.parameters[i].name));
     if (named) { out += Identifier(procedure.parameters[i].name); }
+  }
+  return out;
+}
+
+/// Every inline option a codeunit declares, as its own enumeration with its own traits.
+std::string InlineOptions(const al::CodeunitObject &unit) {
+  const std::string identifier = Identifier(unit.name);
+  std::string out;
+  const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
+    if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
+    const std::string name = OptionName(unit.name, within, declared.name);
+    const std::vector<std::string> names = EnumeratorNames(declared.members);
+    out += "namespace agiru::app {\n\nenum class " + name + " : std::int32_t {\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
+    }
+    out += "};\n\n} // namespace agiru::app\n\n";
+    out += "template <> struct agiru::OptionTraits<agiru::app::" + name + "> {\n";
+    out += "  static constexpr std::array<EnumValueDef, " +
+           std::to_string(declared.members.size()) + "> kValues{{\n";
+    for (std::size_t i = 0; i < declared.members.size(); ++i) {
+      out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
+             ", .name = " + Literal(declared.members[i]) +
+             ", .caption = " + Literal(declared.members[i]) + "},\n";
+    }
+    out += "  }};\n};\n\n";
+  };
+  static_cast<void>(identifier);
+  for (const al::VarDecl &declared : unit.variables) { declare(std::string{}, declared); }
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    for (const al::VarDecl &declared : procedure.parameters) { declare(procedure.name, declared); }
+    for (const al::VarDecl &declared : procedure.variables) { declare(procedure.name, declared); }
   }
   return out;
 }
@@ -91,13 +158,16 @@ std::string Returns(const al::ProcedureDecl &procedure, const Objects &objects) 
                              .name = {},
                              .type = procedure.returnType,
                              .subtype = procedure.returnSubtype,
-                             .length = 0};
+                             .length = 0,
+                             .members = {},
+                             .arguments = {}};
   return TypeOf(returned, objects);
 }
 
-std::string Declaration(const al::ProcedureDecl &procedure, const Objects &objects) {
+std::string
+Declaration(const al::ProcedureDecl &procedure, const Objects &objects, const std::string &unit) {
   return "  " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
-         Parameters(procedure, objects, true) + ");\n";
+         Parameters(procedure, objects, true, unit) + ");\n";
 }
 
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
@@ -178,7 +248,8 @@ private:
   const al::ProcedureDecl &procedure_;
 };
 
-std::string Locals(const al::ProcedureDecl &procedure, const Objects &objects) {
+std::string
+Locals(const al::ProcedureDecl &procedure, const Objects &objects, const std::string &unit) {
   std::string out;
   // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
   // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
@@ -186,7 +257,8 @@ std::string Locals(const al::ProcedureDecl &procedure, const Objects &objects) {
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
   for (const al::VarDecl &declared : procedure.variables) {
-    out += "  " + TypeOf(declared, objects) + " " + Identifier(declared.name) + "{};\n";
+    out += "  " + TypeOf(declared, objects, OptionName(unit, procedure.name, declared.name)) + " " +
+           Identifier(declared.name) + "{};\n";
   }
   return out;
 }
@@ -209,8 +281,8 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     // SITE -- so its definition has nothing to do with its parameters and drops their names.
     const bool publisher = IsPublisher(procedure);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, !publisher) + ") {";
-    const std::string locals = publisher ? std::string{} : Locals(procedure, objects);
+           "(" + Parameters(procedure, objects, !publisher, unit.name) + ") {";
+    const std::string locals = publisher ? std::string{} : Locals(procedure, objects, unit.name);
     const std::string body =
         publisher ? std::string{}
                   : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
@@ -243,7 +315,8 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "\n";
   out += "#pragma once\n\n";
   out += Includes(unit, objects);
-  out += "#include <string_view>\n\n";
+  out += "#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
+  out += InlineOptions(unit);
 
   out += "namespace agiru::app {\n\n";
   out += "class " + identifier + " : public Codeunit<" + identifier + "> {\npublic:\n";
@@ -260,14 +333,15 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (procedure.isLocal) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
-    out += Declaration(procedure, objects);
+    out += Declaration(procedure, objects, unit.name);
     previousWasTrigger = procedure.isTrigger;
     first = false;
   }
 
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    hidden += "  " + TypeOf(declared, objects) + " " + Identifier(declared.name) + ";\n";
+    hidden += "  " + TypeOf(declared, objects, OptionName(unit.name, {}, declared.name)) + " " +
+              Identifier(declared.name) + ";\n";
   }
   if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
   for (const al::LabelDecl &label : unit.labels) {
@@ -277,7 +351,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!procedure.isLocal) { continue; }
-    locals += Declaration(procedure, objects);
+    locals += Declaration(procedure, objects, unit.name);
   }
   if (!hidden.empty() || !locals.empty()) {
     out += "\nprivate:\n";

@@ -204,12 +204,25 @@ private:
     }
   }
 
-  void SkipOptionMembers() {
+  std::vector<std::string> ReadOptionMembers() {
+    std::vector<std::string> members;
+    bool expecting = true;
     while (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier ||
            AtPunctuation(",")) {
-      if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return; }
+      if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { break; }
+      if (AtPunctuation(",")) {
+        // `Option A,,B` -- a blank member holds an ordinal nobody filled in, and it counts.
+        if (expecting) { members.emplace_back(); }
+        expecting = true;
+        Advance();
+        continue;
+      }
+      members.push_back(Peek().text);
+      expecting = false;
       Advance();
     }
+    if (expecting && !members.empty()) { members.emplace_back(); }
+    return members;
   }
 
   std::string ReadSubtypeName() {
@@ -241,13 +254,29 @@ private:
       Expect("of");
     }
     declared.type = ExpectName();
+    // `List of [Text]` AND `Dictionary of [Text, Integer]` NAME THEIR ELEMENT TYPES, and they were
+    // being skipped. A generic with its arguments thrown away is a class template with none.
     if (AtKeyword("of")) {
       Advance();
-      SkipBracketed();
+      Expect("[");
+      while (!AtEnd() && !AtPunctuation("]")) {
+        if (AtPunctuation(",")) {
+          Advance();
+          continue;
+        }
+        const VarDecl argument = ReadType();
+        declared.arguments.push_back(
+            argument.length != 0 ? argument.type + "[" + std::to_string(argument.length) + "]"
+                                 : argument.type);
+      }
+      Expect("]");
       return declared;
     }
+    // AN INLINE OPTION DECLARES ITS MEMBERS AND HAS NO NAME, and they were being skipped. They are
+    // the only thing that says what `Type::All` means where `Type` is a local; without them the
+    // declaration is an integer with a lost vocabulary.
     if (SameName(declared.type, "Option")) {
-      SkipOptionMembers();
+      declared.members = ReadOptionMembers();
       return declared;
     }
     if (AtPunctuation("[")) {

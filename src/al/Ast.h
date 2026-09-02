@@ -51,6 +51,8 @@ struct VarDecl {
   std::string type;
   std::string subtype;
   int length = 0;
+  std::vector<std::string> members;   ///< An inline `Option A,B,C` declares its own.
+  std::vector<std::string> arguments; ///< `List of [Text]`, `Dictionary of [Text, Integer]`.
 };
 
 using Parameter = VarDecl;

@@ -5,6 +5,8 @@
 #include "LineNumberBuffer.h"
 #include "agiru.h"
 
+#include <array>
+#include <cstdint>
 #include <string_view>
 
 namespace agiru::app {
