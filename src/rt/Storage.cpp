@@ -85,6 +85,10 @@ std::string ColumnType(const FieldDef &def) {
     case FieldType::Time: return "time";
     case FieldType::DateTime: return "timestamp";
     case FieldType::Guid: return "uuid";
+    // A DateFormula is STORED AS ITS TEXT, which is what BC does: `dateformula-data-type.md` says a
+    // formula in a field "is converted to a generic, nonlanguage dependent format" -- the invariant
+    // spelling -- and read back into the current language when it is shown. The text IS the value.
+    case FieldType::DateFormula: return "varchar(32)";
     case FieldType::Blob: return "bytea";
   }
   throw Error("ColumnType: no SQL type for this field type yet");

@@ -236,12 +236,13 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   // lower-case k, since Identifier() upper-cases the first letter of every AL name. The AL name is
   // not lost -- it stands beside the array in the KeyDef, which is where a reader looks for it.
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
-    out += "  static constexpr std::array " + KeyArrayName(i) + "{";
+    out += "  static constexpr std::array<FieldNo, " + std::to_string(table.keys[i].fields.size()) +
+           "> " + KeyArrayName(i) + "{{";
     for (std::size_t f = 0; f < table.keys[i].fields.size(); ++f) {
       if (f != 0) { out += ", "; }
       out += "FieldNumber::" + Identifier(table.keys[i].fields[f]);
     }
-    out += "};\n";
+    out += "}};\n";
   }
 
   if (!table.labels.empty()) { out += "\n"; }
@@ -257,7 +258,11 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
   }
   out += "};\n\n";
 
-  out += "inline constexpr std::array k" + tableIdentifier + "Fields{\n";
+  // AN EMPTY BRACED LIST CANNOT DEDUCE ITS ELEMENT TYPE, and a table with no fields is legal AL --
+  // BC declares several as pure event containers. `std::array k{}` is not a declaration the
+  // compiler can complete, so the element type is named when there is nothing to deduce it from.
+  out += "inline constexpr std::array<FieldDef, " + std::to_string(sorted.size()) + "> k" +
+         tableIdentifier + "Fields{{\n";
   for (const al::FieldDecl *field : sorted) {
     const std::string identifier = Identifier(field->name);
     out += "    Declare<&";
@@ -278,16 +283,17 @@ WriteHeader(const al::TableObject &table, const std::string &sourcePath, const E
     out += identifier;
     out += ")),\n";
   }
-  out += "};\n\n";
+  out += "}};\n\n";
 
-  out += "inline constexpr std::array k" + tableIdentifier + "Keys{\n";
+  out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
+         tableIdentifier + "Keys{{\n";
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
     const al::Property *clustered = Find(table.keys[i].properties, "Clustered");
     out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableIdentifier +
            "::" + KeyArrayName(i) + ", .clustered = " +
            (clustered != nullptr && clustered->text == "true" ? "true" : "false") + "},\n";
   }
-  out += "};\n\n";
+  out += "}};\n\n";
 
   out += "inline constexpr TableDef k" + tableIdentifier + "Table{\n";
   out += "    .id = " + tableIdentifier + "::kId,\n";

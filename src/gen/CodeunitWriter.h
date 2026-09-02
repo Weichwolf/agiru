@@ -9,7 +9,7 @@
 
 namespace agiru::gen {
 
-/// Where one AL table object landed: the C++ name it took and the header that declares it.
+/// Where one AL object landed: the C++ name it took and the header that declares it.
 struct TableRef {
   std::string identifier;
   std::string header;
@@ -25,13 +25,21 @@ struct CodeunitHeader {
   std::vector<std::string> unresolvedTables;
 };
 
+/// EVERY OBJECT KIND GETS ITS OWN INDEX, because AL lets a table and a codeunit carry one name and
+/// tells them apart by the keyword: `Record "X"` against `Codeunit "X"`. One index would let a
+/// codeunit variable resolve to a table class, which compiles and is wrong.
+struct Objects {
+  TableIndex tables;
+  TableIndex codeunits;
+};
+
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
-                             const TableIndex &tables);
+                             const Objects &objects);
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                 const std::string &sourcePath,
-                                const TableIndex &tables);
+                                const Objects &objects);
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
 

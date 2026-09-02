@@ -30,12 +30,18 @@ bool NamesAnObject(const al::VarDecl &declared) {
 // A type as it stands in a DECLARATION. `Record "X"` is the generated class, `Record "X" temporary`
 // is that class with no database behind it, `Text[50]` carries its length, and everything else is
 // the door's own name for the AL type.
-std::string TypeOf(const al::VarDecl &declared, const TableIndex &tables) {
+const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
+  const std::string type = TypeName(declared.type);
+  const TableIndex &index = type == "Codeunit" ? objects.codeunits : objects.tables;
+  const auto found = index.find(LowerKey(declared.subtype));
+  return found != index.end() ? &found->second : nullptr;
+}
+
+std::string TypeOf(const al::VarDecl &declared, const Objects &objects) {
   std::string type = TypeName(declared.type);
   if (type == "Record" || type == "Codeunit") {
-    const auto found = tables.find(LowerKey(declared.subtype));
-    const std::string named =
-        found != tables.end() ? found->second.identifier : Identifier(declared.subtype);
+    const TableRef *ref = Reach(declared, objects);
+    const std::string named = ref != nullptr ? ref->identifier : Identifier(declared.subtype);
     return declared.temporary ? "Temporary<" + named + ">" : named;
   }
   if (type == "Code" || type == "Text") {
@@ -44,21 +50,21 @@ std::string TypeOf(const al::VarDecl &declared, const TableIndex &tables) {
   return type;
 }
 
-std::string Signature(const al::VarDecl &declared, const TableIndex &tables) {
-  return TypeOf(declared, tables) + (declared.byReference ? " &" : " ");
+std::string Signature(const al::VarDecl &declared, const Objects &objects) {
+  return TypeOf(declared, objects) + (declared.byReference ? " &" : " ");
 }
 
-std::string Parameters(const al::ProcedureDecl &procedure, const TableIndex &tables, bool named) {
+std::string Parameters(const al::ProcedureDecl &procedure, const Objects &objects, bool named) {
   std::string out;
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
-    out += Signature(procedure.parameters[i], tables);
+    out += Signature(procedure.parameters[i], objects);
     if (named) { out += Identifier(procedure.parameters[i].name); }
   }
   return out;
 }
 
-std::string Returns(const al::ProcedureDecl &procedure, const TableIndex &tables) {
+std::string Returns(const al::ProcedureDecl &procedure, const Objects &objects) {
   if (procedure.returnType.empty()) { return "void"; }
   const al::VarDecl returned{.byReference = false,
                              .temporary = false,
@@ -66,20 +72,20 @@ std::string Returns(const al::ProcedureDecl &procedure, const TableIndex &tables
                              .type = procedure.returnType,
                              .subtype = procedure.returnSubtype,
                              .length = 0};
-  return TypeOf(returned, tables);
+  return TypeOf(returned, objects);
 }
 
-std::string Declaration(const al::ProcedureDecl &procedure, const TableIndex &tables) {
-  return "  " + Returns(procedure, tables) + " " + Identifier(procedure.name) + "(" +
-         Parameters(procedure, tables, true) + ");\n";
+std::string Declaration(const al::ProcedureDecl &procedure, const Objects &objects) {
+  return "  " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
+         Parameters(procedure, objects, true) + ");\n";
 }
 
-std::string Includes(const al::CodeunitObject &unit, const TableIndex &tables) {
+std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
-    const auto found = tables.find(LowerKey(declared.subtype));
-    if (found != tables.end()) { headers.insert(found->second.header); }
+    const TableRef *ref = Reach(declared, objects);
+    if (ref != nullptr) { headers.insert(ref->header); }
   };
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -91,10 +97,10 @@ std::string Includes(const al::CodeunitObject &unit, const TableIndex &tables) {
   return out;
 }
 
-std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const TableIndex &tables) {
+std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const Objects &objects) {
   std::vector<std::string> missing;
   const auto note = [&](const al::VarDecl &declared) {
-    if (!NamesAnObject(declared) || tables.contains(LowerKey(declared.subtype))) { return; }
+    if (!NamesAnObject(declared) || Reach(declared, objects) != nullptr) { return; }
     if (std::ranges::find(missing, declared.subtype) == missing.end()) {
       missing.push_back(declared.subtype);
     }
@@ -152,15 +158,15 @@ private:
   const al::ProcedureDecl &procedure_;
 };
 
-std::string Locals(const al::ProcedureDecl &procedure, const TableIndex &tables) {
+std::string Locals(const al::ProcedureDecl &procedure, const Objects &objects) {
   std::string out;
   // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
   // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
   if (!procedure.returnName.empty()) {
-    out += "  " + Returns(procedure, tables) + " " + Identifier(procedure.returnName) + "{};\n";
+    out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
   for (const al::VarDecl &declared : procedure.variables) {
-    out += "  " + TypeOf(declared, tables) + " " + Identifier(declared.name) + "{};\n";
+    out += "  " + TypeOf(declared, objects) + " " + Identifier(declared.name) + "{};\n";
   }
   return out;
 }
@@ -169,7 +175,7 @@ std::string Locals(const al::ProcedureDecl &procedure, const TableIndex &tables)
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                 const std::string &sourcePath,
-                                const TableIndex &tables) {
+                                const Objects &objects) {
   const std::string identifier = Identifier(unit.name);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
@@ -182,9 +188,9 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     // AN EVENT PUBLISHER'S BODY IS EMPTY BY DESIGN -- the platform fires subscribers at the CALL
     // SITE -- so its definition has nothing to do with its parameters and drops their names.
     const bool publisher = IsPublisher(procedure);
-    out += Returns(procedure, tables) + " " + identifier + "::" + Identifier(procedure.name) + "(" +
-           Parameters(procedure, tables, !publisher) + ") {";
-    const std::string locals = publisher ? std::string{} : Locals(procedure, tables);
+    out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
+           "(" + Parameters(procedure, objects, !publisher) + ") {";
+    const std::string locals = publisher ? std::string{} : Locals(procedure, objects);
     const std::string body =
         publisher ? std::string{}
                   : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
@@ -209,14 +215,14 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
-                             const TableIndex &tables) {
+                             const Objects &objects) {
   const std::string identifier = Identifier(unit.name);
 
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#pragma once\n\n";
-  out += Includes(unit, tables);
+  out += Includes(unit, objects);
   out += "#include <string_view>\n\n";
 
   out += "namespace agiru::app {\n\n";
@@ -234,14 +240,14 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (procedure.isLocal) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
-    out += Declaration(procedure, tables);
+    out += Declaration(procedure, objects);
     previousWasTrigger = procedure.isTrigger;
     first = false;
   }
 
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    hidden += "  " + TypeOf(declared, tables) + " " + Identifier(declared.name) + ";\n";
+    hidden += "  " + TypeOf(declared, objects) + " " + Identifier(declared.name) + ";\n";
   }
   if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
   for (const al::LabelDecl &label : unit.labels) {
@@ -251,7 +257,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!procedure.isLocal) { continue; }
-    locals += Declaration(procedure, tables);
+    locals += Declaration(procedure, objects);
   }
   if (!hidden.empty() || !locals.empty()) {
     out += "\nprivate:\n";
@@ -266,7 +272,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "};\n";
-  return CodeunitHeader{.text = out, .unresolvedTables = Unresolved(unit, tables)};
+  return CodeunitHeader{.text = out, .unresolvedTables = Unresolved(unit, objects)};
 }
 
 } // namespace agiru::gen

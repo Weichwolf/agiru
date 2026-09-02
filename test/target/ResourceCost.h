@@ -65,10 +65,10 @@ public:
     static constexpr FieldNo UnitCost{6};
   };
 
-  static constexpr std::array kKey1{
-      FieldNumber::Type, FieldNumber::Code, FieldNumber::WorkTypeCode};
-  static constexpr std::array kKey2{
-      FieldNumber::CostType, FieldNumber::Code, FieldNumber::WorkTypeCode};
+  static constexpr std::array<FieldNo, 3> kKey1{
+      {FieldNumber::Type, FieldNumber::Code, FieldNumber::WorkTypeCode}};
+  static constexpr std::array<FieldNo, 3> kKey2{
+      {FieldNumber::CostType, FieldNumber::Code, FieldNumber::WorkTypeCode}};
 
   static constexpr std::string_view Text000{"cannot be specified when %1 is %2"};
 
@@ -76,7 +76,7 @@ public:
   void OnValidateCostType();
 };
 
-inline constexpr std::array kResourceCostFields{
+inline constexpr std::array<FieldDef, 6> kResourceCostFields{{
     Declare<&ResourceCost::Type>(
         ResourceCost::FieldNumber::Type, "Type", "Type", offsetof(ResourceCost, Type)),
     Declare<&ResourceCost::Code>(
@@ -97,12 +97,12 @@ inline constexpr std::array kResourceCostFields{
                                      "Unit Cost",
                                      "Unit Cost",
                                      offsetof(ResourceCost, UnitCost)),
-};
+}};
 
-inline constexpr std::array kResourceCostKeys{
+inline constexpr std::array<KeyDef, 2> kResourceCostKeys{{
     KeyDef{.name = "Key1", .fields = ResourceCost::kKey1, .clustered = true},
     KeyDef{.name = "Key2", .fields = ResourceCost::kKey2, .clustered = false},
-};
+}};
 
 inline constexpr TableDef kResourceCostTable{
     .id = ResourceCost::kId,

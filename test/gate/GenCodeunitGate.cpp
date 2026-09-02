@@ -35,12 +35,12 @@ std::vector<std::string> Lines(const std::string &text) {
 /// The index the RUN supplies, standing in for one app's tables. The header path is the one this
 /// gate compiles against; a real run gives the app-relative path instead, and the emitter does not
 /// care which -- that is what makes an enum or a table reachable across apps without qualification.
-agiru::gen::TableIndex Tables() {
-  agiru::gen::TableIndex tables;
-  tables.insert_or_assign(
+agiru::gen::Objects Tables() {
+  agiru::gen::Objects objects;
+  objects.tables.insert_or_assign(
       "line number buffer",
       agiru::gen::TableRef{.identifier = "LineNumberBuffer", .header = "LineNumberBuffer.h"});
-  return tables;
+  return objects;
 }
 
 std::string Generated(const std::string &source) {
@@ -168,7 +168,7 @@ void ATableTheRunNeverSawIsReported() {
   const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(
       agiru::al::ParseCodeunit(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
       std::string(kAlPath),
-      agiru::gen::TableIndex{});
+      agiru::gen::Objects{});
   CHECK_TRUE("the unresolved table is reported", header.unresolvedTables.size() == 1);
   CHECK_TEXT("under the AL name the declaration gave it",
              header.unresolvedTables.front(),

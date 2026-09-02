@@ -216,7 +216,7 @@ void WriteTable(Run &run,
 void ScanTables(Run &run,
                 Counts &counts,
                 const agiru::gen::EnumIndex &index,
-                agiru::gen::TableIndex &tables,
+                agiru::gen::Objects &objects,
                 std::map<std::string, std::size_t> &unresolvedEnums) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
     ++counts.files;
@@ -228,8 +228,8 @@ void ScanTables(Run &run,
       // number freely: `var GLEntry: Record 17`.
       const agiru::gen::TableRef ref{.identifier = agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table)};
-      tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
-      tables.insert_or_assign(std::to_string(table.id), ref);
+      objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
+      objects.tables.insert_or_assign(std::to_string(table.id), ref);
       if (!run.output.empty()) {
         WriteTable(
             run, table, std::filesystem::relative(path, run.root).string(), index, unresolvedEnums);
@@ -270,9 +270,49 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
   return found.tests != 0 ? found : UnitTestPopulation{};
 }
 
+// THE NAMES ARE INDEXED BEFORE ANYTHING IS EMITTED, and lexically rather than by parsing. A
+// codeunit may hold a variable of a codeunit declared later in the same app, so a single pass in
+// file order would not have it -- and parsing 3 914 objects twice to find that out costs minutes
+// for two lines of header. The object's kind, name and namespace are all on its declaration line.
+void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
+    const std::string source = Read(path);
+    const std::size_t at = source.find("\ncodeunit ");
+    if (at == std::string::npos) { continue; }
+    const std::size_t eol = source.find('\n', at + 1);
+    const std::string header = source.substr(at + 1, eol == std::string::npos ? eol : eol - at - 1);
+    const std::size_t quote = header.find('"');
+    std::string name;
+    if (quote != std::string::npos) {
+      const std::size_t close = header.find('"', quote + 1);
+      name = header.substr(quote + 1, close - quote - 1);
+    } else {
+      std::istringstream words(header);
+      std::string word;
+      words >> word >> word >> name;
+    }
+    if (name.empty()) { continue; }
+
+    std::string nameSpace;
+    const std::size_t ns = source.find("namespace ");
+    if (ns != std::string::npos && ns < at) {
+      const std::size_t end = source.find(';', ns);
+      nameSpace = source.substr(ns + std::string("namespace ").size(),
+                                end - ns - std::string("namespace ").size());
+    }
+    const std::string identifier = agiru::gen::Identifier(name);
+    objects.codeunits.insert_or_assign(
+        agiru::gen::LowerKey(name),
+        agiru::gen::TableRef{
+            .identifier = identifier,
+            .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
+                      "/" + identifier + ".h"});
+  }
+}
+
 void ScanCodeunits(Run &run,
                    Counts &counts,
-                   const agiru::gen::TableIndex &tables,
+                   agiru::gen::Objects &objects,
                    std::map<std::string, std::size_t> &unresolvedTables) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
     ++counts.files;
@@ -308,10 +348,10 @@ void ScanCodeunits(Run &run,
     if (run.output.empty()) { continue; }
     try {
       const std::string relative = std::filesystem::relative(path, run.root).string();
-      const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, tables);
+      const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, objects);
       for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
       const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
-      const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, tables);
+      const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
       Write(Output{.directory = run.output, .relative = stem}, header.text);
       Write(Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
             body);
@@ -386,7 +426,7 @@ int Scan(const Job &job) {
   std::map<std::string, std::size_t> unresolvedEnums;
   std::map<std::string, std::size_t> unresolvedTables;
   agiru::gen::EnumIndex index;
-  agiru::gen::TableIndex objects;
+  agiru::gen::Objects objects;
   Counts allEnums;
   Counts allTables;
   Counts allCodeunits;
@@ -410,6 +450,7 @@ int Scan(const Job &job) {
     Counts codeunits;
     ClaimApp(run.output);
     ScanEnums(run, enums, index);
+    IndexCodeunits(run, objects);
     ScanTables(run, tables, index, objects, unresolvedEnums);
     ScanCodeunits(run, codeunits, objects, unresolvedTables);
 

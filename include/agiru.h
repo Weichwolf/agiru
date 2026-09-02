@@ -18,6 +18,7 @@
 #include "type/Byte.h"
 #include "type/Code.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"

@@ -8,6 +8,7 @@
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Enum.h"
@@ -77,6 +78,13 @@ template <> struct FieldTypeOf<Date> {
   static constexpr FieldType kType = FieldType::Date;       ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;               ///< A date declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `DateFormula` -- a date calculation written down.
+template <> struct FieldTypeOf<DateFormula> {
+  static constexpr FieldType kType = FieldType::DateFormula; ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;                ///< A formula declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{};  ///< Not an enumeration.
 };
 
 /// \brief `Time` -- a time of day, in milliseconds since midnight.
