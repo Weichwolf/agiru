@@ -198,6 +198,16 @@ template <typename E> struct FieldTypeOf<Enum<E>> {
   static constexpr std::span<const EnumValueDef> kValues{EnumTraits<E>::kValues};
 };
 
+/// \brief `Enum<>` -- an enum field whose declaration this run never read.
+///
+/// It names no member, which is what `Enum<void>` says: the ordinal is carried and nothing claims
+/// to know what it means. The transpiler names every unresolved enumeration in its summary.
+template <> struct FieldTypeOf<Enum<void>> {
+  static constexpr FieldType kType = FieldType::Enum;       ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< An enum declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< No declaration was in reach.
+};
+
 /// \brief The class a member pointer points into.
 template <typename T> struct MemberOwnerOf;
 

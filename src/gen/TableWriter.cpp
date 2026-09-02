@@ -115,11 +115,14 @@ std::string MemberType(const al::TableObject &table,
                        const OptionField *option,
                        const EnumIndex &enums) {
   if (option != nullptr) { return Reach(table, "Option", "Option<" + option->enumName + ">"); }
+  // AN ENUMERATION THIS RUN NEVER SAW BECOMES `Enum<>`, for the reason the codeunit writer gives:
+  // the platform declares some, BCApps holds only their extensions, and a named type nobody
+  // declares stops the file.
   if (IsEnumField(field)) {
     const auto found = enums.find(LowerKey(field.subtype));
-    const std::string named =
-        found != enums.end() ? found->second.identifier : Identifier(field.subtype);
-    return Reach(table, "Enum", "Enum<enums::" + named + ">");
+    return found != enums.end()
+               ? Reach(table, "Enum", "Enum<enums::" + found->second.identifier + ">")
+               : Reach(table, "Enum", "Enum<>");
   }
   const std::string type = TypeName(field.type);
   if (type == "Code" || type == "Text") {

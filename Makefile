@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all cronus db lint test transpile tree provision doc clean spotless help
+.PHONY: all cronus db gap lint test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -28,6 +28,9 @@ test: all          ## the fast gate
 
 transpile: all     ## every app in apps.json through the transpiler into apps/
 	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
+
+gap: all           ## the first generated header that does not compile, and why
+	@sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
 
 tree: all          ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh

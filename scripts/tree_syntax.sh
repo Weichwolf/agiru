@@ -85,12 +85,17 @@ total=$(wc -l < "$OUT/files" | tr -d ' ')
 : > "$OUT/roots"
 xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
   err=$(mktemp)
-  if clang++ -std=c++23 $4 -fsyntax-only -Wall -Wextra -Wpedantic $2 "$1" 2>"$err"; then
+  if clang++ -std=c++23 $4 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic $2 "$1" \
+      2>"$err"; then
     printf "%s\n" "$1" >> "$3/passed" || exit 1
   else
     printf "%s\n" "$1" >> "$3/failed" || exit 1
     cat "$err" >> "$3/errors"
-    # THE FIRST DIAGNOSTIC IS THE ROOT AND THE REST IS THE CASCADE. clang reports the deepest
+    # THE FIRST DIAGNOSTIC IS THE ROOT AND THE REST IS THE CASCADE, WHICH IS WHY THE RUN STOPS AT
+    # IT. `-ferror-limit=1` above is not a shortcut: only the first diagnostic is ever read, so
+    # every one after it was formatted and thrown away -- 1 700 files ran all the way to "too many
+    # errors" emitting hundreds of lines each, for nothing.
+    # clang reports the deepest
     # include first, so a header that fails because something it includes fails names the OTHER
     # file here. Counting how often a type is MENTIONED ranked symptoms as causes twice in one
     # session: `LibraryVariableStorage` looked like the third-largest gap and was a missing source
@@ -125,16 +130,10 @@ fi
 printf 'tree: %s of %s generated headers compile\n' "$passed" "$total"
 [ "$failed" -eq 0 ] && exit 0
 
-printf '\ntree: what is missing, by how many headers name it\n'
-grep -oE "unknown type name '[^']+'" "$OUT/errors" | sed "s/unknown type name //" | sort | uniq -c |
-  sort -rn | head -20
 printf '\ntree: the ROOT of each failure -- its FIRST diagnostic, by how many headers it stops\n'
 awk -F'\t' '{print $3}' "$OUT/roots" | sed -E "s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -10
 printf '\ntree: what those roots NAME, by how many headers stop on it\n'
 awk -F'\t' '{print $3}' "$OUT/roots" | grep -oE "'[^']+'" | sort | uniq -c | sort -rn | head -14
 printf '\ntree: the single FILE each failure starts in, by how many others it stops\n'
 awk -F'\t' '$1 != $2 {print $2}' "$OUT/roots" | sort | uniq -c | sort -rn | head -10
-printf '\ntree: everything else, by kind\n'
-grep -E 'error:' "$OUT/errors" | grep -v 'unknown type name' |
-  sed -E "s/^[^ ]+: //; s/'[^']*'/'X'/g" | sort | uniq -c | sort -rn | head -10
 exit 0

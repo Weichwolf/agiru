@@ -116,7 +116,18 @@ std::vector<std::filesystem::path> SourcesEndingIn(const std::filesystem::path &
                                                    std::string_view suffix) {
   std::vector<std::filesystem::path> sources;
   for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
-    if (entry.is_regular_file() && entry.path().string().ends_with(suffix)) {
+    // THE SUFFIX IS MATCHED WITHOUT CASE, because BCApps does not hold to its own convention:
+    // 34 enums are `.enum.al`, 156 tables `.table.al`, 127 codeunits `.codeunit.al`. Three of the
+    // five enums this run could not resolve were sitting in a scanned root under a lower-case
+    // extension -- not missing, just not looked at.
+    const std::string path = entry.path().string();
+    if (entry.is_regular_file() && path.size() >= suffix.size() &&
+        std::ranges::equal(path.substr(path.size() - suffix.size()),
+                           suffix,
+                           [](char a, char b) {
+                             return std::tolower(static_cast<unsigned char>(a)) ==
+                                    std::tolower(static_cast<unsigned char>(b));
+                           })) {
       sources.push_back(entry.path());
     }
   }

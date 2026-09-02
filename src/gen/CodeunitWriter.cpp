@@ -51,12 +51,17 @@ TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &o
   }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
   // arguments -- which is not a type at all. The index is the same one a table field uses.
-  if (type == "Enum" && !declared.subtype.empty()) {
+  // AN ENUMERATION THIS RUN NEVER SAW BECOMES `Enum<>`, which carries the ordinal and names no
+  // member. `Copilot Capability` exists in BCApps only as enumextensions of something that is not
+  // there -- the platform declares it. Emitting `Enum<enums::CopilotCapability>` named a type
+  // nobody declares and stopped the file; inventing ordinals from the extensions would be a wrong
+  // number that looks like a right one. The transpiler names every unresolved enumeration in its
+  // summary, so this is reported rather than swallowed.
+  if (type == "Enum") {
+    if (declared.subtype.empty()) { return "Enum<>"; }
     const auto found = objects.enums.find(LowerKey(declared.subtype));
-    return "Enum<enums::" +
-           (found != objects.enums.end() ? found->second.identifier
-                                         : Identifier(declared.subtype)) +
-           ">";
+    return found != objects.enums.end() ? "Enum<enums::" + found->second.identifier + ">"
+                                        : "Enum<>";
   }
   // AN OPTION WITH NO MEMBERS IS AL'S OWN DECLARATION AND NOT A GAP. `procedure P(ChangeType:
   // Option)` takes any option value at all, and the BaseApp calls it with a member of some other

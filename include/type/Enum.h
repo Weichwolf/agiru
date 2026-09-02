@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <span>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief AL's Enum -- a named enumeration whose ordinals are declared rather than counted.
@@ -21,6 +22,10 @@ namespace agiru {
 /// `.rodata` however many tables use it. In the BaseApp that is 462 declarations behind 1 351
 /// fields (measured 2026-09-01).
 template <typename E> struct EnumTraits;
+
+/// \brief AL `Enum`, either with a declaration in reach or without one.
+/// \tparam E The generated enumeration, or `void` when this run never saw its declaration.
+template <typename E = void> class Enum;
 
 /// \brief AL `Enum`.
 ///
@@ -119,6 +124,67 @@ public:
 
   /// \brief Compares two enums by ordinal.
   /// \param o The other enum.
+  /// \return True when the ordinals are equal.
+  [[nodiscard]] constexpr bool operator==(const Enum &o) const {
+    return AsInteger() == o.AsInteger();
+  }
+};
+
+/// \brief An enumeration whose declaration this run did not read.
+///
+/// AL names enumerations the PLATFORM provides and no `.al` file declares -- `Copilot Capability`
+/// and `Agent Metadata Provider` exist in BCApps only as `enumextension`s of something that is not
+/// there. A field of such a type must still hold its value.
+///
+/// \note IT CARRIES THE ORDINAL AND NAMES NO MEMBER, which is the honest half. Inventing ordinals
+///       from the extensions that reference them would be a wrong number that looks like a right
+///       one; an empty `Name()` is a missing answer that looks like one. The transpiler NAMES every
+///       enumeration it could not resolve in its run summary, so this is reported rather than
+///       swallowed.
+///
+/// \note The `<>` is the same visible deviation `Option<>` carries, for the same reason: C++ cannot
+///       spell a class template with no arguments as a type.
+template <> class Enum<void> : public OrdinalValue {
+public:
+  /// \brief The zero ordinal.
+  constexpr Enum() = default;
+
+  /// \brief Holds an ordinal.
+  /// \param ordinal The declared number.
+  constexpr explicit Enum(std::int32_t ordinal) : OrdinalValue(ordinal) {}
+
+  /// \brief Takes a value of any generated enumeration.
+  /// \tparam E The enumeration.
+  /// \param value The value.
+  template <typename E>
+    requires std::is_enum_v<E>
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- AL assigns directly.
+  constexpr Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+
+  /// \brief Takes any enum or option value, keeping its ordinal.
+  /// \param value The value.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- AL assigns directly.
+  constexpr Enum(const OrdinalValue &value) : OrdinalValue(value) {}
+
+  /// \brief Compares against a value of any enumeration.
+  /// \tparam E The enumeration.
+  /// \param value The value.
+  /// \return True when this holds that ordinal.
+  template <typename E>
+    requires std::is_enum_v<E>
+  [[nodiscard]] constexpr bool operator==(E value) const {
+    return AsInteger() == static_cast<std::int32_t>(value);
+  }
+
+  /// \brief Orders two unresolved enumerations by ordinal.
+  /// \param o The other.
+  /// \return The ordering.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const Enum &o) const {
+    return AsInteger() <=> o.AsInteger();
+  }
+
+  /// \brief Compares two unresolved enumerations by ordinal.
+  /// \param o The other.
   /// \return True when the ordinals are equal.
   [[nodiscard]] constexpr bool operator==(const Enum &o) const {
     return AsInteger() == o.AsInteger();
