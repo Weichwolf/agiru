@@ -41,11 +41,20 @@ done
 total=$(wc -l < "$OUT/files")
 seen=0
 
+unit=$(mktemp --suffix=.cpp)
+trap 'rm -f "$unit"' EXIT
+
 while IFS= read -r file; do
   seen=$((seen + 1))
   err=$(mktemp)
+  # A HEADER IS INCLUDED, NOT COMPILED. `#pragma once` has NO EFFECT IN THE MAIN FILE -- clang says
+  # so with `-Wpragma-once-outside-header` -- so a header compiled directly that is reached again
+  # through one of its own includes is read twice and every class in it is a redefinition. That is
+  # the measurement lying about the tree: `AgentMessageImpl.h` includes `AgentTaskImpl.h`, which
+  # includes it back, and a real build has never had a problem with it.
+  printf '#include "%s"\n' "$file" > "$unit"
   if clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic \
-      $includes -include-pch "$PCH" -x c++ "$file" 2>"$err"; then
+      $includes -include-pch "$PCH" "$unit" 2>"$err"; then
     rm -f "$err"
     continue
   fi

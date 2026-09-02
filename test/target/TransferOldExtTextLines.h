@@ -2,8 +2,13 @@
 
 #pragma once
 
-#include "LineNumberBuffer.h"
 #include "agiru.h"
+
+#include "LineNumberBuffer.h"
+
+namespace agiru::app::tables {
+class LineNumberBuffer;
+} // namespace agiru::app::tables
 
 #include <array>
 #include <cstdint>

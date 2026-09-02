@@ -105,7 +105,7 @@ xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
       "$(printf "%s" "$first" | sed -E "s/:[0-9]+:[0-9]+: (fatal )?error: .*//")" \
       "$(printf "%s" "$first" | sed -E "s/^.*: (fatal )?error: //")" >> "$3/roots"
   fi
-  rm -f "$err"
+  rm -f "$err" "$unit"
 ' _ {} "$includes" "$OUT" "$OPT"
 
 # BOTH TALLIES ARE READ, NEITHER IS DERIVED, AND THEY MUST ADD UP.

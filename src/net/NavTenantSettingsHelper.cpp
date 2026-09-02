@@ -2,7 +2,7 @@
 
 #include "runtime/Error.h"
 #include "runtime/Session.h"
-#include "runtime/Tenant.h"
+#include "platform/Tenant.h"
 #include "type/Boolean.h"
 
 #include <string>

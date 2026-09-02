@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -189,9 +190,30 @@ std::string Parameters(const al::ProcedureDecl &procedure,
 std::string InlineOptions(const al::CodeunitObject &unit) {
   const std::string identifier = Identifier(unit.name);
   std::string out;
+  // AN OVERLOAD DECLARES THE SAME INLINE OPTION TWICE. `UserPermissionsImpl` has two
+  // `GetEffectivePermission`, both taking `PermissionObjectType: Option "Table Data",...` -- one
+  // AL parameter written twice, and the generated name is built from the codeunit, the procedure
+  // and the parameter, so it is the same name both times. It is ONE enumeration; emitting it twice
+  // is a redefinition.
+  //
+  // THE MEMBERS DECIDE, not the count. Two options that share a generated name and differ in what
+  // they declare are two enumerations wearing one name, and that is a translation error rather
+  // than something to pick a winner for.
+  std::map<std::string, std::vector<std::string>> emitted;
   const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
     const std::string name = OptionName(unit.name, within, declared.name);
+    const auto seen = emitted.find(name);
+    if (seen != emitted.end()) {
+      if (seen->second != declared.members) {
+        throw std::runtime_error("codeunit \"" + unit.name +
+                                 "\" declares two different options "
+                                 "under the name " +
+                                 name);
+      }
+      return;
+    }
+    emitted.insert_or_assign(name, declared.members);
     const std::vector<std::string> names = EnumeratorNames(declared.members);
     out += "namespace agiru::app::codeunits {\n\nenum class " + name + " : std::int32_t {\n";
     for (std::size_t i = 0; i < names.size(); ++i) {
@@ -272,8 +294,18 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   };
   // AN INTERFACE NEEDS ITS HEADER TOO, and it is the third kind this walk has had to learn: a
   // variable names it, the abstract class is somewhere else, and nothing else pulls it in.
+  std::map<std::string, std::set<std::string>> forward;
+  const auto ahead = [&forward](const std::string &qualified) {
+    const std::size_t colons = qualified.find("::");
+    if (colons == std::string::npos) { return; }
+    forward[qualified.substr(0, colons)].insert(qualified.substr(colons + 2));
+  };
   const auto both = [&](const al::VarDecl &declared) {
     reach(declared);
+    if (NamesAnObject(declared)) {
+      const TableRef *ref = Reach(declared, objects);
+      if (ref != nullptr) { ahead(ref->identifier); }
+    }
     Named(objects.interfaces,
           TypeName(declared.type) == "Interface" ? declared.subtype : "",
           headers);
@@ -296,6 +328,19 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   // round -- and it would make the hand-written target image depend on a transpiler run.
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+
+  // AL LETS TWO CODEUNITS NAME EACH OTHER, AND C++ HEADERS CANNOT. `AOAIFunctionResponse` includes
+  // `AOAIChatMessages` and `AOAIChatMessages` includes it back; `#pragma once` makes the second
+  // include a no-op, so the inner file sees the outer one half-written and the type is not there.
+  // A forward declaration of every object this file NAMES settles it, because a parameter taken by
+  // reference needs the name and not the layout -- and AL passes objects by `var` where it passes
+  // them at all.
+  if (!forward.empty()) { out += "\n"; }
+  for (const auto &[space, named] : forward) {
+    out += "namespace agiru::app::" + space + " {\n";
+    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    out += "} // namespace agiru::app::" + space + "\n";
+  }
   out += "\n";
   return out;
 }

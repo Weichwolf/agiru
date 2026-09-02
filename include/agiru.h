@@ -1,5 +1,25 @@
 #pragma once
 
+/// \file
+/// \brief The one header a generated file includes, and the map of what stands behind it.
+///
+/// FIVE DIRECTORIES, AND EACH ANSWERS A DIFFERENT QUESTION. A new header goes where its question
+/// belongs, and the rule is stated here rather than inferred from what happens to be next to it:
+///
+/// | directory | what it holds |
+/// |---|---|
+/// | `type/` | AL's VALUE types -- `Integer`, `Text`, `Date`, `Variant`, `List`. One header per AL
+/// type, named as AL names it | | `meta/` | the `constexpr` metadata a generated object carries:
+/// `TableDef`, `FieldDef`, `Declare`, the strong ids | | `runtime/` | the MACHINERY: `Table`,
+/// `Record`, `Session`, `Transaction`, `Storage`, `RecordRef`. What AL never names and always uses
+/// | | `platform/` | AL OBJECTS the platform provides rather than an app -- the virtual and system
+/// tables (board:0032). One of eight so far | | `dotnet/` | the .NET classes AL names, and
+/// `Refused` for the members not rebuilt (board:0035) |
+///
+/// The line between `runtime/` and `platform/` is the one worth stating: `runtime/` is what agiru
+/// IS, `platform/` is what BC PROVIDES. `TenantSettings` moved across it -- a tenant's deployment
+/// facts are something the platform states, not machinery agiru runs on.
+
 #include "dotnet/ALConfigSettings.h"
 #include "dotnet/Generic.h"
 #include "dotnet/NavTenantSettingsHelper.h"
@@ -10,6 +30,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
+#include "platform/Tenant.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"

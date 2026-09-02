@@ -2,7 +2,7 @@
 
 #include "runtime/Database.h"
 #include "runtime/Error.h"
-#include "runtime/Tenant.h"
+#include "platform/Tenant.h"
 #include "runtime/Transaction.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
