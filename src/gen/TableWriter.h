@@ -15,6 +15,18 @@ struct TableHeader {
   std::vector<std::string> unresolvedEnums;
 };
 
+/// \brief The C++ member name for one of a table's own variables.
+/// \param table The table.
+/// \param name  The AL variable name.
+/// \return The identifier, disambiguated when a field or an earlier variable already spells it.
+std::string VariableIdentifier(const al::TableObject &table, const std::string &name);
+
+/// \brief The C++ member-function name for one of a table's procedures.
+/// \param table The table.
+/// \param name  The AL procedure name.
+/// \return The identifier, disambiguated when a field or a variable already spells it.
+std::string ProcedureIdentifier(const al::TableObject &table, const std::string &name);
+
 TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
                         const EnumIndex &enums,

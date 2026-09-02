@@ -149,6 +149,9 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
   out += "#include \"agiru.h\"\n";
+  if (NamesAbsentIn(object.variables, object.procedures, objects)) {
+    out += "#include \"absent/Types.h\"\n";
+  }
   const std::string includes = Includes(object, objects);
   if (!includes.empty()) { out += "\n" + includes; }
   out += "\n#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
@@ -181,7 +184,7 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
   std::string publics;
   std::string locals;
   for (const al::ProcedureDecl &procedure : object.procedures) {
-    (procedure.isLocal ? locals : publics) += ProcedureDeclaration(procedure, objects, object.name);
+    (procedure.isLocal ? locals : publics) += ProcedureDeclaration(procedure, objects, object.name, {}, object.procedures);
   }
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }

@@ -8,6 +8,7 @@
 #include "meta/TableDef.h"
 
 #include <algorithm>
+#include <functional>
 #include <cstddef>
 #include <map>
 #include <set>
@@ -266,6 +267,64 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
 
 } // namespace
 
+// A TABLE'S VARIABLE SITS IN THE SAME CLASS AS ITS FIELDS AND MAY COLLIDE WITH ONE. `Campaign`
+// has a field `"No. Series"` and a variable `NoSeries: Codeunit "No. Series"` -- two different AL
+// names that Identifier() spells the same. The variable yields, because a field is what the field
+// table addresses by `offsetof` and what AL code names far more often, and it carries the interior
+// underscore that no AL name can reach.
+namespace {
+
+std::string Disambiguated(const std::string &bare,
+                          std::string_view seam,
+                          const std::function<bool(const std::string &)> &taken) {
+  if (!taken(bare)) { return bare; }
+  for (int n = 0; n < 100; ++n) {
+    const std::string spelled =
+        bare + std::string(seam) + (n == 0 ? std::string{} : std::to_string(n));
+    if (!taken(spelled)) { return spelled; }
+  }
+  return bare + std::string(seam);
+}
+
+bool NamedByAField(const al::TableObject &table, const std::string &spelled) {
+  return std::ranges::any_of(table.fields, [&](const al::FieldDecl &field) {
+    return LowerKey(Identifier(field.name)) == LowerKey(spelled);
+  });
+}
+
+} // namespace
+
+std::string VariableIdentifier(const al::TableObject &table, const std::string &name) {
+  const auto taken = [&](const std::string &spelled) {
+    if (NamedByAField(table, spelled)) { return true; }
+    for (const al::VarDecl &declared : table.variables) {
+      if (declared.name == name) { break; }
+      if (LowerKey(Identifier(declared.name)) == LowerKey(spelled)) { return true; }
+    }
+    return false;
+  };
+  return Disambiguated(Identifier(name), "_Var", taken);
+}
+
+// A PROCEDURE MAY CARRY A FIELD'S NAME TOO. `General Ledger Setup` has a field
+// `"Use Concurrent Posting"` and a procedure `UseConcurrentPosting()`; in AL they are a field and a
+// procedure and never confusable, in C++ they are two members of one class. The FIELD keeps its
+// spelling, because the field table addresses it by `offsetof` and AL code names it far more often.
+std::string ProcedureIdentifier(const al::TableObject &table, const std::string &name) {
+  const auto taken = [&](const std::string &spelled) {
+    if (NamedByAField(table, spelled)) { return true; }
+    for (const al::VarDecl &declared : table.variables) {
+      if (LowerKey(VariableIdentifier(table, declared.name)) == LowerKey(spelled)) { return true; }
+    }
+    for (const al::ProcedureDecl &other : table.procedures) {
+      if (other.name == name) { break; }
+      if (LowerKey(Identifier(other.name)) == LowerKey(spelled)) { return true; }
+    }
+    return false;
+  };
+  return Disambiguated(Identifier(name), "_Proc", taken);
+}
+
 TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
                         const EnumIndex &enums,
@@ -282,35 +341,47 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += Includes(table, options, enums);
   out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
   out += "#include <string_view>\n#include <type_traits>\n\n";
+  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
+    out += "#include \"absent/Types.h\"\n\n";
+  }
   // A TABLE'S PROCEDURES NAME OBJECTS, and a declaration needs the NAME and not the layout:
   // `Currency.GetGainLossAccount` takes a `Record "Detailed CV Ledg. Entry Buffer"`. Including it
   // would put two tables' headers in a cycle the moment each names the other, which AL allows.
   std::map<std::string, std::set<std::string>> ahead;
+  // A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME -- the same rule the codeunits
+  // follow. An object member is the exception, because it is a handle (board:0037). AN ENUM IS
+  // ALWAYS INCLUDED: `Enum<enums::X>` is a template argument and a template argument is complete.
+  std::set<std::string> memberHeaders;
   const auto named = [&](const al::VarDecl &declared) {
+    if (TypeName(declared.type) == "Enum" && !declared.subtype.empty()) {
+      const auto found = objects.enums.find(LowerKey(declared.subtype));
+      if (found != objects.enums.end() && !found->second.header.empty()) {
+        memberHeaders.insert(found->second.header);
+      }
+      return;
+    }
     const TableRef *ref = ReachObject(declared, objects);
     if (ref == nullptr || ref->header.empty()) { return; }
     const std::size_t colons = ref->identifier.find("::");
     if (colons == std::string::npos) { return; }
     ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));
   };
-  // A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME -- the same rule the codeunits
-  // follow. A codeunit-typed member is the exception, because it is a handle (board:0037).
-  std::set<std::string> memberHeaders;
   for (const al::VarDecl &declared : table.variables) {
-    if (TypeName(declared.type) == "Codeunit") {
+    if (DeclaresAnObject(declared)) {
       named(declared);
       continue;
     }
     const TableRef *ref = ReachObject(declared, objects);
     if (ref != nullptr && !ref->header.empty()) { memberHeaders.insert(ref->header); }
+    named(declared);
   }
-  for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
-  if (!memberHeaders.empty()) { out += "\n"; }
   for (const al::ProcedureDecl &procedure : table.procedures) {
     for (const al::VarDecl &declared : procedure.parameters) { named(declared); }
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
   }
+  for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
+  if (!memberHeaders.empty()) { out += "\n"; }
   for (const auto &[space, objectNames] : ahead) {
     const ObjectKind kind = KindOfNamespace(space);
     out += "namespace agiru::app::" + space + " {\n";
@@ -320,6 +391,9 @@ TableHeader WriteHeader(const al::TableObject &declared,
     out += "} // namespace agiru::app::" + space + "\n";
   }
   if (!ahead.empty()) { out += "\n"; }
+
+  // A TABLE'S PROCEDURES DECLARE INLINE OPTIONS TOO, the same way a codeunit's do.
+  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
 
   out += "namespace agiru::app::tables {\n\n";
   for (const OptionField &option : options) {
@@ -411,19 +485,25 @@ TableHeader WriteHeader(const al::TableObject &declared,
   std::string locals;
   for (const al::ProcedureDecl &procedure : table.procedures) {
     (procedure.isLocal ? locals : publics) +=
-        ProcedureDeclaration(procedure, objects, table.name, shadowed);
+        ProcedureDeclaration(procedure,
+                             objects,
+                             table.name,
+                             shadowed,
+                             table.procedures,
+                             ProcedureIdentifier(table, procedure.name));
   }
-  if (!publics.empty()) { out += "\n" + publics; }
-  if (!table.variables.empty() || !locals.empty()) { out += "\nprivate:\n"; }
+  // A TABLE'S VARIABLES ARE PUBLIC, AND THAT IS THE STANDARD-LAYOUT INVARIANT RATHER THAN A CHOICE.
+  // All non-static data members must share one access control, or the class is not standard-layout
+  // and `offsetof` over the field table is undefined -- which is what every generated field
+  // descriptor stands on. AL gives a table variable no access control anyway.
+  if (!table.variables.empty()) { out += "\n"; }
   for (const al::VarDecl &declared : table.variables) {
     std::string type = DeclaredType(declared, objects);
-    if (TypeName(declared.type) == "Codeunit" && ReachObject(declared, objects) != nullptr) {
-      type = "Instance<" + type + ">";
-    }
-    out += "  " + type + " " + Identifier(declared.name) + ";\n";
+    if (DeclaresAnObject(declared)) { type = "Instance<" + type + ">"; }
+    out += "  " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
   }
-  if (!table.variables.empty() && !locals.empty()) { out += "\n"; }
-  out += locals;
+  if (!publics.empty()) { out += "\n" + publics; }
+  if (!locals.empty()) { out += "\nprivate:\n" + locals; }
   out += "};\n\n";
 
   out += FieldTable(sorted, tableIdentifier);

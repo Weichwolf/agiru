@@ -11,18 +11,18 @@ namespace agiru::app::codeunits {
 void TransferOldExtTextLines::OnRun() {}
 
 void TransferOldExtTextLines::InsertLineNumbers(Integer OldLineNo, Integer NewLineNo) {
-  TempLineNumberBuffer.OldLineNumber = OldLineNo;
-  TempLineNumberBuffer.NewLineNumber = NewLineNo;
-  TempLineNumberBuffer.Insert();
+  TempLineNumberBuffer->OldLineNumber = OldLineNo;
+  TempLineNumberBuffer->NewLineNumber = NewLineNo;
+  TempLineNumberBuffer->Insert();
 }
 
 Integer TransferOldExtTextLines::GetNewLineNumber(Integer OldLineNo) {
-  if (TempLineNumberBuffer.Get(OldLineNo)) { return TempLineNumberBuffer.NewLineNumber; }
+  if (TempLineNumberBuffer->Get(OldLineNo)) { return TempLineNumberBuffer->NewLineNumber; }
   return 0;
 }
 
 void TransferOldExtTextLines::ClearLineNumbers() {
-  TempLineNumberBuffer.DeleteAll();
+  TempLineNumberBuffer->DeleteAll();
 }
 
 Integer TransferOldExtTextLines::TransferExtendedText(Integer OldLineNo,

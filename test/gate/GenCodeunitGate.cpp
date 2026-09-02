@@ -118,8 +118,11 @@ void AChangedSourceChangesTheOutput() {
   CHECK_TRUE("dropping `temporary` drops the wrapper",
              afterPermanent.find("Temporary<LineNumberBuffer> TempLineNumberBuffer") ==
                  std::string::npos);
+  // A MEMBER IS A HANDLE EITHER WAY (board:0037), so what `temporary` decides is the wrapper INSIDE
+  // it and nothing else.
   CHECK_TRUE("and leaves the table itself",
-             afterPermanent.find("LineNumberBuffer TempLineNumberBuffer") != std::string::npos);
+             afterPermanent.find("Instance<tables::LineNumberBuffer> TempLineNumberBuffer") !=
+                 std::string::npos);
 
   // A named return value is a return TYPE and nothing else in C++.
   std::string voided = original;

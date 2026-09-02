@@ -4,8 +4,6 @@
 
 #include "agiru.h"
 
-#include "LineNumberBuffer.h"
-
 namespace agiru::app::tables {
 class LineNumberBuffer_Table;
 using LineNumberBuffer = LineNumberBuffer_Table;
@@ -30,7 +28,7 @@ public:
   void GetLineNoBuffer(Temporary<tables::LineNumberBuffer> &OutTempLineNumberBuffer);
 
 private:
-  Temporary<tables::LineNumberBuffer> TempLineNumberBuffer;
+  Instance<Temporary<tables::LineNumberBuffer>> TempLineNumberBuffer;
 
   void InsertLineNumbers(Integer OldLineNo, Integer NewLineNo);
   void OnBeforeTransferExtendedText(Integer OldLineNo,

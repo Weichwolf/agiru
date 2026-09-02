@@ -31,6 +31,21 @@ public:
 
   /// The enumeration that `Name::Member` scopes through, or empty when `Name` is not one here.
   [[nodiscard]] virtual std::string Enumeration(std::string_view name) const = 0;
+
+  /// \brief Whether a name is an object HANDLE rather than a value.
+  ///
+  /// \param name The AL name.
+  /// \return True when reaching through it needs `->`.
+  ///
+  /// \note AN OBJECT MEMBER IS A HANDLE AND AL SAYS SO. Two codeunits may name each other and a
+  ///       table may declare a variable of its own type -- `Currency Exchange Rate` does -- so an
+  ///       eager member would be a class of infinite size, in C++ and in AL alike. The member is
+  ///       created on first use, which C++ spells `->` (board:0037). A procedure's LOCAL stays a
+  ///       value: it lives inside a body, where no cycle can form.
+  [[nodiscard]] virtual bool IsHandle(std::string_view name) const {
+    static_cast<void>(name);
+    return false;
+  }
 };
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent);

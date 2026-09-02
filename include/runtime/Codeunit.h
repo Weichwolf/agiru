@@ -94,6 +94,17 @@ public:
   /// \return A reference to it.
   T &operator*() { return *Made(); }
 
+  /// \brief The instance, made on the first call.
+  ///
+  /// \return A reference to it.
+  ///
+  /// \note IT CONVERTS IMPLICITLY BECAUSE AL PASSES THE OBJECT ITSELF. `Copy(TempBuffer, true)`
+  ///       hands a record to a parameter that takes a record; the handle is agiru's way of
+  ///       DECLARING the member, not a thing AL code ever mentions, so it must disappear at every
+  ///       use but the one C++ cannot hide -- reaching through it, which is `->`.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
+  operator T &() { return *Made(); }
+
 private:
   T *Made() {
     if (held_ == nullptr) {

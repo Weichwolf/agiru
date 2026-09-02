@@ -1,5 +1,7 @@
 #include "BodyWriter.h"
 
+#include "TableWriter.h"
+
 #include "Ast.h"
 #include "Expr.h"
 #include "Names.h"
@@ -315,10 +317,14 @@ private:
       chain.push_back(&walk->children.back());
       walk = &walk->children.front();
     }
+    // A HANDLE IS REACHED THROUGH WITH `->`, AND ONLY ON THE FIRST LINK. `A.B.C` where `A` is a
+    // member object is `A->B.C`: what `A` yields is a value like any other.
+    const bool handle = spelling == "." && walk->kind == al::ExprKind::Name &&
+                        scope_.IsHandle(walk->text);
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
       if (spelling == ".") {
-        out += ".";
+        out += handle && i == chain.size() ? "->" : ".";
       } else {
         out += " ";
         out += spelling;
@@ -392,11 +398,26 @@ class TableNames : public Names {
 public:
   explicit TableNames(const al::TableObject &table) : table_(table) {}
 
+  [[nodiscard]] bool IsHandle(std::string_view name) const override {
+    for (const al::VarDecl &declared : table_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return DeclaresAnObject(declared); }
+    }
+    return false;
+  }
+
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    for (const al::VarDecl &declared : table_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return VariableIdentifier(table_, declared.name);
+      }
+    }
     const al::FieldDecl *field = FieldNamed(table_, name);
     if (field != nullptr) { return Identifier(field->name); }
     for (const al::LabelDecl &label : table_.labels) {
       if (SameName(label.name, name)) { return label.name; }
+    }
+    for (const al::ProcedureDecl &procedure : table_.procedures) {
+      if (SameName(procedure.name, name)) { return ProcedureIdentifier(table_, procedure.name); }
     }
     return {};
   }
@@ -443,8 +464,15 @@ std::string WriteSource(const al::TableObject &table,
   }
   // A TABLE CARRIES CODE, and its procedures are written the way a codeunit's are.
   for (const al::ProcedureDecl &procedure : table.procedures) {
-    out += ProcedureSignature(procedure, objects, table.name, identifier, true) + " {";
-    const std::string locals = ProcedureLocals(procedure, objects, table.name);
+    out += ProcedureSignature(procedure,
+                               objects,
+                               table.name,
+                               identifier,
+                               true,
+                               {},
+                               table.procedures,
+                               ProcedureIdentifier(table, procedure.name)) + " {";
+    const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures);
     const std::string body = WriteStatements(TableNames(table), procedure.body, 2);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";

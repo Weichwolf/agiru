@@ -173,6 +173,36 @@ OptionName(const std::string &unit, const std::string &within, const std::string
   return Identifier(unit) + Identifier(within) + Identifier(name);
 }
 
+/// The generated name for ONE inline option, disambiguated when an overload declares another.
+///
+/// TWO OVERLOADS MAY DECLARE TWO DIFFERENT ANONYMOUS OPTIONS UNDER ONE PARAMETER NAME.
+/// `Cryptography Management` has five `GenerateHash`, three taking
+/// `HashAlgorithmType: Option MD5,SHA1,...` and two taking
+/// `HashAlgorithmType: Option HMACMD5,HMACSHA1,...` -- one generated name, two enumerations, which
+/// the generator refused outright and which cost the whole codeunit and everything including it.
+/// The FIRST MEMBER separates them, is derived from the declaration alone, and so comes out the
+/// same at every call site without anybody carrying a table around.
+std::string OptionNameOf(const std::string &owner,
+                         const std::string &within,
+                         const al::VarDecl &declared,
+                         const std::vector<al::ProcedureDecl> &procedures) {
+  const std::string base = OptionName(owner, within, declared.name);
+  if (declared.members.empty()) { return base; }
+  const auto clashes = [&](const al::ProcedureDecl &procedure, const al::VarDecl &other) {
+    return !other.members.empty() && other.members != declared.members &&
+           OptionName(owner, procedure.name, other.name) == base;
+  };
+  for (const al::ProcedureDecl &procedure : procedures) {
+    const bool found =
+        std::ranges::any_of(procedure.parameters,
+                            [&](const al::VarDecl &o) { return clashes(procedure, o); }) ||
+        std::ranges::any_of(procedure.variables,
+                            [&](const al::VarDecl &o) { return clashes(procedure, o); });
+    if (found) { return base + EnumeratorName(declared.members.front()); }
+  }
+  return base;
+}
+
 // THE NAMESPACE IS DECIDED BY WHAT THE TYPE IS, and getting it wrong cost more than anything else
 // in this tree: `agiru::app::RecordRef` was the FIRST diagnostic of 1 375 of 3 123 failing headers,
 // measured 2026-09-02, because `LibraryAssert` writes `RecordRef: RecordRef` and one bad
@@ -217,10 +247,33 @@ std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
   return names;
 }
 
-std::string Qualified(const al::VarDecl &declared, const std::string &type) {
-  const std::string alType = TypeName(declared.type);
-  const bool object = alType == "Record" || alType == "Codeunit";
-  return (object ? "agiru::app::" : "agiru::") + type;
+/// Qualifies every identifier in a type that a name in scope hides.
+///
+/// AN INNER IDENTIFIER NEEDS IT AS MUCH AS THE OUTER ONE. `GenJnlPostLine` declares a member `Code`
+/// and a parameter of type `List of [Code[10]]`; prefixing the whole string gave
+/// `agiru::List<Code<10>>` and the inner name was still the member. A bare identifier in a
+/// generated type is always a DOOR type -- an object arrives already spelled `tables::X` -- so the
+/// qualification is `agiru::` and nothing else has to be decided.
+std::string Qualified(const std::string &type, const std::set<std::string> &names) {
+  std::string out;
+  for (std::size_t i = 0; i < type.size();) {
+    if (std::isalpha(static_cast<unsigned char>(type[i])) == 0 && type[i] != '_') {
+      out += type[i];
+      ++i;
+      continue;
+    }
+    std::size_t end = i;
+    while (end < type.size() &&
+           (std::isalnum(static_cast<unsigned char>(type[end])) != 0 || type[end] == '_')) {
+      ++end;
+    }
+    const std::string word = type.substr(i, end - i);
+    const bool qualified = i >= 2 && type[i - 1] == ':' && type[i - 2] == ':';
+    if (!qualified && names.contains(word)) { out += "agiru::"; }
+    out += word;
+    i = end;
+  }
+  return out;
 }
 
 /// A PARAMETER NAME HIDES A TYPE NAME FOR EVERY PARAMETER AFTER IT, not only for its own.
@@ -233,7 +286,7 @@ std::string Signature(const al::VarDecl &declared,
                       const std::set<std::string> &names,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
-  if (Hidden(type, names)) { type = Qualified(declared, type); }
+  if (Hidden(type, names)) { type = Qualified(type, names); }
   return type + (declared.byReference ? " &" : " ");
 }
 
@@ -241,7 +294,8 @@ std::string Parameters(const al::ProcedureDecl &procedure,
                        const Objects &objects,
                        bool named,
                        const std::string &unit,
-                       const std::set<std::string> &shadowed = {}) {
+                       const std::set<std::string> &shadowed = {},
+                       const std::vector<al::ProcedureDecl> &all = {}) {
   std::set<std::string> names = shadowed;
   for (const al::VarDecl &parameter : procedure.parameters) {
     names.insert(Identifier(parameter.name));
@@ -252,7 +306,7 @@ std::string Parameters(const al::ProcedureDecl &procedure,
     out += Signature(procedure.parameters[i],
                      objects,
                      names,
-                     OptionName(unit, procedure.name, procedure.parameters[i].name));
+                     OptionNameOf(unit, procedure.name, procedure.parameters[i], all));
     if (named) { out += Identifier(procedure.parameters[i].name); }
   }
   return out;
@@ -279,7 +333,7 @@ std::string InlineOptionsIn(const std::string &owner,
   std::map<std::string, std::vector<std::string>> emitted;
   const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
-    const std::string name = OptionName(owner, within, declared.name);
+    const std::string name = OptionNameOf(owner, within, declared, procedures);
     const auto seen = emitted.find(name);
     if (seen != emitted.end()) {
       if (seen->second != declared.members) {
@@ -322,17 +376,18 @@ std::string Returns(const al::ProcedureDecl &procedure,
                     const std::set<std::string> &shadowed = {}) {
   if (procedure.returnType.empty()) { return "void"; }
   const std::string type = TypeOf(procedure.returned, objects);
-  return Hidden(type, shadowed) ? Qualified(procedure.returned, type) : type;
+  return Hidden(type, shadowed) ? Qualified(type, shadowed) : type;
 }
 
 std::string Declaration(const al::ProcedureDecl &procedure,
                         const Objects &objects,
                         const std::string &unit,
-                        const std::set<std::string> &shadowed = {}) {
+                        const std::set<std::string> &shadowed = {},
+                        const std::vector<al::ProcedureDecl> &all = {}) {
   std::set<std::string> hiding = shadowed;
   hiding.insert(Identifier(procedure.name));
   return "  " + Returns(procedure, objects, hiding) + " " + Identifier(procedure.name) + "(" +
-         Parameters(procedure, objects, true, unit, hiding) + ");\n";
+         Parameters(procedure, objects, true, unit, hiding, all) + ");\n";
 }
 
 bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
@@ -350,11 +405,12 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
 
 /// A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so its header is INCLUDED and never forward
 /// declared: `TestPage<pages::PaymentJournal>` derives from the page to reach its controls.
-/// A CODEUNIT MEMBER IS A HANDLE AND A RECORD MEMBER IS A VALUE, and the difference is AL's own:
-/// two codeunits may name each other and two tables may not, so only the first can be a cycle
-/// (board:0037).
-bool NamesACodeunit(const al::VarDecl &declared) {
-  return TypeName(declared.type) == "Codeunit";
+/// A MEMBER OF OBJECT TYPE IS A HANDLE, whatever kind of object it is. It was a codeunit-only rule
+/// and the tables disproved that: `Currency Exchange Rate` declares a variable of its own type, so
+/// a Record member recurses exactly as a codeunit member does -- and AL cannot be constructing
+/// either eagerly, or neither would terminate (board:0037).
+bool HandleMember(const al::VarDecl &declared) {
+  return NamesAnObject(declared);
 }
 
 bool NamesAPage(std::string_view type) {
@@ -440,7 +496,8 @@ void EnumHeader(const EnumIndex &enums,
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
-    if (!NamesAnObject(declared) || NamesACodeunit(declared)) { return; }
+    // A HANDLE NEEDS THE NAME AND NOT THE LAYOUT, so nothing a member holds is included any more.
+    if (!NamesAnObject(declared) || HandleMember(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
     // A PLATFORM TABLE HAS NO HEADER OF ITS OWN TO NAME: it arrives with the door, so its entry
     // carries an empty path and an empty path would emit `#include ""`.
@@ -621,6 +678,19 @@ public:
   CodeunitNames(const al::CodeunitObject &unit, const al::ProcedureDecl &procedure)
       : unit_(unit), procedure_(procedure) {}
 
+  [[nodiscard]] bool IsHandle(std::string_view name) const override {
+    const auto same = [&name](const al::VarDecl &declared) {
+      return LowerKey(declared.name) == LowerKey(std::string(name));
+    };
+    // A LOCAL WINS OVER A MEMBER, the same order `Resolve` uses, and a local is a value.
+    if (std::ranges::any_of(procedure_.variables, same)) { return false; }
+    if (std::ranges::any_of(procedure_.parameters, same)) { return false; }
+    for (const al::VarDecl &declared : unit_.variables) {
+      if (same(declared)) { return NamesAnObject(declared); }
+    }
+    return false;
+  }
+
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : procedure_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
@@ -658,8 +728,10 @@ private:
   const al::ProcedureDecl &procedure_;
 };
 
-std::string
-Locals(const al::ProcedureDecl &procedure, const Objects &objects, const std::string &unit) {
+std::string Locals(const al::ProcedureDecl &procedure,
+                   const Objects &objects,
+                   const std::string &unit,
+                   const std::vector<al::ProcedureDecl> &all = {}) {
   std::string out;
   // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
   // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
@@ -667,7 +739,7 @@ Locals(const al::ProcedureDecl &procedure, const Objects &objects, const std::st
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
   for (const al::VarDecl &declared : procedure.variables) {
-    out += "  " + TypeOf(declared, objects, OptionName(unit, procedure.name, declared.name)) + " " +
+    out += "  " + TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all)) + " " +
            Identifier(declared.name) + "{};\n";
   }
   return out;
@@ -697,8 +769,8 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     // SITE -- so its definition has nothing to do with its parameters and drops their names.
     const bool publisher = IsPublisher(procedure);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, !publisher, unit.name) + ") {";
-    const std::string locals = publisher ? std::string{} : Locals(procedure, objects, unit.name);
+           "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures) + ") {";
+    const std::string locals = publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures);
     const std::string body =
         publisher ? std::string{}
                   : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
@@ -722,17 +794,21 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                const std::string &owner,
                                const std::string &qualifier,
                                bool named,
-                               const std::set<std::string> &shadowed) {
+                               const std::set<std::string> &shadowed,
+                               const std::vector<al::ProcedureDecl> &all,
+                               const std::string &spelled) {
   std::set<std::string> hiding = shadowed;
   hiding.insert(Identifier(procedure.name));
-  return Returns(procedure, objects, hiding) + " " + qualifier + "::" + Identifier(procedure.name) +
-         "(" + Parameters(procedure, objects, named, owner, hiding) + ")";
+  const std::string name = spelled.empty() ? Identifier(procedure.name) : spelled;
+  return Returns(procedure, objects, hiding) + " " + qualifier + "::" + name + "(" +
+         Parameters(procedure, objects, named, owner, hiding, all) + ")";
 }
 
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
-                            const std::string &owner) {
-  return Locals(procedure, objects, owner);
+                            const std::string &owner,
+                            const std::vector<al::ProcedureDecl> &all) {
+  return Locals(procedure, objects, owner, all);
 }
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
@@ -747,12 +823,32 @@ std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
                                  const std::string &owner,
-                                 const std::set<std::string> &shadowed) {
-  return Declaration(procedure, objects, owner, shadowed);
+                                 const std::set<std::string> &shadowed,
+                                 const std::vector<al::ProcedureDecl> &all,
+                                 const std::string &spelled) {
+  const std::string line = Declaration(procedure, objects, owner, shadowed, all);
+  if (spelled.empty() || spelled == Identifier(procedure.name)) { return line; }
+  const std::string wanted = " " + Identifier(procedure.name) + "(";
+  const std::size_t at = line.find(wanted);
+  if (at == std::string::npos) { return line; }
+  return line.substr(0, at) + " " + spelled + "(" + line.substr(at + wanted.size());
 }
 
 std::string DeclaredType(const al::VarDecl &declared, const Objects &objects) {
   return TypeOf(declared, objects);
+}
+
+bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
+                   const std::vector<al::ProcedureDecl> &procedures,
+                   const Objects &objects) {
+  al::CodeunitObject unit;
+  unit.variables = variables;
+  unit.procedures = procedures;
+  return NamesAbsent(unit, objects);
+}
+
+bool DeclaresAnObject(const al::VarDecl &declared) {
+  return NamesAnObject(declared);
 }
 
 const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects) {
@@ -805,6 +901,9 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
     reach(procedure.returned);
   }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  if (NamesAbsentIn({}, object.procedures, objects)) {
+    out += "#include \"absent/Types.h\"\n";
+  }
   out += "\nnamespace agiru::app::interfaces {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
   out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";
@@ -860,7 +959,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (procedure.isLocal) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
-    out += Declaration(procedure, objects, unit.name, shadowed);
+    out += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
     previousWasTrigger = procedure.isTrigger;
     first = false;
   }
@@ -868,8 +967,8 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
     std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
-    if (Hidden(type, shadowed)) { type = Qualified(declared, type); }
-    const bool handle = NamesACodeunit(declared) && Reach(declared, objects) != nullptr;
+    if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
+    const bool handle = HandleMember(declared);
     hidden +=
         "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) + ";\n";
   }
@@ -881,7 +980,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!procedure.isLocal) { continue; }
-    locals += Declaration(procedure, objects, unit.name, shadowed);
+    locals += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
   }
   if (!hidden.empty() || !locals.empty()) {
     out += "\nprivate:\n";

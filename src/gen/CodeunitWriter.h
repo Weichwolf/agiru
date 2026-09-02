@@ -115,7 +115,9 @@ std::string InlineOptionsOf(const std::string &owner,
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
                                  const std::string &owner,
-                                 const std::set<std::string> &shadowed = {});
+                                 const std::set<std::string> &shadowed = {},
+                                 const std::vector<al::ProcedureDecl> &all = {},
+                                 const std::string &spelled = {});
 
 /// \brief One procedure's definition head -- return type, qualified name and parameters.
 /// \param procedure The AL procedure.
@@ -129,7 +131,9 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                const std::string &owner,
                                const std::string &qualifier,
                                bool named,
-                               const std::set<std::string> &shadowed = {});
+                               const std::set<std::string> &shadowed = {},
+                               const std::vector<al::ProcedureDecl> &all = {},
+                               const std::string &spelled = {});
 
 /// \brief One procedure's local declarations, named return value first.
 /// \param procedure The AL procedure.
@@ -138,7 +142,8 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
 /// \return The declarations, one per line.
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
-                            const std::string &owner);
+                            const std::string &owner,
+                            const std::vector<al::ProcedureDecl> &all = {});
 
 /// \brief The includes a SOURCE file needs -- everything its bodies call, layout and all.
 /// \param variables  The object's own variables.
@@ -154,6 +159,20 @@ std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
 /// \param objects  Everything the run has translated so far.
 /// \return The type.
 std::string DeclaredType(const al::VarDecl &declared, const Objects &objects);
+
+/// \brief Whether an AL declaration names an AL OBJECT rather than a value.
+/// \param declared The AL declaration.
+/// \return True for `Record`, `Codeunit`, `Page` and the kinds with no generator yet.
+/// \brief Whether anything declared here names an object or a .NET type the run does not have.
+/// \param variables  The object's own variables.
+/// \param procedures Its procedures.
+/// \param objects    Everything the run has translated so far.
+/// \return True when the file needs `absent/Types.h`.
+bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
+                   const std::vector<al::ProcedureDecl> &procedures,
+                   const Objects &objects);
+
+bool DeclaresAnObject(const al::VarDecl &declared);
 
 /// \brief The object an AL declaration names, when the run has translated it.
 /// \param declared The AL declaration.
