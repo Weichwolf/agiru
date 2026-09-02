@@ -3,12 +3,17 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 
+#include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <compare>
 #include <cstddef>
+#include <cstdint>
 #include <exception>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -232,6 +237,107 @@ bool Matches(const Expression &expression, std::string_view value, const FieldDe
     if (all) { return true; }
   }
   return false;
+}
+
+namespace {
+
+std::optional<std::int64_t> AsInteger(std::string_view text) {
+  std::int64_t value = 0;
+  const char *first = text.data();
+  const char *last = first + text.size();
+  if (!text.empty() && text.front() == '+') { ++first; }
+  const std::from_chars_result read = std::from_chars(first, last, value);
+  if (read.ec != std::errc{} || read.ptr != last) { return std::nullopt; }
+  return value;
+}
+
+Intervals Normalised(Intervals set) {
+  std::erase_if(set, [](const Interval &i) { return i.low > i.high; });
+  std::ranges::sort(set, [](const Interval &a, const Interval &b) { return a.low < b.low; });
+  Intervals merged;
+  for (const Interval &next : set) {
+    // ADJACENT INTERVALS ARE MERGED, NOT ONLY OVERLAPPING ONES. `1..5|6..9` is one run of integers,
+    // and leaving it as two would emit two series where one describes the same rows.
+    if (!merged.empty() && next.low <= merged.back().high + 1) {
+      merged.back().high = std::max(merged.back().high, next.high);
+      continue;
+    }
+    merged.push_back(next);
+  }
+  return merged;
+}
+
+Intervals Intersected(const Intervals &left, const Intervals &right) {
+  Intervals both;
+  std::size_t l = 0;
+  std::size_t r = 0;
+  while (l < left.size() && r < right.size()) {
+    const std::int64_t low = std::max(left[l].low, right[r].low);
+    const std::int64_t high = std::min(left[l].high, right[r].high);
+    if (low <= high) { both.push_back(Interval{.low = low, .high = high}); }
+    (left[l].high < right[r].high ? l : r)++;
+  }
+  return both;
+}
+
+std::optional<Intervals> Admitted(const Atom &atom, Interval domain) {
+  const std::optional<std::int64_t> bound = AsInteger(atom.value);
+  switch (atom.compare) {
+    // A WILDCARD DESCRIBES NO INTERVAL. AL accepts `*1*` on an integer field, and a caller that
+    // cannot scan has to refuse rather than guess at what it would have matched.
+    case Compare::Like:
+    case Compare::NotLike: return std::nullopt;
+    case Compare::Equal:
+      if (!bound) { return std::nullopt; }
+      return Intervals{{.low = *bound, .high = *bound}};
+    // `<>5` PUNCHES A HOLE and leaves two intervals, which is why a conjunction holds a SET.
+    case Compare::NotEqual:
+      if (!bound) { return std::nullopt; }
+      return Normalised(
+          {{.low = domain.low, .high = *bound - 1}, {.low = *bound + 1, .high = domain.high}});
+    case Compare::Less:
+      if (!bound) { return std::nullopt; }
+      return Normalised({{.low = domain.low, .high = *bound - 1}});
+    case Compare::LessOrEqual:
+      if (!bound) { return std::nullopt; }
+      return Normalised({{.low = domain.low, .high = *bound}});
+    case Compare::Greater:
+      if (!bound) { return std::nullopt; }
+      return Normalised({{.low = *bound + 1, .high = domain.high}});
+    case Compare::GreaterEqual:
+      if (!bound) { return std::nullopt; }
+      return Normalised({{.low = *bound, .high = domain.high}});
+    case Compare::Between: break;
+  }
+  const std::optional<std::int64_t> upper = AsInteger(atom.upper);
+  if ((!atom.openLower && !bound) || (!atom.openUpper && !upper)) { return std::nullopt; }
+  return Normalised({{.low = atom.openLower ? domain.low : *bound,
+                      .high = atom.openUpper ? domain.high : *upper}});
+}
+
+} // namespace
+
+std::optional<Intervals> IntegerIntervals(const Expression &expression, Interval domain) {
+  Intervals whole{{.low = domain.low, .high = domain.high}};
+  if (expression.empty()) { return whole; }
+
+  Intervals admitted;
+  for (const All &conjunction : expression) {
+    Intervals narrowed = whole;
+    for (const Atom &atom : conjunction) {
+      const std::optional<Intervals> one = Admitted(atom, domain);
+      if (!one) { return std::nullopt; }
+      narrowed = Intersected(narrowed, *one);
+    }
+    admitted.insert(admitted.end(), narrowed.begin(), narrowed.end());
+  }
+  return Normalised(std::move(admitted));
+}
+
+std::int64_t CountOf(const Intervals &intervals) {
+  std::int64_t count = 0;
+  for (const Interval &one : intervals) { count += one.high - one.low + 1; }
+  return count;
 }
 
 } // namespace agiru::detail

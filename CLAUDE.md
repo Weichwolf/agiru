@@ -73,6 +73,14 @@ why the language changed:
 - **A process cost a gigabyte.** See the target above. This is not a performance note, it is the
   difference between running and not running.
 
+**And there is an existence proof for the native route: NAVISION WAS WRITTEN IN C AND C++.** C/SIDE
+was a native application with its own database engine, and it computed the virtual tables, ran the
+filter language and executed the posting routines without a dynamic language anywhere in the
+picture. So when something here looks as though it needs runtime reflection, a provider registry or
+a dictionary of descriptors, the answer is that the original did it with `constexpr` data and one
+code path -- and the question is which one, not whether. This is the reason a design that reaches
+for dynamism is suspect here rather than merely inelegant.
+
 What IS carried over stands under "The documentation is the specification" and "Every defect is a
 generic gap". Both were measured there and hold here unchanged.
 
@@ -96,7 +104,14 @@ Plus `~/Git/openerp/` as a **fourth, measured reference**: the same semantics im
 with backlog comments on refuted hypotheses. Grep there before deriving any non-trivial semantics
 from scratch.
 
-**WHERE THEY DISAGREE, THE DOCUMENTATION WINS.** The predecessor's implementation is a hint about
+**WHERE THEY DISAGREE, THE DOCUMENTATION WINS -- ABOUT GUARANTEES.** Validate order, trigger
+lifecycle, transaction behaviour: the platform documentation is the specification and the source is
+usage. A NAME is not a guarantee. `devenv-integer-virtual-table.md` tabulates the field of the
+`Integer` virtual table under the heading `Field` as `Integer`; the field is called `Number`, which
+the source says 33 times and contradicts 0 times. The page is describing the contents of the column,
+not naming it. Where the documentation DESCRIBES and the source DECLARES, the source declares.
+
+The predecessor's implementation is a hint about
 where to look and what it cost, never a verdict on what is correct. It is 97 % green on a subset,
 which means it is also wrong somewhere.
 
@@ -432,7 +447,7 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
 | **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
 | **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
-| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **REWRITE THE FILE. Do not patch it.** This has happened four times in one session, each time after `clang-format` folded a line the anchor spanned, each time silently. Writing the rule down did not stop it; only refusing to patch does |
+| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **REWRITE THE FILE. Do not patch it.** This has happened four times in one session, each time after `clang-format` folded a line the anchor spanned, each time silently. Writing the rule down did not stop it; only refusing to patch does. **AND IF A PATCH IS MADE ANYWAY, IT ASSERTS ITS ANCHOR BEFORE WRITING** -- a replacement that finds nothing must ABORT, not write the file unchanged. It happened a fifth time on a NEGATIVE CONTROL, which is worse than on a fix: the control reported green because the subject was never removed, and a green control proves nothing at all |
 
 ## The environment
 

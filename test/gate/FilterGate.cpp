@@ -2,10 +2,13 @@
 #include "Filter.h"
 #include "meta/TableDef.h"
 
+#include <cstdint>
+#include <optional>
 #include <string_view>
 
 using agiru::FieldDef;
 using agiru::FieldType;
+using agiru::detail::Intervals;
 using agiru::detail::Matches;
 using agiru::detail::ParseFilter;
 
@@ -132,10 +135,85 @@ void AnEmptyFilterPassesEverything() {
   CHECK_TRUE("which excludes what is not blank", !Passes("''", "x", TextField()));
 }
 
+/// A DISJUNCTION OF CONJUNCTIONS IS A UNION OF INTERSECTIONS. The `Integer` virtual table has no
+/// rows to scan -- `devenv-integer-virtual-table.md`: "by applying a filter to the Integer virtual
+/// table, you can easily get a subset or range of numbers" -- so the filter IS the input, and this
+/// is the function that turns it into one.
+constexpr agiru::detail::Interval kSmallDomain{.low = 0, .high = 100};
+
+/// The set a filter admits, or an empty one when it does not reduce -- which `Reduces` asks
+/// separately, so that no assertion below reads an optional it has not checked.
+Intervals Admitted(std::string_view text) {
+  const std::optional<Intervals> set =
+      agiru::detail::IntegerIntervals(ParseFilter(text), kSmallDomain);
+  return set.has_value() ? *set : Intervals{};
+}
+
+bool Reduces(std::string_view text) {
+  return agiru::detail::IntegerIntervals(ParseFilter(text), kSmallDomain).has_value();
+}
+
+void AFilterOverIntegersIsASetOfIntervals() {
+  CHECK_TRUE("an empty filter admits the whole domain",
+             (Admitted("") == Intervals{{.low = 0, .high = 100}}));
+  CHECK_TRUE("a range is one interval", (Admitted("10..20") == Intervals{{.low = 10, .high = 20}}));
+  CHECK_TRUE("an open lower end takes the domain's",
+             (Admitted("..20") == Intervals{{.low = 0, .high = 20}}));
+  CHECK_TRUE("and an open upper end likewise",
+             (Admitted("10..") == Intervals{{.low = 10, .high = 100}}));
+  CHECK_TRUE("a single value is a single-member interval",
+             (Admitted("7") == Intervals{{.low = 7, .high = 7}}));
+  CHECK_TRUE("a conjunction intersects",
+             (Admitted(">=10&<=20") == Intervals{{.low = 10, .high = 20}}));
+
+  // `<>5` PUNCHES A HOLE, so a conjunction holds a SET and not merely a range. A version that
+  // returned one interval per conjunction would answer 0..100 here and admit the 5.
+  CHECK_TRUE("a negation leaves two intervals",
+             (Admitted("<>5") == Intervals{{.low = 0, .high = 4}, {.low = 6, .high = 100}}));
+  CHECK_TRUE("and it still narrows inside a conjunction",
+             (Admitted("1..9&<>5") == Intervals{{.low = 1, .high = 4}, {.low = 6, .high = 9}}));
+
+  // ADJACENT INTERVALS MERGE. Two series over 1..5 and 6..9 emit the same rows as one over 1..9,
+  // and emitting both is a duplicate row rather than a tidiness question.
+  CHECK_TRUE(
+      "a disjunction unions",
+      (Admitted("1..5|20..30") == Intervals{{.low = 1, .high = 5}, {.low = 20, .high = 30}}));
+  CHECK_TRUE("touching parts become one",
+             (Admitted("1..5|6..9") == Intervals{{.low = 1, .high = 9}}));
+  CHECK_TRUE("and overlapping ones too",
+             (Admitted("1..8|4..12") == Intervals{{.low = 1, .high = 12}}));
+
+  CHECK_TRUE("a filter matching nothing admits nothing", Admitted("50..40").empty());
+  CHECK_TRUE("and one outside the domain likewise", Admitted("200..300").empty());
+
+  // THE NEGATIVE CONTROL, and it is what keeps the whole thing honest: a wildcard describes no
+  // interval, and answering the domain for it would silently admit every row the filter excludes.
+  CHECK_TRUE("a wildcard reduces to nothing at all", !Reduces("*1*"));
+  CHECK_TRUE("and so does a value that is not an integer", !Reduces("abc"));
+}
+
+/// A SEQUENCE TABLE ANSWERS Count() BY ARITHMETIC and never asks the database: the count is exact
+/// and costs the number of intervals rather than the number of rows.
+void ASetCountsItselfWithoutCountingRows() {
+  CHECK_TRUE("one interval counts its own members",
+             agiru::detail::CountOf({{.low = 1, .high = 10}}) == 10);
+  CHECK_TRUE("a single member counts one", agiru::detail::CountOf({{.low = 7, .high = 7}}) == 1);
+  CHECK_TRUE("two intervals add up",
+             (agiru::detail::CountOf({{.low = 1, .high = 5}, {.low = 20, .high = 24}}) == 10));
+  CHECK_TRUE("an empty set counts nothing", agiru::detail::CountOf({}) == 0);
+
+  // THE DOMAIN THE PAGE GIVES, counted without producing a single row of it.
+  constexpr std::int64_t kBillion = 1000000000;
+  CHECK_TRUE("and the documented domain counts two billion and one",
+             agiru::detail::CountOf({{.low = -kBillion, .high = kBillion}}) == 2000000001);
+}
+
 } // namespace
 
 int main() {
   return gate::Run("Filter", [] {
+    AFilterOverIntegersIsASetOfIntervals();
+    ASetCountsItselfWithoutCountingRows();
     ConjunctionBindsTighterThanDisjunction();
     SpacesAroundAnOperatorAreNotPartOfTheValue();
     TheEqualsSignIsOptional();
