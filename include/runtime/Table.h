@@ -249,7 +249,7 @@ public:
   /// \param expected The member it must hold.
   /// \throws Error when the field holds another member.
   ///
-  /// The overload exists so that generated code writes `TestField(FieldNumber::CostType,
+  /// The overload exists so that generated code writes `TestField(Field_No::CostType,
   /// ResourceCostCostType::Fixed)` for AL's AL's two-argument TestField, instead
   /// of wrapping the member in its option type at the call site.
   template <typename E>

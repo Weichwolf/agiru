@@ -63,7 +63,7 @@ inline constexpr std::array<SystemFieldDecl, kSystemFieldCount> kSystemFields{{
 
 /// \brief The field numbers the platform gives every table.
 ///
-/// A generated table's `FieldNumber` struct DERIVES from this, so the five numbers are said once in
+/// A generated table's `Field_No` struct DERIVES from this, so the five numbers are said once in
 /// the door instead of once per table. They are static constants, so inheriting them costs no
 /// layout -- which the storage they belong to cannot say for itself (see `WithSystemFields`).
 struct SystemFieldNumbers {

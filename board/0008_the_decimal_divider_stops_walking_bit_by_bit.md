@@ -16,10 +16,9 @@ findings that were structural rather than cosmetic, and one of them -- a bare `3
 bound -- exposed a silently lost carry in the wide multiply. A clever divider written first would
 have hidden it.
 
-**The target decides the urgency** (board:0006): Cortex-A53 at 1 GHz, in-order. 192 iterations with
-a compare and a conditional subtract each is on the order of a thousand cycles per division. A
-posting run rounds thousands of amounts. This is not a micro-optimisation, it is whether the machine
-finishes.
+**The cost is arithmetic and not machine-specific**: 192 iterations of a compare and a conditional
+subtract is hundreds to thousands of cycles per division on anything, and a posting run rounds
+thousands of amounts. How much of the run that is remains a measurement (board:0006).
 
 **The measurement that has to come first:** how often division is actually on the path. If `Round`
 dominates, the cheaper fix is not a faster divider but a `Round` that does not divide at all --

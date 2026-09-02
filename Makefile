@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all cronus db gap lint test transpile tree provision doc clean spotless help
+.PHONY: all apps cronus db gap lint test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -31,6 +31,17 @@ transpile: all     ## every app in apps.json through the transpiler into apps/
 
 gap: all           ## the first generated header that does not compile, and why
 	@sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
+
+# BARE `make` IS `src/`, AND `make apps` IS THE GENERATED TREE. They are separate build directories
+# because they are separate questions: the runtime and the transpiler must stand on their own, and
+# 5 835 generated translation units must never be in the way of the one-second loop that repairs
+# them. Ninja stops at the first failing edge, which is the point -- every error in `apps/` is one
+# generic gap in `src/`, so the second error is almost always the first one again.
+apps: all          ## the generated tree, stopping at the first error
+	@cmake -S $(SELF) -B $(B)/apps -G Ninja \
+	  -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+	  -DAGIRU_BUILD_APPS=ON > /dev/null
+	@cmake --build $(B)/apps -j $(shell nproc) -- -k 1
 
 tree: all          ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh

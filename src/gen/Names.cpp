@@ -60,6 +60,36 @@ std::string Join(const std::vector<std::string> &words) {
 
 } // namespace
 
+std::string_view KindSuffix(ObjectKind kind) {
+  switch (kind) {
+    case ObjectKind::Table: return "Table";
+    case ObjectKind::Codeunit: return "Codeunit";
+    case ObjectKind::Page: return "Page";
+    case ObjectKind::Report: return "Report";
+    case ObjectKind::Query: return "Query";
+    case ObjectKind::XmlPort: return "XmlPort";
+    case ObjectKind::Enum: return "Enum";
+    case ObjectKind::Interface: return "Interface";
+    case ObjectKind::PermissionSet: return "PermissionSet";
+  }
+  return "Object";
+}
+
+std::string ClassName(std::string_view identifier, ObjectKind kind) {
+  return std::string(identifier) + "_" + std::string(KindSuffix(kind));
+}
+
+std::string ClassAlias(std::string_view identifier, ObjectKind kind) {
+  return "using " + std::string(identifier) + " = " + ClassName(identifier, kind) + ";\n";
+}
+
+ObjectKind KindOfNamespace(std::string_view space) {
+  if (space == "tables") { return ObjectKind::Table; }
+  if (space == "interfaces") { return ObjectKind::Interface; }
+  if (space == "enums") { return ObjectKind::Enum; }
+  return ObjectKind::Codeunit;
+}
+
 std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
 }

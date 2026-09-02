@@ -384,7 +384,10 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   if (!forward.empty()) { out += "\n"; }
   for (const auto &[space, named] : forward) {
     out += "namespace agiru::app::" + space + " {\n";
-    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    const ObjectKind kind = KindOfNamespace(space);
+    for (const std::string &one : named) {
+      out += "class " + ClassName(one, kind) + ";\n" + ClassAlias(one, kind);
+    }
     out += "} // namespace agiru::app::" + space + "\n";
   }
   out += "\n";
@@ -631,16 +634,18 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   out += "\nnamespace agiru::app::interfaces {\n\n";
-  out += "class " + identifier + " {\n";
+  const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
+  out += "class " + faceClass + " {\n";
   out += "public:\n";
   // A CLASS SOMEBODY DERIVES FROM NEEDS A VIRTUAL DESTRUCTOR, and an interface is only ever
   // derived from.
-  out += "  virtual ~" + identifier + "() = default;\n\n";
+  out += "  virtual ~" + faceClass + "() = default;\n\n";
   for (const al::ProcedureDecl &procedure : object.procedures) {
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
   }
-  out += "};\n\n} // namespace agiru::app::interfaces\n";
+  out += "};\n\n" + ClassAlias(identifier, ObjectKind::Interface) +
+         "\n} // namespace agiru::app::interfaces\n";
   DotNetUse missing;
   DotNetNames named;
   for (const al::ProcedureDecl &procedure : object.procedures) {
@@ -666,7 +671,8 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += InlineOptions(unit);
 
   out += "namespace agiru::app::codeunits {\n\n";
-  out += "class " + identifier + " : public Codeunit<" + identifier + "> {\npublic:\n";
+  const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
+  out += "class " + unitClass + " : public Codeunit<" + unitClass + "> {\npublic:\n";
 
   // PUBLIC BEFORE PRIVATE, AND `local` IS WHAT DECIDES IT. AL's `local procedure` is exactly C++'s
   // private, and an event publisher is local too -- nobody calls it but the object that raises it.
@@ -707,6 +713,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += locals;
   }
   out += "};\n\n";
+  out += ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
   out += "} // namespace agiru::app::codeunits\n\n";
 
   out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";

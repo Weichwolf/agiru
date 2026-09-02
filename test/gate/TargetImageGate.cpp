@@ -40,21 +40,21 @@ void TheTableDeclaresWhatTheAlSourceDeclares() {
              Table().fields.size() == kFieldCount);
   CHECK_TRUE("two keys", Table().keys.size() == kKeyCount);
   CHECK_TEXT("a field name keeps its spaces",
-             std::string(Field(Table(), ResourceCost::FieldNumber::WorkTypeCode)->name),
+             std::string(Field(Table(), ResourceCost::Field_No::WorkTypeCode)->name),
              "Work Type Code");
   CHECK_TRUE("Code[20] carries its length",
-             Field(Table(), ResourceCost::FieldNumber::Code)->length == kCodeLength);
+             Field(Table(), ResourceCost::Field_No::Code)->length == kCodeLength);
   CHECK_TRUE("Code[10] carries its length",
-             Field(Table(), ResourceCost::FieldNumber::WorkTypeCode)->length ==
+             Field(Table(), ResourceCost::Field_No::WorkTypeCode)->length ==
                  kWorkTypeCodeLength);
   CHECK_TRUE("a Decimal carries no length",
-             Field(Table(), ResourceCost::FieldNumber::UnitCost)->length == 0);
+             Field(Table(), ResourceCost::Field_No::UnitCost)->length == 0);
   CHECK_TRUE("a number nothing declares has no field",
              Field(Table(), FieldNo{kUndeclaredFieldNumber}) == nullptr);
   CHECK_TRUE("the primary key is clustered", Table().keys[0].clustered);
   CHECK_TRUE("and the secondary is not", !Table().keys[1].clustered);
   CHECK_TRUE("Key2 leads with Cost Type",
-             Table().keys[1].fields[0] == ResourceCost::FieldNumber::CostType);
+             Table().keys[1].fields[0] == ResourceCost::Field_No::CostType);
 }
 
 void TheOffsetsReachTheRealFields() {
@@ -65,12 +65,12 @@ void TheOffsetsReachTheRealFields() {
   auto *base = reinterpret_cast<std::byte *>(&rec);
 
   auto *code = reinterpret_cast<decltype(rec.Code) *>(
-      base + Field(Table(), ResourceCost::FieldNumber::Code)->offset);
+      base + Field(Table(), ResourceCost::Field_No::Code)->offset);
   *code = "ab-1";
   CHECK_TEXT("the offset of field 2 reaches Code", std::string(rec.Code.Value()), "AB-1");
 
   auto *cost = reinterpret_cast<decltype(rec.UnitCost) *>(
-      base + Field(Table(), ResourceCost::FieldNumber::UnitCost)->offset);
+      base + Field(Table(), ResourceCost::Field_No::UnitCost)->offset);
   *cost = agiru::Decimal::FromInvariantString("12.50");
   CHECK_TEXT("the offset of field 6 reaches Unit Cost", rec.UnitCost.ToInvariantString(), "12.50");
 }
@@ -87,7 +87,7 @@ void TheOptionsCarryTheirAlSpelling() {
   // them BY ORDINAL rather than by position -- the same call an Enum field answers.
   CHECK_TEXT(
       "and the field table carries them too",
-      std::string(ValueOf(Field(Table(), ResourceCost::FieldNumber::CostType)->values, 1)->name),
+      std::string(ValueOf(Field(Table(), ResourceCost::Field_No::CostType)->values, 1)->name),
       "% Extra");
 }
 

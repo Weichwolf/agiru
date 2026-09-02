@@ -178,7 +178,7 @@ void AChangedStatementChangesTheBody() {
 
 /// A FIELD NAME THAT COLLIDES WITH A RUNTIME TYPE. `Change Log Setup (Field)` really does declare a
 /// field called `Field No.`, and its member is spelled exactly like `agiru::FieldNo` -- so from
-/// that member onward the class's own name wins and every FieldNumber entry below it fails to
+/// that member onward the class's own name wins and every Field_No entry below it fails to
 /// compile. The source is altered in memory; the repository under ~/Git/BCApps is never written to.
 void AFieldThatShadowsARuntimeTypeStillCompiles() {
   const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);

@@ -22,10 +22,10 @@ number series. If those lie scattered across a 200 MB segment, each call touches
 fresh L3 line. If the generator emits them adjacently, the same run stays inside a few hundred pages
 and a working set that fits.
 
-**The target change weakened this and did not remove it.** On the Pi Zero 2 W with 512 MB and a
-microSD, a scattered layout meant page faults against slow storage. On a Pi 5 with 16 GB and NVMe
-the pages stay resident, so what is left is the 2 MB shared L3 and the instruction cache -- a real
-effect, one order of magnitude smaller, and now something to MEASURE rather than to deduce.
+**HOW LARGE THE EFFECT IS DEPENDS ON THE MACHINE, WHICH IS WHY IT IS MEASURED RATHER THAN DEDUCED.**
+Where memory is tight and storage is slow, a scattered layout means page faults; where the pages
+stay resident, what is left is the last-level cache and the instruction cache -- a real effect and a
+smaller one. Neither number is knowable from the argument, only from a run.
 
 **What is not yet known:** how large the segment actually becomes, and how far apart the objects of
 one run lie under the naive layout. Both are measurable as soon as the generator emits more than one

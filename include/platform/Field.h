@@ -178,7 +178,7 @@ public:
   ///       or an audit stamp -- `devenv-virtual-tables.md`: "Virtual tables aren't stored in the
   ///       database, but are computed at runtime". This is why it does not derive from
   ///       `SystemFieldNumbers` the way a generated table does.
-  struct FieldNumber {
+  struct Field_No {
     static constexpr FieldNo TableNo{1};
     static constexpr FieldNo No{2};
     static constexpr FieldNo TableName{3};
@@ -196,47 +196,47 @@ public:
     static constexpr FieldNo IsPartOfPrimaryKey{22};
   };
 
-  static constexpr std::array<FieldNo, 2> kKey1{{FieldNumber::TableNo, FieldNumber::No}};
+  static constexpr std::array<FieldNo, 2> kKey1{{Field_No::TableNo, Field_No::No}};
 };
 
 inline constexpr std::array<FieldDef, 15> kFieldFields{{
     Declare<&Field::TableNo>(
-        Field::FieldNumber::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
-    Declare<&Field::No>(Field::FieldNumber::No, "No.", "No.", offsetof(Field, No)),
+        Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
+    Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),
     Declare<&Field::TableName>(
-        Field::FieldNumber::TableName, "TableName", "TableName", offsetof(Field, TableName)),
+        Field::Field_No::TableName, "TableName", "TableName", offsetof(Field, TableName)),
     Declare<&Field::FieldName>(
-        Field::FieldNumber::FieldName, "FieldName", "FieldName", offsetof(Field, FieldName)),
-    Declare<&Field::Type>(Field::FieldNumber::Type, "Type", "Type", offsetof(Field, Type)),
-    Declare<&Field::Len>(Field::FieldNumber::Len, "Len", "Len", offsetof(Field, Len)),
-    Declare<&Field::Class>(Field::FieldNumber::Class, "Class", "Class", offsetof(Field, Class)),
-    Declare<&Field::RelationTableNo>(Field::FieldNumber::RelationTableNo,
+        Field::Field_No::FieldName, "FieldName", "FieldName", offsetof(Field, FieldName)),
+    Declare<&Field::Type>(Field::Field_No::Type, "Type", "Type", offsetof(Field, Type)),
+    Declare<&Field::Len>(Field::Field_No::Len, "Len", "Len", offsetof(Field, Len)),
+    Declare<&Field::Class>(Field::Field_No::Class, "Class", "Class", offsetof(Field, Class)),
+    Declare<&Field::RelationTableNo>(Field::Field_No::RelationTableNo,
                                      "RelationTableNo",
                                      "RelationTableNo",
                                      offsetof(Field, RelationTableNo)),
-    Declare<&Field::RelationFieldNo>(Field::FieldNumber::RelationFieldNo,
+    Declare<&Field::RelationFieldNo>(Field::Field_No::RelationFieldNo,
                                      "RelationFieldNo",
                                      "RelationFieldNo",
                                      offsetof(Field, RelationFieldNo)),
-    Declare<&Field::OptionString>(Field::FieldNumber::OptionString,
+    Declare<&Field::OptionString>(Field::Field_No::OptionString,
                                   "OptionString",
                                   "OptionString",
                                   offsetof(Field, OptionString)),
-    Declare<&Field::ObsoleteState>(Field::FieldNumber::ObsoleteState,
+    Declare<&Field::ObsoleteState>(Field::Field_No::ObsoleteState,
                                    "ObsoleteState",
                                    "ObsoleteState",
                                    offsetof(Field, ObsoleteState)),
-    Declare<&Field::ObsoleteReason>(Field::FieldNumber::ObsoleteReason,
+    Declare<&Field::ObsoleteReason>(Field::Field_No::ObsoleteReason,
                                     "ObsoleteReason",
                                     "ObsoleteReason",
                                     offsetof(Field, ObsoleteReason)),
-    Declare<&Field::FieldCaption>(Field::FieldNumber::FieldCaption,
+    Declare<&Field::FieldCaption>(Field::Field_No::FieldCaption,
                                   "Field Caption",
                                   "Field Caption",
                                   offsetof(Field, FieldCaption)),
     Declare<&Field::Enabled>(
-        Field::FieldNumber::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
-    Declare<&Field::IsPartOfPrimaryKey>(Field::FieldNumber::IsPartOfPrimaryKey,
+        Field::Field_No::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
+    Declare<&Field::IsPartOfPrimaryKey>(Field::Field_No::IsPartOfPrimaryKey,
                                         "Is Part of Primary Key",
                                         "Is Part of Primary Key",
                                         offsetof(Field, IsPartOfPrimaryKey)),

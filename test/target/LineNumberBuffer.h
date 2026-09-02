@@ -20,20 +20,20 @@ public:
   Integer OldLineNumber{};
   Integer NewLineNumber{};
 
-  struct FieldNumber {
+  struct Field_No {
     static constexpr FieldNo OldLineNumber{1};
     static constexpr FieldNo NewLineNumber{2};
   };
 
-  static constexpr std::array<FieldNo, 1> kKey1{{FieldNumber::OldLineNumber}};
+  static constexpr std::array<FieldNo, 1> kKey1{{Field_No::OldLineNumber}};
 };
 
 inline constexpr std::array<FieldDef, 2> kLineNumberBufferFields{{
-    Declare<&LineNumberBuffer::OldLineNumber>(LineNumberBuffer::FieldNumber::OldLineNumber,
+    Declare<&LineNumberBuffer::OldLineNumber>(LineNumberBuffer::Field_No::OldLineNumber,
                                               "Old Line Number",
                                               "Old Line Number",
                                               offsetof(LineNumberBuffer, OldLineNumber)),
-    Declare<&LineNumberBuffer::NewLineNumber>(LineNumberBuffer::FieldNumber::NewLineNumber,
+    Declare<&LineNumberBuffer::NewLineNumber>(LineNumberBuffer::Field_No::NewLineNumber,
                                               "New Line Number",
                                               "New Line Number",
                                               offsetof(LineNumberBuffer, NewLineNumber)),

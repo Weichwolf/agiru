@@ -82,6 +82,29 @@ void CollidingEnumeratorsAreSeparatedByTheirOrdinal() {
   CHECK_TEXT("and so is the rest of it", distinct[2], "All");
 }
 
+/// The generator owns names inside a generated class, and AL owns the rest. This is the seam.
+///
+/// A generated table declares its fields as members and its field NUMBERS in a nested struct beside
+/// them, so that struct's name lives in the same scope as every field identifier. `FieldNumber` was
+/// that name, and table 700 `Error Message` has a field called `Field Number` -- which made the
+/// struct collide with a member of its own class AND with a member of itself, two errors that
+/// blocked 111 headers.
+///
+/// THE STRUCT IS THEREFORE CALLED `Field_No`, AND THE INTERIOR UNDERSCORE IS THE GUARANTEE RATHER
+/// THAN A DECORATION. `Identifier` keeps only alphanumerics and prepends an underscore only when the
+/// result would start with a digit, so no AL name -- of any table, in any app, ever -- can produce
+/// an identifier with an underscore anywhere but in front. A `k` prefix or a rarer word would have
+/// been a bet on AL not using it; this is a proof that it cannot.
+void AGeneratorOwnedNameCannotCollideWithAnAlName() {
+  CHECK_TEXT("the collision that cost 111 headers", Identifier("Field Number"), "FieldNumber");
+  CHECK_TEXT("and the name it can never reach", Identifier("Field No") == "Field_No" ? "yes" : "no",
+             "no");
+  CHECK_TEXT("nor by spelling the underscore", Identifier("Field_No"), "FieldNo");
+  CHECK_TEXT("nor through punctuation", Identifier("Field-No."), "FieldNo");
+  // The one underscore the generator does emit leads, and a digit always follows it.
+  CHECK_TEXT("a leading underscore is the only one", Identifier("3 Way Match"), "_3WayMatch");
+}
+
 } // namespace
 
 int main() {
@@ -91,5 +114,6 @@ int main() {
     AnOptionFieldGetsItsOwnEnumeration();
     AlTextSurvivesBecomingACppLiteral();
     CollidingEnumeratorsAreSeparatedByTheirOrdinal();
+    AGeneratorOwnedNameCannotCollideWithAnAlName();
   });
 }

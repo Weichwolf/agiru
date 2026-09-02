@@ -3,21 +3,17 @@ State: open
 Area: rt, db, gen
 Tags: measured, owner, target
 
-# `agiru` and PostgreSQL hold a session budget on a Raspberry Pi 5, and the number is known
+# A session costs a known number of bytes, on both architectures
 
-CLAUDE.md names the target. What nobody has is a NUMBER: not one byte of this has been measured on
-aarch64, and until it has, "it runs on the Pi" is a wish.
+CLAUDE.md says portable and fast. What nobody has is a NUMBER, and until there is one, "fast" is a
+wish and "portable" is an untested claim -- not one byte of this has run on `aarch64`.
 
 ## Reference
 
-**The machine**, from the vendor's specification: BCM2712, quad-core Cortex-A76 at 2.4 GHz,
-out-of-order; 512 KB L2 per core and 2 MB shared L3; 16 GB LPDDR4X; microSD or NVMe over PCIe.
-
-**THE TARGET CHANGED, AND SO DID THE QUESTION.** This item was first written against a Pi Zero 2 W
-with 512 MB, where the question was whether a complete ERP fits at all and the answer decided the
-architecture. At 16 GB it fits with room, so that question is answered and a worse one takes its
-place: **how many concurrent SESSIONS does it hold, and what does one cost?** An image is shared
-between processes; a session is not. An ERP is judged on the second number.
+**THE QUESTION IS PER-SESSION AND NOT PER-IMAGE.** An image is shared between processes; a session
+is not. An ERP is judged on how many it holds at once, so the number that matters is what ONE costs
+-- measured, on x86_64 and on `aarch64`, because a divergence between them is the portability
+defect this item exists to catch.
 
 **Predecessor**: openerp's app image cost ~1 GB per process, which is why its test runner is capped
 at two workers and why its whole session architecture -- the rejected fork+CoW, the ContextVar
@@ -32,7 +28,7 @@ small -- a property of the generator's layout, not of the code (board:0009).
 
 ## How
 
-- Cross-compile for `aarch64` from this box; building on the device is not a loop anybody uses.
+- Cross-compile for `aarch64` from this box, and take the same three numbers on both.
 - The measurement is three numbers from a real posting run: peak RSS of the process, the marginal
   RSS of the Nth concurrent session, and wall time. Population and workload quoted beside them.
 - Take them EARLY, on the walking skeleton -- one table, one codeunit, one insert. A per-session
@@ -40,12 +36,11 @@ small -- a property of the generator's layout, not of the code (board:0009).
 
 ## What will be true
 
-- [ ] The marginal cost of one session is measured on the device and quoted from a run.
-- [ ] A stated number of concurrent sessions is served within 16 GB alongside PostgreSQL, with the
-      peak taken from `/proc/<pid>/smaps_rollup` rather than estimated.
+- [ ] The marginal cost of one session is measured and quoted from a run.
+- [ ] The peak is taken from `/proc/<pid>/smaps_rollup` rather than estimated, and a stated number
+      of concurrent sessions is served within a stated amount of memory alongside PostgreSQL.
+- [ ] The two architectures agree, or the difference is explained rather than noticed.
 - [ ] A ceiling is recorded that may only fall, the way every other baseline in this tree works.
 - [ ] **Negative control**: build the object metadata on the heap at startup instead, and require
       the ceiling to go red. If it does not, the static-data decision is buying nothing on this
-      target and should be reconsidered rather than believed. That control matters MORE now than it
-      did at 512 MB, because the argument that forced the decision is gone and only the merits are
-      left.
+      target and should be reconsidered rather than believed.

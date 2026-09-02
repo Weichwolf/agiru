@@ -103,7 +103,7 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
 
 // A FIELD NAME CAN SHADOW A RUNTIME TYPE, AND NOT ONLY ITS OWN. `Change Log Setup (Field)` declares
 // a field called `Field No.`, whose member is `FieldNo` -- and from that member onward `FieldNo`
-// names the member rather than `agiru::FieldNo`, so every entry of the FieldNumber struct below it
+// names the member rather than `agiru::FieldNo`, so every entry of the Field_No struct below it
 // fails to compile. 122 of the BaseApp's 1 545 tables hit this (measured 2026-09-01). Every runtime
 // name the class body uses after its members therefore goes through here, not just the field types.
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
@@ -225,7 +225,7 @@ std::string FieldTable(const std::vector<const al::FieldDecl *> &sorted,
     out += identifier;
     out += ">(";
     out += tableIdentifier;
-    out += "::FieldNumber::";
+    out += "::Field_No::";
     out += identifier;
     out += ", ";
     out += Literal(field->name);
@@ -287,7 +287,8 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
 
   out += "namespace agiru::app::tables {\n\n";
-  out += "class " + tableIdentifier + " : public Table<" + tableIdentifier + "> {\npublic:\n";
+  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
@@ -302,7 +303,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
 
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
-  out += "\n  struct FieldNumber : SystemFieldNumbers {\n";
+  out += "\n  struct Field_No : SystemFieldNumbers {\n";
   for (const al::FieldDecl &field : table.fields) {
     if (IsSystemField(field)) { continue; }
     out += "    static constexpr " + fieldNo + " " + Identifier(field.name) + "{" +
@@ -321,7 +322,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
            "> " + KeyArrayName(i) + "{{";
     for (std::size_t f = 0; f < table.keys[i].fields.size(); ++f) {
       if (f != 0) { out += ", "; }
-      out += "FieldNumber::" + FieldIdentifier(table, table.keys[i].fields[f]);
+      out += "Field_No::" + FieldIdentifier(table, table.keys[i].fields[f]);
     }
     out += "}};\n";
   }
@@ -338,6 +339,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
     }
   }
   out += "};\n\n";
+  out += ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
 
   out += FieldTable(sorted, tableIdentifier);
 

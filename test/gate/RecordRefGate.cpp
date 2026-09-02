@@ -183,19 +183,19 @@ struct Painted : agiru::Table<Painted> {
   agiru::Enum<Kind> Kind;
   agiru::Option<Shade> Shade;
 
-  struct FieldNumber {
+  struct Field_No {
     static constexpr agiru::FieldNo Kind{1};
     static constexpr agiru::FieldNo Shade{2};
   };
 
-  static constexpr std::array<agiru::FieldNo, 1> kKey1{{FieldNumber::Kind}};
+  static constexpr std::array<agiru::FieldNo, 1> kKey1{{Field_No::Kind}};
 };
 
 inline constexpr std::array<agiru::FieldDef, 2> kPaintedFields{{
     agiru::Declare<&Painted::Kind>(
-        Painted::FieldNumber::Kind, "Kind", "Kind", offsetof(Painted, Kind)),
+        Painted::Field_No::Kind, "Kind", "Kind", offsetof(Painted, Kind)),
     agiru::Declare<&Painted::Shade>(
-        Painted::FieldNumber::Shade, "Shade", "Shade", offsetof(Painted, Shade)),
+        Painted::Field_No::Shade, "Shade", "Shade", offsetof(Painted, Shade)),
 }};
 
 inline constexpr std::array<agiru::KeyDef, 1> kPaintedKeys{{

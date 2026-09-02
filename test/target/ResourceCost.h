@@ -61,7 +61,7 @@ public:
   DateTime SystemModifiedAt{};
   Guid SystemModifiedBy{};
 
-  struct FieldNumber : SystemFieldNumbers {
+  struct Field_No : SystemFieldNumbers {
     static constexpr FieldNo Type{1};
     static constexpr FieldNo Code{2};
     static constexpr FieldNo WorkTypeCode{3};
@@ -71,9 +71,9 @@ public:
   };
 
   static constexpr std::array<FieldNo, 3> kKey1{
-      {FieldNumber::Type, FieldNumber::Code, FieldNumber::WorkTypeCode}};
+      {Field_No::Type, Field_No::Code, Field_No::WorkTypeCode}};
   static constexpr std::array<FieldNo, 3> kKey2{
-      {FieldNumber::CostType, FieldNumber::Code, FieldNumber::WorkTypeCode}};
+      {Field_No::CostType, Field_No::Code, Field_No::WorkTypeCode}};
 
   static constexpr std::string_view Text000{"cannot be specified when %1 is %2"};
 
@@ -83,22 +83,22 @@ public:
 
 inline constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::array<FieldDef, 6>{{
     Declare<&ResourceCost::Type>(
-        ResourceCost::FieldNumber::Type, "Type", "Type", offsetof(ResourceCost, Type)),
+        ResourceCost::Field_No::Type, "Type", "Type", offsetof(ResourceCost, Type)),
     Declare<&ResourceCost::Code>(
-        ResourceCost::FieldNumber::Code, "Code", "Code", offsetof(ResourceCost, Code)),
-    Declare<&ResourceCost::WorkTypeCode>(ResourceCost::FieldNumber::WorkTypeCode,
+        ResourceCost::Field_No::Code, "Code", "Code", offsetof(ResourceCost, Code)),
+    Declare<&ResourceCost::WorkTypeCode>(ResourceCost::Field_No::WorkTypeCode,
                                          "Work Type Code",
                                          "Work Type Code",
                                          offsetof(ResourceCost, WorkTypeCode)),
-    Declare<&ResourceCost::CostType>(ResourceCost::FieldNumber::CostType,
+    Declare<&ResourceCost::CostType>(ResourceCost::Field_No::CostType,
                                      "Cost Type",
                                      "Cost Type",
                                      offsetof(ResourceCost, CostType)),
-    Declare<&ResourceCost::DirectUnitCost>(ResourceCost::FieldNumber::DirectUnitCost,
+    Declare<&ResourceCost::DirectUnitCost>(ResourceCost::Field_No::DirectUnitCost,
                                            "Direct Unit Cost",
                                            "Direct Unit Cost",
                                            offsetof(ResourceCost, DirectUnitCost)),
-    Declare<&ResourceCost::UnitCost>(ResourceCost::FieldNumber::UnitCost,
+    Declare<&ResourceCost::UnitCost>(ResourceCost::Field_No::UnitCost,
                                      "Unit Cost",
                                      "Unit Cost",
                                      offsetof(ResourceCost, UnitCost)),

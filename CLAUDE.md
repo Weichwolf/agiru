@@ -30,51 +30,34 @@ which are core function. Permissions and dimensions are compulsory for more than
 
 ## The target this is built against
 
-**`agiru` and PostgreSQL run on a Raspberry Pi 5 with 16 GB, and they run FAST.**
+**PORTABLE AND FAST, and there is no second machine that decides arguments.** `agiru` and
+PostgreSQL are one process and one database on whatever the user has: an x86_64 workstation, an
+`aarch64` board, a container. Nothing is designed for a named device, and no decision is justified
+by one.
 
-| | |
-|---|---|
-| SoC | Broadcom BCM2712 -- quad-core Cortex-A76 at 2.4 GHz, out-of-order |
-| Cache | 64 KB L1-I + 64 KB L1-D per core, 512 KB L2 per core, 2 MB shared L3 |
-| RAM | 16 GB LPDDR4X |
-| Storage | microSD or NVMe over PCIe |
+**What that costs is a rule and not a preference:** no assumption about word size, endianness,
+`char` signedness, alignment or the size of a pointer beyond what the standard guarantees; no
+intrinsic without a portable fallback; no dependency that is not reachable on both architectures.
+`-Wall -Wextra -Wpedantic -Werror` under two front ends is most of the enforcement, and the rest is
+that "it is fast on the workstation" is not a measurement of anything but the workstation.
 
-**This target is not a degraded machine.** Four out-of-order cores at 2.4 GHz and 16 GB are a small
-server, and on memory it matches the development box exactly -- which is what makes a measurement
-here mean something there. What it is NOT is x86: the binary that ships is `aarch64`, and
-"it is fast on the workstation" is still not a measurement.
-
-**The earlier target was a Pi Zero 2 W with 512 MB, and two arguments died when it changed. They
-are written down as dead rather than quietly dropped:**
-
-- *"250 MB of resident set for the whole ERP."* Void. With 16 GB, PostgreSQL gets a real
-  `shared_buffers` and the runtime is not fighting for pages. **What replaces it is a per-SESSION
-  budget rather than a per-image one**: the image is shared, sessions are not, and an ERP is judged
-  on how many it holds at once. That is the number to measure (board:0006).
-- *"Straight-line code beats a clever dispatch table, because a mispredicted branch is not absorbed
-  by an out-of-order window."* Void. The A76 is out-of-order with a deep window and a good
-  predictor; the A53 was neither. Dispatch shape is now a measurement, not a deduction.
-
-**THE ZERO 2 W STAYS AS AN AMBITION.** 512 MB is no longer the specification, and it is still the
-thing worth being able to do: a complete BC on a machine that costs fifteen euros is a different
-claim about this architecture than a complete BC on a small server. Nothing is built for it and no
-decision is justified by it -- board:0006 measures the Pi 5 -- but a design that would make it
-impossible is worth noticing before it lands, and the day the per-session number is small enough to
-try, it gets tried.
-
-**What survives, and now on its own merits rather than on necessity:**
+**FAST IS A PER-SESSION NUMBER, not a per-image one.** The image is shared between sessions and an
+ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Two things
+follow, and they are the reason the design looks the way it does rather than a memory argument
+carried over from anywhere:
 
 - **Object metadata is STATIC CONST DATA, emitted by the transpiler, never built at startup.**
   Field descriptors, table relations, keys, captions -- `constexpr` arrays in `.rodata`,
-  demand-paged, shared between processes, zero startup cost, zero heap. It is no longer the
-  difference between running and not running; it is the difference between a server that starts in
-  milliseconds and one that spends a second per process assembling 9 300 objects it could have
-  been handed.
-- **No allocation on the hot path.** Arena per session, fixed layouts. That was a memory argument
-  and is now a throughput argument, which is the better one anyway.
-- **Code locality still matters**, with 2 MB of shared L3 and 9 300 compiled objects: a posting run
-  should walk contiguous pages rather than scatter across the segment (board:0009). Less acute over
-  NVMe than over microSD, and not gone.
+  demand-paged, shared between processes, zero startup cost, zero heap. It is the difference
+  between a server that starts in milliseconds and one that spends a second per process assembling
+  9 300 objects it could have been handed. The predecessor built them at run time and paid a
+  gigabyte per process for it.
+- **No allocation on the hot path.** Arena per session, fixed layouts.
+- **Code locality matters** with 9 300 compiled objects: a posting run should walk contiguous pages
+  rather than scatter across the segment (board:0009).
+
+**Dispatch shape is a MEASUREMENT, not a deduction.** An argument that a branch is cheaper than a
+table -- or the reverse -- is worth exactly what it measures on the machine it was measured on.
 
 ## Why C++ and not the language this was already attempted in
 
@@ -260,7 +243,7 @@ C++ truths rather than decisions about agiru. They do not move.
 - **A C++ LIBRARY IS ALLOWED WHERE THE STANDARD LIBRARY IS NOT ENOUGH.** Minimising is the rule, not
   abstinence: XML, JSON, HTTP and PDF are not written from scratch here, and the predecessor did not
   write them either. What a dependency must be is JUSTIFIED -- named with what it replaces -- and
-  reachable on `aarch64`, because the binary that ships is the Pi's.
+  reachable on every architecture this builds for, x86_64 and `aarch64` alike.
 - **Reporting is XSL-FO through Apache FOP to PDF**, which is the route `~/Git/openerp` takes and
   the one BC's own RDL layouts translate into most directly.
 - **Artefacts go to `build/` or the system temp directory**, never into the tree.
@@ -374,13 +357,55 @@ Principles, not a map: a map goes stale the day a directory moves.
 
 | | |
 |---|---|
-| `make` | the library, the transpiler, and the client beside them |
+| `make` | `src/` ALONE -- the library, the transpiler, and the client beside them |
+| `make apps` | the generated tree, stopping at the FIRST error |
+| `make gap` | the header that blocks the most others, and the diagnostic that stops it |
+| `make tree` | the whole generated tree, and the census of roots `make gap` then reads |
 | `make db` | `compile_commands.json` for clangd and clang-tidy |
 | `make lint` | format, static analysis, the door |
 | `make test` | the fast gate |
 | `make transpile` | the BaseApp through the transpiler into `apps/` |
 | `make provision` | MSSQL container, BC demo `.bak` from the CDN, PostgreSQL master |
 | `make help` | the list |
+
+### The loop, and its order
+
+**BREADTH FIRST: the transpiler swallows the whole tree, and only then is the tree corrected.**
+A transpiler that translates four object kinds perfectly translates no BC. Widening it exposes
+whole classes of defect at once; polishing what it already emits finds them one at a time and in
+the wrong order. So the sequence is: **more AL goes in -> the tree compiles -> the tree is right.**
+
+- **`make` IS `src/` AND NOTHING ELSE.** The runtime and the transpiler stand on their own, which is
+  what makes the one-second loop possible at all. `make apps` is the generated tree, in its own
+  build directory, and it STOPS AT THE FIRST ERROR -- because every error in `apps/` is one generic
+  gap in `src/`, so the second error is almost always the first one again.
+- **`make gap` IS THE LOOP, and it costs one compile.** `make tree` records, per failing header, the
+  file its FIRST diagnostic came from -- the root. `make gap` reads that census, ranks the roots by
+  how many headers each blocks, and compiles the top one. So a repair is aimed at the root that
+  buys the most, and it is confirmed the same way it was found: **a root leaves the census by
+  COMPILING, never by being crossed off.** When every root in the census compiles, the census is
+  spent and `make tree` writes the next one.
+- **`make lint` IS NOT IN THE LOOP.** It is the gate before a commit, not a step between two
+  edits. Analysis over a tree the transpiler cannot yet fill is analysis of the wrong tree.
+- **A MEASUREMENT THAT RUNS LONG IS RUN BESIDE THE WORK, never instead of it.** `make tree` is
+  minutes on two cores; waiting for it is the one thing that is never the next step.
+
+### The UT suite is started through the CLI, the way BC starts it through a cmdlet
+
+**`agiru run-tests --suite <name>` IS THE DOOR, and the runner behind it is AL's own.** BC does not
+have a test framework beside the platform: `Run-TestsInBcContainer` calls `Invoke-NavCodeunit`, and
+the work is done by the test-runner codeunits -- `Test Runner` walks the `[Test]` procedures of a
+codeunit with `Subtype = Test`, runs each one in its own isolation, catches what it raises and
+writes the verdict into the test-suite tables. The cmdlet is a door in front of that, and nothing
+more.
+
+So the CLI is that door and NOT a second test framework: it opens the session and the database,
+selects the codeunits the suite names, and hands them to the same runner `apps/test_runner` was
+transpiled from. Which means the runner has to WORK -- `Codeunit.Run` returning false, `ClearLastError`,
+`GetLastErrorText`, an isolation that rolls back -- and those are runtime gaps, not CLI gaps.
+
+**`make test` IS NOT THAT.** It is the C++ gate over `src/`, it runs in seconds, and it proves the
+runtime is right about what it already does. The 2 392 come out of `agiru run-tests`.
 
 ## What proves what
 

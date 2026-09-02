@@ -38,7 +38,7 @@ void FieldErrorFollowsTheDocumentedThreeForms() {
   // Example 1: no text, blank field -> "You must specify ...".
   ResourceCost blank;
   CHECK_TEXT("FieldError on a blank field",
-             Raised([&] { blank.FieldError(ResourceCost::FieldNumber::Code); }),
+             Raised([&] { blank.FieldError(ResourceCost::Field_No::Code); }),
              "You must specify Code in Resource Cost Type='Resource',Code='',Work Type Code=''.");
 
   // Example 2: no text, field has a value -> "<Caption> must not be <value> ...".
@@ -46,7 +46,7 @@ void FieldErrorFollowsTheDocumentedThreeForms() {
   valued.Code = "R100";
   CHECK_TEXT(
       "FieldError on a field with a value",
-      Raised([&] { valued.FieldError(ResourceCost::FieldNumber::Code); }),
+      Raised([&] { valued.FieldError(ResourceCost::Field_No::Code); }),
       "Code must not be R100 in Resource Cost Type='Resource',Code='R100',Work Type Code=''.");
 }
 
@@ -84,13 +84,13 @@ void TestFieldMismatchCarriesBothValues() {
 void TestFieldOnABlankFieldSaysSo() {
   ResourceCost rec;
   CHECK_TEXT("TestField on a blank field",
-             Raised([&] { rec.TestField(ResourceCost::FieldNumber::Code); }),
+             Raised([&] { rec.TestField(ResourceCost::Field_No::Code); }),
              "Code must have a value in Resource Cost: "
              "Type='Resource', Code='', Work Type Code=''. It cannot be zero or empty.");
 
   rec.Code = "R100";
   CHECK_SILENT("and stays silent once it has one",
-               Raised([&] { rec.TestField(ResourceCost::FieldNumber::Code); }));
+               Raised([&] { rec.TestField(ResourceCost::Field_No::Code); }));
 }
 
 void ThePrimaryKeySeparatorsDiffferBetweenTheTwo() {
@@ -99,8 +99,8 @@ void ThePrimaryKeySeparatorsDiffferBetweenTheTwo() {
   // second comes from the predecessor where it was verified against the BC test suite. A case
   // states it so that nobody "tidies" one into the other.
   ResourceCost rec;
-  const std::string fieldError = Raised([&] { rec.FieldError(ResourceCost::FieldNumber::Code); });
-  const std::string testField = Raised([&] { rec.TestField(ResourceCost::FieldNumber::Code); });
+  const std::string fieldError = Raised([&] { rec.FieldError(ResourceCost::Field_No::Code); });
+  const std::string testField = Raised([&] { rec.TestField(ResourceCost::Field_No::Code); });
   CHECK_TRUE("FieldError writes ' Type=' with no colon",
              fieldError.find("Resource Cost Type='Resource',Code=") != std::string::npos);
   CHECK_TRUE("TestField writes ': Type=' with a colon and spaced commas",
@@ -124,7 +124,7 @@ void StrSubstNoReplacesWhatItIsGiven() {
 void FieldCaptionIsTheAlCaption() {
   const ResourceCost named;
   CHECK_TEXT("a caption with spaces",
-             std::string(named.FieldCaption(ResourceCost::FieldNumber::WorkTypeCode)),
+             std::string(named.FieldCaption(ResourceCost::Field_No::WorkTypeCode)),
              "Work Type Code");
 }
 

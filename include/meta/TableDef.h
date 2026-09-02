@@ -164,7 +164,7 @@ struct TableDef {
 /// \return The field, or `nullptr` when no field sits there.
 ///
 /// This is what lets generated code name a FIELD where AL names a field -- `FieldError(Code)`
-/// rather than `FieldError(FieldNumber::Code)` -- because the address of a member is enough to find
+/// rather than `FieldError(Field_No::Code)` -- because the address of a member is enough to find
 /// its declaration.
 ///
 /// \note A walk rather than a search, because offsets have no useful order and this is only ever
