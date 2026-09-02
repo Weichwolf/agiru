@@ -11,6 +11,7 @@
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Duration.h"
 #include "type/Enum.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
@@ -92,6 +93,13 @@ template <> struct FieldTypeOf<DateFormula> {
 template <> struct FieldTypeOf<RecordId> {
   static constexpr FieldType kType = FieldType::RecordId;   ///< The AL type tag.
   static constexpr std::uint16_t kLength = 0;               ///< A RecordId declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
+};
+
+/// \brief `Duration` -- how long, in milliseconds.
+template <> struct FieldTypeOf<Duration> {
+  static constexpr FieldType kType = FieldType::Duration;   ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< A duration declares no length.
   static constexpr std::span<const EnumValueDef> kValues{}; ///< Not an enumeration.
 };
 

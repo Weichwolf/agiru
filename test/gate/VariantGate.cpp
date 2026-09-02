@@ -2,9 +2,13 @@
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
+#include "type/Duration.h"
 #include "type/Integer.h"
+#include "type/Time.h"
 #include "type/Variant.h"
 
+#include <cstdint>
 #include <string>
 
 using agiru::Date;
@@ -69,6 +73,43 @@ void TwoVariantsCompareByTypeAndValue() {
              !(Variant{agiru::Integer{1}} == Variant{agiru::BigInteger{1}}));
 }
 
+/// A DURATION AND A BIGINTEGER ARE TWO TYPES, AND A VARIANT MUST TELL THEM APART. They are both
+/// 64-bit integers and were one C++ type until this asked for the difference:
+/// `variant-data-type.md` lists `IsDuration()` and `IsBigInteger()` as separate questions, and a
+/// FieldRef cannot render a field without knowing which of the two it is.
+void ADurationIsNotABigInteger() {
+  constexpr std::int64_t kMilliseconds = 90000;
+  const Variant span{agiru::Duration{kMilliseconds}};
+  const Variant count{agiru::BigInteger{kMilliseconds}};
+
+  CHECK_TRUE("a duration says it is a duration", span.IsDuration());
+  CHECK_TRUE("and NOT a big integer", !span.IsBigInteger());
+  CHECK_TRUE("a big integer says it is one", count.IsBigInteger());
+  CHECK_TRUE("and NOT a duration", !count.IsDuration());
+
+  // THE NEGATIVE CONTROL, and it is the whole reason the alias had to go: the same 64 bits.
+  CHECK_TRUE("they carry the same number",
+             span.Get<agiru::Duration>().Milliseconds() == count.Get<agiru::BigInteger>());
+  CHECK_TRUE("and are still not equal, because the type is part of the value", !(span == count));
+}
+
+/// The algebra `duration-data-type.md` states outright.
+void TheDurationAlgebraIsTheDocumentedOne() {
+  const agiru::DateTime start =
+      agiru::DateTime::Create(Date::FromYmd(2009, 1, 1), agiru::Time::FromHms(8, 0, 0));
+  const agiru::DateTime end =
+      agiru::DateTime::Create(Date::FromYmd(2009, 1, 1), agiru::Time::FromHms(9, 30, 1));
+
+  const agiru::Duration between = end - start;
+  constexpr std::int64_t kHourAndAHalfAndOne = ((std::int64_t{90} * 60) + 1) * 1000;
+  CHECK_TRUE("DateTime - DateTime is a Duration of milliseconds",
+             between.Milliseconds() == kHourAndAHalfAndOne);
+  CHECK_TRUE("DateTime + Duration lands back on the later instant", start + between == end);
+  CHECK_TRUE("DateTime - Duration lands back on the earlier one", end - between == start);
+  CHECK_TRUE("a duration the other way round is negative", (start - end).Milliseconds() < 0);
+  CHECK_TRUE("and adding it moves backwards", end + (start - end) == start);
+}
+
 } // namespace
 
 int main() {
@@ -78,5 +119,7 @@ int main() {
     AnEmptyVariantHoldsNothingAndSaysSo();
     ACodeAndATextAreOneAlternative();
     TwoVariantsCompareByTypeAndValue();
+    ADurationIsNotABigInteger();
+    TheDurationAlgebraIsTheDocumentedOne();
   });
 }

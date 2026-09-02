@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/Duration.h"
+
 #include <compare>
 #include <cstdint>
 #include <string>
@@ -101,6 +103,14 @@ public:
   ///       ToText() without an argument is "Equivalent to calling Format(value, 0, 0)", and format
   ///       0 is the region's: the page's own example renders `115934.444T` as `11:59:34.444 AM`.
   [[nodiscard]] std::string ToInvariantString() const;
+
+  /// \brief AL `Time - Time` -- how long lies between them.
+  /// \param o The earlier time.
+  /// \return The difference, which the page's own CompareTime example compares against 86 399 999.
+  [[nodiscard]] constexpr Duration operator-(const Time &o) const {
+    return Duration{static_cast<std::int64_t>(milliseconds_) -
+                    static_cast<std::int64_t>(o.milliseconds_)};
+  }
 
   /// \brief Orders two times.
   /// \param o The other time.

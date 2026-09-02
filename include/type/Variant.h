@@ -7,6 +7,7 @@
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
@@ -19,6 +20,22 @@
 /// \file
 /// \brief AL `Variant` -- one value, of whichever AL type it was given.
 
+/// \brief Whether a type is one of a variant's alternatives, exactly.
+namespace agiru::detail {
+
+/// \brief Whether a type is one of a variant's alternatives.
+/// \tparam T The type.
+/// \tparam V The variant.
+template <typename T, typename V> struct InVariant : std::false_type {};
+
+/// \brief Whether a type is one of a variant's alternatives.
+/// \tparam T  The type.
+/// \tparam Ts The alternatives.
+template <typename T, typename... Ts>
+struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T, Ts> || ...)> {};
+
+} // namespace agiru::detail
+
 namespace agiru {
 
 /// \brief AL `Variant`.
@@ -30,14 +47,6 @@ namespace agiru {
 ///       and no conversions, because a Variant is how AL passes a value whose type the callee
 ///       decides on. A `Get<T>()` that coerced would turn "this is not a Date" into a plausible
 ///       wrong Date, which is the class of defect this whole tree is built to move to compile time.
-///
-/// \note `IsDuration()` IS MISSING BECAUSE OF AN ALIAS, and this is the first thing that alias has
-///       cost. `Duration` and `BigInteger` are both `std::int64_t` here -- deliberately, since
-///       generated AL code does arithmetic on both constantly and a wrapper would forward every
-///       operator -- so C++ cannot tell them apart and a variant cannot hold both. AL can: it asks
-///       `IsDuration()` and `IsBigInteger()` as two questions. Answering one of them wrongly is
-///       worse than answering neither, so the type is left out and the reason is written down
-///       rather than hidden (board:0024).
 ///
 /// \note THE OBJECT TYPES ARE NOT IN IT YET -- Record, RecordRef, InStream, DotNet and the rest.
 ///       They are not values, they are handles, and each needs its own type in the runtime first.
@@ -54,6 +63,7 @@ public:
                             Date,
                             Time,
                             DateTime,
+                            Duration,
                             Guid,
                             RecordId,
                             DateFormula>;
@@ -62,10 +72,14 @@ public:
   Variant() = default;
 
   /// \brief Holds a value.
-  /// \tparam T The AL type.
+  /// \tparam T The AL type, which must be one of the alternatives EXACTLY.
   /// \param value The value.
+  ///
+  /// \note Exactly, and not merely convertible: a Duration is built from a number, so a
+  ///       constructibility test would make `Variant{5}` ambiguous between Integer, BigInteger and
+  ///       Duration. The type the caller wrote is the type the Variant holds.
   template <typename T>
-    requires std::is_constructible_v<Held, T>
+    requires detail::InVariant<T, Held>::value
   explicit Variant(T value) : held_(std::move(value)) {}
 
   /// \brief AL `Variant.IsEmpty()` -- whether nothing was ever assigned.
@@ -109,6 +123,9 @@ public:
 
   /// \brief AL `Variant.IsDateTime()`. \return True when it holds one.
   [[nodiscard]] bool IsDateTime() const { return Is<DateTime>(); }
+
+  /// \brief AL `Variant.IsDuration()`. \return True when it holds one.
+  [[nodiscard]] bool IsDuration() const { return Is<Duration>(); }
 
   /// \brief AL `Variant.IsGuid()`. \return True when it holds one.
   [[nodiscard]] bool IsGuid() const { return Is<Guid>(); }

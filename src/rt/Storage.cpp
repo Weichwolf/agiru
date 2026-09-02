@@ -92,6 +92,10 @@ std::string ColumnType(const FieldDef &def) {
     // A RecordId is stored as its TEXT, which is what AL code already reads it as: the BaseApp
     // splits `Format(RecordID)` on `': '` to get the primary key back out of it.
     case FieldType::RecordId: return "text";
+    // A Duration IS a count of milliseconds -- `duration-data-type.md` says so outright -- so the
+    // column holds the count and not an interval. An interval would round-trip through the
+    // server's own unit rules, and a Duration has exactly one unit.
+    case FieldType::Duration: return "bigint";
     case FieldType::Blob: return "bytea";
   }
   throw Error("ColumnType: no SQL type for this field type yet");

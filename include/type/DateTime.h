@@ -1,6 +1,7 @@
 #pragma once
 
 #include "type/Date.h"
+#include "type/Duration.h"
 #include "type/Time.h"
 
 #include <compare>
@@ -98,6 +99,27 @@ public:
   /// \brief AL `Format(DateTime, 0, 9)` -- the XML format.
   /// \return `yyyy-mm-ddThh:mm:ss.fffZ`, or the empty string when undefined.
   [[nodiscard]] std::string ToInvariantString() const;
+
+  /// \brief AL `DateTime - DateTime` -- how long lies between them.
+  /// \param o The earlier instant.
+  /// \return The difference; negative when this instant is the earlier one.
+  [[nodiscard]] constexpr Duration operator-(const DateTime &o) const {
+    return Duration{milliseconds_ - o.milliseconds_};
+  }
+
+  /// \brief AL `DateTime + Duration`.
+  /// \param d How long to move forward.
+  /// \return The later instant, or the undefined one when this is undefined.
+  [[nodiscard]] constexpr DateTime operator+(const Duration &d) const {
+    return IsUndefined() ? *this : FromMilliseconds(milliseconds_ + d.Milliseconds());
+  }
+
+  /// \brief AL `DateTime - Duration`.
+  /// \param d How long to move back.
+  /// \return The earlier instant, or the undefined one when this is undefined.
+  [[nodiscard]] constexpr DateTime operator-(const Duration &d) const {
+    return IsUndefined() ? *this : FromMilliseconds(milliseconds_ - d.Milliseconds());
+  }
 
   /// \brief Orders two instants.
   /// \param o The other instant.

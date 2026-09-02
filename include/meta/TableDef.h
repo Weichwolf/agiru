@@ -33,6 +33,7 @@ enum class FieldType : std::uint8_t {
   Blob,
   DateFormula,
   RecordId,
+  Duration,
 };
 
 /// \brief One field's declaration, as static const data.
