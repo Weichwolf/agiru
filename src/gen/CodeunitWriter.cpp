@@ -264,11 +264,61 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
   });
 }
 
-/// Adds the header an index holds for a name, when there is one.
-void Named(const TableIndex &index, const std::string &name, std::set<std::string> &headers) {
-  if (name.empty()) { return; }
-  const auto found = index.find(LowerKey(name));
-  if (found != index.end() && !found->second.header.empty()) {
+std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
+  std::set<std::string> headers;
+  const auto reach = [&](const al::VarDecl &declared) {
+    if (!NamesAnObject(declared)) { return; }
+    const TableRef *ref = Reach(declared, objects);
+    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+  };
+  const auto reachInterface = [&](const al::VarDecl &declared) {
+    if (TypeName(declared.type) != "Interface") { return; }
+    const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+    if (found != objects.interfaces.end() && !found->second.header.empty()) {
+      headers.insert(found->second.header);
+    }
+  };
+  const auto named = [&](const al::VarDecl &declared) {
+    reach(declared);
+    reachInterface(declared);
+  };
+  for (const al::VarDecl &declared : unit.variables) { named(declared); }
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    for (const al::VarDecl &declared : procedure.parameters) { named(declared); }
+    for (const al::VarDecl &declared : procedure.variables) { named(declared); }
+    named(procedure.returned);
+  }
+  std::string out;
+  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  return out;
+}
+
+/// What a declaration needs the header to KNOW: a name for an object, a name for an interface --
+/// which is a pointer -- and the enumeration itself, which is a template argument and not a name.
+template <typename Ahead, typename Enum>
+void Declared(const al::VarDecl &declared, const Objects &objects, Ahead ahead, Enum reachEnum) {
+  if (NamesAnObject(declared)) {
+    const TableRef *ref = Reach(declared, objects);
+    if (ref != nullptr) { ahead(ref->identifier); }
+  }
+  if (TypeName(declared.type) == "Interface") {
+    const auto found = objects.interfaces.find(LowerKey(declared.subtype));
+    if (found != objects.interfaces.end()) { ahead(found->second.identifier); }
+  }
+  if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
+}
+
+/// Adds the header of an enumeration, when the run has one.
+///
+/// AN ENUM NEEDS ITS HEADER even where an object needs only its name: `Enum<enums::X>` is a
+/// TEMPLATE ARGUMENT and a template argument must be complete. Missing it made `LibraryNoSeries`
+/// the first diagnostic of 1 159 failing headers.
+void EnumHeader(const EnumIndex &enums,
+                const std::string &subtype,
+                std::set<std::string> &headers) {
+  if (subtype.empty()) { return; }
+  const auto found = enums.find(LowerKey(subtype));
+  if (found != enums.end() && !found->second.header.empty()) {
     headers.insert(found->second.header);
   }
 }
@@ -286,11 +336,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   // `LibraryNoSeries` names `Enum<enums::NoSeriesImplementation>` and included the table beside it
   // but not the enumeration, which made it the FIRST diagnostic of 1 159 failing headers.
   const auto reachEnum = [&](const std::string &subtype) {
-    if (subtype.empty()) { return; }
-    const auto found = objects.enums.find(LowerKey(subtype));
-    if (found != objects.enums.end() && !found->second.header.empty()) {
-      headers.insert(found->second.header);
-    }
+    EnumHeader(objects.enums, subtype, headers);
   };
   // AN INTERFACE NEEDS ITS HEADER TOO, and it is the third kind this walk has had to learn: a
   // variable names it, the abstract class is somewhere else, and nothing else pulls it in.
@@ -300,17 +346,17 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     if (colons == std::string::npos) { return; }
     forward[qualified.substr(0, colons)].insert(qualified.substr(colons + 2));
   };
+  // INCLUDE WHAT YOU CONTAIN, DECLARE WHAT YOU NAME -- AND A HEADER CONTAINS ONLY ITS MEMBERS.
+  // A function DECLARATION may take and return incomplete types; only a definition or a call needs
+  // the layout, and both of those live in the `.cpp`. Including for parameters too made the include
+  // graph far larger than the containment graph and produced cycles the containment graph does not
+  // have: `Language` holds `LanguageImpl` and `LanguageImpl` holds no codeunit at all, yet their
+  // headers included each other because a parameter named the other.
   const auto both = [&](const al::VarDecl &declared) {
-    reach(declared);
-    if (NamesAnObject(declared)) {
-      const TableRef *ref = Reach(declared, objects);
-      if (ref != nullptr) { ahead(ref->identifier); }
-    }
-    Named(objects.interfaces,
-          TypeName(declared.type) == "Interface" ? declared.subtype : "",
-          headers);
-    if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
+    Declared(declared, objects, ahead, reachEnum);
   };
+  // A MEMBER IS A GLOBAL, so this is the containment graph and nothing else.
+  for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
@@ -511,8 +557,14 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += "#include \"agiru.h\"\n\n";
-  out += "namespace agiru::app::codeunits {\n\n";
+  out += "#include \"agiru.h\"\n";
+  // THE SOURCE INCLUDES WHAT THE HEADER ONLY DECLARED. The header carries the containment graph and
+  // forward-declares everything else, which is what keeps its include graph acyclic; a BODY calls
+  // methods on those objects and needs their layout, so the definitions bring them in. Header
+  // declares, source includes -- and the cycle the header cannot have, the source can, because a
+  // `.cpp` is nobody's dependency.
+  out += SourceIncludes(unit, objects);
+  out += "\nnamespace agiru::app::codeunits {\n\n";
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     // AN EVENT PUBLISHER'S BODY IS EMPTY BY DESIGN -- the platform fires subscribers at the CALL

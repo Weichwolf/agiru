@@ -18,14 +18,22 @@ cd "$(dirname "$0")/.."
 
 APPS=${1:-apps}
 OUT=build/tree-syntax
-LOCK=$OUT/lock
+# THE LOCK LIVES OUTSIDE WHAT THE RUN WIPES. It sat in `$OUT`, which a caller clears before
+# starting -- so clearing it DELETED the lock and a second run began while the first was still
+# appending. That happened: an `xargs` from a killed run stayed alive for 24 minutes, reading the
+# old file list and writing into the new run's tallies, and `passed + failed` came to 6 797 of
+# 6 631. The tally guard caught the count; nothing caught the cause.
+LOCK=$(dirname "$OUT")/tree.lock
 
 mkdir -p "$OUT"
 if ! mkdir "$LOCK" 2>/dev/null; then
   printf 'tree: a run is already in progress (%s). Refusing rather than mixing with it.\n' "$LOCK" >&2
   exit 2
 fi
-trap 'rmdir "$LOCK" 2>/dev/null || true' EXIT INT TERM
+# AND THE WORKERS DIE WITH THE RUN. Killing the script left `xargs` and its children alive for 24
+# minutes, writing into the next run's tallies. The trap takes the CHILDREN and not the process
+# group: `kill 0` reaches the caller's group too, which killed the shell that started the run.
+trap 'rmdir "$LOCK" 2>/dev/null || true; pkill -P $$ 2>/dev/null || true' EXIT INT TERM
 
 [ -d "$APPS" ] || {
   printf 'tree: %s does not exist -- run `make transpile` first\n' "$APPS" >&2
@@ -69,9 +77,27 @@ includes="$includes -include-pch $PCH"
 # header was built" -- which lands in the failure count and looks like 1 701 broken objects. That
 # happened. The lock above stops two RUNS from colliding; this stops a run from colliding with an
 # edit, which is the same mistake wearing different clothes.
-DOORPRINT=$(cat include/agiru.h include/*/*.h | cksum)
+DOORPRINT=$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)
 
 find "$APPS" -name '*.h' | sort > "$OUT/files"
+
+# THE SAME HEADER OVER THE SAME CLOSURE GIVES THE SAME VERDICT, so it is asked once. A run used to
+# compile all 6 630 headers every time, and between two runs a few hundred of them differ -- 25
+# minutes to learn what 24 of them were already going to say.
+#
+# THE KEY IS THE CLOSURE AND NOT THE FILE. A header's result depends on everything it includes, so
+# keying on its own bytes would reuse a verdict for a file that did not change while a header it
+# includes did -- the measurement lying in the direction that is hardest to notice, because it lies
+# in favour of the last good answer. The door's print is part of every key, so a door edit empties
+# the cache by construction. Computing all 6 631 keys costs 3 s (measured).
+CACHE=${AGIRU_TREE_CACHE:-build/tree-cache}
+mkdir -p "$CACHE"
+python3 scripts/tree_keys.py "$DOORPRINT" "$APPS" < "$OUT/files" > "$OUT/keys"
+[ "$(wc -l < "$OUT/keys")" = "$(wc -l < "$OUT/files")" ] || {
+  printf 'tree: one key per header is required and %s of %s came back. ABORT.\n' \
+    "$(wc -l < "$OUT/keys")" "$(wc -l < "$OUT/files")" >&2
+  exit 1
+}
 total=$(wc -l < "$OUT/files" | tr -d ' ')
 # A COUNT OF 0 OVER N UNITS IS AN ABORT, NOT A PASS.
 [ "$total" -gt 0 ] || {
@@ -83,30 +109,49 @@ total=$(wc -l < "$OUT/files" | tr -d ' ')
 : > "$OUT/failed"
 : > "$OUT/errors"
 : > "$OUT/roots"
-xargs -a "$OUT/files" -P "$(nproc)" -I{} sh -c '
+# `-I{}` BRINGS ITS OWN LINE SPLITTING and `-d` overrides it: with both, some lines ran twice and
+# `passed + failed` came to 6 932 of 6 631. The tally guard caught it, which is what it is for.
+xargs -a "$OUT/keys" -P "$(nproc)" -I{} sh -c '
+  file=${1%%	*}
+  hit="$5/${1##*	}"
+  if [ -f "$hit" ]; then
+    if [ "$(head -1 "$hit")" = pass ]; then
+      printf "%s\n" "$file" >> "$3/passed" || exit 1
+    else
+      printf "%s\n" "$file" >> "$3/failed" || exit 1
+      tail -n +2 "$hit" >> "$3/roots"
+    fi
+    exit 0
+  fi
   err=$(mktemp)
-  if clang++ -std=c++23 $4 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic $2 "$1" \
+  unit=$(mktemp --suffix=.cpp)
+  # A HEADER IS INCLUDED, NOT COMPILED: `#pragma once` has no effect in the main file, so a header
+  # reached again through one of its own includes is read twice and every class in it is a
+  # redefinition that a real build never sees.
+  # AN ABSOLUTE PATH, because the unit is written to the system temp directory and a repo-relative
+  # include resolves against the directory of the unit first and the include path second -- neither
+  # of which is the repo root. Every one of 6 631 headers came back "file not found".
+  printf "#include \"%s\"\n" "$(cd "$(dirname "$file")" && pwd)/$(basename "$file")" > "$unit"
+  if clang++ -std=c++23 $4 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic $2 "$unit" \
       2>"$err"; then
-    printf "%s\n" "$1" >> "$3/passed" || exit 1
+    printf "%s\n" "$file" >> "$3/passed" || exit 1
+    printf "pass\n" > "$hit"
   else
-    printf "%s\n" "$1" >> "$3/failed" || exit 1
+    printf "%s\n" "$file" >> "$3/failed" || exit 1
     cat "$err" >> "$3/errors"
     # THE FIRST DIAGNOSTIC IS THE ROOT AND THE REST IS THE CASCADE, WHICH IS WHY THE RUN STOPS AT
-    # IT. `-ferror-limit=1` above is not a shortcut: only the first diagnostic is ever read, so
-    # every one after it was formatted and thrown away -- 1 700 files ran all the way to "too many
-    # errors" emitting hundreds of lines each, for nothing.
-    # clang reports the deepest
-    # include first, so a header that fails because something it includes fails names the OTHER
-    # file here. Counting how often a type is MENTIONED ranked symptoms as causes twice in one
-    # session: `LibraryVariableStorage` looked like the third-largest gap and was a missing source
-    # root, and `LibraryLowerPermissions` looked like a gap and is `DotNet` two includes down.
+    # IT. clang reports the deepest include first, so a header that fails because something it
+    # includes fails names the OTHER file here. Counting how often a type is MENTIONED ranked
+    # symptoms as causes twice in one session.
     first=$(grep -m1 -E "error: " "$err")
-    printf "%s\t%s\t%s\n" "$1" \
+    root=$(printf "%s	%s	%s" "$file" \
       "$(printf "%s" "$first" | sed -E "s/:[0-9]+:[0-9]+: (fatal )?error: .*//")" \
-      "$(printf "%s" "$first" | sed -E "s/^.*: (fatal )?error: //")" >> "$3/roots"
+      "$(printf "%s" "$first" | sed -E "s/^.*: (fatal )?error: //")")
+    printf "%s\n" "$root" >> "$3/roots"
+    { printf "fail\n"; printf "%s\n" "$root"; } > "$hit"
   fi
   rm -f "$err" "$unit"
-' _ {} "$includes" "$OUT" "$OPT"
+' _ {} "$includes" "$OUT" "$OPT" "$CACHE"
 
 # BOTH TALLIES ARE READ, NEITHER IS DERIVED, AND THEY MUST ADD UP.
 for f in passed failed; do
@@ -115,7 +160,10 @@ for f in passed failed; do
     exit 1
   }
 done
-if [ "$(cat include/agiru.h include/*/*.h | cksum)" != "$DOORPRINT" ]; then
+# THE SAME PRINT AT BOTH ENDS. This compared a `cksum` against a `sha1sum` after the print changed
+# at the top and not here, so it fired on every run -- a guard that always fires says as little as
+# one that never does, and this one turned a four-minute measurement into an abort.
+if [ "$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)" != "$DOORPRINT" ]; then
   printf 'tree: the door changed while the run was measuring it. ABORT, not a number.\n' >&2
   exit 1
 fi

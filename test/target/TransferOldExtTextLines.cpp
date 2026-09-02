@@ -4,6 +4,8 @@
 
 #include "agiru.h"
 
+#include "LineNumberBuffer.h"
+
 namespace agiru::app::codeunits {
 
 void TransferOldExtTextLines::OnRun() {}
