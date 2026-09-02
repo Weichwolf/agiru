@@ -9,6 +9,7 @@
 #include "runtime/Error.h"
 #include "runtime/Indexing.h"
 #include "runtime/Record.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
