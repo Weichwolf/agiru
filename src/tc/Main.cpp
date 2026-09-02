@@ -20,6 +20,7 @@
 #include <map>
 #include <memory>
 #include <print>
+#include <ranges>
 #include <set>
 #include <span>
 #include <sstream>
@@ -298,30 +299,12 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
 // for two lines of header. The object's kind, name and namespace are all on its declaration line.
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
-    const std::string source = Read(path);
-    const std::size_t at = source.find("\ncodeunit ");
-    if (at == std::string::npos) { continue; }
-    const std::size_t eol = source.find('\n', at + 1);
-    const std::string header = source.substr(at + 1, eol == std::string::npos ? eol : eol - at - 1);
-    const std::size_t quote = header.find('"');
-    std::string name;
-    if (quote != std::string::npos) {
-      const std::size_t close = header.find('"', quote + 1);
-      name = header.substr(quote + 1, close - quote - 1);
-    } else {
-      std::istringstream words(header);
-      std::string word;
-      words >> word >> word >> name;
-    }
-    if (name.empty()) { continue; }
+    const agiru::gen::ObjectDeclaration declared =
+        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Codeunit);
+    if (!declared.found) { continue; }
+    const std::string &name = declared.name;
+    const std::string &nameSpace = declared.nameSpace;
 
-    std::string nameSpace;
-    const std::size_t ns = source.find("namespace ");
-    if (ns != std::string::npos && ns < at) {
-      const std::size_t end = source.find(';', ns);
-      nameSpace = source.substr(ns + std::string("namespace ").size(),
-                                end - ns - std::string("namespace ").size());
-    }
     const std::string identifier = agiru::gen::Identifier(name);
     objects.codeunits.insert_or_assign(
         agiru::gen::LowerKey(name),
@@ -391,6 +374,8 @@ void ScanCodeunits(Run &run,
 // AN UNRESOLVED ENUM IS REPORTED, NOT SWALLOWED. It is not a defect in the table that names it: the
 // declaration lives in a layer this run was not given, and the count is what says how much the next
 // layer is worth.
+constexpr std::size_t kUnresolvedShown = 10;
+
 void ReportUnresolved(std::string_view what,
                       std::string_view by,
                       const std::map<std::string, std::size_t> &unresolved) {
@@ -402,6 +387,15 @@ void ReportUnresolved(std::string_view what,
                what,
                uses,
                by);
+  // AND WHICH ONES, because a bare count cannot be ranked and a list that cannot be ranked cannot
+  // decide the next piece of work. The ones named most are the platform's own objects -- the
+  // virtual `Field` table and its neighbours -- and they are what the count is really about.
+  std::vector<std::pair<std::string, std::size_t>> ranked(unresolved.begin(), unresolved.end());
+  std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+  const std::size_t shown = std::min<std::size_t>(ranked.size(), kUnresolvedShown);
+  for (std::size_t i = 0; i < shown; ++i) {
+    std::println("          {:>5} x {}", ranked[i].second, ranked[i].first);
+  }
 }
 
 // THE GENERATOR STILL OWNS ITS OUTPUT DIRECTORY, and it owns it by SWEEPING rather than by wiping.

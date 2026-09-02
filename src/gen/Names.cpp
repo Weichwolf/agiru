@@ -1,9 +1,12 @@
 #include "Names.h"
 
+#include "Scope.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -137,6 +140,59 @@ std::string TypeName(std::string_view alType) {
   // An unknown type keeps its AL spelling, so that it fails at the `#include` under the name AL
   // gave it rather than under one this table invented.
   return found != kCanonical.end() ? std::string(*found) : std::string(alType);
+}
+
+namespace {
+
+std::string_view KeywordOf(ObjectKind kind) {
+  switch (kind) {
+    case ObjectKind::Table: return "table";
+    case ObjectKind::Codeunit: return "codeunit";
+    case ObjectKind::Page: return "page";
+    case ObjectKind::Report: return "report";
+    case ObjectKind::Query: return "query";
+    case ObjectKind::XmlPort: return "xmlport";
+    case ObjectKind::Enum: return "enum";
+    case ObjectKind::Interface: return "interface";
+    case ObjectKind::PermissionSet: return "permissionset";
+  }
+  return {};
+}
+
+} // namespace
+
+ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
+  const std::string wanted = std::string(KeywordOf(kind)) + " ";
+  const bool atStart = source.starts_with(wanted);
+  const std::size_t found = atStart ? 0 : source.find("\n" + wanted);
+  if (found == std::string_view::npos) { return {}; }
+
+  const std::size_t at = atStart ? 0 : found + 1;
+  const std::size_t eol = source.find('\n', at);
+  const std::string_view line = source.substr(at, eol == std::string_view::npos ? eol : eol - at);
+
+  ObjectDeclaration declared;
+  declared.found = true;
+  const std::size_t quote = line.find('"');
+  if (quote != std::string_view::npos) {
+    const std::size_t close = line.find('"', quote + 1);
+    declared.name = std::string(line.substr(quote + 1, close - quote - 1));
+  } else {
+    std::istringstream words{std::string(line)};
+    std::string word;
+    words >> word >> word >> declared.name;
+  }
+  if (declared.name.empty()) { return {}; }
+
+  // THE NAMESPACE MUST STAND ABOVE THE OBJECT. One found after it belongs to nothing this file
+  // declares, and a declaration on line 1 can have none at all.
+  const std::size_t ns = source.find("namespace ");
+  if (ns != std::string_view::npos && ns < at) {
+    const std::size_t end = source.find(';', ns);
+    const std::size_t from = ns + std::string("namespace ").size();
+    declared.nameSpace = std::string(source.substr(from, end - from));
+  }
+  return declared;
 }
 
 } // namespace agiru::gen
