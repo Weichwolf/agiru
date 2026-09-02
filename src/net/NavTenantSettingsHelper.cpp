@@ -1,8 +1,8 @@
 #include "dotnet/NavTenantSettingsHelper.h"
 
+#include "platform/Tenant.h"
 #include "runtime/Error.h"
 #include "runtime/Session.h"
-#include "platform/Tenant.h"
 #include "type/Boolean.h"
 
 #include <string>

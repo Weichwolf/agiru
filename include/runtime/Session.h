@@ -1,8 +1,8 @@
 #pragma once
 
+#include "platform/Tenant.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
-#include "platform/Tenant.h"
 #include "runtime/Transaction.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
