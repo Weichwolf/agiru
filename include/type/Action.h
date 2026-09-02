@@ -15,8 +15,8 @@ enum class Action : std::int32_t {
   None, ///< Represents the result of running a page.
   OK,   ///< Represents the result of the user closing a page window by performing one of the
         ///< following actions:<br/>      - Chooses the **OK** button.<br/>      - Chooses the **X**
-      ///< button when there was no **Cancel** button on the window.<br/>      - Presses the Esc key
-      ///< when there is no **Cancel** button on the window.
+  ///< button when there was no **Cancel** button on the window.<br/>      - Presses the Esc key
+  ///< when there is no **Cancel** button on the window.
   Cancel, ///< Represents the result of the user closing a page window by performing one of the
           ///< following actions:<br/>      - Chooses the **Cancel** button.<br/>      - Chooses the
           ///< **X** button when there is a **Cancel** button on the window.<br/>      - Presses the

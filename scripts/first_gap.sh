@@ -43,7 +43,10 @@ trap 'rm -f "$unit" "$err"' EXIT
 # compiled directly that is reached again through one of its own includes is read twice and every
 # class in it is a redefinition -- the measurement lying about a tree a real build is fine with.
 compiles() {
-  printf '#include "%s/%s"\n' "$PWD" "$1" > "$unit"
+  case $1 in
+    /*) printf '#include "%s"\n' "$1" > "$unit" ;;
+    *) printf '#include "%s/%s"\n' "$PWD" "$1" > "$unit" ;;
+  esac
   clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic \
     $includes "$unit" 2>"$err"
 }

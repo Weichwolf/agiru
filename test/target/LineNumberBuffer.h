@@ -12,6 +12,9 @@
 
 namespace agiru::app::tables {
 
+class LineNumberBuffer_Table;
+using LineNumberBuffer = LineNumberBuffer_Table;
+
 class LineNumberBuffer_Table : public Table<LineNumberBuffer_Table> {
 public:
   static constexpr TableId kId{283};
@@ -27,8 +30,6 @@ public:
 
   static constexpr std::array<FieldNo, 1> kKey1{{Field_No::OldLineNumber}};
 };
-
-using LineNumberBuffer = LineNumberBuffer_Table;
 
 inline constexpr std::array<FieldDef, 2> kLineNumberBufferFields{{
     Declare<&LineNumberBuffer::OldLineNumber>(LineNumberBuffer::Field_No::OldLineNumber,

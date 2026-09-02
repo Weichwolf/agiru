@@ -44,6 +44,9 @@ template <> struct agiru::OptionTraits<agiru::app::tables::ResourceCostCostType>
 
 namespace agiru::app::tables {
 
+class ResourceCost_Table;
+using ResourceCost = ResourceCost_Table;
+
 class ResourceCost_Table : public Table<ResourceCost_Table> {
 public:
   static constexpr TableId kId{202};
@@ -80,8 +83,6 @@ public:
   void OnValidateCode();
   void OnValidateCostType();
 };
-
-using ResourceCost = ResourceCost_Table;
 
 inline constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::array<FieldDef, 6>{{
     Declare<&ResourceCost::Type>(

@@ -80,12 +80,23 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
 // one AL field, two C++ identifiers, and the second names nothing. The key is therefore resolved
 // against the DECLARED fields rather than spelled out as written, which is the collapse-match the
 // generator already does for type names.
+// AND TWO DIFFERENT AL NAMES MAY COLLAPSE INTO ONE IDENTIFIER. `Email Related Record` declares
+// `field(3; "System Id"; Guid)` -- the SystemId of the record the mail relates to -- beside the
+// platform's own `SystemId`, and both are legal AL because the space makes them different names.
+// Identifier() removes the space, so the second one carries its FIELD NUMBER: a visible, uniform
+// deviation rather than a silently dropped field, and the number is what AL itself would use to
+// tell them apart.
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
-  const std::string wanted = LowerKey(Identifier(name));
+  std::set<std::string> taken;
+  std::string collapsed;
   for (const al::FieldDecl &field : table.fields) {
-    if (LowerKey(Identifier(field.name)) == wanted) { return Identifier(field.name); }
+    const std::string bare = Identifier(field.name);
+    const bool collides = !taken.insert(LowerKey(bare)).second;
+    const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
+    if (LowerKey(field.name) == LowerKey(name)) { return spelled; }
+    if (collapsed.empty() && LowerKey(bare) == LowerKey(Identifier(name))) { collapsed = spelled; }
   }
-  return Identifier(name);
+  return collapsed.empty() ? Identifier(name) : collapsed;
 }
 
 std::string KeyArrayName(std::size_t position) {
@@ -288,6 +299,10 @@ TableHeader WriteHeader(const al::TableObject &declared,
 
   out += "namespace agiru::app::tables {\n\n";
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  // THE ALIAS COMES BEFORE THE CLASS, because a member may name the object's own type: a codeunit
+  // returns `Codeunit "Http Request Message Impl."` and a table holds a filter on itself. Declared
+  // after the class, the AL name is not yet known inside it.
+  out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
   out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";
@@ -299,14 +314,14 @@ TableHeader WriteHeader(const al::TableObject &declared,
   // without the braces an Integer field of a fresh record holds whatever was on the stack.
   for (const al::FieldDecl &field : table.fields) {
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
-           Identifier(field.name) + "{};\n";
+           FieldIdentifier(table, field.name) + "{};\n";
   }
 
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
   out += "\n  struct Field_No : SystemFieldNumbers {\n";
   for (const al::FieldDecl &field : table.fields) {
     if (IsSystemField(field)) { continue; }
-    out += "    static constexpr " + fieldNo + " " + Identifier(field.name) + "{" +
+    out += "    static constexpr " + fieldNo + " " + FieldIdentifier(table, field.name) + "{" +
            std::to_string(field.number) + "};\n";
   }
   out += "  };\n\n";
@@ -318,8 +333,8 @@ TableHeader WriteHeader(const al::TableObject &declared,
   // lower-case k, since Identifier() upper-cases the first letter of every AL name. The AL name is
   // not lost -- it stands beside the array in the KeyDef, which is where a reader looks for it.
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
-    out += "  static constexpr std::array<FieldNo, " + std::to_string(table.keys[i].fields.size()) +
-           "> " + KeyArrayName(i) + "{{";
+    out += "  static constexpr std::array<" + Reach(table, "FieldNo", "FieldNo") + ", " +
+           std::to_string(table.keys[i].fields.size()) + "> " + KeyArrayName(i) + "{{";
     for (std::size_t f = 0; f < table.keys[i].fields.size(); ++f) {
       if (f != 0) { out += ", "; }
       out += "Field_No::" + FieldIdentifier(table, table.keys[i].fields[f]);
@@ -335,11 +350,10 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
-      out += "  void " + trigger.name + Identifier(field.name) + "();\n";
+      out += "  void " + trigger.name + FieldIdentifier(table, field.name) + "();\n";
     }
   }
   out += "};\n\n";
-  out += ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
 
   out += FieldTable(sorted, tableIdentifier);
 

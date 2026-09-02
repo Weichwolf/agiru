@@ -82,8 +82,10 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
     }
   }
   const TableRef *ref = ReachObject(declared, objects);
-  if (ref == nullptr) { return; }
-  if ((complete || declared.temporary) && !ref->header.empty()) {
+  // A PLATFORM TABLE ARRIVES WITH THE DOOR: no header to include and nothing to declare ahead,
+  // because `platform::Field` is `agiru::platform::Field` and not an object in `agiru::app`.
+  if (ref == nullptr || ref->header.empty()) { return; }
+  if (complete || declared.temporary) {
     reached.headers.insert(ref->header);
     return;
   }
@@ -168,6 +170,7 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
   if (!fields.empty() && !actions.empty()) { out += "\n"; }
   WriteControls(out, actions, "TestAction", taken);
   out += "};\n\n";
+  out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
@@ -184,7 +187,6 @@ PageHeader WritePage(const al::PageObject &object, const std::string &source,
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
 
   out += "};\n\n";
-  out += ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "} // namespace agiru::app::pages\n\n";
   out += "template <> struct agiru::PageTraits<agiru::app::pages::" + identifier + "> {\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";

@@ -1,11 +1,10 @@
 #pragma once
 
-#include "type/NotificationScope.h"
-
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/NotificationScope.h"
 #include "type/Text.h"
 
 #include <cstdint>
@@ -16,7 +15,6 @@
 /// \brief AL `Notification` -- a message the client shows beside the user's work.
 
 namespace agiru {
-
 
 /// \brief AL `Notification`.
 ///

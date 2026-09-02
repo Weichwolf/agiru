@@ -17,6 +17,9 @@ using LineNumberBuffer = LineNumberBuffer_Table;
 
 namespace agiru::app::codeunits {
 
+class TransferOldExtTextLines_Codeunit;
+using TransferOldExtTextLines = TransferOldExtTextLines_Codeunit;
+
 class TransferOldExtTextLines_Codeunit : public Codeunit<TransferOldExtTextLines_Codeunit> {
 public:
   void OnRun();
@@ -36,8 +39,6 @@ private:
                                     Integer &Result,
                                     Boolean &IsHandled);
 };
-
-using TransferOldExtTextLines = TransferOldExtTextLines_Codeunit;
 
 } // namespace agiru::app::codeunits
 

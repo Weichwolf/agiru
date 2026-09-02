@@ -8,6 +8,7 @@
 #include "Token.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <map>
 #include <set>
@@ -28,7 +29,12 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
 
 bool NamesAnObject(const al::VarDecl &declared) {
   const std::string type = TypeName(declared.type);
-  return (type == "Record" || type == "Codeunit" || type == "Page") && !declared.subtype.empty();
+  // AN OBJECT KIND WITH NO GENERATOR YET STILL NAMES AN OBJECT. `Report "X"`, `Query "X"`,
+  // `XmlPort "X"` and `ControlAddIn "X"` resolve to nothing, which makes them `absent::X` -- the
+  // same shape an untranslated table takes, and a refusal that names what it wanted (board:0034).
+  return (type == "Record" || type == "Codeunit" || type == "Page" || type == "Report" ||
+          type == "Query" || type == "XmlPort" || type == "ControlAddIn") &&
+         !declared.subtype.empty();
 }
 
 // A type as it stands in a DECLARATION. `Record "X"` is the generated class, `Record "X" temporary`
@@ -37,8 +43,8 @@ bool NamesAnObject(const al::VarDecl &declared) {
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
   const TableIndex &index = type == "Codeunit" ? objects.codeunits
-                           : type == "Page"     ? objects.pages
-                                                : objects.tables;
+                            : type == "Page"   ? objects.pages
+                                               : objects.tables;
   const auto found = index.find(LowerKey(declared.subtype));
   return found != index.end() ? &found->second : nullptr;
 }
@@ -95,9 +101,7 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
   // A `Page` VARIABLE IS THE PAGE, the way a `Record` variable is the table: AL writes
   // `SalesOrderPage.RunModal()` on an instance. Only `TestPage` is a template, because the headless
   // page is a DIFFERENT type that wraps the page rather than being one.
-  if (type == "Record" || type == "Codeunit" || type == "Page") {
-    return ObjectType(declared, objects);
-  }
+  if (NamesAnObject(declared)) { return ObjectType(declared, objects); }
   // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
   // arguments -- which is not a type at all. The index is the same one a table field uses.
   // A DotNet VARIABLE IS TYPED BY ITS SUBTYPE, and the subtype was being thrown away: every one of
@@ -174,28 +178,80 @@ OptionName(const std::string &unit, const std::string &within, const std::string
 // measured 2026-09-02, because `LibraryAssert` writes `RecordRef: RecordRef` and one bad
 // qualification in it stops every header that includes it. An AL object -- a Record or a Codeunit
 // -- becomes a class in `agiru::app`; every other AL type is a DOOR type and lives in `agiru`.
+/// Whether any identifier inside a type is hidden by a name in the object's own scope.
+///
+/// A TEMPLATE ARGUMENT IS HIDDEN JUST AS THE OUTER TYPE IS. `MatchBankPayments` declares a member
+/// called `Code` and then `Dictionary of [Integer, List of [Code[35]]]`, where only the innermost
+/// name collides. So every identifier is asked, and one that follows `::` is skipped -- it is
+/// already qualified and belongs to whatever named it.
+bool Hidden(const std::string &type, const std::set<std::string> &names) {
+  for (std::size_t i = 0; i < type.size();) {
+    if (std::isalpha(static_cast<unsigned char>(type[i])) == 0 && type[i] != '_') {
+      ++i;
+      continue;
+    }
+    std::size_t end = i;
+    while (end < type.size() &&
+           (std::isalnum(static_cast<unsigned char>(type[end])) != 0 || type[end] == '_')) {
+      ++end;
+    }
+    const bool qualified = i >= 2 && type[i - 1] == ':' && type[i - 2] == ':';
+    if (!qualified && names.contains(type.substr(i, end - i))) { return true; }
+    i = end;
+  }
+  return false;
+}
+
+/// Every name declared in an object's own scope, because each of them hides a type of that name for
+/// the whole class. `Any` declares `procedure Boolean(): Boolean` and the member wins from there
+/// on.
+std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
+                                const std::vector<al::ProcedureDecl> &procedures,
+                                const std::vector<al::LabelDecl> &labels) {
+  std::set<std::string> names;
+  for (const al::VarDecl &declared : variables) { names.insert(Identifier(declared.name)); }
+  for (const al::ProcedureDecl &procedure : procedures) {
+    names.insert(Identifier(procedure.name));
+  }
+  for (const al::LabelDecl &label : labels) { names.insert(Identifier(label.name)); }
+  return names;
+}
+
 std::string Qualified(const al::VarDecl &declared, const std::string &type) {
   const std::string alType = TypeName(declared.type);
   const bool object = alType == "Record" || alType == "Codeunit";
   return (object ? "agiru::app::" : "agiru::") + type;
 }
 
-std::string
-Signature(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {}) {
+/// A PARAMETER NAME HIDES A TYPE NAME FOR EVERY PARAMETER AFTER IT, not only for its own.
+/// `AccPeriodStartEnd(Date: Date; var StartDate: Date; ...)` declares a parameter called `Date`
+/// and then two more of type `Date`, and C++ resolves the later ones to the parameter. So the
+/// question is not whether THIS parameter is named after its type; it is whether ANY parameter in
+/// the signature is named after this one's type.
+std::string Signature(const al::VarDecl &declared,
+                      const Objects &objects,
+                      const std::set<std::string> &names,
+                      const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
-  if (type == Identifier(declared.name)) { type = Qualified(declared, type); }
+  if (Hidden(type, names)) { type = Qualified(declared, type); }
   return type + (declared.byReference ? " &" : " ");
 }
 
 std::string Parameters(const al::ProcedureDecl &procedure,
                        const Objects &objects,
                        bool named,
-                       const std::string &unit) {
+                       const std::string &unit,
+                       const std::set<std::string> &shadowed = {}) {
+  std::set<std::string> names = shadowed;
+  for (const al::VarDecl &parameter : procedure.parameters) {
+    names.insert(Identifier(parameter.name));
+  }
   std::string out;
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
     out += Signature(procedure.parameters[i],
                      objects,
+                     names,
                      OptionName(unit, procedure.name, procedure.parameters[i].name));
     if (named) { out += Identifier(procedure.parameters[i].name); }
   }
@@ -227,15 +283,14 @@ std::string InlineOptionsIn(const std::string &owner,
     const auto seen = emitted.find(name);
     if (seen != emitted.end()) {
       if (seen->second != declared.members) {
-        throw std::runtime_error("\"" + owner + "\" declares two different options under the name " +
-                                 name);
+        throw std::runtime_error("\"" + owner +
+                                 "\" declares two different options under the name " + name);
       }
       return;
     }
     emitted.insert_or_assign(name, declared.members);
     const std::vector<std::string> names = EnumeratorNames(declared.members);
-    out += "namespace agiru::app::" + space + " {\n\nenum class " + name +
-           " : std::int32_t {\n";
+    out += "namespace agiru::app::" + space + " {\n\nenum class " + name + " : std::int32_t {\n";
     for (std::size_t i = 0; i < names.size(); ++i) {
       out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
     }
@@ -262,23 +317,29 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
   return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
 }
 
-std::string Returns(const al::ProcedureDecl &procedure, const Objects &objects) {
+std::string Returns(const al::ProcedureDecl &procedure,
+                    const Objects &objects,
+                    const std::set<std::string> &shadowed = {}) {
   if (procedure.returnType.empty()) { return "void"; }
-  return TypeOf(procedure.returned, objects);
+  const std::string type = TypeOf(procedure.returned, objects);
+  return Hidden(type, shadowed) ? Qualified(procedure.returned, type) : type;
 }
 
-std::string
-Declaration(const al::ProcedureDecl &procedure, const Objects &objects, const std::string &unit) {
-  return "  " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
-         Parameters(procedure, objects, true, unit) + ");\n";
+std::string Declaration(const al::ProcedureDecl &procedure,
+                        const Objects &objects,
+                        const std::string &unit,
+                        const std::set<std::string> &shadowed = {}) {
+  std::set<std::string> hiding = shadowed;
+  hiding.insert(Identifier(procedure.name));
+  return "  " + Returns(procedure, objects, hiding) + " " + Identifier(procedure.name) + "(" +
+         Parameters(procedure, objects, true, unit, hiding) + ");\n";
 }
 
 bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
   const auto absent = [&objects](const al::VarDecl &declared) {
     const std::string type = TypeName(declared.type);
     if (type == "DotNet") { return true; }
-    return (type == "Record" || type == "Codeunit") && !declared.subtype.empty() &&
-           Reach(declared, objects) == nullptr;
+    return NamesAnObject(declared) && Reach(declared, objects) == nullptr;
   };
   if (std::ranges::any_of(unit.variables, absent)) { return true; }
   return std::ranges::any_of(unit.procedures, [&absent](const al::ProcedureDecl &procedure) {
@@ -353,7 +414,10 @@ void Declared(const al::VarDecl &declared,
   if (NamesAPage(TypeName(declared.type))) { reachPage(declared.subtype); }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr) { ahead(ref->identifier); }
+    // A PLATFORM TABLE ARRIVES WITH THE DOOR and its entry carries no header, so there is nothing
+    // to forward declare and nothing to include -- `platform::Field` is `agiru::platform::Field`,
+    // not an object in `agiru::app` that this file could declare ahead of itself.
+    if (ref != nullptr && !ref->header.empty()) { ahead(ref->identifier); }
   }
   if (TypeName(declared.type) == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
@@ -416,7 +480,9 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     // AND A PROCEDURE'S OWN VARIABLES, which were never walked at all: a local `Record` or `Enum`
     // is as much a declaration as a parameter is.
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
-    if (TypeName(procedure.returnType) == "Enum") { reachEnum(procedure.returnSubtype); }
+    // AND THE RETURN, which is a declaration like any other: `GetAltCustVATRegConsistencyImpl`
+    // returns an interface and nothing else in the file names it.
+    both(procedure.returned);
   }
   // A CODEUNIT THAT NAMES A .NET TYPE INCLUDES THE GENERATED SURFACE. It is one file for all of
   // them, because the stubs reference nothing but `Refused` and splitting them would be 499 headers
@@ -457,9 +523,15 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
 // only in what follows, which this does not need.
 using DotNetNames = std::map<std::string, std::string>;
 
-void NoteDotNet(const al::VarDecl &declared, DotNetNames &named) {
+/// A DECLARATION IS ENOUGH TO OWE THE TYPE, and a call is not required. `O365SyncManagement`
+/// takes `Credentials: DotNet ExchangeCredentials` as a parameter and never calls a member on it,
+/// so gathering only the CALL SITES left the signature naming a class nobody wrote. The entry is
+/// created empty and filled if a member turns up.
+void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use) {
   if (TypeName(declared.type) == "DotNet" && !declared.subtype.empty()) {
-    named.insert_or_assign(LowerKey(declared.name), Identifier(declared.subtype));
+    const std::string bare = Identifier(declared.subtype);
+    named.insert_or_assign(LowerKey(declared.name), bare);
+    use.try_emplace(bare);
   }
 }
 
@@ -492,9 +564,7 @@ void NoteAbsent(const al::VarDecl &declared,
     use.try_emplace(bare);
     return;
   }
-  const std::string type = TypeName(declared.type);
-  if (type != "Record" && type != "Codeunit") { return; }
-  if (declared.subtype.empty() || Reach(declared, objects) != nullptr) { return; }
+  if (!NamesAnObject(declared) || Reach(declared, objects) != nullptr) { return; }
   const std::string subtype = Identifier(declared.subtype);
   named.insert_or_assign(LowerKey(declared.name), subtype);
   use.try_emplace(subtype);
@@ -507,7 +577,7 @@ void GatherDotNet(const al::CodeunitObject &unit,
   DotNetNames named;
   DotNetNames missing;
   for (const al::VarDecl &declared : unit.variables) {
-    NoteDotNet(declared, named);
+    NoteDotNet(declared, named, use);
     NoteAbsent(declared, objects, missing, absent);
   }
 
@@ -515,11 +585,11 @@ void GatherDotNet(const al::CodeunitObject &unit,
     DotNetNames inner = named;
     DotNetNames innerMissing = missing;
     for (const al::VarDecl &declared : procedure.parameters) {
-      NoteDotNet(declared, inner);
+      NoteDotNet(declared, inner, use);
       NoteAbsent(declared, objects, innerMissing, absent);
     }
     for (const al::VarDecl &declared : procedure.variables) {
-      NoteDotNet(declared, inner);
+      NoteDotNet(declared, inner, use);
       NoteAbsent(declared, objects, innerMissing, absent);
     }
     GatherCalls(procedure, inner, use);
@@ -709,6 +779,7 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   out += "\nnamespace agiru::app::interfaces {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
+  out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";
   out += "class " + faceClass + " {\n";
   out += "public:\n";
   // A CLASS SOMEBODY DERIVES FROM NEEDS A VIRTUAL DESTRUCTOR, and an interface is only ever
@@ -718,8 +789,7 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
   }
-  out += "};\n\n" + ClassAlias(identifier, ObjectKind::Interface) +
-         "\n} // namespace agiru::app::interfaces\n";
+  out += "};\n\n} // namespace agiru::app::interfaces\n";
   DotNetUse missing;
   DotNetNames named;
   for (const al::ProcedureDecl &procedure : object.procedures) {
@@ -735,6 +805,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
                              const Objects &objects) {
   const std::string identifier = Identifier(unit.name);
+  const std::set<std::string> shadowed = Shadowing(unit.variables, unit.procedures, unit.labels);
 
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
@@ -746,6 +817,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
 
   out += "namespace agiru::app::codeunits {\n\n";
   const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
+  out += "class " + unitClass + ";\n" + ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
   out += "class " + unitClass + " : public Codeunit<" + unitClass + "> {\npublic:\n";
 
   // PUBLIC BEFORE PRIVATE, AND `local` IS WHAT DECIDES IT. AL's `local procedure` is exactly C++'s
@@ -760,17 +832,18 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (procedure.isLocal) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
-    out += Declaration(procedure, objects, unit.name);
+    out += Declaration(procedure, objects, unit.name, shadowed);
     previousWasTrigger = procedure.isTrigger;
     first = false;
   }
 
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    const std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    if (Hidden(type, shadowed)) { type = Qualified(declared, type); }
     const bool handle = NamesACodeunit(declared) && Reach(declared, objects) != nullptr;
-    hidden += "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) +
-              ";\n";
+    hidden +=
+        "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) + ";\n";
   }
   if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
   for (const al::LabelDecl &label : unit.labels) {
@@ -780,7 +853,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!procedure.isLocal) { continue; }
-    locals += Declaration(procedure, objects, unit.name);
+    locals += Declaration(procedure, objects, unit.name, shadowed);
   }
   if (!hidden.empty() || !locals.empty()) {
     out += "\nprivate:\n";
@@ -789,7 +862,6 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += locals;
   }
   out += "};\n\n";
-  out += ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
   out += "} // namespace agiru::app::codeunits\n\n";
 
   out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
