@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
 #include <vector>
 
 /// \file
@@ -33,6 +34,13 @@ struct SortField {
 ///
 /// \note IT TRAVELS WITH `Copy` AND DIES WITH THE VARIABLE. `Rec2.Copy(Rec)` takes the filters with
 ///       it because they are the variable's own state, which is AL's rule.
+/// \brief A cursor the runtime holds open. Defined in `src/rt`, opaque to the door.
+struct OpenCursor;
+
+/// \brief Frees a cursor `FindSet` opened.
+/// \param open The cursor, which may be null.
+void Close(OpenCursor *open);
+
 struct RecordState {
   std::vector<FieldFilter> filters; ///< AND across fields and groups.
   std::vector<SortField> key;       ///< `SetCurrentKey`; empty means the primary key.
@@ -43,15 +51,59 @@ struct RecordState {
   std::vector<std::string> marks;
   bool markedOnly = false; ///< `MarkedOnly(true)`.
 
-  /// \brief What the last `FindSet` read, and where `Next` stands in it.
+  /// \brief The cursor `FindSet` opened, if one is open.
   ///
-  /// \note THE WHOLE SET, because `FindSet` requests all matching rows in one query --
-  ///       `record-findset-boolean-method.md` says so, and it is what separates it from `Find`,
-  ///       which pages. A set too large for memory is the scaling gap the predecessor never closed
-  ///       either (openerp WI-889), and it is named rather than pretended away.
-  std::vector<std::string> rows;
-  std::size_t cursor = 0;  ///< Where `Next` stands.
+  /// \note A SERVER-SIDE CURSOR AND NOT A RESULT SET. `FindSet` on a table with a hundred million
+  ///       rows must not put the rows in the session -- SQL Server declares a cursor and BC is
+  ///       written against that, so this does the same over PostgreSQL. The type is opaque here
+  ///       because the door may not name libpq: `runtime/Table.h` is parsed by every one of the
+  ///       generated translation units.
+  OpenCursor *open = nullptr;
+
+  /// \brief How many rows `Next` has stepped since `FindSet`.
+  std::size_t stepped = 0;
+
   bool positioned = false; ///< Whether a `Find` put it anywhere.
+
+  /// \brief A state that has filtered nothing.
+  RecordState() = default;
+
+  /// \brief Copies the filters and the key; the cursor is not shared.
+  /// \param o The other.
+  ///
+  /// \note `Rec2 := Rec` COPIES WHAT THE VARIABLE DECLARES AND NOT WHERE IT STANDS. Two record
+  ///       variables are two positions in AL, and a shared cursor would step both at once -- so the
+  ///       copy carries the filters, the key and the marks, and finds its own set.
+  RecordState(const RecordState &o)
+      : filters(o.filters),
+        key(o.key),
+        ascending(o.ascending),
+        group(o.group),
+        marks(o.marks),
+        markedOnly(o.markedOnly) {}
+
+  /// \brief Copies the filters and the key; the cursor is not shared.
+  /// \param o The other.
+  /// \return This state.
+  RecordState &operator=(const RecordState &o) {
+    if (this != &o) {
+      RecordState copy(o);
+      Close(open);
+      open = nullptr;
+      stepped = 0;
+      positioned = false;
+      filters = std::move(copy.filters);
+      key = std::move(copy.key);
+      ascending = copy.ascending;
+      group = copy.group;
+      marks = std::move(copy.marks);
+      markedOnly = copy.markedOnly;
+    }
+    return *this;
+  }
+
+  /// \brief Closes the cursor, if one is open.
+  ~RecordState() { Close(open); }
 };
 
 /// \brief The record variable's state, owned, copied and freed with the record.

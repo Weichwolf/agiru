@@ -208,6 +208,21 @@ void TestFieldValue(const void *record, const TableDef &table, FieldNo no, const
       record, table, *def, detail::TextOf(expected, *def), FieldText(record, *def));
 }
 
+/// \brief AL `Format(Any)`, declared here because `TextOf` below calls it.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return Its text.
+///
+/// \warning THE DECLARATION HAS TO PRECEDE THE CALL AND ADL DOES NOT SAVE IT. `TextOf` falls back
+///          to `Format` for a value that is neither string-like, `ToText`-able nor arithmetic, and
+///          the value that reaches that branch is usually a GENERATED enum -- which lives in
+///          `agiru::app::tables`, so argument-dependent lookup never reaches `agiru`. Defined
+///          below; only the declaration belongs up here.
+template <typename T>
+  requires(!std::convertible_to<const T &, const Variant &>)
+[[nodiscard]] std::string Format(const T &value);
+
 /// \brief AL `Format(Value)` for an option -- its caption.
 ///
 /// \tparam E The option's enumeration.
@@ -238,6 +253,8 @@ template <typename T> [[nodiscard]] std::string AsText(const T &value) {
     return value.ToText();
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
+  } else if constexpr (std::is_enum_v<T>) {
+    return std::to_string(static_cast<std::underlying_type_t<T>>(value));
   } else {
     return Format(value);
   }

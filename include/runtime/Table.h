@@ -128,6 +128,50 @@ bool RuntimeDelete(const void *record, const TableDef &table);
 /// \return True when a row carried that key.
 bool RuntimeGet(void *record, const TableDef &table);
 
+/// \brief Opens a server-side cursor over the rows this record's filters and key select, and reads
+///        the first one into the record.
+///
+/// \param record The record, whose state carries the filters and the key.
+/// \param table  Its declaration.
+/// \return True when at least one row matched.
+///
+/// \note THE CURSOR STAYS OPEN AND THE ROWS DO NOT. `Next` steps it. A `FindSet` that read the
+///       whole result into memory would put a 100-million-row table in the session, which is what
+///       `DECLARE ... NO SCROLL CURSOR` exists to avoid -- SQL Server's own answer, and the one BC
+///       is written against.
+bool RuntimeFindSet(void *record, const TableDef &table);
+
+/// \brief Steps the open cursor and reads the row it lands on.
+///
+/// \param record The record, positioned by a previous `RuntimeFindSet`.
+/// \param table  Its declaration.
+/// \param steps  How far to step. AL passes 1 by default and a negative number to go back.
+/// \return The number of steps actually taken, which is 0 at the end -- AL's own `Next` value, and
+///         what `repeat ... until Next() = 0` reads.
+std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps);
+
+/// \brief How many rows this record's filters select.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return The count.
+///
+/// \warning IT COSTS A `count(*)` AND AL CALLS IT IN LOOP CONDITIONS. `IsEmpty` is the one to reach
+///          for when the question is whether there is any row at all; it asks for one row and
+///          stops.
+std::int32_t RuntimeCount(const void *record, const TableDef &table);
+
+/// \brief Whether this record's filters select no row at all.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return True when nothing matched.
+bool RuntimeIsEmpty(const void *record, const TableDef &table);
+
+/// \brief Removes every row this record's filters select.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return How many rows went.
+std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
+
 /// \brief Writes one field from the text a column returned.
 /// \param record The record.
 /// \param def    The field.
@@ -648,6 +692,82 @@ public:
   template <typename... Arguments> Boolean FindLast(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.FindLast is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FindSet()`. Opens the set the filters and the key select and positions on
+  ///        its first row.
+  /// \return True when at least one row matched.
+  ///
+  /// \note IT OPENS A CURSOR AND DOES NOT READ THE SET. `record-findset-method.md` describes one
+  ///       request for the matching rows, and a table with a hundred million of them would put all
+  ///       of them in the session. SQL Server declares a cursor for this and BC is written against
+  ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
+  Boolean FindSet() { return detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable); }
+
+  /// \brief AL `Record.FindSet(ForUpdate)`.
+  /// \param ForUpdate Whether the rows are read for modification.
+  /// \return True when at least one row matched.
+  /// \warning `ForUpdate` DOES NOT RAISE THE LOCK YET. The tri-state locking a read owes AL is
+  ///          board:0012, and the argument is accepted rather than refused so the call site keeps
+  ///          its shape until it is.
+  Boolean FindSet(Boolean ForUpdate) {
+    static_cast<void>(ForUpdate);
+    return FindSet();
+  }
+
+  /// \brief AL `Record.FindSet(ForUpdate, UpdateKey)`.
+  /// \param ForUpdate Whether the rows are read for modification.
+  /// \param UpdateKey Whether a key field may be assigned.
+  /// \return True when at least one row matched.
+  Boolean FindSet(Boolean ForUpdate, Boolean UpdateKey) {
+    static_cast<void>(UpdateKey);
+    return FindSet(ForUpdate);
+  }
+
+  /// \brief AL `Record.Next()`. Steps to the next row of the open set.
+  /// \return 1 when it moved, 0 at the end -- which is what `repeat ... until Next() = 0` reads.
+  Integer Next() { return detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1); }
+
+  /// \brief AL `Record.Next(Steps)`.
+  /// \param Steps How far to step.
+  /// \return How many steps were taken, 0 at the end.
+  /// \throws Error when `Steps` is negative -- stepping back needs a scrollable cursor, which this
+  ///         one is not (board:0044).
+  Integer Next(Integer Steps) {
+    return detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps);
+  }
+
+  /// \brief AL `Record.Count()`. How many rows the filters select.
+  /// \return The count.
+  /// \warning IT COSTS A `count(*)`. `IsEmpty` is the one to reach for when the question is only
+  ///          whether any row matched.
+  [[nodiscard]] Integer Count() const {
+    return detail::RuntimeCount(Self(), TableTraits<Derived>::kTable);
+  }
+
+  /// \brief AL `Record.IsEmpty()`. Whether the filters select nothing.
+  /// \return True when no row matched.
+  [[nodiscard]] Boolean IsEmpty() const {
+    return detail::RuntimeIsEmpty(Self(), TableTraits<Derived>::kTable);
+  }
+
+  /// \brief AL `Record.DeleteAll()`. Removes every row the filters select.
+  /// \note THE TRIGGER DOES NOT RUN. That is AL's own rule for the no-argument form, and
+  ///       `DeleteAll(true)` is the one that runs `OnDelete` per row.
+  void DeleteAll() {
+    static_cast<void>(detail::RuntimeDeleteAll(Self(), TableTraits<Derived>::kTable));
+  }
+
+  /// \brief AL `Record.DeleteAll(RunTrigger)`.
+  /// \param RunTrigger Whether each row's `OnDelete` runs.
+  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
+  ///         do yet (board:0044).
+  void DeleteAll(Boolean RunTrigger) {
+    if (RunTrigger) {
+      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
+                  "(board:0044)");
+    }
+    DeleteAll();
   }
 
   /// \brief AL `Record.FullyQualifiedName(...)`. Gets the fully qualified name of a table.
