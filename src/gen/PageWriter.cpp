@@ -106,8 +106,7 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
 std::string Includes(const al::PageObject &object, const Objects &objects) {
   Reached reached;
   std::set<std::string> &headers = reached.headers;
-  const auto reach = [&](const al::VarDecl &declared) { Named(reached, declared, objects, true); };
-  for (const al::VarDecl &declared : object.variables) { reach(declared); }
+  for (const al::VarDecl &declared : object.variables) { Named(reached, declared, objects, false); }
   for (const al::ProcedureDecl &procedure : object.procedures) {
     for (const al::VarDecl &declared : procedure.parameters) {
       Named(reached, declared, objects, false);
