@@ -1,5 +1,8 @@
 #include "runtime/Error.h"
+#include "runtime/Session.h"
+#include "runtime/TestRunner.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -15,17 +18,26 @@ struct Options {
   std::string_view command;
   std::string suite;
   std::string codeunit;
+  std::string database;
   bool list = false;
 };
 
 constexpr int kUsage = 2;
 
+// THE CONNECTION STRING IS A BUILD SETTING AND NOT AN ENVIRONMENT VARIABLE, for the reason the gate
+// gives: a run that reads its target from the shell passes or fails for reasons the tree cannot
+// see.
+// `--database` overrides it, because a client is allowed to be told where to connect.
+constexpr std::string_view kDatabase = AGIRU_DATABASE;
+
 void Usage() {
   std::println("agiru -- Business Central, translated to C++");
   std::println("");
-  std::println("  agiru run-tests [--suite <name>] [--codeunit <name>]");
+  std::println("  agiru run-tests [--suite <name>] [--codeunit <name>] [--list]");
   std::println("      Run the transpiled [Test] procedures through the AL test runner.");
   std::println("      With no filter, the whole installed test population.");
+  std::println("      --list says which test codeunits this binary carries.");
+  std::println("      --database <url> connects somewhere other than the built-in default.");
   std::println("");
   std::println("  agiru version");
   std::println("      What this binary is.");
@@ -49,6 +61,8 @@ Options Read(std::span<const std::string_view> arguments) {
       options.suite = ValueOf(arguments, at);
     } else if (argument == "--codeunit") {
       options.codeunit = ValueOf(arguments, at);
+    } else if (argument == "--database") {
+      options.database = ValueOf(arguments, at);
     } else if (argument == "--list") {
       options.list = true;
     } else {
@@ -61,19 +75,50 @@ Options Read(std::span<const std::string_view> arguments) {
 /// AL's own test runner walks the `[Test]` procedures; this is the door in front of it, the way
 /// BC's `Run-TestsInBcContainer` is a door in front of `Invoke-NavCodeunit` (board:0039).
 ///
-/// \warning REFUSED, AND IT NAMES WHAT IS MISSING RATHER THAN REPORTING ZERO TESTS. A runner needs
-///          `Codeunit.Run` as a transaction boundary (board:0040), the error builtins that
-///          `asserterror` reads, and a database with the CRONUS data behind it (board:0004). A run
-///          that found nothing and said "0 of 0 passed" would be green for the worst possible
-///          reason.
+/// \warning A RUN THAT FINDS NOTHING IS AN ABORT, NOT A PASS. Zero registered test codeunits means
+///          the apps were not linked in, and "0 of 0 passed" would be the greenest possible lie.
 int RunTests(const Options &options) {
-  std::string what = "the whole installed test population";
-  if (!options.suite.empty()) { what = "the suite " + options.suite; }
-  if (!options.codeunit.empty()) { what = "the codeunit " + options.codeunit; }
-  throw agiru::Error("run-tests cannot run " + what +
-                     " yet: the AL test runner needs Codeunit.Run as a transaction boundary "
-                     "(board:0040), the error builtins asserterror reads, and a database "
-                     "(board:0004). See board:0039.");
+  if (!options.suite.empty()) {
+    // A SUITE IS A ROW IN `Test Suite`, not a name this binary knows. Guessing that a suite means
+    // "everything" would report a pass over a population nobody asked for.
+    throw agiru::Error("run-tests cannot select the suite " + options.suite +
+                       " yet: a suite is data in the `Test Suite` table and needs the database "
+                       "(board:0004). --codeunit works now. See board:0039.");
+  }
+  const std::vector<const agiru::TestCatalogue *> codeunits = agiru::RegisteredTestCodeunits();
+  if (codeunits.empty()) {
+    throw agiru::Error("no test codeunit is registered: nothing linked into this binary declares "
+                       "`Subtype = Test`. See board:0038.");
+  }
+  if (options.list) {
+    for (const agiru::TestCatalogue *codeunit : codeunits) {
+      std::println("{:>7}  {}  ({} test(s))",
+                   codeunit->Id().Value(),
+                   codeunit->Name(),
+                   codeunit->Methods().size());
+    }
+    return 0;
+  }
+  if (!options.codeunit.empty()) {
+    const bool known = std::ranges::any_of(codeunits, [&](const agiru::TestCatalogue *codeunit) {
+      return codeunit->Name() == options.codeunit;
+    });
+    if (!known) {
+      throw agiru::Error("no test codeunit is called " + options.codeunit +
+                         "; `run-tests --list` says which are registered");
+    }
+  }
+  // A TEST METHOD IS A TRANSACTION, so the runner needs a session before it runs one -- and it
+  // opens exactly one for the whole run, because a session is what holds the boundary stack.
+  const agiru::Session session(options.database.empty() ? std::string(kDatabase)
+                                                        : options.database);
+  const agiru::TestRun run = agiru::RunRegisteredTests(options.codeunit);
+  for (const agiru::TestResult &result : run.results) {
+    if (result.passed) { continue; }
+    std::println("FAIL  {}  {}\n      {}", result.codeunit, result.method, result.error);
+  }
+  std::println("{} of {} passed", run.passed, run.passed + run.failed);
+  return run.failed == 0 ? 0 : 1;
 }
 
 int Version() {

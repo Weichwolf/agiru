@@ -45,6 +45,7 @@
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
+#include "runtime/TestRunner.h"
 #include "type/Action.h"
 #include "type/AlArray.h"
 #include "type/Any.h"

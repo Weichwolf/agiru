@@ -106,6 +106,50 @@ std::string Quoted(std::string_view text) {
   return out;
 }
 
+// AL'S DATE, TIME AND DATETIME LITERALS. `date-data-type.md` writes a date as `YYYYMMDDD` and the
+// undefined one as `0D`; a time is `HHMMSS[.mmm]T` and `0T`; a DateTime literal is only ever `0DT`,
+// because AL has no way to write a real one. The suffix decides the type, so it is read off the end
+// rather than guessed from the digit count.
+// `YYYYMMDD` and `HHMMSS`, from the two literal shapes `date-data-type.md` and `time-data-type.md`
+// give. A literal with any other digit count is not one AL writes.
+constexpr std::size_t kDateDigits = 8;
+constexpr std::size_t kClockDigits = 6;
+constexpr std::size_t kYearDigits = 4;
+constexpr std::size_t kPairDigits = 2;
+constexpr std::size_t kMilliDigits = 3;
+
+std::string Temporal(const std::string &literal) {
+  std::string upper = literal;
+  for (char &c : upper) { c = static_cast<char>(std::toupper(static_cast<unsigned char>(c))); }
+  std::size_t end = upper.size();
+  while (end > 0 && (upper[end - 1] == 'D' || upper[end - 1] == 'T')) { --end; }
+  const std::string suffix = upper.substr(end);
+  const std::string digits = upper.substr(0, end);
+  const bool zero = digits.find_first_not_of("0.") == std::string::npos;
+  if (suffix == "DT") {
+    return zero ? "DateTime{}" : "RefusedTemporal<DateTime>(\"" + literal + "\")";
+  }
+  if (suffix == "D") {
+    if (zero) { return "Date{}"; }
+    if (digits.size() != kDateDigits) { return "RefusedTemporal<Date>(\"" + literal + "\")"; }
+    return "Date::FromYmd(" + digits.substr(0, kYearDigits) + ", " +
+           digits.substr(kYearDigits, kPairDigits) + ", " +
+           digits.substr(kYearDigits + kPairDigits, kPairDigits) + ")";
+  }
+  if (suffix == "T") {
+    if (zero) { return "Time{}"; }
+    const std::size_t point = digits.find('.');
+    const std::string clock = point == std::string::npos ? digits : digits.substr(0, point);
+    if (clock.size() != kClockDigits) { return "RefusedTemporal<Time>(\"" + literal + "\")"; }
+    std::string milli = point == std::string::npos ? "0" : digits.substr(point + 1);
+    while (milli.size() < kMilliDigits) { milli += '0'; }
+    return "Time::FromHms(" + clock.substr(0, kPairDigits) + ", " +
+           clock.substr(kPairDigits, kPairDigits) + ", " +
+           clock.substr(2 * kPairDigits, kPairDigits) + ", " + milli.substr(0, kMilliDigits) + ")";
+  }
+  return "RefusedTemporal<Date>(\"" + literal + "\")";
+}
+
 // A DEPTH COUNTER THAT CANNOT LEAK. It was a `++` at the top and a `--` at the bottom, and one
 // early return in the middle -- the `in` operator, which hands off to Membership() -- never reached
 // the bottom. Every `in` expression therefore raised the counter permanently, and the guard fired
@@ -285,6 +329,13 @@ private:
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
       // A NAME THAT IS IN SCOPE IS A VARIABLE AND NOT A KIND. `Type::All` where `Type` is a field
       // stays a field; only an unresolved base can be AL's keyword.
+      // AN OBJECT KIND WINS OVER THE TYPE OF THE SAME NAME, and it has to: `Enum`, `Codeunit`,
+      // `Page`, `Table` and `Interface` are AL TYPE names as well as object-kind keywords, and on
+      // the left of `::` they are always the keyword. `Enum::"No. Series Implementation"::Normal`
+      // came out as `::agiru::Enum::...`, which is the class template with no arguments.
+      const std::string_view kind =
+          scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
+      if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
       // `OBJECTTYPE::Table` AND ITS NEIGHBOURS ARE DOOR OPTIONS. AL writes the platform's own
       // option types in upper case as a scope, and each is a type the door already declares.
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
@@ -293,9 +344,6 @@ private:
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
         return "tables::" + Identifier(expression.text) + "::kId.Value()";
       }
-      const std::string_view kind =
-          scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
-      if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
     }
     return Expression(base, kPrimaryPrecedence) + "::" + EnumeratorName(expression.text);
   }
@@ -592,6 +640,7 @@ private:
     switch (expression.kind) {
       case al::ExprKind::StringLiteral: out = Quoted(expression.text); break;
       case al::ExprKind::NumberLiteral: out = expression.text; break;
+      case al::ExprKind::TemporalLiteral: out = Temporal(expression.text); break;
       case al::ExprKind::Name: out = Name(expression); break;
       case al::ExprKind::Scope: out = Scope(expression); break;
       case al::ExprKind::Call: out = Call(expression); break;

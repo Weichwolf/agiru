@@ -1,0 +1,13 @@
+# THE SLICE: the generated sources that compile and are LINKED INTO `agiru`, so that
+# `agiru run-tests` runs real AL today rather than the whole tree in a year (board:0038).
+#
+# It is a baseline turned the other way round: every other counter here may only fall, and this one
+# may only GROW. A file leaves it only when the AL object it came from is gone.
+#
+# `make` builds exactly these, so the day one of them stops compiling, `make` is red -- which is the
+# whole point of naming them rather than globbing whatever happens to work.
+tests/core/codeunit/Assert.cpp
+tests/core/codeunit/LibraryUtility.cpp
+tests/core/codeunit/LibraryUtilityUT.cpp
+library_assert/system/test_libraries/utilities/codeunit/LibraryAssert.cpp
+foundation_test_library/test_libraries/foundation/no_series/codeunit/LibraryNoSeries.cpp

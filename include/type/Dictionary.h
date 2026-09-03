@@ -64,7 +64,10 @@ public:
   /// \param key   The key.
   /// \param value Receives the value.
   /// \return True when the key was there; `value` is untouched otherwise.
-  [[nodiscard]] Boolean Get(const TKey &key, TValue &value) const {
+  /// \note NOT `[[nodiscard]]`, because the RESULT IS NOT THE PRODUCT. AL writes
+  ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
+  ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
+  Boolean Get(const TKey &key, TValue &value) const {
     const auto at = entries_.find(key);
     if (at == entries_.end()) { return false; }
     value = at->second;
@@ -74,7 +77,10 @@ public:
   /// \brief AL `Dictionary.Remove(Key)`.
   /// \param key The key.
   /// \return True when an entry was removed.
-  [[nodiscard]] Boolean Remove(const TKey &key) { return entries_.erase(key) != 0; }
+  /// \note NOT `[[nodiscard]]`, because the RESULT IS NOT THE PRODUCT. AL writes
+  ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
+  ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
+  Boolean Remove(const TKey &key) { return entries_.erase(key) != 0; }
 
   /// \brief AL `Dictionary.Keys()`.
   /// \return The keys, in key order.

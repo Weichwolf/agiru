@@ -77,7 +77,10 @@ public:
   /// \param index The one-based position.
   /// \param value Receives the element.
   /// \return True when the index is inside the list; `value` is untouched otherwise.
-  [[nodiscard]] Boolean Get(Integer index, T &value) const {
+  /// \note NOT `[[nodiscard]]`, because the RESULT IS NOT THE PRODUCT. AL writes
+  ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
+  ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
+  Boolean Get(Integer index, T &value) const {
     if (!Inside(index)) { return false; }
     value = values_[static_cast<std::size_t>(index) - 1];
     return true;
@@ -108,7 +111,10 @@ public:
   /// \brief AL `List.Remove(Value)` -- removes the first occurrence.
   /// \param value The element.
   /// \return True when one was removed.
-  [[nodiscard]] Boolean Remove(const T &value) {
+  /// \note NOT `[[nodiscard]]`, because the RESULT IS NOT THE PRODUCT. AL writes
+  ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
+  ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
+  Boolean Remove(const T &value) {
     const auto at = std::ranges::find(values_, value);
     if (at == values_.end()) { return false; }
     values_.erase(at);

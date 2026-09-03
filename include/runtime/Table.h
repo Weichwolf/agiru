@@ -140,6 +140,24 @@ public:
   ///       GUID it went in with.
   void Insert() { detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable); }
 
+  /// \brief AL `Record.Insert(RunTrigger)`.
+  ///
+  /// \param RunTrigger True to run the table's `OnInsert` trigger first.
+  /// \throws Error when the row cannot be written, and whatever the trigger raises.
+  ///
+  /// \note THE TRIGGER RUNS BEFORE THE ROW IS WRITTEN, which the trigger's own page states:
+  ///       "This trigger is run before default insert behavior ... The new record is not inserted
+  ///       if an error occurs in the trigger code."
+  /// \note WHETHER THE TABLE HAS ONE IS A COMPILE-TIME QUESTION, not a registry lookup: the
+  ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
+  ///       it and a table without the trigger compiles to the same code `Insert()` does.
+  void Insert(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnInsert(); }) { Self()->OnInsert(); }
+    }
+    detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+  }
+
   /// \brief AL `Record.Modify()`.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
@@ -151,6 +169,17 @@ public:
     }
   }
 
+  /// \brief AL `Record.Modify(RunTrigger)`.
+  /// \param RunTrigger True to run the table's `OnModify` trigger first.
+  /// \throws Error when no row carries this primary key, and whatever the trigger raises.
+  /// \see Insert(Boolean) for why the trigger runs first and how it is found.
+  void Modify(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnModify(); }) { Self()->OnModify(); }
+    }
+    Modify();
+  }
+
   /// \brief AL `Record.Delete()`.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
@@ -158,6 +187,19 @@ public:
     if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
       throw Error("the record does not exist");
     }
+  }
+
+  /// \brief AL `Record.Delete(RunTrigger)`.
+  /// \param RunTrigger True to run the table's `OnDelete` trigger first.
+  /// \throws Error when no row carries this primary key, and whatever the trigger raises.
+  /// \see Insert(Boolean) for why the trigger runs first and how it is found.
+  /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
+  ///       record it is about to remove, and a great many of them do.
+  void Delete(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnDelete(); }) { Self()->OnDelete(); }
+    }
+    Delete();
   }
 
   /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.

@@ -3,11 +3,13 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "EnumWriter.h"
+#include "Expr.h"
 #include "Names.h"
 #include "Scope.h"
 #include "Token.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <map>
@@ -25,6 +27,58 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "IntegrationEvent") ||
          al::HasAttribute(procedure, "BusinessEvent") ||
          al::HasAttribute(procedure, "InternalEvent");
+}
+
+// A TEST CODEUNIT IS `Subtype = Test` and its test procedures carry `[Test]`.
+// `devenv-test-codeunits-and-test-methods.md` names both, and the runner needs both: the subtype
+// says the codeunit is one, the attribute says which procedures the runner calls.
+bool IsTest(const al::ProcedureDecl &procedure) {
+  return al::HasAttribute(procedure, "Test");
+}
+
+std::vector<const al::ProcedureDecl *> TestsOf(const al::CodeunitObject &unit) {
+  std::vector<const al::ProcedureDecl *> tests;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (IsTest(procedure)) { tests.push_back(&procedure); }
+  }
+  return tests;
+}
+
+bool DeclaresOnRun(const al::CodeunitObject &unit) {
+  return std::ranges::any_of(unit.procedures, [](const al::ProcedureDecl &procedure) {
+    return procedure.isTrigger && Identifier(procedure.name) == "OnRun";
+  });
+}
+
+// The catalogue REGISTERS the codeunit with the runtime, which is why it is a definition in the
+// source rather than a declaration in the header.
+std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
+  const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
+  if (tests.empty()) { return {}; }
+  std::string out = "\nnamespace {\n\nconstexpr std::array<TestMethod, ";
+  out += std::to_string(tests.size());
+  out += "> kTestMethods{{\n";
+  for (const al::ProcedureDecl *test : tests) {
+    out += "    {\"";
+    out += test->name;
+    out += "\", &InvokeTest<";
+    out += identifier;
+    out += ", &";
+    out += identifier;
+    out += "::";
+    out += Identifier(test->name);
+    out += ">},\n";
+  }
+  out += "}};\n\nconst TestCatalogue kTestCatalogue{CodeunitTraits<";
+  out += identifier;
+  out += ">::kId,\n                                  CodeunitTraits<";
+  out += identifier;
+  out += ">::kName,\n";
+  out += DeclaresOnRun(unit) ? "                                  &InvokeTest<" + identifier +
+                                   ", &" + identifier + "::OnRun>,\n"
+                             : "                                  nullptr,\n";
+  out += "                                  kTestMethods};\n\n} // namespace\n";
+  return out;
 }
 
 bool NamesAnObject(const al::VarDecl &declared) {
@@ -141,6 +195,22 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
   return inner;
 }
 
+// A MEMBER HIDES A NAMESPACE NAME FOR THE WHOLE CLASS BODY, and the base class declares members
+// AL also has types for: `Record.RecordId()` is a method and `RecordId` is a type, `Record.Field()`
+// is a method and `Field` is the virtual table. Inside a generated class every mention of the type
+// then finds the method, and `RecordId RecId` stops being a declaration -- which is 124 of the 176
+// files that failed to compile in the test tree (measured 2026-09-03). Qualified, for the reason
+// the parameter-named-after-its-type case gives below: `class RecordId RecId` reads like a C++
+// puzzle and `agiru::RecordId RecId` reads like what it is.
+constexpr std::array kHiddenByABaseMember{
+    std::string_view{"Field"},
+    std::string_view{"RecordId"},
+};
+
+std::string Unhidden(const std::string &type) {
+  return std::ranges::contains(kHiddenByABaseMember, type) ? "agiru::" + type : type;
+}
+
 /// What a type is being read FOR: the canonical AL type name, and the object that declares it.
 struct Named {
   std::string type;  ///< What `Element` canonicalised the AL type name to.
@@ -181,7 +251,7 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
   if (type == "Code" || type == "Text") {
     return type + "<" + std::to_string(declared.length) + ">";
   }
-  return type;
+  return Unhidden(type);
 }
 
 std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
@@ -923,11 +993,64 @@ private:
   const Objects &objects_;
 };
 
+// AL LETS A `var` BLOCK DECLARE WHAT THE BODY NEVER TOUCHES, and C++ with `-Werror` does not. The
+// name is looked for in the body that was already written, so the attribute lands only where it is
+// true -- and a local that becomes unused because its use was REFUSED shows up as the refusal it is
+// rather than as a broken build.
+// AL RETURNS THE NAMED RETURN VALUE WHEN THE BODY SIMPLY ENDS. `procedure GenerateRandomNumericText
+// (Length: Integer) String: Text` writes into `String` in a loop and never says `exit`; the value
+// of `String` is the result. C++ falls off the end instead, which is undefined behaviour and a
+// `-Wreturn-type` error -- so a procedure with a return type ends with the return AL implies,
+// unless its last statement already is one.
+std::string FallsOff(const al::ProcedureDecl &procedure, const Names &names) {
+  if (procedure.returnType.empty() && procedure.returned.type.empty()) { return {}; }
+  if (!procedure.body.empty() && procedure.body.back().kind == al::StmtKind::Exit) { return {}; }
+  return "  return" + names.ExitValue() + ";\n";
+}
+
+// A NAME INSIDE A STRING IS NOT A USE, and the refusals are full of them:
+// `RefusedOption("RecordLink.Type::Note")` carries the variable's name in a literal and nowhere
+// else, so a plain search called the variable used and `-Wunused-variable` disagreed.
+std::string WithoutLiterals(const std::string &body) {
+  std::string out = body;
+  bool inside = false;
+  for (std::size_t at = 0; at < out.size(); ++at) {
+    if (out[at] == '\\' && inside) {
+      ++at;
+      continue;
+    }
+    if (out[at] == '"') {
+      inside = !inside;
+      continue;
+    }
+    if (inside) { out[at] = ' '; }
+  }
+  return out;
+}
+
+bool Mentions(const std::string &body, const std::string &name) {
+  for (std::size_t at = body.find(name); at != std::string::npos; at = body.find(name, at + 1)) {
+    const bool before = at > 0 && (std::isalnum(static_cast<unsigned char>(body[at - 1])) != 0 ||
+                                   body[at - 1] == '_');
+    const std::size_t after = at + name.size();
+    const bool behind =
+        after < body.size() &&
+        (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
+    if (!before && !behind) { return true; }
+  }
+  return false;
+}
+
 std::string Locals(const al::ProcedureDecl &procedure,
                    const Objects &objects,
                    const std::string &unit,
-                   const std::vector<al::ProcedureDecl> &all = {}) {
+                   const std::vector<al::ProcedureDecl> &all = {},
+                   const std::string &body = {}) {
   std::string out;
+  const std::string code = WithoutLiterals(body);
+  const auto unused = [&body, &code](const std::string &name) {
+    return body.empty() || Mentions(code, name) ? std::string{} : std::string("[[maybe_unused]] ");
+  };
   // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
   // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
   if (!procedure.returnName.empty()) {
@@ -944,7 +1067,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
     if (Hidden(type, names)) { type = Qualified(type, names); }
-    out += "  " + type + " " + Identifier(declared.name) + "{};\n";
+    out +=
+        "  " + unused(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
   }
   return out;
 }
@@ -966,6 +1090,8 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   // declares, source includes -- and the cycle the header cannot have, the source can, because a
   // `.cpp` is nobody's dependency.
   out += SourceIncludes(unit, objects);
+  const std::string catalogue = TestCatalogueOf(unit, identifier);
+  if (!catalogue.empty()) { out += "\n#include <array>\n"; }
   out += "\nnamespace agiru::app::codeunits {\n\n";
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -974,11 +1100,12 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     const bool publisher = IsPublisher(procedure);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
            "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures) + ") {";
-    const std::string locals =
-        publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures);
     const std::string body =
         publisher ? std::string{}
-                  : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2);
+                  : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
+                        FallsOff(procedure, CodeunitNames(unit, procedure, objects));
+    const std::string locals =
+        publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures, body);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;
@@ -990,6 +1117,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "}\n\n";
   }
 
+  out += catalogue;
   out += "} // namespace agiru::app::codeunits\n";
   return out;
 }

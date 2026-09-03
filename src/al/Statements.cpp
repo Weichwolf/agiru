@@ -464,6 +464,10 @@ private:
       case TokenKind::Integer:
       case TokenKind::Decimal:
         return Expr{.kind = ExprKind::NumberLiteral, .text = token.text, .children = {}};
+      // `0D`, `20011125D`, `080000T`, `0DT`. It is a LITERAL and it was falling through to a name,
+      // so `0D` became the identifier `_0D` -- 6 383 of them in W1 alone.
+      case TokenKind::DateTime:
+        return Expr{.kind = ExprKind::TemporalLiteral, .text = token.text, .children = {}};
       default: return Expr{.kind = ExprKind::Name, .text = token.text, .children = {}};
     }
   }

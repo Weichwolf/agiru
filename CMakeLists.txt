@@ -56,6 +56,7 @@ foreach(tier IN LISTS TIERS)
   if(tier STREQUAL cli)
     add_executable(agiru ${sources})
     set(target agiru)
+    target_compile_definitions(agiru PRIVATE AGIRU_DATABASE="${AGIRU_TEST_DSN}")
   elseif(tier STREQUAL tc)
     add_executable(agirutc ${sources})
     set(target agirutc)
@@ -107,6 +108,36 @@ set(AGIRU_BC_SOURCE "$ENV{HOME}/Git/BCApps/src"
 # surface baseline says how much of AL is reachable, and that is the number that has to rise. The
 # day it is enough, this defaults to ON and the option goes.
 option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
+
+# THE SLICE, while AGIRU_BUILD_APPS is off: the generated sources named in `test/slice` are built
+# and linked into `agiru`, so the CLI has real AL objects to run. Comments and blank lines are
+# skipped; every other line is a path under `apps/`. A named file that does not compile makes `make`
+# red, which is the difference between a slice and a glob.
+if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
+  file(STRINGS "${CMAKE_SOURCE_DIR}/test/slice" slice_lines)
+  set(slice_sources "")
+  foreach(line IN LISTS slice_lines)
+    string(STRIP "${line}" line)
+    if(line STREQUAL "" OR line MATCHES "^#")
+      continue()
+    endif()
+    list(APPEND slice_sources "${CMAKE_SOURCE_DIR}/apps/${line}")
+  endforeach()
+  if(slice_sources)
+    add_library(agiru_slice SHARED ${slice_sources})
+    target_include_directories(agiru_slice PRIVATE
+      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent")
+    file(READ "${CMAKE_SOURCE_DIR}/apps.json" slice_apps_json)
+    string(JSON slice_app_count LENGTH "${slice_apps_json}" apps)
+    math(EXPR slice_app_last "${slice_app_count} - 1")
+    foreach(i RANGE ${slice_app_last})
+      string(JSON slice_app GET "${slice_apps_json}" apps ${i} name)
+      target_include_directories(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/apps/${slice_app}")
+    endforeach()
+    target_link_libraries(agiru_slice PRIVATE agiru_rt agiru_net agiru_db)
+    target_link_libraries(agiru PRIVATE agiru_slice)
+  endif()
+endif()
 
 # AN APP SEES THE DOOR, THE ABSENT SURFACE AND THE APPS IT DEPENDS ON -- nothing else, and that is
 # what the linker enforces about AL's own direction: the Base Application may not know an extension,

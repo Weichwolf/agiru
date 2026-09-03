@@ -66,6 +66,19 @@ template <typename Body> void AssertError(Body body) {
 /// \brief AL `ClearLastError()`.
 void ClearLastError();
 
+/// \brief A date, time or datetime literal AL wrote in a shape this reader does not accept.
+///
+/// \tparam T    The literal's type, which its SUFFIX decides: `D`, `T` or `DT`.
+/// \param what  The literal, spelled as AL wrote it.
+/// \return Never.
+/// \throws Error always.
+///
+/// \note IT IS TYPED, because the suffix already says what the value would have been. A refusal
+///       that had to be converted afterwards would be a second guess on top of the first.
+template <typename T> [[noreturn]] T RefusedTemporal(std::string_view what) {
+  throw Error("the literal " + std::string(what) + " is not a shape AL writes");
+}
+
 /// \brief AL `Commit()` -- everything written so far survives any later rollback.
 /// \note It MOVES the enclosing boundaries rather than releasing them; `runtime/Transaction.h`
 ///       says why, and the predecessor paid for the difference.

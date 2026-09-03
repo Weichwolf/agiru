@@ -7,7 +7,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all apps builtins cronus db gap lint schema test transpile tree provision doc clean spotless help
+.PHONY: all apps builtins cronus db gap lint schema tc test transpile tree provision doc clean spotless help
 
 all: db            ## the library, the transpiler, and the client beside them
 	@cmake --build $(B) -j $(shell nproc)
@@ -26,10 +26,16 @@ lint: all          ## format and analysis over what changed (FULL=1: the whole t
 test: all          ## the fast gate
 	@sh $(SELF)/test/run.sh
 
-transpile: all     ## every app in apps.json through the transpiler into apps/
+# TRANSPILING NEEDS THE TRANSPILER AND NOTHING ELSE. `all` now builds the slice out of apps/, so
+# hanging transpile off it would make the tree depend on its own output -- and a slice file that
+# stopped compiling would take away the one command that repairs it.
+tc: db             ## just the transpiler
+	@cmake --build $(B) -j $(shell nproc) --target agirutc
+
+transpile: tc      ## every app in apps.json through the transpiler into apps/
 	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
 
-gap: all           ## the first generated header that does not compile (SOURCE=1: the bodies)
+gap: db            ## the first generated header that does not compile (SOURCE=1: the bodies)
 	@SOURCE=$(SOURCE) SWEEP=$(SWEEP) sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
 
 # BARE `make` IS `src/`, AND `make apps` IS THE GENERATED TREE. They are separate build directories
@@ -43,7 +49,7 @@ apps: all          ## the generated tree, stopping at the first error
 	  -DAGIRU_BUILD_APPS=ON > /dev/null
 	@cmake --build $(B)/apps -j $(shell nproc) -- -k 1
 
-tree: all          ## how much of the generated tree the compiler accepts
+tree: db           ## how much of the generated tree the compiler accepts
 	@sh $(SELF)/scripts/tree_syntax.sh
 
 builtins:          ## which AL builtins the UT milestone calls, ranked

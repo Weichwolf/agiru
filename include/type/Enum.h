@@ -64,8 +64,14 @@ public:
   constexpr Enum() = default;
 
   /// \brief Holds a named value.
+  ///
   /// \param value The value.
-  constexpr explicit Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+  ///
+  /// \note IT IS NOT `explicit`, BECAUSE AL HANDS A MEMBER TO AN ENUM PARAMETER.
+  ///       `CreateNoSeriesLine(..., Enum::"No. Series Implementation"::Normal)` passes the member
+  ///       itself, and `operator=` already accepts one -- an explicit constructor would have made
+  ///       assignment and argument passing two different things, which they are not in AL.
+  constexpr Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
   /// \brief Returns an enum with the integer value.
   ///

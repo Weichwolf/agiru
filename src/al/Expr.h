@@ -9,6 +9,7 @@ namespace agiru::al {
 enum class ExprKind : std::uint8_t {
   StringLiteral,
   NumberLiteral,
+  TemporalLiteral,
   Name,
   Scope,
   Call,
