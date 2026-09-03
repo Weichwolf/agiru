@@ -439,10 +439,10 @@ working on something else becomes an item in the same round**, even if it closes
 toward a target that is too short arrives somewhere that has to be left again.
 
 
-**THE BOARD OF `~/Git/openerp/` IS READ FIRST, EVERY TIME.** Not after a defect -- before the work.
-Twice in one session it named the exact shape: `Validate` runs the TableRelation check before the
-trigger, and a bare `FindSet` that raises on failure is net negative and was rejected TWICE there.
-Neither is derivable from the documentation alone, and both would have cost days to rediscover.
+**THE BOARD OF `~/Git/openerp/` IS READ FIRST, EVERY TIME** -- before the work, not after a defect.
+Twice in one session it named the exact shape: `Validate` checks the TableRelation before the
+trigger, and a bare `FindSet` that raises on failure is net negative and was rejected there TWICE.
+Neither is derivable from the documentation alone.
 
 **Work autonomously.** Where something is unclear, take the most obvious generic option, measure,
 and on a net negative take it back and write the reason into the board.
@@ -479,7 +479,7 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
 | **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **A PATCH ASSERTS ITS ANCHOR BEFORE WRITING** -- one that finds nothing must ABORT, never write the file unchanged. It has happened five times, each after `clang-format` folded a line the anchor spanned, once on a NEGATIVE CONTROL that then reported green because the subject was never removed |
 | **a golden file updated from the output** | the expected file is overwritten with what the generator produced, so it can never disagree again | the target image under `test/target/` is edited BY HAND, one line at a time, and the change is argued for |
-| **a list somebody has to remember to fill** | one entry point sets it and the others silently get an empty one, which then emits nothing | it FINDS ITSELF, and an empty result is an ABORT. The door's type list is the `include/type/` directory; the gates call the writers directly and would have got the empty version |
+| **a list somebody has to remember to fill** | one entry point sets it, the others get an empty one and emit nothing | it FINDS ITSELF and an empty result is an ABORT -- the door's type list is the `include/type/` directory |
 | **a header trimmed by its own text** | a declaration the HEADER does not name is removed, and its own `.cpp` needed it | a `.cpp` includes its header and stands on what is declared there -- the two halves are written apart and neither may be trimmed alone |
 
 ## The environment
