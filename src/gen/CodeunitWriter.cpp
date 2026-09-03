@@ -745,21 +745,20 @@ public:
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
     if (declared != nullptr && !NamesAnObject(*declared)) {
-      return NamesAControl(*declared, member.field) ? std::string(member.field)
-                                                    : AsTheDoorSpellsIt(member.field);
+      const std::string control = ControlNamed(*declared, member.field);
+      return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
     }
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
-    if (subtype.empty()) { return std::string(member.field); }
+    if (subtype.empty()) { return Identifier(member.field); }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return std::string(member.field);
+      return Identifier(member.field);
     }
-    if (table->second.fields.contains(LowerKey(std::string(member.field)))) {
-      return std::string(member.field);
-    }
-    return AsTheDoorSpellsIt(member.field);
+    const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
+    if (field != table->second.fields.end()) { return field->second; }
+    return AsTheDoorSpellsIt(Identifier(member.field));
   }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
@@ -778,11 +777,17 @@ public:
     return found == table->second.end() ? std::string{} : found->second;
   }
 
-  [[nodiscard]] bool NamesAControl(const al::VarDecl &declared, std::string_view member) const {
-    if (!NamesAPage(TypeName(declared.type)) || declared.subtype.empty()) { return false; }
+  [[nodiscard]] std::string ControlNamed(const al::VarDecl &declared,
+                                         std::string_view member) const {
+    if (!NamesAPage(TypeName(declared.type)) || declared.subtype.empty()) { return {}; }
     const auto page = objects_.pages.find(LowerKey(declared.subtype));
-    if (page == objects_.pages.end()) { return false; }
-    return page->second.fields.contains(LowerKey(std::string(member)));
+    if (page == objects_.pages.end()) { return {}; }
+    const auto control = page->second.fields.find(LowerKey(std::string(member)));
+    return control == page->second.fields.end() ? std::string{} : control->second;
+  }
+
+  [[nodiscard]] bool NamesAControl(const al::VarDecl &declared, std::string_view member) const {
+    return !ControlNamed(declared, member).empty();
   }
 
   [[nodiscard]] std::string SubtypeOfRecord(std::string_view variable) const {

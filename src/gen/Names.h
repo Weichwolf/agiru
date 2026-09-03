@@ -2,6 +2,7 @@
 
 #include "Scope.h"
 
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,7 +11,8 @@ namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
 
-std::vector<std::string> Distinct(const std::vector<std::string> &alNames);
+std::vector<std::string> Distinct(const std::vector<std::string> &alNames,
+                                  std::set<std::string> taken = {});
 
 std::string EnumeratorName(std::string_view optionMember);
 

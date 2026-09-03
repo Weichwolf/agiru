@@ -395,10 +395,7 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::PageObject object = agiru::al::ParsePage(Read(path));
       ++counts.parsed;
       counts.members += object.procedures.size();
-      std::set<std::string> controlNames;
-      for (const auto &[alName, identifier] : agiru::gen::ControlIdentifiers(object)) {
-        controlNames.insert(alName);
-      }
+      std::map<std::string, std::string> controlNames = agiru::gen::ControlIdentifiers(object);
       objects.pages.insert_or_assign(
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
@@ -562,12 +559,13 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++counts.parsed;
       counts.members += table.fields.size();
-      std::set<std::string> fieldNames;
+      std::map<std::string, std::string> fieldNames;
       for (const agiru::al::FieldDecl &field : table.fields) {
-        fieldNames.insert(agiru::gen::LowerKey(field.name));
+        fieldNames.emplace(agiru::gen::LowerKey(field.name),
+                           agiru::gen::FieldIdentifier(table, field.name));
       }
       for (const agiru::SystemFieldDecl &field : agiru::kSystemFields) {
-        fieldNames.insert(agiru::gen::LowerKey(std::string(field.name)));
+        fieldNames.emplace(agiru::gen::LowerKey(std::string(field.name)), std::string(field.name));
       }
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table),

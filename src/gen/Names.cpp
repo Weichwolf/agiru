@@ -100,10 +100,10 @@ std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
 }
 
-std::vector<std::string> Distinct(const std::vector<std::string> &alNames) {
+std::vector<std::string> Distinct(const std::vector<std::string> &alNames,
+                                  std::set<std::string> taken) {
   std::vector<std::string> made;
   made.reserve(alNames.size());
-  std::set<std::string> taken;
   for (const std::string &alName : alNames) {
     const std::string plain = Identifier(alName);
     std::string unique = plain;

@@ -567,7 +567,7 @@ private:
       }
       out += spelling == "." && chain[i - 1]->kind == al::ExprKind::Name
                  ? scope_.MemberSpelling(
-                       OfVariable{.variable = walk->text, .field = Identifier(chain[i - 1]->text)})
+                       OfVariable{.variable = walk->text, .field = chain[i - 1]->text})
                  : Expression(*chain[i - 1], precedence + 1);
       const bool here = calls == Parens::First ? i == chain.size() : i == 1;
       if (calls != Parens::None && here && !asCallee) { out += "()"; }
@@ -693,7 +693,7 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     if (!IsRecord(member.variable) || FieldNamed(table_, member.field) != nullptr) {
-      return std::string(member.field);
+      return Identifier(member.field);
     }
     return AsTheDoorSpellsIt(member.field);
   }
@@ -756,7 +756,7 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     if (!IsRecord(member.variable) || FieldNamed(*source_, member.field) != nullptr) {
-      return std::string(member.field);
+      return Identifier(member.field);
     }
     return AsTheDoorSpellsIt(member.field);
   }

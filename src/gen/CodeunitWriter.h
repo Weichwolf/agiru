@@ -13,7 +13,8 @@ namespace agiru::gen {
 struct TableRef {
   std::string identifier;
   std::string header;
-  std::set<std::string> fields;
+
+  std::map<std::string, std::string> fields;
 };
 
 using TableIndex = std::map<std::string, TableRef>;

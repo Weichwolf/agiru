@@ -205,6 +205,38 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
 
 }
 
+std::set<std::string> TestPageSurface() {
+  static const std::set<std::string> surface{"OpenNew",
+                                             "OpenEdit",
+                                             "OpenView",
+                                             "Close",
+                                             "First",
+                                             "Next",
+                                             "New",
+                                             "Last",
+                                             "Previous",
+                                             "Prev",
+                                             "GotoRecord",
+                                             "GoToKey",
+                                             "Trap",
+                                             "OK",
+                                             "Cancel",
+                                             "Yes",
+                                             "No",
+                                             "Caption",
+                                             "Editable",
+                                             "Expand",
+                                             "IsExpanded",
+                                             "GetField",
+                                             "Filter",
+                                             "GetValidationError",
+                                             "ValidationErrorCount",
+                                             "FindFirstField",
+                                             "FindNextField",
+                                             "FindPreviousField"};
+  return surface;
+}
+
 std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object) {
   Controls all;
   Flatten(object.layout, all);
@@ -215,7 +247,7 @@ std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &obje
        {&all.fields, &all.actions, &all.parts}) {
     for (const al::PageControl *control : *group) { alNames.push_back(control->name); }
   }
-  const std::vector<std::string> made = Distinct(alNames);
+  const std::vector<std::string> made = Distinct(alNames, TestPageSurface());
   std::map<std::string, std::string> named;
   std::size_t at = 0;
   for (const std::vector<const al::PageControl *> *group :

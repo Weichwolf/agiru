@@ -3,6 +3,7 @@
 #include "Ast.h"
 #include "CodeunitWriter.h"
 #include "Expr.h"
+#include "Names.h"
 
 #include <string>
 #include <string_view>
@@ -46,7 +47,7 @@ public:
   }
 
   [[nodiscard]] virtual std::string MemberSpelling(const OfVariable &member) const {
-    return std::string(member.field);
+    return Identifier(member.field);
   }
 
   [[nodiscard]] virtual bool MemberIsCall(const OfVariable &member) const {
