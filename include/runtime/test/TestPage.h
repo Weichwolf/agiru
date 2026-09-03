@@ -39,17 +39,28 @@ class UnknownPage {};
 /// \brief The controls a `TestPage` over an untranslated page has, which is none.
 template <> struct agiru::PageTraits<agiru::UnknownPage> {
   /// \brief No controls at all.
-  /// \tparam Field  How a test reaches a control.
-  /// \tparam Action How a test reaches an action.
-  template <typename Field, typename Action> using Controls = agiru::UnknownPage;
+  /// \tparam Field_Kind  How a test reaches a control.
+  /// \tparam Action_Kind How a test reaches an action.
+  /// \tparam Part_Kind   How a test reaches an embedded page.
+  ///
+  /// \note THE INTERIOR UNDERSCORE IS THE SEAM. `Field`, `Action` and `Part` are names a page
+  ///       control may carry, and a control of that name shadows the template parameter -- 40
+  ///       headers failed on `declaration of 'Field' shadows template parameter`. No AL name
+  ///       reaches an interior underscore.
+  template <typename Field_Kind, typename Action_Kind, template <typename> class Part_Kind>
+  using Controls = agiru::UnknownPage;
 };
 
 namespace agiru {
 
 /// \brief AL `TestPage <Page>` -- the page, headless, with its controls reachable by name.
 /// \tparam P The generated page class.
+/// \note A `part` IS A NESTED `TestPage`, which is why `TestPage` names ITSELF as the third
+///       argument. AL reaches through an embedded page -- `SalesInvoice.SalesLines.Description.
+///       SetValue(...)` -- so the part has to carry the subform's own controls, and a `TestField`,
+///       which has a value and no controls, cannot.
 template <typename P = UnknownPage>
-class TestPage : public PageTraits<P>::template Controls<TestField, TestAction> {
+class TestPage : public PageTraits<P>::template Controls<TestField, TestAction, ::agiru::TestPage> {
 public:
   /// \brief AL `TestPage.OpenNew()` -- opens the page ready to insert.
   /// \throws Error until a page can be opened (board:0030).

@@ -22,8 +22,12 @@ namespace agiru::gen {
 namespace {
 
 bool IsField(const std::string &kind) {
-  return kind == "field" || kind == "part" || kind == "usercontrol" || kind == "label" ||
-         kind == "systempart" || kind == "chartpart";
+  return kind == "field" || kind == "usercontrol" || kind == "label" || kind == "systempart" ||
+         kind == "chartpart";
+}
+
+bool IsPart(const std::string &kind) {
+  return kind == "part";
 }
 
 bool IsAction(const std::string &kind) {
@@ -39,14 +43,44 @@ std::string Lowered(std::string_view text) {
   return out;
 }
 
-void Flatten(const std::vector<al::PageControl> &controls,
-             std::vector<const al::PageControl *> &fields,
-             std::vector<const al::PageControl *> &actions) {
+struct Controls {
+  std::vector<const al::PageControl *> fields;
+  std::vector<const al::PageControl *> actions;
+  std::vector<const al::PageControl *> parts;
+};
+
+void Flatten(const std::vector<al::PageControl> &controls, Controls &into) {
   for (const al::PageControl &control : controls) {
     const std::string kind = Lowered(control.kind);
-    if (!control.name.empty() && IsField(kind)) { fields.push_back(&control); }
-    if (!control.name.empty() && IsAction(kind)) { actions.push_back(&control); }
-    Flatten(control.children, fields, actions);
+    if (!control.name.empty() && IsField(kind)) { into.fields.push_back(&control); }
+    if (!control.name.empty() && IsAction(kind)) { into.actions.push_back(&control); }
+    if (!control.name.empty() && IsPart(kind)) { into.parts.push_back(&control); }
+    Flatten(control.children, into);
+  }
+}
+
+std::string PartSource(const al::PageControl &control) {
+  std::string named;
+  for (const al::Token &token : control.source) { named += token.text; }
+  return named;
+}
+
+void WriteParts(std::string &out,
+                const std::vector<const al::PageControl *> &parts,
+                const Objects &objects,
+                const std::map<std::string, std::string> &named,
+                std::set<std::string> &taken) {
+  if (parts.empty()) { return; }
+  out += "\n";
+  for (const al::PageControl *control : parts) {
+    const std::string identifier = ControlIdentifier(named, control->name);
+    if (identifier.empty() || !taken.insert(identifier).second) { continue; }
+    const auto found = objects.pages.find(LowerKey(PartSource(*control)));
+    if (found == objects.pages.end()) {
+      out += "  Field_Kind " + identifier + "{" + Literal(control->name) + "};\n";
+      continue;
+    }
+    out += "  Part_Kind<" + found->second.identifier + "> " + identifier + ";\n";
   }
 }
 
@@ -114,6 +148,17 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
     }
     Named(reached, procedure.returned, objects, false);
   }
+  {
+    Controls all;
+    Flatten(object.layout, all);
+    Flatten(object.actions, all);
+    for (const al::PageControl *control : all.parts) {
+      const auto found = objects.pages.find(LowerKey(PartSource(*control)));
+      if (found != objects.pages.end() && !found->second.header.empty()) {
+        headers.insert(found->second.header);
+      }
+    }
+  }
   const al::Property *source = al::Find(object.properties, "SourceTable");
   if (source != nullptr && !source->value.empty()) {
     std::string name;
@@ -161,21 +206,23 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
 }
 
 std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object) {
-  std::vector<const al::PageControl *> fields;
-  std::vector<const al::PageControl *> actions;
-  Flatten(object.layout, fields, actions);
-  Flatten(object.actions, fields, actions);
+  Controls all;
+  Flatten(object.layout, all);
+  Flatten(object.actions, all);
   std::vector<std::string> alNames;
-  for (const al::PageControl *control : fields) { alNames.push_back(control->name); }
-  for (const al::PageControl *control : actions) { alNames.push_back(control->name); }
+  alNames.reserve(all.fields.size() + all.actions.size() + all.parts.size());
+  for (const std::vector<const al::PageControl *> *group :
+       {&all.fields, &all.actions, &all.parts}) {
+    for (const al::PageControl *control : *group) { alNames.push_back(control->name); }
+  }
   const std::vector<std::string> made = Distinct(alNames);
   std::map<std::string, std::string> named;
   std::size_t at = 0;
-  for (const al::PageControl *control : fields) {
-    named.emplace(Lowered(control->name), made[at++]);
-  }
-  for (const al::PageControl *control : actions) {
-    named.emplace(Lowered(control->name), made[at++]);
+  for (const std::vector<const al::PageControl *> *group :
+       {&all.fields, &all.actions, &all.parts}) {
+    for (const al::PageControl *control : *group) {
+      named.emplace(Lowered(control->name), made[at++]);
+    }
   }
   return named;
 }
@@ -206,18 +253,21 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "\n#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
   out += InlineOptionsOf(object.name, "pages", object.variables, object.procedures);
 
-  std::vector<const al::PageControl *> fields;
-  std::vector<const al::PageControl *> actions;
-  Flatten(object.layout, fields, actions);
-  Flatten(object.actions, fields, actions);
+  Controls all;
+  Flatten(object.layout, all);
+  Flatten(object.actions, all);
 
   out += "namespace agiru::app::pages {\n\n";
-  out += "template <typename Field, typename Action> class " + controlsClass + " {\npublic:\n";
+  out +=
+      "template <typename Field_Kind, typename Action_Kind, template <typename> class Part_Kind>\n"
+      "class " +
+      controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
   const std::map<std::string, std::string> named = ControlIdentifiers(object);
-  WriteControls(out, fields, "Field", named, taken);
-  if (!fields.empty() && !actions.empty()) { out += "\n"; }
-  WriteControls(out, actions, "Action", named, taken);
+  WriteControls(out, all.fields, "Field_Kind", named, taken);
+  if (!all.fields.empty() && !all.actions.empty()) { out += "\n"; }
+  WriteControls(out, all.actions, "Action_Kind", named, taken);
+  WriteParts(out, all.parts, objects, named, taken);
   out += "};\n\n";
   out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
@@ -250,8 +300,10 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "template <> struct agiru::PageTraits<agiru::app::pages::" + identifier + "> {\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-  out += "  template <typename Field, typename Action>\n  using Controls = agiru::app::pages::" +
-         controlsClass + "<Field, Action>;\n";
+  out += "  template <typename Field_Kind, typename Action_Kind, template <typename> class "
+         "Part_Kind>\n"
+         "  using Controls = agiru::app::pages::" +
+         controlsClass + "<Field_Kind, Action_Kind, Part_Kind>;\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
