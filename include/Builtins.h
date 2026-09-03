@@ -32,6 +32,7 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -615,8 +616,9 @@ ConvertStr(std::string_view String, std::string_view FromCharacters, std::string
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-CopyStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length = {});
+std::string CopyStr(std::string_view String,
+                    ::agiru::Integer Position,
+                    std::optional<::agiru::Integer> Length = std::nullopt);
 
 /// \brief AL `Text.DelChr(Text, Text, Text)`. Deletes chars contained in the which parameter in a
 /// string based on the contents on the where parameter. If the where parameter contains an
@@ -628,12 +630,15 @@ CopyStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Len
 /// is returned unmodified. The which parameter is to be considered as an array of chars to delete
 /// where the order does not matter.
 /// \param String The AL `Text`.
-/// \param Where The AL `Text`.
-/// \param Which The AL `Text`.
+/// \param Where Where to delete, as a set of `=`, `<` and `>`; nothing means `=`.
+/// \param Which The characters to delete; nothing means a space.
 /// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-DelChr(std::string_view String, std::string_view Where = {}, std::string_view Which = {});
+/// \note OMITTED IS NOT EMPTY. The page's sentence about an empty parameter is about a caller who
+///       PASSES `''`, and AL's own defaults are `=` and a space -- which is what makes
+///       `DelChr(S)` strip every space and `DelChr(S, '<>')` trim both ends.
+std::string DelChr(std::string_view String,
+                   std::optional<std::string_view> Where = std::nullopt,
+                   std::optional<std::string_view> Which = std::nullopt);
 
 /// \brief AL `Text.DelStr(Text, Integer, Integer)`. Deletes a substring inside a string (text or
 /// code).
@@ -642,8 +647,9 @@ DelChr(std::string_view String, std::string_view Where = {}, std::string_view Wh
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-DelStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length = {});
+std::string DelStr(std::string_view String,
+                   ::agiru::Integer Position,
+                   std::optional<::agiru::Integer> Length = std::nullopt);
 
 /// \brief AL `Text.IncStr(Text)`. Increases a positive number or decrease a negative number inside
 /// a string by one (1).
@@ -683,8 +689,9 @@ std::string LowerCase(std::string_view String);
 /// \param FillCharacter The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-PadStr(std::string_view String, ::agiru::Integer Length, std::string_view FillCharacter = {});
+std::string PadStr(std::string_view String,
+                   ::agiru::Integer Length,
+                   std::optional<std::string_view> FillCharacter = std::nullopt);
 
 /// \brief AL `Text.SelectStr(Integer, Text)`. Retrieves a substring from a comma-separated string.
 /// \param Number The AL `Integer`.
@@ -700,12 +707,12 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
 /// the WeightString parameter is longer than the source, an exception is thrown.
 /// \param String The AL `Text`.
 /// \param WeightString The AL `Text`.
-/// \param Modulus The AL `Integer`.
+/// \param Modulus The number in the checksum formula; nothing means 10, which the page gives as
+///                the default.
 /// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer StrCheckSum(std::string_view String,
                              std::string_view WeightString = {},
-                             ::agiru::Integer Modulus = {});
+                             std::optional<::agiru::Integer> Modulus = std::nullopt);
 
 /// \brief AL `Text.StrPos(Text, Text)`. Searches for the first occurrence of substring inside a
 /// string.
