@@ -59,6 +59,38 @@ void Flatten(const std::vector<al::PageControl> &controls, Controls &into) {
   }
 }
 
+std::set<std::string> TestPageSurface() {
+  static const std::set<std::string> surface{"OpenNew",
+                                             "OpenEdit",
+                                             "OpenView",
+                                             "Close",
+                                             "First",
+                                             "Next",
+                                             "New",
+                                             "Last",
+                                             "Previous",
+                                             "Prev",
+                                             "GotoRecord",
+                                             "GoToKey",
+                                             "Trap",
+                                             "OK",
+                                             "Cancel",
+                                             "Yes",
+                                             "No",
+                                             "Caption",
+                                             "Editable",
+                                             "Expand",
+                                             "IsExpanded",
+                                             "GetField",
+                                             "Filter",
+                                             "GetValidationError",
+                                             "ValidationErrorCount",
+                                             "FindFirstField",
+                                             "FindNextField",
+                                             "FindPreviousField"};
+  return surface;
+}
+
 std::string PartSource(const al::PageControl &control) {
   std::string named;
   for (const al::Token &token : control.source) { named += token.text; }
@@ -203,38 +235,6 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   return found == objects.tables.end() ? std::string{} : found->second.identifier;
 }
 
-}
-
-std::set<std::string> TestPageSurface() {
-  static const std::set<std::string> surface{"OpenNew",
-                                             "OpenEdit",
-                                             "OpenView",
-                                             "Close",
-                                             "First",
-                                             "Next",
-                                             "New",
-                                             "Last",
-                                             "Previous",
-                                             "Prev",
-                                             "GotoRecord",
-                                             "GoToKey",
-                                             "Trap",
-                                             "OK",
-                                             "Cancel",
-                                             "Yes",
-                                             "No",
-                                             "Caption",
-                                             "Editable",
-                                             "Expand",
-                                             "IsExpanded",
-                                             "GetField",
-                                             "Filter",
-                                             "GetValidationError",
-                                             "ValidationErrorCount",
-                                             "FindFirstField",
-                                             "FindNextField",
-                                             "FindPreviousField"};
-  return surface;
 }
 
 std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object) {
