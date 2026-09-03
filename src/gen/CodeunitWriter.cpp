@@ -800,8 +800,36 @@ std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const Object
 // known, which is what keeps an unknown one from being emitted as if it were.
 class CodeunitNames : public Names {
 public:
-  CodeunitNames(const al::CodeunitObject &unit, const al::ProcedureDecl &procedure)
-      : unit_(unit), procedure_(procedure) {}
+  CodeunitNames(const al::CodeunitObject &unit,
+                const al::ProcedureDecl &procedure,
+                const Objects &objects)
+      : unit_(unit), procedure_(procedure), objects_(objects) {}
+
+  /// The record variable's table, then the field, then what the field was declared as.
+  [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
+    const al::VarDecl *declared = Declaration(field.variable);
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
+    const auto table = objects_.fieldEnums.find(LowerKey(declared->subtype));
+    if (table == objects_.fieldEnums.end()) { return {}; }
+    const auto found = table->second.find(LowerKey(std::string(field.field)));
+    return found == table->second.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] const al::VarDecl *Declaration(std::string_view name) const {
+    const auto same = [&name](const al::VarDecl &declared) {
+      return LowerKey(declared.name) == LowerKey(std::string(name));
+    };
+    for (const al::VarDecl &declared : procedure_.variables) {
+      if (same(declared)) { return &declared; }
+    }
+    for (const al::VarDecl &declared : procedure_.parameters) {
+      if (same(declared)) { return &declared; }
+    }
+    for (const al::VarDecl &declared : unit_.variables) {
+      if (same(declared)) { return &declared; }
+    }
+    return nullptr;
+  }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     const auto same = [&name](const al::VarDecl &declared) {
@@ -862,6 +890,7 @@ public:
 private:
   const al::CodeunitObject &unit_;
   const al::ProcedureDecl &procedure_;
+  const Objects &objects_;
 };
 
 std::string Locals(const al::ProcedureDecl &procedure,
@@ -910,7 +939,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
         publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures);
     const std::string body =
         publisher ? std::string{}
-                  : WriteStatements(CodeunitNames(unit, procedure), procedure.body, 2);
+                  : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;
@@ -1020,8 +1049,15 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 
 TableIndex PlatformTables() {
   TableIndex tables;
-  tables.insert_or_assign("field", TableRef{.identifier = "platform::Field", .header = {}});
-  tables.insert_or_assign("2000000041", TableRef{.identifier = "platform::Field", .header = {}});
+  const auto add = [&tables](std::string_view name, std::string_view number) {
+    const TableRef ref{.identifier = "platform::" + Identifier(name), .header = {}};
+    tables.insert_or_assign(LowerKey(std::string(name)), ref);
+    tables.insert_or_assign(std::string(number), ref);
+  };
+  add("Field", "2000000041");
+  add("Integer", "2000000026");
+  add("Date", "2000000007");
+  add("User", "2000000120");
   return tables;
 }
 

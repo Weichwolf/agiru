@@ -17,6 +17,15 @@ namespace agiru::gen {
 /// a codeunit variable or another procedure of the same object. The statement translator does not
 /// need to know which -- it needs to know the C++ spelling -- so the two callers answer that
 /// question and the translator asks it.
+/// \brief A field, named through the variable that holds it.
+///
+/// Two adjacent strings are two strings a caller can swap in silence, and the question is about ONE
+/// thing: which field of which variable.
+struct OfVariable {
+  std::string_view variable; ///< The AL name of the record variable.
+  std::string_view field;    ///< The AL name of its field.
+};
+
 class Names {
 public:
   Names() = default;
@@ -31,6 +40,19 @@ public:
 
   /// The enumeration that `Name::Member` scopes through, or empty when `Name` is not one here.
   [[nodiscard]] virtual std::string Enumeration(std::string_view name) const = 0;
+
+  /// \brief The enumeration a FIELD OF A RECORD VARIABLE scopes through.
+  ///
+  /// \param field The variable and the field, in one value so they cannot be swapped.
+  /// \return The enumeration's qualified name, or empty when this scope cannot answer.
+  ///
+  /// \note THIS IS THE QUESTION A NAME ALONE CANNOT ANSWER. `Agent.Substate::Archived` needs the
+  ///       variable's TABLE, then the field, then what the field was declared as -- and a body
+  ///       writer that maps a name to a spelling has none of the three (board:0038).
+  [[nodiscard]] virtual std::string FieldEnumeration(const OfVariable &field) const {
+    static_cast<void>(field);
+    return {};
+  }
 
   /// \brief Whether a name is an object HANDLE rather than a value.
   ///

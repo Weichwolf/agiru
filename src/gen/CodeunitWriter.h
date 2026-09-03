@@ -42,12 +42,22 @@ struct CodeunitHeader {
 /// EVERY OBJECT KIND GETS ITS OWN INDEX, because AL lets a table and a codeunit carry one name and
 /// tells them apart by the keyword: `Record "X"` against `Codeunit "X"`. One index would let a
 /// codeunit variable resolve to a table class, which compiles and is wrong.
+/// Per table, per field, the enumeration that field scopes through -- empty for a field that is
+/// not an option at all.
+///
+/// A NAME IS NOT ENOUGH TO TRANSLATE A BODY. AL writes `Agent.Substate::Archived`: a field of a
+/// record variable, scoped through the field's own enumeration. Answering it needs the variable's
+/// TABLE, then the field, then what the field was declared as -- three steps the body writer could
+/// not take, because it mapped a name to a SPELLING and nothing else (board:0038).
+using FieldEnums = std::map<std::string, std::map<std::string, std::string>>;
+
 struct Objects {
   TableIndex tables;
   TableIndex codeunits;
   TableIndex interfaces;
   TableIndex pages;
   EnumIndex enums;
+  FieldEnums fieldEnums;
 };
 
 /// The tables the PLATFORM provides, which no `.al` file declares.

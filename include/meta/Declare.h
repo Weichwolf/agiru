@@ -197,6 +197,17 @@ template <typename E> struct FieldTypeOf<Option<E>> {
   static constexpr std::span<const EnumValueDef> kValues{OptionTraits<E>::kValues};
 };
 
+/// \brief `Option<>` -- an option field that names no members at all.
+///
+/// \note AN OPTION WITH NO VOCABULARY IS AL'S OWN DECLARATION AND NOT A GAP. `procedure P(Type:
+///       Option)` takes any ordinal, and a platform table whose member ORDER nothing states carries
+///       the ordinal without claiming names it cannot check (board:0032).
+template <> struct FieldTypeOf<Option<void>> {
+  static constexpr FieldType kType = FieldType::Option;     ///< The AL type tag.
+  static constexpr std::uint16_t kLength = 0;               ///< An option declares no length.
+  static constexpr std::span<const EnumValueDef> kValues{}; ///< No members are claimed.
+};
+
 /// \brief `Enum` -- an enum field, whose values come from the enum object it names.
 template <typename E> struct FieldTypeOf<Enum<E>> {
   static constexpr FieldType kType = FieldType::Enum; ///< The AL type tag.

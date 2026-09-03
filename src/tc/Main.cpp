@@ -526,6 +526,28 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
+/// Records, per field of a table, the enumeration it scopes through -- the AL enum it was declared
+/// as, or the inline option the generator named after the table and the field.
+///
+/// AN ENUM FIELD AND AN OPTION FIELD ARE THE SAME QUESTION WITH TWO ANSWERS, which is why both are
+/// recorded here rather than decided at the use site: `enum "X"` names a translated enumeration and
+/// `Option A,B,C` names one this generator invented, and a body that writes `Rec.Field::Member`
+/// cannot tell them apart.
+void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums &into) {
+  auto &fields = into[agiru::gen::LowerKey(table.name)];
+  for (const agiru::al::FieldDecl &field : table.fields) {
+    if (agiru::gen::TypeName(field.type) == "Enum" && !field.subtype.empty()) {
+      fields.insert_or_assign(agiru::gen::LowerKey(field.name),
+                              "enums::" + agiru::gen::Identifier(field.subtype));
+      continue;
+    }
+    if (agiru::al::Find(field.properties, "OptionMembers") != nullptr) {
+      fields.insert_or_assign(agiru::gen::LowerKey(field.name),
+                              "tables::" + agiru::gen::OptionEnumName(table.name, field.name));
+    }
+  }
+}
+
 Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Tables kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
@@ -544,6 +566,7 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                      .header = TableHeaderPath(table)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
+      NoteFieldEnums(table, objects.fieldEnums);
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(table));
     } catch (const std::exception &e) {

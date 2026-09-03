@@ -257,6 +257,15 @@ private:
 
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
+    // `Rec.Field::Member` -- a field of a record variable, scoped through the field's own
+    // enumeration. The variable decides the table and the table decides the enumeration.
+    if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
+        base.children[0].kind == al::ExprKind::Name &&
+        base.children[1].kind == al::ExprKind::Name) {
+      const std::string enumeration = scope_.FieldEnumeration(
+          OfVariable{.variable = base.children[0].text, .field = base.children[1].text});
+      if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+    }
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
