@@ -1,3 +1,5 @@
+#include "meta/Declare.h"
+
 #include "Apps.h"
 #include "Ast.h"
 #include "BodyWriter.h"
@@ -559,6 +561,9 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       std::set<std::string> fieldNames;
       for (const agiru::al::FieldDecl &field : table.fields) {
         fieldNames.insert(agiru::gen::LowerKey(field.name));
+      }
+      for (const agiru::SystemFieldDecl &field : agiru::kSystemFields) {
+        fieldNames.insert(agiru::gen::LowerKey(std::string(field.name)));
       }
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table),

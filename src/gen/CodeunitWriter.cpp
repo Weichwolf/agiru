@@ -734,7 +734,7 @@ public:
                                     : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) { return DoorCalls(member.field); }
-    if (subtype.empty() || !DoorDeclares(member.field)) { return false; }
+    if (subtype.empty() || !DoorCalls(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
     return !table->second.fields.contains(LowerKey(std::string(member.field)));

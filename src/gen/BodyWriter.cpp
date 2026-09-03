@@ -671,7 +671,7 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    return IsRecord(member.variable) && DoorDeclares(member.field) &&
+    return IsRecord(member.variable) && DoorCalls(member.field) &&
            FieldNamed(table_, member.field) == nullptr;
   }
 
@@ -734,7 +734,7 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    return IsRecord(member.variable) && DoorDeclares(member.field) &&
+    return IsRecord(member.variable) && DoorCalls(member.field) &&
            FieldNamed(*source_, member.field) == nullptr;
   }
 
