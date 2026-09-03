@@ -320,7 +320,15 @@ schema decision that is cheap now and a migration later.
 
 ## The invariants
 
-Four commitments. Everything else an item may revisit; these it may not.
+Five commitments. Everything else an item may revisit; these it may not.
+
+- **A POSTING IS ALL OR NOTHING, AND THAT OUTRANKS EVERY OTHER GOAL HERE.** This is an accounting
+  system: a run that loses half a document is worse than a run that is slow, and worse than one that
+  refuses. So a boundary rolls back everything inside it, a `Commit()` makes what came before it
+  durable and no later rollback may undo that, an error is never swallowed (`catch (...) {}` is a
+  finding with a counter), and a write that reported success IS on disk -- `synchronous_commit` is
+  not something this tree trades for throughput. The proof is that the same posting over the same
+  data produces the same entries twice, which is the next commitment.
 
 - **NO BINARY FLOATING-POINT TYPE CARRIES AN AMOUNT.** AL `Decimal` is .NET `decimal` -- 2^96-1
   with a scale up to 28. A `double` in a posting line breaks the balance check every posting hangs
