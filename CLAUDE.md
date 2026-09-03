@@ -71,13 +71,12 @@ things follow:
 `~/Git/openerp/` is the same undertaking in Python, at **2 260 of 2 289 green**. Its defeats are
 days already paid for; three of them are why the language changed:
 
-- **AL is statically typed and Python is not.** An AL `Record` is a set of named fields of fixed
-  type; in Python it became a dictionary of descriptors, and every type error surfaced at runtime --
-  inside a test run measured in hours. In C++ a table is a generated class with typed fields and the
-  same error is a compiler error in seconds.
-- **The .NET types are classes, not bridges.** The predecessor mapped `StringBuilder`,
-  `MemoryStream` and `XmlDocument` onto Python libraries and bled on the semantic difference. Here
-  they are REBUILT -- one C++ class per .NET class, with the behaviour its documentation describes.
+- **AL is statically typed and Python is not.** An AL `Record` became a dictionary of descriptors
+  there, and every type error surfaced at runtime, inside a test run measured in hours. Here a table
+  is a generated class with typed fields and the same error is a compiler error in seconds.
+- **The .NET types are classes, not bridges.** `StringBuilder`, `MemoryStream` and `XmlDocument`
+  were mapped onto Python libraries there and bled on the semantic difference. Here they are REBUILT,
+  one C++ class per .NET class.
 - **A process cost a gigabyte.** See the target above. This is not a performance note, it is the
   difference between running and not running.
 
@@ -117,10 +116,10 @@ and refuted. **The `al-semantics` agent does exactly this pass** -- documentatio
 board together -- and hands back the order, the traps with their item numbers and the C++ shape.
 
 **IT IS AUTHORITATIVE ABOUT THE QUESTION AND NEVER ABOUT THE ANSWER** -- that a semantic has a trap
-in it at all, and which call site walks into it. Where it disagrees with the platform documentation
-the documentation wins. Python's dynamism hid some defects and caused others: the `xRec` rounds are
-the first kind, the frame inspection behind `MaxStrLen` the second, and in C++ the declared length
-lives on the value so none of that machinery exists. Read the FINDING, not the fix.
+in it at all, and which call site walks into it. It is 97 % green on a subset, so it is also wrong
+somewhere, and where it disagrees with the documentation the documentation wins. Python's dynamism
+hid some defects and caused others -- the `xRec` rounds are the first kind, the frame inspection
+behind `MaxStrLen` the second. Read the FINDING, not the fix.
 
 **WHERE THEY DISAGREE, THE DOCUMENTATION WINS -- ABOUT GUARANTEES.** Validate order, trigger
 lifecycle, transaction behaviour: the platform documentation is the specification and the source is
@@ -165,13 +164,11 @@ describes, the runtime must do, whether or not a test asks for it.
 1. **Name equality with AL is an architectural invariant.** Types, methods and parameters carry
    their AL names, and only then is the documentation check mechanical -- a type named differently
    breaks it for ALL of its methods. The predecessor allowed `Record`->`Table`,
-   `RecordRef`->`_RecordRefProxy`, `List`->`AlList` and lost the check each time. Internal classes
-   with no AL counterpart may be named anything.
+   `RecordRef`->`_RecordRefProxy`, `List`->`AlList` and lost the check each time.
 
-   **THE STRONGER REASON IS THE READER.** Nobody will write an agiru module by hand: new tables and
-   codeunits will be written by a model, and AL is in its training data while agiru never will be.
-   So **a reader who knows AL and has never seen agiru must open one file and know how to write the
-   next.** Every deviation from AL is a place where that reader's priors mislead them.
+   **THE STRONGER REASON IS THE READER.** Nobody will write an agiru module by hand: it will be
+   written by a model, and AL is in its training data while agiru never will be. So **a reader who
+   knows AL and has never seen agiru must open one file and know how to write the next.**
 
    Three things follow: **consistency beats cleverness** -- if `FieldError(Code)` names the field,
    so do `TestField`, `FieldCaption` and `Validate`; **where idiomatic C++ can produce the AL shape
@@ -370,11 +367,9 @@ the wrong order. So the sequence is: **more AL goes in -> the tree compiles -> t
   the day one of them stops compiling. `make apps` is the whole generated tree in its own build
   directory, stopping AT THE FIRST ERROR, because every error there is one generic gap in `src/`.
 - **`make gap` IS THE LOOP, and it costs one compile.** `make tree` records, per failing header, the
-  file its FIRST diagnostic came from -- the root. `make gap` reads that census, ranks the roots by
-  how many headers each blocks, and compiles the top one. So a repair is aimed at the root that
-  buys the most, and it is confirmed the same way it was found: **a root leaves the census by
-  COMPILING, never by being crossed off.** When every root in the census compiles, the census is
-  spent and `make tree` writes the next one.
+  file its FIRST diagnostic came from -- the root; `make gap` ranks the roots by how many headers
+  each blocks and compiles the top one. **A root leaves the census by COMPILING, never by being
+  crossed off.** When every root compiles, `make tree` writes the next census.
 - **`make lint` IS NOT IN THE LOOP.** It is the gate before a commit, not a step between two edits,
   and it checks only what CHANGED unless `FULL=1` asks for the tree. `FULL=1` is 5 minutes over 82
   units at the analyser's 50 000-node budget; `DEEP=1` restores clang's own 225 000 and quadruples
