@@ -188,11 +188,10 @@ describes, the runtime must do, whether or not a test asks for it.
 
 ### Every defect is a generic gap
 
-Neither transpiler nor runtime knows any concrete AL object. So no defect can be
-"reservation-specific" or "sales-specific". A failing case shows an incompletely implemented generic
-AL primitive -- a builtin, trigger semantics, event dispatch, a FlowField, a TableRelation. With AL
-implemented generically to 100 %, every case passes. An AL object name appearing in `src/` outside
-`apps/` is a finding, not a fix.
+Neither transpiler nor runtime knows any concrete AL object, so no defect can be
+"reservation-specific". A failing case shows an incompletely implemented generic AL primitive -- a
+builtin, trigger semantics, event dispatch, a FlowField, a TableRelation. An AL object name in
+`src/` is a finding, not a fix.
 
 ## The craft
 
