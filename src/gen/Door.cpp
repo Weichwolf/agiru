@@ -47,39 +47,43 @@ std::vector<std::string> &DoorTypes() {
   return const_cast<std::vector<std::string> &>(types);
 }
 
-std::map<std::string, std::string> &DoorSpellings() {
-  static const std::map<std::string, std::string> spellings = [] {
-    std::map<std::string, std::string> found;
-    const std::filesystem::path root = std::filesystem::path(AGIRU_SOURCE_DIR) / "include";
-    if (!std::filesystem::is_directory(root)) {
-      throw std::runtime_error("the door has no include/ directory at " + root.string());
+void NoteSpellings(const std::string &line, std::map<std::string, std::string> &found) {
+  static const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*[({;])");
+  if (line.starts_with("//")) { return; }
+  for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
+    const std::string name = (*it)[1].str();
+    std::string key;
+    for (const char c : name) {
+      key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     }
-    const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*[({;])");
-    for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
-      if (entry.path().extension() != ".h") { continue; }
-      std::ifstream file(entry.path());
-      std::string line;
-      while (std::getline(file, line)) {
-        if (line.starts_with("///") || line.starts_with("//")) { continue; }
-        for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
-          const std::string name = (*it)[1].str();
-          std::string key;
-          for (const char c : name) {
-            key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-          }
-          const auto standing = found.find(key);
-          if (standing == found.end()) {
-            found.emplace(key, name);
-          } else if (standing->second != name) {
-            standing->second.clear();
-          }
-        }
-      }
+    const auto standing = found.find(key);
+    if (standing == found.end()) {
+      found.emplace(key, name);
+    } else if (standing->second != name) {
+      standing->second.clear();
     }
-    if (found.empty()) { throw std::runtime_error("the door declares no names"); }
-    return found;
-  }();
-  return const_cast<std::map<std::string, std::string> &>(spellings);
+  }
+}
+
+std::map<std::string, std::string> ReadSpellings() {
+  std::map<std::string, std::string> found;
+  const std::filesystem::path root = std::filesystem::path(AGIRU_SOURCE_DIR) / "include";
+  if (!std::filesystem::is_directory(root)) {
+    throw std::runtime_error("the door has no include/ directory at " + root.string());
+  }
+  for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
+    if (entry.path().extension() != ".h") { continue; }
+    std::ifstream file(entry.path());
+    std::string line;
+    while (std::getline(file, line)) { NoteSpellings(line, found); }
+  }
+  if (found.empty()) { throw std::runtime_error("the door declares no names"); }
+  return found;
+}
+
+const std::map<std::string, std::string> &DoorSpellings() {
+  static const std::map<std::string, std::string> spellings = ReadSpellings();
+  return spellings;
 }
 
 constexpr std::array<std::pair<std::string_view, std::string_view>, 32> kElsewhere{{
@@ -131,6 +135,22 @@ bool Mentions(std::string_view text, std::string_view name) {
   return false;
 }
 
+std::string WithoutEmptyNamespaces(std::string text) {
+  for (std::size_t at = text.find("namespace agiru::app::"); at != std::string::npos;
+       at = text.find("namespace agiru::app::", at + 1)) {
+    const std::size_t open = text.find(" {\n", at);
+    if (open == std::string::npos) { break; }
+    if (text.compare(open + 3, std::string_view("} // namespace").size(), "} // namespace") != 0) {
+      continue;
+    }
+    const std::size_t shut = text.find('\n', open + 3);
+    if (shut == std::string::npos) { break; }
+    text.erase(at, shut + 1 - at);
+    at = at > 0 ? at - 1 : 0;
+  }
+  return text;
+}
+
 }
 
 std::string DoorIncludes(std::string_view text, ObjectKind kind) {
@@ -160,22 +180,6 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   return out;
 }
 
-std::string WithoutEmptyNamespaces(std::string text) {
-  for (std::size_t at = text.find("namespace agiru::app::"); at != std::string::npos;
-       at = text.find("namespace agiru::app::", at + 1)) {
-    const std::size_t open = text.find(" {\n", at);
-    if (open == std::string::npos) { break; }
-    if (text.compare(open + 3, std::string_view("} // namespace").size(), "} // namespace") != 0) {
-      continue;
-    }
-    const std::size_t shut = text.find('\n', open + 3);
-    if (shut == std::string::npos) { break; }
-    text.erase(at, shut + 1 - at);
-    at = at > 0 ? at - 1 : 0;
-  }
-  return text;
-}
-
 std::string WithDoor(std::string text, ObjectKind kind) {
   const std::size_t at = text.find(kDoorMarker);
   if (at == std::string::npos) { return text; }
@@ -184,26 +188,6 @@ std::string WithDoor(std::string text, ObjectKind kind) {
   const std::string whole =
       without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
   return WithoutEmptyNamespaces(whole);
-}
-
-void KnowDoorTypes(const std::filesystem::path &include) {
-  static constexpr std::array kAlsoAMember{
-      std::string_view{"Field"},
-      std::string_view{"RecordId"},
-      std::string_view{"TestField"},
-      std::string_view{"TestAction"},
-  };
-  DoorTypes().clear();
-  if (!std::filesystem::is_directory(include / "type")) {
-    throw std::runtime_error("the door has no type/ directory at " + include.string());
-  }
-  for (const auto &entry : std::filesystem::directory_iterator(include / "type")) {
-    if (entry.path().extension() != ".h") { continue; }
-    const std::string name = entry.path().stem().string();
-    if (std::ranges::contains(kAlsoAMember, name)) { continue; }
-    DoorTypes().push_back(name);
-  }
-  if (DoorTypes().empty()) { throw std::runtime_error("the door declares no types"); }
 }
 
 bool DoorDeclares(std::string_view name) {
@@ -223,5 +207,4 @@ std::string AsTheDoorSpellsIt(std::string_view name) {
   if (found == DoorSpellings().end() || found->second.empty()) { return std::string(name); }
   return found->second;
 }
-
 }
