@@ -637,6 +637,15 @@ public:
     return {};
   }
 
+  [[nodiscard]] bool IsRecord(std::string_view variable) const override {
+    return SameName("Rec", variable) || SameName("xRec", variable);
+  }
+
+  [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
+    if (!IsRecord(field.variable)) { return {}; }
+    return Enumeration(field.field);
+  }
+
 private:
   const al::TableObject &table_;
 };
@@ -672,6 +681,15 @@ public:
     if (SameName("Rec", name)) { return "Rec"; }
     if (SameName("CurrPage", name)) { return "(*this)"; }
     return {};
+  }
+
+  [[nodiscard]] bool IsRecord(std::string_view variable) const override {
+    return source_ != nullptr && (SameName("Rec", variable) || SameName("xRec", variable));
+  }
+
+  [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
+    if (!IsRecord(field.variable)) { return {}; }
+    return Enumeration(field.field);
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
