@@ -397,21 +397,24 @@ private:
     std::size_t fields = 0;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
-      fields =
-          scope_.IsRecord(callee.children[0].text) ? FieldArguments(callee.children[1].text) : 0;
+      fields = FieldArguments(callee.children[1].text);
       if (fields != 0) {
-        receiver = Expression(callee.children.front(), kPrimaryPrecedence);
-        reach = callee.children[0].kind == al::ExprKind::Name &&
-                        scope_.IsHandle(callee.children[0].text)
-                    ? "->"
-                    : ".";
+        const al::Expr *owner = &callee.children.front();
+        if (owner->kind == al::ExprKind::Binary && owner->text == "." &&
+            owner->children.size() == 2 && owner->children[1].kind == al::ExprKind::Name &&
+            DoorDeclares(owner->children[1].text) && !DoorCalls(owner->children[1].text)) {
+          owner = &owner->children.front();
+        }
+        receiver = Expression(*owner, kPrimaryPrecedence);
+        reach = owner->kind == al::ExprKind::Name && scope_.IsHandle(owner->text) ? "->" : ".";
       }
     }
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
       const bool isField =
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
-      if (isField && expression.children[i].kind == al::ExprKind::Name) {
+      if (isField && expression.children[i].kind == al::ExprKind::Name &&
+          scope_.Resolve(expression.children[i].text).empty()) {
         out += receiver + reach + Identifier(expression.children[i].text);
         continue;
       }
