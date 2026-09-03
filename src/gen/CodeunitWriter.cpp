@@ -65,6 +65,35 @@ std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
 /// AL writes the platform's own enums as bare type names: `Verbosity: Verbosity`,
 /// `DataClassification: DataClassification`. Emitting the word unchanged put it beside the door,
 /// where nothing declares it.
+/// A method whose leading arguments are FIELDS OF THE RECEIVER, and how many.
+///
+/// The body writer spells them against the receiver; this is the same table, because the gatherer
+/// has to know what the writer will reach for.
+constexpr std::size_t kEveryArgument = static_cast<std::size_t>(-1);
+
+std::size_t FieldArguments(std::string_view method) {
+  static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
+      {"SetRange", 1},
+      {"SetFilter", 1},
+      {"TestField", 1},
+      {"FieldError", 1},
+      {"FieldCaption", 1},
+      {"FieldName", 1},
+      {"FieldNo", 1},
+      {"Validate", 1},
+      {"SetAscending", 1},
+      {"CalcFields", kEveryArgument},
+      {"CalcSums", kEveryArgument},
+      {"SetCurrentKey", kEveryArgument},
+      {"SetLoadFields", kEveryArgument},
+      {"AddLoadFields", kEveryArgument},
+  };
+  for (const auto &[name, count] : kTakers) {
+    if (LowerKey(std::string(name)) == LowerKey(std::string(method))) { return count; }
+  }
+  return 0;
+}
+
 bool NamesAbsentType(const al::VarDecl &declared) {
   // AN EMPTY TYPE IS NOT A TYPE. A procedure with no return has one, and calling it absent named a
   // struct with no name at all.
@@ -638,15 +667,65 @@ void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use)
   }
 }
 
+/// The field names a record method takes, read straight out of the token stream.
+///
+/// A FIELD ARGUMENT IS A MEMBER TOO. `X.SetRange("Agent User Security ID", V)` names a field of X,
+/// and the emitter spells it against X -- so an absent X needs that name as well, or the stub is
+/// missing exactly what the body reaches for. The method decides how many: `SetRange` takes one,
+/// `CalcFields` takes all of them (board:0035).
+void GatherFieldArguments(const std::vector<al::Token> &tokens,
+                          std::size_t method,
+                          std::set<std::string> &into) {
+  const std::size_t count = FieldArguments(tokens[method].text);
+  if (count == 0) { return; }
+  std::size_t at = method + 1;
+  if (at >= tokens.size() || tokens[at].text != "(") { return; }
+  ++at;
+  int depth = 0;
+  bool first = true;
+  for (; at < tokens.size(); ++at) {
+    const al::Token &token = tokens[at];
+    if (token.text == "(") { ++depth; }
+    if (token.text == ")") {
+      if (depth == 0) { return; }
+      --depth;
+    }
+    if (depth != 0) { continue; }
+    if (token.text == ",") {
+      if (count != kEveryArgument) { return; }
+      first = true;
+      continue;
+    }
+    if (first && (token.kind == al::TokenKind::Identifier ||
+                  token.kind == al::TokenKind::QuotedIdentifier)) {
+      into.insert(Identifier(token.text));
+    }
+    first = false;
+  }
+}
+
 void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, DotNetUse &use) {
   for (std::size_t i = 0; i + 2 < procedure.tokens.size(); ++i) {
-    if (procedure.tokens[i].kind != al::TokenKind::Identifier) { continue; }
-    if (procedure.tokens[i + 1].text != ".") { continue; }
-    if (procedure.tokens[i + 2].kind != al::TokenKind::Identifier) { continue; }
-    const auto found = named.find(LowerKey(procedure.tokens[i].text));
-    if (found != named.end()) {
-      use[found->second].insert(Identifier(procedure.tokens[i + 2].text));
+    if (procedure.tokens[i].kind != al::TokenKind::Identifier &&
+        procedure.tokens[i].kind != al::TokenKind::QuotedIdentifier) {
+      continue;
     }
+    if (procedure.tokens[i + 1].text != ".") { continue; }
+    // A QUOTED NAME IS A NAME. AL writes `Agent."Display Name" := X` and the gather only accepted
+    // the bare kind, so every member whose AL name has a space in it was missing from the stub --
+    // which is most of them, because BC names fields the way a caption reads.
+    if (procedure.tokens[i + 2].kind != al::TokenKind::Identifier &&
+        procedure.tokens[i + 2].kind != al::TokenKind::QuotedIdentifier) {
+      continue;
+    }
+    const auto found = named.find(LowerKey(procedure.tokens[i].text));
+    if (found == named.end()) { continue; }
+    use[found->second].insert(Identifier(procedure.tokens[i + 2].text));
+    // A FIELD ARGUMENT IS A MEMBER TOO. `X.SetRange("Agent User Security ID", V)` names a field of
+    // X, and the emitter spells it against X -- so an absent X needs that name as well, or the
+    // stub is missing exactly what the body reaches for. The method decides: `SetRange` takes one
+    // field, `CalcFields` takes all of them (board:0035).
+    GatherFieldArguments(procedure.tokens, i + 2, use[found->second]);
   }
 }
 
@@ -737,19 +816,30 @@ public:
     return false;
   }
 
+  /// \note THE DECLARATION'S SPELLING WINS AND NOT THE CALL SITE'S. AL is case-insensitive, so
+  ///       `AgentConsumptionOverview` declares `AgentUserSecurityId` and its body writes
+  ///       `AgentUserSecurityID`; returning what the CALLER wrote made those two different C++
+  ///       symbols and the second one named nothing. CLAUDE.md lists it as a measured failure mode
+  ///       -- "collapse match, once, in the generator" -- and this is the one place it happens.
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : procedure_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return Identifier(declared.name);
+      }
     }
     for (const al::VarDecl &declared : procedure_.parameters) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return Identifier(declared.name);
+      }
     }
     if (!procedure_.returnName.empty() &&
         LowerKey(procedure_.returnName) == LowerKey(std::string(name))) {
-      return Identifier(name);
+      return Identifier(procedure_.returnName);
     }
     for (const al::VarDecl &declared : unit_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return Identifier(declared.name);
+      }
     }
     for (const al::LabelDecl &label : unit_.labels) {
       if (LowerKey(label.name) == LowerKey(std::string(name))) { return Identifier(label.name); }

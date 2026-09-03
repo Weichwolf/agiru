@@ -4,6 +4,7 @@
 
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief What a .NET member that has not been rebuilt answers with: nothing, loudly.
@@ -54,9 +55,19 @@ public:
   /// \tparam T The type the caller wants.
   /// \return Never.
   /// \throws Error always.
+  ///
+  /// \note IT DOES NOT CONVERT TO A STANDARD STRING, and that is what keeps it unambiguous.
+  ///       `Code<50> = Obj.Member` had two viable conversions -- one to `Code<50>` and one to
+  ///       `std::string_view`, which `Code` also assigns from -- and two user-defined conversions
+  ///       to two different parameters is ambiguous rather than wrong. Excluding the standard
+  ///       spellings leaves exactly the AL type, which is the one AL means.
   // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- the conversion must
   // be implicit or `Text x := Obj.Member` would not compile, which is the shape AL writes.
-  template <typename T> operator T() const { Throw(); }
+  template <typename T>
+    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
+  operator T() const {
+    Throw();
+  }
 
   /// \brief Refuses an assignment.
   /// \tparam T The type the caller assigned.

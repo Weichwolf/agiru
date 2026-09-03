@@ -45,8 +45,16 @@ public:
   constexpr Decimal() = default;
 
   /// \brief Constructs from a whole number.
+  ///
   /// \param value The integer value.
-  explicit Decimal(std::int64_t value);
+  ///
+  /// \note NOT EXPLICIT, BECAUSE AL WIDENS AN INTEGER TO A DECIMAL SILENTLY. `exit(0)` in a
+  ///       procedure returning Decimal is ordinary AL, and so is `Amount := 5`. The conversion is
+  ///       LOSSLESS in that direction -- a 64-bit integer is inside the 96-bit mantissa -- so
+  ///       nothing about the amount invariant is weakened by it. The direction that would weaken
+  ///       it, a binary float reaching a Decimal, does not exist here at all.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
+  Decimal(std::int64_t value);
 
   /// \brief Renders the value for round-tripping: sign, digits, a full stop, scale preserved.
   ///

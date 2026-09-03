@@ -29,8 +29,8 @@ test: all          ## the fast gate
 transpile: all     ## every app in apps.json through the transpiler into apps/
 	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
 
-gap: all           ## the first generated header that does not compile, and why
-	@sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
+gap: all           ## the first generated header that does not compile (SOURCE=1: the bodies)
+	@SOURCE=$(SOURCE) SWEEP=$(SWEEP) sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
 
 # BARE `make` IS `src/`, AND `make apps` IS THE GENERATED TREE. They are separate build directories
 # because they are separate questions: the runtime and the transpiler must stand on their own, and

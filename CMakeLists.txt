@@ -108,21 +108,46 @@ set(AGIRU_BC_SOURCE "$ENV{HOME}/Git/BCApps/src"
 # day it is enough, this defaults to ON and the option goes.
 option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
 
-file(GLOB app_dirs RELATIVE "${CMAKE_SOURCE_DIR}/apps" CONFIGURE_DEPENDS "apps/*")
-foreach(app IN LISTS app_dirs)
-  if(NOT IS_DIRECTORY "${CMAKE_SOURCE_DIR}/apps/${app}")
-    continue()
-  endif()
-  file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS "apps/${app}/*.cpp")
-  if(NOT app_sources OR NOT AGIRU_BUILD_APPS)
-    continue()
-  endif()
-  add_library(agiru_app_${app} SHARED ${app_sources})
-  target_include_directories(agiru_app_${app} PRIVATE
-    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/${app}")
-  target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
-  target_link_libraries(agiru PRIVATE agiru_app_${app})
-endforeach()
+# AN APP SEES THE DOOR, THE ABSENT SURFACE AND THE APPS IT DEPENDS ON -- nothing else, and that is
+# what the linker enforces about AL's own direction: the Base Application may not know an extension,
+# only the other way round. `apps.json` declares it, so CMake reads it rather than guessing.
+#
+# `absent` IS EVERY APP'S, because it is not an app: it is the one file naming every AL object and
+# .NET type this run does not have, written by the transpiler for the whole run (board:0035).
+if(AGIRU_BUILD_APPS)
+  file(READ "${CMAKE_SOURCE_DIR}/apps.json" apps_json)
+  string(JSON app_count LENGTH "${apps_json}" apps)
+  math(EXPR app_last "${app_count} - 1")
+  foreach(i RANGE ${app_last})
+    string(JSON app GET "${apps_json}" apps ${i} name)
+    file(GLOB_RECURSE app_sources CONFIGURE_DEPENDS "apps/${app}/*.cpp")
+    if(NOT app_sources)
+      continue()
+    endif()
+    add_library(agiru_app_${app} SHARED ${app_sources})
+    target_include_directories(agiru_app_${app} PRIVATE
+      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/${app}")
+    target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
+
+    string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)
+    if(depends)
+      string(JSON dep_count LENGTH "${depends}")
+      if(dep_count GREATER 0)
+        math(EXPR dep_last "${dep_count} - 1")
+        foreach(j RANGE ${dep_last})
+          string(JSON dep GET "${depends}" ${j})
+          target_include_directories(agiru_app_${app} PRIVATE
+            "${CMAKE_SOURCE_DIR}/apps/${dep}")
+          if(TARGET agiru_app_${dep})
+            target_link_libraries(agiru_app_${app} PRIVATE agiru_app_${dep})
+          endif()
+        endforeach()
+      endif()
+    endif()
+    target_link_libraries(agiru PRIVATE agiru_app_${app})
+  endforeach()
+endif()
 
 # THE GATE. Every case under test/gate/ is its own program with its own `main`, returning red or
 # green -- no framework, no registration, no collected binary that takes everything down with one

@@ -3,6 +3,7 @@
 #include "type/StringValue.h"
 
 #include <compare>
+#include <concepts>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -29,17 +30,38 @@ public:
   /// \brief An empty code.
   Code() = default;
 
-  /// \brief Constructs from text, normalising it first.
+  /// \brief Constructs from anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
   /// \param value The text.
-  /// \throws StringError when the normalised value is longer than N.
-  explicit Code(std::string_view value) { Assign(value); }
+  ///
+  /// \throws StringError when the normalised value does not fit N.
+  ///
+  /// \note ONE CONSTRAINED TEMPLATE AND NOT TWO OVERLOADS, because two were ambiguous: a string
+  ///       literal reaches `std::string_view` and `const std::string &` equally well. And NOT
+  ///       EXPLICIT, because AL assigns text to a Code without ceremony. The NORMALISATION is what
+  ///       `Assign` still does.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Code(const T &value) {
+    Assign(std::string_view(value));
+  }
 
-  /// \brief Assigns text, normalising it first.
+  /// \brief Assigns anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
   /// \param value The text.
   /// \return This object.
-  /// \throws StringError when the normalised value is longer than N.
-  Code &operator=(std::string_view value) {
-    Assign(value);
+  /// \throws StringError when it does not fit the declared length.
+  ///
+  /// \note CONSTRAINED THE SAME WAY THE CONSTRUCTOR IS. With a converting constructor in place, a
+  ///       plain assignment from a string view is ambiguous with the implicit copy assignment for
+  ///       anything that reaches both, and a string literal reaches both.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Code &operator=(const T &value) {
+    Assign(std::string_view(value));
     return *this;
   }
 
@@ -64,10 +86,18 @@ public:
   /// \return True when the stored text is identical, so `"01"` differs from `"1"`.
   [[nodiscard]] bool operator==(const Code &o) const { return Stored() == o.Stored(); }
 
-  /// \brief Compares against a literal, the way AL writes `Code <> ''`.
+  /// \brief Compares against a literal, which is how AL writes an emptiness test.
   /// \param value The text.
   /// \return True when the stored text is identical.
-  [[nodiscard]] bool operator==(std::string_view value) const { return Stored() == value; }
+  /// \note CONSTRAINED, for the reason the constructor is: with a converting constructor in
+  ///       place, a plain equality against a string view is ambiguous with the one against another
+  ///       Code for anything that reaches both, and a string literal reaches both.
+  /// \tparam T The source, which must read as a `std::string_view`.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  [[nodiscard]] bool operator==(const T &value) const {
+    return Stored() == std::string_view(value);
+  }
 };
 
 } // namespace agiru

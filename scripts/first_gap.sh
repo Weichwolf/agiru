@@ -43,6 +43,13 @@ trap 'rm -f "$unit" "$err"' EXIT
 # compiled directly that is reached again through one of its own includes is read twice and every
 # class in it is a redefinition -- the measurement lying about a tree a real build is fine with.
 compiles() {
+  # A SOURCE IS COMPILED AND A HEADER IS INCLUDED. `#pragma once` has no effect in the main file, so
+  # a header compiled directly that is reached through one of its own includes is read twice.
+  if [ -n "${SOURCE:-}" ]; then
+    clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic \
+      $includes "$1" 2>"$err"
+    return
+  fi
   case $1 in
     /*) printf '#include "%s"\n' "$1" > "$unit" ;;
     *) printf '#include "%s/%s"\n' "$PWD" "$1" > "$unit" ;;
@@ -51,12 +58,19 @@ compiles() {
     $includes "$unit" 2>"$err"
 }
 
+# `SOURCE=1` WALKS THE BODIES INSTEAD OF THE DECLARATIONS. A header is what a signature says and a
+# source is what the AL statements became, so the two fail for different reasons and the second set
+# has never been measured (board:0038). `make apps` finds the same defects and pays a full ninja
+# rebuild for every header the repair touches; this pays one translation unit.
+KIND=${SOURCE:+*.cpp}
+KIND=${KIND:-*.h}
+
 sweep() {
   : > "$OUT/files"
   for app in $(python3 -c "
 import json
 print(' '.join(a['name'] for a in json.load(open('apps.json'))['apps']))"); do
-    [ -d "$APPS/$app" ] && find "$APPS/$app" -name '*.h' | sort >> "$OUT/files"
+    [ -d "$APPS/$app" ] && find "$APPS/$app" -name "$KIND" | sort >> "$OUT/files"
   done
   total=$(wc -l < "$OUT/files")
   seen=0
@@ -71,7 +85,7 @@ print(' '.join(a['name'] for a in json.load(open('apps.json'))['apps']))"); do
   printf 'gap: all %s generated headers compile.\n' "$total"
 }
 
-[ "${SWEEP:-0}" = 1 ] && { sweep; exit 0; }
+[ "${SWEEP:-0}" = 1 ] || [ -n "${SOURCE:-}" ] && { sweep; exit 0; }
 [ -s "$CENSUS" ] || {
   printf 'gap: no census under %s -- sweeping. `make tree` writes one.\n\n' "$CENSUS"
   sweep

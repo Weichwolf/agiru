@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -239,19 +240,103 @@ private:
     return out;
   }
 
+  /// The namespace an AL object-kind scope names, or empty when the base is not one.
+  ///
+  /// AL WRITES AN OBJECT'S IDENTITY AS `Kind::"Name"` -- `Page::"Agent Consumption Overview"`,
+  /// `Codeunit::"Sales-Post"` -- and the kind is the keyword, not a variable. The generated tree
+  /// puts each kind in its own namespace for exactly the reason AL needs the keyword: 51 names in
+  /// the read roots are two kinds at once.
+  static std::string_view KindNamespace(std::string_view base) {
+    if (SameName(base, "Codeunit")) { return "codeunits"; }
+    if (SameName(base, "Page")) { return "pages"; }
+    if (SameName(base, "Table")) { return "tables"; }
+    if (SameName(base, "Enum")) { return "enums"; }
+    if (SameName(base, "Interface")) { return "interfaces"; }
+    return {};
+  }
+
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+      // A NAME THAT IS IN SCOPE IS A VARIABLE AND NOT A KIND. `Type::All` where `Type` is a field
+      // stays a field; only an unresolved base can be AL's keyword.
+      const std::string_view kind =
+          scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
+      if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
     }
     return Expression(base, kPrimaryPrecedence) + "::" + EnumeratorName(expression.text);
   }
 
+  /// How many leading arguments of an AL record method are FIELDS OF THE RECEIVER.
+  ///
+  /// A FIELD ARGUMENT IS NOT A NAME IN SCOPE. `AgentTaskConsumption.SetRange("Agent User Security
+  /// ID", X)` names a field of the record it is called on, and AL resolves it there -- so the C++
+  /// has to spell it against the receiver, `AgentTaskConsumption.AgentUserSecurityID`. Emitting the
+  /// bare identifier made it an undeclared name in every body that filters, which is most of them.
+  ///
+  /// The count is per method and it comes from the documentation's own signatures: `SetRange(Field,
+  /// ...)` takes one, `CalcFields(Field, ...)` takes all of them.
+  static std::size_t FieldArguments(std::string_view method) {
+    static constexpr auto kAll = static_cast<std::size_t>(-1);
+    static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
+        {"SetRange", 1},
+        {"SetFilter", 1},
+        {"TestField", 1},
+        {"FieldError", 1},
+        {"FieldCaption", 1},
+        {"FieldName", 1},
+        {"FieldNo", 1},
+        {"Validate", 1},
+        {"SetAscending", 1},
+        {"CalcFields", kAll},
+        {"CalcSums", kAll},
+        {"SetCurrentKey", kAll},
+        {"SetLoadFields", kAll},
+        {"AddLoadFields", kAll},
+    };
+    for (const auto &[name, count] : kTakers) {
+      if (SameName(name, method)) { return count; }
+    }
+    return 0;
+  }
+
   std::string Call(const al::Expr &expression) {
-    std::string out = Expression(expression.children.front(), kPrimaryPrecedence) + "(";
+    const al::Expr &callee = expression.children.front();
+    // `Page.Run(Page::"X", Rec)` IS A CALL ON THE OBJECT AND NOT ON A DISPATCHER. AL names the kind
+    // twice -- once as the receiver, once in the identity -- and what it means is "run that
+    // object". The generated form says it once: `pages::X::Run(Rec)`.
+    if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
+        callee.children[0].kind == al::ExprKind::Name &&
+        !KindNamespace(callee.children[0].text).empty() && expression.children.size() > 1 &&
+        expression.children[1].kind == al::ExprKind::Scope) {
+      std::string out = Expression(expression.children[1], kPrimaryPrecedence) +
+                        "::" + Identifier(callee.children[1].text) + "(";
+      for (std::size_t i = 2; i < expression.children.size(); ++i) {
+        if (i != 2) { out += ", "; }
+        out += Expression(expression.children[i], 0);
+      }
+      return out + ")";
+    }
+    std::string out = Expression(callee, kPrimaryPrecedence) + "(";
+    // The receiver is the left of the dot, when there is one; a bare call has none and its
+    // arguments are ordinary expressions.
+    std::string receiver;
+    std::size_t fields = 0;
+    if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
+        callee.children[1].kind == al::ExprKind::Name) {
+      fields = FieldArguments(callee.children[1].text);
+      if (fields != 0) { receiver = Expression(callee.children.front(), kPrimaryPrecedence); }
+    }
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
+      const bool isField =
+          !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
+      if (isField && expression.children[i].kind == al::ExprKind::Name) {
+        out += receiver + "." + Identifier(expression.children[i].text);
+        continue;
+      }
       out += Expression(expression.children[i], 0);
     }
     return out + ")";
@@ -415,7 +500,7 @@ public:
       }
     }
     const al::FieldDecl *field = FieldNamed(table_, name);
-    if (field != nullptr) { return Identifier(field->name); }
+    if (field != nullptr) { return FieldIdentifier(table_, field->name); }
     for (const al::LabelDecl &label : table_.labels) {
       if (SameName(label.name, name)) { return label.name; }
     }

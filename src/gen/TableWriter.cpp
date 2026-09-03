@@ -79,6 +79,8 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
+} // namespace
+
 // AL IS CASE-INSENSITIVE AND A KEY MAY SPELL A FIELD DIFFERENTLY FROM THE FIELD ITSELF. `Default
 // Dimension` declares `field(8000; ParentId; Guid)` and then `key(Key3; "Parent Type", ParentID)`:
 // one AL field, two C++ identifiers, and the second names nothing. The key is therefore resolved
@@ -112,6 +114,8 @@ std::string FieldIdentifier(const al::TableObject &table, const std::string &nam
   }
   return collapsed.empty() ? Identifier(name) : collapsed;
 }
+
+namespace {
 
 std::string KeyArrayName(std::size_t position) {
   return "kKey" + std::to_string(position + 1);

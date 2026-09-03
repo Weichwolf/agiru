@@ -23,6 +23,12 @@ struct TableHeader {
 /// \return The identifier, disambiguated when a field or an earlier variable already spells it.
 std::string VariableIdentifier(const al::TableObject &table, const std::string &name);
 
+/// \brief The C++ member name for one of a table's fields.
+/// \param table The table.
+/// \param name  The AL field name, however the caller spelled it.
+/// \return The identifier, disambiguated when two AL names collapse onto one.
+std::string FieldIdentifier(const al::TableObject &table, const std::string &name);
+
 /// \brief The C++ member-function name for one of a table's procedures.
 /// \param table The table.
 /// \param name  The AL procedure name.
