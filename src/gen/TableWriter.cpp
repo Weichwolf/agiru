@@ -561,11 +561,16 @@ TableHeader WriteHeader(const al::TableObject &declared,
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       if (LowerKey(trigger.name) != "onvalidate") { continue; }
-      validators += "      {agiru::app::tables::" + tableIdentifier +
-                    "::Field_No::" + FieldIdentifier(table, field.name) +
-                    ", [](agiru::app::tables::" + tableIdentifier +
-                    " &record) { record.OnValidate" + FieldIdentifier(table, field.name) +
-                    "(); }},\n";
+      const std::string member = FieldIdentifier(table, field.name);
+      validators += "      {agiru::app::tables::";
+      validators += tableIdentifier;
+      validators += "::Field_No::";
+      validators += member;
+      validators += ", [](agiru::app::tables::";
+      validators += tableIdentifier;
+      validators += " &record) { record.OnValidate";
+      validators += member;
+      validators += "(); }},\n";
     }
   }
   if (!validators.empty()) {
