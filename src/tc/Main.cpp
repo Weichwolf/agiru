@@ -59,18 +59,13 @@ struct Counts {
   std::size_t parsed = 0;
   std::size_t members = 0;
   std::size_t tests = 0;
-  std::size_t unitFiles = 0;  ///< UT codeunits in the POPULATION, counted from the text.
-  std::size_t unitTests = 0;  ///< Their [Test] methods, likewise.
-  std::size_t unitParsed = 0; ///< How many of those methods came through the parser.
-  std::size_t emitted = 0;    ///< Objects the generator could WRITE, which is the narrower count.
-  std::size_t unitLost = 0;   ///< UT codeunits the parser could not read at all.
+  std::size_t unitFiles = 0;
+  std::size_t unitTests = 0;
+  std::size_t unitParsed = 0;
+  std::size_t emitted = 0;
+  std::size_t unitLost = 0;
 };
 
-// `UT` IS A SUFFIX AND NOT A SYLLABLE. Matching the two letters alone counted `Sales Stockout`,
-// `SCM Stockout`, `Jobs Stockout`, `Service Stockout`, `Report Layout` and `Office Addin Popout` as
-// unit-test codeunits -- six of them, 87 [Test] methods, in the milestone's own denominator. What
-// separates the suffix from the ending is the character in front of it, and BCApps uses three:
-// `Library - Utility UT`, `Autom. Payment Registration.UT`, and a hyphen in a handful more.
 bool IsUnitTest(std::string_view name) {
   if (name.size() < 3) { return false; }
   const std::string_view tail = name.substr(name.size() - 2);
@@ -123,18 +118,16 @@ void Cluster(const std::vector<Failure> &failures) {
 }
 
 struct Run {
-  const agiru::gen::TranspileScope *scope = nullptr; ///< What of BC this run translates.
+  const agiru::gen::TranspileScope *scope = nullptr;
   std::filesystem::path root;
   std::filesystem::path output;
-  std::vector<Failure> failures;        ///< What could not be READ.
-  std::vector<Failure> refusals;        ///< What could be read and not WRITTEN.
-  std::size_t written = 0;              ///< Objects emitted.
-  std::size_t changed = 0;              ///< Files whose bytes actually differ from what was there.
-  std::set<std::filesystem::path> kept; ///< Every path this run stands behind.
+  std::vector<Failure> failures;
+  std::vector<Failure> refusals;
+  std::size_t written = 0;
+  std::size_t changed = 0;
+  std::set<std::filesystem::path> kept;
 };
 
-// THE FIRST FEW HUNDRED BYTES DECIDE IT. A `namespace` declaration is the first statement of an AL
-// file, so the scope question is answered without reading -- let alone parsing -- the whole object.
 std::string DeclaredNamespace(const std::filesystem::path &path) {
   std::ifstream file(path);
   if (!file) { return {}; }
@@ -154,8 +147,6 @@ std::string DeclaredNamespace(const std::filesystem::path &path) {
   return {};
 }
 
-// A SOURCE IS IN SCOPE BY ITS NAMESPACE, OR BY ITS FOLDER WHEN IT DECLARES NONE. scope.json says
-// which; both halves are the predecessor's own list, so the two trees translate the same BC.
 bool InScope(const Run &run, const std::filesystem::path &path) {
   if (run.scope == nullptr) { return true; }
   const std::string nameSpace = DeclaredNamespace(path);
@@ -169,10 +160,6 @@ std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_v
   const std::filesystem::path &root = run.root;
   std::vector<std::filesystem::path> sources;
   for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
-    // THE SUFFIX IS MATCHED WITHOUT CASE, because BCApps does not hold to its own convention:
-    // 34 enums are `.enum.al`, 156 tables `.table.al`, 127 codeunits `.codeunit.al`. Three of the
-    // five enums this run could not resolve were sitting in a scanned root under a lower-case
-    // extension -- not missing, just not looked at.
     const std::string path = entry.path().string();
     if (entry.is_regular_file() && path.size() >= suffix.size() &&
         std::ranges::equal(path.substr(path.size() - suffix.size()), suffix, [](char a, char b) {
@@ -191,11 +178,6 @@ struct Output {
   std::string relative;
 };
 
-// A FILE THAT DID NOT CHANGE IS NOT WRITTEN, and that is what makes verifying a change affordable.
-// A generator change usually rewrites a few hundred of the 6 398 objects; rewriting all of them
-// gives every one a new timestamp, and the build then recompiles the whole ERP to find out that
-// 6 000 of them are byte for byte what they were. Compared before writing, the rest keep their
-// timestamps and the build skips them.
 bool WriteFile(const Output &where, const std::string &text) {
   const std::filesystem::path path = where.directory / where.relative;
   if (std::filesystem::exists(path)) {
@@ -216,14 +198,11 @@ struct Job {
   std::filesystem::path apps;
 };
 
-/// What every pass shares: where the source is, where the output goes, and what went wrong.
 void Keep(Run &run, const Output &where, const std::string &text) {
   if (WriteFile(where, text)) { ++run.changed; }
   run.kept.insert(where.directory / where.relative);
 }
 
-/// Records one parse failure, or reports the file as carrying no object of this kind at all.
-/// \return True when the file held no such object and must not count towards the population.
 bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) {
   if (Declares(e.what())) { return true; }
   run.failures.push_back(Failure{.reason = Normalised(e.what()),
@@ -232,26 +211,15 @@ bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) 
   return false;
 }
 
-// THE ENUMS COME FIRST AND THAT IS NOT AN ORDERING PREFERENCE. A table field spelled
-// `Enum "Item Type"` names an object declared in another file, so neither the type it translates to
-// nor the header that declares it is knowable from the table alone. The index is built over the
-// whole source before the first table is written.
-// AN INTERFACE IS READ BEFORE THE CODEUNITS THAT IMPLEMENT IT, for the reason the enums are: a
-// codeunit's variable of interface type resolves through this index, and an index filled after the
-// fact resolves nothing (board:0027).
-/// What a run gathers beside its objects: the members of every type it does not have.
 struct Gathered {
-  agiru::gen::DotNetUse dotnet; ///< Per .NET type, the members the corpus calls.
-  agiru::gen::DotNetUse absent; ///< Per AL object no source root declares, the same.
+  agiru::gen::DotNetUse dotnet;
+  agiru::gen::DotNetUse absent;
 };
 
 void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
   for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
 }
 
-/// AN INTERFACE NAMES ANOTHER INTERFACE, so all of them are indexed before any is written --
-/// `Price Calculation` takes a `Line With Price`, and writing in walk order made whichever came
-/// second an absent type.
 struct Interfaces {
   std::vector<agiru::al::InterfaceObject> objects;
   std::vector<std::string> paths;
@@ -302,38 +270,14 @@ void WriteInterfaces(Run &run,
   }
 }
 
-/// A PAGE IS INDEXED BEFORE THE CODEUNITS AND WRITTEN AFTER THEM, and both halves are forced.
-/// A codeunit takes `Page "Item Tracking Lines"` as a parameter, so the index has to exist before
-/// the codeunits are written; a page names tables, enums and codeunits in its own variables, so it
-/// cannot be written before they are. Parsing once and keeping the objects settles both.
-/// EVERY EXTENSION IN EVERY APP, KEYED BY WHAT IT EXTENDS.
-///
-/// AN EXTENSION CROSSES THE APP BOUNDARY IN THE DIRECTION THE BOUNDARY FORBIDS FOR EVERYTHING ELSE.
-/// `base` extends `Accessible Companies`, which `system` declares -- and the app loop reads system
-/// first and writes it before base is even opened. Merging per app therefore lost 70 of 267
-/// extensions, each with a named refusal.
-///
-/// The answer is not to hold every parsed object until the end: that is 9 600 ASTs with every
-/// procedure's tokens in them. It is to read the EXTENSIONS first -- 267 files, all of them small
-/// -- and let each app consume what belongs to the objects it declares. Which apps are installed is
-/// a transpile-time decision either way (board:0033).
 struct Extensions {
   std::map<std::string, std::vector<agiru::al::TableExtensionObject>> tables;
   std::map<std::string, std::vector<agiru::al::EnumExtensionObject>> enums;
   std::map<std::string, std::vector<agiru::al::PageExtensionObject>> pages;
-  /// What each key ADDS UP TO, and what was actually merged. An extension whose target no app in
-  /// this run declares is a hole with a name, not something to pass over: `Copilot Capability`
-  /// exists in BCApps only as extensions of something the platform declares.
   mutable std::map<std::string, std::size_t> held;
   mutable std::map<std::string, std::size_t> consumed;
 };
 
-/// A procedure's identity for the purpose of NOT declaring it twice: the name and the parameter
-/// types, which is what C++ overloads on.
-///
-/// A PAGE AND ITS EXTENSION MAY BOTH DECLARE THE SAME EVENT PUBLISHER. `Error Messages` declares
-/// `OnAfterGetCurrRecord` and so does the extension that adds to it -- legal AL, because the
-/// extension's is its own object's -- and appending both gives one C++ class two identical members.
 std::string Overload(const agiru::al::ProcedureDecl &procedure) {
   std::string key = agiru::gen::LowerKey(procedure.name);
   for (const agiru::al::VarDecl &parameter : procedure.parameters) {
@@ -343,9 +287,6 @@ std::string Overload(const agiru::al::ProcedureDecl &procedure) {
   return key;
 }
 
-/// TWO EXTENSIONS MAY ADD THE SAME FIELD, and so may an extension and the table it extends: BC
-/// installs one of them and agiru merges all of them, which is the price of the build-time boundary
-/// (board:0033). A field already declared -- by NAME or by NUMBER -- is not added twice.
 void TakeFields(std::vector<agiru::al::FieldDecl> &into,
                 const std::vector<agiru::al::FieldDecl> &from) {
   std::set<std::string> names;
@@ -361,9 +302,6 @@ void TakeFields(std::vector<agiru::al::FieldDecl> &into,
   }
 }
 
-/// A TABLE AND ITS EXTENSION MAY DECLARE THE SAME VARIABLE, for the same reason they declare the
-/// same publisher: each is its own object in AL. `Item Journal Line` and the manufacturing
-/// extension both keep a `UOMMgt`, and one C++ class cannot have two.
 void TakeVariables(std::vector<agiru::al::VarDecl> &into,
                    const std::vector<agiru::al::VarDecl> &from) {
   std::set<std::string> declared;
@@ -384,17 +322,12 @@ void TakeProcedures(std::vector<agiru::al::ProcedureDecl> &into,
   }
 }
 
-/// Records every target the store holds, so that whatever is left after the run can be named.
 void NoteTargets(const Extensions &store) {
-  // THE KEY CARRIES THE KIND, because a table and a page may share a name -- 51 objects in the read
-  // roots are two kinds at once -- and one counter for both would go negative.
   for (const auto &[name, list] : store.tables) { store.held["table " + name] += list.size(); }
   for (const auto &[name, list] : store.enums) { store.held["enum " + name] += list.size(); }
   for (const auto &[name, list] : store.pages) { store.held["page " + name] += list.size(); }
 }
 
-/// Reads every extension in every app, in the order the file walk finds them, which is sorted by
-/// path -- determinism is compulsory and the merge appends in this order.
 Extensions ReadExtensions(Run &run,
                           Counts &counts,
                           const std::vector<agiru::gen::App> &apps,
@@ -448,10 +381,6 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   return pages;
 }
 
-/// EVERY `pageextension` IS MERGED INTO ITS PAGE BEFORE THE PAGE IS WRITTEN, for the reason a
-/// tableextension is (board:0033). The added controls are appended, which is enough for the class:
-/// a control is reached by NAME and the nesting decides the layout of a running page rather than
-/// the declaration.
 std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
   std::size_t merged = 0;
   const auto take = [](auto &into, auto &from) {
@@ -506,9 +435,6 @@ void ScanEnums(Run &run, Counts &counts, const Extensions &store, agiru::gen::En
     }
   }
 
-  // EVERY `enumextension` IS MERGED INTO ITS ENUMERATION BEFORE IT IS WRITTEN, for the reason a
-  // tableextension is: BC merges them at build time and a C++ enumeration is closed (board:0033).
-  // The added values carry their own ordinals, so the order is AL's and the merge is an append.
   for (agiru::al::EnumObject &object : objects) {
     const auto found = store.enums.find(agiru::gen::LowerKey(object.name));
     if (found == store.enums.end()) { continue; }
@@ -559,22 +485,11 @@ void WriteTable(Run &run,
   ++run.written;
 }
 
-/// A TABLE IS INDEXED BEFORE THE CODEUNITS AND WRITTEN AFTER THEM, for the reason a page is
-/// (board:0034): AL lets a table declare `procedure SetSourceFilter(var Rec: Record ...)`, so
-/// writing one needs every object resolved -- and every codeunit needs the table index to exist
-/// before it is written. Parsing once and keeping the objects settles both directions.
 struct Tables {
   std::vector<agiru::al::TableObject> objects;
   std::vector<std::string> paths;
 };
 
-/// Records, per field of a table, the enumeration it scopes through -- the AL enum it was declared
-/// as, or the inline option the generator named after the table and the field.
-///
-/// AN ENUM FIELD AND AN OPTION FIELD ARE THE SAME QUESTION WITH TWO ANSWERS, which is why both are
-/// recorded here rather than decided at the use site: `enum "X"` names a translated enumeration and
-/// `Option A,B,C` names one this generator invented, and a body that writes `Rec.Field::Member`
-/// cannot tell them apart.
 void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums &into) {
   auto &fields = into[agiru::gen::LowerKey(table.name)];
   for (const agiru::al::FieldDecl &field : table.fields) {
@@ -598,12 +513,6 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++counts.parsed;
       counts.members += table.fields.size();
-      // BY NAME AND BY NUMBER BOTH, because AL names an object either way and test code uses the
-      // number freely: `var GLEntry: Record 17`.
-      // THE KIND IS PART OF THE NAME. 51 objects in the read roots are a table AND a codeunit at
-      // once -- `Language`, `Default Dimension`, `Currency` -- because AL tells them apart by the
-      // keyword and C++ has no keyword to tell them apart by. `enums::` already did this; the other
-      // two kinds follow it rather than inventing a second answer.
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
@@ -618,13 +527,6 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   return kept;
 }
 
-/// EVERY `tableextension` IS MERGED INTO ITS TABLE BEFORE THE TABLE IS WRITTEN, and BC merges them
-/// at build time as well -- the added columns land in the SAME SQL table. A C++ class is closed, so
-/// there is no run-time alternative, which is what makes which apps are installed a transpile-time
-/// decision (board:0033).
-///
-/// The order inside the merged table is AL's: the base declaration first, then each extension in
-/// the order the file walk found them, which is sorted by path. Determinism is compulsory.
 std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
   std::size_t merged = 0;
   const auto take = [](auto &into, const auto &from) {
@@ -634,8 +536,6 @@ std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
     const auto found = store.tables.find(agiru::gen::LowerKey(table.name));
     if (found == store.tables.end()) { continue; }
     for (const agiru::al::TableExtensionObject &extension : found->second) {
-      // A MODIFIED FIELD IS THE BASE FIELD WITH MORE ON IT: the extension carries no type, so what
-      // it brings is properties and triggers, and they go onto the declaration that is there.
       for (const agiru::al::FieldDecl &change : extension.modified) {
         for (agiru::al::FieldDecl &field : table.fields) {
           if (agiru::gen::LowerKey(field.name) != agiru::gen::LowerKey(change.name)) { continue; }
@@ -668,12 +568,6 @@ void WriteTables(Run &run,
   }
 }
 
-// THE UT POPULATION IS COUNTED FROM THE TEXT AND NOT FROM THE PARSE, and that is the whole point.
-// A codeunit that fails to parse contributes nothing to `unitTests` through the parser, so the
-// milestone's DENOMINATOR would shrink every time the parser lost a file -- the baseline that falls
-// by accident, which CLAUDE.md lists as a trap and which cost exactly 3 codeunits and 67 methods
-// here before it was found. The name and the [Test] count are both recoverable lexically, so they
-// are recovered lexically and the denominator is the population.
 struct UnitTestPopulation {
   std::size_t files = 0;
   std::size_t tests = 0;
@@ -698,10 +592,6 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
   return found.tests != 0 ? found : UnitTestPopulation{};
 }
 
-// THE NAMES ARE INDEXED BEFORE ANYTHING IS EMITTED, and lexically rather than by parsing. A
-// codeunit may hold a variable of a codeunit declared later in the same app, so a single pass in
-// file order would not have it -- and parsing 3 914 objects twice to find that out costs minutes
-// for two lines of header. The object's kind, name and namespace are all on its declaration line.
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     const agiru::gen::ObjectDeclaration declared =
@@ -731,11 +621,6 @@ void ScanCodeunits(Run &run,
     const UnitTestPopulation population = UnitTestsIn(source);
     counts.unitFiles += population.files;
     counts.unitTests += population.tests;
-    // PARSING AND EMITTING ARE COUNTED APART, and mixing them cost a whole run's numbers: an
-    // emitter that refused a body threw out of the same try, so the codeunit went down as a PARSE
-    // failure and its [Test] methods were never counted. 41 568 became 4 624 in one step. What an
-    // object can be READ is one question and what it can be WRITTEN is another, and the second is
-    // where the runtime's gaps show up.
     std::unique_ptr<agiru::al::CodeunitObject> unit;
     try {
       unit = std::make_unique<agiru::al::CodeunitObject>(agiru::al::ParseCodeunit(source));
@@ -779,14 +664,8 @@ void ScanCodeunits(Run &run,
   }
 }
 
-// AN UNRESOLVED ENUM IS REPORTED, NOT SWALLOWED. It is not a defect in the table that names it: the
-// declaration lives in a layer this run was not given, and the count is what says how much the next
-// layer is worth.
 constexpr std::size_t kUnresolvedShown = 10;
 
-// THE .NET TYPES THIS TREE HAS REBUILT BY HAND. They live behind the door with real behaviour, so
-// the generated stubs must not declare them a second time. The list is the platform's own
-// vocabulary in the same sense `TypeName()`'s list of AL types is (board:0035).
 const std::set<std::string> &Rebuilt() {
   static const std::set<std::string> kRebuilt{"ALConfigSettings",
                                               "GenericDictionary2",
@@ -796,9 +675,6 @@ const std::set<std::string> &Rebuilt() {
   return kRebuilt;
 }
 
-// ONE FILE FOR EVERY .NET TYPE THE CORPUS NAMES, and its members are exactly the ones the corpus
-// asks for. .NET's own API is thousands of members that nobody here needs; this is the set that is
-// actually reached, which makes it a worklist with a denominator rather than a port.
 struct Counted {
   std::size_t types = 0;
   std::size_t members = 0;
@@ -827,24 +703,14 @@ Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebu
   return counted;
 }
 
-// ONE FILE FOR EVERY TYPE THE CORPUS NAMES AND THIS RUN DOES NOT HAVE, and its members are exactly
-// the ones the corpus asks for. .NET's own API is thousands of members nobody here needs, and a
-// platform table's field list is the platform's; this is the set actually reached, which makes it a
-// worklist with a denominator rather than a port (board:0035).
 void WriteAbsent(const std::filesystem::path &out,
                  const agiru::gen::DotNetUse &dotnet,
                  const agiru::gen::DotNetUse &absent) {
   if (out.empty()) { return; }
   std::string text = "// Generated from every AL body that names a type this run does not have.\n";
-  // IT NEEDS `Refused` AND NOTHING ELSE, and that is 2.4 seconds per file that names an absent
-  // type. The whole door was reaching every one of them through a stub that uses one class.
   text += "// Do not edit.\n\n#pragma once\n\n#include \"dotnet/Refused.h\"\n";
   text += "\nnamespace agiru::dotnet {\n";
   const Counted net = Stubs(text, dotnet, true);
-  // A NAMESPACE OF THEIR OWN, because an absent AL object may carry a name the AL TYPE system
-  // already uses: the virtual table `Integer` is one, and declaring `agiru::app::Integer` shadowed
-  // `agiru::Integer` for every generated table that has an Integer field. `absent::` also says at
-  // the use site what the type is -- something this run does not have.
   text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::app::absent {\n";
   const Counted objects = Stubs(text, absent, false);
   text += "\n} // namespace agiru::app::absent\n";
@@ -871,9 +737,6 @@ void ReportUnresolved(std::string_view what,
                what,
                uses,
                by);
-  // AND WHICH ONES, because a bare count cannot be ranked and a list that cannot be ranked cannot
-  // decide the next piece of work. The ones named most are the platform's own objects -- the
-  // virtual `Field` table and its neighbours -- and they are what the count is really about.
   std::vector<std::pair<std::string, std::size_t>> ranked(unresolved.begin(), unresolved.end());
   std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
   const std::size_t shown = std::min<std::size_t>(ranked.size(), kUnresolvedShown);
@@ -882,17 +745,11 @@ void ReportUnresolved(std::string_view what,
   }
 }
 
-// THE GENERATOR STILL OWNS ITS OUTPUT DIRECTORY, and it owns it by SWEEPING rather than by wiping.
-// An aborted run must not leave half a tree behind for the next build to read as if it were whole
-// -- the predecessor records exactly that failure. Wiping up front achieved that and cost every
-// unchanged file its timestamp; sweeping at the end achieves the same and costs nothing, because a
-// run that aborts sweeps nothing and leaves the previous tree intact rather than a fragment.
 void ClaimOutput(const std::filesystem::path &out) {
   if (out.empty()) { return; }
   std::filesystem::create_directories(out);
 }
 
-/// Removes every generated file the run did not write or keep.
 std::size_t Sweep(const std::filesystem::path &out, const std::set<std::filesystem::path> &kept) {
   if (out.empty() || !std::filesystem::is_directory(out)) { return 0; }
   std::vector<std::filesystem::path> stale;
@@ -930,14 +787,8 @@ void Add(Counts &into, const Counts &one) {
   into.emitted += one.emitted;
 }
 
-// ONE ENUM INDEX ACROSS THE APPS, FILLED IN DECLARATION ORDER, AND THAT ORDER IS THE ENFORCEMENT.
-// apps.json lists the apps in dependency order, so a table resolves an enum against its own app and
-// everything read before it -- never against an app that comes later. The direction AL declares
-// therefore holds because of the shape of the loop, not because of a second check that could drift.
 int Scan(const Job &job) {
   const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
-  // scope.json SITS BESIDE apps.json, because the two answer the same question from opposite ends:
-  // apps.json says which trees are read and scope.json says which of what is in them is translated.
   const agiru::gen::TranspileScope scope =
       agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
   ClaimOutput(job.output);
@@ -970,14 +821,9 @@ int Scan(const Job &job) {
   std::size_t changed = 0;
   std::set<std::filesystem::path> kept;
 
-  // THE COLUMN IS AS WIDE AS THE WIDEST APP NAME. A fixed width was 11, which fits `foundation`
-  // and truncates nothing but runs `library_variable_storage` straight into its own count.
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
-  // THE PLATFORM'S OWN TABLES ARE THERE BEFORE THE FIRST APP IS READ, so `Record Field` resolves
-  // where it lives. An app that declares a table of the same name overwrites the entry, which is
-  // the precedence AL itself has.
   objects.tables = agiru::gen::PlatformTables();
 
   for (const agiru::gen::App &app : apps) {
@@ -1003,14 +849,9 @@ int Scan(const Job &job) {
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
     ScanEnums(run, enums, store, index);
-    // AFTER the enums are read, not before: a codeunit variable of enum type resolves through the
-    // same index a table field does, and the index is filled by the pass above.
     objects.enums = index;
     Tables parsedTables = IndexTables(run, tables, objects);
     extensions.emitted += MergeExtensions(store, parsedTables);
-    // AFTER the tables and BEFORE the codeunits: an interface's SIGNATURE names records and enums,
-    // and a codeunit's variable names an interface. Read in any other order, one of the two
-    // resolves nothing.
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
     Pages parsed = IndexPages(run, pages, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
@@ -1054,9 +895,6 @@ int Scan(const Job &job) {
   Report("pages", allPages);
   Report("extensions", allExtensionsRead);
   std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
-  // AN APP MAY DECLARE A NAME ANOTHER APP ALSO DECLARES, so an extension can be consumed more than
-  // once. What is asked here is only whether it was consumed AT ALL: an extension nobody took is a
-  // hole with a name.
   std::map<std::string, std::size_t> orphans;
   for (const auto &[name, total] : store.held) {
     const auto taken = store.consumed.find(name);

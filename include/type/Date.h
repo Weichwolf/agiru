@@ -207,7 +207,6 @@ public:
   ///       day of the week (1-7, Monday = 1)". It is NOT `std::chrono`'s, where Sunday is 0.
   [[nodiscard]] constexpr int DayOfWeek() const {
     if (IsUndefined()) { return 0; }
-    // 1970-01-01 was a Thursday, which is ISO 4, and the arithmetic keeps a non-negative remainder.
     return (((Days() % kDaysPerWeek) + kDaysPerWeek + kThursdayShift) % kDaysPerWeek) + 1;
   }
 

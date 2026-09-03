@@ -16,9 +16,6 @@ std::vector<const TableEntry *> &Entries() {
   return entries;
 }
 
-// THE SORT IS DEFERRED TO THE FIRST QUESTION, not done on every registration: the order static
-// initialisation hands them over in is the linker's and means nothing, so the catalogue is
-// unordered until somebody asks it something, and ordered from then on.
 bool &Sorted() {
   static bool sorted = false;
   return sorted;

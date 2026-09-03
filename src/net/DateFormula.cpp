@@ -18,7 +18,6 @@ constexpr int kIsoMonday = 1;
 constexpr int kIsoSunday = 7;
 constexpr unsigned kLastOfDecember = 31;
 
-/// Reads the digits at `at`, leaving `at` past them.
 int TakeNumber(std::string_view text, std::size_t &at) {
   int n = 0;
   while (at < text.size() && (std::isdigit(static_cast<unsigned char>(text[at])) != 0)) {
@@ -36,14 +35,6 @@ bool IsUnit(char c) {
   return c == 'D' || c == 'W' || c == 'M' || c == 'Q' || c == 'Y';
 }
 
-/// The first or the last day of the period `unit` names around `d`.
-///
-/// THE SIGN DECIDES WHICH END, and that is the one rule the platform page does not state. Its
-/// worked examples pin the positive side: `<CM+30D>` from 1996-05-21 is 1996-06-30, which requires
-/// CM to be 05-31 rather than 05-01, and `<CQ+1M-10D>` is 1996-07-20, which requires CQ to be the
-/// quarter's last day. The negative side is the predecessor's, measured rather than documented:
-/// `Date2DMY('<-CM>')` is 1 in an ERMKPIWebService test, so `-C...` is the FIRST day. Recorded on
-/// board:0022 as a measured hint rather than a citation.
 Date Boundary(const Date &d, char unit, bool first) {
   const int year = d.Year();
   const int month = d.Month();
@@ -79,9 +70,6 @@ Date Boundary(const Date &d, char unit, bool first) {
   }
 }
 
-/// AL `<nM>` KEEPS THE DAY AND CLAMPS IT to the target month's length: 31 December plus one month
-/// is 31 January, and 31 January plus one month is 28 or 29 February. Adding a fixed number of days
-/// would give neither.
 Date AddMonths(const Date &d, int months) {
   const int total = ((d.Year() * kMonthsPerYear) + d.Month() - 1) + months;
   const int year = total / kMonthsPerYear;
@@ -93,10 +81,6 @@ Date AddMonths(const Date &d, int months) {
                        static_cast<unsigned>(d.Day() < length ? d.Day() : length));
 }
 
-/// The next or previous occurrence of an ISO weekday, EXCLUSIVE of the reference date.
-///
-/// `system-calcdate-string-date-method.md` gives `<-WD2>` from Tuesday 1996-05-21 as 1996-05-14 --
-/// the Tuesday a week earlier, not the day itself.
 Date Weekday(const Date &d, int target, bool backwards) {
   if (target < kIsoMonday || target > kIsoSunday) { return d; }
   const int today = d.DayOfWeek();
@@ -134,7 +118,6 @@ DateFormula DateFormula::FromText(std::string_view text) {
       ++at;
       continue;
     }
-    // `C<unit>` -- one end of the current period.
     if (c == 'C' && at + 1 < text.size() && IsUnit(Upper(text[at + 1]))) {
       formula.terms_.push_back(Term{
           .kind = Kind::Period, .unit = Upper(text[at + 1]), .count = 0, .negative = negative});
@@ -142,7 +125,6 @@ DateFormula DateFormula::FromText(std::string_view text) {
       negative = false;
       continue;
     }
-    // `WD<n>` -- a weekday selector. Read BEFORE `W`, or it splits into W(eek) and D(ay).
     if (c == 'W' && at + 1 < text.size() && Upper(text[at + 1]) == 'D') {
       at += 2;
       formula.terms_.push_back(Term{
@@ -150,7 +132,6 @@ DateFormula DateFormula::FromText(std::string_view text) {
       negative = false;
       continue;
     }
-    // `W<n>` -- the Monday of ISO week n. First-class grammar, and distinct from `<nW>`.
     if (c == 'W' && at + 1 < text.size() &&
         (std::isdigit(static_cast<unsigned char>(text[at + 1])) != 0)) {
       ++at;
@@ -159,7 +140,6 @@ DateFormula DateFormula::FromText(std::string_view text) {
       negative = false;
       continue;
     }
-    // `<n><unit>` -- a quantity. The number may be absent, which means one.
     const std::size_t before = at;
     const int n = TakeNumber(text, at);
     if (at < text.size() && IsUnit(Upper(text[at]))) {

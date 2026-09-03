@@ -10,7 +10,7 @@ namespace {
 
 thread_local Session *g_current = nullptr;
 
-} // namespace
+}
 
 Session::Session(const std::string &connectionInfo)
     : connection_(connectionInfo), boundaries_(), previous_(g_current) {

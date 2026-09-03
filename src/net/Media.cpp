@@ -21,9 +21,6 @@ std::string Importing(std::string_view filename, std::string_view description) {
   return "importing '" + std::string(filename) + "' as '" + std::string(description) + "'";
 }
 
-// AN IMPORT REPLACES WHAT THE FIELD ALREADY REFERENCES, so the refusal says what would have been
-// overwritten. A caller who sees only "importing x failed" cannot tell a first import from one that
-// would have dropped a picture the record already had.
 std::string Over(const Guid &current) {
   return current.IsNull() ? std::string{} : " over media " + current.ToText();
 }

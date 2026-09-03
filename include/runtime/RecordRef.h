@@ -20,10 +20,6 @@
 /// \file
 /// \brief AL `RecordRef` and `FieldRef` -- a record reached by NUMBER rather than by name.
 
-// A REFUSAL DOES NOT USE `this`, and every generated body below is one -- so the checks that
-// say so are true of the STATE and not of the design. They go away as the bodies land, and
-// the suppression goes with them (board:0035). The parameter orders are AL's own, which is
-// what makes the surface checkable against the documentation at all.
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
 namespace agiru::detail {
 
@@ -221,8 +217,6 @@ public:
   /// \throws Error when the value does not fit the field.
   void SetValue(std::string_view text);
 
-  // THE REST OF THE FieldRef SURFACE, from `methods-auto/fieldref/`. `FldRef.Class` and its
-  // neighbours are what AL code branches on when it walks a table it cannot name.
   /// \brief AL `FieldRef.Active()`. Checks whether the field that is currently selected is enabled.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -481,9 +475,6 @@ public:
   /// \return True when the table declares it.
   [[nodiscard]] bool FieldExist(Integer fieldNo) const;
 
-  // WHAT A RecordRef CAN DO, from `methods-auto/recordref/`. AL code opens one and then works it
-  // like a record it cannot name -- `RecRef.ChangeCompany(X)`, `RecRef.Next()` -- and every one of
-  // those is a signature the documentation states, optional parameters and all.
   /// \brief AL `RecordRef.AddLink(Text, Text)`. Adds a link to a record in a table.
   /// \param URL The AL `Text`.
   /// \param Description The AL `Text`.
@@ -1175,9 +1166,6 @@ private:
   void *record_ = nullptr;
   const TableDef *table_ = nullptr;
 
-  // A RecordRef IS COPIED BY VALUE in generated code -- `FieldRef := RecRef.Field(No)` and every
-  // `var RecordRef` parameter -- so the record a copy points at has to outlive the copy. A shared
-  // owner is what says that; a unique one would make the copy a compile error AL does not have.
   detail::SharedRecord owned_;
 };
 

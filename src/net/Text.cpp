@@ -27,8 +27,6 @@ bool IsAsciiDigits(std::string_view s) {
 
 } // namespace
 
-// THE UTF-8 DECODER'S OWN CONSTANTS, from the encoding rather than from taste: a lead byte says
-// how many follow, and the low bits of each carry the code point six at a time.
 constexpr std::int32_t kFourByteBits = 0x07;
 constexpr unsigned char kThreeByteMark = 0xE0;
 constexpr std::int32_t kThreeByteBits = 0x0F;
@@ -38,9 +36,6 @@ constexpr std::int32_t kContinuationBits = 0x3F;
 constexpr int kBitsPerContinuation = 6;
 
 std::int32_t CodePointAt(std::string_view s, std::size_t unit) {
-  // THE INDEX IS IN UTF-16 UNITS, because that is what AL counts and what `Utf16Length` returns.
-  // A code point outside the BMP is two units, so it is refused rather than half-read: AL would
-  // give a surrogate and nothing here can carry one.
   std::size_t at = 0;
   for (std::size_t i = 0; i < s.size();) {
     const auto lead = static_cast<unsigned char>(s[i]);
@@ -91,10 +86,6 @@ void RaiseTooLong(std::string_view value, std::size_t actual, std::size_t max) {
                     " characters. Value: '" + std::string(value) + "'.");
 }
 
-// A DECLARED LENGTH OF ZERO IS NO LENGTH AT ALL, which is what AL means by a bare `Text`. The page
-// gives `Text[50]` a maximum and `Text` none -- a variable declared without brackets holds up to
-// the platform's own limit, not up to nothing. Treating 0 as "refuse everything" would have made
-// every unbounded Text variable in the BaseApp raise on its first assignment.
 void CheckLength(std::string_view s, std::size_t max) {
   if (max == 0) { return; }
   const std::size_t actual = Utf16Length(s);
@@ -116,8 +107,6 @@ namespace {
 
 constexpr std::string_view kWhitespace = " \t\n\v\f\r";
 
-// THE UTF-8 WIDTH BOUNDARIES, from the encoding: a code point below the first fits one byte, below
-// the second two, below the third three, and everything above is four.
 constexpr std::int32_t kOneByteLimit = 0x80;
 constexpr std::int32_t kTwoByteLimit = 0x800;
 constexpr std::int32_t kBasicPlaneLimit = 0x10000;
@@ -174,8 +163,6 @@ Integer IndexOfText(std::string_view s, std::string_view value, Integer startInd
 }
 
 Integer LastIndexOfText(std::string_view s, std::string_view value, Integer startIndex) {
-  // THE BACKWARD SEARCH INCLUDES THE START POSITION, which is what "proceeds from startIndex toward
-  // the beginning" means: the occurrence may begin exactly there.
   const std::size_t upto =
       startIndex < 1 ? std::string_view::npos : ByteOfUnit(s, static_cast<std::size_t>(startIndex));
   const std::size_t at = s.rfind(value, upto);
@@ -233,8 +220,6 @@ std::string ReplaceText(std::string_view s, Replacement what) {
 }
 
 List<std::string> SplitText(std::string_view s, std::span<const std::string> separators) {
-  // NO SEPARATOR MEANS WHITE SPACE, which `text-split-text-method.md` states, and an empty piece is
-  // KEPT: .NET drops them only when asked to, and AL does not ask.
   List<std::string> pieces;
   std::size_t at = 0;
   while (at <= s.size()) {

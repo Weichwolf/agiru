@@ -22,22 +22,6 @@ struct Level {
   const char *word;
 };
 
-// THE AL HIERARCHY IS PASCAL'S AND NOT C'S, and this table was C's until it was checked.
-// `c-al-operators.md` states the order of precedence outright, and AL inherited it from C/AL:
-//
-//     1. . (fields)  [] (indexing)  () (parentheses)  :: (scope)
-//     2. NOT, unary -, unary +
-//     3. *  /  DIV  MOD  AND  XOR
-//     4. +  -  OR
-//     5. >  <  >=  <=  =  <>  IN
-//     6. .. (range)
-//
-// So AND binds like multiplication, OR like addition, and THE COMPARISONS BIND LOOSEST. `A = B and
-// C = D` is `A = (B and C) = D` in AL and `(A = B) and (C = D)` in C. BC code parenthesises heavily
-// because of this, which is why the wrong table cost nothing visible -- and why it would have cost
-// something eventually, silently, in the one place that did not.
-//
-// The numbers here run the other way from the documentation's list: HIGHER BINDS TIGHTER.
 constexpr std::array kLevels{
     Level{.precedence = 1, .word = "="},
     Level{.precedence = 1, .word = "<>"},
@@ -164,8 +148,6 @@ private:
       }
       return leave;
     }
-    // `break` LEAVES THE INNERMOST LOOP and nothing else -- `devenv-al-control-statements.md`
-    // separates it from the Break METHOD of a report, which also ends its trigger.
     if (AtKeyword("break")) {
       Advance();
       return Stmt{.kind = StmtKind::Break,
@@ -176,10 +158,6 @@ private:
                   .descending = false};
     }
     if (AtKeyword("if")) { return ReadIf(); }
-    // `asserterror <statement>` -- AL's own try/expect. The statement is expected to raise, the
-    // error text lands where GetLastErrorText reads it, and execution carries on with the next
-    // statement. It is one word in front of an ordinary statement, so it parses as one; what it
-    // MEANS is board:0021, and a test suite is mostly made of it.
     if (AtKeyword("asserterror")) {
       Advance();
       Stmt expected{.kind = StmtKind::AssertError,
@@ -300,19 +278,6 @@ private:
                    .descending = false};
     Expect("then");
     statement.body.push_back(ReadStatement());
-    // A SEMICOLON ENDS THE `if`, SO THE `else` AFTER ONE IS NOT ITS OWN. `Incoming Document` writes
-    //
-    //     case true of
-    //         SalesCrMemoHeader.Get(DocNo):
-    //             if SalesCrMemoHeader."Posting Date" = PostingDate then
-    //                 exit("Document Type"::"Sales Credit Memo");
-    //         else
-    //             ...
-    //
-    // and taking that `else` for the `if` swallowed the case's own branch: the branch parser then
-    // ran off the end of the tokens looking for the next label, which is where
-    // "expected ':' but found ''" came from. AL's own `if ... then ... else` never carries a
-    // semicolon in front of the `else`, so the presence of one is the signal.
     bool terminated = false;
     while (AtPunctuation(";")) {
       Advance();
@@ -334,9 +299,6 @@ private:
     return 0;
   }
 
-  /// AL's conditional operator, `cond ? a : b`, which BC 25 added and which binds loosest of all.
-  /// It is read here rather than in the level table because it is right-associative and ternary,
-  /// which a precedence climb over binary levels cannot express.
   Expr ReadTernary() {
     Expr condition = ReadExpression(1);
     if (!AtPunctuation("?")) { return condition; }
@@ -464,8 +426,6 @@ private:
       case TokenKind::Integer:
       case TokenKind::Decimal:
         return Expr{.kind = ExprKind::NumberLiteral, .text = token.text, .children = {}};
-      // `0D`, `20011125D`, `080000T`, `0DT`. It is a LITERAL and it was falling through to a name,
-      // so `0D` became the identifier `_0D` -- 6 383 of them in W1 alone.
       case TokenKind::DateTime:
         return Expr{.kind = ExprKind::TemporalLiteral, .text = token.text, .children = {}};
       default: return Expr{.kind = ExprKind::Name, .text = token.text, .children = {}};

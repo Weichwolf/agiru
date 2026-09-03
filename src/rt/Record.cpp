@@ -58,8 +58,6 @@ std::string FieldText(const void *record, const FieldDef &def) {
       return reinterpret_cast<const Time *>(At(record, def))->ToInvariantString();
     case FieldType::DateTime:
       return reinterpret_cast<const DateTime *>(At(record, def))->ToInvariantString();
-    // `guid-data-type.md` gives the standard textual representation WITH its braces, and AL
-    // compares a Guid against a Text directly, so this is the text a message shows.
     case FieldType::Guid: return reinterpret_cast<const Guid *>(At(record, def))->ToText();
     case FieldType::RecordId: return reinterpret_cast<const RecordId *>(At(record, def))->ToText();
     case FieldType::DateFormula:
@@ -81,8 +79,6 @@ bool IsBlank(const void *record, const FieldDef &def) {
     case FieldType::Code:
     case FieldType::Text: return reinterpret_cast<const StringValue *>(At(record, def))->IsEmpty();
     case FieldType::Decimal: return reinterpret_cast<const Decimal *>(At(record, def))->IsZero();
-    // `date-data-type.md`: the undefined date IS the blank one, and it is what a date field holds
-    // until something writes to it.
     case FieldType::Date: return reinterpret_cast<const Date *>(At(record, def))->IsUndefined();
     case FieldType::Time: return reinterpret_cast<const Time *>(At(record, def))->IsUndefined();
     case FieldType::DateTime:
@@ -186,9 +182,6 @@ std::string SubstituteInto(std::string_view pattern, std::span<const std::string
 
 } // namespace detail
 
-// A KEY IS COMPARED BY ITS TYPE AND NEVER BY ITS TEXT. Rendering both sides and comparing the
-// strings orders "10" before "9", which is the wrong walk order for every buffer keyed on an entry
-// number -- and wrong silently, since both orders look plausible in a small test.
 std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &def) {
   const auto compare = [](const auto &left, const auto &right) {
     return left < right   ? std::strong_ordering::less

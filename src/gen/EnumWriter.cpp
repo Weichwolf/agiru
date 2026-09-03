@@ -20,10 +20,6 @@ std::string Caption(const al::EnumValueDecl &value) {
   return property != nullptr ? property->text : value.name;
 }
 
-// SORTED BY ORDINAL, NOT AS AL DECLARED IT. ValueOf() binary-searches and the emitted
-// static_assert holds it to that, and AL does not always oblige: FlushingMethodFilter declares
-// 0, 1, 2, 3, 4, 6, 50, 5 (measured over the BaseApp, 2026-09-01). The C++ ENUMERATORS keep AL's
-// order, because that is what a reader compares against the .al file; only the value table moves.
 std::vector<const al::EnumValueDecl *> ByOrdinal(const al::EnumObject &object) {
   std::vector<const al::EnumValueDecl *> values;
   values.reserve(object.values.size());
@@ -62,13 +58,6 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
   out += "\n";
   out += "#include <array>\n#include <cstdint>\n\n";
 
-  // ENUM OBJECTS GET A NAMESPACE OF THEIR OWN AND TABLES DO NOT. AL tells an object's kind apart at
-  // every use site -- `Record "Reminder Action"` against `Enum "Reminder Action"` -- and C++ has
-  // one name space for types, so the kind has to become a namespace somewhere. It becomes one HERE
-  // because table names carry the bulk of generated code and stay closest to AL unqualified: 4 of
-  // the BaseApp's table names collide with an enum name and 1 with a generated option name
-  // (measured 2026-09-01), and the rule is total rather than applied on collision, since a rule
-  // that fires only on collision renames an object when an unrelated one is added.
   out += "namespace agiru::app::enums {\n\n";
   out += "enum class " + identifier + " : std::int32_t {\n";
   for (const al::EnumValueDecl &value : object.values) {

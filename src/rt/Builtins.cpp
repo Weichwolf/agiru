@@ -37,7 +37,6 @@
 
 namespace agiru {
 
-// `text-strchecksum-method.md`: "The default value is 10."
 constexpr ::agiru::Integer kDefaultChecksumModulus = 10;
 
 [[noreturn]] void RefuseDoor(std::string_view what) {
@@ -468,8 +467,6 @@ std::string DelChr(std::string_view String,
   if (where.find_first_not_of("=<>") != std::string_view::npos) {
     throw Error("DelChr: Where takes only '=', '<' and '>'");
   }
-  // `=` WINS OVER THE OTHER TWO, which is what "delete everywhere" means: `=<>` on an IBAN takes
-  // every space, not merely the ones at the ends.
   if (where.find('=') != std::string_view::npos) {
     std::string out;
     for (const char c : String) {
@@ -507,9 +504,6 @@ std::string IncStr(std::string_view String) {
 }
 
 std::string IncStr(std::string_view String, ::agiru::BigInteger Increment) {
-  // THE NUMBER IS THE LAST ONE ANYWHERE IN THE STRING, not the one at the end: the page's own
-  // example increments "Account no. 99 does not balance." to 100. A string with no digits at all
-  // yields an EMPTY string, which is how a caller can tell there was nothing to increment.
   const std::size_t last = String.find_last_of("0123456789");
   if (last == std::string_view::npos) { return {}; }
   std::size_t first = last;
@@ -583,8 +577,6 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString) {
   }
   ::agiru::Integer total = 0;
   for (std::size_t i = 0; i < String.size(); ++i) {
-    // A WEIGHT SHORTER THAN THE STRING IS PADDED WITH `1`, which the page states, so the positions
-    // it does not reach count themselves.
     const ::agiru::Integer weight = i < WeightString.size() ? WeightString[i] - '0' : 1;
     total += (String[i] - '0') * weight;
   }

@@ -61,8 +61,6 @@ public:
   ///       `std::string_view`, which `Code` also assigns from -- and two user-defined conversions
   ///       to two different parameters is ambiguous rather than wrong. Excluding the standard
   ///       spellings leaves exactly the AL type, which is the one AL means.
-  // The conversion must
-  // be implicit or `Text x := Obj.Member` would not compile, which is the shape AL writes.
   template <typename T>
     requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
   operator T() const {
@@ -73,7 +71,7 @@ public:
   /// \tparam T The type the caller assigned.
   /// \return Never.
   /// \throws Error always.
-  template <typename T> Refused &operator=(const T & /*unused*/) { Throw(); }
+  template <typename T> Refused &operator=(const T &) { Throw(); }
 
 private:
   [[noreturn]] void Throw() const {

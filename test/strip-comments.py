@@ -27,6 +27,14 @@ import sys
 import os
 
 KEEP_LINE = ("///", "//!")
+
+# A `NOLINT` LINE IS AN INSTRUCTION TO clang-tidy AND NOT COMMENTARY. Deleting it changes what the
+# analyser does: measured 2026-09-03, removing the eleven of them raised the lint from 0 findings to
+# 1 070, every one of them on a body that only throws -- the refusing surface (board:0030,
+# board:0035), which is true of the STATE and not of the design. It also costs a number in the
+# silent-places baseline, which is the mechanism that keeps it rare, and that number may only fall.
+# The REASON above it is prose and goes; the reason ON the line rides along with it.
+KEEP_MARK = "NOLINT"
 KEEP_BLOCK = ("/**", "/*!")
 
 DOORS = ("include/",)
@@ -67,6 +75,12 @@ def strip(text, doxygen=True):
                 at = stop
                 continue
         if two == "//":
+            if KEEP_MARK in text[at:text.find("\n", at) if text.find("\n", at) > 0 else end]:
+                stop = text.find("\n", at)
+                stop = end if stop < 0 else stop
+                out.append(text[at:stop])
+                at = stop
+                continue
             if doxygen and text[at:at + 3] in KEEP_LINE:
                 stop = text.find("\n", at)
                 stop = end if stop < 0 else stop

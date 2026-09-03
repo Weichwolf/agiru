@@ -164,12 +164,10 @@ public:
   /// \param value The value.
   template <typename E>
     requires std::is_enum_v<E>
-  // AL assigns directly.
   constexpr Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
   /// \brief Takes any enum or option value, keeping its ordinal.
   /// \param value The value.
-  // AL assigns directly.
   constexpr Enum(const OrdinalValue &value) : OrdinalValue(value) {}
 
   /// \brief Compares against a value of any enumeration.

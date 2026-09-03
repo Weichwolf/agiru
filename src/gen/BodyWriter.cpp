@@ -23,10 +23,6 @@ namespace agiru::gen {
 
 namespace {
 
-// MEASURED, NOT GUESSED (2026-09-01, over all four apps): the deepest expression the BaseApp and
-// its tests actually build is well inside this, and the guard exists to stop runaway recursion on a
-// malformed tree rather than to cap a legitimate expression. BC really does split a base64 blob
-// across hundreds of lines joined by `+`.
 constexpr int kMaxDepth = 4096;
 
 struct Operator {
@@ -35,23 +31,15 @@ struct Operator {
   int precedence;
 };
 
-/// C++'s conditional operator binds looser than everything but assignment and comma, which is
-/// where AL puts it too.
 constexpr int kConditionalPrecedence = 1;
 constexpr int kEqualityPrecedence = 3;
 constexpr int kComparisonPrecedence = 4;
 constexpr int kUnaryPrecedence = 8;
 constexpr int kPrimaryPrecedence = 9;
 
-// THIS TABLE IS C++'S PRECEDENCE AND THE ONE IN src/al/Statements.cpp IS AL'S. They are DIFFERENT
-// ON PURPOSE and neither is a copy of the other: the parser's table decides what the AL text means,
-// this one decides which parentheses the C++ text needs so that it means the same thing. AL binds
-// AND like multiplication and its comparisons loosest; C++ does neither. Making them agree would
-// break one of the two jobs.
 constexpr std::array kOperators{
     Operator{.al = "or", .cpp = "||", .precedence = 1},
     Operator{.al = "and", .cpp = "&&", .precedence = 2},
-    // AL `xor` on two booleans is C++ `!=` on two booleans, which sits with `==` and NOT with `||`.
     Operator{.al = "xor", .cpp = "!=", .precedence = 3},
     Operator{.al = "=", .cpp = "==", .precedence = 3},
     Operator{.al = "<>", .cpp = "!=", .precedence = 3},
@@ -108,12 +96,6 @@ std::string Quoted(std::string_view text) {
   return out;
 }
 
-// AL'S DATE, TIME AND DATETIME LITERALS. `date-data-type.md` writes a date as `YYYYMMDDD` and the
-// undefined one as `0D`; a time is `HHMMSS[.mmm]T` and `0T`; a DateTime literal is only ever `0DT`,
-// because AL has no way to write a real one. The suffix decides the type, so it is read off the end
-// rather than guessed from the digit count.
-// `YYYYMMDD` and `HHMMSS`, from the two literal shapes `date-data-type.md` and `time-data-type.md`
-// give. A literal with any other digit count is not one AL writes.
 constexpr std::size_t kDateDigits = 8;
 constexpr std::size_t kClockDigits = 6;
 constexpr std::size_t kYearDigits = 4;
@@ -152,11 +134,6 @@ std::string Temporal(const std::string &literal) {
   return "RefusedTemporal<Date>(\"" + literal + "\")";
 }
 
-// A DEPTH COUNTER THAT CANNOT LEAK. It was a `++` at the top and a `--` at the bottom, and one
-// early return in the middle -- the `in` operator, which hands off to Membership() -- never reached
-// the bottom. Every `in` expression therefore raised the counter permanently, and the guard fired
-// on files that were not deep at all: 9 objects refused for a reason that was not true of them.
-// Written as a scope, the mistake is not available.
 class Deeper {
 public:
   explicit Deeper(int &depth) : depth_(depth) {
@@ -266,9 +243,6 @@ private:
         throw std::runtime_error("a case branch stands only inside a case");
       case al::StmtKind::With:
         throw std::runtime_error("AL `with` needs the members it opens to be resolved first");
-      // `asserterror <stmt>` is the statement inside a boundary that EXPECTS it to raise: the text
-      // is captured where GetLastErrorText reads it, the write set is discarded, and execution
-      // carries on. A lambda is what carries the statement in, and it reads as what it is.
       case al::StmtKind::AssertError:
         out = Pad(indent) + "AssertError([&] {\n" + Statements(statement.body, indent + 2) +
               Pad(indent) + "});\n";
@@ -288,15 +262,6 @@ private:
     return out;
   }
 
-  /// The namespace an AL object-kind scope names, or empty when the base is not one.
-  ///
-  /// AL WRITES AN OBJECT'S IDENTITY AS `Kind::"Name"` -- `Page::"Agent Consumption Overview"`,
-  /// `Codeunit::"Sales-Post"` -- and the kind is the keyword, not a variable. The generated tree
-  /// puts each kind in its own namespace for exactly the reason AL needs the keyword: 51 names in
-  /// the read roots are two kinds at once.
-  /// `DATABASE::"X"` IS A TABLE NUMBER AND NOT A TYPE. AL writes it where an Integer is wanted --
-  /// `GenerateRandomCode(FieldNo, DATABASE::"No. Series")` -- so what it becomes is the table's own
-  /// number constant, read out as the integer AL treats it as.
   static bool NamesATableNumber(std::string_view base) { return SameName(base, "Database"); }
 
   static std::string_view KindNamespace(std::string_view base) {
@@ -310,17 +275,12 @@ private:
 
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
-    // `Rec.Field::Member` -- a field of a record variable, scoped through the field's own
-    // enumeration. The variable decides the table and the table decides the enumeration.
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
         base.children[0].kind == al::ExprKind::Name &&
         base.children[1].kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.FieldEnumeration(
           OfVariable{.variable = base.children[0].text, .field = base.children[1].text});
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
-      // A FIELD OF A RECORD THIS RUN DOES NOT HAVE STILL HAS TO COMPILE, and it must not compile
-      // into a number. `RecordLink.Type::Note` names a platform table's field (board:0032), so the
-      // ordinal is genuinely unknown and the expression refuses where AL would have used it.
       if (scope_.IsRecord(base.children[0].text)) {
         return "RefusedOption(\"" + base.children[0].text + "." + base.children[1].text +
                "::" + expression.text + "\")";
@@ -329,17 +289,9 @@ private:
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
-      // A NAME THAT IS IN SCOPE IS A VARIABLE AND NOT A KIND. `Type::All` where `Type` is a field
-      // stays a field; only an unresolved base can be AL's keyword.
-      // AN OBJECT KIND WINS OVER THE TYPE OF THE SAME NAME, and it has to: `Enum`, `Codeunit`,
-      // `Page`, `Table` and `Interface` are AL TYPE names as well as object-kind keywords, and on
-      // the left of `::` they are always the keyword. `Enum::"No. Series Implementation"::Normal`
-      // came out as `::agiru::Enum::...`, which is the class template with no arguments.
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
-      // `OBJECTTYPE::Table` AND ITS NEIGHBOURS ARE DOOR OPTIONS. AL writes the platform's own
-      // option types in upper case as a scope, and each is a type the door already declares.
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
         return "::agiru::" + TypeName(base.text) + "::" + EnumeratorName(expression.text);
       }
@@ -350,15 +302,6 @@ private:
     return Expression(base, kPrimaryPrecedence) + "::" + EnumeratorName(expression.text);
   }
 
-  /// How many leading arguments of an AL record method are FIELDS OF THE RECEIVER.
-  ///
-  /// A FIELD ARGUMENT IS NOT A NAME IN SCOPE. `AgentTaskConsumption.SetRange("Agent User Security
-  /// ID", X)` names a field of the record it is called on, and AL resolves it there -- so the C++
-  /// has to spell it against the receiver, `AgentTaskConsumption.AgentUserSecurityID`. Emitting the
-  /// bare identifier made it an undeclared name in every body that filters, which is most of them.
-  ///
-  /// The count is per method and it comes from the documentation's own signatures: `SetRange(Field,
-  /// ...)` takes one, `CalcFields(Field, ...)` takes all of them.
   static std::size_t FieldArguments(std::string_view method) {
     static constexpr auto kAll = static_cast<std::size_t>(-1);
     static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
@@ -383,10 +326,6 @@ private:
     return 0;
   }
 
-  /// AL `Error(...)` IS A STATEMENT THAT RAISES, and it was emitted as a call whose value is
-  /// discarded -- an Error object built and thrown away, so the body ran on past the point AL stops
-  /// at. `agiru::Error` is the exception, so the translation is the `throw` AL means, and the
-  /// message goes through `StrSubstNo` when arguments follow it, which is AL's own overload.
   std::string Raise(const al::Expr &expression) {
     std::string message = expression.children.size() > 2 ? "StrSubstNo(" : "";
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
@@ -397,9 +336,6 @@ private:
     return "throw Error(" + message + ")";
   }
 
-  /// `Page.Run(Page::"X", Rec)` IS A CALL ON THE OBJECT AND NOT ON A DISPATCHER. AL names the kind
-  /// twice -- once as the receiver, once in the identity -- and what it means is "run that object".
-  /// The generated form says it once: `pages::X::Run(Rec)`.
   std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
     std::string out = Expression(expression.children[1], kPrimaryPrecedence) +
                       "::" + Identifier(callee.children[1].text) + "(";
@@ -410,8 +346,6 @@ private:
     return out + ")";
   }
 
-  /// A CALLEE IS ALREADY A CALL, so the parentheses AL omits are not added to it a second time:
-  /// `CompanyName()` would become `CompanyName()()`.
   std::string Callee(const al::Expr &callee) {
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
@@ -435,15 +369,10 @@ private:
     }
     const std::string spelled = Callee(callee);
     std::string out = spelled + "(";
-    // The receiver is the left of the dot, when there is one; a bare call has none and its
-    // arguments are ordinary expressions.
     std::string receiver;
     std::size_t fields = 0;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
-      // AND ONLY ON A RECORD. `FieldRef.SetRange(NewCode)` is the same method name on a door type,
-      // where the argument is an ordinary value and `NewCode` is a local -- spelling it against the
-      // receiver named a member the FieldRef does not have.
       fields =
           scope_.IsRecord(callee.children[0].text) ? FieldArguments(callee.children[1].text) : 0;
       if (fields != 0) { receiver = Expression(callee.children.front(), kPrimaryPrecedence); }
@@ -461,17 +390,6 @@ private:
     return out + ")";
   }
 
-  /// The AL free functions that take NO arguments, which AL therefore writes without parentheses.
-  ///
-  /// `RecordLink.URL1 := GetUrl(DefaultClientType, CompanyName, ...)` passes two of them as VALUES,
-  /// and C++ reads a bare function name as its address. The set is every parameterless static
-  /// method in `methods-auto/` -- 42 of them, and the list is what the pages say rather than what
-  /// anybody remembered.
-  /// The door's own spelling of a parameterless builtin, or empty when it is not one.
-  ///
-  /// AL IS CASE-INSENSITIVE AND C++ IS NOT, and it bites here as it bites everywhere else: a body
-  /// writes `GetLastErrorCallstack` and the door declares `GetLastErrorCallStack`. The KNOWN name
-  /// wins, which is the same rule the variables follow.
   static std::string_view BareBuiltin(std::string_view name) {
     static constexpr std::array kNoArgument{
         std::string_view{"ApplicationIdentifier"},
@@ -523,9 +441,6 @@ private:
   }
 
   std::string Name(const al::Expr &expression) {
-    // AL'S BOOLEAN LITERALS ARE NOT IDENTIFIERS, and treating them as one capitalised them:
-    // `IsHandled := false` became `IsHandled = False`, which is an unknown name in every body that
-    // has one. AL is case-insensitive here and C++ is not.
     if (SameName(expression.text, "true")) { return "true"; }
     if (SameName(expression.text, "false")) { return "false"; }
     const std::string known = scope_.Resolve(expression.text);
@@ -562,8 +477,6 @@ private:
     return out;
   }
 
-  /// Whether a call reaches through a door type -- `RecRef.KeyIndex(1)` gives a `KeyRef`, whose
-  /// members are all methods.
   [[nodiscard]] bool YieldsADoorType(const al::Expr &call) const {
     if (call.children.empty()) { return false; }
     const al::Expr &callee = call.children.front();
@@ -576,11 +489,6 @@ private:
 
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
-    // AL'S CONDITIONAL OPERATOR IS C++'S, and it is the one Binary node with three children.
-    // Without a case of its own the chain walk below found no chain, left `walk` pointing at this
-    // very node, and called Expression on it again -- recursion with no bottom. It showed up as
-    // nine objects "nesting too deeply" and, once the guard was lifted to measure it, as a
-    // segmentation fault.
     if (expression.text == "?:") { return Conditional(expression, outer); }
     if (expression.children.size() != 2) {
       throw std::runtime_error("a binary operator with " +
@@ -599,16 +507,8 @@ private:
       chain.push_back(&walk->children.back());
       walk = &walk->children.front();
     }
-    // A HANDLE IS REACHED THROUGH WITH `->`, AND ONLY ON THE FIRST LINK. `A.B.C` where `A` is a
-    // member object is `A->B.C`: what `A` yields is a value like any other.
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
-    // A MEMBER OF A DOOR TYPE IS A CALL, and AL wrote no parentheses because it never needs them
-    // for a parameterless one. `FieldRef.Name` and `RecRef.Name` are both calls; a field of a
-    // record is not, and the receiver is what tells them apart.
-    // AND A CALL YIELDS A DOOR TYPE TOO. `RecRef.KeyIndex(1).FieldCount` reaches through the KeyRef
-    // that `KeyIndex` returned, and that is a door type like any other -- so what decides is the
-    // LEFTMOST expression's kind, and a call on a door type yields one.
     const bool calls = spelling == "." &&
                        ((walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
                         (walk->kind == al::ExprKind::Call && YieldsADoorType(*walk)));
@@ -653,9 +553,6 @@ private:
       case al::ExprKind::Set:
       case al::ExprKind::Range:
         throw std::runtime_error("a set literal stands only on the right of `in`");
-      // AL COUNTS FROM ONE AND C++ FROM ZERO, and what is being indexed is not known here: an
-      // array, a List or a string, depending on a declaration this translator does not resolve. So
-      // it writes the call and the OVERLOAD SET decides, which is a compiler's job.
       case al::ExprKind::Index: {
         std::string call = "At(" + Expression(expression.children.front(), 0);
         for (std::size_t i = 1; i < expression.children.size(); ++i) {
@@ -664,11 +561,6 @@ private:
         out = call + ")";
         break;
       }
-      // A LEFT-ASSOCIATIVE CHAIN IS EMITTED IN A LOOP, NOT BY RECURSION. `a + b + c + ...` builds a
-      // left-deep tree, so walking it down recursively costs one frame per term -- and BC really
-      // does split a base64 blob across hundreds of lines joined by `+`. The depth guard below
-      // exists to stop runaway recursion on a malformed tree, not to cap a legitimate expression,
-      // so the chain is flattened first and the guard keeps its job.
       case al::ExprKind::Binary: out = Binary(expression, outer, false); break;
     }
     return out;
@@ -684,9 +576,6 @@ std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &bod
   return Writer(scope).Statements(body, indent);
 }
 
-/// A table trigger's scope: the table's own fields, then its labels. AL resolves a bare name in a
-/// trigger against the record it belongs to before anything else, which is why `Code` inside
-/// `Resource Cost` is the field and not a type.
 class TableNames : public Names {
 public:
   explicit TableNames(const al::TableObject &table) : table_(table) {}
@@ -714,19 +603,10 @@ public:
     for (const al::ProcedureDecl &procedure : table_.procedures) {
       if (SameName(procedure.name, name)) { return ProcedureIdentifier(table_, procedure.name); }
     }
-    // `Rec` INSIDE A TABLE IS THE RECORD ITSELF, and AL declares it nowhere: a trigger writes
-    // `OnBeforeLookupCity(Rec, ...)` to hand the object it is running on to a subscriber. It comes
-    // LAST, so a table that declares a variable or a field of that name keeps its own.
     if (SameName("Rec", name)) { return "*this"; }
     return {};
   }
 
-  /// \note AN ENUM FIELD SCOPES THROUGH ITS ENUMERATION AND NOT THROUGH ITSELF. AL writes
-  ///       `"SEPA Partner Type" = "SEPA Partner Type"::Blank` -- the same words on both sides, the
-  ///       field on the left and the enum object on the right. Answering only for inline OPTIONS
-  ///       left the right-hand side spelled as the field, which is not a scope and does not
-  ///       compile. It is the same question with two answers depending on how the field was
-  ///       declared.
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::FieldDecl *field = FieldNamed(table_, name);
     if (field == nullptr) { return {}; }
@@ -743,9 +623,6 @@ private:
   const al::TableObject &table_;
 };
 
-// A PAGE'S SCOPE: its variables, its source record's FIELDS, its labels and its procedures. AL
-// writes a page trigger against the same names a table trigger uses -- `Rec` is the source record
-// and a bare field name reaches through it -- so the page resolves a field to `Rec.<Field>`.
 class PageNames : public Names {
 public:
   PageNames(const al::PageObject &page, const al::TableObject *source)
@@ -770,8 +647,6 @@ public:
     for (const al::ProcedureDecl &procedure : page_.procedures) {
       if (SameName(procedure.name, name)) { return Identifier(procedure.name); }
     }
-    // A BARE FIELD NAME ON A PAGE IS A FIELD OF ITS SOURCE RECORD. AL writes `"No." := ''` in a
-    // page trigger and means `Rec."No."`; the page has no field of its own to confuse it with.
     if (source_ != nullptr) {
       const al::FieldDecl *field = FieldNamed(*source_, name);
       if (field != nullptr) { return "Rec." + FieldIdentifier(*source_, field->name); }
@@ -798,9 +673,6 @@ private:
   const al::TableObject *source_;
 };
 
-// AL NAMES TWO RECORDS INSIDE A TABLE TRIGGER and declares neither: `Rec` is the object and `xRec`
-// is what it was before the change. The platform supplies the second one, so the body binds it
-// where AL would have found it -- as a name, spelled the way the collapse spells every identifier.
 namespace {
 std::string BindsBefore(const std::string &body, const std::string &identifier) {
   return body.find("XRec") == std::string::npos
@@ -829,7 +701,6 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
       out += "}\n\n";
     }
   }
-  // A TABLE CARRIES CODE, and its procedures are written the way a codeunit's are.
   for (const al::ProcedureDecl &procedure : table.procedures) {
     out += ProcedureSignature(procedure,
                               objects,
@@ -852,9 +723,6 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     out += body + "}\n\n";
   }
 
-  // EVERY TABLE PUTS ITSELF IN THE CATALOGUE, which is what lets `RecordRef.Open(18)` reach a table
-  // the runtime does not know the name of. The entry is `constexpr` and lives in `.rodata`; what
-  // this line adds is the pointer to it.
   out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
   return WithDoor(out, ObjectKind::Table);

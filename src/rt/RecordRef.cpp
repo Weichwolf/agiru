@@ -64,8 +64,6 @@ List<std::string> FieldRef::OptionMembers() const {
   return members;
 }
 
-// A FIELD'S VALUE CARRIES ITS TYPE OUT OF THE RECORD, which is the whole reason a Variant had to
-// tell a Duration from a BigInteger: both are 64 bits in the record and two different answers here.
 Variant FieldRef::Value() const {
   switch (def_->type) {
     case FieldType::Boolean: return Variant{As<Boolean>(record_, *def_)};
@@ -81,17 +79,10 @@ Variant FieldRef::Value() const {
     case FieldType::Guid: return Variant{As<Guid>(record_, *def_)};
     case FieldType::RecordId: return Variant{As<RecordId>(record_, *def_)};
     case FieldType::DateFormula: return Variant{As<DateFormula>(record_, *def_)};
-    // AN OPTION AND AN ENUM COME OUT AS THEIR ORDINAL, because that is what they are: AL converts
-    // either to an Integer without ceremony, and the NAMES live in the field's declaration, which
-    // is what this same FieldRef hands out through GetEnumValueName.
     case FieldType::Option:
     case FieldType::Enum: return Variant{Integer{As<OrdinalValue>(record_, *def_).AsInteger()}};
     case FieldType::Blob:
       throw Error("a Blob is not read with its record, so it has no value here (board:0017)");
-    // A Media AND A MediaSet ARE OBJECT TYPES, and `Variant` holds none of those yet -- the same
-    // sentence its own door carries about Record, RecordRef and InStream. The identifier is in the
-    // row and handing it back as a Guid would be a GUESS at what the platform answers here, which
-    // is the one thing this tree does not do with an unread page.
     case FieldType::Media:
     case FieldType::MediaSet:
       throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
@@ -109,7 +100,6 @@ void FieldRef::TestField() const {
   agiru::detail::TestField(record_, *table_, def_->no);
 }
 
-// A refusal uses no state, and the declaration is AL's (board:0035).
 // NOLINTBEGIN(readability-convert-member-functions-to-static)
 RecordRef FieldRef::Record() const {
   throw Error("FieldRef.Record() is declared and not implemented yet (board:0035)");
@@ -118,8 +108,6 @@ RecordRef FieldRef::Record() const {
 // NOLINTEND(readability-convert-member-functions-to-static)
 
 void RecordRef::Open(Integer tableNo) {
-  // IT LETS GO OF WHAT IT HELD FIRST, which is what Open does in AL: it re-points the reference,
-  // and a failed Open must not leave it answering questions about the record it used to hold.
   Close();
   const TableEntry *entry = FindTable(TableId{tableNo});
   if (entry == nullptr) {

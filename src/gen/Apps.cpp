@@ -16,16 +16,10 @@ namespace agiru::gen {
 
 namespace {
 
-// A READER FOR THIS FILE AND NOT A JSON LIBRARY. apps.json is written by hand, has four keys and is
-// read once per run; a dependency that parses every JSON in existence would be carried by every
-// build of this tree for that. The shape it accepts is the shape apps.json has, and anything else
-// is a refusal with a reason rather than a quiet default.
 class Reader {
 public:
   explicit Reader(std::string text) : text_(std::move(text)) {}
 
-  /// The string array under a key, for scope.json's four lists.
-  /// It is public because scope.json is four arrays and no object.
   [[nodiscard]] std::vector<std::string> At(std::string_view key) {
     at_ = 0;
     const std::size_t found = text_.find(key);
@@ -140,8 +134,6 @@ std::string Lowered(std::string_view text) {
   return out;
 }
 
-// THE LONGEST MATCH WINS AND IT MATCHES ON A DOT BOUNDARY. `System.TestTools` is not inside
-// `System.Test`, and a prefix test without the boundary would have said it was.
 std::size_t LongestPrefix(std::string_view lowered, const std::vector<std::string> &table) {
   std::size_t best = 0;
   for (const std::string &entry : table) {

@@ -18,7 +18,7 @@ namespace {
 
 constexpr std::string_view kLineBreak = "\r\n";
 
-} // namespace
+}
 
 void OutStream::RefuseTyped() {
   throw Error("a typed Write puts the platform's own binary layout into the stream, and this "

@@ -34,8 +34,6 @@ std::string Time::ToInvariantString() const {
 
 std::string DateTime::ToInvariantString() const {
   if (IsUndefined()) { return {}; }
-  // UTC, and the Z says so. `datetime-data-type.md`: "A DateTime is stored in the database as
-  // Coordinated Universal Time (UTC)."
   return Date().ToInvariantString() + "T" + Time().ToInvariantString() + "Z";
 }
 

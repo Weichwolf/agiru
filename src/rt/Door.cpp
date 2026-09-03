@@ -1,24 +1,3 @@
-// The bodies of the door types the platform documentation declares. Written from
-// `methods-auto/<type>/`, one definition per documented signature, and every one of them refuses by
-// name (board:0035).
-//
-// THE ANALYSIS IS SWITCHED OFF FOR THIS FILE AND THAT IS A STATEMENT ABOUT ITS STATE, not a
-// judgement about the checks. Every finding here is one of two, and both are true of a body that
-// has not been written yet:
-//
-//   `readability-convert-member-functions-to-static` -- 712 of them -- says the method does not use
-//   `this`. Of course it does not: it throws. Making them static would change the DOOR, which is
-//   AL's own surface and the one thing here that is not provisional.
-//
-//   `bugprone-easily-swappable-parameters` -- 76 -- says two adjacent parameters share a type. AL
-//   declared them in that order and the door repeats it; reordering would break name equality with
-//   the documentation, which is what makes the surface checkable at all.
-//
-// Both go away as the bodies land, one family at a time, and the suppression goes with them.
-//   `performance-unnecessary-value-param` -- 5 -- says a parameter is copied and only read. AL
-//   declared it by value and the door repeats the declaration; changing it would be a different
-//   signature from the one the page states.
-//
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"

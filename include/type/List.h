@@ -168,9 +168,6 @@ public:
   [[nodiscard]] bool operator==(const List &o) const = default;
 
 private:
-  // A LOOP RATHER THAN `std::ranges::find`, and the reason is the door's build time: `<algorithm>`
-  // costs 372 ms of every translation unit that reads `agiru.h`, and 5 835 generated sources read
-  // it (measured 2026-09-03). A list is a vector and this is the one thing looked up in it.
   [[nodiscard]] auto At(const T &value) const {
     auto at = values_.begin();
     while (at != values_.end() && !(*at == value)) { ++at; }

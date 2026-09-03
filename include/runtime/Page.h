@@ -86,9 +86,6 @@ public:
     throw Error("Page.RunModal needs a running UI (board:0030)");
   }
 
-  // WHAT A PAGE VARIABLE CAN DO, from `methods-auto/page/`. AL writes `P.SetTableView(Rec)` and
-  // `P.GetRecord(Rec)` on a page it is about to run, so these are the page's own surface and not
-  // the test framework's -- `TestPage` is a different type with a different one.
   /// \brief AL `Page.Activate(Boolean)`. Activates the current page on the client if possible. The
   /// data on the page will not be refreshed.
   /// \param Refresh The AL `Boolean`.

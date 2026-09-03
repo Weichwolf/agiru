@@ -27,8 +27,6 @@
 
 namespace agiru {
 
-// A declaration takes a NAME. `ErrorInfo.RecordId(RecordRef)` and `RecordRef` naming an ErrorInfo
-// would include each other otherwise.
 class RecordRef;
 
 /// \brief AL `ErrorInfo`.

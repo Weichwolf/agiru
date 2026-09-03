@@ -24,10 +24,6 @@ struct Options {
 
 constexpr int kUsage = 2;
 
-// THE CONNECTION STRING IS A BUILD SETTING AND NOT AN ENVIRONMENT VARIABLE, for the reason the gate
-// gives: a run that reads its target from the shell passes or fails for reasons the tree cannot
-// see.
-// `--database` overrides it, because a client is allowed to be told where to connect.
 constexpr std::string_view kDatabase = AGIRU_DATABASE;
 
 void Usage() {
@@ -72,15 +68,8 @@ Options Read(std::span<const std::string_view> arguments) {
   return options;
 }
 
-/// AL's own test runner walks the `[Test]` procedures; this is the door in front of it, the way
-/// BC's `Run-TestsInBcContainer` is a door in front of `Invoke-NavCodeunit` (board:0039).
-///
-/// \warning A RUN THAT FINDS NOTHING IS AN ABORT, NOT A PASS. Zero registered test codeunits means
-///          the apps were not linked in, and "0 of 0 passed" would be the greenest possible lie.
 int RunTests(const Options &options) {
   if (!options.suite.empty()) {
-    // A SUITE IS A ROW IN `Test Suite`, not a name this binary knows. Guessing that a suite means
-    // "everything" would report a pass over a population nobody asked for.
     throw agiru::Error("run-tests cannot select the suite " + options.suite +
                        " yet: a suite is data in the `Test Suite` table and needs the database "
                        "(board:0004). --codeunit works now. See board:0039.");
@@ -108,8 +97,6 @@ int RunTests(const Options &options) {
                          "; `run-tests --list` says which are registered");
     }
   }
-  // A TEST METHOD IS A TRANSACTION, so the runner needs a session before it runs one -- and it
-  // opens exactly one for the whole run, because a session is what holds the boundary stack.
   const agiru::Session session(options.database.empty() ? std::string(kDatabase)
                                                         : options.database);
   const agiru::TestRun run = agiru::RunRegisteredTests(options.codeunit);
@@ -128,9 +115,6 @@ int Version() {
 
 } // namespace
 
-/// A FAILURE IS LOUD AND IT IS ALSO A RETURN CODE. The handler prints and returns; what the checker
-/// sees is that PRINTING can itself throw, which would leave `main` -- so the handler is wrapped in
-/// one of its own, and the last resort says nothing and returns 1.
 int main(int argc, char **argv) {
   try {
     std::vector<std::string_view> arguments;
@@ -149,10 +133,7 @@ int main(int argc, char **argv) {
   } catch (const std::exception &e) {
     try {
       std::println(stderr, "agiru: {}", e.what());
-    } catch (...) {
-      // Reporting itself failed; the return code is the report.
-      return 1;
-    }
+    } catch (...) { return 1; }
     return 1;
   } catch (...) { return 1; }
 }

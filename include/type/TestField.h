@@ -13,10 +13,6 @@
 ///       generated page declares its controls as a class TEMPLATE so that nothing test-shaped
 ///       lands in `apps/` outside the test app.
 
-// A REFUSAL DOES NOT USE `this`, and every generated body below is one -- so the checks that say so
-// are true of the STATE and not of the design. They go away as the bodies land, and the suppression
-// goes with them (board:0030). The parameter orders are AL's own.
-// NOLINTBEGIN(readability-convert-member-functions-to-static,modernize-use-nodiscard)
 namespace agiru {
 
 /// \brief AL `TestField` -- one control of a page, reached by the name AL gave it.
@@ -90,61 +86,47 @@ public:
   /// type.
   /// \return The AL `Date`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Date AsDate() const {
-    throw Error("TestField.AsDate() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Date AsDate() const { Unbound(); }
 
   /// \brief AL `TestField.AsDateTime()`. Converts the value in a field on a test page to a DateTime
   /// data type.
   /// \return The AL `DateTime`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::DateTime AsDateTime() const {
-    throw Error("TestField.AsDateTime() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::DateTime AsDateTime() const { Unbound(); }
 
   /// \brief AL `TestField.AsDecimal()`. Converts the value in a field on a test page to a Date data
   /// type.
   /// \return The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Decimal AsDecimal() const {
-    throw Error("TestField.AsDecimal() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Decimal AsDecimal() const { Unbound(); }
 
   /// \brief AL `TestField.AssistEdit()`. Provides assist-edit functionality to a field on a test
   /// page.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AssistEdit() const {
-    throw Error("TestField.AssistEdit() is declared and not implemented yet (board:0035)");
-  }
+  void AssistEdit() const { Unbound(); }
 
   /// \brief AL `TestField.AsTime()`. Converts the value in a field on a test page to a Time data
   /// type.
   /// \return The AL `Time`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Time AsTime() const {
-    throw Error("TestField.AsTime() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Time AsTime() const { Unbound(); }
 
   /// \brief AL `TestField.Caption()`. Gets the current caption of the field as a String.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Caption() const {
-    throw Error("TestField.Caption() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] std::string Caption() const { Unbound(); }
 
   /// \brief AL `TestField.Drilldown()`. Applies drill-down capability for a field on a test page.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Drilldown() const {
-    throw Error("TestField.Drilldown() is declared and not implemented yet (board:0035)");
-  }
+  void Drilldown() const { Unbound(); }
 
   /// \brief AL `TestField.GetOption(Integer)`. Gets the options for a field on a test page.
   /// \param Index The AL `Integer`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetOption(::agiru::Integer Index = {}) const {
+  [[nodiscard]] std::string GetOption(::agiru::Integer Index = {}) const {
     static_cast<void>(Index);
-    throw Error("TestField.GetOption(Integer) is declared and not implemented yet (board:0035)");
+    Unbound();
   }
 
   /// \brief AL `TestField.GetValidationError(Integer)`. Gets the validation error that occurred on
@@ -152,47 +134,35 @@ public:
   /// \param Index The AL `Integer`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetValidationError(::agiru::Integer Index = {}) const {
+  [[nodiscard]] std::string GetValidationError(::agiru::Integer Index = {}) const {
     static_cast<void>(Index);
-    throw Error(
-        "TestField.GetValidationError(Integer) is declared and not implemented yet (board:0035)");
+    Unbound();
   }
 
   /// \brief AL `TestField.HideValue()`. Gets the hide value state for the field.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean HideValue() const {
-    throw Error("TestField.HideValue() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Boolean HideValue() const { Unbound(); }
 
   /// \brief AL `TestField.Invoke()`. Invokes the default action on the field.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Invoke() const {
-    throw Error("TestField.Invoke() is declared and not implemented yet (board:0035)");
-  }
+  void Invoke() const { Unbound(); }
 
   /// \brief AL `TestField.OptionCount()`. Gets the number of options in a field on a test page.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer OptionCount() const {
-    throw Error("TestField.OptionCount() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Integer OptionCount() const { Unbound(); }
 
   /// \brief AL `TestField.ShowMandatory()`. Gets the ShowMandatory state for the field.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean ShowMandatory() const {
-    throw Error("TestField.ShowMandatory() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Boolean ShowMandatory() const { Unbound(); }
 
   /// \brief AL `TestField.ValidationErrorCount()`. Gets the number of validation errors that
   /// occurred on the test page.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer ValidationErrorCount() const {
-    throw Error(
-        "TestField.ValidationErrorCount() is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Integer ValidationErrorCount() const { Unbound(); }
 
 private:
   [[noreturn]] void Unbound() const;
@@ -201,5 +171,3 @@ private:
 };
 
 } // namespace agiru
-
-// NOLINTEND(readability-convert-member-functions-to-static,modernize-use-nodiscard)

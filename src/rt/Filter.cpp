@@ -35,11 +35,6 @@ bool HasWildcard(std::string_view text) {
   return text.find('*') != std::string_view::npos || text.find('?') != std::string_view::npos;
 }
 
-/// Splits on a separator that is not inside a quoted operand.
-///
-/// AL QUOTES AN OPERAND THAT CONTAINS AN OPERATOR: `'A&B'` is one value and not a conjunction. A
-/// split that ignored the quotes would turn a company name into a filter, and a value arriving
-/// through `%1` is data this runtime did not write.
 std::vector<std::string_view> SplitOutsideQuotes(std::string_view text, char separator) {
   std::vector<std::string_view> parts;
   bool quoted = false;
@@ -55,7 +50,6 @@ std::vector<std::string_view> SplitOutsideQuotes(std::string_view text, char sep
   return parts;
 }
 
-/// Removes the quotes AL puts around an operand, keeping the spaces inside them.
 std::string Unquote(std::string_view text) {
   text = Trim(text);
   if (text.size() >= 2 && text.front() == '\'' && text.back() == '\'') {
@@ -66,15 +60,6 @@ std::string Unquote(std::string_view text) {
   return std::string(text);
 }
 
-/// Reads the operator at the front of an atom, leaving the operand.
-///
-/// WHITESPACE IS INSIGNIFICANT and `=` IS OPTIONAL, and both cost the predecessor real defects.
-/// `'< %1'`, `'> 5'` and `'<> 0'` are ordinary AL spellings, and matching against the raw string
-/// missed every spaced form, so the whole expression fell into the equality branch and compared a
-/// value against the literal text `"< 2028-01-28"`. And `SetFilter(F, '=1')` is the same filter as
-/// `SetFilter(F, '1')` -- the `=` is optional syntax at 121 call sites in the corpus. Unrecognised,
-/// the atom compared against the literal `"=1"` and matched NOTHING, silently, because an empty
-/// result set is a legal outcome.
 Compare TakeOperator(std::string_view &text) {
   text = Trim(text);
   for (const auto &[spelling, compare] : {std::pair{std::string_view("<>"), Compare::NotEqual},
@@ -95,15 +80,10 @@ Compare TakeOperator(std::string_view &text) {
 Atom ReadAtom(std::string_view text) {
   text = Trim(text);
 
-  // `@` IS A MODIFIER AND NOT A CHARACTER. It asks for a case-insensitive comparison, and every
-  // comparison here is already case-insensitive the way AL compares text, so it is consumed and
-  // the rest read as usual.
   if (text.starts_with("@")) { text.remove_prefix(1); }
 
   const Compare given = TakeOperator(text);
 
-  // A RANGE IS NOT AN OPERATOR ON AN OPERAND, it is two operands. It is looked for only when no
-  // operator was given, because `<..9` is not AL.
   if (given == Compare::Equal) {
     const std::size_t dots = text.find("..");
     if (dots != std::string_view::npos) {
@@ -134,7 +114,6 @@ char Lower(char c) {
   return static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
 }
 
-/// AL compares text without regard to case, and so does the wildcard match.
 bool SameText(std::string_view a, std::string_view b) {
   if (a.size() != b.size()) { return false; }
   for (std::size_t i = 0; i < a.size(); ++i) {
@@ -143,8 +122,6 @@ bool SameText(std::string_view a, std::string_view b) {
   return true;
 }
 
-/// `*` stands for any run of characters and `?` for exactly one. NOT a regular expression, and not
-/// translated into one: a value out of the database is full of characters a regex would read.
 bool WildcardMatch(std::string_view pattern, std::string_view value) {
   std::size_t p = 0;
   std::size_t v = 0;
@@ -168,10 +145,6 @@ bool WildcardMatch(std::string_view pattern, std::string_view value) {
   return p == pattern.size();
 }
 
-/// Orders two rendered values the way the FIELD orders them.
-///
-/// A NUMBER IS NOT COMPARED AS TEXT: `"10" < "9"` lexically, and a filter `>=9` over an entry
-/// number would then drop every row from ten upward.
 std::strong_ordering Order(std::string_view value, std::string_view against, const FieldDef &def) {
   switch (def.type) {
     case FieldType::Integer:
@@ -256,8 +229,6 @@ Intervals Normalised(Intervals set) {
   std::ranges::sort(set, [](const Interval &a, const Interval &b) { return a.low < b.low; });
   Intervals merged;
   for (const Interval &next : set) {
-    // ADJACENT INTERVALS ARE MERGED, NOT ONLY OVERLAPPING ONES. `1..5|6..9` is one run of integers,
-    // and leaving it as two would emit two series where one describes the same rows.
     if (!merged.empty() && next.low <= merged.back().high + 1) {
       merged.back().high = std::max(merged.back().high, next.high);
       continue;
@@ -283,14 +254,11 @@ Intervals Intersected(const Intervals &left, const Intervals &right) {
 std::optional<Intervals> Admitted(const Atom &atom, Interval domain) {
   const std::optional<std::int64_t> bound = AsInteger(atom.value);
   switch (atom.compare) {
-    // A WILDCARD DESCRIBES NO INTERVAL. AL accepts `*1*` on an integer field, and a caller that
-    // cannot scan has to refuse rather than guess at what it would have matched.
     case Compare::Like:
     case Compare::NotLike: return std::nullopt;
     case Compare::Equal:
       if (!bound) { return std::nullopt; }
       return Intervals{{.low = *bound, .high = *bound}};
-    // `<>5` PUNCHES A HOLE and leaves two intervals, which is why a conjunction holds a SET.
     case Compare::NotEqual:
       if (!bound) { return std::nullopt; }
       return Normalised(

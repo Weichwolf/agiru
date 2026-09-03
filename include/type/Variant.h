@@ -38,10 +38,6 @@ struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T,
 
 } // namespace agiru::detail
 
-// A REFUSAL DOES NOT USE `this`, and every generated body below is one -- so the checks that
-// say so are true of the STATE and not of the design. They go away as the bodies land, and
-// the suppression goes with them (board:0035). The parameter orders are AL's own, which is
-// what makes the surface checkable against the documentation at all.
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
 
@@ -85,10 +81,6 @@ public:
   /// \note Exactly, and not merely convertible: a Duration is built from a number, so a
   ///       constructibility test would make `Variant{5}` ambiguous between Integer, BigInteger and
   ///       Duration. The type the caller wrote is the type the Variant holds.
-  // AL passes anything to
-  // an `Any` parameter without ceremony -- `Assert.AreEqual(0, X, '')` is the shape every test
-  // writes -- so the conversion is implicit. What stays strict is WHICH types: exactly the
-  // alternatives, so `Variant{5}` cannot be ambiguous between Integer, BigInteger and Duration.
   template <typename T>
     requires detail::InVariant<T, Held>::value
   Variant(T value) : held_(std::move(value)) {}
@@ -161,9 +153,6 @@ public:
   /// \brief AL `Variant.IsDateFormula()`. \return True when it holds one.
   [[nodiscard]] bool IsDateFormula() const { return Is<DateFormula>(); }
 
-  // THE REST OF THE SIXTY PREDICATES, from `methods-auto/variant/`. The page lists one per AL
-  // type and a body asks whichever it needs; the ones this Variant can answer are above, and each
-  // of these refuses by name until its type is an alternative (board:0035).
   /// \brief AL `Variant.IsAction()`. Indicates whether an AL variant contains an Action variable.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -634,12 +623,6 @@ public:
   operator T() const {
     const T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
-    // A LESS GENERAL NUMBER CONVERTS TO A MORE GENERAL ONE, and that is AL's own rule rather than a
-    // convenience: `devenv-al-type-conversion-expressions.md` ranks the numeric types from most to
-    // least general -- "a decimal is more general than an integer, which is more general than a
-    // char" -- and the platform converts on the way up. `Assert.AreEqual(0, X, '')` puts an Integer
-    // in the Any and hands it to `EqualNumbers(Decimal, Decimal)`; refusing that is refusing AL.
-    // The way DOWN is not here and must not be: Decimal to Integer is what `Round` is for.
     if constexpr (std::is_same_v<T, Decimal>) {
       if (const Integer *narrow = std::get_if<Integer>(&held_); narrow != nullptr) {
         return Decimal{*narrow};

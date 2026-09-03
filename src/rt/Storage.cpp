@@ -73,39 +73,15 @@ std::string ColumnType(const FieldDef &def) {
     case FieldType::Decimal: return "numeric(38,20)";
     case FieldType::Code:
     case FieldType::Text: return "varchar(" + std::to_string(def.length) + ")";
-    // NOT `date`, AND THE DOCUMENTATION IS WHY. `date-data-type.md`: "For date fields, Business
-    // Central uses only the date and uses a constant value for the time. For a normal date, this
-    // constant value contains 00:00:00:000. For a closing date, it contains 23:59:59:000." A `date`
-    // column has nowhere to put that, and a closing date would collapse onto its normal date --
-    // which is the whole ordering a fiscal-year close depends on. The undefined date is "the
-    // earliest valid date in SQL Server", 1753-01-01 00:00:00:000.
     case FieldType::Date: return "timestamp";
-    // A `time` column holds everything an AL Time can, so unlike Date there is nothing to work
-    // around: `time-data-type.md` describes SQL Server storing it in a datetime with the constant
-    // date 01-01-1754, and that constant carries no information.
     case FieldType::Time: return "time";
     case FieldType::DateTime: return "timestamp";
     case FieldType::Guid: return "uuid";
-    // A DateFormula is STORED AS ITS TEXT, which is what BC does: `dateformula-data-type.md` says a
-    // formula in a field "is converted to a generic, nonlanguage dependent format" -- the invariant
-    // spelling -- and read back into the current language when it is shown. The text IS the value.
     case FieldType::DateFormula: return "varchar(32)";
-    // A RecordId is stored as its TEXT, which is what AL code already reads it as: the BaseApp
-    // splits `Format(RecordID)` on `': '` to get the primary key back out of it.
-    // A TableFilter IS its expression, and only the Permission table stores one: what a row holds
-    // is the filter text, and where it applies is decided by the row (board:0018). It reaches the
-    // same column type as a RecordId by a different argument, so the two are named together rather
-    // than looking like one rule.
     case FieldType::RecordId:
     case FieldType::TableFilter: return "text";
-    // A Duration IS a count of milliseconds -- `duration-data-type.md` says so outright -- so the
-    // column holds the count and not an interval. An interval would round-trip through the
-    // server's own unit rules, and a Duration has exactly one unit.
     case FieldType::Duration: return "bigint";
     case FieldType::Blob: return "bytea";
-    // A Media FIELD HOLDS AN IDENTIFIER AND NOT BYTES. The media object lives in the tenant media
-    // table and the row carries the GUID that finds it, which is why this column is the same shape
-    // as SystemId's and not the same shape as a BLOB's (board:0031).
     case FieldType::Media:
     case FieldType::MediaSet: return "uuid";
   }

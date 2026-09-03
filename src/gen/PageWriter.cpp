@@ -60,11 +60,6 @@ void WriteControls(std::string &out,
   }
 }
 
-/// A DECLARATION NEEDS A NAME AND A MEMBER NEEDS A LAYOUT, the same rule the codeunits follow.
-/// A page's procedures are declared in its header and their parameters are objects, so including
-/// every one of them would put a page and the codeunits it talks to in a cycle. What genuinely
-/// needs the definition is a member, an enumeration and anything inside a template argument --
-/// `Temporary<tables::X>` instantiates and `TestPage<pages::Y>` derives.
 struct Reached {
   std::set<std::string> headers;
   std::map<std::string, std::set<std::string>> forward;
@@ -84,7 +79,6 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
       reached.headers.insert(found->second.header);
     }
   }
-  // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
   if (type == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
     if (found != objects.interfaces.end()) { Ahead(reached, found->second.identifier); }
@@ -100,8 +94,6 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
     Named(reached, argument, objects, complete);
   }
   const TableRef *ref = ReachObject(declared, objects);
-  // A PLATFORM TABLE ARRIVES WITH THE DOOR: no header to include and nothing to declare ahead,
-  // because `platform::Field` is `agiru::platform::Field` and not an object in `agiru::app`.
   if (ref == nullptr || ref->header.empty()) { return; }
   if (complete || declared.temporary) {
     reached.headers.insert(ref->header);
@@ -181,13 +173,6 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   Flatten(object.actions, fields, actions);
 
   out += "namespace agiru::app::pages {\n\n";
-  // A CONTROL IS NOT A MEMBER OF THE PAGE, and AL is the reason rather than C++. A page's controls
-  // and its procedures live in different namespaces there -- `ItemTrackingLines` has an action
-  // `AssignSerialNo` AND a procedure `AssignSerialNo` -- and a TestPage reaches the controls and
-  // never the procedures. So the controls are their own class, and `TestPage<P>` derives from it.
-  // A PAGE HAS CONTROLS AND A TEST HAS `TestField`s, and only the second is test code. The class
-  // is a TEMPLATE over the two so the page names neither: `apps/` outside the test app carries no
-  // test type at all, and `TestPage` instantiates it with the pair it needs.
   out += "template <typename Field, typename Action> class " + controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
   WriteControls(out, fields, "Field", taken);

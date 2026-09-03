@@ -16,8 +16,12 @@ B    := $(SELF)/build
 all: comments db   ## strip the comments, then the library, the transpiler and the client
 	@cmake --build $(B) -j $(shell nproc)
 
+# THE FORMATTER RUNS AFTER THE STRIP, because removing a line changes what fits on the next one and
+# `make lint` would otherwise fail on a tree `make` just wrote. The two together are idempotent.
 comments:          ## delete every comment in src/; include/ keeps its Doxygen
 	@python3 $(SELF)/test/strip-comments.py $(SELF)/src $(SELF)/include
+	@git -C $(SELF) diff --name-only --diff-filter=ACM -- '*.h' '*.cpp' 2>/dev/null | \
+	  grep -v '^apps/' | xargs -r clang-format -i 2>/dev/null || true
 
 db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json

@@ -114,10 +114,6 @@ private:
   }
 
   void Release() {
-    // The analyser cannot follow a function POINTER to the `delete` it calls, and that indirection
-    // is the whole design -- it is what lets this destructor work on an incomplete `T`
-    // (board:0037). The gate proves the pairing instead: InstanceGate counts constructions against
-    // destructions.
     if (free_ != nullptr) { free_(held_); }
     held_ = nullptr;
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): see above.
@@ -138,8 +134,6 @@ private:
 ///
 /// \note The base holds NO data, for the same reason `Table` holds none: a generated codeunit is a
 ///       plain class whose members are exactly the variables its `.al` declares.
-// The check wants a private constructor with `friend Derived`; `Table` carries the reason it cannot
-// have one, and a codeunit is the same shape.
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
 template <typename Derived> class Codeunit {
 public:

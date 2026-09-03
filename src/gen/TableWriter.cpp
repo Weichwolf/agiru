@@ -83,24 +83,7 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
 
 } // namespace
 
-// AL IS CASE-INSENSITIVE AND A KEY MAY SPELL A FIELD DIFFERENTLY FROM THE FIELD ITSELF. `Default
-// Dimension` declares `field(8000; ParentId; Guid)` and then `key(Key3; "Parent Type", ParentID)`:
-// one AL field, two C++ identifiers, and the second names nothing. The key is therefore resolved
-// against the DECLARED fields rather than spelled out as written, which is the collapse-match the
-// generator already does for type names.
-// AND TWO DIFFERENT AL NAMES MAY COLLAPSE INTO ONE IDENTIFIER. `Email Related Record` declares
-// `field(3; "System Id"; Guid)` -- the SystemId of the record the mail relates to -- beside the
-// platform's own `SystemId`, and both are legal AL because the space makes them different names.
-// Identifier() removes the space, so the second one carries its FIELD NUMBER: a visible, uniform
-// deviation rather than a silently dropped field, and the number is what AL itself would use to
-// tell them apart.
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
-  // THE PLATFORM'S FIVE KEEP THEIR NAMES AND THE AL FIELD YIELDS, which is the opposite of the
-  // order the fields are walked in. `Cost Adjmt. Action Message` declares `field(6; SystemID;
-  // Guid)`
-  // -- one letter of case away from the platform's `SystemId` -- and letting the AL field win left
-  // the table with no `SystemId` at all, which `WithSystemFields<T>` addresses by name and the door
-  // promises to every client.
   std::set<std::string> taken;
   for (const SystemFieldDecl &system : kSystemFields) {
     taken.insert(LowerKey(std::string(system.name)));
@@ -132,16 +115,7 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
       table.fields, [type](const al::FieldDecl &field) { return Identifier(field.name) == type; });
 }
 
-// A FIELD NAME CAN SHADOW A RUNTIME TYPE, AND NOT ONLY ITS OWN. `Change Log Setup (Field)` declares
-// a field called `Field No.`, whose member is `FieldNo` -- and from that member onward `FieldNo`
-// names the member rather than `agiru::FieldNo`, so every entry of the Field_No struct below it
-// fails to compile. 122 of the BaseApp's 1 545 tables hit this (measured 2026-09-01). Every runtime
-// name the class body uses after its members therefore goes through here, not just the field types.
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
-  // `FieldNo` IS HIDDEN BY THE BASE CLASS AND NOT ONLY BY A FIELD. `Table<Derived>` carries AL's
-  // own `Record.FieldNo(Field)`, and a member declared anywhere in a class hides a namespace name
-  // for the WHOLE class body -- so every generated table qualifies the TYPE, not just the ones with
-  // a field of that name. AL names both, and the door keeps both names.
   if (type == "FieldNo" || HiddenByABaseMember(type)) { return "::agiru::" + bare; }
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
 }
@@ -151,9 +125,6 @@ std::string MemberType(const al::TableObject &table,
                        const OptionField *option,
                        const EnumIndex &enums) {
   if (option != nullptr) { return Reach(table, "Option", "Option<" + option->enumName + ">"); }
-  // AN ENUMERATION THIS RUN NEVER SAW BECOMES `Enum<>`, for the reason the codeunit writer gives:
-  // the platform declares some, BCApps holds only their extensions, and a named type nobody
-  // declares stops the file.
   if (IsEnumField(field)) {
     const auto found = enums.find(LowerKey(field.subtype));
     return found != enums.end()
@@ -167,11 +138,6 @@ std::string MemberType(const al::TableObject &table,
   return Reach(table, type, type);
 }
 
-// SORTED BY FIELD NUMBER, NOT AS AL DECLARED IT. Field() binary-searches and the emitted
-// static_assert holds it to that, and AL does not always oblige: 19 of the BaseApp's 1 545 tables
-// declare their fields out of order, Sales Line among them (measured 2026-09-01). The MEMBERS keep
-// AL's order, because that is what a reader compares against the .al file and because `offsetof`
-// does not care; only the field table moves.
 std::vector<const al::FieldDecl *> ByNumber(const al::TableObject &table) {
   std::vector<const al::FieldDecl *> fields;
   fields.reserve(table.fields.size());
@@ -194,9 +160,6 @@ void WriteOptionTraits(std::string &out, const OptionField &option) {
   out += "};\n";
 }
 
-// ONE LINE FOR THE DOOR AND ONE PER APP HEADER IT NEEDS. An AL file declares no includes, so the
-// translation writes none either beyond what the C++ compiler cannot do without: `agiru.h`, and the
-// enum objects this table's fields name, which live in other files of this same app.
 std::string Includes(const al::TableObject &table,
                      const std::vector<OptionField> &options,
                      const EnumIndex &enums) {
@@ -216,16 +179,6 @@ std::string Includes(const al::TableObject &table,
   return out;
 }
 
-// EVERY TABLE CARRIES THE SYSTEM FIELDS AND THE PLATFORM PUTS THEM THERE, not the AL author.
-// `devenv-table-system-fields.md` names five with their numbers, says the range 2000000000-
-// 2147483647 is reserved for them, and says "system fields are fields that are automatically
-// included in every table object by the platform". The BaseApp KEYS on them -- 121 keys name
-// SystemModifiedAt, 26 name SystemId, 15 name SystemCreatedAt -- so a table without them has keys
-// that name nothing, and that is what blocked those files.
-//
-// SystemRowVersion IS NOT HERE. AL exposes the SQL rowversion under that name and the page gives it
-// no field NUMBER, unlike the five it tabulates. Inventing one would put a number in the metadata
-// that nothing can check, and the rowversion needs its database half anyway (board:0013).
 bool IsSystemField(const al::FieldDecl &field) {
   return field.number >= kSystemFields.front().no.Value();
 }
@@ -243,9 +196,6 @@ al::TableObject WithSystemFields(al::TableObject table) {
   return table;
 }
 
-// AN EMPTY BRACED LIST CANNOT DEDUCE ITS ELEMENT TYPE, and a table with no fields is legal AL --
-// BC declares several as pure event containers. `std::array k{}` is not a declaration the compiler
-// can complete, so the element type is named when there is nothing to deduce it from.
 std::string FieldTable(const al::TableObject &table,
                        const std::vector<const al::FieldDecl *> &sorted,
                        const std::string &tableIdentifier) {
@@ -255,9 +205,6 @@ std::string FieldTable(const al::TableObject &table,
                     ">{{\n";
   for (const al::FieldDecl *field : sorted) {
     if (IsSystemField(*field)) { continue; }
-    // THE SAME SPELLING THE CLASS USES, and not `Identifier` again: a field whose name collapses
-    // onto another's carries a seam, and a row that named the bare form pointed at a different
-    // field's number -- which the sortedness assertion caught, three files away from the cause.
     const std::string identifier = FieldIdentifier(table, field->name);
     out += "    Declare<&";
     out += tableIdentifier;
@@ -294,11 +241,6 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
 
 } // namespace
 
-// A TABLE'S VARIABLE SITS IN THE SAME CLASS AS ITS FIELDS AND MAY COLLIDE WITH ONE. `Campaign`
-// has a field `"No. Series"` and a variable `NoSeries: Codeunit "No. Series"` -- two different AL
-// names that Identifier() spells the same. The variable yields, because a field is what the field
-// table addresses by `offsetof` and what AL code names far more often, and it carries the interior
-// underscore that no AL name can reach.
 namespace {
 
 std::string Disambiguated(const std::string &bare,
@@ -333,10 +275,6 @@ std::string VariableIdentifier(const al::TableObject &table, const std::string &
   return Disambiguated(Identifier(name), "_Var", taken);
 }
 
-// A PROCEDURE MAY CARRY A FIELD'S NAME TOO. `General Ledger Setup` has a field
-// `"Use Concurrent Posting"` and a procedure `UseConcurrentPosting()`; in AL they are a field and a
-// procedure and never confusable, in C++ they are two members of one class. The FIELD keeps its
-// spelling, because the field table addresses it by `offsetof` and AL code names it far more often.
 std::string ProcedureIdentifier(const al::TableObject &table, const std::string &name) {
   const auto taken = [&](const std::string &spelled) {
     if (NamedByAField(table, spelled)) { return true; }
@@ -352,13 +290,8 @@ std::string ProcedureIdentifier(const al::TableObject &table, const std::string 
   return Disambiguated(Identifier(name), "_Proc", taken);
 }
 
-/// What a table's own header must include and what it may merely name.
-///
-/// A MEMBER NEEDS THE LAYOUT AND A DECLARATION NEEDS THE NAME. Including everything a signature
-/// mentions would put two tables in a cycle the moment each names the other, which AL allows.
 namespace {
 
-/// Adds the header an index holds for a subtype, when the run translated one.
 template <typename Index>
 void Indexed(const Index &index, const std::string &subtype, std::set<std::string> &headers) {
   if (subtype.empty()) { return; }
@@ -368,8 +301,6 @@ void Indexed(const Index &index, const std::string &subtype, std::set<std::strin
   }
 }
 
-/// What one declaration in a table needs the header to have: a header for anything that is a
-/// template argument or a member, a NAME for anything that is only mentioned.
 struct Reached {
   std::set<std::string> headers;
   std::map<std::string, std::set<std::string>> ahead;
@@ -378,12 +309,10 @@ struct Reached {
 void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects) {
   for (const al::VarDecl &argument : declared.arguments) { Name(reached, argument, objects); }
   const std::string alType = TypeName(declared.type);
-  // A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so `TestPage<pages::X>` needs the header.
   if (alType == "TestPage" || alType == "TestRequestPage") {
     Indexed(objects.pages, declared.subtype, reached.headers);
     return;
   }
-  // AN INTERFACE VARIABLE IS A POINTER, so the header needs the NAME and not the class.
   if (alType == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
     if (found != objects.interfaces.end()) {
@@ -405,11 +334,6 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
 
 std::string Declarations(const al::TableObject &table, const Objects &objects) {
   std::string out;
-  // A TABLE'S PROCEDURES NAME OBJECTS, and a declaration needs the NAME and not the layout:
-  // `Currency.GetGainLossAccount` takes a `Record "Detailed CV Ledg. Entry Buffer"`. Including it
-  // would put two tables' headers in a cycle the moment each names the other, which AL allows.
-  // A MEMBER IS THE EXCEPTION, because it needs the layout -- unless it is an object, which is a
-  // handle (board:0037).
   Reached reached;
   const std::map<std::string, std::set<std::string>> &ahead = reached.ahead;
   std::set<std::string> &memberHeaders = reached.headers;
@@ -442,10 +366,6 @@ std::string Declarations(const al::TableObject &table, const Objects &objects) {
   return out;
 }
 
-/// The class itself: its identity, its fields, its field numbers, its captions, its variables
-/// and its procedures -- everything AL puts between the braces of a `table`.
-/// The constants a table declares beside its fields: the field NUMBERS, the key arrays and the
-/// labels. None of them is data, so none of them touches the standard layout.
 std::string ClassConstants(const al::TableObject &table) {
   std::string out;
   const std::string fieldNo = Reach(table, "FieldNo", "FieldNo");
@@ -457,12 +377,6 @@ std::string ClassConstants(const al::TableObject &table) {
   }
   out += "  };\n\n";
 
-  // A KEY ARRAY IS NAMED BY ITS POSITION AND NOT BY ITS AL NAME. 19 of the BaseApp's keys are
-  // called `Name`, whose array would be `kName` -- which is already the table's own name constant,
-  // and a duplicate member the compiler refuses (measured 2026-09-01). A position cannot collide:
-  // the class declares exactly two other `k` constants, and no FIELD member can ever start with a
-  // lower-case k, since Identifier() upper-cases the first letter of every AL name. The AL name is
-  // not lost -- it stands beside the array in the KeyDef, which is where a reader looks for it.
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
     out += "  static constexpr std::array<" + Reach(table, "FieldNo", "FieldNo") + ", " +
            std::to_string(table.keys[i].fields.size()) + "> " + KeyArrayName(i) + "{{";
@@ -488,19 +402,12 @@ std::string ClassBody(const al::TableObject &table,
   std::string out;
   out += "namespace agiru::app::tables {\n\n";
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
-  // THE ALIAS COMES BEFORE THE CLASS, because a member may name the object's own type: a codeunit
-  // returns `Codeunit "Http Request Message Impl."` and a table holds a filter on itself. Declared
-  // after the class, the AL name is not yet known inside it.
   out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
   out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
 
-  // A RECORD STARTS BLANK, AND AL GUARANTEES IT. `var Rec: Record X` gives every field its zero --
-  // an empty Code, a zero Decimal, the undefined date -- and AL code reads a fresh record without
-  // writing to it first. C++ default-initialises a member of built-in type to nothing at all, so
-  // without the braces an Integer field of a fresh record holds whatever was on the stack.
   for (const al::FieldDecl &field : table.fields) {
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
            FieldIdentifier(table, field.name) + "{};\n";
@@ -514,11 +421,6 @@ std::string ClassBody(const al::TableObject &table,
       out += "  void " + trigger.name + FieldIdentifier(table, field.name) + "();\n";
     }
   }
-  // A TABLE CARRIES CODE. `Tracking Specification` declares `procedure SetSourceFilter(...)` beside
-  // its fields and the BaseApp calls it on a record; skipping them made every such call name a
-  // member that is not there.
-  // A FIELD NAME HIDES A TYPE FOR THE WHOLE CLASS, and a table's procedures sit below its fields:
-  // `Currency` has a field `Code` and a procedure returning `Code[20]`.
   std::set<std::string> shadowed;
   for (const al::FieldDecl &field : table.fields) {
     shadowed.insert(FieldIdentifier(table, field.name));
@@ -541,16 +443,9 @@ std::string ClassBody(const al::TableObject &table,
                              table.procedures,
                              ProcedureIdentifier(table, procedure.name));
   }
-  // A TABLE'S VARIABLES LIVE BEHIND ONE POINTER, AND THE STANDARD-LAYOUT INVARIANT DECIDES IT.
-  // `offsetof` over the field table requires standard layout, which requires every member to be
-  // standard-layout too -- and `Item Application Entry` declares `Dictionary of [Integer,
-  // Boolean]`, whose std::map is not. Fields are the class; everything AL puts in the table's `var`
-  // block goes into one nested struct reached through `Var_Block`, which is two pointers and
-  // standard-layout. The interior underscore is the seam no AL name can reach.
   if (!table.variables.empty()) {
     out += "\n  struct Variables {\n";
     for (const al::VarDecl &declared : table.variables) {
-      // The nested struct is inside the class, so a field name hides a type here as well.
       std::string type = QualifiedType(DeclaredType(declared, objects), shadowed);
       if (DeclaresAnObject(declared)) { type.insert(0, "Instance<").append(">"); }
       out += "    " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
@@ -586,7 +481,6 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
   out += Declarations(table, objects);
 
-  // A TABLE'S PROCEDURES DECLARE INLINE OPTIONS TOO, the same way a codeunit's do.
   out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
 
   out += "namespace agiru::app::tables {\n\n";

@@ -18,71 +18,24 @@ std::string OptionEnumName(std::string_view tableName, std::string_view fieldNam
 
 std::string TypeName(std::string_view alType);
 
-/// \brief Whether a name is one of AL's own type names.
-///
-/// \param alType The name as AL wrote it.
-/// \return True when `TypeName` recognised it.
-///
-/// A name that is NEITHER an AL type NOR an object this run has read is a type nobody here defines:
-/// AL writes the platform's own enums as bare type names -- `Verbosity`, `DataClassification`,
-/// `TelemetryScope` -- and they belong with the absent rather than beside the door.
 bool IsAlTypeName(std::string_view alType);
 
-/// Whether a member of `Table<Derived>` or `Codeunit<Derived>` carries this type's name.
-///
-/// A MEMBER HIDES A NAMESPACE NAME FOR THE WHOLE CLASS BODY, and the base classes declare members
-/// AL also has types for: `Record.RecordId()` is a method and `RecordId` is a type,
-/// `Record.Field()` is a method and `Field` is the virtual table. Inside a generated class every
-/// mention of the type then finds the method, so those two are written qualified.
 bool HiddenByABaseMember(std::string_view type);
 
 std::string Literal(std::string_view text);
 
-/// \brief The C++ class name for an AL object, which is NOT the AL name.
-///
-/// \param identifier The AL name as an identifier.
-/// \param kind       The object kind.
-/// \return The class name, `<identifier>_<Kind>`.
-///
-/// \warning AN AL MEMBER MAY CARRY ITS OBJECT'S OWN NAME AND A C++ MEMBER MAY NOT.
-///          `codeunit "Create Reserv. Entry"` declares `procedure CreateReservEntry`, which C++
-///          reads as a constructor with a return type; a table with a field of its own name is the
-///          same error. So the class takes a generated name and the AL name becomes an ALIAS beside
-///          it -- `ClassAlias` writes that line. The interior underscore is what makes it safe:
-///          `Identifier` emits one only in front of a leading digit, so no AL name can reach it.
 std::string ClassName(std::string_view identifier, ObjectKind kind);
 
-/// \brief The `using` line that gives the class its AL name back.
-/// \param identifier The AL name as an identifier.
-/// \param kind       The object kind.
-/// \return `using <identifier> = <identifier>_<Kind>;` with a trailing newline.
 std::string ClassAlias(std::string_view identifier, ObjectKind kind);
 
-/// \brief The object kind a generated namespace holds.
-/// \param space The namespace under `agiru::app`, such as `tables`.
-/// \return The kind.
 ObjectKind KindOfNamespace(std::string_view space);
 
-/// What an AL source file declares at its top level: the object's name and the namespace above it.
 struct ObjectDeclaration {
-  bool found = false;    ///< False when the file declares no object of the wanted kind.
-  std::string name;      ///< The AL object name, quotes removed: `Library - Lower Permissions`.
-  std::string nameSpace; ///< The `namespace` line above it, empty when there is none.
+  bool found = false;
+  std::string name;
+  std::string nameSpace;
 };
 
-/// Reads the declaration line of an AL object LEXICALLY, without parsing the file.
-///
-/// This exists because a codeunit may hold a variable of a codeunit declared later in the same app,
-/// so the names must be indexed before anything is emitted -- and parsing 4 000 objects twice to
-/// learn two lines costs minutes.
-///
-/// THE DECLARATION MAY BE THE FIRST LINE OF THE FILE, and 5 387 of BCApps' 14 282 codeunit files
-/// begin with it -- 38 %, measured 2026-09-02. A search for "\ncodeunit " alone found none of them,
-/// and an object that is not indexed is not RESOLVED: the generator then emits the bare AL name and
-/// the C++ compiler reports a missing type in every file that names it.
-/// \note THE KIND IS A KIND AND NOT A KEYWORD. AL declares nine kinds of object with the same
-///       shape, and a free string beside the source is two adjacent texts a caller can swap
-///       silently -- which is what `ObjectKind` already exists to prevent for the output path.
 ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind);
 
 } // namespace agiru::gen

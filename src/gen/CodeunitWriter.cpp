@@ -30,15 +30,7 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
          al::HasAttribute(procedure, "InternalEvent");
 }
 
-// A TEST CODEUNIT IS `Subtype = Test`, AND THE SUBTYPE IS WHAT DECIDES IT.
-// `devenv-test-codeunits-and-test-methods.md`: "Test codeunits are codeunits that have the SubType
-// Property set to Test." The `[Test]` attribute then says which of its procedures the runner calls.
-// A test codeunit may live in ANY app -- it is a property of the object, not of where it sits --
-// and the runtime collects every one of them.
 bool IsTestCodeunit(const al::CodeunitObject &unit) {
-  // ONLY `Test`. `devenv-subtype-codeunit-property.md` separates the two: a `Test` codeunit HOLDS
-  // the test methods, a `TestRunner` codeunit RUNS test codeunits and carries `OnBeforeTestRun` and
-  // `OnAfterTestRun` instead. Registering a runner as a test would run its triggers as cases.
   const al::Property *subtype = al::Find(unit.properties, "Subtype");
   return subtype != nullptr && LowerKey(subtype->text) == "test";
 }
@@ -62,8 +54,6 @@ bool DeclaresOnRun(const al::CodeunitObject &unit) {
   });
 }
 
-// The catalogue REGISTERS the codeunit with the runtime, which is why it is a definition in the
-// source rather than a declaration in the header.
 std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
@@ -95,17 +85,11 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
 
 bool NamesAnObject(const al::VarDecl &declared) {
   const std::string type = TypeName(declared.type);
-  // AN OBJECT KIND WITH NO GENERATOR YET STILL NAMES AN OBJECT. `Report "X"`, `Query "X"`,
-  // `XmlPort "X"` and `ControlAddIn "X"` resolve to nothing, which makes them `absent::X` -- the
-  // same shape an untranslated table takes, and a refusal that names what it wanted (board:0034).
   return (type == "Record" || type == "Codeunit" || type == "Page" || type == "Report" ||
           type == "Query" || type == "XmlPort" || type == "ControlAddIn") &&
          !declared.subtype.empty();
 }
 
-// A type as it stands in a DECLARATION. `Record "X"` is the generated class, `Record "X" temporary`
-// is that class with no database behind it, `Text[50]` carries its length, and everything else is
-// the door's own name for the AL type.
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
   const TableIndex &index = type == "Codeunit" ? objects.codeunits
@@ -115,10 +99,6 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   return found != index.end() ? &found->second : nullptr;
 }
 
-// AN INLINE `Option A,B,C` DECLARES ITS OWN MEMBERS AND HAS NO NAME, so the generator gives it
-// one: the codeunit, the procedure it stands in, and the variable. A table does the same for its
-// own inline options, and the alternative -- an Integer -- would compile and lose the vocabulary
-// `Type::All` is written in.
 std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
   const auto found = objects.interfaces.find(LowerKey(declared.subtype));
   return (found != objects.interfaces.end() ? found->second.identifier
@@ -126,15 +106,6 @@ std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
          " *";
 }
 
-/// Whether a declaration names a type that is neither AL's nor an object -- a bare platform enum.
-///
-/// AL writes the platform's own enums as bare type names: `Verbosity: Verbosity`,
-/// `DataClassification: DataClassification`. Emitting the word unchanged put it beside the door,
-/// where nothing declares it.
-/// A method whose leading arguments are FIELDS OF THE RECEIVER, and how many.
-///
-/// The body writer spells them against the receiver; this is the same table, because the gatherer
-/// has to know what the writer will reach for.
 constexpr std::size_t kEveryArgument = static_cast<std::size_t>(-1);
 
 std::size_t FieldArguments(std::string_view method) {
@@ -161,17 +132,12 @@ std::size_t FieldArguments(std::string_view method) {
 }
 
 bool NamesAbsentType(const al::VarDecl &declared) {
-  // AN EMPTY TYPE IS NOT A TYPE. A procedure with no return has one, and calling it absent named a
-  // struct with no name at all.
   return !declared.type.empty() && !IsAlTypeName(declared.type) && declared.subtype.empty() &&
          declared.members.empty() && declared.arguments.empty();
 }
 
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
-  // AN OBJECT THIS RUN DOES NOT HAVE IS NAMED AS ABSENT. It used to be emitted as a bare
-  // identifier, which named nothing; and putting the stub beside the real objects shadowed the AL
-  // TYPES, because the virtual table `Integer` and the AL type `Integer` are one word.
   if (ref == nullptr) { return "absent::" + Identifier(declared.subtype); }
   return declared.temporary ? "Temporary<" + ref->identifier + ">" : ref->identifier;
 }
@@ -179,7 +145,6 @@ std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
 std::string
 TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {});
 
-/// A generic's element types, each read by the same function that read the generic.
 std::string Generic(const std::string &type,
                     const std::vector<al::VarDecl> &arguments,
                     const Objects &objects) {
@@ -193,7 +158,6 @@ std::string Generic(const std::string &type,
 
 std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner);
 
-/// AN ARRAY WRAPS WHAT IT HOLDS, outermost dimension first, and it is indexed from ONE.
 std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   std::string inner = Element(declared, objects, owner);
   for (std::size_t i = declared.dimensions.size(); i > 0; --i) {
@@ -207,27 +171,18 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
   return inner;
 }
 
-// Qualified for the reason the parameter-named-after-its-type case gives below: `class RecordId
-// RecId` reads like a C++ puzzle and `agiru::RecordId RecId` reads like what it is.
 std::string Unhidden(const std::string &type) {
   return HiddenByABaseMember(type) ? "agiru::" + type : type;
 }
 
-/// What a type is being read FOR: the canonical AL type name, and the object that declares it.
 struct Named {
-  std::string type;  ///< What `Element` canonicalised the AL type name to.
-  std::string owner; ///< The enclosing object, which names an inline option's enumeration.
+  std::string type;
+  std::string owner;
 };
 
-/// The half of the type map that carries a TEMPLATE ARGUMENT or a length: the headless page, an
-/// inline option, a generic, an absent type and the sized strings.
 std::string Parameterised(const al::VarDecl &declared, const Objects &objects, const Named &named) {
   const std::string &type = named.type;
   const std::string &owner = named.owner;
-  // A PAGE VARIABLE NAMES ITS PAGE, and `TestPage` is a class template that takes it: AL's
-  // `TestPage "Payment Journal"` is the headless page and not a page-shaped thing, so the argument
-  // is what makes `PaymentJournal."No.".SetValue(...)` resolve to a control at all. A page this run
-  // never saw leaves the template empty, the way an unresolved enumeration does.
   if (type == "TestPage" || type == "TestRequestPage") {
     if (declared.subtype.empty()) { return type + "<>"; }
     const auto found = objects.pages.find(LowerKey(declared.subtype));
@@ -236,20 +191,11 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
   if (type == "Option") {
     return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
   }
-  // `List of [Text]` and `Dictionary of [Text, Integer]` carry their element types with them, AND
-  // THOSE NEST: `Dictionary of [Integer, List of [Text]]` is one the BaseApp writes. An argument is
-  // read by this same function, so an inner generic, an enum's subtype and a `Text[50]`'s length
-  // all survive.
   if ((type == "List" || type == "Dictionary") && !declared.arguments.empty()) {
     return Generic(type, declared.arguments, objects);
   }
 
-  // A NAME THAT IS NEITHER AN AL TYPE NOR AN OBJECT THIS RUN READ IS ABSENT. AL writes the
-  // platform's own enums as bare type names -- `Verbosity: Verbosity` -- and emitting the word
-  // unchanged put it beside the door, where nothing declares it.
   if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
-  // A BARE `Text` IS UNBOUNDED, and it lands here as a length of zero -- which the string types
-  // read as no limit rather than a limit of nothing. `Text[50]` carries its 50.
   if (type == "Code" || type == "Text") {
     return type + "<" + std::to_string(declared.length) + ">";
   }
@@ -258,61 +204,25 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
 
 std::string Element(const al::VarDecl &declared, const Objects &objects, const std::string &owner) {
   const std::string type = TypeName(declared.type);
-  // A `Page` VARIABLE IS THE PAGE, the way a `Record` variable is the table: AL writes
-  // `SalesOrderPage.RunModal()` on an instance. Only `TestPage` is a template, because the headless
-  // page is a DIFFERENT type that wraps the page rather than being one.
   if (NamesAnObject(declared)) { return ObjectType(declared, objects); }
-  // AN ENUM VARIABLE NAMES ITS ENUMERATION, and without it `Enum` is a class template with no
-  // arguments -- which is not a type at all. The index is the same one a table field uses.
-  // A DotNet VARIABLE IS TYPED BY ITS SUBTYPE, and the subtype was being thrown away: every one of
-  // the 7 117 declarations came out as the bare word `DotNet`, so the compiler said "unknown type
-  // name 'DotNet'" 1 971 times and named none of the 577 classes actually wanted. A .NET class
-  // cannot be papered over the way an enum ordinal can -- it is used by CALLING it, and no
-  // placeholder carries 577 method sets -- so what this buys is not a compile, it is a MEASUREMENT:
-  // the roots now name `dotnet::XmlDocument` and the classes can be ranked by what they stop.
   if (type == "DotNet") {
     return declared.subtype.empty() ? "dotnet::Unnamed" : "dotnet::" + Identifier(declared.subtype);
   }
-  // AN ENUMERATION THIS RUN NEVER SAW BECOMES `Enum<>`, which carries the ordinal and names no
-  // member. `Copilot Capability` exists in BCApps only as enumextensions of something that is not
-  // there -- the platform declares it. Emitting `Enum<enums::CopilotCapability>` named a type
-  // nobody declares and stopped the file; inventing ordinals from the extensions would be a wrong
-  // number that looks like a right one. The transpiler names every unresolved enumeration in its
-  // summary, so this is reported rather than swallowed.
   if (type == "Enum") {
     if (declared.subtype.empty()) { return "Enum<>"; }
     const auto found = objects.enums.find(LowerKey(declared.subtype));
     return found != objects.enums.end() ? "Enum<enums::" + found->second.identifier + ">"
                                         : "Enum<>";
   }
-  // AN OPTION WITH NO MEMBERS IS AL'S OWN DECLARATION AND NOT A GAP. `procedure P(ChangeType:
-  // Option)` takes any option value at all, and the BaseApp calls it with a member of some other
-  // enumeration entirely. `Option<>` is that: the ordinal, without a vocabulary.
-  // AN INTERFACE VARIABLE HOLDS A POINTER TO THE ABSTRACT CLASS. AL writes `I.Method()` and C++
-  // writes `I->Method()`, which is the deviation board:0027 names: an interface variable IS a
-  // handle to something else, and 822 signatures cannot be forwarded by a wrapper.
   if (type == "Interface") { return InterfaceType(declared, objects); }
   return Parameterised(declared, objects, Named{.type = type, .owner = owner});
 }
 
-// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly: `Item: Record Item`,
-// `SalesLine: Record "Sales Line"`. In C++ the name then hides the class and the declaration needs
-// an elaborated specifier or a qualification. Qualified, because `class Item &Item` reads like a
-// C++ puzzle and `agiru::app::Item &Item` reads like what it is.
 std::string
 OptionName(const std::string &unit, const std::string &within, const std::string &name) {
   return Identifier(unit) + Identifier(within) + Identifier(name);
 }
 
-/// The generated name for ONE inline option, disambiguated when an overload declares another.
-///
-/// TWO OVERLOADS MAY DECLARE TWO DIFFERENT ANONYMOUS OPTIONS UNDER ONE PARAMETER NAME.
-/// `Cryptography Management` has five `GenerateHash`, three taking
-/// `HashAlgorithmType: Option MD5,SHA1,...` and two taking
-/// `HashAlgorithmType: Option HMACMD5,HMACSHA1,...` -- one generated name, two enumerations, which
-/// the generator refused outright and which cost the whole codeunit and everything including it.
-/// The FIRST MEMBER separates them, is derived from the declaration alone, and so comes out the
-/// same at every call site without anybody carrying a table around.
 std::string OptionNameOf(const std::string &owner,
                          const std::string &within,
                          const al::VarDecl &declared,
@@ -334,17 +244,6 @@ std::string OptionNameOf(const std::string &owner,
   return base;
 }
 
-// THE NAMESPACE IS DECIDED BY WHAT THE TYPE IS, and getting it wrong cost more than anything else
-// in this tree: `agiru::app::RecordRef` was the FIRST diagnostic of 1 375 of 3 123 failing headers,
-// measured 2026-09-02, because `LibraryAssert` writes `RecordRef: RecordRef` and one bad
-// qualification in it stops every header that includes it. An AL object -- a Record or a Codeunit
-// -- becomes a class in `agiru::app`; every other AL type is a DOOR type and lives in `agiru`.
-/// Whether any identifier inside a type is hidden by a name in the object's own scope.
-///
-/// A TEMPLATE ARGUMENT IS HIDDEN JUST AS THE OUTER TYPE IS. `MatchBankPayments` declares a member
-/// called `Code` and then `Dictionary of [Integer, List of [Code[35]]]`, where only the innermost
-/// name collides. So every identifier is asked, and one that follows `::` is skipped -- it is
-/// already qualified and belongs to whatever named it.
 bool Hidden(const std::string &type, const std::set<std::string> &names) {
   for (std::size_t i = 0; i < type.size();) {
     if (std::isalpha(static_cast<unsigned char>(type[i])) == 0 && type[i] != '_') {
@@ -363,9 +262,6 @@ bool Hidden(const std::string &type, const std::set<std::string> &names) {
   return false;
 }
 
-/// Every name declared in an object's own scope, because each of them hides a type of that name for
-/// the whole class. `Any` declares `procedure Boolean(): Boolean` and the member wins from there
-/// on.
 std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
                                 const std::vector<al::ProcedureDecl> &procedures,
                                 const std::vector<al::LabelDecl> &labels) {
@@ -378,13 +274,6 @@ std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
   return names;
 }
 
-/// Qualifies every identifier in a type that a name in scope hides.
-///
-/// AN INNER IDENTIFIER NEEDS IT AS MUCH AS THE OUTER ONE. `GenJnlPostLine` declares a member `Code`
-/// and a parameter of type `List of [Code[10]]`; prefixing the whole string gave
-/// `agiru::List<Code<10>>` and the inner name was still the member. A bare identifier in a
-/// generated type is always a DOOR type -- an object arrives already spelled `tables::X` -- so the
-/// qualification is `agiru::` and nothing else has to be decided.
 std::string Qualified(const std::string &type, const std::set<std::string> &names) {
   std::string out;
   for (std::size_t i = 0; i < type.size();) {
@@ -407,11 +296,6 @@ std::string Qualified(const std::string &type, const std::set<std::string> &name
   return out;
 }
 
-/// A PARAMETER NAME HIDES A TYPE NAME FOR EVERY PARAMETER AFTER IT, not only for its own.
-/// `AccPeriodStartEnd(Date: Date; var StartDate: Date; ...)` declares a parameter called `Date`
-/// and then two more of type `Date`, and C++ resolves the later ones to the parameter. So the
-/// question is not whether THIS parameter is named after its type; it is whether ANY parameter in
-/// the signature is named after this one's type.
 std::string Signature(const al::VarDecl &declared,
                       const Objects &objects,
                       const std::set<std::string> &names,
@@ -443,24 +327,11 @@ std::string Parameters(const al::ProcedureDecl &procedure,
   return out;
 }
 
-/// Every inline option an object declares, as its own enumeration with its own traits.
-///
-/// A PAGE DECLARES THEM THE SAME WAY A CODEUNIT DOES, so the object's name and the namespace its
-/// enumerations live in are arguments rather than assumptions.
 std::string InlineOptionsIn(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
                             const std::vector<al::ProcedureDecl> &procedures) {
   std::string out;
-  // AN OVERLOAD DECLARES THE SAME INLINE OPTION TWICE. `UserPermissionsImpl` has two
-  // `GetEffectivePermission`, both taking `PermissionObjectType: Option "Table Data",...` -- one
-  // AL parameter written twice, and the generated name is built from the codeunit, the procedure
-  // and the parameter, so it is the same name both times. It is ONE enumeration; emitting it twice
-  // is a redefinition.
-  //
-  // THE MEMBERS DECIDE, not the count. Two options that share a generated name and differ in what
-  // they declare are two enumerations wearing one name, and that is a translation error rather
-  // than something to pick a winner for.
   std::map<std::string, std::vector<std::string>> emitted;
   const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
@@ -534,12 +405,6 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
   });
 }
 
-/// A PAGE IS A TEMPLATE ARGUMENT AND A BASE CLASS, so its header is INCLUDED and never forward
-/// declared: `TestPage<pages::PaymentJournal>` derives from the page to reach its controls.
-/// A MEMBER OF OBJECT TYPE IS A HANDLE, whatever kind of object it is. It was a codeunit-only rule
-/// and the tables disproved that: `Currency Exchange Rate` declares a variable of its own type, so
-/// a Record member recurses exactly as a codeunit member does -- and AL cannot be constructing
-/// either eagerly, or neither would terminate (board:0037).
 bool HandleMember(const al::VarDecl &declared) {
   return NamesAnObject(declared);
 }
@@ -548,7 +413,6 @@ bool NamesAPage(std::string_view type) {
   return type == "TestPage" || type == "Page" || type == "TestRequestPage";
 }
 
-/// Adds the header an index holds for a subtype, when the run translated one.
 template <typename Index>
 void IndexedHeader(const Index &index, const std::string &subtype, std::set<std::string> &headers) {
   if (subtype.empty()) { return; }
@@ -590,8 +454,6 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
   return out;
 }
 
-/// What a declaration needs the header to KNOW: a name for an object, a name for an interface --
-/// which is a pointer -- and the enumeration itself, which is a template argument and not a name.
 template <typename Ahead, typename Enum, typename Page, typename Element>
 void Declared(const al::VarDecl &declared,
               const Objects &objects,
@@ -602,9 +464,6 @@ void Declared(const al::VarDecl &declared,
   if (NamesAPage(TypeName(declared.type))) { reachPage(declared.subtype); }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
-    // A PLATFORM TABLE ARRIVES WITH THE DOOR and its entry carries no header, so there is nothing
-    // to forward declare and nothing to include -- `platform::Field` is `agiru::platform::Field`,
-    // not an object in `agiru::app` that this file could declare ahead of itself.
     if (ref != nullptr && !ref->header.empty()) { ahead(ref->identifier); }
   }
   if (TypeName(declared.type) == "Interface") {
@@ -612,15 +471,6 @@ void Declared(const al::VarDecl &declared,
     if (found != objects.interfaces.end()) { ahead(found->second.identifier); }
   }
   if (TypeName(declared.type) == "Enum") { reachEnum(declared.subtype); }
-  // A GENERIC CARRIES ITS ELEMENT TYPES AND THEY ARE DECLARATIONS TOO. `List of [Enum "Image
-  // Analysis Type"]` names an enumeration that nothing else in the file mentions, and the walk
-  // stopped at the outer `List`.
-  //
-  // AND AN ELEMENT IS A MEMBER, not a mention: `Dictionary of [Integer, Codeunit "Temp Blob"]`
-  // instantiates `std::pair<Integer, TempBlob>`, which needs the LAYOUT. The handle rule does not
-  // reach inside a generic -- what it makes a handle of is the Dictionary, not what the Dictionary
-  // holds -- so the element's header is included rather than named. It was the last root of the
-  // tree: 9 598 of 9 600 headers compiled and these two did not.
   for (const al::VarDecl &argument : declared.arguments) {
     Declared(argument, objects, ahead, reachEnum, reachPage, reachElement);
     const TableRef *element = ReachObject(argument, objects);
@@ -628,11 +478,6 @@ void Declared(const al::VarDecl &declared,
   }
 }
 
-/// Adds the header of an enumeration, when the run has one.
-///
-/// AN ENUM NEEDS ITS HEADER even where an object needs only its name: `Enum<enums::X>` is a
-/// TEMPLATE ARGUMENT and a template argument must be complete. Missing it made `LibraryNoSeries`
-/// the first diagnostic of 1 159 failing headers.
 void EnumHeader(const EnumIndex &enums,
                 const std::string &subtype,
                 std::set<std::string> &headers) {
@@ -642,33 +487,19 @@ void EnumHeader(const EnumIndex &enums,
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
-    // A HANDLE NEEDS THE NAME AND NOT THE LAYOUT, so nothing a member holds is included any more.
     if (!NamesAnObject(declared) || HandleMember(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
-    // A PLATFORM TABLE HAS NO HEADER OF ITS OWN TO NAME: it arrives with the door, so its entry
-    // carries an empty path and an empty path would emit `#include ""`.
     if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
   };
-  // AN ENUM NEEDS ITS HEADER TOO, and it was the only kind of object this did not ask for:
-  // `LibraryNoSeries` names `Enum<enums::NoSeriesImplementation>` and included the table beside it
-  // but not the enumeration, which made it the FIRST diagnostic of 1 159 failing headers.
   const auto reachEnum = [&](const std::string &subtype) {
     EnumHeader(objects.enums, subtype, headers);
   };
-  // AN INTERFACE NEEDS ITS HEADER TOO, and it is the third kind this walk has had to learn: a
-  // variable names it, the abstract class is somewhere else, and nothing else pulls it in.
   std::map<std::string, std::set<std::string>> forward;
   const auto ahead = [&forward](const std::string &qualified) {
     const std::size_t colons = qualified.find("::");
     if (colons == std::string::npos) { return; }
     forward[qualified.substr(0, colons)].insert(qualified.substr(colons + 2));
   };
-  // INCLUDE WHAT YOU CONTAIN, DECLARE WHAT YOU NAME -- AND A HEADER CONTAINS ONLY ITS MEMBERS.
-  // A function DECLARATION may take and return incomplete types; only a definition or a call needs
-  // the layout, and both of those live in the `.cpp`. Including for parameters too made the include
-  // graph far larger than the containment graph and produced cycles the containment graph does not
-  // have: `Language` holds `LanguageImpl` and `LanguageImpl` holds no codeunit at all, yet their
-  // headers included each other because a parameter named the other.
   const auto reachPage = [&](const std::string &subtype) {
     IndexedHeader(objects.pages, subtype, headers);
   };
@@ -676,34 +507,17 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   const auto both = [&](const al::VarDecl &declared) {
     Declared(declared, objects, ahead, reachEnum, reachPage, reachElement);
   };
-  // A MEMBER IS A GLOBAL, so this is the containment graph and nothing else.
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
-    // AND A PROCEDURE'S OWN VARIABLES, which were never walked at all: a local `Record` or `Enum`
-    // is as much a declaration as a parameter is.
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
-    // AND THE RETURN, which is a declaration like any other: `GetAltCustVATRegConsistencyImpl`
-    // returns an interface and nothing else in the file names it.
     both(procedure.returned);
   }
-  // A CODEUNIT THAT NAMES A .NET TYPE INCLUDES THE GENERATED SURFACE. It is one file for all of
-  // them, because the stubs reference nothing but `Refused` and splitting them would be 499 headers
-  // for no reader's benefit.
   std::string out = std::string(kDoorMarker);
-  // ONLY WHERE SOMETHING IS ACTUALLY ABSENT. An unconditional include would make every generated
-  // codeunit depend on a file that exists because something is MISSING, which is the wrong way
-  // round -- and it would make the hand-written target image depend on a transpiler run.
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
 
-  // AL LETS TWO CODEUNITS NAME EACH OTHER, AND C++ HEADERS CANNOT. `AOAIFunctionResponse` includes
-  // `AOAIChatMessages` and `AOAIChatMessages` includes it back; `#pragma once` makes the second
-  // include a no-op, so the inner file sees the outer one half-written and the type is not there.
-  // A forward declaration of every object this file NAMES settles it, because a parameter taken by
-  // reference needs the name and not the layout -- and AL passes objects by `var` where it passes
-  // them at all.
   if (!forward.empty()) { out += "\n"; }
   for (const auto &[space, named] : forward) {
     out += "namespace agiru::app::" + space + " {\n";
@@ -717,20 +531,8 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   return out;
 }
 
-// THE .NET SURFACE EXISTS ONLY AT THE CALL SITES. A `dotnet` package declares an assembly and a
-// type alias and no members at all, so nothing in the AL source says what `XmlDocument` can do --
-// only what this corpus ASKS it to do. That set is gathered here, per type, from the tokens of
-// every body: a name that is a DotNet variable, a dot, and the member after it (board:0035).
-//
-// TOKENS AND NOT THE EXPRESSION TREE, because a property read and a call are the same thing here
-// and the token pair is the same for both -- `UserInfo.ObjectId` and `Doc.SelectNodes(x)` differ
-// only in what follows, which this does not need.
 using DotNetNames = std::map<std::string, std::string>;
 
-/// A DECLARATION IS ENOUGH TO OWE THE TYPE, and a call is not required. `O365SyncManagement`
-/// takes `Credentials: DotNet ExchangeCredentials` as a parameter and never calls a member on it,
-/// so gathering only the CALL SITES left the signature naming a class nobody wrote. The entry is
-/// created empty and filled if a member turns up.
 void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use) {
   if (TypeName(declared.type) == "DotNet" && !declared.subtype.empty()) {
     const std::string bare = Identifier(declared.subtype);
@@ -739,12 +541,6 @@ void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use)
   }
 }
 
-/// The field names a record method takes, read straight out of the token stream.
-///
-/// A FIELD ARGUMENT IS A MEMBER TOO. `X.SetRange("Agent User Security ID", V)` names a field of X,
-/// and the emitter spells it against X -- so an absent X needs that name as well, or the stub is
-/// missing exactly what the body reaches for. The method decides how many: `SetRange` takes one,
-/// `CalcFields` takes all of them (board:0035).
 void GatherFieldArguments(const std::vector<al::Token> &tokens,
                           std::size_t method,
                           std::set<std::string> &into) {
@@ -783,9 +579,6 @@ void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, D
       continue;
     }
     if (procedure.tokens[i + 1].text != ".") { continue; }
-    // A QUOTED NAME IS A NAME. AL writes `Agent."Display Name" := X` and the gather only accepted
-    // the bare kind, so every member whose AL name has a space in it was missing from the stub --
-    // which is most of them, because BC names fields the way a caption reads.
     if (procedure.tokens[i + 2].kind != al::TokenKind::Identifier &&
         procedure.tokens[i + 2].kind != al::TokenKind::QuotedIdentifier) {
       continue;
@@ -793,21 +586,10 @@ void GatherCalls(const al::ProcedureDecl &procedure, const DotNetNames &named, D
     const auto found = named.find(LowerKey(procedure.tokens[i].text));
     if (found == named.end()) { continue; }
     use[found->second].insert(Identifier(procedure.tokens[i + 2].text));
-    // A FIELD ARGUMENT IS A MEMBER TOO. `X.SetRange("Agent User Security ID", V)` names a field of
-    // X, and the emitter spells it against X -- so an absent X needs that name as well, or the
-    // stub is missing exactly what the body reaches for. The method decides: `SetRange` takes one
-    // field, `CalcFields` takes all of them (board:0035).
     GatherFieldArguments(procedure.tokens, i + 2, use[found->second]);
   }
 }
 
-// AN AL OBJECT THIS RUN DOES NOT HAVE IS THE SAME QUESTION AS A .NET TYPE. `Record "Windows
-// Language"` names a platform table no source root declares, so the generator emitted the bare
-// identifier and the file stopped. What the corpus asks of it is in the call sites, exactly as it
-// is for `DotNet` -- so it is gathered by the same walk and answered by the same shape.
-// A TYPE THAT IS NAMED BUT NEVER ASKED ANYTHING STILL NEEDS TO EXIST. `Verbosity` appears as a
-// parameter type and nothing is ever called on it, so gathering only members would leave the
-// declaration pointing at nothing. The entry is created empty and filled if a member turns up.
 void NoteAbsent(const al::VarDecl &declared,
                 const Objects &objects,
                 DotNetNames &named,
@@ -866,10 +648,6 @@ std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const Object
   return missing;
 }
 
-// A PROCEDURE'S SCOPE, INNERMOST FIRST: its own locals, then its parameters, then the codeunit's
-// variables, labels and other procedures. AL resolves a bare name that way and so does C++ once the
-// locals are declared, so every one of them spells itself -- what this settles is that the name IS
-// known, which is what keeps an unknown one from being emitted as if it were.
 class CodeunitNames : public Names {
 public:
   CodeunitNames(const al::CodeunitObject &unit,
@@ -877,7 +655,6 @@ public:
                 const Objects &objects)
       : unit_(unit), procedure_(procedure), objects_(objects) {}
 
-  /// The record variable's table, then the field, then what the field was declared as.
   [[nodiscard]] std::string ExitValue() const override {
     if (!procedure_.returnName.empty()) { return " " + Identifier(procedure_.returnName); }
     return procedure_.returnType.empty() ? std::string{} : std::string(" {}");
@@ -888,13 +665,10 @@ public:
     return declared != nullptr && TypeName(declared->type) == "Record";
   }
 
-  /// A door type has no fields, so a member of one is a call however AL spelled it.
   [[nodiscard]] bool MembersAreCalls(std::string_view variable) const override {
     const al::VarDecl *declared = Declaration(variable);
     if (declared == nullptr) { return false; }
     const std::string type = TypeName(declared->type);
-    // Every door type whose members are all methods. A `Variant` is one: AL asks it `IsOption`
-    // and `IsRecord` without parentheses, and it has no fields to confuse them with.
     return type == "RecordRef" || type == "FieldRef" || type == "KeyRef" || type == "Variant" ||
            type == "RecordId" || type == "ModuleInfo" || type == "Version";
   }
@@ -928,7 +702,6 @@ public:
     const auto same = [&name](const al::VarDecl &declared) {
       return LowerKey(declared.name) == LowerKey(std::string(name));
     };
-    // A LOCAL WINS OVER A MEMBER, the same order `Resolve` uses, and a local is a value.
     if (std::ranges::any_of(procedure_.variables, same)) { return false; }
     if (std::ranges::any_of(procedure_.parameters, same)) { return false; }
     for (const al::VarDecl &declared : unit_.variables) {
@@ -937,11 +710,6 @@ public:
     return false;
   }
 
-  /// \note THE DECLARATION'S SPELLING WINS AND NOT THE CALL SITE'S. AL is case-insensitive, so
-  ///       `AgentConsumptionOverview` declares `AgentUserSecurityId` and its body writes
-  ///       `AgentUserSecurityID`; returning what the CALLER wrote made those two different C++
-  ///       symbols and the second one named nothing. CLAUDE.md lists it as a measured failure mode
-  ///       -- "collapse match, once, in the generator" -- and this is the one place it happens.
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : procedure_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
@@ -971,11 +739,6 @@ public:
     return {};
   }
 
-  /// \note A VARIABLE'S OWN ENUMERATION, which is the question `X::Member` asks. AL names the
-  ///       VARIABLE and means the type it was declared as -- `Library - Utility` takes a parameter
-  ///       called `Option` declared as an inline `Option Capitalized,...` and its body writes
-  ///       `Option::Capitalized`. An inline option's enumeration is the one the generator named
-  ///       after the object, the procedure and the parameter; a declared one is the enum object.
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::VarDecl *declared = Declaration(name);
     if (declared == nullptr) { return {}; }
@@ -995,24 +758,12 @@ private:
   const Objects &objects_;
 };
 
-// AL LETS A `var` BLOCK DECLARE WHAT THE BODY NEVER TOUCHES, and C++ with `-Werror` does not. The
-// name is looked for in the body that was already written, so the attribute lands only where it is
-// true -- and a local that becomes unused because its use was REFUSED shows up as the refusal it is
-// rather than as a broken build.
-// AL RETURNS THE NAMED RETURN VALUE WHEN THE BODY SIMPLY ENDS. `procedure GenerateRandomNumericText
-// (Length: Integer) String: Text` writes into `String` in a loop and never says `exit`; the value
-// of `String` is the result. C++ falls off the end instead, which is undefined behaviour and a
-// `-Wreturn-type` error -- so a procedure with a return type ends with the return AL implies,
-// unless its last statement already is one.
 std::string FallsOff(const al::ProcedureDecl &procedure, const Names &names) {
   if (procedure.returnType.empty() && procedure.returned.type.empty()) { return {}; }
   if (!procedure.body.empty() && procedure.body.back().kind == al::StmtKind::Exit) { return {}; }
   return "  return" + names.ExitValue() + ";\n";
 }
 
-// A NAME INSIDE A STRING IS NOT A USE, and the refusals are full of them:
-// `RefusedOption("RecordLink.Type::Note")` carries the variable's name in a literal and nowhere
-// else, so a plain search called the variable used and `-Wunused-variable` disagreed.
 std::string WithoutLiterals(const std::string &body) {
   std::string out = body;
   bool inside = false;
@@ -1053,14 +804,9 @@ std::string Locals(const al::ProcedureDecl &procedure,
   const auto unused = [&body, &code](const std::string &name) {
     return body.empty() || Mentions(code, name) ? std::string{} : std::string("[[maybe_unused]] ");
   };
-  // THE NAMED RETURN VALUE IS A LOCAL, and it comes first because AL declares it in the signature,
-  // ahead of the var block. `exit;` with no argument returns it, zero-initialised if nothing wrote.
   if (!procedure.returnName.empty()) {
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
-  // A LOCAL NAMED AFTER ITS TYPE HIDES IT FOR EVERY LOCAL AFTER IT. AL writes
-  // `FieldRef: FieldRef;` and then declares another of the same type; the second one names the
-  // variable. It is the same rule the parameters follow, over the same scope.
   std::set<std::string> names;
   for (const al::VarDecl &declared : procedure.variables) {
     names.insert(Identifier(declared.name));
@@ -1086,19 +832,12 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
-  // THE SOURCE INCLUDES WHAT THE HEADER ONLY DECLARED. The header carries the containment graph and
-  // forward-declares everything else, which is what keeps its include graph acyclic; a BODY calls
-  // methods on those objects and needs their layout, so the definitions bring them in. Header
-  // declares, source includes -- and the cycle the header cannot have, the source can, because a
-  // `.cpp` is nobody's dependency.
   out += SourceIncludes(unit, objects);
   const std::string catalogue = TestCatalogueOf(unit, identifier);
   if (!catalogue.empty()) { out += "\n#include <array>\n"; }
   out += "\nnamespace agiru::app::codeunits {\n\n";
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    // AN EVENT PUBLISHER'S BODY IS EMPTY BY DESIGN -- the platform fires subscribers at the CALL
-    // SITE -- so its definition has nothing to do with its parameters and drops their names.
     const bool publisher = IsPublisher(procedure);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
            "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures) + ") {";
@@ -1230,9 +969,6 @@ TableIndex PlatformTables() {
   return tables;
 }
 
-/// The headers and the forward declarations an interface needs. A SIGNATURE IS A DECLARATION, so
-/// what it names is reached the way a codeunit reaches its own -- and an interface variable is a
-/// pointer, so another interface is only named (board:0027).
 namespace {
 
 void FaceReach(const al::VarDecl &declared,
@@ -1242,9 +978,6 @@ void FaceReach(const al::VarDecl &declared,
   for (const al::VarDecl &argument : declared.arguments) {
     FaceReach(argument, objects, headers, forward);
   }
-  // AN INTERFACE NAMES ANOTHER INTERFACE, and that one is a POINTER: `Price Calculation` takes a
-  // `Line With Price`. A declaration needs the name, so it is forward declared and the two files do
-  // not include each other.
   if (TypeName(declared.type) == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
     if (found != objects.interfaces.end()) {
@@ -1266,9 +999,6 @@ void FaceReach(const al::VarDecl &declared,
 
 std::string FaceDeclarations(const al::InterfaceObject &object, const Objects &objects) {
   std::string out;
-  // AN INTERFACE INCLUDES WHAT ITS SIGNATURES NAME, exactly as a codeunit includes what its
-  // declarations name -- a signature is a declaration and a `Verbosity` in one is an enum the file
-  // has to have seen.
   std::set<std::string> headers;
   std::map<std::string, std::set<std::string>> forward;
   for (const al::ProcedureDecl &procedure : object.procedures) {
@@ -1306,16 +1036,12 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";
   out += "class " + faceClass + " {\n";
   out += "public:\n";
-  // A CLASS SOMEBODY DERIVES FROM NEEDS A VIRTUAL DESTRUCTOR, and an interface is only ever
-  // derived from.
   out += "  virtual ~" + faceClass + "() = default;\n\n";
   for (const al::ProcedureDecl &procedure : object.procedures) {
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
   }
   out += "};\n\n} // namespace agiru::app::interfaces\n";
-  // AN INTERFACE'S SIGNATURES NAME .NET TYPES TOO, and gathering only the absent ones left the
-  // dotnet surface short of what the declarations need.
   DotNetUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
@@ -1343,13 +1069,6 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "class " + unitClass + ";\n" + ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
   out += "class " + unitClass + " : public Codeunit<" + unitClass + "> {\npublic:\n";
 
-  // PUBLIC BEFORE PRIVATE, AND `local` IS WHAT DECIDES IT. AL's `local procedure` is exactly C++'s
-  // private, and an event publisher is local too -- nobody calls it but the object that raises it.
-  //
-  // THE ORDER IS AL'S ORDER, with a blank line where the KIND changes. A `trigger` is called by the
-  // platform and a `procedure` by whoever holds the object; AL says which, and a reader scanning
-  // the class wants that boundary. Reordering to group them would read less like the .al than the
-  // blank line costs.
   bool previousWasTrigger = false;
   bool first = true;
   for (const al::ProcedureDecl &procedure : unit.procedures) {

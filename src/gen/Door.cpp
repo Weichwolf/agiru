@@ -14,9 +14,6 @@ namespace agiru::gen {
 
 namespace {
 
-// ONE DOOR HEADER PER AL TYPE, and the file stem IS the type name -- which is what makes this table
-// derivable rather than invented. `make lint` holds it against the directory, so a type the door
-// gains and this table does not is a finding rather than a compile error in 5 835 files.
 constexpr std::array kTypes{
     std::string_view{"Action"},
     std::string_view{"AlArray"},
@@ -135,8 +132,6 @@ constexpr std::array kTypes{
     std::string_view{"XmlWriteOptions"},
 };
 
-// The names that are not a type's own header: a runtime class, a platform table, a .NET class or
-// the metadata a generated table declares.
 constexpr std::array<std::pair<std::string_view, std::string_view>, 27> kElsewhere{{
     {"Temporary", "runtime/Table.h"},
     {"TestPage", "type/TestPage.h"},
@@ -185,7 +180,6 @@ bool Mentions(std::string_view text, std::string_view name) {
 
 std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   std::set<std::string> headers;
-  // EVERY BODY CAN RAISE AND EVERY OBJECT CARRIES ITS NUMBER, so those two are unconditional.
   headers.insert("meta/Ids.h");
   headers.insert("runtime/Error.h");
   switch (kind) {
@@ -205,8 +199,6 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
   }
-  // A BUILTIN IS A BARE NAME AND THERE ARE 154 OF THEM, so the file that calls one is not found by
-  // asking after each; `Builtins.h` comes in whenever a body was written at all.
   if (text.find(") {\n") != std::string_view::npos) { headers.insert("Builtins.h"); }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
@@ -218,8 +210,6 @@ std::string WithDoor(std::string text, ObjectKind kind) {
   if (at == std::string::npos) { return text; }
   std::string without = text;
   without.erase(at, kDoorMarker.size());
-  // A BLANK LINE AFTER THE DOOR, because what follows it is the OBJECTS this file names -- two
-  // different kinds of dependency, and AL separates them too: `namespace` then `using`.
   return without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
 }
 

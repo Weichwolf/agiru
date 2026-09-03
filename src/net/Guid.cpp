@@ -12,7 +12,6 @@ namespace agiru {
 
 namespace {
 
-// `guid-data-type.md`: "4byte-2byte-2byte-2byte-6byte".
 constexpr std::array<std::size_t, 5> kGroups{4, 2, 2, 2, 6};
 constexpr int kHexPerByte = 2;
 constexpr unsigned kBitsPerByte = 8;
@@ -29,9 +28,6 @@ constexpr std::size_t kTimestampBytes = 6;
 constexpr int kDecimalDigits = 10;
 
 std::uint64_t Random() {
-  // ONE GENERATOR PER THREAD, seeded once. A GUID is asked for on an insert path and BC's SystemId
-  // means every row wants one, so building a generator per call would put the seeding cost on that
-  // path -- and `thread_local` is what keeps it correct under the concurrency this is built for.
   thread_local std::mt19937_64 engine{std::random_device{}()};
   return engine();
 }

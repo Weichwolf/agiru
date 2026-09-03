@@ -27,8 +27,6 @@
 
 namespace agiru {
 
-// A DECLARATION TAKES A NAME. `Variant` includes the string types and the string types name a
-// Variant in two signatures; the circle does not exist in the declarations.
 class Variant;
 
 /// \brief An error raised by a string assignment, such as an over-length value.
@@ -262,15 +260,6 @@ public:
   /// \return The character.
   /// \throws StringError when the index is outside the text.
   [[nodiscard]] Char operator[](Integer index) const;
-
-  // WHAT A TEXT CAN DO, from `methods-auto/text/`. `Code` has all of it too, because AL's Code IS a
-  // Text with a normalisation rule. What the documentation lists with an explicit `String`
-  // parameter
-  // -- `StrLen`, `MaxStrLen`, `CopyStr`, `StrSubstNo` -- is a FREE function and lives in Text.h,
-  // Builtins.h and Record.h; a body calls those with no receiver.
-  //
-  // EVERY INDEX HERE IS ONE-BASED AND COUNTED IN UTF-16 UNITS, which is what the pages say and what
-  // `Length()` returns. .NET counts from zero; AL does not, and each page states its own base.
 
   /// \brief AL `Text.Contains(Text)`.
   /// \param Value The string to seek.

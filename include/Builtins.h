@@ -64,8 +64,6 @@ namespace agiru {
 ///       to reach the refusal from here.
 [[noreturn]] void RefuseDoor(std::string_view what);
 
-// ---- system ----
-
 /// \brief AL `System.Abs(Decimal)`. Calculates the absolute value of a number (Decimal, Integer or
 /// BigInteger). ABS always returns a positive numeric value or zero.
 /// \param Number The AL `Decimal`.
@@ -593,8 +591,6 @@ std::string TemporaryPath();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date WorkDate(::agiru::Date NewDate = {});
 
-// ---- text ----
-
 /// \brief AL `Text.ConvertStr(Text, Text, Text)`. Replaces all chars in source found in
 /// FromCharacters with the corresponding char in ToCharacters and returns the converted string. If
 /// the length of the FromCharacters parameter and the ToChars parameter are different, an exception
@@ -727,8 +723,6 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string UpperCase(std::string_view String);
-
-// ---- database ----
 
 /// \brief AL `Database.AlterKey(KeyRef, Boolean)`. Alter a table's key in SQL, either disabling or
 /// enabling it. Any alteration only pertains to the current transaction and will be reverted at the
@@ -973,8 +967,6 @@ std::string UserId();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Guid UserSecurityId();
 
-// ---- session ----
-
 /// \brief AL `Session.ApplicationArea(Text)`. Gets or sets the application areas for the current
 /// session.
 /// \param ApplicationArea The AL `Text`.
@@ -1195,8 +1187,6 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean UnbindSubscription(const ::agiru::Variant &Codeunit);
 
-// ---- dialog ----
-
 /// \brief AL `Dialog.Confirm(Text, Boolean, Any)`. Creates a dialog box that prompts the user for a
 /// yes or no answer. The dialog box is centered on the screen.
 /// \param String The AL `Text`.
@@ -1245,8 +1235,6 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 ::agiru::Integer StrMenu(std::string_view OptionMembers,
                          ::agiru::Integer DefaultNumber = {},
                          std::string_view Instruction = {});
-
-// ---- file ----
 
 /// \brief AL `File.Copy(Text, Text)`. Copies a file.
 /// \param FromName The AL `Text`.
@@ -1391,8 +1379,6 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 ::agiru::Boolean ViewFromStream(const ::agiru::InStream &InStream,
                                 std::string_view FileName,
                                 ::agiru::Boolean AllowDownloadAndPrint = {});
-
-// ---- secrettext ----
 
 /// \brief AL `SecretText.SecretStrSubstNo(Text, SecretText)`. Replaces %1, %2, %3... and #1, #2,
 /// #3... fields in a string with the values you provide as optional parameters.

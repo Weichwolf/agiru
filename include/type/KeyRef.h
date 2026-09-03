@@ -24,9 +24,6 @@
 
 namespace agiru {
 
-// A CIRCLE THE DECLARATIONS DO NOT HAVE. `RecordRef.KeyIndex(N)` returns a KeyRef and
-// `KeyRef.Record()` returns a RecordRef, so the two headers cannot include each other -- and they
-// do not need to: a declaration takes and returns a NAME.
 class FieldRef;
 class RecordRef;
 

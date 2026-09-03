@@ -43,8 +43,6 @@ public:
     return table;
   }
 
-  /// A `tableextension` HAS THE SAME BODY AS A TABLE, which is why one routine reads both: fields,
-  /// keys, variables and code, in AL's own grammar. What differs is only the header.
   TableExtensionObject ParseTableExtension() {
     TableExtensionObject extension;
     extension.nameSpace = ReadHeaderNamespace("tableextension");
@@ -88,8 +86,6 @@ public:
         table.procedures.push_back(ParseProcedure(attributes));
         attributes.clear();
       } else if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
-        // A block this parser has no use for -- `fieldgroups`, `modify(...)` in an extension, and
-        // whatever a later platform version adds -- is skipped by SHAPE, the way a page's are.
         Advance();
         SkipBracedBlock();
       } else {
@@ -148,9 +144,6 @@ public:
     Expect("enum");
     object.id = ExpectInteger();
     object.name = ExpectName();
-    // An enum may implement interfaces, and 28 of the BaseApp's 576 do. The interface list is read
-    // and dropped here rather than skipped past: `implements` is the only thing that may stand
-    // between the name and the brace, so anything else is still an error.
     if (AtKeyword("implements")) {
       Advance();
       while (!AtEnd() && !AtPunctuation("{")) {
@@ -162,7 +155,6 @@ public:
     return object;
   }
 
-  /// An `enumextension` HAS THE SAME BODY AS AN ENUM: a list of values. What differs is the header.
   EnumExtensionObject ParseEnumExtension() {
     EnumExtensionObject extension;
     extension.nameSpace = ReadHeaderNamespace("enumextension");
@@ -200,9 +192,6 @@ public:
 
 private:
 public:
-  // AN INTERFACE'S PROCEDURE IS A SIGNATURE AND NOTHING ELSE -- no `begin`, no `var`, no body. It
-  // is the same header a codeunit's procedure has, which is why the two share this and only the
-  // BODY is read separately.
   ProcedureDecl ParseSignature() {
     ProcedureDecl procedure;
     while (AtKeyword("local") || AtKeyword("internal") || AtKeyword("protected")) {
@@ -252,11 +241,8 @@ public:
     InterfaceObject object;
     object.nameSpace = ReadHeaderNamespace("interface");
     Expect("interface");
-    // AN INTERFACE MAY CARRY NO NUMBER. `interface "No. Series - Single"` is how BCApps writes
-    // them, and the id is optional where every other object kind requires one.
     if (Peek().kind == TokenKind::Integer) { object.id = ExpectInteger(); }
     object.name = ExpectName();
-    // AL 26 lets an interface EXTEND another, and the base is a name like any other.
     if (AtKeyword("extends")) {
       Advance();
       while (!AtEnd() && !AtPunctuation("{")) {
@@ -286,9 +272,6 @@ public:
     return object;
   }
 
-  /// A `pageextension` HAS THE SAME BODY AS A PAGE -- `layout`, `actions`, `var` and code, with the
-  /// operations `addafter`, `addlast` and `modify` reading as controls like everything else,
-  /// because the layout grammar is one shape. What differs is the header.
   PageExtensionObject ParsePageExtension() {
     PageExtensionObject extension;
     extension.nameSpace = ReadHeaderNamespace("pageextension");
@@ -325,10 +308,6 @@ public:
         ParseControlsInto(object.actions);
         continue;
       }
-      // A BLOCK THIS PARSER HAS NO USE FOR IS SKIPPED BY SHAPE RATHER THAN BY NAME. `views`,
-      // `analysisviews` and whatever a later platform version adds all read as `<word> { ... }`,
-      // where a property reads as `<word> = ...;`. The token after the word decides, so a new
-      // block kind costs nothing and a new property is still parsed.
       if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
         Advance();
         SkipBracedBlock();
@@ -362,7 +341,6 @@ public:
     Expect("}");
   }
 
-  /// `field("No."; Rec."No.")` -- the name, and then whatever follows the semicolon, verbatim.
   void ParseControlHead(PageControl &control) {
     if (!AtPunctuation("(")) { return; }
     Advance();
@@ -385,7 +363,6 @@ public:
     control.kind = Peek().text;
     Advance();
     ParseControlHead(control);
-    // `separator;` and `systemaction(X);` carry no block at all.
     if (AtPunctuation(";")) {
       Advance();
       return control;
@@ -398,8 +375,6 @@ public:
         control.triggers.push_back(ParseProcedure({}));
         continue;
       }
-      // A CONTROL OPENS WITH `(` AND A PROPERTY WITH `=`, which is the whole distinction and the
-      // reason no keyword list is needed. `Visible = true;` against `field(Name; Rec.Name)`.
       if (Peek(1).kind == TokenKind::Punctuation && (Peek(1).text == "(" || Peek(1).text == "{")) {
         control.children.push_back(ParseControl());
         continue;
@@ -421,10 +396,6 @@ private:
     procedure.isTrigger = AtKeyword("trigger");
     if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("event")) { Advance(); }
     procedure.name = ExpectName();
-    // A DotNet event receiver names its trigger through the variable it listens on:
-    // `trigger EventReceiver::OnPermissionCheckEvent(sender: Variant; e: DotNet ...)`. The
-    // qualifier belongs to the SUBSCRIPTION rather than to the signature, so the name kept here is
-    // the event's.
     while (AtPunctuation("::")) {
       Advance();
       procedure.name = ExpectName();
@@ -481,7 +452,6 @@ private:
            AtPunctuation(",")) {
       if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { break; }
       if (AtPunctuation(",")) {
-        // `Option A,,B` -- a blank member holds an ordinal nobody filled in, and it counts.
         if (expecting) { members.emplace_back(); }
         expecting = true;
         Advance();
@@ -497,8 +467,6 @@ private:
 
   std::string ReadSubtypeName() {
     if (AtKeyword("var") || AtKeyword("begin") || AtKeyword("temporary")) { return {}; }
-    // AL names an object by NAME or by NUMBER, and both are legal in a subtype:
-    // `var GLEntry: Record 17` is `Record "G/L Entry"`. Test code uses the number freely.
     if (Peek().kind == TokenKind::Integer) {
       std::string number = Peek().text;
       Advance();
@@ -512,11 +480,6 @@ private:
     return name;
   }
 
-  // ONE READER FOR A TYPE, AND IT KEEPS WHAT IT READS. The subtype is what turns `Record` into a
-  // class and `Codeunit` into another object, the length is what turns `Text` into `Text<N>`, and
-  // `temporary` is what turns a record into one with no database behind it. Discarding them made a
-  // type name enough for counting and not enough for emitting.
-  /// `array[6] of` and `array[3, 4] of` -- the dimensions, outermost first.
   void ReadDimensions(VarDecl &declared) {
     while (AtKeyword("array")) {
       Advance();
@@ -539,8 +502,6 @@ private:
     VarDecl declared;
     ReadDimensions(declared);
     declared.type = ExpectName();
-    // `List of [Text]` AND `Dictionary of [Text, Integer]` NAME THEIR ELEMENT TYPES, and they were
-    // being skipped. A generic with its arguments thrown away is a class template with none.
     if (AtKeyword("of")) {
       Advance();
       Expect("[");
@@ -554,9 +515,6 @@ private:
       Expect("]");
       return declared;
     }
-    // AN INLINE OPTION DECLARES ITS MEMBERS AND HAS NO NAME, and they were being skipped. They are
-    // the only thing that says what `Type::All` means where `Type` is a local; without them the
-    // declaration is an integer with a lost vocabulary.
     if (SameName(declared.type, "Option")) {
       declared.members = ReadOptionMembers();
       return declared;
@@ -594,20 +552,12 @@ private:
     return name;
   }
 
-  // A `var` BLOCK ENDS AT THE NEXT `var` AS WELL AS AT THE NEXT MEMBER. A codeunit may declare
-  // several, separated by nothing but a comment, and `#pragma` lines between them vanish in the
-  // lexer. Without `var` in this list the keyword was read as a variable NAME and the block after
-  // it was lost with the rest of the file.
   void ParseVarsInto(std::vector<LabelDecl> &labels) {
     std::vector<VarDecl> discarded;
     ParseVarsInto(labels, discarded);
   }
 
   void ParseVarsInto(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
-    // AND AT `begin`, because this now reads a PROCEDURE'S OWN var block as well as a codeunit's.
-    // The codeunit-level block never meets one; a local block always does, and without it the
-    // declarations ran straight into the body -- 3877 codeunits down to 380 in one run, which the
-    // population baseline caught on the spot.
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("begin") &&
            !AtKeyword("trigger") && !AtKeyword("procedure") && !AtKeyword("local") &&
            !AtKeyword("internal") && !AtKeyword("protected")) {
@@ -616,16 +566,12 @@ private:
         (void)ReadAttribute();
         continue;
       }
-      // ONE TYPE CAN CARRY SEVERAL NAMES: `HasFileContent, HasTextContent : Boolean;`. Reading one
-      // name and expecting a colon lost 9 codeunits over the tree, all with the same message.
       std::vector<std::string> names{ExpectName()};
       while (AtPunctuation(",")) {
         Advance();
         names.push_back(ExpectName());
       }
       Expect(":");
-      // A LABEL IS NOT A VARIABLE, and AL declares them in the same block. A Label is a constant
-      // string with a caption and translations behind it; everything else is state.
       if (AtKeyword("Label")) {
         Advance();
         if (Peek().kind == TokenKind::String) {
@@ -652,8 +598,6 @@ private:
     return index < tokens_.size() ? tokens_[index] : tokens_.back();
   }
 
-  /// AL writes `protected var` and `local var` on pages, tables and codeunits alike, and the word
-  /// in front makes it look like the start of a procedure to anything reading one token.
   [[nodiscard]] bool AtProtectedVar() const {
     return (AtKeyword("protected") || AtKeyword("internal") || AtKeyword("local")) &&
            IsKeyword(Peek(1), "var");
@@ -736,17 +680,8 @@ private:
     return named && IsPunctuation(Peek(1), ":");
   }
 
-  /// Whether a variable declaration follows the bracket group the cursor sits on, WITHOUT
-  /// consuming it.
-  ///
-  /// A `var` block ends where the next member begins, and the next member usually begins with its
-  /// attributes: `var ... [Test] procedure X()`. Reading the attribute to find that out threw it
-  /// away, and the procedure was then declared without it -- one lost `[Test]` per test codeunit,
-  /// 67 of them, invisible because the count came from the same parser that had dropped them.
   [[nodiscard]] bool VariableFollowsAttribute() const {
     std::size_t ahead = 0;
-    // ATTRIBUTES STACK: `[NonDebuggable] [WithEvents] AzureMLRequest: DotNet ...`. Skipping one
-    // group and looking at the next `[` decided there was no variable and ended the var block.
     while (IsPunctuation(Peek(ahead), "[")) {
       int depth = 0;
       do {
@@ -755,8 +690,6 @@ private:
         ++ahead;
       } while (depth > 0 && Peek(ahead).kind != TokenKind::EndOfFile);
     }
-    // AND ONE TYPE CAN CARRY SEVERAL NAMES: `[NonDebuggable] A, B : Text;`. Looking for a single
-    // `name :` after the attributes missed those too.
     while (Peek(ahead).kind == TokenKind::Identifier ||
            Peek(ahead).kind == TokenKind::QuotedIdentifier) {
       if (IsPunctuation(Peek(ahead + 1), ":")) { return true; }
@@ -787,7 +720,6 @@ private:
     ParseVarsInto(labels, variables);
   }
 
-  /// A body whose local declarations are thrown away -- a table trigger, or a member being skipped.
   std::vector<Token> SkipBeginEnd() {
     std::vector<LabelDecl> labels;
     std::vector<VarDecl> variables;
@@ -832,8 +764,6 @@ private:
   void ParseFields(TableObject &table) {
     Expect("{");
     while (!AtPunctuation("}")) {
-      // A `tableextension` MODIFIES a field it did not declare: `modify("No.") { Editable = false;
-      // }` carries the name, the changed properties and any added trigger, and no type at all.
       if (AtKeyword("modify")) {
         Advance();
         Expect("(");

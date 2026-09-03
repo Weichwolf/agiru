@@ -104,12 +104,6 @@ std::string EnumeratorName(std::string_view optionMember) {
   return name.empty() ? "Blank" : name;
 }
 
-// TWO MEMBERS CAN SCRUB TO ONE IDENTIFIER, AND 24 TABLES DO IT. `OptionMembers = ,"Sales Order",,,`
-// is ordinary in the BaseApp -- a blank member marks "none" and later blanks are reserved ordinals
-// that were never filled in. Every one of them becomes `Blank`, and the second is a redefinition
-// the compiler refuses (measured 2026-09-01). The ORDINAL disambiguates, because it is the one
-// thing that is already unique and already meaningful: the first keeps the bare name and each
-// later collision carries the number AL gave it.
 std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members) {
   std::vector<std::string> names;
   names.reserve(members.size());
@@ -125,12 +119,6 @@ std::string OptionEnumName(std::string_view tableName, std::string_view fieldNam
   return Identifier(tableName) + Identifier(fieldName);
 }
 
-// AL HAS NO ESCAPE CHARACTER AND C++ DOES. A Label may read
-// `The Total Cubage %1 ... exceeds %3 %4.\\Do you still want to enter this %3?` -- in AL that
-// backslash is a line break in the message and nothing more, and copied into a C++ literal it
-// becomes `\\D`, which is an unknown escape sequence and therefore an error under -Werror. 196
-// emitted strings in 69 of the BaseApp's tables carry one, and 16 carry a quote that would close
-// the literal early (measured 2026-09-01).
 std::string Literal(std::string_view text) {
   std::string out;
   out.reserve(text.size() + 2);
@@ -149,19 +137,8 @@ std::string Literal(std::string_view text) {
   return out;
 }
 
-// AL TYPE NAMES ARE CASE-INSENSITIVE AND THE BASEAPP USES THAT. The same field type is written
-// `Guid` 822 times and `GUID` 209 times, `BLOB` 163 times and `Blob` 54, `Enum` 1 351 times and
-// `enum` 41 (measured 2026-09-01). Passing the spelling through would ask for eight door headers
-// per type and would let `enum "Item Type"` slip past the enum path entirely. The canonical
-// spelling is the one the platform documentation gives its data-type page -- `RecordId`, not
-// `RecordID`.
 namespace {
 
-// AL'S OWN TYPE NAMES, AND THE LIST IS THE DOOR'S. A name that is not here and not an object this
-// run read is a type nobody defines, so it goes to `absent::` -- which means every type the door
-// gains has to arrive here too. It fell behind once already: `ModuleInfo`, `Version`,
-// `Notification` and `Variant` were built, were not listed, and were sent to the absent as a
-// result.
 constexpr std::array kCanonicalTypes{
     std::string_view{"Action"},
     std::string_view{"Any"},
@@ -306,8 +283,6 @@ const std::string_view *CanonicalType(std::string_view alType) {
 
 std::string TypeName(std::string_view alType) {
   const std::string_view *const found = CanonicalType(alType);
-  // An unknown type keeps its AL spelling, so that it fails at the `#include` under the name AL
-  // gave it rather than under one this table invented.
   return found != nullptr ? std::string(*found) : std::string(alType);
 }
 
@@ -316,8 +291,6 @@ bool IsAlTypeName(std::string_view alType) {
 }
 
 bool HiddenByABaseMember(std::string_view type) {
-  // Measured 2026-09-03: the whole intersection of `Table<Derived>`'s member names with the door's
-  // type names, and it was 124 of the 176 files that failed to compile in the test tree.
   constexpr std::array kHidden{std::string_view{"Field"}, std::string_view{"RecordId"}};
   return std::ranges::contains(kHidden, type);
 }
@@ -364,8 +337,6 @@ ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
   }
   if (declared.name.empty()) { return {}; }
 
-  // THE NAMESPACE MUST STAND ABOVE THE OBJECT. One found after it belongs to nothing this file
-  // declares, and a declaration on line 1 can have none at all.
   const std::size_t ns = source.find("namespace ");
   if (ns != std::string_view::npos && ns < at) {
     const std::size_t end = source.find(';', ns);

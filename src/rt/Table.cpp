@@ -43,11 +43,6 @@ std::byte *At(void *record, const FieldDef &def) {
   return static_cast<std::byte *>(record) + def.offset;
 }
 
-// THE COLUMN IS A TIMESTAMP AND THE TIME CARRIES THE CLOSING FLAG, which is what
-// `date-data-type.md` describes: 00:00:00 for a normal date, 23:59:59 for a closing one, and the
-// earliest date SQL accepts for the undefined one. The reason to follow it is not tidiness: a plain
-// `date` column has nowhere to put the closing bit, so it would collapse a closing date onto its
-// normal one and lose the ordering a fiscal-year close is built on.
 std::string DateStorageText(const Date &date) {
   if (date.IsUndefined()) { return "1753-01-01 00:00:00"; }
   return std::format("{:04}-{:02}-{:02} {}",
@@ -67,10 +62,6 @@ struct IsoDate {
 };
 
 Date DateFromStorageText(std::string_view text) {
-  // 1753-01-01 IS THE UNDEFINED DATE, ALL OF IT. A date column carries only two instants per day,
-  // 00:00:00 and 23:59:59, and both of that day's are spent on the sentinel the platform writes for
-  // 0D. So the whole day reads back as undefined here -- unlike a datetime column, where only the
-  // one instant is reserved.
   if (text.size() < IsoDate::kWidth) { return Date{}; }
   const int year = std::stoi(std::string(text.substr(IsoDate::kYear, IsoDate::kYearDigits)));
   const auto month =
@@ -82,8 +73,6 @@ Date DateFromStorageText(std::string_view text) {
   return text.find("23:59:59") != std::string_view::npos ? normal.Closing() : normal;
 }
 
-// `hh:mm:ss[.fff]`, which is what a `time` column hands back. The offsets are the ISO layout and
-// are named rather than counted at each use.
 struct IsoTime {
   static constexpr std::size_t kHour = 0;
   static constexpr std::size_t kMinute = 3;
@@ -114,18 +103,10 @@ std::string DateTimeStorageText(const DateTime &instant) {
   return instant.Date().ToInvariantString() + " " + instant.Time().ToInvariantString();
 }
 
-// `yyyy-mm-dd hh:mm:ss[.fff]`, which is what a `timestamp` column hands back. The undefined
-// DateTime and the earliest instant AL accepts are the same value, so the sentinel needs no
-// special case: 1753-01-01 00:00:00 lands on zero on its own.
 DateTime DateTimeFromStorageText(std::string_view text) {
   constexpr std::size_t kNarrowest = 19;
   constexpr std::size_t kTimeAt = 11;
   if (text.size() < kNarrowest) { return DateTime{}; }
-  // NOT DateFromStorageText(), and the difference is a whole day. A DATE column carries the
-  // sentinel across the whole of 1753-01-01, because that day's normal and closing timestamps are
-  // both reserved for the undefined date. A DATETIME column reserves one INSTANT --
-  // 1753-01-01 00:00:00.000 -- and 1753-01-01 12:00:00 on that same day is an ordinary value.
-  // DateTime::Create() lands it on zero of its own accord, so there is no sentinel test here.
   return DateTime::Create(
       Date::FromYmd(std::stoi(std::string(text.substr(IsoDate::kYear, IsoDate::kYearDigits))),
                     static_cast<unsigned>(
@@ -145,14 +126,9 @@ std::string StorageText(const void *record, const FieldDef &def) {
     case FieldType::Date:
       return DateStorageText(
           *reinterpret_cast<const Date *>(static_cast<const std::byte *>(record) + def.offset));
-    // A `timestamp` column takes the ISO form with a space rather than the `T` and without the `Z`
-    // the XML format carries: the column has no time zone, and handing it one would have the server
-    // read a zone it then discards.
     case FieldType::DateTime:
       return DateTimeStorageText(
           *reinterpret_cast<const DateTime *>(static_cast<const std::byte *>(record) + def.offset));
-    // A `uuid` column writes and reads the hyphenated form WITHOUT braces. The braces belong to
-    // AL's text and not to the value, so they go on and come off at this boundary.
     case FieldType::Guid:
       return reinterpret_cast<const Guid *>(static_cast<const std::byte *>(record) + def.offset)
           ->ToStorageText();
@@ -290,9 +266,6 @@ bool RuntimeGet(void *record, const TableDef &table) {
   return true;
 }
 
-// THE STACK IS PER THREAD AND IT NESTS, because a trigger runs AL code that may Validate another
-// record: `Sales Line`'s OnValidate assigns a field of `Sales Header`, and the inner xRec must not
-// be the outer one's.
 namespace {
 std::vector<const void *> &BeforeStack() {
   static thread_local std::vector<const void *> stack;

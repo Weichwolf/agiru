@@ -152,11 +152,6 @@ template <typename T> bool SameKey(const T &a, const T &b) {
 ///
 /// \note The base holds NO data. That is what leaves a generated record standard-layout, which is
 ///       what lets the field table address a field by `offsetof`.
-// The check wants a private constructor with `friend Derived`, and that makes every generated table
-// a NON-INITIALISABLE AGGREGATE -- a table has no user-declared constructor, so `X Rec{}` is
-// aggregate initialisation, which initialises this base from the caller's context and is refused
-// there. Every page and every local record hit it. `Self()` asserts the pairing instead, on first
-// use and at no run-time cost.
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see above.
 template <typename Derived> class Table {
 public:
@@ -376,11 +371,6 @@ public:
     return ::agiru::FieldCaption(TableTraits<Derived>::kTable, no);
   }
 
-  // WHAT A RECORD CAN DO, from `methods-auto/record/`: 111 pages over 82 names, and what a body
-  // needs first is that the NAME exists and refuses rather than failing to compile. Each takes
-  // whatever AL's overload set takes, because a variadic template is the one shape that accepts
-  // every call site while the behaviour is still a refusal (board:0035). They go one at a time as
-  // the behaviour lands, and each that does gets its documented signature and its gate case.
   /// \brief AL `Record.AddLink(...)`. Adds a link to a record.
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
@@ -1315,9 +1305,6 @@ public:
   }
 
 private:
-  // A BINARY SEARCH WRITTEN OUT RATHER THAN `std::ranges::lower_bound`, for the door's build time:
-  // `<algorithm>` costs 372 ms of every translation unit that reads `agiru.h`, and 5 835 generated
-  // sources read it (measured 2026-09-03). Eight lines against half a second per file.
   [[nodiscard]] auto LowerBound() {
     auto first = store_->rows.begin();
     auto last = store_->rows.end();
