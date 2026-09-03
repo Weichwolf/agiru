@@ -165,4 +165,4 @@ public:
   static ::agiru::Boolean RestoreArchiveData(::agiru::Integer TableNo, ::agiru::Boolean RunTrigger);
 };
 
-} // namespace agiru
+}

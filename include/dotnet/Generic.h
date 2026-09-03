@@ -95,4 +95,4 @@ private:
   std::map<std::string, Variant> entries_;
 };
 
-} // namespace agiru::dotnet
+}

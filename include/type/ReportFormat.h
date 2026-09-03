@@ -19,4 +19,4 @@ enum class ReportFormat : std::int32_t {
   Xml,   ///< Saves the report in XML format.
 };
 
-} // namespace agiru
+}

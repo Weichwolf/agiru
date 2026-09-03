@@ -20,4 +20,4 @@ enum class InherentPermissionsScope : std::int32_t {
   Both,         ///< The Both scope
 };
 
-} // namespace agiru
+}

@@ -26,4 +26,4 @@ enum class DataClassification : std::int32_t {
   OrganizationIdentifiableInformation ///< Data that identifies the organisation.
 };
 
-} // namespace agiru
+}

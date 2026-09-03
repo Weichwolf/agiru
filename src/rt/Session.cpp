@@ -30,4 +30,4 @@ bool Session::HasCurrent() {
   return g_current != nullptr;
 }
 
-} // namespace agiru
+}

@@ -240,4 +240,4 @@ public:
   ::agiru::Boolean WriteTo(std::string &Data);
 };
 
-} // namespace agiru
+}

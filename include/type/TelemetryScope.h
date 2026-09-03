@@ -17,4 +17,4 @@ enum class TelemetryScope : std::int32_t {
   All,                ///< Emit telemetry to extension publisher's and partner's telemetry account .
 };
 
-} // namespace agiru
+}

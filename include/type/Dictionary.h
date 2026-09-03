@@ -107,4 +107,4 @@ private:
   std::map<TKey, TValue> entries_;
 };
 
-} // namespace agiru
+}

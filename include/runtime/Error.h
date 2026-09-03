@@ -84,4 +84,4 @@ template <typename T> [[noreturn]] T RefusedTemporal(std::string_view what) {
 ///       says why, and the predecessor paid for the difference.
 void Commit();
 
-} // namespace agiru
+}

@@ -15,7 +15,7 @@ std::string NextName(std::size_t issued) {
   return "al_" + std::to_string(issued);
 }
 
-} // namespace
+}
 
 std::size_t Boundaries::Open(const Connection &connection) {
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
@@ -50,7 +50,7 @@ void Boundaries::Commit(const Connection &connection) {
   }
 }
 
-} // namespace agiru
+}
 
 namespace agiru::detail {
 
@@ -73,7 +73,7 @@ void Scope::Discard(std::string_view why) {
   Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
 }
 
-} // namespace agiru::detail
+}
 
 namespace agiru {
 
@@ -89,4 +89,4 @@ void Commit() {
   Session::Current().Transaction().Commit(Session::Current().Database());
 }
 
-} // namespace agiru
+}

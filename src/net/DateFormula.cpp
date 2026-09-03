@@ -95,7 +95,7 @@ Date Weekday(const Date &d, int target, bool backwards) {
   return Date::FromDaysSinceFirst(d.DaysSinceFirst() + shift);
 }
 
-} // namespace
+}
 
 DateFormula DateFormula::FromText(std::string_view text) {
   DateFormula formula;
@@ -189,4 +189,4 @@ Date DateFormula::CalcDate(const Date &from) const {
   return d;
 }
 
-} // namespace agiru
+}

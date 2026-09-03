@@ -27,4 +27,4 @@ enum class HttpRequestType : std::int32_t {
   Trace,   ///< A trace request
 };
 
-} // namespace agiru
+}

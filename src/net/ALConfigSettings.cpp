@@ -11,7 +11,7 @@ Boolean Service() {
   return Session::HasCurrent() && Session::Current().IsSaaS();
 }
 
-} // namespace
+}
 
 Boolean ALConfigSettings::ApiServicesEnabled() {
   return Service();
@@ -29,4 +29,4 @@ Boolean ALConfigSettings::EnableSaasExtensionInstallConfigSetting() {
   return Service();
 }
 
-} // namespace agiru::dotnet
+}

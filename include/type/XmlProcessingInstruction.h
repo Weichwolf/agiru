@@ -191,4 +191,4 @@ public:
   ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text);
 };
 
-} // namespace agiru
+}

@@ -196,4 +196,4 @@ public:
   ::agiru::Verbosity Verbosity(const ::agiru::Verbosity &Verbosity);
 };
 
-} // namespace agiru
+}

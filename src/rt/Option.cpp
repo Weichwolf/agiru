@@ -12,4 +12,4 @@ Option<> RefusedOption(std::string_view what) {
               " scopes through an enumeration this run does not have (board:0032)");
 }
 
-} // namespace agiru
+}

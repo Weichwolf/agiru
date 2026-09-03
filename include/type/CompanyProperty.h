@@ -48,4 +48,4 @@ public:
   static std::string UrlName();
 };
 
-} // namespace agiru
+}

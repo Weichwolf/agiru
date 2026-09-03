@@ -58,7 +58,7 @@ std::string Join(const std::vector<std::string> &words) {
   return out;
 }
 
-} // namespace
+}
 
 namespace {
 
@@ -77,7 +77,7 @@ std::string_view KindSuffix(ObjectKind kind) {
   return "Object";
 }
 
-} // namespace
+}
 
 std::string ClassName(std::string_view identifier, ObjectKind kind) {
   return std::string(identifier) + "_" + std::string(KindSuffix(kind));
@@ -279,7 +279,7 @@ const std::string_view *CanonicalType(std::string_view alType) {
   return found != kCanonicalTypes.end() ? found : nullptr;
 }
 
-} // namespace
+}
 
 std::string TypeName(std::string_view alType) {
   const std::string_view *const found = CanonicalType(alType);
@@ -312,7 +312,7 @@ std::string_view KeywordOf(ObjectKind kind) {
   return {};
 }
 
-} // namespace
+}
 
 ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
   const std::string wanted = std::string(KeywordOf(kind)) + " ";
@@ -346,4 +346,4 @@ ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
   return declared;
 }
 
-} // namespace agiru::gen
+}

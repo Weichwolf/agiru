@@ -88,7 +88,7 @@ namespace {
   throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");
 }
 
-} // namespace
+}
 
 void BigText::AddText(const ::agiru::BigText &String, ::agiru::Integer Position) {
   static_cast<void>(String);
@@ -4597,6 +4597,6 @@ std::string XmlText::Value(std::string_view NewValue) {
   RefuseDoor("KeyRef.Record()");
 }
 
-} // namespace agiru
+}
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)

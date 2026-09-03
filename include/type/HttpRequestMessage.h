@@ -113,4 +113,4 @@ public:
   ::agiru::Boolean SetSecretRequestUri(const ::agiru::SecretText &RequestUri);
 };
 
-} // namespace agiru
+}

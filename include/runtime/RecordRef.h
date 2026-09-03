@@ -110,7 +110,7 @@ private:
   long *uses_ = nullptr;
 };
 
-} // namespace agiru::detail
+}
 
 namespace agiru {
 
@@ -1171,4 +1171,4 @@ private:
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
 
-} // namespace agiru
+}

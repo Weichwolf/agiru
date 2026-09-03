@@ -114,7 +114,7 @@ private:
   std::size_t at_ = 0;
 };
 
-} // namespace
+}
 
 std::vector<App> ReadApps(const std::filesystem::path &path) {
   const std::ifstream file(path);
@@ -146,7 +146,7 @@ std::size_t LongestPrefix(std::string_view lowered, const std::vector<std::strin
   return best;
 }
 
-} // namespace
+}
 
 bool Holds(const TranspileScope &scope, std::string_view nameSpace) {
   if (nameSpace.empty()) { return true; }
@@ -181,4 +181,4 @@ TranspileScope ReadScope(const std::filesystem::path &path) {
   return scope;
 }
 
-} // namespace agiru::gen
+}

@@ -154,7 +154,7 @@ FieldValues KeyOf(const void *record, const TableDef &table) {
   return values;
 }
 
-} // namespace
+}
 
 void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
   switch (def.type) {
@@ -237,7 +237,7 @@ void StampInserted(void *record, const TableDef &table) {
   StampModified(record, table, now, user);
 }
 
-} // namespace
+}
 
 void RuntimeInsert(void *record, const TableDef &table) {
   StampInserted(record, table);
@@ -271,7 +271,7 @@ std::vector<const void *> &BeforeStack() {
   static thread_local std::vector<const void *> stack;
   return stack;
 }
-} // namespace
+}
 
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   static_cast<void>(record);
@@ -291,4 +291,4 @@ const void *CurrentBefore() {
   return BeforeStack().empty() ? nullptr : BeforeStack().back();
 }
 
-} // namespace agiru::detail
+}

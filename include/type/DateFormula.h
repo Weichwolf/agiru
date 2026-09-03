@@ -78,4 +78,4 @@ private:
   std::string text_;
 };
 
-} // namespace agiru
+}

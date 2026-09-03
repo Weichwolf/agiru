@@ -125,7 +125,7 @@ namespace detail {
 /// \throws Error with BC's own wording when the field holds its type's zero.
 void TestField(const void *record, const TableDef &table, FieldNo no);
 
-} // namespace detail
+}
 
 /// \brief Internals of the record operations. Not part of the door.
 namespace detail {
@@ -183,7 +183,7 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
   }
 }
 
-} // namespace detail
+}
 
 /// \brief AL `Record.TestField(Field, Value)` -- raises when the field does not hold that value.
 ///
@@ -278,4 +278,4 @@ template <typename... Args>
   return detail::SubstituteInto(pattern, std::span<const std::string_view>(values));
 }
 
-} // namespace agiru
+}

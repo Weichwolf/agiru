@@ -54,4 +54,4 @@ private:
   std::int32_t code_ = 0;
 };
 
-} // namespace agiru
+}

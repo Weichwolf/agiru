@@ -186,7 +186,7 @@ bool Satisfies(const Atom &atom, std::string_view value, const FieldDef &def) {
   return false;
 }
 
-} // namespace
+}
 
 Expression ParseFilter(std::string_view text) {
   Expression expression;
@@ -283,7 +283,7 @@ std::optional<Intervals> Admitted(const Atom &atom, Interval domain) {
                       .high = atom.openUpper ? domain.high : *upper}});
 }
 
-} // namespace
+}
 
 std::optional<Intervals> IntegerIntervals(const Expression &expression, Interval domain) {
   Intervals whole{{.low = domain.low, .high = domain.high}};
@@ -308,4 +308,4 @@ std::int64_t CountOf(const Intervals &intervals) {
   return count;
 }
 
-} // namespace agiru::detail
+}

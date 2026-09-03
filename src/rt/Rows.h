@@ -32,4 +32,4 @@ bool DeleteRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> key);
 
-} // namespace agiru
+}

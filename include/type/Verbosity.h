@@ -19,4 +19,4 @@ enum class Verbosity : std::int32_t {
   Verbose,  ///< Identifies a detailed trace event.
 };
 
-} // namespace agiru
+}

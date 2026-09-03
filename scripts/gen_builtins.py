@@ -1,8 +1,27 @@
 import sys, pathlib, re
-sys.path.insert(0, "/tmp/claude-1000/-home-cosmo-Git-agiru/94c34270-14d1-470d-916f-8c83426f799c/scratchpad")
+
+# THE SCRIPT FINDS ITS OWN NEIGHBOURS AND ITS OWN ROOT. Both were absolute paths -- one into a
+# session's temporary directory, one into a checkout by name -- so this ran on exactly one machine
+# and nowhere else, which is the same defect as a hardcoded connection string.
+HERE = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
 import door, free
 
-ROOT = pathlib.Path("/home/cosmo/Git/agiru")
+ROOT = HERE.parent
+
+
+def settle(path, text):
+    """Write only when the bytes differ.
+
+    An unconditional write changes the mtime, and clang's precompiled header compares MTIME rather
+    than content: a rewrite that changes nothing still kills the PCH for the whole door and every
+    ccache entry behind it, and a `make tree` running beside it loses its entire census to
+    "file has been modified since the precompiled header was built".
+    """
+    if path.exists() and path.read_text() == text:
+        return
+    path.write_text(text)
+
 door.GENERATED = set()
 existing = {}
 for d, pre in (("include/type", "type"), ("include/runtime", "runtime"),
@@ -88,7 +107,11 @@ head = '''#pragma once
 namespace agiru {
 
 '''
-(ROOT / "include/Builtins.h").write_text(head + "\n\n".join(alldecls) + "\n\n} // namespace agiru\n")
+# NO CLOSING COMMENT. `test/strip-comments.py` deletes every `//` in the door and only Doxygen
+# survives there, so `} // namespace agiru` is written by this script and removed by the next
+# `make` -- forever. The door's precompiled header and every ccache entry behind it fall over on
+# each of those rewrites, and a `make tree` running beside one loses its whole census.
+settle(ROOT / "include/Builtins.h", head + "\n\n".join(alldecls) + "\n}\n")
 
 # THE SOURCE INCLUDES WHAT ITS BODIES NAME, which is only what the signatures spell -- the header
 # is what needs the whole set.
@@ -103,6 +126,6 @@ src = ['#include "Builtins.h"', "", '#include "runtime/Error.h"'] + \
        "namespace {", "", "[[noreturn]] void RefuseDoor(std::string_view what) {",
        '  throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");',
        "}", "", "} // namespace", "", guard, ""] + allbodies + \
-      ["", guard.replace("NOLINTBEGIN", "NOLINTEND"), "", "} // namespace agiru", ""]
-(ROOT / "src/rt/Builtins.cpp").write_text("\n".join(src))
+      ["", guard.replace("NOLINTBEGIN", "NOLINTEND"), "", "}", ""]
+settle(ROOT / "src/rt/Builtins.cpp", "\n".join(src))
 print(len(allbodies), "free functions")

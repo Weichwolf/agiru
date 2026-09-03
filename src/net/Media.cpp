@@ -25,7 +25,7 @@ std::string Over(const Guid &current) {
   return current.IsNull() ? std::string{} : " over media " + current.ToText();
 }
 
-} // namespace
+}
 
 Guid Media::ImportFile(std::string_view filename,
                        std::string_view description,
@@ -59,4 +59,4 @@ Guid MediaSet::ImportFile(std::string_view filename, std::string_view descriptio
   RefuseWithoutStore(Importing(filename, description) + " into set " + id_.ToText());
 }
 
-} // namespace agiru
+}

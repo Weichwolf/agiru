@@ -271,4 +271,4 @@ public:
   ///       initialisation and both of those make it fail from the caller's context.
 };
 
-} // namespace agiru
+}

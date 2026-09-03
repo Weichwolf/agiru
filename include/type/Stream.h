@@ -108,4 +108,4 @@ private:
   std::size_t position_ = 0;
 };
 
-} // namespace agiru
+}

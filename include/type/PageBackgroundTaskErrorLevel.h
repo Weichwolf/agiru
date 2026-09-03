@@ -25,4 +25,4 @@ enum class PageBackgroundTaskErrorLevel : std::int32_t {
            ///< in the client as a normal error.
 };
 
-} // namespace agiru
+}

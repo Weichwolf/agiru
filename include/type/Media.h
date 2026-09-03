@@ -98,4 +98,4 @@ private:
   Guid id_;
 };
 
-} // namespace agiru
+}

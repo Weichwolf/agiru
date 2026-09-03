@@ -121,4 +121,4 @@ public:
   void Update(::agiru::Integer Number, const ::agiru::Variant &Value);
 };
 
-} // namespace agiru
+}

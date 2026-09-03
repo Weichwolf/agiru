@@ -17,4 +17,4 @@ enum class PromptMode : std::int32_t {
   Content,  ///< Showing the output of the copilot interaction.
 };
 
-} // namespace agiru
+}

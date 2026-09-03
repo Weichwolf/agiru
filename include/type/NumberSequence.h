@@ -106,4 +106,4 @@ public:
   Restart(std::string_view Name, ::agiru::BigInteger Seed, ::agiru::Boolean CompanySpecific);
 };
 
-} // namespace agiru
+}

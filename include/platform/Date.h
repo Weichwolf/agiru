@@ -35,7 +35,7 @@ enum class PeriodType : std::int32_t {
   Year = 4,    ///< One row per year.
 };
 
-} // namespace agiru::platform
+}
 
 /// \brief The vocabulary of the `Period Type` field.
 template <> struct agiru::OptionTraits<agiru::platform::PeriodType> {
@@ -131,7 +131,7 @@ inline constexpr TableDef kDateTable{
     .keys = kDateKeys,
 };
 
-} // namespace agiru::platform
+}
 
 /// \brief What the runtime reaches the virtual `Date` table through.
 template <> struct agiru::TableTraits<agiru::platform::Date> {

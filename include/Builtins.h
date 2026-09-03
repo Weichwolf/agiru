@@ -1388,4 +1388,4 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::SecretText SecretStrSubstNo(std::string_view String, const ::agiru::SecretText &Value1);
 
-} // namespace agiru
+}

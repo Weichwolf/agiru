@@ -116,4 +116,4 @@ bool DeclaresAnObject(const al::VarDecl &declared);
 
 const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects);
 
-} // namespace agiru::gen
+}

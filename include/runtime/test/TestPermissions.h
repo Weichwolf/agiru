@@ -33,4 +33,4 @@ enum class TestPermissions : std::int32_t {
             ///< all tests will be executed using SUPER.
 };
 
-} // namespace agiru
+}

@@ -43,7 +43,7 @@ std::string PrimaryKeyText(const void *record, const TableDef &table, std::strin
   return out;
 }
 
-} // namespace
+}
 
 std::string FieldText(const void *record, const FieldDef &def) {
   switch (def.type) {
@@ -135,7 +135,7 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
               (key.empty() ? std::string{} : ": " + key) + ". It cannot be zero or empty.");
 }
 
-} // namespace detail
+}
 
 namespace detail {
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
@@ -180,7 +180,7 @@ std::string SubstituteInto(std::string_view pattern, std::span<const std::string
   return out;
 }
 
-} // namespace detail
+}
 
 std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &def) {
   const auto compare = [](const auto &left, const auto &right) {
@@ -218,4 +218,4 @@ std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &
   }
 }
 
-} // namespace agiru
+}

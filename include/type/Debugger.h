@@ -146,4 +146,4 @@ public:
   static ::agiru::Boolean Stop();
 };
 
-} // namespace agiru
+}

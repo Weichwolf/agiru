@@ -50,4 +50,4 @@ public:
   static std::string Short();
 };
 
-} // namespace agiru
+}

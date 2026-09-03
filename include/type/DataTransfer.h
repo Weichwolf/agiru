@@ -100,4 +100,4 @@ public:
   ::agiru::Boolean UpdateAuditFields(::agiru::Boolean UpdateAuditFields);
 };
 
-} // namespace agiru
+}

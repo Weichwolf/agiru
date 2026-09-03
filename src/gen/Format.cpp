@@ -35,7 +35,7 @@ std::string Formatter() {
   throw std::runtime_error("gen: clang-format is missing -- see scripts/install.sh");
 }
 
-} // namespace
+}
 
 std::string Formatted(const FormatRequest &request) {
   const std::string path = "/tmp/agiru-format-in";
@@ -48,4 +48,4 @@ std::string Formatted(const FormatRequest &request) {
                  " --assume-filename=" + request.assumedName + " < " + path);
 }
 
-} // namespace agiru::gen
+}

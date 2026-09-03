@@ -27,4 +27,4 @@ TableHeader WriteHeader(const al::TableObject &declared,
                         const EnumIndex &enums,
                         const Objects &objects);
 
-} // namespace agiru::gen
+}

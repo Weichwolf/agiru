@@ -55,4 +55,4 @@ public:
   ::agiru::HttpRequestType RequestType();
 };
 
-} // namespace agiru
+}

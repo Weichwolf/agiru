@@ -46,4 +46,4 @@ public:
   ::agiru::Boolean Get(std::string_view Key, std::string &Result);
 };
 
-} // namespace agiru
+}

@@ -155,7 +155,7 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   return found == objects.tables.end() ? std::string{} : found->second.identifier;
 }
 
-} // namespace
+}
 
 std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
@@ -229,4 +229,4 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   return PageHeader{.text = WithDoor(out, ObjectKind::Page), .dotnet = dotnet, .absent = absent};
 }
 
-} // namespace agiru::gen
+}

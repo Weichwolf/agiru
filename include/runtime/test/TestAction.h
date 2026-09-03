@@ -44,4 +44,4 @@ private:
   std::string_view name_;
 };
 
-} // namespace agiru
+}

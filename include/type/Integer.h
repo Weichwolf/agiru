@@ -35,4 +35,4 @@ struct IntegerRange {
 /// \see `integer-totext-method.md`
 [[nodiscard]] std::string ToText(Integer value);
 
-} // namespace agiru
+}

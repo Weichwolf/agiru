@@ -18,4 +18,4 @@ enum class TextEncoding : std::int32_t {
   Windows, ///< Windows encoding.
 };
 
-} // namespace agiru
+}

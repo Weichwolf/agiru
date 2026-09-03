@@ -316,4 +316,4 @@ WithSystemFields(const std::array<FieldDef, N> &declared) {
   return all;
 }
 
-} // namespace agiru
+}

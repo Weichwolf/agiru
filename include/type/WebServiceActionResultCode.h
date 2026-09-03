@@ -20,4 +20,4 @@ enum class WebServiceActionResultCode : std::int32_t {
   Deleted, ///< Item deleted.
 };
 
-} // namespace agiru
+}

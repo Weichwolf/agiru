@@ -126,4 +126,4 @@ private:
   std::int32_t milliseconds_{0};
 };
 
-} // namespace agiru
+}

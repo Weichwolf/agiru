@@ -133,4 +133,4 @@ public:
   ::agiru::Boolean SetView(std::string_view Name, std::string_view View);
 };
 
-} // namespace agiru
+}

@@ -27,4 +27,4 @@ enum class PageStyle : std::int32_t {
   Subordinate,     ///< Grey
 };
 
-} // namespace agiru
+}

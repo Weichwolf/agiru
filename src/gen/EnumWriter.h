@@ -20,4 +20,4 @@ std::string EnumHeaderPath(const al::EnumObject &object);
 
 std::string LowerKey(const std::string &alName);
 
-} // namespace agiru::gen
+}

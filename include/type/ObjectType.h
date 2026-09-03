@@ -21,4 +21,4 @@ enum class ObjectType : std::int32_t {
   XmlPort,   ///< The XMLPort object type
 };
 
-} // namespace agiru
+}

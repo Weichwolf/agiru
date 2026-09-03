@@ -437,10 +437,10 @@ private:
   int depth_ = 0;
 };
 
-} // namespace
+}
 
 std::vector<Stmt> ParseStatements(std::span<const Token> tokens) {
   return Reader(tokens).ReadBlock();
 }
 
-} // namespace agiru::al
+}

@@ -94,4 +94,4 @@ private:
   static constexpr Integer kApiTimeout = 30000;
 };
 
-} // namespace agiru::dotnet
+}

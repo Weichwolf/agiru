@@ -178,4 +178,4 @@ bool HasAttribute(const ProcedureDecl &procedure, std::string_view name);
 
 std::vector<std::string> ListValue(const Property &property);
 
-} // namespace agiru::al
+}

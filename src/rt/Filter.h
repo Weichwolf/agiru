@@ -55,4 +55,4 @@ using Intervals = std::vector<Interval>;
 
 [[nodiscard]] std::int64_t CountOf(const Intervals &intervals);
 
-} // namespace agiru::detail
+}

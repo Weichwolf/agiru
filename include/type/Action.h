@@ -36,4 +36,4 @@ enum class Action : std::int32_t {
              ///< program.
 };
 
-} // namespace agiru
+}

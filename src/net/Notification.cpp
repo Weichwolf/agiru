@@ -27,4 +27,4 @@ void Notification::Send() {
 
 void Notification::Recall() {}
 
-} // namespace agiru
+}

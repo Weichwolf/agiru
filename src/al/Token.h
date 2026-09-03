@@ -30,4 +30,4 @@ bool IsKeyword(const Token &token, std::string_view keyword);
 
 bool IsPunctuation(const Token &token, std::string_view punctuation);
 
-} // namespace agiru::al
+}

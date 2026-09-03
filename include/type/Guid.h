@@ -96,4 +96,4 @@ private:
   std::array<std::uint8_t, kSize> bytes_{};
 };
 
-} // namespace agiru
+}

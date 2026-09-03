@@ -89,4 +89,4 @@ public:
   ::agiru::Boolean Write(const ::agiru::OutStream &OutStream);
 };
 
-} // namespace agiru
+}

@@ -20,4 +20,4 @@ enum class DataScope : std::int32_t {
                   ///< the app context.
 };
 
-} // namespace agiru
+}

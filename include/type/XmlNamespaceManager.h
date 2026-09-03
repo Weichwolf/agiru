@@ -86,4 +86,4 @@ public:
   void RemoveNamespace(std::string_view Prefix, std::string_view Uri);
 };
 
-} // namespace agiru
+}

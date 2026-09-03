@@ -81,7 +81,7 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
   return nullptr;
 }
 
-} // namespace
+}
 
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
   std::set<std::string> taken;
@@ -239,7 +239,7 @@ std::vector<std::string> Unresolved(const al::TableObject &table, const EnumInde
   return missing;
 }
 
-} // namespace
+}
 
 namespace {
 
@@ -261,7 +261,7 @@ bool NamedByAField(const al::TableObject &table, const std::string &spelled) {
   });
 }
 
-} // namespace
+}
 
 std::string VariableIdentifier(const al::TableObject &table, const std::string &name) {
   const auto taken = [&](const std::string &spelled) {
@@ -460,7 +460,7 @@ std::string ClassBody(const al::TableObject &table,
   return out;
 }
 
-} // namespace
+}
 
 TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
@@ -581,4 +581,4 @@ TableHeader WriteHeader(const al::TableObject &declared,
                      .absent = absent};
 }
 
-} // namespace agiru::gen
+}

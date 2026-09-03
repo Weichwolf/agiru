@@ -39,4 +39,4 @@ private:
 
 std::string OutputDirectory(std::string_view nameSpace, ObjectKind kind);
 
-} // namespace agiru::gen
+}

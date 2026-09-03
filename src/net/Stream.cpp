@@ -63,7 +63,7 @@ Integer InStream::ReadText(std::string &text) {
   return ReadText(text, static_cast<Integer>(blob_->Length() - position_));
 }
 
-} // namespace agiru
+}
 
 namespace agiru {
 
@@ -75,4 +75,4 @@ InStream Blob::CreateInStream() const {
   return InStream{*this};
 }
 
-} // namespace agiru
+}

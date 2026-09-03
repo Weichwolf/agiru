@@ -24,4 +24,4 @@ enum class TableConnectionType : std::int32_t {
   MicrosoftGraph, ///< This is for internal use only.
 };
 
-} // namespace agiru
+}

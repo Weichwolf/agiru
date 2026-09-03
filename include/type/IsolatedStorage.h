@@ -138,4 +138,4 @@ public:
   SetEncrypted(std::string_view Key, std::string_view Value, const ::agiru::DataScope &DataScope);
 };
 
-} // namespace agiru
+}

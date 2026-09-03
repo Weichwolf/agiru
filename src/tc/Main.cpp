@@ -976,7 +976,7 @@ int Scan(const Job &job) {
   return 0;
 }
 
-} // namespace
+}
 
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));

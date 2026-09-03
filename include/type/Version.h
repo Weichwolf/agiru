@@ -78,4 +78,4 @@ private:
   std::array<Integer, 4> parts_{};
 };
 
-} // namespace agiru
+}

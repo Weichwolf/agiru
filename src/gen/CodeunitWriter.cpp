@@ -883,7 +883,7 @@ std::string Locals(const al::ProcedureDecl &procedure,
   return out;
 }
 
-} // namespace
+}
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                 const std::string &sourcePath,
@@ -1108,7 +1108,7 @@ std::string FaceDeclarations(const al::InterfaceObject &object, const Objects &o
   return out;
 }
 
-} // namespace
+}
 
 InterfaceHeader WriteInterface(const al::InterfaceObject &object,
                                const std::string &sourcePath,
@@ -1211,4 +1211,4 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                         .absent = std::move(absent)};
 }
 
-} // namespace agiru::gen
+}

@@ -20,4 +20,4 @@ enum class ErrorBehavior : std::int32_t {
            ///< ErrorBehavior scope, execution will stop with an aggregated error.
 };
 
-} // namespace agiru
+}

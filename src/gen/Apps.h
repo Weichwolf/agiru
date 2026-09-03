@@ -27,4 +27,4 @@ struct TranspileScope {
 
 TranspileScope ReadScope(const std::filesystem::path &path);
 
-} // namespace agiru::gen
+}

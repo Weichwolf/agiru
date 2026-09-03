@@ -30,7 +30,7 @@ void Order() {
   });
 }
 
-} // namespace
+}
 
 void RegisterTableEntry(const TableEntry *entry) {
   Entries().push_back(entry);
@@ -51,4 +51,4 @@ std::span<const TableEntry *const> InstalledTables() {
   return Entries();
 }
 
-} // namespace agiru
+}

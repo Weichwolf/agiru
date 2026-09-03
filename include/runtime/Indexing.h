@@ -60,4 +60,4 @@ template <typename T, std::size_t N>
   return values[static_cast<std::size_t>(index) - 1];
 }
 
-} // namespace agiru
+}

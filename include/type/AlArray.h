@@ -88,4 +88,4 @@ template <typename Container, typename Index>
   return container[index];
 }
 
-} // namespace agiru
+}

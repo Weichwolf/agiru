@@ -69,3 +69,11 @@ IncludeCategories:
     Priority: 3
   - Regex: '.*'
     Priority: 5
+
+# THE FORMATTER MAY NOT WRITE WHAT THE STRIPPER DELETES. `FixNamespaceComments` defaults to true and
+# puts `} // namespace agiru` back on every closing brace; `test/strip-comments.py` then removes it,
+# because only Doxygen survives in the door and nothing at all in `src/`. `make` runs both, so every
+# file that differs from HEAD was rewritten twice per build -- which changes its mtime, which kills
+# the door's precompiled header and every ccache entry behind it, and takes a concurrent
+# `make tree` census with it.
+FixNamespaceComments: false

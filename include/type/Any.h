@@ -14,4 +14,4 @@ namespace agiru {
 /// name AL uses for it, rather than a second one with the same job.
 using Any = Variant;
 
-} // namespace agiru
+}

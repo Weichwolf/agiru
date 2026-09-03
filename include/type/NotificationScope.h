@@ -21,4 +21,4 @@ enum class NotificationScope : std::int32_t {
                ///< user is currently working on. This is the default value.
 };
 
-} // namespace agiru
+}

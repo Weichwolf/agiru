@@ -24,4 +24,4 @@ enum class PermissionObjectType : std::int32_t {
   Query,     ///< The Query object type
 };
 
-} // namespace agiru
+}

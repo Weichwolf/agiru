@@ -13,7 +13,7 @@ namespace agiru {
 namespace detail {
 /// \brief Lets the runtime write an ordinal it read from a column.
 class ValueAccess;
-} // namespace detail
+}
 
 /// \brief The part of an enumeration value that does not depend on which enumeration it is.
 ///
@@ -138,4 +138,4 @@ struct EnumValueDef {
   return nullptr;
 }
 
-} // namespace agiru
+}

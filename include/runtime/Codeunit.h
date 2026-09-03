@@ -213,4 +213,4 @@ private:
   friend Derived;
 };
 
-} // namespace agiru
+}

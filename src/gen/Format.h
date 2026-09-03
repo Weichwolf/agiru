@@ -12,4 +12,4 @@ struct FormatRequest {
 
 std::string Formatted(const FormatRequest &request);
 
-} // namespace agiru::gen
+}

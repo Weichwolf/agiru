@@ -42,4 +42,4 @@ enum class TransactionType : std::int32_t {
           ///< SQL Server, it maps to Browse.
 };
 
-} // namespace agiru
+}

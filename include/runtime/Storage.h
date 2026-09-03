@@ -34,4 +34,4 @@ void DropTable(const Connection &connection, const TableDef &table);
 ///         stores.
 [[nodiscard]] std::string ColumnType(const FieldDef &def);
 
-} // namespace agiru
+}

@@ -47,7 +47,7 @@ enum class ObsoleteState : std::int32_t {
   PendingMove = 4, ///< On its way to another extension.
 };
 
-} // namespace agiru::platform
+}
 
 namespace agiru::detail {
 
@@ -101,7 +101,7 @@ inline constexpr std::array<Named, 17> kFieldTypeNames{{
     {.ordinal = 40, .name = "Media"},
 }};
 
-} // namespace agiru::detail
+}
 
 /// \brief The vocabulary of AL `FieldType`, which the virtual table reports as an option.
 template <> struct agiru::OptionTraits<agiru::FieldType> {
@@ -299,7 +299,7 @@ static_assert(std::is_standard_layout_v<Field>,
               "offsetof reaches a field only in a standard-layout "
               "record");
 
-} // namespace agiru::platform
+}
 
 /// \brief What the runtime reaches the virtual `Field` table through.
 template <> struct agiru::TableTraits<agiru::platform::Field> {

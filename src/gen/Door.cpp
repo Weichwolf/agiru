@@ -93,7 +93,7 @@ bool Mentions(std::string_view text, std::string_view name) {
   return false;
 }
 
-} // namespace
+}
 
 std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   std::set<std::string> headers;
@@ -168,4 +168,4 @@ void KnowDoorTypes(const std::filesystem::path &include) {
   if (DoorTypes().empty()) { throw std::runtime_error("the door declares no types"); }
 }
 
-} // namespace agiru::gen
+}

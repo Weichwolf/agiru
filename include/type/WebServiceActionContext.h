@@ -74,4 +74,4 @@ public:
   void SetResultCode(const ::agiru::WebServiceActionResultCode &ResultCode);
 };
 
-} // namespace agiru
+}

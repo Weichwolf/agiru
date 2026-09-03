@@ -25,7 +25,7 @@ bool IsAsciiDigits(std::string_view s) {
   return !s.empty() && std::ranges::all_of(s, [](char c) { return c >= '0' && c <= '9'; });
 }
 
-} // namespace
+}
 
 constexpr std::int32_t kFourByteBits = 0x07;
 constexpr unsigned char kThreeByteMark = 0xE0;
@@ -140,7 +140,7 @@ void AppendCodePoint(std::string &out, std::int32_t point) {
   out.push_back(static_cast<char>(kContinuationMark | (point & kContinuationBits)));
 }
 
-} // namespace
+}
 
 std::size_t ByteOfUnit(std::string_view s, std::size_t unit) {
   std::size_t at = 1;
@@ -315,4 +315,4 @@ std::strong_ordering CompareCode(std::string_view a, std::string_view b) {
   return a.compare(b) <=> 0;
 }
 
-} // namespace agiru::detail
+}

@@ -39,4 +39,4 @@ public:
   ::agiru::Boolean PreserveWhitespace(::agiru::Boolean NewValue);
 };
 
-} // namespace agiru
+}

@@ -38,4 +38,4 @@ std::string Version::ToText() const {
          std::to_string(parts_[2]) + "." + std::to_string(parts_[3]);
 }
 
-} // namespace agiru
+}

@@ -18,7 +18,7 @@ constexpr std::int64_t kAlEpochToUnixDays = -calendar::DaysFromCivil(Date::kFirs
 static_assert(kAlEpochToUnixDays == kDaysFrom1753To1970,
               "1753-01-01 to 1970-01-01, which is what a DateTime's zero has to be moved by");
 
-} // namespace
+}
 
 DateTime CurrentDateTime() {
   const auto since = std::chrono::system_clock::now().time_since_epoch();
@@ -37,7 +37,7 @@ std::string DateTime::ToInvariantString() const {
   return Date().ToInvariantString() + "T" + Time().ToInvariantString() + "Z";
 }
 
-} // namespace agiru
+}
 
 namespace agiru {
 
@@ -45,4 +45,4 @@ std::string Duration::ToInvariantString() const {
   return std::to_string(milliseconds_);
 }
 
-} // namespace agiru
+}

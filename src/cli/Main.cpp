@@ -122,7 +122,7 @@ int Version() {
   return 0;
 }
 
-} // namespace
+}
 
 int main(int argc, char **argv) {
   try {

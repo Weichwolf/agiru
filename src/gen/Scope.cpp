@@ -83,7 +83,7 @@ std::string SnakeCase(std::string_view segment) {
   return out;
 }
 
-} // namespace
+}
 
 Scope Scope::FromFile(const std::filesystem::path &path) {
   const std::ifstream file(path);
@@ -148,4 +148,4 @@ std::string OutputDirectory(std::string_view nameSpace, ObjectKind kind) {
   return out;
 }
 
-} // namespace agiru::gen
+}

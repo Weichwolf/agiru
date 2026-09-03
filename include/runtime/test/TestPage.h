@@ -31,7 +31,7 @@ namespace agiru {
 ///       with no members at all: the call site fails to compile and says which control it wanted.
 class UnknownPage {};
 
-} // namespace agiru
+}
 
 /// \brief The controls a `TestPage` over an untranslated page has, which is none.
 template <> struct agiru::PageTraits<agiru::UnknownPage> {
@@ -84,4 +84,4 @@ private:
   }
 };
 
-} // namespace agiru
+}

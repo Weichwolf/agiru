@@ -36,7 +36,7 @@ template <typename T, typename V> struct InVariant : std::false_type {};
 template <typename T, typename... Ts>
 struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T, Ts> || ...)> {};
 
-} // namespace agiru::detail
+}
 
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
@@ -652,4 +652,4 @@ private:
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 
-} // namespace agiru
+}

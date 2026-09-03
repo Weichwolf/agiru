@@ -215,4 +215,4 @@ template <typename T> Integer MaxStrLen(const T &value) {
   return static_cast<Integer>(detail::Utf16Length(value));
 }
 
-} // namespace agiru
+}

@@ -61,7 +61,7 @@ FieldValues RowOf(const Result &result, std::size_t row) {
   return values;
 }
 
-} // namespace
+}
 
 std::string ColumnType(const FieldDef &def) {
   switch (def.type) {
@@ -201,4 +201,4 @@ std::string_view Required(const std::optional<std::string> &value, const FieldDe
   return *value;
 }
 
-} // namespace agiru
+}

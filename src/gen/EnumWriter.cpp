@@ -30,7 +30,7 @@ std::vector<const al::EnumValueDecl *> ByOrdinal(const al::EnumObject &object) {
   return values;
 }
 
-} // namespace
+}
 
 std::string LowerKey(const std::string &alName) {
   std::string out;
@@ -92,4 +92,4 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
   return WithDoor(out, ObjectKind::Enum);
 }
 
-} // namespace agiru::gen
+}

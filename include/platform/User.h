@@ -156,7 +156,7 @@ inline constexpr TableDef kUserTable{
     .keys = kUserKeys,
 };
 
-} // namespace agiru::platform
+}
 
 /// \brief What the runtime reaches the system `User` table through.
 template <> struct agiru::TableTraits<agiru::platform::User> {

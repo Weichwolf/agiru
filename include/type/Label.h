@@ -177,4 +177,4 @@ public:
   std::string TrimStart(std::string_view Chars);
 };
 
-} // namespace agiru
+}

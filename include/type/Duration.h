@@ -125,4 +125,4 @@ private:
   return d * factor;
 }
 
-} // namespace agiru
+}

@@ -18,4 +18,4 @@ std::string ToText(Boolean value) {
   return value ? "Yes" : "No";
 }
 
-} // namespace agiru
+}

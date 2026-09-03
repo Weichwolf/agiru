@@ -586,7 +586,7 @@ private:
   int depth_ = 0;
 };
 
-} // namespace
+}
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent) {
   return Writer(scope).Statements(body, indent);
@@ -619,7 +619,7 @@ public:
     for (const al::ProcedureDecl &procedure : table_.procedures) {
       if (SameName(procedure.name, name)) { return ProcedureIdentifier(table_, procedure.name); }
     }
-    if (SameName("Rec", name)) { return "*this"; }
+    if (SameName("Rec", name)) { return "(*this)"; }
     return {};
   }
 
@@ -696,7 +696,7 @@ std::string BindsBefore(const std::string &body, const std::string &identifier) 
              ? std::string{}
              : "  const " + identifier + " &XRec = detail::Before<" + identifier + ">();\n\n";
 }
-} // namespace
+}
 
 std::string
 WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects) {
@@ -778,7 +778,7 @@ void ControlBodies(std::string &out,
   }
 }
 
-} // namespace
+}
 
 std::string WriteSource(const al::PageObject &page,
                         const std::string &sourcePath,
@@ -823,4 +823,4 @@ std::string WriteSource(const al::PageObject &page,
   return WithDoor(out, ObjectKind::Page);
 }
 
-} // namespace agiru::gen
+}

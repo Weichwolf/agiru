@@ -18,4 +18,4 @@ enum class CommitBehavior : std::int32_t {
   Error,  ///< Throw an error when a commit is attempted within the scope of this method.
 };
 
-} // namespace agiru
+}

@@ -10,4 +10,4 @@ std::string Date::ToInvariantString() const {
   return std::format("{:04}-{:02}-{:02}", Year(), Month(), Day());
 }
 
-} // namespace agiru
+}

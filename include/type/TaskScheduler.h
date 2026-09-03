@@ -97,4 +97,4 @@ public:
   static ::agiru::Boolean TaskExists(::agiru::Guid Task);
 };
 
-} // namespace agiru
+}

@@ -90,4 +90,4 @@ public:
   void WriteFrom(std::string_view Text);
 };
 
-} // namespace agiru
+}

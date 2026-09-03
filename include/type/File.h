@@ -354,4 +354,4 @@ public:
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 };
 
-} // namespace agiru
+}

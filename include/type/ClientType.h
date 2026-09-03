@@ -30,4 +30,4 @@ enum class ClientType : std::int32_t {
   Teams,        ///< Microsoft Teams client.
 };
 
-} // namespace agiru
+}

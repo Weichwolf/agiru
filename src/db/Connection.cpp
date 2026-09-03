@@ -22,7 +22,7 @@ PGconn *Conn(void *h) {
   return static_cast<PGconn *>(h);
 }
 
-} // namespace
+}
 
 Result::Result(void *handle) : handle_(handle) {}
 
@@ -112,7 +112,7 @@ void Connection::Run(std::string_view sql,
   const Result discarded = Execute(sql, params);
 }
 
-} // namespace agiru
+}
 
 namespace agiru {
 
@@ -121,4 +121,4 @@ bool Connection::InTransaction() const {
   return status == PQTRANS_INTRANS || status == PQTRANS_INERROR;
 }
 
-} // namespace agiru
+}

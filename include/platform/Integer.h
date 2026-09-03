@@ -76,7 +76,7 @@ inline constexpr TableDef kIntegerTable{
     .keys = kIntegerKeys,
 };
 
-} // namespace agiru::platform
+}
 
 /// \brief What the runtime reaches the virtual `Integer` table through.
 template <> struct agiru::TableTraits<agiru::platform::Integer> {

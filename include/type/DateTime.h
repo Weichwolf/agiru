@@ -145,4 +145,4 @@ private:
 ///       is the clock, and AL's `WorkDate` is a different thing that a session carries.
 [[nodiscard]] DateTime CurrentDateTime();
 
-} // namespace agiru
+}

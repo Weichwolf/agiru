@@ -34,4 +34,4 @@ enum class AuditCategory : std::int32_t {
   Euii,                   ///< Identifies Euii (end user identifiable information) audit category.
 };
 
-} // namespace agiru
+}

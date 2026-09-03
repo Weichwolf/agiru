@@ -19,4 +19,4 @@ enum class SecurityOperationResult : std::int32_t {
   Timeout,     ///< Identifies operation timeout.
 };
 
-} // namespace agiru
+}

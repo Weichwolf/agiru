@@ -28,4 +28,4 @@ EnumExtensionObject ParseEnumExtension(std::string_view source);
 
 PageExtensionObject ParsePageExtension(std::string_view source);
 
-} // namespace agiru::al
+}

@@ -117,4 +117,4 @@ private:
   void *handle_;
 };
 
-} // namespace agiru
+}

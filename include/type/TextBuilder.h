@@ -127,4 +127,4 @@ public:
   std::string ToText(::agiru::Integer StartIndex, ::agiru::Integer Count);
 };
 
-} // namespace agiru
+}

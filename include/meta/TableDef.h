@@ -177,4 +177,4 @@ struct TableDef {
   return nullptr;
 }
 
-} // namespace agiru
+}

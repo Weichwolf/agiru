@@ -18,4 +18,4 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
 std::string PageHeaderPath(const al::PageObject &object);
 
-} // namespace agiru::gen
+}

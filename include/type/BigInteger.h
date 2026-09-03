@@ -23,4 +23,4 @@ struct BigIntegerRange {
 /// \see `biginteger-totext-method.md`
 [[nodiscard]] std::string ToText(BigInteger value);
 
-} // namespace agiru
+}

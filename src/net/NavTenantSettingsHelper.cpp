@@ -16,7 +16,7 @@ const TenantSettings &Tenant() {
   return Session::HasCurrent() ? Session::Current().Tenant() : kSelfHosted;
 }
 
-} // namespace
+}
 
 Boolean NavTenantSettingsHelper::IsProduction() {
   return !Tenant().sandbox;
@@ -43,4 +43,4 @@ void NavTenantSettingsHelper::EnableM365Collaboration() {
               "tenant service to change");
 }
 
-} // namespace agiru::dotnet
+}

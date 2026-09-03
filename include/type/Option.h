@@ -218,4 +218,4 @@ public:
 ///       which expression it was.
 [[noreturn]] Option<> RefusedOption(std::string_view what);
 
-} // namespace agiru
+}

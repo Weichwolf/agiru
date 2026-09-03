@@ -46,4 +46,4 @@ public:
   ::agiru::Boolean Get(::agiru::Integer Index, ::agiru::XmlNode &Node);
 };
 
-} // namespace agiru
+}

@@ -165,7 +165,7 @@ template <typename T> bool SameKey(const T &a, const T &b) {
   return !ByKey(a, b) && !ByKey(b, a);
 }
 
-} // namespace detail
+}
 
 /// \brief What every AL table can do, without the generated class saying any of it.
 ///
@@ -1471,4 +1471,4 @@ private:
   std::size_t position_{0};
 };
 
-} // namespace agiru
+}

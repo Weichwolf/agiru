@@ -102,4 +102,4 @@ public:
   void Set(std::string_view LocalName, std::string_view NamespaceUri, std::string_view Value);
 };
 
-} // namespace agiru
+}

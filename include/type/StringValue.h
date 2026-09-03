@@ -231,7 +231,7 @@ std::string NormaliseCode(std::string_view s);
 ///       remain different primary keys.
 std::strong_ordering CompareCode(std::string_view a, std::string_view b);
 
-} // namespace detail
+}
 
 /// \brief The part of a string field that does not depend on its declared length.
 ///
@@ -640,4 +640,4 @@ template <typename T>
   return std::string(std::string_view(left)) + std::string(right.Value());
 }
 
-} // namespace agiru
+}

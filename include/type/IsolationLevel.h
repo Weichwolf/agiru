@@ -25,4 +25,4 @@ enum class IsolationLevel : std::int32_t {
            ///< allow reading of uncommitted data.
 };
 
-} // namespace agiru
+}

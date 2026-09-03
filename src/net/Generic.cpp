@@ -29,4 +29,4 @@ const Variant &GenericDictionary2::Item(const std::string &key) const {
   return found->second;
 }
 
-} // namespace agiru::dotnet
+}

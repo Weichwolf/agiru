@@ -199,4 +199,4 @@ Decimal Round(const Decimal &number,
               const Decimal &precision,
               RoundDirection direction = RoundDirection::Nearest);
 
-} // namespace agiru
+}

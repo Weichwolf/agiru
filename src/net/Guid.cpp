@@ -70,7 +70,7 @@ std::string Hyphenated(const std::array<std::uint8_t, Guid::kSize> &bytes) {
   return out;
 }
 
-} // namespace
+}
 
 Guid Guid::Create() {
   std::array<std::uint8_t, kSize> bytes{};
@@ -125,4 +125,4 @@ std::string Guid::ToStorageText() const {
   return Hyphenated(bytes_);
 }
 
-} // namespace agiru
+}

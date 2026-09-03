@@ -80,4 +80,4 @@ template <typename T> struct RegisterTable {
 /// \return The entries, sorted by table number.
 [[nodiscard]] std::span<const TableEntry *const> InstalledTables();
 
-} // namespace agiru
+}

@@ -38,4 +38,4 @@ struct TenantSettings {
   std::string ringName;
 };
 
-} // namespace agiru
+}

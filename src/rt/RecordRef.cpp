@@ -37,7 +37,7 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
   return *reinterpret_cast<const T *>(At(record, def));
 }
 
-} // namespace
+}
 
 FieldType FieldRef::Type() const {
   return def_->type == FieldType::Enum ? FieldType::Option : def_->type;
@@ -158,4 +158,4 @@ bool RecordRef::FieldExist(Integer fieldNo) const {
   return table_ != nullptr && agiru::Field(*table_, FieldNo{fieldNo}) != nullptr;
 }
 
-} // namespace agiru
+}

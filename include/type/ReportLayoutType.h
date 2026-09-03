@@ -19,4 +19,4 @@ enum class ReportLayoutType : std::int32_t {
   Custom, ///< Denotes a report layout of a user-defined type.
 };
 
-} // namespace agiru
+}

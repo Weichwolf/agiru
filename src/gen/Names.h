@@ -38,4 +38,4 @@ struct ObjectDeclaration {
 
 ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind);
 
-} // namespace agiru::gen
+}

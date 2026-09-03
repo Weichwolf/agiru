@@ -221,7 +221,7 @@ Decimal TruncateMagnitude(const Decimal &d) {
   return DecimalAccess::Make(u, 0, false);
 }
 
-} // namespace
+}
 
 Decimal::Decimal(Repr r) : units_(r.units), scale_(r.scale), negative_(r.negative) {}
 
@@ -403,4 +403,4 @@ Decimal Round(const Decimal &number, const Decimal &precision, RoundDirection di
   return number.IsNegative() ? -result : result;
 }
 
-} // namespace agiru
+}

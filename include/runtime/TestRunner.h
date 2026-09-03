@@ -120,4 +120,4 @@ struct TestRun {
 /// \return Them, by codeunit number.
 [[nodiscard]] std::vector<const TestCatalogue *> RegisteredTestCodeunits();
 
-} // namespace agiru
+}

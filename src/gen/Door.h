@@ -14,4 +14,4 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] std::string WithDoor(std::string text, ObjectKind kind);
 
-} // namespace agiru::gen
+}

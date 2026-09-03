@@ -17,4 +17,4 @@ enum class ExecutionMode : std::int32_t {
   Debug,    ///< The session is executing in debug mode.
 };
 
-} // namespace agiru
+}

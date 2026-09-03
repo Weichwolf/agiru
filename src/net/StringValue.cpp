@@ -16,4 +16,4 @@ Char StringValue::operator[](Integer index) const {
   return Char{detail::CodePointAt(Stored(), static_cast<std::size_t>(index) - 1)};
 }
 
-} // namespace agiru
+}

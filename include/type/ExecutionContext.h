@@ -19,4 +19,4 @@ enum class ExecutionContext : std::int32_t {
   Upgrade,   ///< An application is being upgraded.
 };
 
-} // namespace agiru
+}

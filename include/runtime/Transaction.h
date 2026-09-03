@@ -73,7 +73,7 @@ private:
   std::size_t issued_ = 0;
 };
 
-} // namespace agiru
+}
 
 /// \brief The platform half of a transaction boundary. Not part of the door's vocabulary.
 namespace agiru::detail {
@@ -106,4 +106,4 @@ private:
   bool open_ = true;
 };
 
-} // namespace agiru::detail
+}

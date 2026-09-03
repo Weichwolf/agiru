@@ -20,4 +20,4 @@ using Boolean = bool;
 /// \see `boolean-totext--method.md`
 [[nodiscard]] std::string ToText(Boolean value);
 
-} // namespace agiru
+}

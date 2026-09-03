@@ -850,7 +850,7 @@ private:
   std::size_t position_ = 0;
 };
 
-} // namespace
+}
 
 const Property *Find(const std::vector<Property> &properties, std::string_view name) {
   for (const Property &p : properties) {
@@ -923,4 +923,4 @@ bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {
   });
 }
 
-} // namespace agiru::al
+}

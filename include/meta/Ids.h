@@ -48,4 +48,4 @@ using FieldNo = Id<FieldNoTag>;       ///< An AL field number, unique within its
 using CodeunitId = Id<CodeunitIdTag>; ///< An AL codeunit number.
 using PageId = Id<PageIdTag>;         ///< An AL page number.
 
-} // namespace agiru
+}

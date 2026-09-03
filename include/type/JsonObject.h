@@ -517,4 +517,4 @@ public:
                                       ::agiru::SecretText &Result);
 };
 
-} // namespace agiru
+}

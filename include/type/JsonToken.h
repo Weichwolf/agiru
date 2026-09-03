@@ -123,4 +123,4 @@ public:
   ::agiru::Boolean WriteTo(std::string &String);
 };
 
-} // namespace agiru
+}

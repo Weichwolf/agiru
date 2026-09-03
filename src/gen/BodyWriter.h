@@ -65,4 +65,4 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
 
 [[nodiscard]] std::string ControlTrigger(std::string_view trigger, std::string_view control);
 
-} // namespace agiru::gen
+}

@@ -18,4 +18,4 @@ enum class ErrorType : std::int32_t {
             ///< generic error will be displayed to the user.
 };
 
-} // namespace agiru
+}

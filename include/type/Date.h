@@ -95,12 +95,12 @@ struct Civil {
   return m >= 1 && m <= kMonthsPerYear && d >= 1 && d <= LastDayOfMonth(y, m);
 }
 
-} // namespace calendar
+}
 
 namespace detail {
 /// \brief Lets the runtime write a serial it read from a column.
 class ValueAccess;
-} // namespace detail
+}
 
 /// \brief AL `Date`.
 ///
@@ -325,4 +325,4 @@ private:
   return Date::FromDaysSinceFirst(left.Normal().DaysSinceFirst() - days);
 }
 
-} // namespace agiru
+}

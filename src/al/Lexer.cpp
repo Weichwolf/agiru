@@ -360,7 +360,7 @@ std::vector<Token> ApplyDirectives(std::vector<Token> tokens) {
   return live;
 }
 
-} // namespace
+}
 
 bool IsKeyword(const Token &token, std::string_view keyword) {
   if (token.kind != TokenKind::Identifier || token.text.size() != keyword.size()) { return false; }
@@ -378,4 +378,4 @@ std::vector<Token> Tokenize(std::string_view source) {
   return ApplyDirectives(Scanner(source).Run());
 }
 
-} // namespace agiru::al
+}

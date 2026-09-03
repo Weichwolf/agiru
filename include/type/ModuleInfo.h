@@ -105,4 +105,4 @@ private:
   List<ModuleDependencyInfo> dependencies_;
 };
 
-} // namespace agiru
+}

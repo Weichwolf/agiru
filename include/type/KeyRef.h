@@ -59,4 +59,4 @@ public:
   ::agiru::RecordRef Record();
 };
 
-} // namespace agiru
+}

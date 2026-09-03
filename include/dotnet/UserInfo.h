@@ -95,4 +95,4 @@ private:
   List<std::string> groups_;
 };
 
-} // namespace agiru::dotnet
+}

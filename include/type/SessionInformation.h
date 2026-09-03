@@ -55,4 +55,4 @@ public:
   static ::agiru::BigInteger SqlStatementsExecuted();
 };
 
-} // namespace agiru
+}

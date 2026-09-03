@@ -37,7 +37,7 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
       .codeunit = codeunit.Name(), .method = method.name, .passed = true, .error = {}};
 }
 
-} // namespace
+}
 
 TestCatalogue::TestCatalogue(CodeunitId id,
                              std::string_view name,
@@ -86,4 +86,4 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
   return run;
 }
 
-} // namespace agiru
+}

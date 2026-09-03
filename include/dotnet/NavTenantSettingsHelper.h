@@ -52,4 +52,4 @@ public:
   static void EnableM365Collaboration();
 };
 
-} // namespace agiru::dotnet
+}

@@ -52,4 +52,4 @@ public:
   std::string FileName();
 };
 
-} // namespace agiru
+}

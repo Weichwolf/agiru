@@ -19,4 +19,4 @@ enum class DefaultLayout : std::int32_t {
   Excel, ///< The default layout is Excel.
 };
 
-} // namespace agiru
+}
