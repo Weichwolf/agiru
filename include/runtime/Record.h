@@ -3,12 +3,15 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Decimal.h"
 #include "type/Option.h"
 #include "type/Text.h"
+#include "type/Variant.h"
 
 #include <compare>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -16,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 /// \file
 /// \brief The AL record operations that raise the platform's own error messages.
@@ -172,6 +176,8 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
     return std::string(value.Value());
   } else if constexpr (std::is_same_v<T, Decimal>) {
     return value.ToInvariantString();
+  } else if constexpr (std::is_same_v<T, Boolean>) {
+    return ToText(value);
   } else {
     return std::string(value);
   }
@@ -215,6 +221,44 @@ template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
   return std::string(value.Caption());
 }
 
+/// \brief One argument of `StrSubstNo`, rendered the way AL renders it.
+///
+/// \tparam T The argument's type.
+/// \param value The argument.
+/// \return Its text.
+///
+/// \note AL's `StrSubstNo` TAKES `Any`, AND EVERY TYPE HAS A RENDERING. Requiring a string view
+///       made `StrSubstNo(Msg, Amount)` -- a Decimal in a message, which the BaseApp writes
+///       constantly -- fail to compile. What reads as text is used as it is; everything else goes
+///       through `Format`, which is what AL does with it.
+template <typename T> [[nodiscard]] std::string AsText(const T &value) {
+  if constexpr (std::convertible_to<const T &, std::string_view>) {
+    return std::string(std::string_view(value));
+  } else if constexpr (requires { value.ToText(); }) {
+    return value.ToText();
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return std::to_string(value);
+  } else {
+    return Format(value);
+  }
+}
+
+/// \brief AL `Format(Any)` for a value that is not a Variant.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return Its text.
+///
+/// \note THE DOCUMENTED SIGNATURE TAKES AN `Any` AND A VARIANT HOLDS ONLY SOME TYPES. A `Char`, an
+///       array element, a generated option -- AL formats all of them and none of them is a Variant
+///       alternative. This is the same rendering `StrSubstNo` uses on its arguments, under the name
+///       AL calls it by.
+template <typename T>
+  requires(!std::convertible_to<const T &, const Variant &>)
+[[nodiscard]] std::string Format(const T &value) {
+  return AsText(value);
+}
+
 /// \brief AL `StrSubstNo(Text [, Any,...])`.
 ///
 /// \tparam Args    The argument types, each convertible to a string view.
@@ -227,7 +271,10 @@ template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
 /// \see `text-strsubstno-method.md`
 template <typename... Args>
 [[nodiscard]] std::string StrSubstNo(std::string_view pattern, const Args &...args) {
-  const std::initializer_list<std::string_view> values{std::string_view(args)...};
+  const std::initializer_list<std::string> rendered{AsText(args)...};
+  std::vector<std::string_view> values;
+  values.reserve(rendered.size());
+  for (const std::string &one : rendered) { values.emplace_back(one); }
   return detail::SubstituteInto(pattern, std::span<const std::string_view>(values));
 }
 

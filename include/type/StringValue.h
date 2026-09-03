@@ -1,15 +1,22 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
 #include "type/Char.h"
 #include "type/Integer.h"
+#include "type/List.h"
 
 #include <compare>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 /// \file
 /// \brief What AL's two string types share.
@@ -19,6 +26,10 @@
 /// agiru/Text.h and agiru/Code.h.
 
 namespace agiru {
+
+// A DECLARATION TAKES A NAME. `Variant` includes the string types and the string types name a
+// Variant in two signatures; the circle does not exist in the declarations.
+class Variant;
 
 /// \brief An error raised by a string assignment, such as an over-length value.
 class StringError : public Error {
@@ -52,6 +63,124 @@ std::size_t Utf16Length(std::string_view s);
 /// \return The code point.
 /// \throws StringError when the position is outside the text or inside a surrogate pair.
 std::int32_t CodePointAt(std::string_view s, std::size_t unit);
+
+/// \brief The byte offset of a ONE-BASED UTF-16 unit position, clamped to the end.
+/// \param s    The text.
+/// \param unit The position, counting from one.
+/// \return The byte offset.
+std::size_t ByteOfUnit(std::string_view s, std::size_t unit);
+
+/// \brief The one-based UTF-16 unit position of a byte offset.
+/// \param s  The text.
+/// \param at The byte offset.
+/// \return The position, counting from one.
+std::size_t UnitOfByte(std::string_view s, std::size_t at);
+
+/// \brief AL `Text.IndexOf`.
+/// \param s          The text.
+/// \param value      The string to seek.
+/// \param startIndex The one-based position to start at.
+/// \return The one-based position, or 0.
+Integer IndexOfText(std::string_view s, std::string_view value, Integer startIndex);
+
+/// \brief AL `Text.LastIndexOf`.
+/// \param s          The text.
+/// \param value      The string to seek.
+/// \param startIndex The one-based position the backward search starts at; 0 means the end.
+/// \return The one-based position, or 0.
+Integer LastIndexOfText(std::string_view s, std::string_view value, Integer startIndex);
+
+/// \brief AL `Text.IndexOfAny`.
+/// \param s          The text.
+/// \param values     The characters to seek.
+/// \param startIndex The one-based position to start at.
+/// \return The one-based position, or 0.
+Integer IndexOfAnyText(std::string_view s, std::string_view values, Integer startIndex);
+
+/// \brief Which end a text is padded at.
+enum class PadSide : std::uint8_t {
+  Left,  ///< AL `Text.PadLeft` -- the text is right-aligned.
+  Right, ///< AL `Text.PadRight` -- the text is left-aligned.
+};
+
+/// \brief Which ends a text is trimmed at.
+enum class TrimSides : std::uint8_t {
+  Start, ///< AL `Text.TrimStart`.
+  End,   ///< AL `Text.TrimEnd`.
+  Both,  ///< AL `Text.Trim`.
+};
+
+/// \brief What `Text.Replace` replaces, and with what.
+struct Replacement {
+  std::string_view from; ///< What is replaced.
+  std::string_view to;   ///< What replaces it.
+};
+
+/// \brief AL `Text.PadLeft` and `Text.PadRight`.
+/// \param s     The text.
+/// \param count The length to pad to.
+/// \param side  Which end to pad at.
+/// \param pad   The padding character.
+/// \return The padded text.
+std::string PadText(std::string_view s, Integer count, PadSide side, Char pad);
+
+/// \brief AL `Text.Remove`.
+/// \param s          The text.
+/// \param startIndex The one-based position to delete from.
+/// \param count      How many characters to delete, or nothing for everything after the position.
+/// \return What is left.
+std::string RemoveText(std::string_view s, Integer startIndex, std::optional<Integer> count);
+
+/// \brief AL `Text.Substring`.
+/// \param s          The text.
+/// \param startIndex The one-based position the substring starts at.
+/// \param count      How many characters it holds, or nothing for the rest of the text.
+/// \return The substring.
+std::string SubstringText(std::string_view s, Integer startIndex, std::optional<Integer> count);
+
+/// \brief AL `Text.Replace` -- every occurrence.
+/// \param s    The text.
+/// \param what What is replaced, and with what.
+/// \return The result.
+std::string ReplaceText(std::string_view s, Replacement what);
+
+/// \brief AL `Text.Split`.
+/// \param s          The text.
+/// \param separators The separators; empty means white space.
+/// \return The pieces, in order.
+List<std::string> SplitText(std::string_view s, std::span<const std::string> separators);
+
+/// \brief Each character of a `List of [Char]` as its own one-character string.
+/// \param values The characters.
+/// \return The strings.
+std::vector<std::string> EachChar(const List<Char> &values);
+
+/// \brief A `List of [Char]` as one string.
+/// \param values The characters.
+/// \return The string.
+std::string TextOfChars(const List<Char> &values);
+
+/// \brief The elements of a `List of [Text]`, contiguously.
+/// \param values The list.
+/// \return The elements.
+std::vector<std::string> EachText(const List<std::string> &values);
+
+/// \brief AL `Text.ToLower`.
+/// \param s The text.
+/// \return It in lower case.
+std::string LowerText(std::string_view s);
+
+/// \brief AL `Text.ToUpper`.
+/// \param s The text.
+/// \return It in upper case.
+std::string UpperText(std::string_view s);
+
+/// \brief AL `Text.Trim`, `Text.TrimStart` and `Text.TrimEnd`.
+/// \param s     The text.
+/// \param sides Which ends to strip.
+/// \param chars The characters to strip; empty means white space.
+/// \return The trimmed text.
+std::string TrimText(std::string_view s, TrimSides sides, std::string_view chars);
 
 /// \brief Raises the platform's own over-length message.
 ///
@@ -134,6 +263,281 @@ public:
   /// \throws StringError when the index is outside the text.
   [[nodiscard]] Char operator[](Integer index) const;
 
+  // WHAT A TEXT CAN DO, from `methods-auto/text/`. `Code` has all of it too, because AL's Code IS a
+  // Text with a normalisation rule. What the documentation lists with an explicit `String`
+  // parameter
+  // -- `StrLen`, `MaxStrLen`, `CopyStr`, `StrSubstNo` -- is a FREE function and lives in Text.h,
+  // Builtins.h and Record.h; a body calls those with no receiver.
+  //
+  // EVERY INDEX HERE IS ONE-BASED AND COUNTED IN UTF-16 UNITS, which is what the pages say and what
+  // `Length()` returns. .NET counts from zero; AL does not, and each page states its own base.
+
+  /// \brief AL `Text.Contains(Text)`.
+  /// \param Value The string to seek.
+  /// \return True when this text holds it.
+  /// \see `text-contains-method.md`
+  [[nodiscard]] Boolean Contains(std::string_view Value) const {
+    return value_.find(Value) != std::string::npos;
+  }
+
+  /// \brief AL `Text.EndsWith(Text)`.
+  /// \param Value The string to match.
+  /// \return True when this text ends with it.
+  /// \see `text-endswith-method.md`
+  [[nodiscard]] Boolean EndsWith(std::string_view Value) const { return value_.ends_with(Value); }
+
+  /// \brief AL `Text.StartsWith(Text)`.
+  /// \param Value The string to match.
+  /// \return True when this text begins with it.
+  /// \see `text-startswith-method.md`
+  [[nodiscard]] Boolean StartsWith(std::string_view Value) const {
+    return value_.starts_with(Value);
+  }
+
+  /// \brief AL `Text.IndexOf(Text)`.
+  /// \param Value The string to seek.
+  /// \return Its one-based position, or 0 when the text does not hold it.
+  /// \see `text-indexof-method.md`
+  [[nodiscard]] Integer IndexOf(std::string_view Value) const {
+    return detail::IndexOfText(value_, Value, 1);
+  }
+
+  /// \brief AL `Text.IndexOf(Text, Integer)`.
+  /// \param Value      The string to seek.
+  /// \param StartIndex The one-based position to start at.
+  /// \return Its one-based position, or 0 when the text does not hold it from there on.
+  /// \see `text-indexof-method.md`
+  [[nodiscard]] Integer IndexOf(std::string_view Value, Integer StartIndex) const {
+    return detail::IndexOfText(value_, Value, StartIndex);
+  }
+
+  /// \brief AL `Text.LastIndexOf(Text)`.
+  /// \param Value The string to seek.
+  /// \return The one-based position of its LAST occurrence, or 0.
+  /// \see `text-lastindexof-method.md`
+  [[nodiscard]] Integer LastIndexOf(std::string_view Value) const {
+    return detail::LastIndexOfText(value_, Value, 0);
+  }
+
+  /// \brief AL `Text.LastIndexOf(Text, Integer)`.
+  /// \param Value      The string to seek.
+  /// \param StartIndex The one-based position the backward search starts from.
+  /// \return The one-based position of the last occurrence at or before it, or 0.
+  /// \see `text-lastindexof-method.md`
+  [[nodiscard]] Integer LastIndexOf(std::string_view Value, Integer StartIndex) const {
+    return detail::LastIndexOfText(value_, Value, StartIndex);
+  }
+
+  /// \brief AL `Text.IndexOfAny(Text)`.
+  /// \param Values The characters to seek, as a string.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-text-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(std::string_view Values) const {
+    return detail::IndexOfAnyText(value_, Values, 1);
+  }
+
+  /// \brief AL `Text.IndexOfAny(Text, Integer)`.
+  /// \param Values     The characters to seek, as a string.
+  /// \param StartIndex The one-based position to start at.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-text-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(std::string_view Values, Integer StartIndex) const {
+    return detail::IndexOfAnyText(value_, Values, StartIndex);
+  }
+
+  /// \brief AL `Text.IndexOfAny(List of [Char])`.
+  /// \param Values The characters to seek.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-list[char]-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(const List<Char> &Values) const {
+    return detail::IndexOfAnyText(value_, detail::TextOfChars(Values), 1);
+  }
+
+  /// \brief AL `Text.IndexOfAny(List of [Char], Integer)`.
+  /// \param Values     The characters to seek.
+  /// \param StartIndex The one-based position to start at.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-list[char]-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(const List<Char> &Values, Integer StartIndex) const {
+    return detail::IndexOfAnyText(value_, detail::TextOfChars(Values), StartIndex);
+  }
+
+  /// \brief AL `Text.PadLeft(Integer)` -- right-aligns by padding with spaces.
+  /// \param Count The length the result is padded to.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padleft-method.md`
+  [[nodiscard]] std::string PadLeft(Integer Count) const {
+    return detail::PadText(value_, Count, detail::PadSide::Left, Char{' '});
+  }
+
+  /// \brief AL `Text.PadLeft(Integer, Char)`.
+  /// \param Count   The length the result is padded to.
+  /// \param Padding The padding character.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padleft-method.md`
+  [[nodiscard]] std::string PadLeft(Integer Count, Char Padding) const {
+    return detail::PadText(value_, Count, detail::PadSide::Left, Padding);
+  }
+
+  /// \brief AL `Text.PadRight(Integer)` -- left-aligns by padding with spaces.
+  /// \param Count The length the result is padded to.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padright-method.md`
+  [[nodiscard]] std::string PadRight(Integer Count) const {
+    return detail::PadText(value_, Count, detail::PadSide::Right, Char{' '});
+  }
+
+  /// \brief AL `Text.PadRight(Integer, Char)`.
+  /// \param Count   The length the result is padded to.
+  /// \param Padding The padding character.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padright-method.md`
+  [[nodiscard]] std::string PadRight(Integer Count, Char Padding) const {
+    return detail::PadText(value_, Count, detail::PadSide::Right, Padding);
+  }
+
+  /// \brief AL `Text.Remove(Integer)` -- everything from a position onwards.
+  /// \param StartIndex The one-based position to begin deleting at.
+  /// \return What is left.
+  /// \see `text-remove-method.md`
+  [[nodiscard]] std::string Remove(Integer StartIndex) const {
+    return detail::RemoveText(value_, StartIndex, std::nullopt);
+  }
+
+  /// \brief AL `Text.Remove(Integer, Integer)`.
+  /// \param StartIndex The one-based position to begin deleting at.
+  /// \param Count      How many characters to delete.
+  /// \return What is left.
+  /// \see `text-remove-method.md`
+  [[nodiscard]] std::string Remove(Integer StartIndex, Integer Count) const {
+    return detail::RemoveText(value_, StartIndex, Count);
+  }
+
+  /// \brief AL `Text.Replace(Text, Text)` -- every occurrence.
+  /// \param OldValue The string to replace.
+  /// \param NewValue What replaces it.
+  /// \return The result.
+  /// \see `text-replace-method.md`
+  [[nodiscard]] std::string Replace(std::string_view OldValue, std::string_view NewValue) const {
+    return detail::ReplaceText(value_, {.from = OldValue, .to = NewValue});
+  }
+
+  /// \brief AL `Text.Substring(Integer)` -- everything from a position onwards.
+  /// \param StartIndex The one-based position the substring starts at.
+  /// \return The substring.
+  /// \see `text-substring-method.md`
+  [[nodiscard]] std::string Substring(Integer StartIndex) const {
+    return detail::SubstringText(value_, StartIndex, std::nullopt);
+  }
+
+  /// \brief AL `Text.Substring(Integer, Integer)`.
+  /// \param StartIndex The one-based position the substring starts at.
+  /// \param Count      How many characters it holds.
+  /// \return The substring.
+  /// \see `text-substring-method.md`
+  /// \note A COUNT PAST THE END IS NOT AN ERROR since application version 27.1, which the page
+  ///       states outright; it yields the rest of the text.
+  [[nodiscard]] std::string Substring(Integer StartIndex, Integer Count) const {
+    return detail::SubstringText(value_, StartIndex, Count);
+  }
+
+  /// \brief AL `Text.Split()` -- at white space.
+  /// \return The pieces, in order.
+  /// \see `text-split-text-method.md`
+  [[nodiscard]] List<std::string> Split() const { return detail::SplitText(value_, {}); }
+
+  /// \brief AL `Text.Split(Text)`.
+  /// \param Separators The separator.
+  /// \return The pieces, in order.
+  /// \see `text-split-text-method.md`
+  [[nodiscard]] List<std::string> Split(std::string_view Separators) const {
+    const std::string one{Separators};
+    return detail::SplitText(value_, std::span<const std::string>{&one, 1});
+  }
+
+  /// \brief AL `Text.Split(List of [Text])`.
+  /// \param Separators The separators.
+  /// \return The pieces, in order.
+  /// \see `text-split-list[text]-method.md`
+  [[nodiscard]] List<std::string> Split(const List<std::string> &Separators) const {
+    return detail::SplitText(value_, detail::EachText(Separators));
+  }
+
+  /// \brief AL `Text.Split(List of [Char])`.
+  /// \param Separators The separators, one character each.
+  /// \return The pieces, in order.
+  /// \see `text-split-list[char]-method.md`
+  [[nodiscard]] List<std::string> Split(const List<Char> &Separators) const {
+    return detail::SplitText(value_, detail::EachChar(Separators));
+  }
+
+  /// \brief AL `Text.ToLower()`.
+  /// \return This text in lower case.
+  /// \see `text-tolower-method.md`
+  /// \warning IT LOWERS ASCII ONLY. The platform lowers by the invariant culture, which covers
+  /// every
+  ///          cased script; anything above 127 is left alone here and is board:0041.
+  [[nodiscard]] std::string ToLower() const { return detail::LowerText(value_); }
+
+  /// \brief AL `Text.ToUpper()`.
+  /// \return This text in upper case.
+  /// \see `text-toupper-method.md`
+  /// \warning IT RAISES ASCII ONLY, for the reason ToLower gives.
+  [[nodiscard]] std::string ToUpper() const { return detail::UpperText(value_); }
+
+  /// \brief AL `Text.Trim()` -- white space off both ends.
+  /// \return The trimmed text.
+  /// \see `text-trim-method.md`
+  [[nodiscard]] std::string Trim() const {
+    return detail::TrimText(value_, detail::TrimSides::Both, {});
+  }
+
+  /// \brief AL `Text.TrimStart()` -- white space off the front.
+  /// \return The trimmed text.
+  /// \see `text-trimstart-method.md`
+  [[nodiscard]] std::string TrimStart() const {
+    return detail::TrimText(value_, detail::TrimSides::Start, {});
+  }
+
+  /// \brief AL `Text.TrimStart(Text)`.
+  /// \param Chars The characters to strip.
+  /// \return The trimmed text.
+  /// \see `text-trimstart-method.md`
+  [[nodiscard]] std::string TrimStart(std::string_view Chars) const {
+    return detail::TrimText(value_, detail::TrimSides::Start, Chars);
+  }
+
+  /// \brief AL `Text.TrimEnd()` -- white space off the back.
+  /// \return The trimmed text.
+  /// \see `text-trimend-method.md`
+  [[nodiscard]] std::string TrimEnd() const {
+    return detail::TrimText(value_, detail::TrimSides::End, {});
+  }
+
+  /// \brief AL `Text.TrimEnd(Text)`.
+  /// \param Chars The characters to strip.
+  /// \return The trimmed text.
+  /// \see `text-trimend-method.md`
+  [[nodiscard]] std::string TrimEnd(std::string_view Chars) const {
+    return detail::TrimText(value_, detail::TrimSides::End, Chars);
+  }
+
+  /// \brief AL `+=` on text -- appends.
+  ///
+  /// \tparam T The other side, which must read as a `std::string_view`.
+  /// \param value The text to append.
+  /// \return This value.
+  ///
+  /// \note THE LENGTH IS CHECKED BY WHOEVER OWNS IT. `StringValue` carries no declared length --
+  ///       `Text<N>` and `Code<N>` do -- so the append goes through the derived type's `Assign`,
+  ///       which is what raises when the result no longer fits.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  StringValue &operator+=(const T &value) {
+    value_ += std::string_view(value);
+    return *this;
+  }
+
   /// \brief Reads as text wherever text is wanted.
   ///
   /// \return The stored text.
@@ -169,6 +573,33 @@ private:
 ///       assigned to -- which is where `Text` and `Code` already check it.
 [[nodiscard]] inline std::string operator+(const StringValue &left, const StringValue &right) {
   return std::string(left.Value()) + std::string(right.Value());
+}
+
+/// \brief AL `+` on text and a literal.
+///
+/// \tparam T The other side, which must read as a `std::string_view`.
+/// \param left  The text.
+/// \param right The literal, or anything else that reads as text.
+/// \return The two joined.
+///
+/// \note AL WRITES `X + '@' + Y` and means text. Without this the literal reaches neither side --
+///       `std::string_view` and `const StringValue &` are both one user-defined conversion away and
+///       neither is chosen.
+template <typename T>
+  requires std::convertible_to<const T &, std::string_view> && (!std::derived_from<T, StringValue>)
+[[nodiscard]] std::string operator+(const StringValue &left, const T &right) {
+  return std::string(left.Value()) + std::string(std::string_view(right));
+}
+
+/// \brief AL `+` on a literal and text.
+/// \tparam T The other side, which must read as a `std::string_view`.
+/// \param left  The literal.
+/// \param right The text.
+/// \return The two joined.
+template <typename T>
+  requires std::convertible_to<const T &, std::string_view> && (!std::derived_from<T, StringValue>)
+[[nodiscard]] std::string operator+(const T &left, const StringValue &right) {
+  return std::string(std::string_view(left)) + std::string(right.Value());
 }
 
 } // namespace agiru

@@ -116,6 +116,15 @@ public:
   /// \throws Error when the field's type has no Variant alternative yet.
   [[nodiscard]] Variant Value() const;
 
+  /// \brief AL `FieldRef.Value(NewValue)` -- the setter, written as a call.
+  ///
+  /// \tparam T What AL handed it.
+  /// \param value The value.
+  ///
+  /// \note AL WRITES A PROPERTY SETTER AS A CALL. `FieldRef.Value(NoSeriesCode)` and
+  ///       `FieldRef.Value := NoSeriesCode` are the same statement, and the BaseApp writes both.
+  template <typename T> void Value(const T &value) { SetValue(std::string_view(value)); }
+
   /// \brief AL `FieldRef.Value := X` -- writes the field from text.
   /// \param text The value, as the column would hold it.
   /// \throws Error when the value does not fit the field.
@@ -256,7 +265,7 @@ public:
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetFilter(std::string_view String, const ::agiru::Variant &Value) const {
+  void SetFilter(std::string_view String, const ::agiru::Variant &Value = {}) const {
     static_cast<void>(String);
     static_cast<void>(Value);
     throw Error("FieldRef.SetFilter(Text, Any) is declared and not implemented yet (board:0035)");
@@ -267,7 +276,8 @@ public:
   /// \param FromValue The AL `Any`.
   /// \param ToValue The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetRange(const ::agiru::Variant &FromValue, const ::agiru::Variant &ToValue) const {
+  void SetRange(const ::agiru::Variant &FromValue = {},
+                const ::agiru::Variant &ToValue = {}) const {
     static_cast<void>(FromValue);
     static_cast<void>(ToValue);
     throw Error("FieldRef.SetRange(Any, Any) is declared and not implemented yet (board:0035)");
@@ -277,7 +287,7 @@ public:
   /// the new value validated by the properties and code that have been defined for that field.
   /// \param NewValue The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Validate(const ::agiru::Variant &NewValue) const {
+  void Validate(const ::agiru::Variant &NewValue = {}) const {
     static_cast<void>(NewValue);
     throw Error("FieldRef.Validate(Any) is declared and not implemented yet (board:0035)");
   }
@@ -303,6 +313,19 @@ class RecordRef {
 public:
   /// \brief A RecordRef pointing at nothing.
   RecordRef() = default;
+
+  /// \brief AL `RecordRef.GetTable(Record)` -- when what AL held was an `Any`.
+  ///
+  /// \param rec The Variant.
+  /// \throws Error always.
+  ///
+  /// \note A VARIANT HOLDS NO RECORD YET, and `Assert.RecordIsEmpty(RecVariant)` hands one over --
+  ///       AL passes a record through an `Any` and the platform unwraps it. Refusing by name is
+  ///       what a Variant that cannot hold a record owes the caller (board:0035).
+  void GetTable(Variant &rec) {
+    static_cast<void>(rec);
+    throw Error("RecordRef.GetTable(Any) needs a Variant that can hold a record (board:0035)");
+  }
 
   /// \brief AL `RecordRef.GetTable(Record)` -- points at an existing record.
   /// \tparam T The generated table class.
@@ -838,7 +861,7 @@ public:
   /// \param ReadIsolation The AL `IsolationLevel`.
   /// \return The AL `IsolationLevel`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::IsolationLevel ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation) {
+  ::agiru::IsolationLevel ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation = {}) {
     static_cast<void>(ReadIsolation);
     throw Error(
         "RecordRef.ReadIsolation(IsolationLevel) is declared and not implemented yet (board:0035)");
@@ -872,7 +895,7 @@ public:
   /// \param Value2 The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Rename(const ::agiru::Variant &Value1, const ::agiru::Variant &Value2) {
+  ::agiru::Boolean Rename(const ::agiru::Variant &Value1, const ::agiru::Variant &Value2 = {}) {
     static_cast<void>(Value1);
     static_cast<void>(Value2);
     throw Error("RecordRef.Rename(Any, Any) is declared and not implemented yet (board:0035)");
@@ -892,7 +915,8 @@ public:
   /// \param NewSecurityFiltering The AL `SecurityFilter`.
   /// \return The AL `SecurityFilter`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::SecurityFilter SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering) {
+  ::agiru::SecurityFilter
+  SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering = {}) {
     static_cast<void>(NewSecurityFiltering);
     throw Error("RecordRef.SecurityFiltering(SecurityFilter) is declared and not implemented yet "
                 "(board:0035)");

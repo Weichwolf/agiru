@@ -13,6 +13,7 @@
 #include "type/RecordId.h"
 #include "type/Time.h"
 
+#include <concepts>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -92,20 +93,20 @@ public:
     requires detail::InVariant<T, Held>::value
   Variant(T value) : held_(std::move(value)) {}
 
-  /// \brief Holds text.
+  /// \brief Holds anything that reads as text.
   ///
+  /// \tparam T The source, which must read as a `std::string_view`.
   /// \param value The text.
   ///
-  /// \note A LITERAL IS NOT ONE OF THE ALTERNATIVES AND AL PASSES ONE CONSTANTLY. `const char[1]`
-  ///       reaches `std::string` by a user-defined conversion, and C++ allows only one on the way
-  ///       to a parameter -- so `Assert.AreEqual(0, X, '')` would not compile without this.
+  /// \note ONE STEP AND NOT TWO. A literal, a `std::string`, a `Text` and a `Code` all reach
+  ///       `std::string_view`, and C++ allows only ONE user-defined conversion on the way to a
+  ///       parameter -- so without this, `Assert.AreEqual(0, X, '')` and every `Any` parameter
+  ///       handed a Code would fail to compile.
   // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
-  Variant(std::string_view value) : held_(std::string(value)) {}
-
-  /// \brief Holds text.
-  /// \param value The text.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
-  Variant(const char *value) : held_(std::string(value)) {}
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view> &&
+             (!detail::InVariant<T, Held>::value)
+  Variant(const T &value) : held_(std::string(std::string_view(value))) {}
 
   /// \brief AL `Variant.IsEmpty()` -- whether nothing was ever assigned.
   /// \return True when the Variant holds no value.

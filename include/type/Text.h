@@ -110,12 +110,15 @@ template <typename T> constexpr Integer MaxStrLen(const T & /*value*/) {
 }
 
 /// \brief AL `StrLen(String)`.
-/// \tparam T A Text or Code.
+///
 /// \param value The string.
 /// \return Its length in UTF-16 code units.
 /// \see `text-strlen-method.md`
-template <typename T> Integer StrLen(const T &value) {
-  return static_cast<Integer>(value.Length());
+/// \note IT TAKES A `string_view` RATHER THAN A `Text`, because AL's argument is a text EXPRESSION:
+///       `StrLen(DelChr(S, '=', ','))` hands it the result of another builtin, which carries no
+///       declared length and is therefore not a `Text<N>`. Text and Code convert to it.
+[[nodiscard]] inline Integer StrLen(std::string_view value) {
+  return static_cast<Integer>(detail::Utf16Length(value));
 }
 
 } // namespace agiru

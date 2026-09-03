@@ -164,6 +164,17 @@ private:
       }
       return leave;
     }
+    // `break` LEAVES THE INNERMOST LOOP and nothing else -- `devenv-al-control-statements.md`
+    // separates it from the Break METHOD of a report, which also ends its trigger.
+    if (AtKeyword("break")) {
+      Advance();
+      return Stmt{.kind = StmtKind::Break,
+                  .expression = {},
+                  .labels = {},
+                  .body = {},
+                  .otherwise = {},
+                  .descending = false};
+    }
     if (AtKeyword("if")) { return ReadIf(); }
     // `asserterror <statement>` -- AL's own try/expect. The statement is expected to raise, the
     // error text lands where GetLastErrorText reads it, and execution carries on with the next

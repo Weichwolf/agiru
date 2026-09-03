@@ -230,10 +230,11 @@ private:
       case al::StmtKind::Exit:
         out = Pad(indent) + "return" +
               (statement.expression.kind == al::ExprKind::Name && statement.expression.text.empty()
-                   ? ""
+                   ? scope_.ExitValue()
                    : " " + Expression(statement.expression, 0)) +
               ";\n";
         break;
+      case al::StmtKind::Break: out = Pad(indent) + "break;\n"; break;
       case al::StmtKind::Expression:
         out = Pad(indent) + Expression(statement.expression, 0) + ";\n";
         break;
@@ -390,7 +391,11 @@ private:
     std::size_t fields = 0;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
-      fields = FieldArguments(callee.children[1].text);
+      // AND ONLY ON A RECORD. `FieldRef.SetRange(NewCode)` is the same method name on a door type,
+      // where the argument is an ordinary value and `NewCode` is a local -- spelling it against the
+      // receiver named a member the FieldRef does not have.
+      fields =
+          scope_.IsRecord(callee.children[0].text) ? FieldArguments(callee.children[1].text) : 0;
       if (fields != 0) { receiver = Expression(callee.children.front(), kPrimaryPrecedence); }
     }
     for (std::size_t i = 1; i < expression.children.size(); ++i) {

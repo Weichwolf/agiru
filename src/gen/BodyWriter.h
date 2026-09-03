@@ -54,6 +54,16 @@ public:
     return {};
   }
 
+  /// \brief What a bare `exit;` returns.
+  ///
+  /// \return The expression to return, empty when the procedure returns nothing.
+  ///
+  /// \note AL `exit;` WITH NO ARGUMENT RETURNS THE NAMED RETURN VALUE, or the type's zero when the
+  ///       procedure declared no name for it. Emitting a bare `return;` from a function that
+  ///       returns something is a compiler error, and it was one in every AL body that leaves early
+  ///       -- which is most of them.
+  [[nodiscard]] virtual std::string ExitValue() const { return {}; }
+
   /// \brief Whether a name is a RECORD variable.
   /// \param variable The AL name.
   /// \return True when it was declared as `Record "X"`.

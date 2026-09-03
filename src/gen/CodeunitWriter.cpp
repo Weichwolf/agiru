@@ -806,6 +806,11 @@ public:
       : unit_(unit), procedure_(procedure), objects_(objects) {}
 
   /// The record variable's table, then the field, then what the field was declared as.
+  [[nodiscard]] std::string ExitValue() const override {
+    if (!procedure_.returnName.empty()) { return " " + Identifier(procedure_.returnName); }
+    return procedure_.returnType.empty() ? std::string{} : std::string(" {}");
+  }
+
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
     const al::VarDecl *declared = Declaration(variable);
     return declared != nullptr && TypeName(declared->type) == "Record";
@@ -894,13 +899,22 @@ public:
     return {};
   }
 
-  /// \note EMPTY UNTIL A VARIABLE'S ENUM CAN BE NAMED. `X::Member` where `X` is an option or enum
-  ///       variable needs the enumeration that declared it, which is an index this writer does not
-  ///       carry yet. Returning nothing emits `X::Member` against a variable, which does not
-  ///       compile -- loud, and at build time, rather than a plausible wrong type.
+  /// \note A VARIABLE'S OWN ENUMERATION, which is the question `X::Member` asks. AL names the
+  ///       VARIABLE and means the type it was declared as -- `Library - Utility` takes a parameter
+  ///       called `Option` declared as an inline `Option Capitalized,...` and its body writes
+  ///       `Option::Capitalized`. An inline option's enumeration is the one the generator named
+  ///       after the object, the procedure and the parameter; a declared one is the enum object.
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
-    static_cast<void>(name);
-    return {};
+    const al::VarDecl *declared = Declaration(name);
+    if (declared == nullptr) { return {}; }
+    const std::string type = TypeName(declared->type);
+    if (type == "Enum" && !declared->subtype.empty()) {
+      const auto found = objects_.enums.find(LowerKey(declared->subtype));
+      if (found != objects_.enums.end()) { return "enums::" + found->second.identifier; }
+      return {};
+    }
+    if (type != "Option" || declared->members.empty()) { return {}; }
+    return OptionNameOf(unit_.name, procedure_.name, *declared, unit_.procedures);
   }
 
 private:

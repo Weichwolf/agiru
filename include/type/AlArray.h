@@ -55,6 +55,22 @@ private:
   std::array<T, N> held_{};
 };
 
+/// \brief AL `ArrayLen(A)` -- how many elements the declaration gave it.
+///
+/// \tparam T The element type.
+/// \tparam N How many.
+/// \param array The array.
+/// \return The count.
+///
+/// \note IT SHADOWS THE DOOR'S REFUSING `ArrayLen(Any)`, and deliberately: the array's own length
+///       is known at translation time, so the answer is a constant rather than a refusal. The
+///       generic one stays for what is genuinely an `Any`.
+template <typename T, std::size_t N>
+[[nodiscard]] constexpr Integer ArrayLen(const AlArray<T, N> &array) {
+  static_cast<void>(array);
+  return AlArray<T, N>::Length();
+}
+
 /// \brief AL `X[i]` -- the element at a ONE-BASED index.
 ///
 /// \tparam Container What is being indexed.

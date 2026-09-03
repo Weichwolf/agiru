@@ -68,8 +68,16 @@ public:
   constexpr explicit Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
   /// \brief Holds an ordinal, declared or not.
+  ///
   /// \param ordinal The zero-based member number.
-  constexpr explicit Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
+  ///
+  /// \note NOT EXPLICIT, AND THE ASSIGNMENT'S NOTE SAYS WHY THE OTHER DIRECTION IS. AL hands an
+  ///       Integer to an option PARAMETER as readily as it assigns one --
+  ///       `GenerateRandomAlphabeticText(Length, 1)` -- and refusing it is a deviation the AL
+  ///       reader has no reason to expect. What stays refused is reading an option AS a member
+  ///       where a named one is wanted, which no constructor offers.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
+  constexpr Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
 
   /// \brief Assigns an ordinal.
   ///

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/Integer.h"
+
 #include <array>
 #include <compare>
 #include <cstdint>
@@ -293,5 +295,35 @@ private:
 
   std::int32_t serial_{0};
 };
+
+/// \brief AL `Date - Date` -- how many days lie between them.
+///
+/// \param left  The later date.
+/// \param right The earlier one.
+/// \return The difference in days, which AL gives as an Integer.
+///
+/// \note AL SUBTRACTS TWO DATES AND GETS A NUMBER, which `date-data-type.md` describes as the
+///       ordinary arithmetic on dates. A closing date is normalised first: the difference between
+///       two days is the same whether either is a close, and keeping the flag would make it one
+///       larger (board:0016).
+[[nodiscard]] constexpr Integer operator-(const Date &left, const Date &right) {
+  return static_cast<Integer>(left.Normal().DaysSinceFirst() - right.Normal().DaysSinceFirst());
+}
+
+/// \brief AL `Date + Integer` -- the day that many days later.
+/// \param left  The date.
+/// \param days  How many days.
+/// \return The date.
+[[nodiscard]] constexpr Date operator+(const Date &left, Integer days) {
+  return Date::FromDaysSinceFirst(left.Normal().DaysSinceFirst() + days);
+}
+
+/// \brief AL `Date - Integer` -- the day that many days earlier.
+/// \param left The date.
+/// \param days How many days.
+/// \return The date.
+[[nodiscard]] constexpr Date operator-(const Date &left, Integer days) {
+  return Date::FromDaysSinceFirst(left.Normal().DaysSinceFirst() - days);
+}
 
 } // namespace agiru
