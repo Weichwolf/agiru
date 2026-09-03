@@ -104,8 +104,26 @@ void MovingTakesTheInstance() {
 
 } // namespace
 
+// A RECORD IS COPIED CONSTANTLY and a table with a `var` block holds an `Instance`, so the handle
+// must be copyable -- and the copy must hold NOTHING, because two AL variables are two instances.
+void ACopyHoldsNothingAndFreesNothing() {
+  Counted::made = 0;
+  Counted::gone = 0;
+  {
+    agiru::Instance<Counted> first;
+    static_cast<void>(*first);
+    CHECK_TRUE("the first handle made one", Counted::made == 1);
+    agiru::Instance<Counted> second(first);
+    CHECK_TRUE("the copy made nothing", Counted::made == 1);
+    static_cast<void>(*second);
+    CHECK_TRUE("and makes its own on first use", Counted::made == 2);
+  }
+  CHECK_TRUE("both are freed exactly once", Counted::gone == 2);
+}
+
 int main() {
   return gate::Run("Instance", [] {
+    ACopyHoldsNothingAndFreesNothing();
     AHandleIsMadeOnFirstUse();
     AnUnusedHandleFreesNothing();
     AHandleConvertsToTheObject();

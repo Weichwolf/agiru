@@ -48,15 +48,26 @@ template <typename T> struct CodeunitTraits;
 ///       whole reason a generated header can forward declare what it holds and the include cycle
 ///       disappears with the containment cycle.
 ///
-/// \warning IT IS NOT COPYABLE. Two codeunit variables in AL are two instances, and a copy that
-///          shared one pointer would free it twice.
+/// \warning A COPY HOLDS NOTHING, AND THAT IS AL'S OWN ANSWER. Two codeunit variables in AL are two
+///          instances, so a copy must not share the pointer -- but it must EXIST, because a RECORD
+///          is copied constantly (`Rec2 := Rec`, every by-value parameter) and a table with a `var`
+///          block holds one of these. AL copies a record's FIELDS; its object variables are the
+///          copy's own and are made on ITS first use. 412 generated tables carry a `Var_Block`, and
+///          a deleted copy constructor made every one of them uncopyable.
 template <typename T> class Instance {
 public:
   /// \brief An instance that has not been made yet.
   Instance() = default;
 
-  Instance(const Instance &) = delete;
-  Instance &operator=(const Instance &) = delete;
+  /// \brief A copy that has made nothing yet.
+  Instance(const Instance &) {}
+
+  /// \brief Lets go of what this one made; the other's instance is not shared.
+  /// \return This handle.
+  Instance &operator=(const Instance &) {
+    Release();
+    return *this;
+  }
 
   /// \brief Takes over another's instance.
   /// \param other The one to take from.
