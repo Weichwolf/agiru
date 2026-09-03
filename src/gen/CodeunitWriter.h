@@ -83,6 +83,12 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                const std::vector<al::ProcedureDecl> &all = {},
                                const std::string &spelled = {});
 
+[[nodiscard]] std::string MemberDeclarations(const std::string &owner,
+                                             const std::vector<al::VarDecl> &variables,
+                                             const std::vector<al::LabelDecl> &labels,
+                                             const std::vector<al::ProcedureDecl> &procedures,
+                                             const Objects &objects);
+
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,

@@ -402,19 +402,36 @@ std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
   return merged;
 }
 
+using TableByName = std::map<std::string, const agiru::al::TableObject *>;
+
+const agiru::al::TableObject *SourceOf(const agiru::al::PageObject &page,
+                                       const TableByName &tables) {
+  const agiru::al::Property *source = agiru::al::Find(page.properties, "SourceTable");
+  if (source == nullptr) { return nullptr; }
+  const auto found = tables.find(agiru::gen::LowerKey(source->text));
+  return found == tables.end() ? nullptr : found->second;
+}
+
 void WritePages(Run &run,
                 const Pages &pages,
                 const agiru::gen::Objects &objects,
-                Gathered &gathered) {
+                Gathered &gathered,
+                const TableByName &tables) {
   if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < pages.objects.size(); ++i) {
     const agiru::gen::PageHeader written =
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
+    const std::filesystem::path header = agiru::gen::PageHeaderPath(pages.objects[i]);
+    Keep(run, Output{.directory = run.output, .relative = header}, written.text);
+    ++run.written;
+    std::filesystem::path body = header;
+    body.replace_extension(".cpp");
     Keep(run,
-         Output{.directory = run.output, .relative = agiru::gen::PageHeaderPath(pages.objects[i])},
-         written.text);
+         Output{.directory = run.output, .relative = body},
+         agiru::gen::WriteSource(
+             pages.objects[i], pages.paths[i], objects, SourceOf(pages.objects[i], tables)));
     ++run.written;
   }
 }
@@ -820,6 +837,8 @@ int Scan(const Job &job) {
   std::size_t written = 0;
   std::size_t changed = 0;
   std::set<std::filesystem::path> kept;
+  std::vector<Tables> held;
+  TableByName everyTable;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -850,15 +869,18 @@ int Scan(const Job &job) {
     IndexCodeunits(run, objects);
     ScanEnums(run, enums, store, index);
     objects.enums = index;
-    Tables parsedTables = IndexTables(run, tables, objects);
+    Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
+    for (const agiru::al::TableObject &table : parsedTables.objects) {
+      everyTable.insert_or_assign(agiru::gen::LowerKey(table.name), &table);
+    }
     Pages parsed = IndexPages(run, pages, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
-    WritePages(run, parsed, objects, gathered);
+    WritePages(run, parsed, objects, gathered, everyTable);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",
                  app.name,

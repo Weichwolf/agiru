@@ -878,6 +878,32 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
          Parameters(procedure, objects, named, owner, hiding, all) + ")";
 }
 
+std::string FallsOffEnd(const al::ProcedureDecl &procedure, const Names &names) {
+  return FallsOff(procedure, names);
+}
+
+std::string MemberDeclarations(const std::string &owner,
+                               const std::vector<al::VarDecl> &variables,
+                               const std::vector<al::LabelDecl> &labels,
+                               const std::vector<al::ProcedureDecl> &procedures,
+                               const Objects &objects) {
+  const std::set<std::string> shadowed = Shadowing(variables, procedures, labels);
+  std::string out;
+  for (const al::VarDecl &declared : variables) {
+    std::string type = TypeOf(declared, objects, OptionName(owner, {}, declared.name));
+    if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
+    const bool handle = HandleMember(declared);
+    out +=
+        "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) + ";\n";
+  }
+  if (!labels.empty() && !out.empty()) { out += "\n"; }
+  for (const al::LabelDecl &label : labels) {
+    out += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
+           Literal(label.text) + "};\n";
+  }
+  return out;
+}
+
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,

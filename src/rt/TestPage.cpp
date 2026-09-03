@@ -1,10 +1,10 @@
-#include "type/TestPage.h"
+#include "runtime/test/TestPage.h"
 
 #include "runtime/Error.h"
+#include "runtime/test/TestAction.h"
+#include "runtime/test/TestField.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
-#include "type/TestAction.h"
-#include "type/TestField.h"
 
 #include <string>
 #include <string_view>

@@ -521,7 +521,9 @@ private:
         out += spelling;
         out += " ";
       }
-      out += Expression(*chain[i - 1], precedence + 1);
+      out += spelling == "." && chain[i - 1]->kind == al::ExprKind::Name
+                 ? Identifier(chain[i - 1]->text)
+                 : Expression(*chain[i - 1], precedence + 1);
       if (calls && i == chain.size() && !asCallee) { out += "()"; }
     }
     if (precedence < outer) { out = "(" + out + ")"; }
@@ -652,6 +654,7 @@ public:
       if (field != nullptr) { return "Rec." + FieldIdentifier(*source_, field->name); }
     }
     if (SameName("Rec", name)) { return "Rec"; }
+    if (SameName("CurrPage", name)) { return "(*this)"; }
     return {};
   }
 
@@ -726,6 +729,78 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
   return WithDoor(out, ObjectKind::Table);
+}
+
+std::string ControlTrigger(std::string_view trigger, std::string_view control) {
+  return Identifier(trigger) + Identifier(control);
+}
+
+namespace {
+
+void ControlBodies(std::string &out,
+                   const std::vector<al::PageControl> &controls,
+                   const std::string &identifier,
+                   const al::PageObject &page,
+                   const al::TableObject *source,
+                   const Objects &objects) {
+  for (const al::PageControl &control : controls) {
+    for (const al::ProcedureDecl &trigger : control.triggers) {
+      const std::string name = ControlTrigger(trigger.name, control.name);
+      const std::string body = WriteStatements(PageNames(page, source), trigger.body, 2);
+      const std::string locals = ProcedureLocals(trigger, objects, page.name, page.procedures);
+      out += "void " + identifier + "::" + name + "() {";
+      if (locals.empty() && body.empty()) {
+        out += "}\n\n";
+        continue;
+      }
+      out += "\n" + locals;
+      if (!locals.empty() && !body.empty()) { out += "\n"; }
+      out += body + "}\n\n";
+    }
+    ControlBodies(out, control.children, identifier, page, source, objects);
+  }
+}
+
+} // namespace
+
+std::string WriteSource(const al::PageObject &page,
+                        const std::string &sourcePath,
+                        const Objects &objects,
+                        const al::TableObject *source) {
+  const std::string identifier = Identifier(page.name);
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#include \"" + identifier + ".h\"\n\n";
+  out += kDoorMarker;
+  out += "\n";
+  out += SourceIncludesOf(page.variables, page.procedures, objects);
+  out += "\nnamespace agiru::app::pages {\n\n";
+  ControlBodies(out, page.layout, identifier, page, source, objects);
+  ControlBodies(out, page.actions, identifier, page, source, objects);
+  for (const al::ProcedureDecl &procedure : page.procedures) {
+    out += ProcedureSignature(procedure,
+                              objects,
+                              page.name,
+                              identifier,
+                              true,
+                              {},
+                              page.procedures,
+                              Identifier(procedure.name)) +
+           " {";
+    const std::string locals = ProcedureLocals(procedure, objects, page.name, page.procedures);
+    const std::string body = WriteStatements(PageNames(page, source), procedure.body, 2) +
+                             FallsOffEnd(procedure, PageNames(page, source));
+    if (locals.empty() && body.empty()) {
+      out += "}\n\n";
+      continue;
+    }
+    out += "\n" + locals;
+    if (!locals.empty() && !body.empty()) { out += "\n"; }
+    out += body + "}\n\n";
+  }
+  out += "} // namespace agiru::app::pages\n";
+  return WithDoor(out, ObjectKind::Page);
 }
 
 } // namespace agiru::gen

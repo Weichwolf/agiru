@@ -2,9 +2,9 @@
 
 #include "runtime/Error.h"
 #include "runtime/Page.h"
+#include "runtime/test/TestAction.h"
+#include "runtime/test/TestField.h"
 #include "type/Boolean.h"
-#include "type/TestAction.h"
-#include "type/TestField.h"
 
 /// \file
 /// \brief AL `TestPage` -- a page driven without a screen.

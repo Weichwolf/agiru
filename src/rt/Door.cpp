@@ -1,6 +1,8 @@
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/test/TestHttpRequestMessage.h"
+#include "runtime/test/TestHttpResponseMessage.h"
 #include "type/BigInteger.h"
 #include "type/BigText.h"
 #include "type/Boolean.h"
@@ -50,8 +52,6 @@
 #include "type/SessionSettings.h"
 #include "type/Stream.h"
 #include "type/TaskScheduler.h"
-#include "type/TestHttpRequestMessage.h"
-#include "type/TestHttpResponseMessage.h"
 #include "type/TextBuilder.h"
 #include "type/TextConst.h"
 #include "type/TextEncoding.h"

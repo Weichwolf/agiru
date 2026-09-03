@@ -98,10 +98,6 @@ constexpr std::array kTypes{
     std::string_view{"TableFilter"},
     std::string_view{"TaskScheduler"},
     std::string_view{"TelemetryScope"},
-    std::string_view{"TestHttpRequestMessage"},
-    std::string_view{"TestHttpResponseMessage"},
-    std::string_view{"TestPage"},
-    std::string_view{"TestPermissions"},
     std::string_view{"Text"},
     std::string_view{"TextBuilder"},
     std::string_view{"TextConst"},
@@ -134,7 +130,7 @@ constexpr std::array kTypes{
 
 constexpr std::array<std::pair<std::string_view, std::string_view>, 27> kElsewhere{{
     {"Temporary", "runtime/Table.h"},
-    {"TestPage", "type/TestPage.h"},
+    {"TestPage", "runtime/test/TestPage.h"},
     {"TempStore", "runtime/Table.h"},
     {"Instance", "runtime/Codeunit.h"},
     {"CodeunitTraits", "runtime/Codeunit.h"},

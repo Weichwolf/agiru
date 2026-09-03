@@ -1,6 +1,7 @@
 #include "PageWriter.h"
 
 #include "Ast.h"
+#include "BodyWriter.h"
 #include "CodeunitWriter.h"
 #include "Door.h"
 #include "EnumWriter.h"
@@ -136,6 +137,15 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
   return out;
 }
 
+void ControlTriggerDeclarations(std::string &out, const std::vector<al::PageControl> &controls) {
+  for (const al::PageControl &control : controls) {
+    for (const al::ProcedureDecl &trigger : control.triggers) {
+      out += "  void " + ControlTrigger(trigger.name, control.name) + "();\n";
+    }
+    ControlTriggerDeclarations(out, control.children);
+  }
+}
+
 std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   const al::Property *source = al::Find(object.properties, "SourceTable");
   if (source == nullptr || source->value.empty()) { return {}; }
@@ -186,6 +196,15 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   const std::string table = SourceTable(object, objects);
   if (!table.empty()) { out += "  " + table + " Rec;\n\n"; }
+
+  const std::string members =
+      MemberDeclarations(object.name, object.variables, object.labels, object.procedures, objects);
+  if (!members.empty()) { out += members + "\n"; }
+
+  std::string triggers;
+  ControlTriggerDeclarations(triggers, object.layout);
+  ControlTriggerDeclarations(triggers, object.actions);
+  if (!triggers.empty()) { out += "\n" + triggers; }
 
   std::string publics;
   std::string locals;
