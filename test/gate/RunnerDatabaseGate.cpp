@@ -8,6 +8,7 @@
 
 using agiru::Connection;
 using agiru::DatabaseError;
+using agiru::DatabaseName;
 using agiru::Error;
 using agiru::PointedAt;
 using agiru::RunnerDatabase;
@@ -19,20 +20,21 @@ namespace {
 // database would look like a test defect for as long as anyone cared to look.
 void TheDsnIsPointedElsewhere() {
   CHECK_TEXT("the URI's database is replaced",
-             PointedAt("postgresql://u:p@h:5433/agiru_master", "agiru_test_0"),
+             PointedAt("postgresql://u:p@h:5433/agiru_master", DatabaseName{"agiru_test_0"}),
              "postgresql://u:p@h:5433/agiru_test_0");
   CHECK_TEXT("and its parameters survive",
-             PointedAt("postgresql://u:p@h:5433/agiru_master?sslmode=require", "agiru_test_0"),
+             PointedAt("postgresql://u:p@h:5433/agiru_master?sslmode=require",
+                       DatabaseName{"agiru_test_0"}),
              "postgresql://u:p@h:5433/agiru_test_0?sslmode=require");
   CHECK_TEXT("the keyword form's database is replaced",
-             PointedAt("host=h port=5433 dbname=agiru_master user=u", "agiru_test_0"),
+             PointedAt("host=h port=5433 dbname=agiru_master user=u", DatabaseName{"agiru_test_0"}),
              "host=h port=5433 dbname=agiru_test_0 user=u");
 
   // AND A STRING THAT NAMES NO DATABASE IS REFUSED. Defaulting to the server's own idea of one
   // would put the runner's writes wherever libpq happened to land.
   bool refused = false;
   try {
-    (void)PointedAt("host=h port=5433 user=u", "agiru_test_0");
+    (void)PointedAt("host=h port=5433 user=u", DatabaseName{"agiru_test_0"});
   } catch (const DatabaseError &) { refused = true; }
   CHECK_TRUE("a string naming no database is refused", refused);
 }
@@ -46,18 +48,18 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
   // there, and PostgreSQL refuses to copy a database ANY session is connected to -- so a template
   // is a database nobody opens, which the master, being the gate's own target, is not.
   {
-    const Connection maintenance(PointedAt(AGIRU_TEST_DSN, "postgres"));
+    const Connection maintenance(PointedAt(AGIRU_TEST_DSN, DatabaseName{"postgres"}));
     maintenance.Run("SET client_min_messages = warning");
     maintenance.Run("DROP DATABASE IF EXISTS agiru_runner_template");
     maintenance.Run("CREATE DATABASE agiru_runner_template");
   }
   {
-    const Connection seed(PointedAt(AGIRU_TEST_DSN, "agiru_runner_template"));
+    const Connection seed(PointedAt(AGIRU_TEST_DSN, DatabaseName{"agiru_runner_template"}));
     seed.Run("CREATE TABLE runner_gate (who text NOT NULL)");
     seed.Run("INSERT INTO runner_gate (who) VALUES ('template')");
   }
 
-  const std::string tpl = PointedAt(AGIRU_TEST_DSN, "agiru_runner_template");
+  const std::string tpl = PointedAt(AGIRU_TEST_DSN, DatabaseName{"agiru_runner_template"});
   {
     const RunnerDatabase runner(tpl, "agiru_runner_gate", true);
     CHECK_TRUE("the runner's dsn is not the template's", runner.Dsn() != tpl);
@@ -95,7 +97,7 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
   }
   forced.Drop();
 
-  const Connection maintenance(PointedAt(AGIRU_TEST_DSN, "postgres"));
+  const Connection maintenance(PointedAt(AGIRU_TEST_DSN, DatabaseName{"postgres"}));
   maintenance.Run("SET client_min_messages = warning");
   maintenance.Run("DROP DATABASE IF EXISTS agiru_runner_template");
 }

@@ -715,15 +715,6 @@ public:
     return FindSet();
   }
 
-  /// \brief AL `Record.FindSet(ForUpdate, UpdateKey)`.
-  /// \param ForUpdate Whether the rows are read for modification.
-  /// \param UpdateKey Whether a key field may be assigned.
-  /// \return True when at least one row matched.
-  Boolean FindSet(Boolean ForUpdate, Boolean UpdateKey) {
-    static_cast<void>(UpdateKey);
-    return FindSet(ForUpdate);
-  }
-
   /// \brief AL `Record.Next()`. Steps to the next row of the open set.
   /// \return 1 when it moved, 0 at the end -- which is what `repeat ... until Next() = 0` reads.
   Integer Next() { return detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1); }

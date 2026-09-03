@@ -3,6 +3,7 @@
 #include "runtime/Database.h"
 
 #include <array>
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -22,7 +23,11 @@ bool IsUri(std::string_view dsn) {
 std::string Quoted(std::string_view name) {
   std::string quoted = "\"";
   for (const char c : name) {
-    if (c == '"') { quoted += "\"\""; } else { quoted += c; }
+    if (c == '"') {
+      quoted += "\"\"";
+    } else {
+      quoted += c;
+    }
   }
   quoted += '"';
   return quoted;
@@ -42,7 +47,8 @@ Split UriDatabase(std::string_view dsn) {
   const std::size_t slash = dsn.find('/', authority);
   if (slash == std::string_view::npos) { Refuse(dsn); }
   const std::size_t end = dsn.find_first_of("?#", slash);
-  return {slash + 1, (end == std::string_view::npos ? dsn.size() : end) - slash - 1};
+  return {.at = slash + 1,
+          .length = (end == std::string_view::npos ? dsn.size() : end) - slash - 1};
 }
 
 Split KeywordDatabase(std::string_view dsn) {
@@ -58,7 +64,7 @@ Split KeywordDatabase(std::string_view dsn) {
     }
     if (dsn.substr(start, stop - start).starts_with("dbname=")) {
       const std::size_t value = start + std::string_view("dbname=").size();
-      return {value, stop - value};
+      return {.at = value, .length = stop - value};
     }
     at = stop;
   }
@@ -71,17 +77,18 @@ Split DatabaseIn(std::string_view dsn) {
 
 }
 
-std::string PointedAt(std::string_view dsn, std::string_view database) {
+std::string PointedAt(std::string_view dsn, DatabaseName database) {
   const Split split = DatabaseIn(dsn);
   std::string pointed(dsn.substr(0, split.at));
-  pointed += database;
+  pointed += database.value;
   pointed += dsn.substr(split.at + split.length);
   return pointed;
 }
 
 RunnerDatabase::RunnerDatabase(const std::string &master, std::string_view name, bool fresh)
-    : maintenance_(PointedAt(master, kMaintenance)), name_(name), dsn_(PointedAt(master, name)),
-      cloned_(false) {
+    : maintenance_(PointedAt(master, DatabaseName{kMaintenance})),
+      name_(name),
+      dsn_(PointedAt(master, DatabaseName{name})) {
   const Split split = DatabaseIn(master);
   const std::string_view templateName = std::string_view(master).substr(split.at, split.length);
   if (templateName.empty()) { Refuse(master); }

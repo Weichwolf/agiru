@@ -1,15 +1,18 @@
-#include "Cursor.h"
-#include "Rows.h"
-#include "Selection.h"
-
+#include "meta/TableDef.h"
+#include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
 
+#include "Cursor.h"
+#include "Selection.h"
+
+#include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
-#include <utility>
+#include <string_view>
 
 namespace agiru::detail {
 
@@ -42,7 +45,8 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
   for (std::size_t i = 0; i < table.fields.size(); ++i) {
     const std::optional<std::string_view> value = cursor.Value(i);
     if (!value.has_value()) {
-      throw Error("the column " + std::string(table.fields[i].name) + " came back null, and an AL "
+      throw Error("the column " + std::string(table.fields[i].name) +
+                  " came back null, and an AL "
                   "field has no null");
     }
     SetFieldText(record, table.fields[i], *value);
@@ -54,8 +58,7 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
   RecordState *state = StateOf(record);
-  Close(state->open);
-  state->open = nullptr;
+  state->open.Forget();
   state->stepped = 0;
   state->positioned = false;
   const Connection &connection = Session::Current().Database();
@@ -67,26 +70,27 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
     return false;
   }
   ReadInto(record, table, open->cursor);
-  state->open = open;
+  state->open.Hold(open);
   state->positioned = true;
   return true;
 }
 
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
   RecordState *state = StateOf(record);
-  if (state->open == nullptr || !state->positioned) { return 0; }
+  OpenCursor *open = state->open.Held();
+  if (open == nullptr || !state->positioned) { return 0; }
   if (steps < 0) {
     throw Error("Record.Next with a negative step needs a scrollable cursor, which this one is not "
                 "(board:0044)");
   }
   const std::int32_t wanted = steps == 0 ? 1 : steps;
   for (std::int32_t taken = 0; taken < wanted; ++taken) {
-    if (!state->open->cursor.Step()) {
+    if (!open->cursor.Step()) {
       state->positioned = false;
       return taken;
     }
   }
-  ReadInto(record, table, state->open->cursor);
+  ReadInto(record, table, open->cursor);
   ++state->stepped;
   return wanted;
 }

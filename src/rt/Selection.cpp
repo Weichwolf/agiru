@@ -1,11 +1,17 @@
 #include "Selection.h"
 
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "runtime/RecordState.h"
+
 #include "Filter.h"
 #include "Where.h"
 
-#include "runtime/Error.h"
-
+#include <cstddef>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace agiru::detail {
 
@@ -14,7 +20,11 @@ namespace {
 std::string Quoted(std::string_view identifier) {
   std::string out = "\"";
   for (const char c : identifier) {
-    if (c == '"') { out += "\"\""; } else { out += c; }
+    if (c == '"') {
+      out += "\"\"";
+    } else {
+      out += c;
+    }
   }
   out += '"';
   return out;
@@ -25,6 +35,30 @@ const FieldDef &FieldOf(const TableDef &table, FieldNo no) {
     if (def.no == no) { return def; }
   }
   throw Error("the table carries no field " + std::to_string(no.Value()));
+}
+
+std::vector<FieldNo> OrderedBy(const RecordState *state, const TableDef &table) {
+  std::vector<FieldNo> named;
+  if (state != nullptr && !state->key.empty()) {
+    named.reserve(state->key.size());
+    for (const SortField &one : state->key) { named.push_back(one.field); }
+    return named;
+  }
+  if (table.keys.empty()) { return named; }
+  named.assign(table.keys[0].fields.begin(), table.keys[0].fields.end());
+  return named;
+}
+
+void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
+  if (state == nullptr) { return; }
+  for (const FieldFilter &filter : state->filters) {
+    const Clause clause =
+        Where(FieldOf(table, filter.field), ParseFilter(filter.text), made.binds.size() + 1);
+    if (clause.sql.empty()) { continue; }
+    if (!made.where.empty()) { made.where += " AND "; }
+    made.where += clause.sql;
+    made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
+  }
 }
 
 }
@@ -44,28 +78,9 @@ std::string Columns(const TableDef &table) {
 
 Selection Select(const RecordState *state, const TableDef &table) {
   Selection made;
-  if (state != nullptr) {
-    for (const FieldFilter &filter : state->filters) {
-      const FieldDef &def = FieldOf(table, filter.field);
-      const Clause clause = Where(def, ParseFilter(filter.text), made.binds.size() + 1);
-      if (clause.sql.empty()) { continue; }
-      if (!made.where.empty()) { made.where += " AND "; }
-      made.where += clause.sql;
-      for (const std::optional<std::string> &bind : clause.binds) { made.binds.push_back(bind); }
-    }
-  }
-  const std::vector<FieldNo> ordered = [&] {
-    if (state != nullptr && !state->key.empty()) {
-      std::vector<FieldNo> named;
-      for (const SortField &one : state->key) { named.push_back(one.field); }
-      return named;
-    }
-    return table.keys.empty() ? std::vector<FieldNo>{}
-                              : std::vector<FieldNo>(table.keys[0].fields.begin(),
-                                                     table.keys[0].fields.end());
-  }();
+  Narrow(made, state, table);
   const bool ascending = state == nullptr || state->ascending;
-  for (const FieldNo no : ordered) {
+  for (const FieldNo no : OrderedBy(state, table)) {
     if (!made.order.empty()) { made.order += ", "; }
     made.order += Quoted(FieldOf(table, no).name);
     if (!ascending) { made.order += " DESC"; }

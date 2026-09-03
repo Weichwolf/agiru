@@ -79,7 +79,16 @@ private:
   std::string maintenance_;
   std::string name_;
   std::string dsn_;
-  bool cloned_;
+  bool cloned_ = false;
+};
+
+/// \brief The name of a database, so it cannot be passed where a connection string belongs.
+///
+/// \note TWO `std::string_view` PARAMETERS ARE ONE TRANSPOSITION AWAY FROM A CONNECTION TO THE
+///       WRONG DATABASE, and nothing downstream would say so -- the run would simply write its rows
+///       somewhere else. The type carries the difference the names alone could not.
+struct DatabaseName {
+  std::string_view value; ///< The database's name.
 };
 
 /// \brief Points a connection string at another database on the same server.
@@ -90,6 +99,6 @@ private:
 ///
 /// \throws DatabaseError When the string names no database at all, since then there is nothing to
 ///         replace and guessing which server was meant is worse than refusing.
-[[nodiscard]] std::string PointedAt(std::string_view dsn, std::string_view database);
+[[nodiscard]] std::string PointedAt(std::string_view dsn, DatabaseName database);
 
 }

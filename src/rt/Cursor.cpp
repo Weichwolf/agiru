@@ -4,7 +4,12 @@
 #include "runtime/Error.h"
 
 #include <atomic>
+#include <cstddef>
+#include <cstdio>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace agiru::detail {
 
@@ -27,7 +32,8 @@ Cursor::Cursor(const Connection &connection,
 Cursor::~Cursor() {
   try {
     connection_->Run("CLOSE " + name_);
-  } catch (const Error &) {
+  } catch (const Error &e) {
+    std::fputs(("agiru: the cursor " + name_ + " stayed open: " + e.what() + "\n").c_str(), stderr);
   }
 }
 

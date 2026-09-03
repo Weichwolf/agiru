@@ -41,6 +41,73 @@ struct OpenCursor;
 /// \param open The cursor, which may be null.
 void Close(OpenCursor *open);
 
+/// \brief The open cursor a record's state owns.
+///
+/// \note A SERVER-SIDE CURSOR AND NOT A RESULT SET. `FindSet` on a table with a hundred million
+///       rows must not put the rows in the session -- SQL Server declares a cursor and BC is
+///       written against that, so this does the same over PostgreSQL. The type is opaque here
+///       because the door may not name libpq: `runtime/Table.h` is parsed by every one of the
+///       generated translation units.
+///
+/// \note A COPY HOLDS NOTHING, which is `Rec2 := Rec` in AL: two record variables are two
+///       positions, and a shared cursor would step both at once. The copy carries the filters and
+///       the key -- which the state around this does copy -- and finds its own set.
+class CursorHandle {
+public:
+  /// \brief No cursor.
+  CursorHandle() = default;
+
+  /// \brief A copy holds no cursor of its own.
+  /// \param o The other, whose cursor is not shared.
+  CursorHandle(const CursorHandle &o) { static_cast<void>(o); }
+
+  /// \brief Takes the other's cursor.
+  /// \param o The other.
+  CursorHandle(CursorHandle &&o) noexcept : open_(o.open_) { o.open_ = nullptr; }
+
+  /// \brief Lets go of this one's cursor; the other's is not shared.
+  /// \param o The other, whose cursor is not shared.
+  /// \return This handle.
+  CursorHandle &operator=(const CursorHandle &o) {
+    if (this != &o) { Forget(); }
+    return *this;
+  }
+
+  /// \brief Takes the other's cursor.
+  /// \param o The other.
+  /// \return This handle.
+  CursorHandle &operator=(CursorHandle &&o) noexcept {
+    if (this != &o) {
+      Forget();
+      open_ = o.open_;
+      o.open_ = nullptr;
+    }
+    return *this;
+  }
+
+  /// \brief Closes the cursor, if one is open.
+  ~CursorHandle() { Forget(); }
+
+  /// \brief Takes ownership of a cursor, closing whatever stood here.
+  /// \param open The cursor.
+  void Hold(OpenCursor *open) {
+    Forget();
+    open_ = open;
+  }
+
+  /// \brief The cursor, or `nullptr`.
+  [[nodiscard]] OpenCursor *Held() const { return open_; }
+
+  /// \brief Closes the cursor, if one is open.
+  void Forget() {
+    Close(open_);
+    open_ = nullptr;
+  }
+
+private:
+  OpenCursor *open_ = nullptr;
+};
+
 struct RecordState {
   std::vector<FieldFilter> filters; ///< AND across fields and groups.
   std::vector<SortField> key;       ///< `SetCurrentKey`; empty means the primary key.
@@ -52,58 +119,12 @@ struct RecordState {
   bool markedOnly = false; ///< `MarkedOnly(true)`.
 
   /// \brief The cursor `FindSet` opened, if one is open.
-  ///
-  /// \note A SERVER-SIDE CURSOR AND NOT A RESULT SET. `FindSet` on a table with a hundred million
-  ///       rows must not put the rows in the session -- SQL Server declares a cursor and BC is
-  ///       written against that, so this does the same over PostgreSQL. The type is opaque here
-  ///       because the door may not name libpq: `runtime/Table.h` is parsed by every one of the
-  ///       generated translation units.
-  OpenCursor *open = nullptr;
+  CursorHandle open;
 
   /// \brief How many rows `Next` has stepped since `FindSet`.
   std::size_t stepped = 0;
 
   bool positioned = false; ///< Whether a `Find` put it anywhere.
-
-  /// \brief A state that has filtered nothing.
-  RecordState() = default;
-
-  /// \brief Copies the filters and the key; the cursor is not shared.
-  /// \param o The other.
-  ///
-  /// \note `Rec2 := Rec` COPIES WHAT THE VARIABLE DECLARES AND NOT WHERE IT STANDS. Two record
-  ///       variables are two positions in AL, and a shared cursor would step both at once -- so the
-  ///       copy carries the filters, the key and the marks, and finds its own set.
-  RecordState(const RecordState &o)
-      : filters(o.filters),
-        key(o.key),
-        ascending(o.ascending),
-        group(o.group),
-        marks(o.marks),
-        markedOnly(o.markedOnly) {}
-
-  /// \brief Copies the filters and the key; the cursor is not shared.
-  /// \param o The other.
-  /// \return This state.
-  RecordState &operator=(const RecordState &o) {
-    if (this != &o) {
-      RecordState copy(o);
-      Close(open);
-      open = nullptr;
-      stepped = 0;
-      positioned = false;
-      filters = std::move(copy.filters);
-      key = std::move(copy.key);
-      ascending = copy.ascending;
-      group = copy.group;
-      marks = std::move(copy.marks);
-      markedOnly = copy.markedOnly;
-    }
-    return *this;
-  }
-
-  /// \brief Closes the cursor, if one is open.
-  ~RecordState() { Close(open); }
 };
 
 /// \brief The record variable's state, owned, copied and freed with the record.
