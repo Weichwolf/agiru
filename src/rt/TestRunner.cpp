@@ -5,6 +5,7 @@
 #include "runtime/Transaction.h"
 
 #include <algorithm>
+#include <mutex>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -43,11 +44,13 @@ TestCatalogue::TestCatalogue(CodeunitId id,
 }
 
 std::vector<const TestCatalogue *> RegisteredTestCodeunits() {
-  std::vector<const TestCatalogue *> all = Registered();
-  std::ranges::sort(all, [](const TestCatalogue *a, const TestCatalogue *b) {
-    return a->Id().Value() < b->Id().Value();
+  static std::once_flag once;
+  std::call_once(once, [] {
+    std::ranges::sort(Registered(), [](const TestCatalogue *a, const TestCatalogue *b) {
+      return a->Id().Value() < b->Id().Value();
+    });
   });
-  return all;
+  return Registered();
 }
 
 TestRun RunRegisteredTests(std::string_view codeunit) {

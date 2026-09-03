@@ -76,6 +76,20 @@ Four consequences, and each has already decided a design here:
 - **Per-session state is counted in bytes.** A record that never filters costs eight (board:0018);
   object metadata is shared `.rodata` and never per-process.
 
+**THERE ARE MANY SERVICE TIERS AND ONE WRITING DATABASE**, and that decides more than it looks like:
+
+- **NOTHING IN A PROCESS IS AUTHORITATIVE.** A number series, a lock, the rowversion, a posting
+  sequence -- shared state lives in the database or it is wrong the moment a second tier starts. A
+  cached ROW is a coherence problem, and BC's own answer is the rowversion plus
+  `SelectLatestVersion`; anything cached across a transaction without that is stale by design.
+  Read-only METADATA is the exception, because it never changes at run time.
+- **WRITES SERIALISE ON ONE PRIMARY**, so what matters is how long a transaction holds a lock, not
+  how fast one tier is. Reads can go to a replica; a write cannot.
+- **MANY CORES, EACH SLOW.** A SaaS tier is wide and not fast, so the shape that wins is many
+  sessions not contending: per-session arenas, `thread_local` for what belongs to one session, and
+  shared structures read-only after startup -- a lazily sorted global is a data race with the answer
+  as the prize, which the catalogue was until it got its `call_once`.
+
 **FAST IS A PER-SESSION NUMBER, not a per-image one.** The image is shared between sessions and an
 ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Three
 things follow:

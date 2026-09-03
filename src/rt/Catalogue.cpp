@@ -4,6 +4,7 @@
 #include "meta/TableDef.h"
 
 #include <algorithm>
+#include <mutex>
 #include <span>
 #include <vector>
 
@@ -16,24 +17,23 @@ std::vector<const TableEntry *> &Entries() {
   return entries;
 }
 
-bool &Sorted() {
-  static bool sorted = false;
-  return sorted;
+std::once_flag &Once() {
+  static std::once_flag once;
+  return once;
 }
 
 void Order() {
-  if (Sorted()) { return; }
-  std::sort(Entries().begin(), Entries().end(), [](const TableEntry *a, const TableEntry *b) {
-    return a->table->id.Value() < b->table->id.Value();
+  std::call_once(Once(), [] {
+    std::sort(Entries().begin(), Entries().end(), [](const TableEntry *a, const TableEntry *b) {
+      return a->table->id.Value() < b->table->id.Value();
+    });
   });
-  Sorted() = true;
 }
 
 } // namespace
 
 void RegisterTableEntry(const TableEntry *entry) {
   Entries().push_back(entry);
-  Sorted() = false;
 }
 
 const TableEntry *FindTable(TableId id) {
