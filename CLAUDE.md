@@ -153,19 +153,17 @@ Where to find what:
 | compiler diagnostic | `diagnostics/` (907) |
 | concepts | `devenv-*.md` at the root |
 
-**The transpiler reads `~/Git/BCApps` on `main`, directly.** No copy, no worktree, no checkout --
-the repository is read where it lies and is never switched by this project. The three trees it
-reads are `src/Layers/W1/BaseApp`, `src/System Application/App` and `src/Business Foundation/App`.
+**The transpiler reads `~/Git/BCApps` on `main`, directly** -- no copy, no worktree, no checkout --
+and `apps.json` names which trees. **What of them is TRANSLATED is `scope.json`**, a whitelist over
+AL namespaces: `Microsoft` whole minus the cloud bridges, `System.*` per sub, and a namespace-less
+file decided by its top-level folder. It is the predecessor's own list, entry for entry, and the
+border cases were the user's (openerp WI-990).
 
-**The demo database is 28.4 and the source is 30.0, and that gap is carried openly.** Measured
-2026-09-01: BCApps carries the BaseApp only on `main`, where it landed on 2026-06-29; every release
-branch from 27.x through 28.x holds ZERO BaseApp `.al` files. The newest public on-prem artefact is
-28.4.53241.0 -- there is no 29.x and no 30.x, and the insider feed refuses without a Collaborate
-account. So no pairing exists. Version 30 ships in a few weeks and closes it; until then the
-mismatch surfaces where it can be judged -- as unmapped columns in the CRONUS load (board:0004) --
-rather than being papered over. How large it is, measured on the central table: `Sales Header`
-carries the SAME 183 fields under 28.4 and 30.0, same numbers, same names; the divergence is in
-procedures, not in the schema.
+**The demo database is 28.4 and the source is 30.0, and that gap is carried openly.** No pairing
+exists: BCApps carries the BaseApp only on `main`, and the newest public on-prem artefact is
+28.4.53241.0. The mismatch surfaces as unmapped columns in the CRONUS load (board:0004) rather than
+being papered over. Measured on the central table, `Sales Header` carries the SAME 183 fields under
+both -- the divergence is in procedures, not in the schema.
 
 **The overload filenames are the key.** Behaviour often hangs off the ARGUMENT rather than the
 method name. The predecessor paid three reverts for this: the SystemId rule lives in
@@ -355,14 +353,12 @@ Principles, not a map: a map goes stale the day a directory moves.
   `apps.json`. The point is not build time but DIRECTION: the linker then enforces what AL declares
   -- the Base Application may not know an extension, only the other way round and only through
   events -- and nothing else in this tree checks that.
-  **The limit, because it decides the design:** a `tableextension` that adds fields cannot be a
-  link-time addition, since a C++ class is closed. BC merges extensions at BUILD time as well (the
-  columns land in the same SQL table), so merging them in the transpiler is faithful -- but it means
-  the app boundary is a BUILD boundary and not a runtime plug-in boundary, and which apps are
-  installed is a transpile-time decision.
-- **An app sees only the door**, never the runtime's internals. That is build time: with `rt` in its
-  `reaches`, every change to an internal runtime header would throw away every generated translation
-  unit in every app.
+  **The limit:** a `tableextension` that adds fields cannot be a link-time addition, since a C++
+  class is closed. BC merges extensions at BUILD time too, so merging them in the transpiler is
+  faithful -- but the app boundary is a BUILD boundary and which apps are installed is a
+  transpile-time decision.
+- **An app sees only the door**, never the runtime's internals: with `rt` in its `reaches`, every
+  change to an internal header would throw away every generated translation unit in every app.
 - **ONE DOOR HEADER PER AL TYPE, named as AL names the type.** `type/Integer.h`, `type/Code.h`,
   `type/Decimal.h` -- the shape the documentation uses for `methods-auto/<type>/`, so a reader who
   knows the AL type knows the file. What two types share and AL has no name for is free to be named
@@ -377,13 +373,15 @@ Principles, not a map: a map goes stale the day a directory moves.
 
 | | |
 |---|---|
-| `make` | `src/` ALONE -- the library, the transpiler, and the client beside them |
+| `make` | strip the comments, then `src/` and the slice |
 | `make apps` | the generated tree, stopping at the FIRST error |
 | `make gap` | the header that blocks the most others, and the diagnostic that stops it |
 | `make tree` | the whole generated tree, and the census of roots `make gap` then reads |
 | `make db` | `compile_commands.json` for clangd and clang-tidy |
-| `make lint` | format, static analysis, the door |
+| `make lint` | format, static analysis, the door (`FULL=1` the tree, `DEEP=1` the full analyser) |
 | `make test` | the fast gate |
+| `make comments` | delete every comment in `src/`; `make` runs it first |
+| `make schema` | how much of the CRONUS dataset the transpiled schema can hold |
 | `make transpile` | the BaseApp through the transpiler into `apps/` |
 | `make provision` | MSSQL container, BC demo `.bak` from the CDN, PostgreSQL master |
 | `make help` | the list |
