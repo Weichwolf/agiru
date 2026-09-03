@@ -74,6 +74,27 @@ rule only for `Find`, which is the shape WI-1136 proved. The other three stay si
 there is a green UT baseline to A/B against -- repeating a twice-rejected activation without one
 measures nothing.
 
+## What thousands of sessions change about it
+
+**THE SNAPSHOT IS PER SESSION AND THE IMAGE IS SHARED, so the snapshot is the number that scales
+wrong.** `FindSet` requests all matching rows in one query -- that is what the page says and what
+separates it from `Find` -- and holding them costs memory per RECORD VARIABLE, in every session at
+once. One session reading a large journal is nothing; a thousand doing it is the per-session budget
+board:0006 measures, spent in one place.
+
+Three things follow, and none is optional at a thousand sessions:
+
+- **A snapshot has a CEILING and the ceiling is a measured number, not a guess.** Past it, `Next`
+  goes back to the database with the last key it read -- keyset paging, not `OFFSET`. The predecessor
+  never closed this either (openerp WI-889, still open there), so it is named here rather than
+  discovered later.
+- **The filters, not the rows, are what `Copy` carries.** A copied record variable must not double
+  the snapshot; it takes the filters and re-reads. That falls out of `StateHandle` copying the state,
+  and the snapshot being cleared on copy rather than duplicated.
+- **A session's connection stays pinned for its transaction** (board:0012), and `FindSet(true)` reads
+  `UPDLOCK`. With one user a missing lock is invisible; with a thousand it is the difference between
+  a posting run and a deadlock.
+
 ## Gate
 
 `RecordNavigationGate` over a fixture table: each filter operator produces the row set AL would;

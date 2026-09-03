@@ -408,6 +408,8 @@ std::string ClassBody(const al::TableObject &table,
          std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
 
+  out += "  detail::StateHandle State_Block;\n\n";
+
   for (const al::FieldDecl &field : table.fields) {
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
            FieldIdentifier(table, field.name) + "{};\n";
@@ -526,6 +528,12 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "              \"the field table is emitted sorted by field number, which is what lets ";
   out += "Field() \"\n";
   out += "              \"binary-search it\");\n";
+  out += "static_assert(offsetof(agiru::app::tables::";
+  out += tableIdentifier;
+  out += ", State_Block) == 0,\n";
+  out += "              \"the record variable's state is the FIRST member, which is how the base ";
+  out += "reaches it \"\n";
+  out += "              \"through the address of the object\");\n";
   out += "static_assert(std::is_standard_layout_v<";
   out += tableIdentifier;
   out += ">,\n";

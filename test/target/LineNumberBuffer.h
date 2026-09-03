@@ -6,6 +6,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -26,6 +27,8 @@ class LineNumberBuffer_Table : public Table<LineNumberBuffer_Table> {
 public:
   static constexpr TableId kId{283};
   static constexpr std::string_view kName{"Line Number Buffer"};
+
+  detail::StateHandle State_Block;
 
   Integer OldLineNumber{};
   Integer NewLineNumber{};
@@ -64,6 +67,9 @@ inline constexpr TableDef kLineNumberBufferTable{
 static_assert(FieldsAreSorted(kLineNumberBufferTable),
               "the field table is emitted sorted by field number, which is what lets Field() "
               "binary-search it");
+static_assert(offsetof(agiru::app::tables::LineNumberBuffer, State_Block) == 0,
+              "the record variable's state is the FIRST member, which is how the base reaches it "
+              "through the address of the object");
 static_assert(std::is_standard_layout_v<LineNumberBuffer>,
               "offsetof over the field table requires standard layout. The base carries NO data, "
               "which is what keeps it so");

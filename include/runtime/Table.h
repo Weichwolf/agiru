@@ -4,6 +4,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "runtime/RecordState.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -435,9 +436,17 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Ascending(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Ascending is declared and not implemented yet (board:0035)");
+  [[nodiscard]] Boolean Ascending() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr || state->ascending;
+  }
+
+  /// \brief AL `Record.Ascending(Value)` -- sets which way the current key runs.
+  /// \param value True for upwards.
+  /// \return The direction it now runs.
+  Boolean Ascending(Boolean value) {
+    State().ascending = value;
+    return value;
   }
 
   /// \brief AL `Record.CalcFields(...)`. Calculates the FlowFields in a record. You specify which
@@ -510,9 +519,10 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CopyFilters(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CopyFilters is declared and not implemented yet (board:0035)");
+  void CopyFilters(const Derived &from) {
+    const detail::RecordState *source =
+        reinterpret_cast<const detail::StateHandle *>(&from)->Peek();
+    State().filters = source == nullptr ? std::vector<detail::FieldFilter>{} : source->filters;
   }
 
   /// \brief AL `Record.CopyLinks(...)`. Copies all the links from a specified record.
@@ -745,9 +755,9 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean HasFilter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.HasFilter is declared and not implemented yet (board:0035)");
+  [[nodiscard]] Boolean HasFilter() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && !state->filters.empty();
   }
 
   /// \brief AL `Record.HasLinks(...)`. Determines whether a record contains any links.
@@ -819,9 +829,17 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean MarkedOnly(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.MarkedOnly is declared and not implemented yet (board:0035)");
+  [[nodiscard]] Boolean MarkedOnly() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && state->markedOnly;
+  }
+
+  /// \brief AL `Record.MarkedOnly(Value)` -- restricts reads to the marked records.
+  /// \param value True to restrict.
+  /// \return What it was set to.
+  Boolean MarkedOnly(Boolean value) {
+    State().markedOnly = value;
+    return value;
   }
 
   /// \brief AL `Record.ModifyAll(...)`. Modifies a field in all records within a range that you
@@ -909,18 +927,12 @@ public:
     throw Error("Record.Rename is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Reset(...)`. Removes all filters, including any special filters set by
-  /// MarkedOnly, changes fields select for loading back to all, sets the read isolation level to
-  /// the default value, and changes the current key to the primary key. Also removes any marks on
-  /// the record and clears any AL variables defined on its table definition.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Reset(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Reset is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.Reset()` -- everything the variable held, gone.
+  ///
+  /// \note IT CLEARS MORE THAN THE FILTERS. `record-reset-method.md` lists the marks, `MarkedOnly`,
+  ///       the load-field selection, the isolation level and the current key -- which goes back to
+  ///       the PRIMARY key and not to whatever `SetCurrentKey` last chose.
+  void Reset() { reinterpret_cast<detail::StateHandle *>(Self())->Forget(); }
 
   /// \brief AL `Record.SecurityFiltering(...)`. Gets or sets how security filters are applied to
   /// the record.
@@ -974,9 +986,11 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetCurrentKey(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetCurrentKey is declared and not implemented yet (board:0035)");
+  template <typename... Fields> Boolean SetCurrentKey(const Fields &...members) {
+    detail::RecordState &state = State();
+    state.key.clear();
+    (state.key.push_back(detail::SortField{.field = NumberOf(&members), .ascending = true}), ...);
+    return detail::KeyMatches(TableTraits<Derived>::kTable, state.key);
   }
 
   /// \brief AL `Record.SetFilter(...)`. Assigns a filter to a field that you specify.
@@ -984,9 +998,9 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetFilter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetFilter is declared and not implemented yet (board:0035)");
+  template <typename Field, typename... Arguments>
+  void SetFilter(const Field &member, std::string_view expression, const Arguments &...arguments) {
+    detail::Narrow(State(), NumberOf(&member), StrSubstNo(expression, arguments...));
   }
 
   /// \brief AL `Record.SetLoadFields(...)`. Sets the fields to be initially loaded when the record
@@ -1028,9 +1042,30 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetRange(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetRange is declared and not implemented yet (board:0035)");
+  template <typename Field> void SetRange(const Field &member) {
+    detail::Narrow(State(), NumberOf(&member), {});
+  }
+
+  /// \brief AL `Record.SetRange(Field, Value)` -- the field must equal that value.
+  /// \tparam Field The field's type.
+  /// \tparam Value What it must equal.
+  /// \param member The field.
+  /// \param value  The value.
+  template <typename Field, typename Value> void SetRange(const Field &member, const Value &value) {
+    detail::Narrow(State(), NumberOf(&member), detail::Literally(AsText(value)));
+  }
+
+  /// \brief AL `Record.SetRange(Field, From, To)` -- the field must lie in that range.
+  /// \tparam Field The field's type.
+  /// \tparam Value The bounds' type.
+  /// \param member The field.
+  /// \param from   The lower bound.
+  /// \param to     The upper bound.
+  template <typename Field, typename Value>
+  void SetRange(const Field &member, const Value &from, const Value &to) {
+    detail::Narrow(State(),
+                   NumberOf(&member),
+                   detail::Literally(AsText(from)) + ".." + detail::Literally(AsText(to)));
   }
 
   /// \brief AL `Record.SetRecFilter(...)`. Sets the values in the current key of the current record
@@ -1220,6 +1255,22 @@ protected:
 
 private:
   [[nodiscard]] void *Self() { return static_cast<Derived *>(this); }
+
+  /// The record variable's own state, made on the first call.
+  ///
+  /// A STANDARD-LAYOUT OBJECT'S ADDRESS IS ITS FIRST MEMBER'S ADDRESS, and the generator emits the
+  /// state handle first and asserts the offset is zero beside every table. So the base reaches it
+  /// without the generated file declaring an accessor -- the language guarantees the cast, and the
+  /// assertion holds the layout it depends on (board:0018).
+  [[nodiscard]] detail::RecordState &State() {
+    return reinterpret_cast<detail::StateHandle *>(Self())->Ensure();
+  }
+
+  /// The state as it stands, or nothing when this record has never filtered.
+  [[nodiscard]] const detail::RecordState *Filtered() const {
+    return reinterpret_cast<const detail::StateHandle *>(static_cast<const Derived *>(this))
+        ->Peek();
+  }
 
   template <typename Key>
   void AssignKey(const TableDef &table, std::size_t position, const Key &value) {

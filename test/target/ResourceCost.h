@@ -6,6 +6,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
@@ -60,6 +61,8 @@ class ResourceCost_Table : public Table<ResourceCost_Table> {
 public:
   static constexpr TableId kId{202};
   static constexpr std::string_view kName{"Resource Cost"};
+
+  detail::StateHandle State_Block;
 
   Option<ResourceCostType> Type{};
   ::agiru::Code<20> Code{};
@@ -132,6 +135,9 @@ inline constexpr TableDef kResourceCostTable{
 static_assert(FieldsAreSorted(kResourceCostTable),
               "the field table is emitted sorted by field number, which is what lets Field() "
               "binary-search it");
+static_assert(offsetof(agiru::app::tables::ResourceCost, State_Block) == 0,
+              "the record variable's state is the FIRST member, which is how the base reaches it "
+              "through the address of the object");
 static_assert(std::is_standard_layout_v<ResourceCost>,
               "offsetof over the field table requires standard layout. The base carries NO data, "
               "which is what keeps it so");

@@ -44,8 +44,9 @@ std::vector<std::string> &DoorTypes() {
   return const_cast<std::vector<std::string> &>(types);
 }
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 31> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 32> kElsewhere{{
     {"Temporary", "runtime/Table.h"},
+    {"StateHandle", "runtime/RecordState.h"},
     {"TestPage", "runtime/test/TestPage.h"},
     {"TempStore", "runtime/Table.h"},
     {"Instance", "runtime/Codeunit.h"},
