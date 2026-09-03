@@ -737,6 +737,8 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(std::string_view variable,
                                            std::string_view member) const override {
+    const al::VarDecl *declared = Declaration(variable);
+    if (declared != nullptr && !NamesAnObject(*declared)) { return AsTheDoorSpellsIt(member); }
     const std::string subtype =
         LowerKey(std::string(variable)) == "rec" ? TableNoOf(unit_) : SubtypeOfRecord(variable);
     if (subtype.empty()) { return std::string(member); }

@@ -54,7 +54,7 @@ std::map<std::string, std::string> &DoorSpellings() {
     if (!std::filesystem::is_directory(root)) {
       throw std::runtime_error("the door has no include/ directory at " + root.string());
     }
-    const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*\()");
+    const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*[({;])");
     for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
       if (entry.path().extension() != ".h") { continue; }
       std::ifstream file(entry.path());
