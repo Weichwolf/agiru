@@ -19,9 +19,25 @@ ERP a normal BC user can work in, not a demonstration that AL can be translated.
 - **The UI is a core expectation and not polish.** BC's user works in pages: role centers with cues,
   Tell Me, card/list/document layout, lookups, drilldowns, confirm dialogs with BC's own wording,
   OnValidate updating live. A deviation from BC's behaviour is a finding that has to be argued for.
-- **The UT suite is the PROOF, not the target.** 2 392 green is how the runtime demonstrates it is
-  right about what it already does. It is the milestone; the reserve is 111 526 tests and the target
-  is the whole application.
+- **The UT suite is the PROOF, not the target.** 2 291 green is how the runtime demonstrates it is
+  right about what it already does. It is phase 1; the whole suite in scope is 39 731 `[Test]`
+  procedures in 1 296 codeunits (measured 2026-09-03), of which the milestone is 5.8 %.
+
+**THE WORK IS THREE PHASES AND THEY ARE IN THIS ORDER.**
+
+1. **The UT suite green: `agiru run-tests` reports 2 291 of 2 291.** 78 codeunits with
+   `Subtype = Test` whose name ends in ` UT`, `-UT` or `.UT`, under `Layers/W1/Tests`. The
+   denominator is counted from the TEXT and never from the parser, so a lost parse cannot shrink it.
+2. **The UI, and the TestPage tests run against it.** htmx: the server holds the state and sends
+   HTML fragments, and a page's layout is already `constexpr` metadata -- so a renderer walks the
+   control tree and there is one source rather than a template beside a model. A `TestPage` drives
+   the page the way a user does: `SetValue` fires the control's `OnValidate`, `Invoke` its
+   `OnAction`, `OpenEdit` runs `OnOpenPage`. **The proof lives under `test/ui/`:** every UT test
+   that uses a `TestPage` is run a SECOND time over the real HTTP surface, and both ways must give
+   the same answer -- same message, same rows, same values. Where they differ the view is wrong and
+   not the test.
+3. **The whole AL test suite.** Then agiru is a multi-user ERP with Business Central's function,
+   rather than a demonstration that AL can be translated.
 
 Scope follows from that rather than from taste. Events and `OnValidate` are not optional -- the
 BaseApp wires hundreds of `[EventSubscriber]`s inside itself, so without dispatch it is missing real
@@ -42,29 +58,22 @@ intrinsic without a portable fallback; no dependency that is not reachable on bo
 that "it is fast on the workstation" is not a measurement of anything but the workstation.
 
 **FAST IS A PER-SESSION NUMBER, not a per-image one.** The image is shared between sessions and an
-ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Two things
-follow, and they are the reason the design looks the way it does rather than a memory argument
-carried over from anywhere:
+ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Three
+things follow:
 
 - **Object metadata is STATIC CONST DATA, emitted by the transpiler, never built at startup.**
-  Field descriptors, table relations, keys, captions -- `constexpr` arrays in `.rodata`,
-  demand-paged, shared between processes, zero startup cost, zero heap. It is the difference
-  between a server that starts in milliseconds and one that spends a second per process assembling
-  9 300 objects it could have been handed. The predecessor built them at run time and paid a
-  gigabyte per process for it.
-- **No allocation on the hot path.** Arena per session, fixed layouts.
-- **Code locality matters** with 9 300 compiled objects: a posting run should walk contiguous pages
-  rather than scatter across the segment (board:0009).
-
-**Dispatch shape is a MEASUREMENT, not a deduction.** An argument that a branch is cheaper than a
-table -- or the reverse -- is worth exactly what it measures on the machine it was measured on.
+  Field descriptors, relations, keys, captions, the `OnValidate` map -- `constexpr` arrays in
+  `.rodata`, demand-paged, shared between processes, zero startup cost, zero heap. The predecessor
+  built them at run time and paid a gigabyte per process.
+- **No allocation on the hot path.** Arena per session, fixed layouts. **Code locality matters**
+  with 9 300 compiled objects (board:0009).
+- **Dispatch shape is a MEASUREMENT, not a deduction.** An argument that a branch beats a table --
+  or the reverse -- is worth what it measures on the machine it measured.
 
 ## Why C++ and not the language this was already attempted in
 
-`~/Git/openerp/` is the same undertaking in Python: 63 k lines of runtime, 3.3 million generated,
-a backlog full of measured reverts, and **97.0 % of the UT subset green (2 234 of 2 303 methods)**.
-It is the fourth reference of this tree and its defeats are days already paid for. Three of them are
-why the language changed:
+`~/Git/openerp/` is the same undertaking in Python, at **2 260 of 2 289 green**. Its defeats are
+days already paid for; three of them are why the language changed:
 
 - **AL is statically typed and Python is not.** An AL `Record` is a set of named fields of fixed
   type; in Python it became a dictionary of descriptors, and every type error surfaced at runtime --
@@ -86,14 +95,11 @@ a dictionary of descriptors, the answer is that the original did it with `conste
 code path -- and the question is which one, not whether. This is the reason a design that reaches
 for dynamism is suspect here rather than merely inelegant.
 
-What IS carried over stands under "The documentation is the specification" and "Every defect is a
-generic gap". Both were measured there and hold here unchanged.
-
-**Do not port the predecessor's session and threading apparatus.** The `ContextVar` conversion, the
-snapshot/restore of event bindings, the rejected fork+CoW with its refcount argument, free-threaded
-CPython -- all of it solves PYTHON problems: the GIL, refcount churn eroding copy-on-write, a
-gigabyte of image per process. None of those exist here. Likewise most of `scripts/analysis/`:
-those thirty tools answer questions a compiler answers earlier.
+**Do not port the predecessor's session and threading apparatus**, nor most of
+`scripts/analysis/`. `ContextVar`, the snapshot/restore of event bindings, the rejected fork+CoW,
+free-threaded CPython -- all of it solves PYTHON problems: the GIL, refcount churn eroding
+copy-on-write, a gigabyte of image per process. None exist here, and those thirty tools answer
+questions a compiler answers earlier.
 
 ## The references
 
@@ -105,41 +111,24 @@ Every question about intended behaviour has three sources, in this order:
 | 2 | **AL source** `~/Git/BCApps/` on `main` | what the BaseApp DOES -- the usage, never the guarantee |
 | 3 | **User documentation** `~/Git/dynamics365smb-docs/` (2 802 MD) | what the user expects -- the functional intent |
 
-Plus `~/Git/openerp/` as a **fourth, measured reference**: the same semantics implemented once,
-with backlog comments on refuted hypotheses. Grep there before deriving any non-trivial semantics
-from scratch.
+### `~/Git/openerp/` IS THE FOURTH REFERENCE AND ITS BOARD IS CONSULTED BEFORE ANYTHING IS BUILT
 
-### `~/Git/openerp/board/` IS A REFERENCE WORK, AND IT IS CONSULTED BEFORE ANYTHING IS BUILT
+The same semantics implemented once, at 2 260 of 2 289 green. Its `board/` is **773 work items, 656
+of them roots, 151 carrying an A/B measurement over the test net, 116 recording a refuted
+hypothesis** -- each one an AL semantic that was got wrong, measured and corrected, with the BaseApp
+call site that exposed it. Written in German, named `<id>_<slug>.md`.
 
-**772 work items, 656 of them roots, 286 closed, 151 carrying an A/B measurement over the test net,
-116 recording a refuted hypothesis.** Each is one AL semantic that was got wrong, measured, and
-corrected -- with the call site in the BaseApp that exposed it, the number of tests it moved, and
-the wrong turns taken on the way. It is written in German; the items are named
-`<id>_<slug>.md` and the id is stable.
+**READ IT BEFORE IMPLEMENTING AN AL SEMANTIC, not after.** `xRec` cost four rounds there (WI-781,
+WI-1078, WI-1137, WI-1156); reading them is minutes. `ls board | grep -i <name>` finds a subject,
+`grep -h "^measured:" board/*` what a fix was worth, `grep -lin WIDERLEGT board/*` what was tried
+and refuted.
 
-**READ IT BEFORE IMPLEMENTING AN AL SEMANTIC, not after.** The rule is the same one CLAUDE.md
-already states about the tree itself -- a refuted hypothesis is the most expensive thing to pursue
-twice -- and this is 772 of them, already paid for. `xRec` cost the predecessor four rounds
-(WI-781, WI-1078, WI-1137, WI-1156) before it was right; reading those four is minutes and rebuilds
-none of it.
-
-| looking for | grep |
-|---|---|
-| a type's or builtin's semantics | `ls board \| grep -i <name>` -- the slug carries the subject |
-| what a fix was worth | `grep -h "^measured:" board/*` -- `GAINED n, LOST m` over the UT net |
-| what was tried and refuted | `grep -lin "WIDERLEGT" board/*` |
-| the shape of a runtime mechanism | the implementation under `openerp/runtime/`, which the item names |
-
-**IT IS A HINT ABOUT WHERE TO LOOK AND WHAT IT COST, NEVER A VERDICT.** The same sentence stands
-above about the predecessor's implementation: it is 97 % green on a subset, so it is also wrong
-somewhere, and where it disagrees with the platform documentation the documentation wins. What it
-IS authoritative about is the QUESTION -- that a semantic has a trap in it at all, and which call
-site in the BaseApp walks into it.
-
-**A defect that shape found there is a defect here until measured otherwise.** Python's dynamism hid
-some of them and caused others; the four `xRec` rounds are the first kind and the whole
-`_al_var_sizes` / frame-inspection apparatus behind `MaxStrLen` is the second -- in C++ the declared
-length lives on the value and none of that machinery exists. So read the FINDING, not the fix.
+**IT IS AUTHORITATIVE ABOUT THE QUESTION AND NEVER ABOUT THE ANSWER** -- that a semantic has a trap
+in it at all, and which call site walks into it. It is 97 % green on a subset, so it is also wrong
+somewhere, and where it disagrees with the platform documentation the documentation wins. Python's
+dynamism hid some defects and caused others: the `xRec` rounds are the first kind, the frame
+inspection behind `MaxStrLen` the second -- in C++ the declared length lives on the value and none
+of that machinery exists. Read the FINDING, not the fix.
 
 **WHERE THEY DISAGREE, THE DOCUMENTATION WINS -- ABOUT GUARANTEES.** Validate order, trigger
 lifecycle, transaction behaviour: the platform documentation is the specification and the source is
@@ -200,17 +189,12 @@ describes, the runtime must do, whether or not a test asks for it.
    to open one file and know how to write the next one.** Every deviation from AL is a place where
    that reader's priors mislead them, which makes it a defect class rather than a matter of taste.
 
-   Three things follow, and they decide arguments that would otherwise be preference:
-   - **Consistency beats cleverness.** If `FieldError(Code)` names the field, then `TestField`,
-     `FieldCaption` and `Validate` name it the same way. An exception is a trap for anyone
-     generalising from one example to the next, which is exactly how such a reader works.
-   - **Where idiomatic C++ can produce the AL shape, it does.** `FieldError(Code)` rather than
-     `FieldError(FieldNumber::Code)`; `Rec.Insert()` rather than `Insert(connection, table, ...)`.
-     The platform half lives in the base class, where AL keeps it too.
-   - **Where it cannot, the deviation is VISIBLE and uniform rather than clever.** `Code != ""`
-     for `Code <> ''` is fine: it reads as itself. A macro or an operator trick that spelled it
-     `<>` would be worse than the deviation -- that is what "without abusing C++" means, and it
-     is the boundary the two rules meet at.
+   Three things follow: **consistency beats cleverness** -- if `FieldError(Code)` names the field,
+   so do `TestField`, `FieldCaption` and `Validate`; **where idiomatic C++ can produce the AL shape
+   it does** -- `FieldError(Code)`, `Rec.Insert()`, the platform half in the base class where AL
+   keeps it; and **where it cannot, the deviation is VISIBLE and uniform rather than clever** --
+   `Code != ""` for `Code <> ''` reads as itself, while a macro that spelled it `<>` would be worse
+   than the deviation.
 2. **A documented behaviour without a gate case is a gap**, even when no AL test touches it.
 3. **The completeness measure is a counter with a baseline** -- documented syntax block against C++
    signature, across all 135 AL types. It does NOT measure whether an existing signature does the
@@ -248,21 +232,29 @@ C++ truths rather than decisions about agiru. They do not move.
 - **The type system over checkers**: `std::span` / `std::string_view` at boundaries,
   `std::expected` where a refusal carries its reason, strong types instead of `int` for anything
   that means something (`TableId`, `FieldNo`, `EntryNo`). AL swaps them silently otherwise.
+- **THE DOOR IS PARSED ONCE PER FILE AND THAT IS THE BUILD'S WHOLE COST.** There is no master
+  include: a generated file names the headers it uses, the way an AL file names its `using`. A
+  header that pulls `<memory>`, `<algorithm>` or `<format>` into the door costs every one of the
+  7 885 generated translation units -- `<memory>` alone was 1.2 s of 3.4 s (measured 2026-09-03).
+  `cmake/Precompiled.h` is the union of the door and sits off every include path, for the one job a
+  union is good for.
 - **`private` is the default**; a wider door justifies itself. A public data member is an invariant
   nobody can hold.
 - **`include/` IS DOCUMENTED AND `src/` IS NOT.** The two halves have different jobs and different
   rules, and neither is a matter of taste:
-  - **`include/agiru/` is the public interface and every public name carries Doxygen** -- `\brief`,
-    `\param`, `\return`, `\throws`, and a `\warning` on anything load-bearing. `make lint` counts
-    what doxygen cannot document and holds it at zero. A public name without a sign on it is the
-    one thing a reader cannot recover from the code.
-  - **`src/` carries no comments.** Code and names speak for themselves; a comment repeating the
-    line beside it is the same statement in two languages and drifts away from it. What is left is
-    a `NOLINT` directive with its reason, and that costs a number in the silent-places baseline.
-  - **Where does the WHY go, then?** Into the door if it is part of the contract -- BC's exact
-    message wording, a rounding rule, a trap somebody will otherwise tidy away. Into the GATE CASE
-    if it is a fact about behaviour: a case states what it claims, and that is prose which cannot
-    drift, because it fails when it stops being true. Into the BOARD if it is a decision.
+  - **`include/` is the public interface and every public name carries Doxygen** -- `\brief`,
+    `\param`, `\return`, `\throws`, and a `\warning` on anything load-bearing. `make lint` holds
+    the undocumented count at zero, and ONLY Doxygen survives there: a `//` comment in the door is
+    deleted like any other.
+  - **`src/` carries no comments, AND `make` DELETES THEM.** Code and names speak for themselves; a
+    comment repeating the line beside it is the same statement in two languages and drifts away from
+    it. `make` runs `test/strip-comments.py` before it builds, so the rule is enforced rather than
+    stated -- every line removed is in the commit that added it. A `NOLINT` line survives, because
+    it is an instruction to clang-tidy and not commentary, and it costs a number in the
+    silent-places baseline.
+  - **Where does the WHY go, then?** Into the door if it is part of the contract; into the GATE
+    CASE if it is a fact about behaviour, because a case's prose cannot drift -- it fails when it
+    stops being true; into the BOARD if it is a decision; into the COMMIT otherwise.
 - **A name is a promise.** A word that means something else in AL spends the reader's knowledge
   against them. The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger, Validate, Filter,
   Key, FlowField, Dimension.
@@ -284,9 +276,8 @@ C++ truths rather than decisions about agiru. They do not move.
 
 ### What the database layer owes AL
 
-Three things about BC's use of SQL are not details and shape `src/db` from the start. They are
-listed here because the generator is about to emit 1 700 tables and each of them is a schema
-decision that is cheap now and a migration later.
+Three things about BC's use of SQL are not details: the generator emits 1 609 tables and each is a
+schema decision that is cheap now and a migration later.
 
 - **Isolation is a state machine per table, not a setting.** A read takes `READUNCOMMITTED` until
   the session writes to that table, then `READCOMMITTED`; `LockTable()` raises it to `UPDLOCK` for
@@ -313,13 +304,9 @@ decision that is cheap now and a migration later.
   and it is recorded as one (board:0015), not defended as a design.
 - **NO MACROS.** One was built here to remove that last repetition and thrown away: it moved the
   cost onto the reader, and this tree's reader is a model that has to know how to write the next
-  table from having read one. A macro list is not that. The same sentence already stands in
-  `.clang-tidy` about a macro that generated types -- it applies here with more force, because
-  these files are the examples everything else is written from.
+  table from having read one.
 - **A GENERATED FILE CARRIES NO COMMENTS**, only a two-line provenance header naming the `.al` it
-  came from. It is `src/` and the `src/` rule holds: quoting the AL above each trigger reads well
-  and carries nothing -- the C++ already reads like the AL, the source is one path away, and 9 300
-  objects' worth of quoted AL is bytes the compiler and the repository pay for. Where the mapping
+  came from, and it INCLUDES ONLY WHAT IT NAMES -- there is no master header. Where the mapping
   needs teaching, the door's Doxygen teaches it and a gate case proves it.
 - **The platform half is in the base class**, where AL keeps it: `Insert`, `Modify`, `Delete`,
   `Get`, `FieldError`, `TestField`, `FieldCaption`. A generated file names no connection, no row,
@@ -376,13 +363,14 @@ Principles, not a map: a map goes stale the day a directory moves.
 - **An app sees only the door**, never the runtime's internals. That is build time: with `rt` in its
   `reaches`, every change to an internal runtime header would throw away every generated translation
   unit in every app.
-- **ONE DOOR HEADER PER AL TYPE, named as AL names the type.** `agiru/Integer.h`, `agiru/Code.h`,
-  `agiru/Decimal.h` -- the same shape the documentation uses for `methods-auto/<type>/`, so a
-  reader who knows the AL type knows the file without being told. What two types share and AL has
-  no name for is free to be named what it is (`StringValue.h`), and a generated file includes only
-  the types it actually uses.
-- **A header is PUBLIC only if a client cannot use the runtime without it.** `include/agiru/` is
-  the door and nothing else stands in it. The door is the AL surface -- what generated code needs.
+- **ONE DOOR HEADER PER AL TYPE, named as AL names the type.** `type/Integer.h`, `type/Code.h`,
+  `type/Decimal.h` -- the shape the documentation uses for `methods-auto/<type>/`, so a reader who
+  knows the AL type knows the file. What two types share and AL has no name for is free to be named
+  what it is (`StringValue.h`). `runtime/` holds the object BASES -- `Table`, `Codeunit`, `Page` --
+  and `runtime/test/` what only a test uses: `TestPage`, `TestField`, `TestAction`,
+  `TestPermissions`.
+- **A header is PUBLIC only if a client cannot use the runtime without it**, and `include/` holds
+  nothing else. **There is no master header**: a generated file includes what it names.
 - **`make` IS THE ONLY WAY IN.** Nothing is started by reaching past it. That CMake and Ninja work
   behind it changes nothing: a door in front of a generator is not a second mechanism, it is the
   door.
@@ -407,37 +395,37 @@ A transpiler that translates four object kinds perfectly translates no BC. Widen
 whole classes of defect at once; polishing what it already emits finds them one at a time and in
 the wrong order. So the sequence is: **more AL goes in -> the tree compiles -> the tree is right.**
 
-- **`make` IS `src/` AND NOTHING ELSE.** The runtime and the transpiler stand on their own, which is
-  what makes the one-second loop possible at all. `make apps` is the generated tree, in its own
-  build directory, and it STOPS AT THE FIRST ERROR -- because every error in `apps/` is one generic
-  gap in `src/`, so the second error is almost always the first one again.
+- **`make` IS `src/` PLUS THE SLICE.** The runtime and the transpiler stand on their own, which is
+  what makes the one-second loop possible. `test/slice` names the generated sources linked into
+  `agiru`, and it is a baseline turned the other way round -- it may only GROW, and `make` is red
+  the day one of them stops compiling. `make apps` is the whole generated tree in its own build
+  directory, stopping AT THE FIRST ERROR, because every error there is one generic gap in `src/`.
 - **`make gap` IS THE LOOP, and it costs one compile.** `make tree` records, per failing header, the
   file its FIRST diagnostic came from -- the root. `make gap` reads that census, ranks the roots by
   how many headers each blocks, and compiles the top one. So a repair is aimed at the root that
   buys the most, and it is confirmed the same way it was found: **a root leaves the census by
   COMPILING, never by being crossed off.** When every root in the census compiles, the census is
   spent and `make tree` writes the next one.
-- **`make lint` IS NOT IN THE LOOP.** It is the gate before a commit, not a step between two
-  edits. Analysis over a tree the transpiler cannot yet fill is analysis of the wrong tree.
+- **`make lint` IS NOT IN THE LOOP.** It is the gate before a commit, not a step between two edits,
+  and it checks only what CHANGED unless `FULL=1` asks for the tree. `FULL=1` is 5 minutes over 82
+  units at the analyser's 50 000-node budget; `DEEP=1` restores clang's own 225 000 and quadruples
+  it. Running `FULL=1` between two edits is the fastest way to get nothing done.
 - **A MEASUREMENT THAT RUNS LONG IS RUN BESIDE THE WORK, never instead of it.** `make tree` is
   minutes on two cores; waiting for it is the one thing that is never the next step.
 
 ### The UT suite is started through the CLI, the way BC starts it through a cmdlet
 
-**`agiru run-tests --suite <name>` IS THE DOOR, and the runner behind it is AL's own.** BC does not
-have a test framework beside the platform: `Run-TestsInBcContainer` calls `Invoke-NavCodeunit`, and
-the work is done by the test-runner codeunits -- `Test Runner` walks the `[Test]` procedures of a
-codeunit with `Subtype = Test`, runs each one in its own isolation, catches what it raises and
-writes the verdict into the test-suite tables. The cmdlet is a door in front of that, and nothing
-more.
-
-So the CLI is that door and NOT a second test framework: it opens the session and the database,
-selects the codeunits the suite names, and hands them to the same runner `apps/test_runner` was
-transpiled from. Which means the runner has to WORK -- `Codeunit.Run` returning false, `ClearLastError`,
-`GetLastErrorText`, an isolation that rolls back -- and those are runtime gaps, not CLI gaps.
+**`agiru run-tests [--suite <name>] [--codeunit <name>] [--list]` IS THE DOOR, and the runner behind
+it is AL's own.** BC has no test framework beside the platform: `Run-TestsInBcContainer` calls
+`Invoke-NavCodeunit`, and the work is done by the test-runner codeunits. So the CLI is that door and
+NOT a second framework -- it opens the session and the database and hands the codeunits to the same
+runner `apps/test_runner` was transpiled from. A **test codeunit is `Subtype = Test`**, which is a
+property of the object and not of the app it sits in; the runtime collects every one of them and
+registers its `[Test]` procedures from its own generated source. `TestRunner` is the OTHER subtype
+and runs test codeunits, so registering one as a test would run its triggers as cases.
 
 **`make test` IS NOT THAT.** It is the C++ gate over `src/`, it runs in seconds, and it proves the
-runtime is right about what it already does. The 2 392 come out of `agiru run-tests`.
+runtime is right about what it already does. The 2 291 come out of `agiru run-tests`.
 
 ## What proves what
 
@@ -467,9 +455,11 @@ finding there has no address. It does NOT fall out of the compiler: `-Wall -Wext
 -Werror` applies to it like everything else, and that is what holds it.
 
 **A tick is earned when its proof stands AND its negative control goes red.** A control that passes
-proves nothing. That is the trap that costs most here -- and one already went green in this tree for
-a good reason, which is why the rule reads: check that the control tests the right thing before
-concluding the gate is blind.
+proves nothing -- check it tests the right thing before concluding the gate is blind.
+
+**A GOLDEN FILE IS NEVER UPDATED FROM THE OUTPUT.** `test/target/` holds what a generated file must
+LOOK like; overwriting it with what the generator produced makes it a file that can never disagree
+again. It is edited by hand, one line at a time, and the change is argued for in the commit.
 
 ## The board
 
@@ -491,14 +481,9 @@ else about the board is legible from the board itself.
 AL source does, what the predecessor made of it and what that cost, which way is taken and why. An
 item that cannot say this is not understood yet, and writing that line is most of the thinking.
 
-**Titles say what WILL BE TRUE.** One in the present tense is a complaint; one in the future is a
-target somebody can aim at.
-
-**Grep the history before filing**: a removal was a decision, and filing the same thing again
-overrules it by accident.
-
-**A defect found while working on something else becomes an item in the same round**, even if it
-closes in that round: the alternative is a defect only one person ever knew about.
+**Titles say what WILL BE TRUE** -- the present tense is a complaint, the future a target somebody
+can aim at. **Grep the history before filing**: a removal was a decision. **A defect found while
+working on something else becomes an item in the same round**, even if it closes in that round.
 
 ## How the work goes
 
@@ -532,13 +517,14 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
 | **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
 | **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
-| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **REWRITE THE FILE. Do not patch it.** This has happened four times in one session, each time after `clang-format` folded a line the anchor spanned, each time silently. Writing the rule down did not stop it; only refusing to patch does. **AND IF A PATCH IS MADE ANYWAY, IT ASSERTS ITS ANCHOR BEFORE WRITING** -- a replacement that finds nothing must ABORT, not write the file unchanged. It happened a fifth time on a NEGATIVE CONTROL, which is worse than on a fix: the control reported green because the subject was never removed, and a green control proves nothing at all |
+| **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **A PATCH ASSERTS ITS ANCHOR BEFORE WRITING** -- one that finds nothing must ABORT, never write the file unchanged. It has happened five times, each after `clang-format` folded a line the anchor spanned, once on a NEGATIVE CONTROL that then reported green because the subject was never removed |
+| **a golden file updated from the output** | the expected file is overwritten with what the generator produced, so it can never disagree again | the target image under `test/target/` is edited BY HAND, one line at a time, and the change is argued for |
 
 ## The environment
 
-Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: a full run over 2.56
-million lines of AL is minutes to hours here. Hence `ccache`, hence `lld`, hence translation time is
-a measured quantity with a board item.
+Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: 7 885 generated sources
+at ~1 s each is over an hour. Hence `ccache`, hence `lld`, hence the door's parse cost is a measured
+quantity and `make lint` has a node budget.
 
 - **libstdc++-14 has no `mdspan` and no `flat_map`** (measured; `__cpp_lib_*` undefined under both
   g++-14 and clang++-19). Present and used: `expected`, `print`, `format`, `ranges::to`.
