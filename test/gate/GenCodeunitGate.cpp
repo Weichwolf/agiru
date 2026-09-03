@@ -42,8 +42,8 @@ agiru::gen::Objects Tables() {
       "line number buffer",
       // THE KIND IS PART OF THE NAME, as it is in the transpiler's own index: 51 objects in the
       // read roots are a table AND a codeunit at once, and `enums::` already told them apart.
-      agiru::gen::TableRef{.identifier = "tables::LineNumberBuffer",
-                           .header = "LineNumberBuffer.h"});
+      agiru::gen::TableRef{
+          .identifier = "tables::LineNumberBuffer", .header = "LineNumberBuffer.h", .fields = {}});
   objects.enums.insert_or_assign(
       "sales line type",
       agiru::gen::EnumRef{.identifier = "SalesLineType", .header = "SalesLineType.h"});

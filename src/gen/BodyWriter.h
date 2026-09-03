@@ -33,11 +33,22 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual std::string EnumObject(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
   [[nodiscard]] virtual std::string ExitValue() const { return {}; }
 
   [[nodiscard]] virtual bool IsRecord(std::string_view variable) const {
     static_cast<void>(variable);
     return false;
+  }
+
+  [[nodiscard]] virtual bool MemberIsCall(std::string_view variable,
+                                          std::string_view member) const {
+    static_cast<void>(member);
+    return MembersAreCalls(variable);
   }
 
   [[nodiscard]] virtual bool MembersAreCalls(std::string_view variable) const {

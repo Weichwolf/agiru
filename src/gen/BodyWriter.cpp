@@ -302,6 +302,8 @@ private:
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+      const std::string named = scope_.EnumObject(base.text);
+      if (!named.empty()) { return named + "::" + EnumeratorName(expression.text); }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) {
@@ -315,7 +317,11 @@ private:
         return "tables::" + Identifier(expression.text) + "::kId.Value()";
       }
     }
-    return Expression(base, kPrimaryPrecedence) + "::" + EnumeratorName(expression.text);
+    const std::string resolved = Expression(base, kPrimaryPrecedence);
+    if (resolved.find("::") == std::string::npos) {
+      return "RefusedOption(\"" + base.text + "::" + expression.text + "\")";
+    }
+    return resolved + "::" + EnumeratorName(expression.text);
   }
 
   static std::size_t FieldArguments(std::string_view method) {
@@ -526,7 +532,10 @@ private:
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
     const bool calls = spelling == "." &&
-                       ((walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
+                       ((walk->kind == al::ExprKind::Name && chain.size() == 1 &&
+                         chain.front()->kind == al::ExprKind::Name &&
+                         scope_.MemberIsCall(walk->text, chain.front()->text)) ||
+                        (walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
                         (walk->kind == al::ExprKind::Call && YieldsADoorType(*walk)));
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
@@ -594,9 +603,20 @@ std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &bod
   return Writer(scope).Statements(body, indent);
 }
 
+std::string NamedEnum(const Objects &objects, std::string_view name) {
+  const auto found = objects.enums.find(LowerKey(std::string(name)));
+  if (found == objects.enums.end()) { return {}; }
+  return "enums::" + Identifier(name);
+}
+
 class TableNames : public Names {
 public:
-  explicit TableNames(const al::TableObject &table) : table_(table) {}
+  TableNames(const al::TableObject &table, const Objects &objects)
+      : table_(table), objects_(objects) {}
+
+  [[nodiscard]] std::string EnumObject(std::string_view name) const override {
+    return NamedEnum(objects_, name);
+  }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     for (const al::VarDecl &declared : table_.variables) {
@@ -641,6 +661,11 @@ public:
     return SameName("Rec", variable) || SameName("xRec", variable);
   }
 
+  [[nodiscard]] bool MemberIsCall(std::string_view variable,
+                                  std::string_view member) const override {
+    return IsRecord(variable) && FieldNamed(table_, member) == nullptr;
+  }
+
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (!IsRecord(field.variable)) { return {}; }
     return Enumeration(field.field);
@@ -648,12 +673,17 @@ public:
 
 private:
   const al::TableObject &table_;
+  const Objects &objects_;
 };
 
 class PageNames : public Names {
 public:
-  PageNames(const al::PageObject &page, const al::TableObject *source)
-      : page_(page), source_(source) {}
+  PageNames(const al::PageObject &page, const al::TableObject *source, const Objects &objects)
+      : page_(page), source_(source), objects_(objects) {}
+
+  [[nodiscard]] std::string EnumObject(std::string_view name) const override {
+    return NamedEnum(objects_, name);
+  }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     for (const al::VarDecl &declared : page_.variables) {
@@ -687,6 +717,11 @@ public:
     return source_ != nullptr && (SameName("Rec", variable) || SameName("xRec", variable));
   }
 
+  [[nodiscard]] bool MemberIsCall(std::string_view variable,
+                                  std::string_view member) const override {
+    return IsRecord(variable) && FieldNamed(*source_, member) == nullptr;
+  }
+
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (!IsRecord(field.variable)) { return {}; }
     return Enumeration(field.field);
@@ -708,6 +743,7 @@ public:
 private:
   const al::PageObject &page_;
   const al::TableObject *source_;
+  const Objects &objects_;
 };
 
 namespace {
@@ -731,7 +767,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
-      const std::string body = WriteStatements(TableNames(table), trigger.body, 2);
+      const std::string body = WriteStatements(TableNames(table, objects), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
       out += ProcedureLocals(trigger, objects, table.name, table.procedures);
       out += BindsBefore(body, identifier);
@@ -749,7 +785,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                               table.procedures,
                               ProcedureIdentifier(table, procedure.name)) +
            " {";
-    const std::string body = WriteStatements(TableNames(table), procedure.body, 2);
+    const std::string body = WriteStatements(TableNames(table, objects), procedure.body, 2);
     const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures) +
                                BindsBefore(body, identifier);
     if (locals.empty() && body.empty()) {
@@ -782,7 +818,7 @@ void ControlBodies(std::string &out,
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
-      const std::string body = WriteStatements(PageNames(page, source), trigger.body, 2);
+      const std::string body = WriteStatements(PageNames(page, source, objects), trigger.body, 2);
       const std::string locals =
           ProcedureLocals(trigger, objects, page.name, page.procedures) +
           (source == nullptr ? std::string{}
@@ -828,8 +864,8 @@ std::string WriteSource(const al::PageObject &page,
                               page.procedures,
                               Identifier(procedure.name)) +
            " {";
-    const std::string body = WriteStatements(PageNames(page, source), procedure.body, 2) +
-                             FallsOffEnd(procedure, PageNames(page, source));
+    const std::string body = WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
+                             FallsOffEnd(procedure, PageNames(page, source, objects));
     const std::string locals =
         ProcedureLocals(procedure, objects, page.name, page.procedures) +
         (source == nullptr ? std::string{}

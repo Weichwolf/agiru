@@ -263,7 +263,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
           agiru::gen::TableRef{.identifier = "interfaces::" + identifier,
                                .header = agiru::gen::OutputDirectory(
                                              object.nameSpace, agiru::gen::ObjectKind::Interface) +
-                                         "/" + identifier + ".h"});
+                                         "/" + identifier + ".h",
+                               .fields = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -395,7 +396,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       objects.pages.insert_or_assign(
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
-                               .header = agiru::gen::PageHeaderPath(object)});
+                               .header = agiru::gen::PageHeaderPath(object),
+                               .fields = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -554,8 +556,13 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
       ++counts.parsed;
       counts.members += table.fields.size();
+      std::set<std::string> fieldNames;
+      for (const agiru::al::FieldDecl &field : table.fields) {
+        fieldNames.insert(agiru::gen::LowerKey(field.name));
+      }
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
-                                     .header = TableHeaderPath(table)};
+                                     .header = TableHeaderPath(table),
+                                     .fields = std::move(fieldNames)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.fieldEnums);
@@ -647,7 +654,8 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
         agiru::gen::TableRef{
             .identifier = "codeunits::" + identifier,
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
-                      "/" + identifier + ".h"});
+                      "/" + identifier + ".h",
+            .fields = {}});
   }
 }
 

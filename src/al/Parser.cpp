@@ -232,6 +232,7 @@ public:
       procedure.returnType = returned.type;
       procedure.returnSubtype = returned.subtype;
       procedure.returned = returned;
+      procedure.returned.name = procedure.returnName;
     }
     if (AtPunctuation(";")) { Advance(); }
     return procedure;
@@ -427,6 +428,7 @@ private:
       procedure.returnType = returned.type;
       procedure.returnSubtype = returned.subtype;
       procedure.returned = returned;
+      procedure.returned.name = procedure.returnName;
     }
     if (AtPunctuation(";")) { Advance(); }
     std::vector<LabelDecl> locals;

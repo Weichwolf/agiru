@@ -724,6 +724,22 @@ public:
            type == "RecordId" || type == "ModuleInfo" || type == "Version";
   }
 
+  [[nodiscard]] bool MemberIsCall(std::string_view variable,
+                                  std::string_view member) const override {
+    if (MembersAreCalls(variable)) { return true; }
+    const std::string subtype =
+        LowerKey(std::string(variable)) == "rec" ? TableNoOf(unit_) : SubtypeOfRecord(variable);
+    if (subtype.empty()) { return false; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
+    return !table->second.fields.contains(LowerKey(std::string(member)));
+  }
+
+  [[nodiscard]] std::string EnumObject(std::string_view name) const override {
+    const auto found = objects_.enums.find(LowerKey(std::string(name)));
+    return found == objects_.enums.end() ? std::string{} : "enums::" + Identifier(name);
+  }
+
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     const std::string subtype = LowerKey(std::string(field.variable)) == "rec"
                                     ? TableNoOf(unit_)
@@ -750,6 +766,9 @@ public:
     }
     for (const al::VarDecl &declared : procedure_.parameters) {
       if (same(declared)) { return &declared; }
+    }
+    if (!procedure_.returnName.empty() && same(procedure_.returned)) {
+      return &procedure_.returned;
     }
     for (const al::VarDecl &declared : unit_.variables) {
       if (same(declared)) { return &declared; }
@@ -1046,7 +1065,7 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
-    const TableRef ref{.identifier = "platform::" + Identifier(name), .header = {}};
+    const TableRef ref{.identifier = "platform::" + Identifier(name), .header = {}, .fields = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
