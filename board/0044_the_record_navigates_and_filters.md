@@ -84,10 +84,14 @@ board:0006 measures, spent in one place.
 
 Three things follow, and none is optional at a thousand sessions:
 
-- **A snapshot has a CEILING and the ceiling is a measured number, not a guess.** Past it, `Next`
-  goes back to the database with the last key it read -- keyset paging, not `OFFSET`. The predecessor
-  never closed this either (openerp WI-889, still open there), so it is named here rather than
-  discovered later.
+- **IT IS A CURSOR AND NOT A SNAPSHOT.** SQL Server gives BC a server-side cursor and PostgreSQL has
+  the same thing: `DECLARE <name> CURSOR FOR SELECT ... ORDER BY ...` and `FETCH FORWARD n`. A
+  session then costs the fetch buffer rather than the result set, the position lives in the server,
+  and `Next` past the buffer fetches the next block instead of re-querying. A cursor lives inside a
+  transaction, which is where a session already is -- board:0012 pins the connection for exactly
+  that. `WITH HOLD` is what carries one across a commit, and it costs a materialisation, so it is
+  taken only where AL's own behaviour needs it. The predecessor never closed this (openerp WI-889,
+  still open there) because Python had no equivalent to reach for.
 - **The filters, not the rows, are what `Copy` carries.** A copied record variable must not double
   the snapshot; it takes the filters and re-reads. That falls out of `StateHandle` copying the state,
   and the snapshot being cleared on copy rather than duplicated.

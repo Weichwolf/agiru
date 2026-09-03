@@ -268,8 +268,19 @@ private:
     if (SameName(base, "Codeunit")) { return "codeunits"; }
     if (SameName(base, "Page")) { return "pages"; }
     if (SameName(base, "Table")) { return "tables"; }
+    if (SameName(base, "Report")) { return "reports"; }
+    if (SameName(base, "Query")) { return "queries"; }
+    if (SameName(base, "XmlPort")) { return "xmlports"; }
     if (SameName(base, "Enum")) { return "enums"; }
     if (SameName(base, "Interface")) { return "interfaces"; }
+    return {};
+  }
+
+  static std::string_view NumberedKind(std::string_view space) {
+    if (space == "codeunits" || space == "pages" || space == "reports" || space == "queries" ||
+        space == "xmlports") {
+      return space;
+    }
     return {};
   }
 
@@ -291,7 +302,10 @@ private:
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
-      if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
+      if (!kind.empty()) {
+        const std::string named = std::string(kind) + "::" + Identifier(expression.text);
+        return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
+      }
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
         return "::agiru::" + TypeName(base.text) + "::" + EnumeratorName(expression.text);
       }
