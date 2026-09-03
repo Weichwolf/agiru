@@ -713,6 +713,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::Trigger &trigger : field.triggers) {
       const std::string body = WriteStatements(TableNames(table), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
+      out += ProcedureLocals(trigger, objects, table.name, table.procedures);
       out += BindsBefore(body, identifier);
       out += body;
       out += "}\n\n";

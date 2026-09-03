@@ -815,6 +815,11 @@ private:
         trigger.name = ExpectName();
         Expect("(");
         Expect(")");
+        if (AtKeyword("var")) {
+          Advance();
+          std::vector<LabelDecl> labels;
+          ParseVarsInto(labels, trigger.variables);
+        }
         trigger.tokens = SkipBeginEnd();
         trigger.body = ParseStatements(trigger.tokens);
         field.triggers.push_back(std::move(trigger));

@@ -15,22 +15,6 @@ struct Property {
   std::string text;
 };
 
-struct Trigger {
-  std::string name;
-  std::vector<Token> tokens;
-  std::vector<Stmt> body;
-};
-
-struct FieldDecl {
-  int number = 0;
-  std::string name;
-  std::string type;
-  std::string subtype;
-  int length = 0;
-  std::vector<Property> properties;
-  std::vector<Trigger> triggers;
-};
-
 struct KeyDecl {
   std::string name;
   std::vector<std::string> fields;
@@ -70,6 +54,18 @@ struct ProcedureDecl {
   VarDecl returned;
   std::vector<Token> tokens;
   std::vector<Stmt> body;
+};
+
+using Trigger = ProcedureDecl;
+
+struct FieldDecl {
+  int number = 0;
+  std::string name;
+  std::string type;
+  std::string subtype;
+  int length = 0;
+  std::vector<Property> properties;
+  std::vector<ProcedureDecl> triggers;
 };
 
 struct CodeunitObject {
