@@ -546,6 +546,23 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "template <> struct agiru::TableTraits<agiru::app::tables::" + tableIdentifier + "> {\n";
   out += "  static constexpr const TableDef &kTable = agiru::app::tables::k" + tableIdentifier +
          "Table;\n";
+  std::string validators;
+  for (const al::FieldDecl &field : table.fields) {
+    for (const al::Trigger &trigger : field.triggers) {
+      if (LowerKey(trigger.name) != "onvalidate") { continue; }
+      validators += "      {agiru::app::tables::" + tableIdentifier +
+                    "::Field_No::" + FieldIdentifier(table, field.name) +
+                    ", [](agiru::app::tables::" + tableIdentifier +
+                    " &record) { record.OnValidate" + FieldIdentifier(table, field.name) +
+                    "(); }},\n";
+    }
+  }
+  if (!validators.empty()) {
+    out +=
+        "  static constexpr std::array<agiru::OnValidateOf<agiru::app::tables::" + tableIdentifier +
+        ">, " + std::to_string(std::count(validators.begin(), validators.end(), '\n')) +
+        "> kOnValidate{{\n" + validators + "  }};\n";
+  }
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;

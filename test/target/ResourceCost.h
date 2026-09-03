@@ -142,4 +142,11 @@ static_assert(kResourceCostFields.size() == 6 + kSystemFieldCount,
 
 template <> struct agiru::TableTraits<agiru::app::tables::ResourceCost> {
   static constexpr const TableDef &kTable = agiru::app::tables::kResourceCostTable;
+  static constexpr std::array<agiru::OnValidateOf<agiru::app::tables::ResourceCost>, 2> kOnValidate{
+      {
+          {agiru::app::tables::ResourceCost::Field_No::Code,
+           [](agiru::app::tables::ResourceCost &record) { record.OnValidateCode(); }},
+          {agiru::app::tables::ResourceCost::Field_No::CostType,
+           [](agiru::app::tables::ResourceCost &record) { record.OnValidateCostType(); }},
+      }};
 };

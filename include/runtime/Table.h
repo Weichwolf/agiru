@@ -29,6 +29,18 @@ namespace agiru {
 /// \tparam T The generated table class.
 template <typename T> struct TableTraits;
 
+/// \brief One field's `OnValidate` trigger, as the generator emits it beside its table.
+///
+/// \tparam T The generated table class.
+///
+/// \note IT IS A FUNCTION POINTER AND NOT A MEMBER POINTER, because a lambda over the record reads
+///       as what it does and needs no member-pointer syntax at the call site. The array is
+///       `constexpr` and lands in `.rodata` like every other piece of object metadata.
+template <typename T> struct OnValidateOf {
+  FieldNo field;    ///< The field the trigger belongs to.
+  void (*run)(T &); ///< What calls it.
+};
+
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
 
@@ -82,6 +94,19 @@ public:
 /// \param record The record.
 /// \param table  Its declaration.
 /// \throws DatabaseError when the row cannot be written.
+/// \brief Holds a field's `TableRelation` against the table it points at.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field just assigned.
+/// \throws Error when the value names no row of the related table.
+///
+/// \note IT RUNS BEFORE THE TRIGGER, which is the documented order and not a choice: a field whose
+///       `OnValidate` raises on its own would otherwise never let the relation message appear.
+/// \warning THE RELATION IS NOT IN THE METADATA YET, so this is a no-op with a name rather than a
+///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
+void CheckRelation(const void *record, const TableDef &table, FieldNo no);
+
 void RuntimeInsert(void *record, const TableDef &table);
 
 /// \brief Overwrites the row this record's primary key selects.
@@ -1072,14 +1097,55 @@ public:
     throw Error("Record.Truncate is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Validate(...)`. Calls the OnValidate trigger for the field that you specify.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Validate(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Validate is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.Validate(Field, Value)` -- assigns, then runs the field's `OnValidate`.
+  ///
+  /// \tparam Field The field's type.
+  /// \tparam Value What is assigned, which need not be the field's type: AL hands a `Text` to a
+  ///               `Code` field and the assignment converts, the same as a plain one would.
+  /// \param member The field itself, the way AL names it: `Rec.Validate(Code, X)`.
+  /// \param value  What to assign.
+  /// \throws Error whatever the relation check or the trigger raises.
+  ///
+  /// \note THE ORDER IS THE PLATFORM'S AND IT WAS MEASURED. The relation check runs BEFORE the
+  ///       trigger: `Service Item Line."Variant Code"` has an `OnValidate` that raises outright
+  ///       once
+  ///       `"Service Item No."` is set, and BC's own test expects the RELATION message for a
+  ///       blocked variant on exactly such a line -- with the trigger first its error wins and the
+  ///       relation message can never appear (openerp WI, `test_validate_relation_before_trigger`).
+  /// \note IT IS ATOMIC ON THE RECORD. If the relation check or the trigger raises, the assigned
+  ///       field and every side effect of the trigger are rolled back to the state before the
+  ///       assignment -- BC's `WorkflowStepArgument "Custom Link"` test asserts `TestField` on the
+  ///       blank right after an `asserterror Validate(...)`.
+  /// \warning `MinValue`, `MaxValue` and `NotBlank` are INPUT bounds and are NOT checked here. The
+  ///          client refuses a value outside them before it takes it; a programmatic `Validate`
+  ///          does not (openerp WI, "MinValue/MaxValue sind Eingabe-Grenzen").
+  template <typename Field, typename Value> void Validate(Field &member, const Value &value) {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    const Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before);
+    member = value;
+    try {
+      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      RunOnValidate(no);
+    } catch (...) {
+      static_cast<Derived &>(*this) = before;
+      throw;
+    }
+  }
+
+  /// \brief AL `Record.Validate(Field)` -- runs the `OnValidate` without assigning.
+  ///
+  /// \tparam Field The field's type.
+  /// \param member The field.
+  /// \throws Error whatever the relation check or the trigger raises.
+  /// \note NOTHING IS ROLLED BACK, because nothing was assigned: AL's no-value form re-runs the
+  ///       trigger over the value the field already holds.
+  template <typename Field> void Validate(Field &member) {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    const Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before);
+    detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+    RunOnValidate(no);
   }
 
   /// \brief AL `Record.WritePermission(...)`. Determines whether a user can write to a table. This
@@ -1097,6 +1163,21 @@ public:
 
 private:
   friend Derived;
+
+  /// Runs the `OnValidate` trigger of one field, when the table declares one.
+  ///
+  /// WHICH TRIGGERS A TABLE HAS IS STATIC DATA, emitted beside the table as a sorted array of
+  /// {field number, thunk}. A table that declares none compiles to nothing at all here.
+  void RunOnValidate(::agiru::FieldNo no) {
+    if constexpr (requires { TableTraits<Derived>::kOnValidate; }) {
+      for (const auto &[field, run] : TableTraits<Derived>::kOnValidate) {
+        if (field == no) {
+          run(static_cast<Derived &>(*this));
+          return;
+        }
+      }
+    }
+  }
 
   /// The AL field number of a member of this record, found by where it sits.
   [[nodiscard]] ::agiru::FieldNo NumberOf(const void *member) const {

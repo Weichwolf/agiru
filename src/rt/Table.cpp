@@ -273,6 +273,12 @@ std::vector<const void *> &BeforeStack() {
 }
 } // namespace
 
+void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
+  static_cast<void>(record);
+  static_cast<void>(table);
+  static_cast<void>(no);
+}
+
 void PushBefore(const void *record) {
   BeforeStack().push_back(record);
 }
