@@ -531,12 +531,12 @@ private:
     }
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
-    const bool calls = spelling == "." &&
-                       ((walk->kind == al::ExprKind::Name && chain.size() == 1 &&
-                         chain.front()->kind == al::ExprKind::Name &&
-                         scope_.MemberIsCall(walk->text, chain.front()->text)) ||
-                        (walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
-                        (walk->kind == al::ExprKind::Call && YieldsADoorType(*walk)));
+    const bool calls =
+        spelling == "." &&
+        ((walk->kind == al::ExprKind::Name && chain.front()->kind == al::ExprKind::Name &&
+          scope_.MemberIsCall(walk->text, chain.front()->text)) ||
+         (walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
+         (walk->kind == al::ExprKind::Call && YieldsADoorType(*walk)));
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
       if (spelling == ".") {

@@ -18,4 +18,6 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] bool DoorDeclares(std::string_view name);
 
+[[nodiscard]] bool DoorCalls(std::string_view name);
+
 }

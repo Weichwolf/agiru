@@ -47,11 +47,17 @@ std::vector<std::string> &DoorTypes() {
   return const_cast<std::vector<std::string> &>(types);
 }
 
+std::set<std::string> &Callables() {
+  static std::set<std::string> callable;
+  return callable;
+}
+
 void NoteSpellings(const std::string &line, std::map<std::string, std::string> &found) {
   static const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*[({;])");
   if (line.starts_with("//")) { return; }
   for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
     const std::string name = (*it)[1].str();
+    if ((*it)[0].str().back() == '(') { Callables().insert(name); }
     std::string key;
     for (const char c : name) {
       key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -196,6 +202,11 @@ bool DoorDeclares(std::string_view name) {
     key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
   return DoorSpellings().contains(key);
+}
+
+bool DoorCalls(std::string_view name) {
+  const std::string spelled = AsTheDoorSpellsIt(name);
+  return Callables().contains(spelled);
 }
 
 std::string AsTheDoorSpellsIt(std::string_view name) {

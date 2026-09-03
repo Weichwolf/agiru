@@ -729,6 +729,8 @@ public:
     if (MembersAreCalls(variable)) { return true; }
     const std::string subtype =
         LowerKey(std::string(variable)) == "rec" ? TableNoOf(unit_) : SubtypeOfRecord(variable);
+    const al::VarDecl *held = Declaration(variable);
+    if (held != nullptr && !NamesAnObject(*held)) { return DoorCalls(member); }
     if (subtype.empty() || !DoorDeclares(member)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
