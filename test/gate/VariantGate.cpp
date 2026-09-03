@@ -3,6 +3,7 @@
 #include "type/BigInteger.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
+#include "type/Decimal.h"
 #include "type/Duration.h"
 #include "type/Integer.h"
 #include "type/Time.h"
@@ -110,6 +111,36 @@ void TheDurationAlgebraIsTheDocumentedOne() {
   CHECK_TRUE("and adding it moves backwards", end + (start - end) == start);
 }
 
+bool Raises(const auto &what) {
+  try {
+    what();
+  } catch (const Error &) { return true; }
+  return false;
+}
+
+// `devenv-al-type-conversion-expressions.md`: "a decimal is more general than an integer, which is
+// more general than a char", and the system converts up when it must.
+void ALessGeneralNumberReadsAsAMoreGeneralOne() {
+  const Variant whole{agiru::Integer{7}};
+  const agiru::Decimal widened = whole;
+  CHECK_TRUE("an Integer reads as a Decimal", widened == agiru::Decimal{7});
+  const agiru::BigInteger wide = whole;
+  CHECK_TRUE("an Integer reads as a BigInteger", wide == agiru::BigInteger{7});
+  const Variant big{agiru::BigInteger{7}};
+  const agiru::Decimal fromBig = big;
+  CHECK_TRUE("a BigInteger reads as a Decimal", fromBig == agiru::Decimal{7});
+  // THE WAY DOWN IS NOT A CONVERSION, it is `Round`, and reading a Decimal as an Integer would
+  // decide a rounding rule the caller never asked for.
+  CHECK_TRUE("a Decimal does not read as an Integer", Raises([] {
+               const Variant fraction{agiru::Decimal{7}};
+               return static_cast<agiru::Integer>(fraction);
+             }));
+  CHECK_TRUE("and a Boolean is not a number at all", Raises([] {
+               const Variant flag{true};
+               return static_cast<agiru::Integer>(flag);
+             }));
+}
+
 } // namespace
 
 int main() {
@@ -121,5 +152,6 @@ int main() {
     TwoVariantsCompareByTypeAndValue();
     ADurationIsNotABigInteger();
     TheDurationAlgebraIsTheDocumentedOne();
+    ALessGeneralNumberReadsAsAMoreGeneralOne();
   });
 }

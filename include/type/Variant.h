@@ -633,8 +633,27 @@ public:
     requires detail::InVariant<T, Held>::value
   operator T() const {
     const T *value = std::get_if<T>(&held_);
-    if (value == nullptr) { Refuse(); }
-    return *value;
+    if (value != nullptr) { return *value; }
+    // A LESS GENERAL NUMBER CONVERTS TO A MORE GENERAL ONE, and that is AL's own rule rather than a
+    // convenience: `devenv-al-type-conversion-expressions.md` ranks the numeric types from most to
+    // least general -- "a decimal is more general than an integer, which is more general than a
+    // char" -- and the platform converts on the way up. `Assert.AreEqual(0, X, '')` puts an Integer
+    // in the Any and hands it to `EqualNumbers(Decimal, Decimal)`; refusing that is refusing AL.
+    // The way DOWN is not here and must not be: Decimal to Integer is what `Round` is for.
+    if constexpr (std::is_same_v<T, Decimal>) {
+      if (const Integer *narrow = std::get_if<Integer>(&held_); narrow != nullptr) {
+        return Decimal{*narrow};
+      }
+      if (const BigInteger *wide = std::get_if<BigInteger>(&held_); wide != nullptr) {
+        return Decimal{*wide};
+      }
+    }
+    if constexpr (std::is_same_v<T, BigInteger>) {
+      if (const Integer *narrow = std::get_if<Integer>(&held_); narrow != nullptr) {
+        return BigInteger{*narrow};
+      }
+    }
+    Refuse();
   }
 
   /// \brief Compares two Variants.
