@@ -15,7 +15,8 @@ ERP a normal BC user can work in, not a demonstration that AL can be translated.
 - **EVERY AL OBJECT KIND IS TRANSPILED AND REPRESENTED IN THE RUNTIME.** All twelve, no exceptions:
   Table, Codeunit, Enum, Page, Report, Query, XmlPort, Interface, PermissionSet, Profile,
   ControlAddIn, Entitlement -- and their extensions. A kind with no generator is a HOLE with a
-  count, never a decision (board:0034, board:0033).
+  count, never a decision (board:0034, board:0033), and the transpiler PRINTS that count on every
+  run: 1 508 objects in scope today, 668 of them reports.
 - **The UI is a core expectation and not polish.** BC's user works in pages: role centers with cues,
   Tell Me, card/list/document layout, lookups, drilldowns, confirm dialogs with BC's own wording,
   OnValidate updating live. A deviation from BC's behaviour is a finding that has to be argued for.
@@ -112,7 +113,8 @@ call site that exposed it. Written in German, named `<id>_<slug>.md`.
 **READ IT BEFORE IMPLEMENTING AN AL SEMANTIC, not after.** `xRec` cost four rounds there (WI-781,
 WI-1078, WI-1137, WI-1156); reading them is minutes. `ls board | grep -i <name>` finds a subject,
 `grep -h "^measured:" board/*` what a fix was worth, `grep -lin WIDERLEGT board/*` what was tried
-and refuted.
+and refuted. **The `al-semantics` agent does exactly this pass** -- documentation, AL source and the
+board together -- and hands back the order, the traps with their item numbers and the C++ shape.
 
 **IT IS AUTHORITATIVE ABOUT THE QUESTION AND NEVER ABOUT THE ANSWER** -- that a semantic has a trap
 in it at all, and which call site walks into it. Where it disagrees with the platform documentation
@@ -126,10 +128,6 @@ usage. A NAME is not a guarantee. `devenv-integer-virtual-table.md` tabulates th
 `Integer` virtual table under the heading `Field` as `Integer`; the field is called `Number`, which
 the source says 33 times and contradicts 0 times. The page is describing the contents of the column,
 not naming it. Where the documentation DESCRIBES and the source DECLARES, the source declares.
-
-The predecessor's implementation is a hint about
-where to look and what it cost, never a verdict on what is correct. It is 97 % green on a subset,
-which means it is also wrong somewhere.
 
 Where to find what:
 
@@ -381,8 +379,6 @@ the wrong order. So the sequence is: **more AL goes in -> the tree compiles -> t
   and it checks only what CHANGED unless `FULL=1` asks for the tree. `FULL=1` is 5 minutes over 82
   units at the analyser's 50 000-node budget; `DEEP=1` restores clang's own 225 000 and quadruples
   it. Running `FULL=1` between two edits is the fastest way to get nothing done.
-- **A MEASUREMENT THAT RUNS LONG IS RUN BESIDE THE WORK, never instead of it.** `make tree` is
-  minutes on two cores; waiting for it is the one thing that is never the next step.
 
 ### The UT suite is started through the CLI, the way BC starts it through a cmdlet
 
@@ -451,6 +447,11 @@ working on something else becomes an item in the same round**, even if it closes
 **Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild
 toward a target that is too short arrives somewhere that has to be left again.
 
+**THE BOARD OF `~/Git/openerp/` IS READ FIRST, EVERY TIME.** Not after a defect -- before the work.
+Twice in one session it named the exact shape: `Validate` runs the TableRelation check before the
+trigger, and a bare `FindSet` that raises on failure is net negative and was rejected TWICE there.
+Neither is derivable from the documentation alone, and both would have cost days to rediscover.
+
 **Work autonomously.** Where something is unclear, take the most obvious generic option, measure,
 and on a net negative take it back and write the reason into the board.
 
@@ -458,6 +459,21 @@ and on a net negative take it back and write the reason into the board.
 does not throw; net positive and low risk -- or **activation** -- a previously dead path now runs,
 often net negative because cases were green over the no-op, so always a full A/B, and on a loss the
 list names the deeper roots and those come first.
+
+**MEASURE THE POPULATION BEFORE BUILDING FOR IT.** `grep -c` over `apps/` says how many call sites a
+primitive has, and the answer decides the order: `SetRange` is 55 402 and `GetView` is 132. Two
+numbers that would have changed a decision if they had been taken first: 2 717 page HEADERS with
+zero page sources, so 790 761 lines of AL were dropped on the floor; and `<memory>` in one door
+header costing 1.2 s of every one of 7 885 translation units.
+
+**A LONG RUN GOES IN THE BACKGROUND AND THE WORK CONTINUES.** `make lint FULL=1` is five minutes and
+a full sweep over the generated tree is an hour; waiting for either is the one thing that is never
+the next step. `make lint` without `FULL=1` checks what CHANGED and is the one that belongs between
+two edits.
+
+**AN UNDO IS A RESULT.** A change that looked like a free 25 000 lines and broke files is taken back
+with the measurement in the commit, not softened. Two of those in this tree already read better than
+the versions that stayed.
 
 
 ## What goes wrong
@@ -476,6 +492,8 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a baseline that falls by accident** | fewer units compiled, so fewer findings, so a false floor | the baseline carries the unit count beside the counter; a shrinking denominator is an abort |
 | **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **A PATCH ASSERTS ITS ANCHOR BEFORE WRITING** -- one that finds nothing must ABORT, never write the file unchanged. It has happened five times, each after `clang-format` folded a line the anchor spanned, once on a NEGATIVE CONTROL that then reported green because the subject was never removed |
 | **a golden file updated from the output** | the expected file is overwritten with what the generator produced, so it can never disagree again | the target image under `test/target/` is edited BY HAND, one line at a time, and the change is argued for |
+| **a list somebody has to remember to fill** | one entry point sets it and the others silently get an empty one, which then emits nothing | it FINDS ITSELF, and an empty result is an ABORT. The door's type list is the `include/type/` directory; the gates call the writers directly and would have got the empty version |
+| **a header trimmed by its own text** | a declaration the HEADER does not name is removed, and its own `.cpp` needed it | a `.cpp` includes its header and stands on what is declared there -- the two halves are written apart and neither may be trimmed alone |
 
 ## The environment
 
