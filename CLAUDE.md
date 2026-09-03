@@ -228,9 +228,9 @@ C++ truths rather than decisions about agiru. They do not move.
     stated -- every line removed is in the commit that added it. A `NOLINT` line survives, because
     it is an instruction to clang-tidy and not commentary, and it costs a number in the
     silent-places baseline.
-  - **Where does the WHY go, then?** Into the door if it is part of the contract; into the GATE
-    CASE if it is a fact about behaviour, because a case's prose cannot drift -- it fails when it
-    stops being true; into the BOARD if it is a decision; into the COMMIT otherwise.
+  - **Where does the WHY go?** Into the door if it is part of the contract; into the GATE CASE if
+    it is a fact about behaviour, because a case's prose fails when it stops being true; into the
+    BOARD if it is a decision; into the COMMIT otherwise.
 - **A name is a promise.** The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger,
   Validate, Filter, Key, FlowField, Dimension -- and a word that means something else in AL spends
   the reader's knowledge against them.
@@ -301,9 +301,8 @@ Four commitments. Everything else an item may revisit; these it may not.
 
 Principles, not a map: a map goes stale the day a directory moves.
 
-- **A directory IS a dependency tier** and carries a `reaches` file naming what it may see. The
-  include path is DERIVED from that, so a tier break fails at the `#include` with a file and a line.
-  CMake reads those files and refuses a tier that does not exist.
+- **A directory IS a dependency tier** and carries a `reaches` file naming what it may see; the
+  include path is DERIVED from it, so a tier break fails at the `#include` with a file and a line.
 
 ```
   src/al     <- lexer, parser, AST of the AL language      reaches: --
@@ -316,11 +315,10 @@ Principles, not a map: a map goes stale the day a directory moves.
   apps/<app> <- GENERATED. One BC app, one library.         reaches: (the door, and its own depends)
 ```
 
-- **AN APP IS A LIBRARY, and that is BC's own unit.** A BC app is what gets deployed, versioned and
-  depended upon, so each becomes one library under `apps/` with its dependencies declared in
-  `apps.json`. The point is not build time but DIRECTION: the linker then enforces what AL declares
-  -- the Base Application may not know an extension, only the other way round and only through
-  events -- and nothing else in this tree checks that.
+- **AN APP IS A LIBRARY, and that is BC's own unit.** Each becomes one library under `apps/` with
+  its dependencies in `apps.json`. The point is not build time but DIRECTION: the linker enforces
+  what AL declares -- the Base Application may not know an extension, only the other way round and
+  only through events -- and nothing else in this tree checks that.
   **The limit:** a `tableextension` that adds fields cannot be a link-time addition, since a C++
   class is closed. BC merges extensions at BUILD time too, so merging them in the transpiler is
   faithful -- but the app boundary is a BUILD boundary and which apps are installed is a
@@ -335,9 +333,8 @@ Principles, not a map: a map goes stale the day a directory moves.
   `TestPermissions`.
 - **A header is PUBLIC only if a client cannot use the runtime without it**, and `include/` holds
   nothing else. **There is no master header**: a generated file includes what it names.
-- **`make` IS THE ONLY WAY IN.** Nothing is started by reaching past it. That CMake and Ninja work
-  behind it changes nothing: a door in front of a generator is not a second mechanism, it is the
-  door.
+- **`make` IS THE ONLY WAY IN.** That CMake and Ninja work behind it changes nothing: a door in
+  front of a generator is not a second mechanism, it is the door.
 
 | | |
 |---|---|
@@ -357,9 +354,8 @@ Principles, not a map: a map goes stale the day a directory moves.
 ### The loop, and its order
 
 **BREADTH FIRST: the transpiler swallows the whole tree, and only then is the tree corrected.**
-A transpiler that translates four object kinds perfectly translates no BC. Widening it exposes
-whole classes of defect at once; polishing what it already emits finds them one at a time and in
-the wrong order. So the sequence is: **more AL goes in -> the tree compiles -> the tree is right.**
+Widening it exposes whole classes of defect at once; polishing what it already emits finds them one
+at a time and in the wrong order. **more AL goes in -> the tree compiles -> the tree is right.**
 
 - **`make` IS `src/` PLUS THE SLICE.** The runtime and the transpiler stand on their own, which is
   what makes the one-second loop possible. `test/slice` names the generated sources linked into
@@ -442,6 +438,7 @@ working on something else becomes an item in the same round**, even if it closes
 **Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild
 toward a target that is too short arrives somewhere that has to be left again.
 
+
 **THE BOARD OF `~/Git/openerp/` IS READ FIRST, EVERY TIME.** Not after a defect -- before the work.
 Twice in one session it named the exact shape: `Validate` runs the TableRelation check before the
 trigger, and a bare `FindSet` that raises on failure is net negative and was rejected TWICE there.
@@ -455,20 +452,15 @@ does not throw; net positive and low risk -- or **activation** -- a previously d
 often net negative because cases were green over the no-op, so always a full A/B, and on a loss the
 list names the deeper roots and those come first.
 
-**MEASURE THE POPULATION BEFORE BUILDING FOR IT.** `grep -c` over `apps/` says how many call sites a
-primitive has, and the answer decides the order: `SetRange` is 55 402 and `GetView` is 132. Two
-numbers that would have changed a decision if they had been taken first: 2 717 page HEADERS with
-zero page sources, so 790 761 lines of AL were dropped on the floor; and `<memory>` in one door
-header costing 1.2 s of every one of 7 885 translation units.
+**MEASURE THE POPULATION BEFORE BUILDING FOR IT.** `grep -c` over `apps/` decides the order:
+`SetRange` is 55 402 call sites and `GetView` is 132. Two numbers that would have changed a decision
+if taken first -- 2 717 page HEADERS with zero page sources, so 790 761 lines of AL on the floor;
+`<memory>` in one door header costing 1.2 s of every one of 7 885 translation units.
 
-**A LONG RUN GOES IN THE BACKGROUND AND THE WORK CONTINUES.** `make lint FULL=1` is five minutes and
-a full sweep over the generated tree is an hour; waiting for either is the one thing that is never
-the next step. `make lint` without `FULL=1` checks what CHANGED and is the one that belongs between
-two edits.
+**A LONG RUN GOES IN THE BACKGROUND AND THE WORK CONTINUES.** `make lint FULL=1` is five minutes, a
+full sweep an hour; waiting for either is never the next step.
 
-**AN UNDO IS A RESULT.** A change that looked like a free 25 000 lines and broke files is taken back
-with the measurement in the commit, not softened. Two of those in this tree already read better than
-the versions that stayed.
+**AN UNDO IS A RESULT**, taken back with the measurement in the commit rather than softened.
 
 
 ## What goes wrong
