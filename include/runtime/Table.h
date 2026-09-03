@@ -1519,6 +1519,67 @@ public:
     ++store_->version;
   }
 
+  /// \brief AL `Record.Insert(RunTrigger)` on a temporary record.
+  /// \param RunTrigger Whether the table's `OnInsert` runs.
+  /// \throws Error when a row already carries this primary key.
+  ///
+  /// \note A TEMPORARY RECORD RUNS ITS TRIGGERS. The platform page says a temporary table behaves
+  ///       like a real one except that it lives in memory and its triggers are the table's own --
+  ///       so `TempRec.Insert(true)` fires `OnInsert`, and 102 call sites in the 58 UT codeunits
+  ///       alone write it.
+  void Insert(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(T &record) { record.OnInsert(); }) {
+        static_cast<T *>(this)->OnInsert();
+      }
+    }
+    Insert();
+  }
+
+  /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` on a temporary record.
+  /// \param RunTrigger         Whether the table's `OnInsert` runs.
+  /// \param InsertWithSystemId Whether an assigned SystemId is kept.
+  void Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    static_cast<void>(InsertWithSystemId);
+    Insert(RunTrigger);
+  }
+
+  /// \brief AL `Record.Modify(RunTrigger)` on a temporary record.
+  /// \param RunTrigger Whether the table's `OnModify` runs.
+  /// \return True when a row carried this primary key.
+  bool Modify(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(T &record) { record.OnModify(); }) {
+        static_cast<T *>(this)->OnModify();
+      }
+    }
+    return Modify();
+  }
+
+  /// \brief AL `Record.Delete(RunTrigger)` on a temporary record.
+  /// \param RunTrigger Whether the table's `OnDelete` runs.
+  /// \return True when a row carried this primary key.
+  bool Delete(Boolean RunTrigger) {
+    if (RunTrigger) {
+      if constexpr (requires(T &record) { record.OnDelete(); }) {
+        static_cast<T *>(this)->OnDelete();
+      }
+    }
+    return Delete();
+  }
+
+  /// \brief AL `Record.DeleteAll(RunTrigger)` on a temporary record.
+  /// \param RunTrigger Whether each row's `OnDelete` runs.
+  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
+  ///         do yet (board:0044).
+  void DeleteAll(Boolean RunTrigger) {
+    if (RunTrigger) {
+      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
+                  "(board:0044)");
+    }
+    DeleteAll();
+  }
+
   /// \brief AL `Record.Count()`.
   /// \return How many rows the store holds.
   [[nodiscard]] Integer Count() const { return static_cast<Integer>(store_->rows.size()); }
@@ -1539,6 +1600,22 @@ public:
   bool Next() {
     ++position_;
     return Fetch();
+  }
+
+  /// \brief AL `Record.Next(Steps)` on a temporary record.
+  /// \param Steps How far to step; AL takes a negative number to go back.
+  /// \return How many steps were taken, 0 at the end.
+  Integer Next(Integer Steps) {
+    if (Steps == 0) { return Next() ? 1 : 0; }
+    const Integer way = Steps > 0 ? 1 : -1;
+    Integer taken = 0;
+    for (Integer step = 0; step < (Steps > 0 ? Steps : -Steps); ++step) {
+      if (way < 0 && position_ == 0) { break; }
+      position_ += way;
+      if (!Fetch()) { break; }
+      taken += way;
+    }
+    return taken;
   }
 
   /// \brief AL `Record.Copy(From, true)` -- shares another temporary record's store.
