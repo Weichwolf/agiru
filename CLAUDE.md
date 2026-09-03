@@ -402,10 +402,7 @@ runtime is right about what it already does. The 2 291 come out of `agiru run-te
 
 **Every baseline may only SHRINK.** A strict analysis over a grown tree is red on day one and
 switched off in the first week; a recorded count a commit may lower and never raise holds new code
-to zero and lets old code be repaired at the pace it is touched.
-
-**This tree is new, so every baseline is 0 today and stays there.** There is no legacy to make an
-exception for. Anything above zero here was written in on the day.
+to zero. **This tree is new, so every baseline is 0** -- there is no legacy to make an exception for.
 
 | counter | measures |
 |---|---|
@@ -413,9 +410,8 @@ exception for. Anything above zero here was written in on the day.
 | `test/doc-baseline` | undocumented public names in `include/` -- doxygen over `doc/Doxyfile` |
 | `test/todo-baseline` | `NOLINT`, `TODO`, `FIXME`, `catch (...)` -- the silent places |
 
-**The silent-places counter is what keeps the first baseline honest.** A `NOLINT` would otherwise
-cost nothing, and a baseline that can be silenced for free is a fig leaf. Suppressing a finding
-costs a number, and that number may only fall.
+**The silent-places counter keeps the rest honest**: a baseline that can be silenced for free is a
+fig leaf, so suppressing a finding costs a number and that number may only fall.
 
 **A check is switched off only when its finding is not a defect**, which happens in exactly two
 ways: the finding is taste, or the domain already fixes the answer and the check is arguing with AL
