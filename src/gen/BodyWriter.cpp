@@ -393,19 +393,26 @@ private:
     const std::string spelled = Callee(callee);
     std::string out = spelled + "(";
     std::string receiver;
+    std::string reach = ".";
     std::size_t fields = 0;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
       fields =
           scope_.IsRecord(callee.children[0].text) ? FieldArguments(callee.children[1].text) : 0;
-      if (fields != 0) { receiver = Expression(callee.children.front(), kPrimaryPrecedence); }
+      if (fields != 0) {
+        receiver = Expression(callee.children.front(), kPrimaryPrecedence);
+        reach = callee.children[0].kind == al::ExprKind::Name &&
+                        scope_.IsHandle(callee.children[0].text)
+                    ? "->"
+                    : ".";
+      }
     }
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
       const bool isField =
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
       if (isField && expression.children[i].kind == al::ExprKind::Name) {
-        out += receiver + "." + Identifier(expression.children[i].text);
+        out += receiver + reach + Identifier(expression.children[i].text);
         continue;
       }
       out += Expression(expression.children[i], 0);
