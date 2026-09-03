@@ -547,8 +547,57 @@ public:
   ///       check that matters is on the way IN, not on the way out.
   operator std::string_view() const { return value_; }
 
+  /// \brief The DECLARED length, which is not the current one.
+  ///
+  /// \return The maximum this string accepts, or 0 when it was declared without a length.
+  ///
+  /// \note IT IS A FIELD AND NOT A TEMPLATE ARGUMENT, and the predecessor is why. AL passes a
+  ///       `Text[30]` field to a `var Text` parameter -- `PostCode.LookupPostCode(City, ...)` in
+  ///       Customer.Table.al -- so the callee holds a reference whose STATIC type has no length and
+  ///       whose value has one. `~/Git/openerp/` had the same question and no value to ask, so its
+  ///       `MaxStrLen` PARSED THE CALLING SOURCE LINE to recover the declaration; the comment there
+  ///       lists what that cost when it guessed wrong. Eight bytes per string buys the right answer
+  ///       at the point of use.
+  [[nodiscard]] std::size_t Max() const { return max_; }
+
 protected:
   friend class detail::ValueAccess;
+
+  /// \brief A string with a declared length.
+  /// \param max The declared length, or 0 for none.
+  explicit StringValue(std::size_t max) : max_(max) {}
+
+  /// \brief A string with no declared length.
+  StringValue() = default;
+
+  /// \brief Copies the value AND the declared length, which is what constructing one is.
+  StringValue(const StringValue &) = default;
+
+  /// \brief Moves the value and the declared length.
+  StringValue(StringValue &&) = default;
+
+  ~StringValue() = default;
+
+  /// \brief Copies the VALUE and keeps this string's own declared length.
+  ///
+  /// \param o The other string.
+  /// \return This string.
+  ///
+  /// \note ASSIGNMENT DOES NOT MOVE THE DECLARATION. `Customer.City := SomeUnboundedText` leaves
+  ///       City a `Text[30]`; copying the source's length would quietly widen the target and the
+  ///       next over-long value would go in unchecked.
+  StringValue &operator=(const StringValue &o) {
+    if (this != &o) { value_ = o.value_; }
+    return *this;
+  }
+
+  /// \brief The same, moving the value.
+  /// \param o The other string.
+  /// \return This string.
+  StringValue &operator=(StringValue &&o) noexcept {
+    if (this != &o) { value_ = std::move(o.value_); }
+    return *this;
+  }
 
   /// \brief Stores an already validated value.
   /// \param value The text, checked and normalised by the derived type.
@@ -559,6 +608,7 @@ protected:
 
 private:
   std::string value_;
+  std::size_t max_ = 0;
 };
 
 /// \brief AL `+` on text -- concatenation.

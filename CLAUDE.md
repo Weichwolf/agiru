@@ -109,6 +109,38 @@ Plus `~/Git/openerp/` as a **fourth, measured reference**: the same semantics im
 with backlog comments on refuted hypotheses. Grep there before deriving any non-trivial semantics
 from scratch.
 
+### `~/Git/openerp/board/` IS A REFERENCE WORK, AND IT IS CONSULTED BEFORE ANYTHING IS BUILT
+
+**772 work items, 656 of them roots, 286 closed, 151 carrying an A/B measurement over the test net,
+116 recording a refuted hypothesis.** Each is one AL semantic that was got wrong, measured, and
+corrected -- with the call site in the BaseApp that exposed it, the number of tests it moved, and
+the wrong turns taken on the way. It is written in German; the items are named
+`<id>_<slug>.md` and the id is stable.
+
+**READ IT BEFORE IMPLEMENTING AN AL SEMANTIC, not after.** The rule is the same one CLAUDE.md
+already states about the tree itself -- a refuted hypothesis is the most expensive thing to pursue
+twice -- and this is 772 of them, already paid for. `xRec` cost the predecessor four rounds
+(WI-781, WI-1078, WI-1137, WI-1156) before it was right; reading those four is minutes and rebuilds
+none of it.
+
+| looking for | grep |
+|---|---|
+| a type's or builtin's semantics | `ls board \| grep -i <name>` -- the slug carries the subject |
+| what a fix was worth | `grep -h "^measured:" board/*` -- `GAINED n, LOST m` over the UT net |
+| what was tried and refuted | `grep -lin "WIDERLEGT" board/*` |
+| the shape of a runtime mechanism | the implementation under `openerp/runtime/`, which the item names |
+
+**IT IS A HINT ABOUT WHERE TO LOOK AND WHAT IT COST, NEVER A VERDICT.** The same sentence stands
+above about the predecessor's implementation: it is 97 % green on a subset, so it is also wrong
+somewhere, and where it disagrees with the platform documentation the documentation wins. What it
+IS authoritative about is the QUESTION -- that a semantic has a trap in it at all, and which call
+site in the BaseApp walks into it.
+
+**A defect that shape found there is a defect here until measured otherwise.** Python's dynamism hid
+some of them and caused others; the four `xRec` rounds are the first kind and the whole
+`_al_var_sizes` / frame-inspection apparatus behind `MaxStrLen` is the second -- in C++ the declared
+length lives on the value and none of that machinery exists. So read the FINDING, not the fix.
+
 **WHERE THEY DISAGREE, THE DOCUMENTATION WINS -- ABOUT GUARANTEES.** Validate order, trigger
 lifecycle, transaction behaviour: the platform documentation is the specification and the source is
 usage. A NAME is not a guarantee. `devenv-integer-virtual-table.md` tabulates the field of the
