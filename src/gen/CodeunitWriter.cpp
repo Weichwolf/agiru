@@ -30,6 +30,21 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
          al::HasAttribute(procedure, "InternalEvent");
 }
 
+std::string TableNoOf(const al::CodeunitObject &unit) {
+  const al::Property *source = al::Find(unit.properties, "TableNo");
+  if (source == nullptr || source->value.empty()) { return {}; }
+  std::string name;
+  for (const al::Token &token : source->value) { name += token.text; }
+  return name;
+}
+
+std::string SourceTableOf(const al::CodeunitObject &unit, const Objects &objects) {
+  const std::string name = TableNoOf(unit);
+  if (name.empty()) { return {}; }
+  const auto found = objects.tables.find(LowerKey(name));
+  return found == objects.tables.end() ? std::string{} : found->second.identifier;
+}
+
 std::string SubtypeOf(const al::CodeunitObject &unit) {
   const al::Property *subtype = al::Find(unit.properties, "Subtype");
   if (subtype == nullptr) { return "Normal"; }
@@ -518,6 +533,17 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   const auto both = [&](const al::VarDecl &declared) {
     Declared(declared, objects, ahead, reachEnum, reachPage, reachElement);
   };
+  {
+    const al::Property *source = al::Find(unit.properties, "TableNo");
+    if (source != nullptr && !source->value.empty()) {
+      std::string name;
+      for (const al::Token &token : source->value) { name += token.text; }
+      const auto found = objects.tables.find(LowerKey(name));
+      if (found != objects.tables.end() && !found->second.header.empty()) {
+        headers.insert(found->second.header);
+      }
+    }
+  }
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -672,6 +698,7 @@ public:
   }
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
+    if (LowerKey(std::string(variable)) == "rec") { return !TableNoOf(unit_).empty(); }
     const al::VarDecl *declared = Declaration(variable);
     return declared != nullptr && TypeName(declared->type) == "Record";
   }
@@ -685,12 +712,20 @@ public:
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
-    const al::VarDecl *declared = Declaration(field.variable);
-    if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
-    const auto table = objects_.fieldEnums.find(LowerKey(declared->subtype));
+    const std::string subtype = LowerKey(std::string(field.variable)) == "rec"
+                                    ? TableNoOf(unit_)
+                                    : SubtypeOfRecord(field.variable);
+    if (subtype.empty()) { return {}; }
+    const auto table = objects_.fieldEnums.find(LowerKey(subtype));
     if (table == objects_.fieldEnums.end()) { return {}; }
     const auto found = table->second.find(LowerKey(std::string(field.field)));
     return found == table->second.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] std::string SubtypeOfRecord(std::string_view variable) const {
+    const al::VarDecl *declared = Declaration(variable);
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
+    return declared->subtype;
   }
 
   [[nodiscard]] const al::VarDecl *Declaration(std::string_view name) const {
@@ -746,6 +781,9 @@ public:
     }
     for (const al::ProcedureDecl &other : unit_.procedures) {
       if (LowerKey(other.name) == LowerKey(std::string(name))) { return Identifier(other.name); }
+    }
+    if (LowerKey(std::string(name)) == "rec" && al::Find(unit_.properties, "TableNo") != nullptr) {
+      return "Rec";
     }
     return {};
   }
@@ -1105,6 +1143,9 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
   out += "class " + unitClass + ";\n" + ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
   out += "class " + unitClass + " : public Codeunit<" + unitClass + "> {\npublic:\n";
+
+  const std::string source = SourceTableOf(unit, objects);
+  if (!source.empty()) { out += "  " + source + " Rec;\n\n"; }
 
   bool previousWasTrigger = false;
   bool first = true;
