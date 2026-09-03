@@ -61,6 +61,16 @@ bool IsTestCodeunit(const al::CodeunitObject &unit) {
   return subtype != nullptr && LowerKey(subtype->text) == "test";
 }
 
+std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("transactionmodel") == std::string::npos) { continue; }
+    if (lowered.find("autocommit") != std::string::npos) { return "AutoCommit"; }
+    if (lowered.find("none") != std::string::npos) { return "None"; }
+  }
+  return "AutoRollback";
+}
+
 bool IsTest(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "Test");
 }
@@ -95,7 +105,9 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
     out += identifier;
     out += "::";
     out += Identifier(test->name);
-    out += ">},\n";
+    out += ">, TransactionModel::";
+    out += TransactionModelOf(*test);
+    out += "},\n";
   }
   out += "}};\n\nconst TestCatalogue kTestCatalogue{CodeunitTraits<";
   out += identifier;

@@ -542,14 +542,15 @@ private:
 
   std::string ReadAttribute() {
     Expect("[");
-    const std::string name = Peek().text;
+    std::string written;
     int depth = 1;
     while (!AtEnd() && depth > 0) {
       if (AtPunctuation("[")) { ++depth; }
       if (AtPunctuation("]")) { --depth; }
+      if (depth > 0) { written += Peek().text; }
       Advance();
     }
-    return name;
+    return written;
   }
 
   void ParseVarsInto(std::vector<LabelDecl> &labels) {
@@ -916,8 +917,10 @@ PageExtensionObject ParsePageExtension(std::string_view source) {
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {
-  return std::ranges::any_of(procedure.attributes,
-                             [name](const std::string &a) { return SameName(a, name); });
+  return std::ranges::any_of(procedure.attributes, [name](const std::string &a) {
+    const std::size_t open = a.find('(');
+    return SameName(open == std::string::npos ? a : a.substr(0, open), name);
+  });
 }
 
 } // namespace agiru::al

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "type/TransactionModel.h"
 
 #include <cstddef>
 #include <span>
@@ -15,8 +16,9 @@ namespace agiru {
 
 /// \brief One `[Test]` procedure.
 struct TestMethod {
-  std::string_view name; ///< The procedure's AL name.
-  void (*invoke)();      ///< Makes the codeunit and calls the procedure.
+  std::string_view name;  ///< The procedure's AL name.
+  void (*invoke)();       ///< Makes the codeunit and calls the procedure.
+  TransactionModel model; ///< What its `[TransactionModel]` attribute asked for.
 };
 
 /// \brief Calls one `[Test]` procedure on a freshly made codeunit.

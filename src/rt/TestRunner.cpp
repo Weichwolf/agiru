@@ -28,7 +28,11 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
     return TestResult{
         .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
   }
-  scope.Discard("");
+  if (method.model == TransactionModel::AutoRollback) {
+    scope.Discard("");
+  } else {
+    scope.Keep();
+  }
   return TestResult{
       .codeunit = codeunit.Name(), .method = method.name, .passed = true, .error = {}};
 }
@@ -57,13 +61,12 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
   TestRun run;
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
+    detail::Scope isolation;
     if (catalogue->OnRun() != nullptr) {
-      detail::Scope scope;
       try {
         catalogue->OnRun()();
-        scope.Discard("");
       } catch (const Error &e) {
-        scope.Discard(e.what());
+        isolation.Discard(e.what());
         run.results.push_back(TestResult{
             .codeunit = catalogue->Name(), .method = "OnRun", .passed = false, .error = e.what()});
         ++run.failed;
@@ -78,6 +81,7 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
         ++run.failed;
       }
     }
+    isolation.Discard("");
   }
   return run;
 }
