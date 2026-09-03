@@ -438,7 +438,6 @@ working on something else becomes an item in the same round**, even if it closes
 **Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild
 toward a target that is too short arrives somewhere that has to be left again.
 
-
 **THE BOARD OF `~/Git/openerp/` IS READ FIRST, EVERY TIME** -- before the work, not after a defect.
 Twice in one session it named the exact shape: `Validate` checks the TableRelation before the
 trigger, and a bare `FindSet` that raises on failure is net negative and was rejected there TWICE.
@@ -461,7 +460,6 @@ if taken first -- 2 717 page HEADERS with zero page sources, so 790 761 lines of
 full sweep an hour; waiting for either is never the next step.
 
 **AN UNDO IS A RESULT**, taken back with the measurement in the commit rather than softened.
-
 
 ## What goes wrong
 
