@@ -40,22 +40,17 @@ ERP a normal BC user can work in, not a demonstration that AL can be translated.
    rather than a demonstration that AL can be translated.
 
 Scope follows from that rather than from taste. Events and `OnValidate` are not optional -- the
-BaseApp wires hundreds of `[EventSubscriber]`s inside itself, so without dispatch it is missing real
-BC logic and not merely extension paths. `DotNet` and streams block reports, imports and e-documents,
-which are core function. Permissions and dimensions are compulsory for more than one user.
+BaseApp wires hundreds of `[EventSubscriber]`s inside itself. `DotNet` and streams block reports,
+imports and e-documents. Permissions and dimensions are compulsory for more than one user.
 
 ## The target this is built against
 
-**PORTABLE AND FAST, and there is no second machine that decides arguments.** `agiru` and
-PostgreSQL are one process and one database on whatever the user has: an x86_64 workstation, an
-`aarch64` board, a container. Nothing is designed for a named device, and no decision is justified
-by one.
-
-**What that costs is a rule and not a preference:** no assumption about word size, endianness,
-`char` signedness, alignment or the size of a pointer beyond what the standard guarantees; no
-intrinsic without a portable fallback; no dependency that is not reachable on both architectures.
-`-Wall -Wextra -Wpedantic -Werror` under two front ends is most of the enforcement, and the rest is
-that "it is fast on the workstation" is not a measurement of anything but the workstation.
+**PORTABLE AND FAST, and no named machine decides an argument.** `agiru` and PostgreSQL are one
+process and one database on whatever the user has -- x86_64 workstation, `aarch64` board, container.
+No assumption about word size, endianness, `char` signedness, alignment or pointer size beyond what
+the standard guarantees; no intrinsic without a portable fallback; no dependency unreachable on
+either architecture. Two front ends under `-Werror` are most of the enforcement, and the rest is
+that "it is fast on the workstation" measures nothing but the workstation.
 
 **FAST IS A PER-SESSION NUMBER, not a per-image one.** The image is shared between sessions and an
 ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Three
@@ -79,21 +74,17 @@ days already paid for; three of them are why the language changed:
   type; in Python it became a dictionary of descriptors, and every type error surfaced at runtime --
   inside a test run measured in hours. In C++ a table is a generated class with typed fields and the
   same error is a compiler error in seconds.
-- **The .NET types are classes, not bridges.** AL speaks `System.Text.StringBuilder`,
-  `System.IO.MemoryStream`, `System.Xml.XmlDocument`. The predecessor mapped them onto Python
-  libraries as `dotnet_*.py` bridges and bled on the semantic difference. Here they are REBUILT --
-  one C++ class per .NET class, with the behaviour the .NET documentation describes. More work
-  once, and no work afterwards.
+- **The .NET types are classes, not bridges.** The predecessor mapped `StringBuilder`,
+  `MemoryStream` and `XmlDocument` onto Python libraries and bled on the semantic difference. Here
+  they are REBUILT -- one C++ class per .NET class, with the behaviour its documentation describes.
 - **A process cost a gigabyte.** See the target above. This is not a performance note, it is the
   difference between running and not running.
 
-**And there is an existence proof for the native route: NAVISION WAS WRITTEN IN C AND C++.** C/SIDE
-was a native application with its own database engine, and it computed the virtual tables, ran the
-filter language and executed the posting routines without a dynamic language anywhere in the
-picture. So when something here looks as though it needs runtime reflection, a provider registry or
-a dictionary of descriptors, the answer is that the original did it with `constexpr` data and one
-code path -- and the question is which one, not whether. This is the reason a design that reaches
-for dynamism is suspect here rather than merely inelegant.
+**There is an existence proof for the native route: NAVISION WAS WRITTEN IN C AND C++.** C/SIDE
+computed the virtual tables, ran the filter language and executed the posting routines with no
+dynamic language anywhere. So when something here looks as though it needs runtime reflection or a
+dictionary of descriptors, the original did it with `constexpr` data and one code path -- and the
+question is which one, not whether.
 
 **Do not port the predecessor's session and threading apparatus**, nor most of
 `scripts/analysis/`. `ContextVar`, the snapshot/restore of event bindings, the rejected fork+CoW,
@@ -124,11 +115,10 @@ WI-1078, WI-1137, WI-1156); reading them is minutes. `ls board | grep -i <name>`
 and refuted.
 
 **IT IS AUTHORITATIVE ABOUT THE QUESTION AND NEVER ABOUT THE ANSWER** -- that a semantic has a trap
-in it at all, and which call site walks into it. It is 97 % green on a subset, so it is also wrong
-somewhere, and where it disagrees with the platform documentation the documentation wins. Python's
-dynamism hid some defects and caused others: the `xRec` rounds are the first kind, the frame
-inspection behind `MaxStrLen` the second -- in C++ the declared length lives on the value and none
-of that machinery exists. Read the FINDING, not the fix.
+in it at all, and which call site walks into it. Where it disagrees with the platform documentation
+the documentation wins. Python's dynamism hid some defects and caused others: the `xRec` rounds are
+the first kind, the frame inspection behind `MaxStrLen` the second, and in C++ the declared length
+lives on the value so none of that machinery exists. Read the FINDING, not the fix.
 
 **WHERE THEY DISAGREE, THE DOCUMENTATION WINS -- ABOUT GUARANTEES.** Validate order, trigger
 lifecycle, transaction behaviour: the platform documentation is the specification and the source is
@@ -175,17 +165,15 @@ The coverage of the BC test suite is unknown; the documentation is complete. Wha
 describes, the runtime must do, whether or not a test asks for it.
 
 1. **Name equality with AL is an architectural invariant.** Types, methods and parameters carry
-   their AL names. Only then is the documentation check mechanical: a type named differently breaks
-   it for ALL of its methods. The predecessor allowed `Record`->`Table`, `RecordRef`->`_RecordRefProxy`,
-   `List`->`AlList` and lost the check for each of them. Here `Record` is called `Record`.
-   Internal classes with no AL counterpart are free to be named anything.
+   their AL names, and only then is the documentation check mechanical -- a type named differently
+   breaks it for ALL of its methods. The predecessor allowed `Record`->`Table`,
+   `RecordRef`->`_RecordRefProxy`, `List`->`AlList` and lost the check each time. Internal classes
+   with no AL counterpart may be named anything.
 
-   **AND THERE IS A SECOND REASON, WHICH IS THE STRONGER ONE.** Nobody will write an agiru module
-   by hand. New tables, new codeunits, new extensions will be written by a model -- and AL is in
-   that model's training data while agiru never will be. So the criterion for the generated shape
-   is not fidelity for its own sake: **a reader who knows AL and has never seen agiru must be able
-   to open one file and know how to write the next one.** Every deviation from AL is a place where
-   that reader's priors mislead them, which makes it a defect class rather than a matter of taste.
+   **THE STRONGER REASON IS THE READER.** Nobody will write an agiru module by hand: new tables and
+   codeunits will be written by a model, and AL is in its training data while agiru never will be.
+   So **a reader who knows AL and has never seen agiru must open one file and know how to write the
+   next.** Every deviation from AL is a place where that reader's priors mislead them.
 
    Three things follow: **consistency beats cleverness** -- if `FieldError(Code)` names the field,
    so do `TestField`, `FieldCaption` and `Validate`; **where idiomatic C++ can produce the AL shape
@@ -216,17 +204,14 @@ C++ truths rather than decisions about agiru. They do not move.
 - **`constexpr` AND `static_assert` WHEREVER THEY FIT, and that is not a style note.** This tree's
   whole reason for leaving Python is that a compiler can check what a test run otherwise has to
   find. So:
-  - **Anything knowable at translation time is `constexpr`** -- field tables, key tables, option
-    member names, captions, every AL declaration. `constexpr` data lands in `.rodata`: paged in on
-    demand, shared between processes, costing nothing at startup. Building it at run time is the
-    gigabyte the predecessor paid per process.
-  - **Anything decidable at translation time is a `static_assert`, never a test case.** Field
-    counts, sort order, layout, enum exhaustiveness, catalogue completeness, a TableRelation whose
-    target does not exist. The transpiler EMITS those assertions beside every object it writes, so
-    a mis-generated table is a translation error rather than a lookup that quietly finds nothing.
-  - **Every construct the type system can carry, it carries** -- strong ids, typed fields, a
-    field's type deciding its SQL column. Each one moves a class of defect from a run to a build,
-    which is the whole trade this project made.
+  - **Anything knowable at translation time is `constexpr`** -- field and key tables, option member
+    names, captions, the `OnValidate` map, every AL declaration. It lands in `.rodata`: demand-paged,
+    shared, costing nothing at startup.
+  - **Anything decidable at translation time is a `static_assert`, never a test case.** Field counts,
+    sort order, layout, enum exhaustiveness. The transpiler EMITS them beside every object, so a
+    mis-generated table is a translation error rather than a lookup that quietly finds nothing.
+  - **Every construct the type system can carry, it carries** -- strong ids, typed fields, a field's
+    type deciding its SQL column. Each moves a class of defect from a run to a build.
 - **The type system over checkers**: `std::span` / `std::string_view` at boundaries,
   `std::expected` where a refusal carries its reason, strong types instead of `int` for anything
   that means something (`TableId`, `FieldNo`, `EntryNo`). AL swaps them silently otherwise.
@@ -236,8 +221,7 @@ C++ truths rather than decisions about agiru. They do not move.
   7 885 generated translation units -- `<memory>` alone was 1.2 s of 3.4 s (measured 2026-09-03).
   `cmake/Precompiled.h` is the union of the door and sits off every include path, for the one job a
   union is good for.
-- **`private` is the default**; a wider door justifies itself. A public data member is an invariant
-  nobody can hold.
+- **`private` is the default**; a public data member is an invariant nobody can hold.
 - **`include/` IS DOCUMENTED AND `src/` IS NOT.** The two halves have different jobs and different
   rules, and neither is a matter of taste:
   - **`include/` is the public interface and every public name carries Doxygen** -- `\brief`,
@@ -253,24 +237,20 @@ C++ truths rather than decisions about agiru. They do not move.
   - **Where does the WHY go, then?** Into the door if it is part of the contract; into the GATE
     CASE if it is a fact about behaviour, because a case's prose cannot drift -- it fails when it
     stops being true; into the BOARD if it is a decision; into the COMMIT otherwise.
-- **A name is a promise.** A word that means something else in AL spends the reader's knowledge
-  against them. The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger, Validate, Filter,
-  Key, FlowField, Dimension.
-- **Every number carries its origin** (`derived` / `measured` / `[SET]`) with unit and population.
-  A bare constant in the code is a finding, and `readability-magic-numbers` enforces it.
-- **A diagnostic is a declared label**, never a free literal: a file's ways of refusing read as a
-  list. AL error texts are part of intended behaviour -- tests compare them.
-- **A failure is loud.** Accepting a declaration and doing nothing with it is worse than refusing
-  it. `catch (...) {}` is a finding with a counter.
-- **A C++ LIBRARY IS ALLOWED WHERE THE STANDARD LIBRARY IS NOT ENOUGH.** Minimising is the rule, not
-  abstinence: XML, JSON, HTTP and PDF are not written from scratch here, and the predecessor did not
-  write them either. What a dependency must be is JUSTIFIED -- named with what it replaces -- and
-  reachable on every architecture this builds for, x86_64 and `aarch64` alike.
-- **Reporting is XSL-FO through Apache FOP to PDF**, which is the route `~/Git/openerp` takes and
-  the one BC's own RDL layouts translate into most directly.
-- **Artefacts go to `build/` or the system temp directory**, never into the tree.
-  `compile_commands.json` is the exception, because clangd looks for it at the root; it is
-  gitignored.
+- **A name is a promise.** The AL vocabulary is law -- Record, FieldRef, Codeunit, Trigger,
+  Validate, Filter, Key, FlowField, Dimension -- and a word that means something else in AL spends
+  the reader's knowledge against them.
+- **Every number carries its origin** (`derived` / `measured` / `[SET]`) with unit and population;
+  a bare constant is a finding and `readability-magic-numbers` enforces it. **A diagnostic is a
+  declared label**, never a free literal -- AL error texts are intended behaviour and tests compare
+  them. **A failure is loud**: accepting a declaration and doing nothing with it is worse than
+  refusing it, and `catch (...) {}` is a finding with a counter.
+- **A C++ LIBRARY IS ALLOWED WHERE THE STANDARD LIBRARY IS NOT ENOUGH.** Minimising, not abstinence:
+  XML, JSON, HTTP and PDF are not written from scratch. A dependency must be JUSTIFIED -- named with
+  what it replaces -- and reachable on every architecture this builds for.
+- **Reporting is XSL-FO through Apache FOP to PDF**, the route the predecessor takes and the one BC's
+  own RDL layouts translate into most directly. **Artefacts go to `build/`** or the system temp
+  directory, never into the tree; `compile_commands.json` is the gitignored exception clangd needs.
 
 ### What the database layer owes AL
 
@@ -278,25 +258,22 @@ Three things about BC's use of SQL are not details: the generator emits 1 609 ta
 schema decision that is cheap now and a migration later.
 
 - **Isolation is a state machine per table, not a setting.** A read takes `READUNCOMMITTED` until
-  the session writes to that table, then `READCOMMITTED`; `LockTable()` raises it to `UPDLOCK` for
-  the rest of the transaction (`devenv-tri-state-locking.md`, `devenv-read-isolation.md`).
-  **PostgreSQL cannot do the first one** -- it has no dirty read -- so that divergence is named and
+  the session writes to that table, then `READCOMMITTED`; `LockTable()` raises it to `UPDLOCK`
+  (`devenv-tri-state-locking.md`). **PostgreSQL has no dirty read**, so that divergence is named and
   measured rather than mapped away (board:0012).
 - **Every table carries system fields**, `SystemId` through `SystemRowVersion`
-  (`devenv-table-system-fields.md`). The rowversion is monotonic across the DATABASE, not per
-  table, because `Database.LastUsedRowVersion` is `@@DBTS`; synchronisation and change tracking
-  stand on that, and a rowversion that is merely present is worse than none (board:0013).
+  (`devenv-table-system-fields.md`). The rowversion is monotonic across the DATABASE and not per
+  table (`@@DBTS`); one that is merely present is worse than none (board:0013).
 - **A session's connection is pinned for its transaction.** Whatever pool this grows, handing a
   different connection to the same session mid-transaction breaks the transaction (board:0012).
 
 ### What a generated file looks like
 
 - **The header carries every DECLARATION, the source carries every BODY.** What AL puts in a
-  `field` or `key` block is a declaration and goes in the `.h`; what it puts in a `trigger` or a
-  `procedure` is code and goes in the `.cpp`. Nothing else lives in either.
-- **Each property is stated once.** A field says its number, its AL name, its caption and its type.
-  The type TAG, the declared LENGTH and an option's MEMBER NAMES are derived from the type
-  (`agiru::Declare`, `agiru::FieldTypeOf`) rather than repeated.
+  `field` or `key` block goes in the `.h`; what it puts in a `trigger` or a `procedure` goes in the
+  `.cpp`. That holds for PAGES too: a page's triggers and its controls' triggers are code.
+- **Each property is stated once.** A field says its number, its AL name, its caption and its type;
+  the type TAG, the LENGTH and an option's MEMBER NAMES are derived from it (`agiru::Declare`).
 - **The identifier is the one thing said twice**, as the member and inside `offsetof`, because no
   standard C++ turns a member pointer into a `constexpr` offset. That is a missing language feature
   and it is recorded as one (board:0015), not defended as a design.
@@ -314,20 +291,17 @@ schema decision that is cheap now and a migration later.
 
 Four commitments. Everything else an item may revisit; these it may not.
 
-- **NO BINARY FLOATING-POINT TYPE CARRIES AN AMOUNT.** AL `Decimal` is .NET `decimal`; the
-  documentation states the mapping outright and gives 2^96-1 with a scale up to 28. A `double` in
-  a posting line is a defect, not a rounding issue -- it breaks the balance check every posting
-  hangs on. `agiru::Decimal` is that type, and the scale is part of the value.
-- **THE GENERATED TREE IS NEVER TOUCHED BY HAND.** `apps/` is transpiler output. A fix belongs
-  in `src/gen/` or `src/rt/`. A hand edit there does not survive the next run and costs the time
-  twice.
+- **NO BINARY FLOATING-POINT TYPE CARRIES AN AMOUNT.** AL `Decimal` is .NET `decimal` -- 2^96-1
+  with a scale up to 28. A `double` in a posting line breaks the balance check every posting hangs
+  on. `agiru::Decimal` is that type, and the scale is part of the value.
+- **THE GENERATED TREE IS NEVER TOUCHED BY HAND.** `apps/` is transpiler output; a fix belongs in
+  `src/gen/` or `src/rt/`. A hand edit there does not survive the next run.
 - **THE RUNTIME KNOWS NO AL OBJECT.** Neither transpiler nor runtime ever names a concrete table,
-  codeunit or library method. Any AL app must pass through both. A hardcoded AL name is the fix
-  that prevented the next ten cases and breaks the eleventh.
-- **DETERMINISM IS COMPULSORY.** The same posting over the same data produces the same entries,
-  byte for byte, twice. Anything assembled from concurrent work is combined in a DECLARED order,
-  never in completion order. The proof is a digest over the entry tables after a run -- the same
-  mechanism a renderer uses to check its pictures.
+  codeunit or library method. A hardcoded AL name is the fix that prevented the next ten cases and
+  breaks the eleventh.
+- **DETERMINISM IS COMPULSORY.** The same posting over the same data produces the same entries twice,
+  byte for byte. Anything assembled from concurrent work is combined in a DECLARED order, never in
+  completion order, and the proof is a digest over the entry tables.
 
 ## How the tree is arranged
 
@@ -449,8 +423,7 @@ ways: the finding is taste, or the domain already fixes the answer and the check
 rather than with us. The second kind carries a citation, not an opinion.
 
 **Generated code is not analysed; the generator is.** `apps/` falls out of `make lint` because a
-finding there has no address. It does NOT fall out of the compiler: `-Wall -Wextra -Wpedantic
--Werror` applies to it like everything else, and that is what holds it.
+finding there has no address -- but not out of the compiler, where `-Werror` holds it.
 
 **A tick is earned when its proof stands AND its negative control goes red.** A control that passes
 proves nothing -- check it tests the right thing before concluding the gate is blind.
@@ -463,17 +436,12 @@ again. It is edited by hand, one line at a time, and the change is argued for in
 
 `board/` is one flat directory of work items as Markdown. It holds only what is OPEN.
 
-**Three conventions are written down because breaking them is silent and irreversible.** Everything
-else about the board is legible from the board itself.
+**Three conventions, because breaking them is silent and irreversible.**
 
-- **A number is issued ONCE and never again**, and the next one comes from the HISTORY, which knows
-  every id ever filed -- not from the directory, which knows only what is still open. Taken from the
-  directory it would be the number of something closed, and two things would share an identity for
-  good.
-- **Closing an item is DELETING the file.** What it said is in the commit and `git log` is the
-  logbook. A `State: closed` left behind takes the directory's meaning away.
-- **`active` is said in the item's own commit BEFORE the work** -- the only ownership mark. Several
-  may stand on one chain, each naming what it waits on.
+- **A number is issued ONCE**, and the next comes from the HISTORY -- which knows every id ever
+  filed -- not from the directory, which knows only what is open.
+- **Closing an item is DELETING the file.** What it said is in the commit; `git log` is the logbook.
+- **`active` is said in the item's own commit BEFORE the work** -- the only ownership mark.
 
 **Every item names its reference and its choice** -- what the platform documentation says, what the
 AL source does, what the predecessor made of it and what that cost, which way is taken and why. An
@@ -489,17 +457,13 @@ working on something else becomes an item in the same round**, even if it closes
 toward a target that is too short arrives somewhere that has to be left again.
 
 **Work autonomously.** Where something is unclear, take the most obvious generic option, measure,
-and on a net negative take it back and write the reason into the board. A refuted hypothesis is
-commented, not deleted -- the most expensive mistake is to pursue a cause that has already been
-ruled out.
+and on a net negative take it back and write the reason into the board.
 
-**Classify every fix before making it:**
+**Classify every fix before making it: silent-wrong-data** -- runs through, returns a wrong value,
+does not throw; net positive and low risk -- or **activation** -- a previously dead path now runs,
+often net negative because cases were green over the no-op, so always a full A/B, and on a loss the
+list names the deeper roots and those come first.
 
-- **silent-wrong-data** -- runs through, returns a wrong value, does not throw. Net positive and
-  low regression risk.
-- **activation** -- a previously dead path now runs. Often net negative, because cases were green
-  over the no-op. Always a full A/B. On a net negative do not discard it: the loss list names the
-  deeper roots, and those come first.
 
 ## What goes wrong
 
