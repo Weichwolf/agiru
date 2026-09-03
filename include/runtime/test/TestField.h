@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "runtime/Record.h"
 #include "type/Boolean.h"
 
 #include <string_view>
@@ -36,9 +37,20 @@ public:
   [[nodiscard]] constexpr std::string_view Name() const { return name_; }
 
   /// \brief AL `TestField.SetValue(Value)`.
-  /// \param value The value, in the string form the platform moves it in.
+  ///
+  /// \tparam T The value's type -- the page documents the parameter as `Any`.
+  /// \param value The value, rendered the way the platform moves it: as text.
   /// \throws Error until a page can be opened.
-  void SetValue(std::string_view value);
+  ///
+  /// \note `Any` IS THE DOCUMENTED PARAMETER and it is not a courtesy. A test writes
+  ///       `Line."Unit Price".SetValue(9.79)` and `Header.Blocked.SetValue(true)`, so a
+  ///       `std::string_view` parameter refuses the two commonest calls there are.
+  template <typename T> void SetValue(const T &value) { SetValueText(AsText(value)); }
+
+  /// \brief AL `TestField.SetValue(Value)` for a value that is already text.
+  /// \param value The value.
+  /// \throws Error until a page can be opened.
+  void SetValue(std::string_view value) { SetValueText(value); }
 
   /// \brief AL `TestField.Value()`.
   /// \return The control's value as text.
@@ -46,9 +58,18 @@ public:
   [[nodiscard]] std::string Value() const;
 
   /// \brief AL `TestField.AssertEquals(Expected)`.
-  /// \param expected What the control should hold.
+  ///
+  /// \tparam T What the control should hold -- the page documents it as `Any`.
+  /// \param expected The value.
   /// \throws Error when it holds something else, and until a page can be opened.
-  void AssertEquals(std::string_view expected) const;
+  template <typename T> void AssertEquals(const T &expected) const {
+    AssertEqualsText(AsText(expected));
+  }
+
+  /// \brief AL `TestField.AssertEquals(Expected)` for a value that is already text.
+  /// \param expected The value.
+  /// \throws Error when it holds something else, and until a page can be opened.
+  void AssertEquals(std::string_view expected) const { AssertEqualsText(expected); }
 
   /// \brief AL `TestField.AsInteger()`. \return The value as an Integer. \throws Error as Value
   /// does.
@@ -165,6 +186,9 @@ public:
   [[nodiscard]] ::agiru::Integer ValidationErrorCount() const { Unbound(); }
 
 private:
+  void SetValueText(std::string_view value);
+  void AssertEqualsText(std::string_view expected) const;
+
   [[noreturn]] void Unbound() const;
 
   std::string_view name_;

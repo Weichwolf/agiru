@@ -215,8 +215,12 @@ public:
 
   /// \brief AL `TestPage.Filter` -- the page's filters.
   ///
-  /// \note IT IS A MEMBER AND NOT A METHOD, because AL writes `Page.FILTER.SETFILTER(...)` with no
-  ///       parentheses on `FILTER`. `methods-auto/testfilter/` is its own type for the same reason.
+  /// \note IT IS A DATA MEMBER AND A METHOD WOULD BE WRONG. AL writes
+  ///       `Page.FILTER.SETFILTER("No.", '1000')` -- no parentheses on `FILTER`, and the call after
+  ///       it carries arguments, so the rule that puts AL's missing parentheses back never reaches
+  ///       `FILTER`: it adds them to ONE link of a chain, and that link is the call. Written as a
+  ///       method it cost 82 errors over the 58 UT codeunits, measured. `methods-auto/testfilter/`
+  ///       is its own directory for the same reason it is a member here.
   TestFilter Filter{};
 
 private:

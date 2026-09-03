@@ -68,9 +68,14 @@ public:
   [[nodiscard]] Boolean Ascending() const { Unfiltered(); }
 
 private:
-  [[noreturn]] static void Unfiltered() {
-    throw Error("a TestPage's filters need a running page (board:0030)");
+  /// \note NOT STATIC, because it will name the page. A filter belongs to one, and the message a
+  ///       test sees is worth more than the byte the pointer costs.
+  [[noreturn]] void Unfiltered() const {
+    throw Error(page_ == nullptr ? "a TestPage's filters need a running page (board:0030)"
+                                 : "this TestPage's filters are not implemented yet (board:0030)");
   }
+
+  const void *page_ = nullptr;
 };
 
 }

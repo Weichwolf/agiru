@@ -56,14 +56,20 @@ namespace agiru {
 struct RecordInVariant {
   const void *record; ///< The record.
   TableId table;      ///< Which table it is, so a reader can refuse the wrong one.
-
-  /// \brief Two handles are equal when they refer to the same row of the same table.
-  /// \param o The other.
-  /// \return Whether they do.
-  [[nodiscard]] bool operator==(const RecordInVariant &o) const {
-    return record == o.record && table.Value() == o.table.Value();
-  }
 };
+
+/// \brief Two record handles are equal when they refer to the same row of the same table.
+///
+/// \param a One handle.
+/// \param b The other.
+/// \return Whether they refer to the same record.
+///
+/// \note FREE AND NOT A MEMBER, so `RecordInVariant` stays an aggregate. A member `operator==`
+///       makes it a class with behaviour, and its two data members then have to be private -- which
+///       would buy accessors for a pair that IS the value.
+[[nodiscard]] inline bool operator==(const RecordInVariant &a, const RecordInVariant &b) {
+  return a.record == b.record && a.table.Value() == b.table.Value();
+}
 
 /// \brief AL `Variant`.
 ///

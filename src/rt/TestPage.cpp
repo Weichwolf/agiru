@@ -15,7 +15,7 @@ void TestField::Unbound() const {
   throw Error("the control '" + std::string(name_) + "' is not on a running page (board:0030)");
 }
 
-void TestField::SetValue(std::string_view value) {
+void TestField::SetValueText(std::string_view value) {
   static_cast<void>(value);
   Unbound();
 }
@@ -24,7 +24,7 @@ std::string TestField::Value() const {
   Unbound();
 }
 
-void TestField::AssertEquals(std::string_view expected) const {
+void TestField::AssertEqualsText(std::string_view expected) const {
   static_cast<void>(expected);
   Unbound();
 }

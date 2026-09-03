@@ -41,6 +41,19 @@ CheckOptions:
   # characters, which is wrong here: the tree carries AL vocabulary, and `i`, `n`, `no` are the
   # clearest names an index, a count and a `No.` will ever have. At one it still refuses the truly
   # nameless and stops arguing about loop counters.
+  # `misc-non-private-member-variables-in-classes` stays ON -- CLAUDE.md's own sentence is that a
+  # public data member is an invariant nobody can hold. What it must not do is argue with AL. A
+  # `TestPage` reaches its filters as `Page.FILTER.SETFILTER(...)`, a MEMBER access with no
+  # parentheses -- which is why the documentation gives `TestFilter` a directory of its own under
+  # `methods-auto/` rather than listing those methods on `TestPage`. Written as a method instead it
+  # cost 82 errors over the 58 UT codeunits, because the rule that restores AL's missing
+  # parentheses adds them to the link of a chain that is the CALL, and `FILTER` is not it.
+  #
+  # The narrowest lever available: a class whose data members are ALL public holds no mixed
+  # encapsulation for the check to protect. One with a private member beside a public one still
+  # does, and is still a finding.
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true
+
   readability-identifier-length.MinimumVariableNameLength: 1
   readability-identifier-length.MinimumParameterNameLength: 1
   readability-identifier-length.MinimumLoopCounterNameLength: 1
