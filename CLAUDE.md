@@ -53,6 +53,22 @@ the standard guarantees; no intrinsic without a portable fallback; no dependency
 either architecture. Two front ends under `-Werror` are most of the enforcement, and the rest is
 that "it is fast on the workstation" measures nothing but the workstation.
 
+**THE SIZE IT IS BUILT FOR IS 2 TB AND 10 000 USERS, and that is what turns "fast" into a number
+somebody can be wrong about.** A BC table of 100 million rows is ordinary. Four consequences, and
+each one has already decided a design here:
+
+- **A read STREAMS.** SQL Server hands BC a server-side cursor; PostgreSQL has `DECLARE ... CURSOR`
+  and `FETCH FORWARD`, so a session costs the fetch block and never the result set (board:0045). A
+  `FindSet` that held its rows would be the process at 100 million and the machine at 10 000
+  sessions.
+- **Every declared key is a real INDEX.** 1 609 tables declare 3 272 keys; `Sales Line` alone has 17.
+  A `SetCurrentKey` onto a key with no index is a sort of the table.
+- **A CONNECTION IS BORROWED FOR A TRANSACTION AND NOT OWNED BY A SESSION.** PostgreSQL does not hold
+  10 000 backends; what a session owns is its transaction, and the connection is pinned only for
+  that (board:0012).
+- **Per-session state is counted in bytes.** A record that never filters costs eight (board:0018);
+  object metadata is shared `.rodata` and never per-process.
+
 **FAST IS A PER-SESSION NUMBER, not a per-image one.** The image is shared between sessions and an
 ERP is judged on how many it holds at once, so that is what gets measured (board:0006). Three
 things follow:
