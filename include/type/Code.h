@@ -41,7 +41,6 @@ public:
   ///       literal reaches `std::string_view` and `const std::string &` equally well. And NOT
   ///       EXPLICIT, because AL assigns text to a Code without ceremony. The NORMALISATION is what
   ///       `Assign` still does.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   template <typename T>
     requires std::convertible_to<const T &, std::string_view>
   Code(const T &value) {

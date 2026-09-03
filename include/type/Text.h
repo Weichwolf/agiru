@@ -43,7 +43,6 @@ public:
   ///       EXPLICIT, because AL assigns text without ceremony -- a body writes
   ///       `AssignCompany(X, CompanyName())` where the parameter is a `Text` and the builtin
   ///       returns a string. What is still checked is the LENGTH, which is what AL checks too.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   template <typename T>
     requires std::convertible_to<const T &, std::string_view>
   Text(const T &value) {

@@ -102,7 +102,6 @@ public:
   ///       hands a record to a parameter that takes a record; the handle is agiru's way of
   ///       DECLARING the member, not a thing AL code ever mentions, so it must disappear at every
   ///       use but the one C++ cannot hide -- reaching through it, which is `->`.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   operator T &() { return *Made(); }
 
 private:

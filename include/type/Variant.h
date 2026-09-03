@@ -85,7 +85,7 @@ public:
   /// \note Exactly, and not merely convertible: a Duration is built from a number, so a
   ///       constructibility test would make `Variant{5}` ambiguous between Integer, BigInteger and
   ///       Duration. The type the caller wrote is the type the Variant holds.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): AL passes anything to
+  // AL passes anything to
   // an `Any` parameter without ceremony -- `Assert.AreEqual(0, X, '')` is the shape every test
   // writes -- so the conversion is implicit. What stays strict is WHICH types: exactly the
   // alternatives, so `Variant{5}` cannot be ambiguous between Integer, BigInteger and Duration.
@@ -102,7 +102,6 @@ public:
   ///       `std::string_view`, and C++ allows only ONE user-defined conversion on the way to a
   ///       parameter -- so without this, `Assert.AreEqual(0, X, '')` and every `Any` parameter
   ///       handed a Code would fail to compile.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   template <typename T>
     requires std::convertible_to<const T &, std::string_view> &&
              (!detail::InVariant<T, Held>::value)
@@ -615,7 +614,6 @@ public:
   ///       does it on every call. The conversion is implicit because AL's is, and it RAISES on a
   ///       mismatch because AL's does: what it must not do is hand back an empty string for an
   ///       Integer, which is the wrong answer wearing the right type.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   operator std::string_view() const {
     const std::string *text = std::get_if<std::string>(&held_);
     if (text == nullptr) { Refuse(); }
@@ -633,7 +631,6 @@ public:
   ///       hand back a zero for a Text, which is the wrong answer wearing the right type.
   template <typename T>
     requires detail::InVariant<T, Held>::value
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   operator T() const {
     const T *value = std::get_if<T>(&held_);
     if (value == nullptr) { Refuse(); }

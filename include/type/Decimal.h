@@ -53,7 +53,6 @@ public:
   ///       LOSSLESS in that direction -- a 64-bit integer is inside the 96-bit mantissa -- so
   ///       nothing about the amount invariant is weakened by it. The direction that would weaken
   ///       it, a binary float reaching a Decimal, does not exist here at all.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   Decimal(std::int64_t value);
 
   /// \brief Renders the value for round-tripping: sign, digits, a full stop, scale preserved.

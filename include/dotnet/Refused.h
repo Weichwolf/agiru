@@ -61,7 +61,7 @@ public:
   ///       `std::string_view`, which `Code` also assigns from -- and two user-defined conversions
   ///       to two different parameters is ambiguous rather than wrong. Excluding the standard
   ///       spellings leaves exactly the AL type, which is the one AL means.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- the conversion must
+  // The conversion must
   // be implicit or `Text x := Obj.Member` would not compile, which is the shape AL writes.
   template <typename T>
     requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)

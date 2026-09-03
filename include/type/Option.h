@@ -76,7 +76,6 @@ public:
   ///       `GenerateRandomAlphabeticText(Length, 1)` -- and refusing it is a deviation the AL
   ///       reader has no reason to expect. What stays refused is reading an option AS a member
   ///       where a named one is wanted, which no constructor offers.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   constexpr Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
 
   /// \brief Assigns an ordinal.
@@ -173,14 +172,12 @@ public:
   ///       directly and the generated call site has to read the same way.
   template <typename E>
     requires std::is_enum_v<E>
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- see the note above.
   constexpr Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
   /// \brief Takes any option or enum value, keeping its ordinal.
   /// \param value The value.
   /// \note IMPLICIT for the same reason: AL passes a typed `Option` variable to an untyped
   ///       parameter without saying anything.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- see the note above.
   constexpr Option(const OrdinalValue &value) : OrdinalValue(value) {}
 
   /// \brief Compares against a member of any enumeration.

@@ -38,7 +38,7 @@ public:
 
   /// \brief A number of milliseconds.
   /// \param milliseconds How long, negative for a duration that runs backwards.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions) -- AL assigns a number
+  // AL assigns a number
   // to a Duration directly, and the generated line has to read like the AL line.
   constexpr Duration(std::int64_t milliseconds) : milliseconds_(milliseconds) {}
 

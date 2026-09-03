@@ -545,7 +545,6 @@ public:
   /// \note AL HANDS A `Code` TO A `Text` PARAMETER WITHOUT CEREMONY, and every builtin that takes
   ///       text takes it. Without this the door refuses what AL writes constantly -- and the LENGTH
   ///       check that matters is on the way IN, not on the way out.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   operator std::string_view() const { return value_; }
 
 protected:

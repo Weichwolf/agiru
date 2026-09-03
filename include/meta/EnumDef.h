@@ -38,7 +38,6 @@ public:
   ///       hand one to a parameter that takes one, and the conversion is lossless in that direction
   ///       -- the ordinal IS the value. What it does not do is convert BACK: an integer is not an
   ///       option, because nothing says which member it would be.
-  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
   constexpr operator std::int32_t() const { return ordinal_; }
 
   friend class detail::ValueAccess;
