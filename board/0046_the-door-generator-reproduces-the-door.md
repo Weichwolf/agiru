@@ -40,6 +40,23 @@ overwrites a working door with a worse one:
 3. Then `python3 scripts/gen_builtins.py` leaves `include/Builtins.h` byte-identical, and a gate
    asserts that, so this cannot come back.
 
+**What a second attempt established** (this round). The regeneration does not merely produce
+FEWER functions -- it loses named ones. `System.Format(Any, Integer, Integer)` is documented at
+`methods-auto/system/system-format-joker-integer-integer-method.md`, stands in the committed header
+as `std::string Format(const Variant &, Integer = {}, Integer = {})`, and is ABSENT from what either
+script state emits. `Assert.cpp` calls `Format(Left, 0, 2)` and is in the slice, so the loss is
+immediate and visible.
+
+Step 2 is done: `RefuseDoor` is declared in the header rather than hidden in an anonymous namespace
+in the source. It has to be, because a `var Any` parameter becomes a TEMPLATE -- `Clear(var Any)`
+takes a record, a text, a list, anything at all by reference -- and a template's body must be
+visible where it is instantiated. That was the error the first attempt died on.
+
+What remains is step 1 and step 3: find why `Format` is dropped, then assert byte-identity in a
+gate. **Until then the header is not regenerated**, and the missing optional tails stay missing --
+`Message(String)` alone is one error in `Currency`, whose table number is 4, which is what the two
+failing tests in `Library - Utility UT` ask for.
+
 **Why it matters beyond the file.** The three counts differ because the two later states DROP
 functions the first one had -- a shorter overload rule removing what a call site needs shows up as
 `no matching function for call to 'Format'`, which is 20 errors in `Assert.cpp` alone and reads as

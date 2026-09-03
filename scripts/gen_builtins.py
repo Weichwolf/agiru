@@ -111,7 +111,12 @@ namespace agiru {
 # survives there, so `} // namespace agiru` is written by this script and removed by the next
 # `make` -- forever. The door's precompiled header and every ccache entry behind it fall over on
 # each of those rewrites, and a `make tree` running beside one loses its whole census.
-settle(ROOT / "include/Builtins.h", head + "\n\n".join(alldecls) + "\n}\n")
+# `RefuseDoor` IS DECLARED IN THE HEADER, because a body can land there. An AL `var Any` parameter
+# becomes a TEMPLATE -- `Clear(var Any)` takes a record, a text, a list, anything at all by
+# reference -- and a template's body has to be visible where it is instantiated, so the refusal has
+# to be reachable from the header rather than hidden in an anonymous namespace in the source.
+refusal = ("[[noreturn]] void RefuseDoor(std::string_view what);\n\n")
+settle(ROOT / "include/Builtins.h", head + refusal + "\n\n".join(alldecls) + "\n}\n")
 
 # THE SOURCE INCLUDES WHAT ITS BODIES NAME, which is only what the signatures spell -- the header
 # is what needs the whole set.
@@ -123,9 +128,9 @@ guard = ("// NOLINTBEGIN(bugprone-easily-swappable-parameters,"
 src = ['#include "Builtins.h"', "", '#include "runtime/Error.h"'] + \
       [f'#include "{existing[t]}"' for t in sorted(inbody)] + \
       ["", "#include <string>", "#include <string_view>", "", "namespace agiru {", "",
-       "namespace {", "", "[[noreturn]] void RefuseDoor(std::string_view what) {",
+       "[[noreturn]] void RefuseDoor(std::string_view what) {",
        '  throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");',
-       "}", "", "} // namespace", "", guard, ""] + allbodies + \
+       "}", "", guard, ""] + allbodies + \
       ["", guard.replace("NOLINTBEGIN", "NOLINTEND"), "", "}", ""]
 settle(ROOT / "src/rt/Builtins.cpp", "\n".join(src))
 print(len(allbodies), "free functions")
