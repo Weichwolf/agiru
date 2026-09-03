@@ -433,7 +433,7 @@ again. It is edited by hand, one line at a time, and the change is argued for in
 
 ## The board
 
-`board/` is one flat directory of work items as Markdown. It holds only what is OPEN.
+`board/` is one flat directory of open work items as Markdown.
 
 **Three conventions, because breaking them is silent and irreversible.**
 
