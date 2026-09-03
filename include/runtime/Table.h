@@ -263,7 +263,9 @@ public:
   ///       it and a table without the trigger compiles to the same code `Insert()` does.
   void Insert(Boolean RunTrigger) {
     if (RunTrigger) {
-      if constexpr (requires(Derived &record) { record.OnInsert(); }) { Self()->OnInsert(); }
+      if constexpr (requires(Derived &record) { record.OnInsert(); }) {
+        static_cast<Derived *>(this)->OnInsert();
+      }
     }
     detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
   }
@@ -285,7 +287,9 @@ public:
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   void Modify(Boolean RunTrigger) {
     if (RunTrigger) {
-      if constexpr (requires(Derived &record) { record.OnModify(); }) { Self()->OnModify(); }
+      if constexpr (requires(Derived &record) { record.OnModify(); }) {
+        static_cast<Derived *>(this)->OnModify();
+      }
     }
     Modify();
   }
@@ -307,7 +311,9 @@ public:
   ///       record it is about to remove, and a great many of them do.
   void Delete(Boolean RunTrigger) {
     if (RunTrigger) {
-      if constexpr (requires(Derived &record) { record.OnDelete(); }) { Self()->OnDelete(); }
+      if constexpr (requires(Derived &record) { record.OnDelete(); }) {
+        static_cast<Derived *>(this)->OnDelete();
+      }
     }
     Delete();
   }
@@ -1341,6 +1347,9 @@ private:
   ///       refused there. Every page and every local record hit it. The assertion below catches the
   ///       same misuse -- `class Wrong : public Table<Right>` -- the moment any method is used, and
   ///       costs nothing at run time.
+  /// \warning `Self()` IS `void *` -- it feeds the type-erased `Runtime*` bridge, so
+  ///          `Self()->OnInsert()` does not compile and never did. A trigger is called through
+  ///          `static_cast<Derived *>(this)`, which is the same address with the type kept.
   [[nodiscard]] const void *Self() const {
     static_assert(std::is_base_of_v<Table, Derived>, "a table must derive from Table of itself");
     return static_cast<const Derived *>(this);
