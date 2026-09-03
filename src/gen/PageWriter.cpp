@@ -2,6 +2,7 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
+#include "Door.h"
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
@@ -165,7 +166,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   const std::string controlsClass = identifier + "_Controls";
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
-  out += "#include \"agiru.h\"\n";
+  out += kDoorMarker;
   if (NamesAbsentIn(object.variables, object.procedures, objects)) {
     out += "#include \"absent/Types.h\"\n";
   }
@@ -184,11 +185,14 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   // and its procedures live in different namespaces there -- `ItemTrackingLines` has an action
   // `AssignSerialNo` AND a procedure `AssignSerialNo` -- and a TestPage reaches the controls and
   // never the procedures. So the controls are their own class, and `TestPage<P>` derives from it.
-  out += "class " + controlsClass + " {\npublic:\n";
+  // A PAGE HAS CONTROLS AND A TEST HAS `TestField`s, and only the second is test code. The class
+  // is a TEMPLATE over the two so the page names neither: `apps/` outside the test app carries no
+  // test type at all, and `TestPage` instantiates it with the pair it needs.
+  out += "template <typename Field, typename Action> class " + controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
-  WriteControls(out, fields, "TestField", taken);
+  WriteControls(out, fields, "Field", taken);
   if (!fields.empty() && !actions.empty()) { out += "\n"; }
-  WriteControls(out, actions, "TestAction", taken);
+  WriteControls(out, actions, "Action", taken);
   out += "};\n\n";
   out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
@@ -212,12 +216,13 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "template <> struct agiru::PageTraits<agiru::app::pages::" + identifier + "> {\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-  out += "  using Controls = agiru::app::pages::" + controlsClass + ";\n";
+  out += "  template <typename Field, typename Action>\n  using Controls = agiru::app::pages::" +
+         controlsClass + "<Field, Action>;\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
   GatherAbsentIn(object.variables, object.procedures, objects, dotnet, absent);
-  return PageHeader{.text = out, .dotnet = dotnet, .absent = absent};
+  return PageHeader{.text = WithDoor(out, ObjectKind::Page), .dotnet = dotnet, .absent = absent};
 }
 
 } // namespace agiru::gen

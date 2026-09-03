@@ -1,11 +1,12 @@
-#include "Check.h"
-#include "ResourceCost.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Transaction.h"
+
+#include "Check.h"
+#include "ResourceCost.h"
 
 #include <cstddef>
 #include <string>

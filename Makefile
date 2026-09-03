@@ -7,10 +7,17 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 
-.PHONY: all apps builtins cronus db gap lint schema tc test transpile tree provision doc clean spotless help
+.PHONY: all apps builtins comments cronus db gap lint schema tc test transpile tree provision doc clean spotless help
 
-all: db            ## the library, the transpiler, and the client beside them
+# `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. CLAUDE.md states the rule -- `include/` is
+# documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
+# to. Deleting does not destroy: every line removed is in the commit that added it, which is where
+# a reason belongs. The door keeps its Doxygen, and `make lint` counts what is undocumented there.
+all: comments db   ## strip the comments, then the library, the transpiler and the client
 	@cmake --build $(B) -j $(shell nproc)
+
+comments:          ## delete every comment in src/; include/ keeps its Doxygen
+	@python3 $(SELF)/test/strip-comments.py $(SELF)/src $(SELF)/include
 
 db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json

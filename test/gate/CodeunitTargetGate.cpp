@@ -1,10 +1,11 @@
-#include "Check.h"
-#include "LineNumberBuffer.h"
-#include "TransferOldExtTextLines.h"
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
+
+#include "Check.h"
+#include "LineNumberBuffer.h"
+#include "TransferOldExtTextLines.h"
 
 #include <string>
 #include <type_traits>

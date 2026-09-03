@@ -1,6 +1,7 @@
-#include "Check.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
+
+#include "Check.h"
 
 #include <string>
 

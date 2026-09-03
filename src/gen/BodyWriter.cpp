@@ -2,9 +2,11 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
+#include "Door.h"
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "Scope.h"
 #include "TableWriter.h"
 
 #include <algorithm>
@@ -741,6 +743,61 @@ private:
   const al::TableObject &table_;
 };
 
+// A PAGE'S SCOPE: its variables, its source record's FIELDS, its labels and its procedures. AL
+// writes a page trigger against the same names a table trigger uses -- `Rec` is the source record
+// and a bare field name reaches through it -- so the page resolves a field to `Rec.<Field>`.
+class PageNames : public Names {
+public:
+  PageNames(const al::PageObject &page, const al::TableObject *source)
+      : page_(page), source_(source) {}
+
+  [[nodiscard]] bool IsHandle(std::string_view name) const override {
+    for (const al::VarDecl &declared : page_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return DeclaresAnObject(declared);
+      }
+    }
+    return false;
+  }
+
+  [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    for (const al::VarDecl &declared : page_.variables) {
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+    }
+    for (const al::LabelDecl &label : page_.labels) {
+      if (SameName(label.name, name)) { return label.name; }
+    }
+    for (const al::ProcedureDecl &procedure : page_.procedures) {
+      if (SameName(procedure.name, name)) { return Identifier(procedure.name); }
+    }
+    // A BARE FIELD NAME ON A PAGE IS A FIELD OF ITS SOURCE RECORD. AL writes `"No." := ''` in a
+    // page trigger and means `Rec."No."`; the page has no field of its own to confuse it with.
+    if (source_ != nullptr) {
+      const al::FieldDecl *field = FieldNamed(*source_, name);
+      if (field != nullptr) { return "Rec." + FieldIdentifier(*source_, field->name); }
+    }
+    if (SameName("Rec", name)) { return "Rec"; }
+    return {};
+  }
+
+  [[nodiscard]] std::string Enumeration(std::string_view name) const override {
+    if (source_ == nullptr) { return {}; }
+    const al::FieldDecl *field = FieldNamed(*source_, name);
+    if (field == nullptr) { return {}; }
+    if (Find(field->properties, "OptionMembers") != nullptr) {
+      return OptionEnumName(source_->name, field->name);
+    }
+    if (TypeName(field->type) == "Enum" && !field->subtype.empty()) {
+      return "enums::" + Identifier(field->subtype);
+    }
+    return {};
+  }
+
+private:
+  const al::PageObject &page_;
+  const al::TableObject *source_;
+};
+
 // AL NAMES TWO RECORDS INSIDE A TABLE TRIGGER and declares neither: `Rec` is the object and `xRec`
 // is what it was before the change. The platform supplies the second one, so the body binds it
 // where AL would have found it -- as a name, spelled the way the collapse spells every identifier.
@@ -759,7 +816,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += "#include \"agiru.h\"\n\n";
+  out += kDoorMarker;
+  out += "\n";
   out += SourceIncludesOf(table.variables, table.procedures, objects);
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
@@ -799,7 +857,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   // this line adds is the pointer to it.
   out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
-  return out;
+  return WithDoor(out, ObjectKind::Table);
 }
 
 } // namespace agiru::gen

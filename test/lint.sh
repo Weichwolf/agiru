@@ -41,6 +41,23 @@ else
 fi
 
 printf '\n== analysis ==\n'
+# HOW HARD THE PATH-SENSITIVE ANALYSER LOOKS IS A BUDGET, AND THE DEFAULT IS NOT AFFORDABLE HERE.
+# Measured 2026-09-03 on src/rt/Record.cpp, one file: 30 s at clang's default of 225 000 nodes,
+# 16 s at 50 000, 14 s at 20 000 -- and 11 s with the analyser off altogether, so it is two thirds
+# of the cost. Over 46 units on two cores that is 11.5 minutes against 6, and a gate that takes
+# eleven minutes is a gate nobody runs before a commit.
+#
+# IT IS A BUDGET AND NOT AN EXCEPTION. The check still runs on every path it can reach inside it;
+# what it gives up is the deepest ones. `DEEP=1` restores clang's own number for the run that wants
+# it, and the baseline is the same either way -- which is the point: a finding the budget hides is
+# a finding DEEP=1 still has to find before a commit lands.
+NODES=${DEEP:+225000}
+NODES=${NODES:-50000}
+# `clang-tidy` takes `--extra-arg`, `run-clang-tidy` takes `-extra-arg`. One dash apart, and the
+# wrong one made the wrapper refuse the whole run -- which the gate then counted as a finding
+# rather than reporting a pass, which is the behaviour that caught it.
+BUDGET="-extra-arg=-Xclang -extra-arg=-analyzer-config -extra-arg=-Xclang -extra-arg=max-nodes=$NODES"
+ONEBUDGET="--extra-arg=-Xclang --extra-arg=-analyzer-config --extra-arg=-Xclang --extra-arg=max-nodes=$NODES"
 # ONLY WHAT CHANGED, UNLESS THE WHOLE TREE IS ASKED FOR. clang-tidy costs 16 times what the
 # compiler costs on the same file -- measured 2026-09-02 on src/rt/Table.cpp: 2.0 s to parse it,
 # 32.6 s to check it, of which 20.8 s is the path-sensitive analyzer alone. Over 97 units that is
@@ -73,14 +90,17 @@ units=$(grep '"file"' compile_commands.json | grep -v '/apps/' | sort -u | wc -l
 if [ -z "$FULL" ]; then
   : > "$REPORT/tidy.log"
   for f in $(printf '%s\n' "$ours" | grep '\.cpp$' || true); do
-    "$TIDY" -p . --quiet "$f" >> "$REPORT/tidy.log" 2>&1 || true
+    # shellcheck disable=SC2086
+    "$TIDY" -p . --quiet $ONEBUDGET "$f" >> "$REPORT/tidy.log" 2>&1 || true
   done
 elif [ -n "$RUNTIDY" ]; then
-  "$RUNTIDY" -p . -quiet -j "$(nproc)" '^(?!.*/(apps|test/target)/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
+  # shellcheck disable=SC2086
+  "$RUNTIDY" -p . -quiet -j "$(nproc)" $BUDGET '^(?!.*/(apps|test/target)/).*\.cpp$' > "$REPORT/tidy.log" 2>&1 || true
 else
   : > "$REPORT/tidy.log"
   for f in $(echo "$ours" | grep '\.cpp$' | grep -v '/test/target/'); do
-    "$TIDY" -p . --quiet "$f" >> "$REPORT/tidy.log" 2>&1 || true
+    # shellcheck disable=SC2086
+    "$TIDY" -p . --quiet $ONEBUDGET "$f" >> "$REPORT/tidy.log" 2>&1 || true
   done
 fi
 grep 'warning:\|error:' "$REPORT/tidy.log" | sed 's/ \[/\t[/' | sort -u > "$REPORT/tidy.unique"
@@ -172,14 +192,20 @@ printf '\n== the door ==\n'
 if command -v doxygen >/dev/null 2>&1; then
   mkdir -p build/doc
   doxygen doc/Doxyfile >/dev/null 2>&1 || true
-  undocumented=$(wc -l < build/doc/warnings.txt 2>/dev/null | tr -d ' ')
+  # ONE WARNING CLASS IS DOXYGEN'"'"'S OWN LIMIT AND NOT A MISSING SIGN. `Text<N> : Text<0>` and
+  # `Code<N> : Code<0>` are legal C++ -- a primary template deriving from its own specialisation --
+  # and doxygen reports each of them as a "potential recursive class relation". The construct is
+  # what lets AL hand a `Text[30]` to a `var Text` parameter, so the finding argues with AL rather
+  # than with us; every other warning still counts, including a name in the same file.
+  grep -v "recursive class relation" build/doc/warnings.txt > build/doc/undocumented.txt 2>/dev/null
+  undocumented=$(wc -l < build/doc/undocumented.txt 2>/dev/null | tr -d ' ')
   allowedDoc=$(cat test/doc-baseline 2>/dev/null || echo 0)
   printf 'lint: %s undocumented public entit(ies), the baseline allows %s\n' \
     "$undocumented" "$allowedDoc"
   if [ "$undocumented" -gt "$allowedDoc" ]; then
     printf 'lint: THE DOOR BASELINE GREW by %s -- a public name arrived without a sign.\n' \
       "$((undocumented - allowedDoc))" >&2
-    printf 'lint: they are named in build/doc/warnings.txt\n' >&2
+    printf 'lint: they are named in build/doc/undocumented.txt\n' >&2
     exit 1
   fi
   if [ "$undocumented" -lt "$allowedDoc" ]; then

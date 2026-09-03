@@ -29,7 +29,7 @@ for d in "$APPS"/*/; do
 done
 
 mkdir -p "$OUT"
-clang++ -std=c++23 -O2 $includes -x c++-header -o "$PCH" include/agiru.h 2>"$OUT/pch.log" || {
+clang++ -std=c++23 -O2 $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
   printf 'gap: the door does not precompile -- see %s\n' "$OUT/pch.log" >&2
   exit 1
 }

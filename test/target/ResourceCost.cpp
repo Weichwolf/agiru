@@ -2,7 +2,15 @@
 
 #include "ResourceCost.h"
 
-#include "agiru.h"
+#include "Builtins.h"
+#include "meta/Declare.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
+#include "runtime/Error.h"
+#include "runtime/Record.h"
+#include "runtime/Table.h"
+#include "type/Code.h"
 
 namespace agiru::app::tables {
 

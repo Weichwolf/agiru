@@ -1,4 +1,3 @@
-#include "Check.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Date.h"
@@ -8,6 +7,8 @@
 #include "type/Integer.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+
+#include "Check.h"
 
 #include <cstdint>
 #include <string>

@@ -1,6 +1,7 @@
+#include "meta/TableDef.h"
+
 #include "Check.h"
 #include "Filter.h"
-#include "meta/TableDef.h"
 
 #include <cstdint>
 #include <optional>

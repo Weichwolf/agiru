@@ -1,13 +1,15 @@
 #include "TableWriter.h"
 
+#include "meta/Declare.h"
+#include "meta/TableDef.h"
+
 #include "Ast.h"
 #include "CodeunitWriter.h"
+#include "Door.h"
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
 #include "Token.h"
-#include "meta/Declare.h"
-#include "meta/TableDef.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -204,7 +206,7 @@ std::string Includes(const al::TableObject &table,
     const auto found = enums.find(LowerKey(field.subtype));
     if (found != enums.end()) { headers.insert(found->second.header); }
   }
-  std::string out = "#include \"agiru.h\"\n";
+  std::string out = std::string(kDoorMarker);
   for (const std::string &header : headers) {
     out += "#include \"";
     out += header;
@@ -654,8 +656,10 @@ TableHeader WriteHeader(const al::TableObject &declared,
   DotNetUse dotnet;
   DotNetUse absent;
   GatherAbsentIn(table.variables, table.procedures, objects, dotnet, absent);
-  return TableHeader{
-      .text = out, .unresolvedEnums = Unresolved(table, enums), .dotnet = dotnet, .absent = absent};
+  return TableHeader{.text = WithDoor(out, ObjectKind::Table),
+                     .unresolvedEnums = Unresolved(table, enums),
+                     .dotnet = dotnet,
+                     .absent = absent};
 }
 
 } // namespace agiru::gen

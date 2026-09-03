@@ -1,7 +1,8 @@
-#include "Check.h"
 #include "type/Char.h"
 #include "type/List.h"
 #include "type/Text.h"
+
+#include "Check.h"
 
 #include <string>
 

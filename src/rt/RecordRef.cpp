@@ -22,7 +22,6 @@
 #include "type/Variant.h"
 
 #include <cstddef>
-#include <memory>
 #include <string>
 #include <string_view>
 
@@ -126,8 +125,8 @@ void RecordRef::Open(Integer tableNo) {
   if (entry == nullptr) {
     throw Error("this installation carries no table " + std::to_string(tableNo));
   }
-  owned_ = std::shared_ptr<void>(entry->make(), entry->free);
-  record_ = owned_.get();
+  owned_ = detail::SharedRecord(entry->make(), entry->free);
+  record_ = owned_.Get();
   table_ = entry->table;
 }
 

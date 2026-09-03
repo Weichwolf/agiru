@@ -1,5 +1,6 @@
-#include "Check.h"
 #include "type/Guid.h"
+
+#include "Check.h"
 
 #include <array>
 #include <cstddef>

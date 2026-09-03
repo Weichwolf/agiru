@@ -2,7 +2,13 @@
 
 #include "TransferOldExtTextLines.h"
 
-#include "agiru.h"
+#include "Builtins.h"
+#include "meta/Ids.h"
+#include "runtime/Codeunit.h"
+#include "runtime/Error.h"
+#include "runtime/Table.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
 
 #include "LineNumberBuffer.h"
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <array>
 #include <compare>
 #include <cstddef>
@@ -67,7 +66,9 @@ public:
 
   /// \return True when every byte is zero, which is AL's empty Guid.
   [[nodiscard]] constexpr bool IsNull() const {
-    return std::ranges::all_of(bytes_, [](std::uint8_t byte) { return byte == 0; });
+    std::uint8_t any = 0;
+    for (const std::uint8_t byte : bytes_) { any |= byte; }
+    return any == 0;
   }
 
   /// \return The sixteen bytes.

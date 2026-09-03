@@ -1,24 +1,14 @@
 #pragma once
 
 /// \file
-/// \brief The one header a generated file includes, and the map of what stands behind it.
+/// \brief THE UNION OF THE DOOR, AND IT IS NOT THE DOOR. Nothing includes this: it is not on any
+///        include path, and a generated file names the headers it uses -- which is what AL does
+///        with `using`, and what keeps a translation unit from paying for the whole surface.
 ///
-/// FIVE DIRECTORIES, AND EACH ANSWERS A DIFFERENT QUESTION. A new header goes where its question
-/// belongs, and the rule is stated here rather than inferred from what happens to be next to it:
-///
-/// | directory | what it holds |
-/// |---|---|
-/// | `type/` | AL's VALUE types -- `Integer`, `Text`, `Date`, `Variant`, `List`. One header per AL
-/// type, named as AL names it | | `meta/` | the `constexpr` metadata a generated object carries:
-/// `TableDef`, `FieldDef`, `Declare`, the strong ids | | `runtime/` | the MACHINERY: `Table`,
-/// `Record`, `Session`, `Transaction`, `Storage`, `RecordRef`. What AL never names and always uses
-/// | | `platform/` | AL OBJECTS the platform provides rather than an app -- the virtual and system
-/// tables (board:0032). One of eight so far | | `dotnet/` | the .NET classes AL names, and
-/// `Refused` for the members not rebuilt (board:0035) |
-///
-/// The line between `runtime/` and `platform/` is the one worth stating: `runtime/` is what agiru
-/// IS, `platform/` is what BC PROVIDES. `TenantSettings` moved across it -- a tenant's deployment
-/// facts are something the platform states, not machinery agiru runs on.
+/// It exists for ONE job: a precompiled header. `agiru.h` used to be both, and being includable
+/// made it the default, so every one of the 5 835 generated sources parsed the whole door -- 988 ms
+/// against the 406 ms its own types cost (measured 2026-09-03). Precompiled once it costs nothing;
+/// included by hand it costs that, per file.
 
 #include "Builtins.h"
 #include "dotnet/ALConfigSettings.h"
@@ -130,6 +120,8 @@
 #include "type/TableFilter.h"
 #include "type/TaskScheduler.h"
 #include "type/TelemetryScope.h"
+#include "type/TestAction.h"
+#include "type/TestField.h"
 #include "type/TestHttpRequestMessage.h"
 #include "type/TestHttpResponseMessage.h"
 #include "type/TestPage.h"

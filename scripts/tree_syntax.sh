@@ -65,7 +65,7 @@ done
 # negative control caught it.
 PCH=$OUT/agiru.pch
 # shellcheck disable=SC2086
-clang++ -std=c++23 $OPT $includes -x c++-header -o "$PCH" include/agiru.h 2>"$OUT/pch.log" || {
+clang++ -std=c++23 $OPT $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
   printf 'tree: the door does not precompile -- see %s
 ' "$OUT/pch.log" >&2
   exit 1
@@ -77,7 +77,7 @@ includes="$includes -include-pch $PCH"
 # header was built" -- which lands in the failure count and looks like 1 701 broken objects. That
 # happened. The lock above stops two RUNS from colliding; this stops a run from colliding with an
 # edit, which is the same mistake wearing different clothes.
-DOORPRINT=$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)
+DOORPRINT=$(cat cmake/Precompiled.h include/*/*.h | sha1sum | cut -d' ' -f1)
 # AND THE TREE ITSELF, because a transpile during the run changes what is being measured and the
 # door fingerprint would not notice. The list of files and their sizes is enough and costs a
 # fraction of hashing 9 600 headers: a re-transpile rewrites files, and a rewritten file that is
@@ -168,7 +168,7 @@ done
 # THE SAME PRINT AT BOTH ENDS. This compared a `cksum` against a `sha1sum` after the print changed
 # at the top and not here, so it fired on every run -- a guard that always fires says as little as
 # one that never does, and this one turned a four-minute measurement into an abort.
-if [ "$(cat include/agiru.h include/*/*.h | sha1sum | cut -d' ' -f1)" != "$DOORPRINT" ]; then
+if [ "$(cat cmake/Precompiled.h include/*/*.h | sha1sum | cut -d' ' -f1)" != "$DOORPRINT" ]; then
   printf 'tree: the door changed while the run was measuring it. ABORT, not a number.\n' >&2
   exit 1
 fi

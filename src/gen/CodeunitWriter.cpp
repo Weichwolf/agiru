@@ -2,6 +2,7 @@
 
 #include "Ast.h"
 #include "BodyWriter.h"
+#include "Door.h"
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
@@ -29,15 +30,26 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
          al::HasAttribute(procedure, "InternalEvent");
 }
 
-// A TEST CODEUNIT IS `Subtype = Test` and its test procedures carry `[Test]`.
-// `devenv-test-codeunits-and-test-methods.md` names both, and the runner needs both: the subtype
-// says the codeunit is one, the attribute says which procedures the runner calls.
+// A TEST CODEUNIT IS `Subtype = Test`, AND THE SUBTYPE IS WHAT DECIDES IT.
+// `devenv-test-codeunits-and-test-methods.md`: "Test codeunits are codeunits that have the SubType
+// Property set to Test." The `[Test]` attribute then says which of its procedures the runner calls.
+// A test codeunit may live in ANY app -- it is a property of the object, not of where it sits --
+// and the runtime collects every one of them.
+bool IsTestCodeunit(const al::CodeunitObject &unit) {
+  // ONLY `Test`. `devenv-subtype-codeunit-property.md` separates the two: a `Test` codeunit HOLDS
+  // the test methods, a `TestRunner` codeunit RUNS test codeunits and carries `OnBeforeTestRun` and
+  // `OnAfterTestRun` instead. Registering a runner as a test would run its triggers as cases.
+  const al::Property *subtype = al::Find(unit.properties, "Subtype");
+  return subtype != nullptr && LowerKey(subtype->text) == "test";
+}
+
 bool IsTest(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "Test");
 }
 
 std::vector<const al::ProcedureDecl *> TestsOf(const al::CodeunitObject &unit) {
   std::vector<const al::ProcedureDecl *> tests;
+  if (!IsTestCodeunit(unit)) { return tests; }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (IsTest(procedure)) { tests.push_back(&procedure); }
   }
@@ -679,7 +691,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   // A CODEUNIT THAT NAMES A .NET TYPE INCLUDES THE GENERATED SURFACE. It is one file for all of
   // them, because the stubs reference nothing but `Refused` and splitting them would be 499 headers
   // for no reader's benefit.
-  std::string out = "#include \"agiru.h\"\n";
+  std::string out = std::string(kDoorMarker);
   // ONLY WHERE SOMETHING IS ACTUALLY ABSENT. An unconditional include would make every generated
   // codeunit depend on a file that exists because something is MISSING, which is the wrong way
   // round -- and it would make the hand-written target image depend on a transpiler run.
@@ -1073,7 +1085,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += "#include \"agiru.h\"\n";
+  out += kDoorMarker;
   // THE SOURCE INCLUDES WHAT THE HEADER ONLY DECLARED. The header carries the containment graph and
   // forward-declares everything else, which is what keeps its include graph acyclic; a BODY calls
   // methods on those objects and needs their layout, so the definitions bring them in. Header
@@ -1109,7 +1121,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   out += catalogue;
   out += "} // namespace agiru::app::codeunits\n";
-  return out;
+  return WithDoor(out, ObjectKind::Codeunit);
 }
 
 std::string ProcedureSignature(const al::ProcedureDecl &procedure,
@@ -1286,7 +1298,8 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   const std::string identifier = Identifier(object.name);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "\n#pragma once\n\n#include \"agiru.h\"\n";
+  out += "\n#pragma once\n\n";
+  out += kDoorMarker;
   out += FaceDeclarations(object, objects);
   out += "\nnamespace agiru::app::interfaces {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
@@ -1306,7 +1319,9 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   DotNetUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
-  return InterfaceHeader{.text = out, .absent = std::move(missing), .dotnet = std::move(dotnet)};
+  return InterfaceHeader{.text = WithDoor(out, ObjectKind::Interface),
+                         .absent = std::move(missing),
+                         .dotnet = std::move(dotnet)};
 }
 
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
@@ -1379,7 +1394,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   DotNetUse dotnet;
   DotNetUse absent;
   GatherDotNet(unit, objects, dotnet, absent);
-  return CodeunitHeader{.text = out,
+  return CodeunitHeader{.text = WithDoor(out, ObjectKind::Codeunit),
                         .unresolvedTables = Unresolved(unit, objects),
                         .dotnet = std::move(dotnet),
                         .absent = std::move(absent)};

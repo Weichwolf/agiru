@@ -1,7 +1,8 @@
-#include "Check.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Time.h"
+
+#include "Check.h"
 
 #include <cstdint>
 #include <ctime>

@@ -1,10 +1,11 @@
-#include "Check.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
 #include "type/Option.h"
+
+#include "Check.h"
 
 #include <string>
 

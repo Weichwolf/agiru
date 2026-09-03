@@ -2,7 +2,13 @@
 
 #pragma once
 
-#include "agiru.h"
+#include "meta/Ids.h"
+#include "runtime/Codeunit.h"
+#include "runtime/Error.h"
+#include "runtime/Table.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
+#include "type/Text.h"
 
 namespace agiru::app::tables {
 class LineNumberBuffer_Table;

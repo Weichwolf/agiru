@@ -1,7 +1,8 @@
-#include "Check.h"
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/RecordId.h"
+
+#include "Check.h"
 
 #include <cstddef>
 #include <string>

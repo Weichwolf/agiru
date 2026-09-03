@@ -1,6 +1,7 @@
 #include "EnumWriter.h"
 
 #include "Ast.h"
+#include "Door.h"
 #include "Names.h"
 #include "Scope.h"
 
@@ -57,7 +58,8 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#pragma once\n\n";
-  out += "#include \"agiru.h\"\n\n";
+  out += kDoorMarker;
+  out += "\n";
   out += "#include <array>\n#include <cstdint>\n\n";
 
   // ENUM OBJECTS GET A NAMESPACE OF THEIR OWN AND TABLES DO NOT. AL tells an object's kind apart at
@@ -98,7 +100,7 @@ std::string WriteEnum(const al::EnumObject &object, const std::string &sourcePat
          ">::kValues.size() == " + std::to_string(object.values.size()) + ",\n";
   out += "              \"enum " + std::to_string(object.id) + " declares " +
          std::to_string(object.values.size()) + " values\");\n";
-  return out;
+  return WithDoor(out, ObjectKind::Enum);
 }
 
 } // namespace agiru::gen

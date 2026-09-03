@@ -1,7 +1,8 @@
-#include "Check.h"
 #include "runtime/Error.h"
 #include "type/Dictionary.h"
 #include "type/List.h"
+
+#include "Check.h"
 
 #include <string>
 

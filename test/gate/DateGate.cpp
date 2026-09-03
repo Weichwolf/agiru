@@ -1,5 +1,6 @@
-#include "Check.h"
 #include "type/Date.h"
+
+#include "Check.h"
 
 using agiru::Date;
 

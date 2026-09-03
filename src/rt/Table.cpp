@@ -1,6 +1,5 @@
 #include "runtime/Table.h"
 
-#include "Rows.h"
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
@@ -17,6 +16,8 @@
 #include "type/Integer.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
+
+#include "Rows.h"
 
 #include <cstddef>
 #include <cstdint>

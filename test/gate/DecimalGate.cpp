@@ -1,5 +1,6 @@
-#include "Check.h"
 #include "type/Decimal.h"
+
+#include "Check.h"
 
 #include <string>
 

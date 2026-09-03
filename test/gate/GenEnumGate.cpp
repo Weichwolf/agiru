@@ -87,8 +87,13 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
              Has(header.text, "Enum<enums::SalesLineType> Type{};"));
   CHECK_TRUE("and the header that declares it is included",
              Has(header.text, "#include \"sales/document/enum/SalesLineType.h\""));
-  CHECK_TRUE("and the door comes as ONE line, the way an AL file declares no includes at all",
-             Has(header.text, "#include \"agiru.h\"") && !Has(header.text, "#include \"type/"));
+  // The claim CHANGED with the design: the door was one master include and is now the headers the
+  // file names. What it must never be again is `agiru.h`, which cost every generated translation
+  // unit the whole door.
+  CHECK_TRUE("the door is the headers this file names and not a master include",
+             !Has(header.text, "#include \"agiru.h\"") &&
+                 Has(header.text, "#include \"type/Enum.h\"") &&
+                 Has(header.text, "#include \"runtime/Table.h\""));
 }
 
 /// THE NEGATIVE CONTROL. Without the index the reference cannot be resolved, and the generator has

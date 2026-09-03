@@ -194,6 +194,10 @@ public:
 ///       `StrLen(Filter) + ... <= MaxStrLen(Filter)` stopped after its first iteration.
 constexpr Integer kUnboundedLength = 2147483647;
 
+/// \brief AL `MaxStrLen(String)`.
+/// \tparam T A Text or Code.
+/// \param value The string.
+/// \return Its DECLARED length, which is the platform's own limit when it was declared without one.
 template <typename T> Integer MaxStrLen(const T &value) {
   const std::size_t declared = value.Max();
   return declared == 0 ? kUnboundedLength : static_cast<Integer>(declared);

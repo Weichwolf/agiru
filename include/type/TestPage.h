@@ -3,6 +3,8 @@
 #include "runtime/Error.h"
 #include "runtime/Page.h"
 #include "type/Boolean.h"
+#include "type/TestAction.h"
+#include "type/TestField.h"
 
 /// \file
 /// \brief AL `TestPage` -- a page driven without a screen.
@@ -34,14 +36,17 @@ class UnknownPage {};
 /// \brief The controls a `TestPage` over an untranslated page has, which is none.
 template <> struct agiru::PageTraits<agiru::UnknownPage> {
   /// \brief No controls at all.
-  using Controls = agiru::UnknownPage;
+  /// \tparam Field  How a test reaches a control.
+  /// \tparam Action How a test reaches an action.
+  template <typename Field, typename Action> using Controls = agiru::UnknownPage;
 };
 
 namespace agiru {
 
 /// \brief AL `TestPage <Page>` -- the page, headless, with its controls reachable by name.
 /// \tparam P The generated page class.
-template <typename P = UnknownPage> class TestPage : public PageTraits<P>::Controls {
+template <typename P = UnknownPage>
+class TestPage : public PageTraits<P>::template Controls<TestField, TestAction> {
 public:
   /// \brief AL `TestPage.OpenNew()` -- opens the page ready to insert.
   /// \throws Error until a page can be opened (board:0030).

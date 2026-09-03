@@ -135,6 +135,12 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
       target_include_directories(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/apps/${slice_app}")
     endforeach()
     target_link_libraries(agiru_slice PRIVATE agiru_rt agiru_net agiru_db)
+    # THE DOOR IS PARSED ONCE AND NOT ONCE PER FILE. `cmake/Precompiled.h` is the union of it, and
+    # generated source takes (measured 2026-09-03, clang++-19 over libstdc++-14), and 5 835 of them
+    # read it. A precompiled header is 1.1 s built once. It is not a substitute for a generated file
+    # including what it uses -- that stands as its own rule -- it is what makes the loop bearable
+    # while the tree is still repaired file by file.
+    target_precompile_headers(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
     target_link_libraries(agiru PRIVATE agiru_slice)
   endif()
 endif()
@@ -160,6 +166,7 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
+    target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
 
     string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)
     if(depends)

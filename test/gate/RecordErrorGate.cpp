@@ -1,9 +1,10 @@
-#include "Check.h"
-#include "ResourceCost.h"
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "type/Option.h"
+
+#include "Check.h"
+#include "ResourceCost.h"
 
 #include <string>
 

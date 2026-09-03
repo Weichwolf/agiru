@@ -1,5 +1,3 @@
-#include "Check.h"
-#include "ResourceCost.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
@@ -8,6 +6,9 @@
 #include "type/Code.h"
 #include "type/Decimal.h"
 #include "type/Option.h"
+
+#include "Check.h"
+#include "ResourceCost.h"
 
 #include <array>
 #include <cstddef>

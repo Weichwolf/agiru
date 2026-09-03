@@ -14,7 +14,6 @@
 #include "type/SecurityFilter.h"
 #include "type/Variant.h"
 
-#include <memory>
 #include <string>
 #include <string_view>
 
@@ -26,6 +25,97 @@
 // the suppression goes with them (board:0035). The parameter orders are AL's own, which is
 // what makes the surface checkable against the documentation at all.
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
+namespace agiru::detail {
+
+/// \brief A record several `RecordRef`s hold at once, freed when the last one lets go.
+///
+/// \note IT IS NOT A `std::shared_ptr`, AND THE REASON IS THE DOOR'S OWN BUILD TIME. Including
+///       `<memory>` here costs every generated translation unit 1.2 s of the 3.4 s it takes to read
+///       `agiru.h` at all (measured 2026-09-03, clang++-19 over libstdc++-14, where `<memory>`
+///       pulls in `<format>` through `unique_ptr.h`). 5 835 generated sources pay that, so the
+///       twenty lines are cheaper than the header. The shape is `Instance<T>`'s: a raw pointer and
+///       the free function captured where the type was still complete (board:0037).
+class SharedRecord {
+public:
+  /// \brief Holds nothing.
+  SharedRecord() = default;
+
+  /// \brief Takes ownership of a record.
+  /// \param record The record.
+  /// \param free   What unmakes it.
+  SharedRecord(void *record, void (*free)(void *))
+      : record_(record), free_(free), uses_(record == nullptr ? nullptr : new long{1}) {}
+
+  /// \brief Shares another's record.
+  /// \param o The other.
+  SharedRecord(const SharedRecord &o) : record_(o.record_), free_(o.free_), uses_(o.uses_) {
+    if (uses_ != nullptr) { ++*uses_; }
+  }
+
+  /// \brief Takes another's record.
+  /// \param o The other.
+  SharedRecord(SharedRecord &&o) noexcept : record_(o.record_), free_(o.free_), uses_(o.uses_) {
+    o.record_ = nullptr;
+    o.free_ = nullptr;
+    o.uses_ = nullptr;
+  }
+
+  /// \brief Shares another's record, letting go of this one.
+  /// \param o The other.
+  /// \return This.
+  SharedRecord &operator=(const SharedRecord &o) {
+    if (this != &o) {
+      SharedRecord copy(o);
+      Swap(copy);
+    }
+    return *this;
+  }
+
+  /// \brief Takes another's record, letting go of this one.
+  /// \param o The other.
+  /// \return This.
+  SharedRecord &operator=(SharedRecord &&o) noexcept {
+    if (this != &o) { Swap(o); }
+    return *this;
+  }
+
+  ~SharedRecord() { Reset(); }
+
+  /// \brief Lets go, freeing the record when this was the last holder.
+  void Reset() {
+    if (uses_ != nullptr && --*uses_ == 0) {
+      if (free_ != nullptr) { free_(record_); }
+      delete uses_;
+    }
+    record_ = nullptr;
+    free_ = nullptr;
+    uses_ = nullptr;
+  }
+
+  /// \brief The record.
+  /// \return It, or `nullptr`.
+  [[nodiscard]] void *Get() const { return record_; }
+
+private:
+  void Swap(SharedRecord &o) noexcept {
+    void *record = record_;
+    void (*free)(void *) = free_;
+    long *uses = uses_;
+    record_ = o.record_;
+    free_ = o.free_;
+    uses_ = o.uses_;
+    o.record_ = record;
+    o.free_ = free;
+    o.uses_ = uses;
+  }
+
+  void *record_ = nullptr;
+  void (*free_)(void *) = nullptr;
+  long *uses_ = nullptr;
+};
+
+} // namespace agiru::detail
+
 namespace agiru {
 
 /// \brief AL `FieldRef` -- one field of one record, reached without naming its type.
@@ -1071,7 +1161,7 @@ public:
   void Close() {
     record_ = nullptr;
     table_ = nullptr;
-    owned_.reset();
+    owned_.Reset();
   }
 
   /// \brief AL `RecordRef.KeyCount()`.
@@ -1088,7 +1178,7 @@ private:
   // A RecordRef IS COPIED BY VALUE in generated code -- `FieldRef := RecRef.Field(No)` and every
   // `var RecordRef` parameter -- so the record a copy points at has to outlive the copy. A shared
   // owner is what says that; a unique one would make the copy a compile error AL does not have.
-  std::shared_ptr<void> owned_;
+  detail::SharedRecord owned_;
 };
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)

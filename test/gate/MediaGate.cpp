@@ -1,4 +1,3 @@
-#include "Check.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
@@ -7,6 +6,8 @@
 #include "type/Guid.h"
 #include "type/Media.h"
 #include "type/MediaSet.h"
+
+#include "Check.h"
 
 #include <span>
 #include <string>

@@ -1,8 +1,9 @@
-#include "Check.h"
 #include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
+
+#include "Check.h"
 
 #include <string>
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 # WHAT ONE GENERATED TRANSLATION UNIT COSTS, and what a precompiled door would save.
 #
-# Every generated file includes `agiru.h`, and the door plus the standard library it pulls is some
+# A generated file includes the door headers it names, and the door plus the standard library is some
 # 36 500 of the ~36 760 preprocessed lines in one -- 99 % of the file is the same 99 % as every
 # other file's. That is the same text parsed once per translation unit, and there are 5 681 of them.
 # This measures the three costs a build actually pays, so the projection is arithmetic rather than a
@@ -45,7 +45,7 @@ time_it "compile, -O0" clang++ $FLAGS -O0 -c -o "$OUT/one.o" "$FILE"
 
 printf '\ncompile: the door, precompiled\n'
 # shellcheck disable=SC2086
-clang++ $FLAGS -x c++-header -O2 -o "$OUT/agiru.pch" include/agiru.h 2>/dev/null || {
+clang++ $FLAGS -x c++-header -O2 -o "$OUT/agiru.pch" cmake/Precompiled.h 2>/dev/null || {
   printf '  the door does not precompile on its own\n'
   exit 0
 }

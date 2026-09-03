@@ -1,5 +1,6 @@
 #include "Apps.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
@@ -22,6 +23,17 @@ namespace {
 class Reader {
 public:
   explicit Reader(std::string text) : text_(std::move(text)) {}
+
+  /// The string array under a key, for scope.json's four lists.
+  /// It is public because scope.json is four arrays and no object.
+  [[nodiscard]] std::vector<std::string> At(std::string_view key) {
+    at_ = 0;
+    const std::size_t found = text_.find(key);
+    if (found == std::string::npos) { return {}; }
+    at_ = text_.find(':', found) + 1;
+    SkipSpace();
+    return Strings();
+  }
 
   [[nodiscard]] std::vector<App> Apps() {
     Seek("\"apps\"");
@@ -118,6 +130,63 @@ std::vector<App> ReadApps(const std::filesystem::path &path) {
   std::vector<App> apps = Reader(text.str()).Apps();
   if (apps.empty()) { throw std::runtime_error("apps.json: declares no apps"); }
   return apps;
+}
+
+namespace {
+
+std::string Lowered(std::string_view text) {
+  std::string out(text);
+  for (char &c : out) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+  return out;
+}
+
+// THE LONGEST MATCH WINS AND IT MATCHES ON A DOT BOUNDARY. `System.TestTools` is not inside
+// `System.Test`, and a prefix test without the boundary would have said it was.
+std::size_t LongestPrefix(std::string_view lowered, const std::vector<std::string> &table) {
+  std::size_t best = 0;
+  for (const std::string &entry : table) {
+    const std::string prefix = Lowered(entry);
+    const bool matches =
+        lowered == prefix || (lowered.starts_with(prefix) && lowered.size() > prefix.size() &&
+                              lowered[prefix.size()] == '.');
+    if (matches && prefix.size() > best) { best = prefix.size(); }
+  }
+  return best;
+}
+
+} // namespace
+
+bool Holds(const TranspileScope &scope, std::string_view nameSpace) {
+  if (nameSpace.empty()) { return true; }
+  const std::string lowered = Lowered(nameSpace);
+  const std::size_t included = LongestPrefix(lowered, scope.include);
+  if (included == 0) { return false; }
+  return LongestPrefix(lowered, scope.exclude) <= included;
+}
+
+bool HoldsArea(const TranspileScope &scope, std::string_view area) {
+  const std::string lowered = Lowered(area);
+  const auto named = [&lowered](const std::string &entry) { return lowered == Lowered(entry); };
+  const auto ends = [&lowered](const std::string &s) { return lowered.ends_with(Lowered(s)); };
+  return !std::ranges::any_of(scope.areaExclude, named) &&
+         !std::ranges::any_of(scope.areaExcludeSuffix, ends);
+}
+
+TranspileScope ReadScope(const std::filesystem::path &path) {
+  const std::ifstream file(path);
+  if (!file) { throw std::runtime_error("scope.json: cannot read " + path.string()); }
+  std::ostringstream text;
+  text << file.rdbuf();
+  Reader reader(text.str());
+  TranspileScope scope;
+  scope.include = reader.At("\"include\"");
+  scope.exclude = reader.At("\"exclude\"");
+  scope.areaExclude = reader.At("\"area_exclude\"");
+  scope.areaExcludeSuffix = reader.At("\"area_exclude_suffix\"");
+  if (scope.include.empty()) {
+    throw std::runtime_error("scope.json: the include list is empty, so nothing is in scope");
+  }
+  return scope;
 }
 
 } // namespace agiru::gen

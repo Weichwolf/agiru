@@ -66,8 +66,17 @@ struct Counts {
   std::size_t unitLost = 0;   ///< UT codeunits the parser could not read at all.
 };
 
+// `UT` IS A SUFFIX AND NOT A SYLLABLE. Matching the two letters alone counted `Sales Stockout`,
+// `SCM Stockout`, `Jobs Stockout`, `Service Stockout`, `Report Layout` and `Office Addin Popout` as
+// unit-test codeunits -- six of them, 87 [Test] methods, in the milestone's own denominator. What
+// separates the suffix from the ending is the character in front of it, and BCApps uses three:
+// `Library - Utility UT`, `Autom. Payment Registration.UT`, and a hyphen in a handful more.
 bool IsUnitTest(std::string_view name) {
-  return name.size() >= 2 && (name.ends_with("UT") || name.ends_with("Ut") || name.ends_with("ut"));
+  if (name.size() < 3) { return false; }
+  const std::string_view tail = name.substr(name.size() - 2);
+  const bool suffix = (tail[0] == 'U' || tail[0] == 'u') && (tail[1] == 'T' || tail[1] == 't');
+  const char before = name[name.size() - 3];
+  return suffix && (before == ' ' || before == '-' || before == '.');
 }
 
 void Report(std::string_view what, const Counts &counts) {
@@ -113,8 +122,51 @@ void Cluster(const std::vector<Failure> &failures) {
   }
 }
 
-std::vector<std::filesystem::path> SourcesEndingIn(const std::filesystem::path &root,
-                                                   std::string_view suffix) {
+struct Run {
+  const agiru::gen::TranspileScope *scope = nullptr; ///< What of BC this run translates.
+  std::filesystem::path root;
+  std::filesystem::path output;
+  std::vector<Failure> failures;        ///< What could not be READ.
+  std::vector<Failure> refusals;        ///< What could be read and not WRITTEN.
+  std::size_t written = 0;              ///< Objects emitted.
+  std::size_t changed = 0;              ///< Files whose bytes actually differ from what was there.
+  std::set<std::filesystem::path> kept; ///< Every path this run stands behind.
+};
+
+// THE FIRST FEW HUNDRED BYTES DECIDE IT. A `namespace` declaration is the first statement of an AL
+// file, so the scope question is answered without reading -- let alone parsing -- the whole object.
+std::string DeclaredNamespace(const std::filesystem::path &path) {
+  std::ifstream file(path);
+  if (!file) { return {}; }
+  std::string line;
+  while (std::getline(file, line)) {
+    const std::size_t at = line.find("namespace ");
+    if (at == std::string::npos) { continue; }
+    if (line.find_first_not_of(" \t") != at) { continue; }
+    std::string name = line.substr(at + std::string_view("namespace ").size());
+    const std::size_t end = name.find(';');
+    if (end != std::string::npos) { name.resize(end); }
+    while (!name.empty() && (std::isspace(static_cast<unsigned char>(name.back())) != 0)) {
+      name.pop_back();
+    }
+    return name;
+  }
+  return {};
+}
+
+// A SOURCE IS IN SCOPE BY ITS NAMESPACE, OR BY ITS FOLDER WHEN IT DECLARES NONE. scope.json says
+// which; both halves are the predecessor's own list, so the two trees translate the same BC.
+bool InScope(const Run &run, const std::filesystem::path &path) {
+  if (run.scope == nullptr) { return true; }
+  const std::string nameSpace = DeclaredNamespace(path);
+  if (!nameSpace.empty()) { return agiru::gen::Holds(*run.scope, nameSpace); }
+  const std::filesystem::path relative = path.lexically_relative(run.root);
+  if (relative.empty() || relative.begin() == relative.end()) { return true; }
+  return agiru::gen::HoldsArea(*run.scope, relative.begin()->string());
+}
+
+std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_view suffix) {
+  const std::filesystem::path &root = run.root;
   std::vector<std::filesystem::path> sources;
   for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
     // THE SUFFIX IS MATCHED WITHOUT CASE, because BCApps does not hold to its own convention:
@@ -127,7 +179,7 @@ std::vector<std::filesystem::path> SourcesEndingIn(const std::filesystem::path &
           return std::tolower(static_cast<unsigned char>(a)) ==
                  std::tolower(static_cast<unsigned char>(b));
         })) {
-      sources.push_back(entry.path());
+      if (InScope(run, entry.path())) { sources.push_back(entry.path()); }
     }
   }
   std::ranges::sort(sources);
@@ -165,16 +217,6 @@ struct Job {
 };
 
 /// What every pass shares: where the source is, where the output goes, and what went wrong.
-struct Run {
-  std::filesystem::path root;
-  std::filesystem::path output;
-  std::vector<Failure> failures;        ///< What could not be READ.
-  std::vector<Failure> refusals;        ///< What could be read and not WRITTEN.
-  std::size_t written = 0;              ///< Objects emitted.
-  std::size_t changed = 0;              ///< Files whose bytes actually differ from what was there.
-  std::set<std::filesystem::path> kept; ///< Every path this run stands behind.
-};
-
 void Keep(Run &run, const Output &where, const std::string &text) {
   if (WriteFile(where, text)) { ++run.changed; }
   run.kept.insert(where.directory / where.relative);
@@ -217,7 +259,7 @@ struct Interfaces {
 
 Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Interfaces kept;
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Interface.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Interface.al")) {
     ++counts.files;
     try {
       agiru::al::InterfaceObject object = agiru::al::ParseInterface(Read(path));
@@ -362,7 +404,7 @@ Extensions ReadExtensions(Run &run,
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
     const auto read = [&](std::string_view suffix, auto parse, auto &into) {
-      for (const std::filesystem::path &path : SourcesEndingIn(run.root, suffix)) {
+      for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
         try {
           auto extension = parse(Read(path));
@@ -387,7 +429,7 @@ struct Pages {
 
 Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Pages pages;
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Page.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Page.al")) {
     ++counts.files;
     try {
       agiru::al::PageObject object = agiru::al::ParsePage(Read(path));
@@ -451,7 +493,7 @@ void WritePages(Run &run,
 void ScanEnums(Run &run, Counts &counts, const Extensions &store, agiru::gen::EnumIndex &index) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Enum.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Enum.al")) {
     ++counts.files;
     try {
       agiru::al::EnumObject object = agiru::al::ParseEnum(Read(path));
@@ -550,7 +592,7 @@ void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums 
 
 Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Tables kept;
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Table.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Table.al")) {
     ++counts.files;
     try {
       agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
@@ -661,7 +703,7 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
 // file order would not have it -- and parsing 3 914 objects twice to find that out costs minutes
 // for two lines of header. The object's kind, name and namespace are all on its declaration line.
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     const agiru::gen::ObjectDeclaration declared =
         agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Codeunit);
     if (!declared.found) { continue; }
@@ -683,7 +725,7 @@ void ScanCodeunits(Run &run,
                    Gathered &gathered,
                    agiru::gen::Objects &objects,
                    std::map<std::string, std::size_t> &unresolvedTables) {
-  for (const std::filesystem::path &path : SourcesEndingIn(run.root, ".Codeunit.al")) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     ++counts.files;
     const std::string source = Read(path);
     const UnitTestPopulation population = UnitTestsIn(source);
@@ -794,7 +836,9 @@ void WriteAbsent(const std::filesystem::path &out,
                  const agiru::gen::DotNetUse &absent) {
   if (out.empty()) { return; }
   std::string text = "// Generated from every AL body that names a type this run does not have.\n";
-  text += "// Do not edit.\n\n#pragma once\n\n#include \"agiru.h\"\n";
+  // IT NEEDS `Refused` AND NOTHING ELSE, and that is 2.4 seconds per file that names an absent
+  // type. The whole door was reaching every one of them through a stub that uses one class.
+  text += "// Do not edit.\n\n#pragma once\n\n#include \"dotnet/Refused.h\"\n";
   text += "\nnamespace agiru::dotnet {\n";
   const Counted net = Stubs(text, dotnet, true);
   // A NAMESPACE OF THEIR OWN, because an absent AL object may carry a name the AL TYPE system
@@ -892,10 +936,15 @@ void Add(Counts &into, const Counts &one) {
 // therefore holds because of the shape of the loop, not because of a second check that could drift.
 int Scan(const Job &job) {
   const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
+  // scope.json SITS BESIDE apps.json, because the two answer the same question from opposite ends:
+  // apps.json says which trees are read and scope.json says which of what is in them is translated.
+  const agiru::gen::TranspileScope scope =
+      agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
   ClaimOutput(job.output);
 
   Counts allExtensionsRead;
-  Run reader{.root = job.source,
+  Run reader{.scope = &scope,
+             .root = job.source,
              .output = {},
              .failures = {},
              .refusals = {},
@@ -937,7 +986,8 @@ int Scan(const Job &job) {
       std::println("{:<10} {} -- no such tree, skipped", app.name, source.string());
       continue;
     }
-    Run run{.root = source,
+    Run run{.scope = &scope,
+            .root = source,
             .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
             .failures = {},
             .refusals = {},

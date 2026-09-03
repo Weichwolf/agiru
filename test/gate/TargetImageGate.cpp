@@ -1,9 +1,10 @@
-#include "Check.h"
-#include "ResourceCost.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "type/Decimal.h"
+
+#include "Check.h"
+#include "ResourceCost.h"
 
 #include <cstddef>
 #include <cstdint>

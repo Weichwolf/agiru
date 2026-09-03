@@ -1,5 +1,3 @@
-#include "Check.h"
-#include "ResourceCost.h"
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
@@ -12,6 +10,9 @@
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Variant.h"
+
+#include "Check.h"
+#include "ResourceCost.h"
 
 #include <array>
 #include <cstddef>

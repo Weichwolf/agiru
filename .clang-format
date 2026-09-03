@@ -54,10 +54,12 @@ PackConstructorInitializers: NextLine
 SortIncludes: CaseSensitive
 IncludeBlocks: Regroup
 IncludeCategories:
-  # THE DOOR COMES FIRST IN EVERY GENERATED FILE, and this pattern was left behind when the door
-  # moved from `agiru/AL.h` to `agiru.h`: it stopped matching, so `"agiru.h"` sorted with the rest
-  # and landed after any header whose name starts with a capital -- which is most of them.
-  - Regex: '^"agiru\.h"'
+  # THE DOOR COMES FIRST IN EVERY GENERATED FILE, AS ITS OWN BLOCK. It used to be one header and
+  # one pattern; it is now the set a file actually names, so the pattern is the door's DIRECTORIES.
+  # Without it `Regroup` merges the door with the objects the file includes and sorts the two
+  # together, which reads as one undifferentiated list -- and they are two different kinds of
+  # dependency, the way AL separates `namespace` from `using`.
+  - Regex: '^"(Builtins\.h|meta/|runtime/|type/|platform/|dotnet/|absent/)'
     Priority: 1
   - Regex: '^"'
     Priority: 2

@@ -1,9 +1,10 @@
-#include "Check.h"
-#include "LineNumberBuffer.h"
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
+
+#include "Check.h"
+#include "LineNumberBuffer.h"
 
 #include <string>
 #include <vector>

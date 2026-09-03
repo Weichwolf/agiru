@@ -1,5 +1,6 @@
-#include "Check.h"
 #include "type/SecretText.h"
+
+#include "Check.h"
 
 #include <string>
 #include <type_traits>

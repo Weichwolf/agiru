@@ -2,7 +2,16 @@
 
 #pragma once
 
-#include "agiru.h"
+#include "meta/Declare.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "runtime/Table.h"
+#include "type/Code.h"
+#include "type/DateTime.h"
+#include "type/Decimal.h"
+#include "type/Guid.h"
+#include "type/Option.h"
 
 #include <array>
 #include <cstddef>
