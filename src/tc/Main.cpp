@@ -174,6 +174,29 @@ std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_v
   return sources;
 }
 
+std::map<std::string, std::size_t> UntranslatedKinds(const Run &run) {
+  static constexpr std::array kWithoutAGenerator{
+      std::string_view{"report"},
+      std::string_view{"query"},
+      std::string_view{"xmlport"},
+      std::string_view{"permissionset"},
+      std::string_view{"permissionsetext"},
+      std::string_view{"profile"},
+      std::string_view{"controladdin"},
+      std::string_view{"entitlement"},
+      std::string_view{"pagecustomization"},
+      std::string_view{"reportext"},
+      std::string_view{"dotnet"},
+  };
+  std::map<std::string, std::size_t> counted;
+  for (const std::string_view kind : kWithoutAGenerator) {
+    const std::string suffix = "." + std::string(kind) + ".al";
+    const std::size_t found = SourcesEndingIn(run, suffix).size();
+    if (found != 0) { counted[std::string(kind)] += found; }
+  }
+  return counted;
+}
+
 struct Output {
   std::filesystem::path directory;
   std::string relative;
@@ -840,6 +863,7 @@ int Scan(const Job &job) {
   std::set<std::filesystem::path> kept;
   std::vector<Tables> held;
   TableByName everyTable;
+  std::map<std::string, std::size_t> untranslated;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -892,6 +916,7 @@ int Scan(const Job &job) {
                  enums.parsed,
                  codeunits.tests,
                  run.written != 0 ? std::format(" -- {} written", run.written) : std::string{});
+    for (const auto &[kind, found] : UntranslatedKinds(run)) { untranslated[kind] += found; }
     Add(allEnums, enums);
     Add(allTables, tables);
     Add(allCodeunits, codeunits);
@@ -922,6 +947,16 @@ int Scan(const Job &job) {
   for (const auto &[name, total] : store.held) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
+  }
+  if (!untranslated.empty()) {
+    std::size_t total = 0;
+    for (const auto &[kind, found] : untranslated) { total += found; }
+    std::println("untranslated {} object(s) in scope whose kind has no generator (board:0034)",
+                 total);
+    std::vector<std::pair<std::string, std::size_t>> ranked(untranslated.begin(),
+                                                            untranslated.end());
+    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
   }
   ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
   if (allCodeunits.emitted != 0) {
