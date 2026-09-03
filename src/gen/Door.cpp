@@ -7,6 +7,9 @@
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
+#include <map>
+#include <regex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -42,6 +45,41 @@ std::vector<std::string> &DoorTypes() {
     return found;
   }();
   return const_cast<std::vector<std::string> &>(types);
+}
+
+std::map<std::string, std::string> &DoorSpellings() {
+  static const std::map<std::string, std::string> spellings = [] {
+    std::map<std::string, std::string> found;
+    const std::filesystem::path root = std::filesystem::path(AGIRU_SOURCE_DIR) / "include";
+    if (!std::filesystem::is_directory(root)) {
+      throw std::runtime_error("the door has no include/ directory at " + root.string());
+    }
+    const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*\()");
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
+      if (entry.path().extension() != ".h") { continue; }
+      std::ifstream file(entry.path());
+      std::string line;
+      while (std::getline(file, line)) {
+        if (line.starts_with("///") || line.starts_with("//")) { continue; }
+        for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
+          const std::string name = (*it)[1].str();
+          std::string key;
+          for (const char c : name) {
+            key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+          }
+          const auto standing = found.find(key);
+          if (standing == found.end()) {
+            found.emplace(key, name);
+          } else if (standing->second != name) {
+            standing->second.clear();
+          }
+        }
+      }
+    }
+    if (found.empty()) { throw std::runtime_error("the door declares no names"); }
+    return found;
+  }();
+  return const_cast<std::map<std::string, std::string> &>(spellings);
 }
 
 constexpr std::array<std::pair<std::string_view, std::string_view>, 32> kElsewhere{{
@@ -166,6 +204,24 @@ void KnowDoorTypes(const std::filesystem::path &include) {
     DoorTypes().push_back(name);
   }
   if (DoorTypes().empty()) { throw std::runtime_error("the door declares no types"); }
+}
+
+bool DoorDeclares(std::string_view name) {
+  std::string key;
+  for (const char c : name) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return DoorSpellings().contains(key);
+}
+
+std::string AsTheDoorSpellsIt(std::string_view name) {
+  std::string key;
+  for (const char c : name) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  const auto found = DoorSpellings().find(key);
+  if (found == DoorSpellings().end() || found->second.empty()) { return std::string(name); }
+  return found->second;
 }
 
 }

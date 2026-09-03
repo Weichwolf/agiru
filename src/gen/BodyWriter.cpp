@@ -547,7 +547,7 @@ private:
         out += " ";
       }
       out += spelling == "." && chain[i - 1]->kind == al::ExprKind::Name
-                 ? Identifier(chain[i - 1]->text)
+                 ? scope_.MemberSpelling(walk->text, Identifier(chain[i - 1]->text))
                  : Expression(*chain[i - 1], precedence + 1);
       if (calls && i == chain.size() && !asCallee) { out += "()"; }
     }
@@ -663,7 +663,15 @@ public:
 
   [[nodiscard]] bool MemberIsCall(std::string_view variable,
                                   std::string_view member) const override {
-    return IsRecord(variable) && FieldNamed(table_, member) == nullptr;
+    return IsRecord(variable) && DoorDeclares(member) && FieldNamed(table_, member) == nullptr;
+  }
+
+  [[nodiscard]] std::string MemberSpelling(std::string_view variable,
+                                           std::string_view member) const override {
+    if (!IsRecord(variable) || FieldNamed(table_, member) != nullptr) {
+      return std::string(member);
+    }
+    return AsTheDoorSpellsIt(member);
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
@@ -719,7 +727,15 @@ public:
 
   [[nodiscard]] bool MemberIsCall(std::string_view variable,
                                   std::string_view member) const override {
-    return IsRecord(variable) && FieldNamed(*source_, member) == nullptr;
+    return IsRecord(variable) && DoorDeclares(member) && FieldNamed(*source_, member) == nullptr;
+  }
+
+  [[nodiscard]] std::string MemberSpelling(std::string_view variable,
+                                           std::string_view member) const override {
+    if (!IsRecord(variable) || FieldNamed(*source_, member) != nullptr) {
+      return std::string(member);
+    }
+    return AsTheDoorSpellsIt(member);
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {

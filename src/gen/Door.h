@@ -14,4 +14,8 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] std::string WithDoor(std::string text, ObjectKind kind);
 
+[[nodiscard]] std::string AsTheDoorSpellsIt(std::string_view name);
+
+[[nodiscard]] bool DoorDeclares(std::string_view name);
+
 }

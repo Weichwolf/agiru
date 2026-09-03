@@ -45,6 +45,12 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual std::string MemberSpelling(std::string_view variable,
+                                                   std::string_view member) const {
+    static_cast<void>(variable);
+    return std::string(member);
+  }
+
   [[nodiscard]] virtual bool MemberIsCall(std::string_view variable,
                                           std::string_view member) const {
     static_cast<void>(member);
