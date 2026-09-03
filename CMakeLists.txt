@@ -36,6 +36,18 @@ set(TIERS al net db gen rt cli tc)
 # THE LAYERING IS CHECKED BEFORE ANY SOURCE IS LOOKED AT. A tier without a .cpp is skipped below;
 # its `reaches` would then never have been read, and a typo in it would have slept until its first
 # file arrived.
+# NO ENVIRONMENT VARIABLE DECIDES A RESULT. The gate's database is a declared build setting, not
+# something the shell happens to be carrying: a case that reads its target from the environment
+# passes or fails for reasons the tree cannot see.
+#
+# AND THE GATE'S DATABASE IS NOT THE RUNNER'S. `agiru run-tests` CLONES its master, and PostgreSQL
+# refuses to copy a database any session holds open -- so a gate sitting on the master stops every
+# run, and whatever the gate wrote is in every clone after it (openerp WI-832).
+set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_gate"
+    CACHE STRING "Connection string the gate connects to")
+set(AGIRU_MASTER_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
+    CACHE STRING "Connection string of the template `agiru run-tests` clones")
+
 foreach(tier IN LISTS TIERS)
   if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches")
     message(FATAL_ERROR "src/${tier}/ carries no reaches file.")
@@ -56,7 +68,7 @@ foreach(tier IN LISTS TIERS)
   if(tier STREQUAL cli)
     add_executable(agiru ${sources})
     set(target agiru)
-    target_compile_definitions(agiru PRIVATE AGIRU_DATABASE="${AGIRU_TEST_DSN}")
+    target_compile_definitions(agiru PRIVATE AGIRU_DATABASE="${AGIRU_MASTER_DSN}")
   elseif(tier STREQUAL tc)
     add_executable(agirutc ${sources})
     set(target agirutc)
@@ -90,11 +102,6 @@ if(TARGET agiru_db)
 endif()
 
 
-# NO ENVIRONMENT VARIABLE DECIDES A RESULT. The gate's database is a declared build setting, not
-# something the shell happens to be carrying: a case that reads its target from the environment
-# passes or fails for reasons the tree cannot see.
-set(AGIRU_TEST_DSN "postgresql://agiru:agiru@localhost:5433/agiru_master"
-    CACHE STRING "Connection string the gate uses")
 set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
     CACHE STRING "The AL source the gate parses")
 # The root the TRANSPILER reads, which is one level up: apps.json names each app's tree beneath it.

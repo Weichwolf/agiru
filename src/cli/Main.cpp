@@ -1,6 +1,7 @@
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"
+#include "runtime/test/RunnerDatabase.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -19,6 +20,8 @@ struct Options {
   std::string suite;
   std::string codeunit;
   std::string database;
+  std::string scratch = "agiru_test_0";
+  bool fresh = false;
   bool list = false;
 };
 
@@ -29,7 +32,8 @@ constexpr std::string_view kDatabase = AGIRU_DATABASE;
 void Usage() {
   std::println("agiru -- Business Central, translated to C++");
   std::println("");
-  std::println("  agiru run-tests [--suite <name>] [--codeunit <name>] [--list]");
+  std::println("  agiru run-tests [--suite <name>] [--codeunit <name>] [--scratch <db>]\n          "
+               "       [--database <dsn>] [--fresh] [--list]");
   std::println("      Run the transpiled [Test] procedures through the AL test runner.");
   std::println("      With no filter, the whole installed test population.");
   std::println("      --list says which test codeunits this binary carries.");
@@ -59,6 +63,10 @@ Options Read(std::span<const std::string_view> arguments) {
       options.codeunit = ValueOf(arguments, at);
     } else if (argument == "--database") {
       options.database = ValueOf(arguments, at);
+    } else if (argument == "--scratch") {
+      options.scratch = ValueOf(arguments, at);
+    } else if (argument == "--fresh") {
+      options.fresh = true;
     } else if (argument == "--list") {
       options.list = true;
     } else {
@@ -97,8 +105,9 @@ int RunTests(const Options &options) {
                          "; `run-tests --list` says which are registered");
     }
   }
-  const agiru::Session session(options.database.empty() ? std::string(kDatabase)
-                                                        : options.database);
+  const std::string master = options.database.empty() ? std::string(kDatabase) : options.database;
+  const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
+  const agiru::Session session(runner.Dsn());
   const agiru::TestRun run = agiru::RunRegisteredTests(options.codeunit);
   for (const agiru::TestResult &result : run.results) {
     if (result.passed) { continue; }
