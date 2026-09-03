@@ -14,6 +14,7 @@
 #include "type/SecurityFilter.h"
 #include "type/Variant.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -1064,10 +1065,13 @@ public:
   }
 
   /// \brief AL `RecordRef.Close()` -- lets go of the record it was opened on.
-  /// \throws Error until `Open` can make one (board:0025).
+  ///
+  /// \note IT LETS GO OF A RECORD IT MADE AND OF ONE IT WAS GIVEN, and only the first is freed:
+  ///       `GetTable(Rec)` points a RecordRef at somebody else's record and `Open(18)` makes one.
   void Close() {
     record_ = nullptr;
     table_ = nullptr;
+    owned_.reset();
   }
 
   /// \brief AL `RecordRef.KeyCount()`.
@@ -1080,6 +1084,11 @@ private:
 
   void *record_ = nullptr;
   const TableDef *table_ = nullptr;
+
+  // A RecordRef IS COPIED BY VALUE in generated code -- `FieldRef := RecRef.Field(No)` and every
+  // `var RecordRef` parameter -- so the record a copy points at has to outlive the copy. A shared
+  // owner is what says that; a unique one would make the copy a compile error AL does not have.
+  std::shared_ptr<void> owned_;
 };
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)

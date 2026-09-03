@@ -16,4 +16,8 @@ void ResourceCost::OnValidateCostType() {
   if (WorkTypeCode == "") { TestField(CostType, ResourceCostCostType::Fixed); }
 }
 
+namespace {
+const RegisterTable<ResourceCost> kInCatalogue;
+} // namespace
+
 } // namespace agiru::app::tables

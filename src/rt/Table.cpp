@@ -25,6 +25,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace agiru::detail {
 
@@ -286,6 +287,28 @@ bool RuntimeGet(void *record, const TableDef &table) {
     SetFieldText(record, table.fields[i], Required((*row)[i], table.fields[i]));
   }
   return true;
+}
+
+// THE STACK IS PER THREAD AND IT NESTS, because a trigger runs AL code that may Validate another
+// record: `Sales Line`'s OnValidate assigns a field of `Sales Header`, and the inner xRec must not
+// be the outer one's.
+namespace {
+std::vector<const void *> &BeforeStack() {
+  static thread_local std::vector<const void *> stack;
+  return stack;
+}
+} // namespace
+
+void PushBefore(const void *record) {
+  BeforeStack().push_back(record);
+}
+
+void PopBefore() {
+  if (!BeforeStack().empty()) { BeforeStack().pop_back(); }
+}
+
+const void *CurrentBefore() {
+  return BeforeStack().empty() ? nullptr : BeforeStack().back();
 }
 
 } // namespace agiru::detail

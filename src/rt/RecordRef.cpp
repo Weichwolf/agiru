@@ -2,6 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/Table.h"
@@ -21,6 +22,7 @@
 #include "type/Variant.h"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -119,10 +121,14 @@ RecordRef FieldRef::Record() const {
 void RecordRef::Open(Integer tableNo) {
   // IT LETS GO OF WHAT IT HELD FIRST, which is what Open does in AL: it re-points the reference,
   // and a failed Open must not leave it answering questions about the record it used to hold.
-  record_ = nullptr;
-  table_ = nullptr;
-  throw Error("RecordRef.Open(" + std::to_string(tableNo) +
-              ") needs a registry from table number to declaration");
+  Close();
+  const TableEntry *entry = FindTable(TableId{tableNo});
+  if (entry == nullptr) {
+    throw Error("this installation carries no table " + std::to_string(tableNo));
+  }
+  owned_ = std::shared_ptr<void>(entry->make(), entry->free);
+  record_ = owned_.get();
+  table_ = entry->table;
 }
 
 const TableDef &RecordRef::Table() const {

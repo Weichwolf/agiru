@@ -195,20 +195,10 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
   return inner;
 }
 
-// A MEMBER HIDES A NAMESPACE NAME FOR THE WHOLE CLASS BODY, and the base class declares members
-// AL also has types for: `Record.RecordId()` is a method and `RecordId` is a type, `Record.Field()`
-// is a method and `Field` is the virtual table. Inside a generated class every mention of the type
-// then finds the method, and `RecordId RecId` stops being a declaration -- which is 124 of the 176
-// files that failed to compile in the test tree (measured 2026-09-03). Qualified, for the reason
-// the parameter-named-after-its-type case gives below: `class RecordId RecId` reads like a C++
-// puzzle and `agiru::RecordId RecId` reads like what it is.
-constexpr std::array kHiddenByABaseMember{
-    std::string_view{"Field"},
-    std::string_view{"RecordId"},
-};
-
+// Qualified for the reason the parameter-named-after-its-type case gives below: `class RecordId
+// RecId` reads like a C++ puzzle and `agiru::RecordId RecId` reads like what it is.
 std::string Unhidden(const std::string &type) {
-  return std::ranges::contains(kHiddenByABaseMember, type) ? "agiru::" + type : type;
+  return HiddenByABaseMember(type) ? "agiru::" + type : type;
 }
 
 /// What a type is being read FOR: the canonical AL type name, and the object that declares it.

@@ -712,6 +712,10 @@ public:
     for (const al::ProcedureDecl &procedure : table_.procedures) {
       if (SameName(procedure.name, name)) { return ProcedureIdentifier(table_, procedure.name); }
     }
+    // `Rec` INSIDE A TABLE IS THE RECORD ITSELF, and AL declares it nowhere: a trigger writes
+    // `OnBeforeLookupCity(Rec, ...)` to hand the object it is running on to a subscriber. It comes
+    // LAST, so a table that declares a variable or a field of that name keeps its own.
+    if (SameName("Rec", name)) { return "*this"; }
     return {};
   }
 
@@ -737,6 +741,17 @@ private:
   const al::TableObject &table_;
 };
 
+// AL NAMES TWO RECORDS INSIDE A TABLE TRIGGER and declares neither: `Rec` is the object and `xRec`
+// is what it was before the change. The platform supplies the second one, so the body binds it
+// where AL would have found it -- as a name, spelled the way the collapse spells every identifier.
+namespace {
+std::string BindsBefore(const std::string &body, const std::string &identifier) {
+  return body.find("XRec") == std::string::npos
+             ? std::string{}
+             : "  const " + identifier + " &XRec = detail::Before<" + identifier + ">();\n\n";
+}
+} // namespace
+
 std::string
 WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects) {
   const std::string identifier = Identifier(table.name);
@@ -749,8 +764,10 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
+      const std::string body = WriteStatements(TableNames(table), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
-      out += WriteStatements(TableNames(table), trigger.body, 2);
+      out += BindsBefore(body, identifier);
+      out += body;
       out += "}\n\n";
     }
   }
@@ -765,8 +782,9 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                               table.procedures,
                               ProcedureIdentifier(table, procedure.name)) +
            " {";
-    const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures);
     const std::string body = WriteStatements(TableNames(table), procedure.body, 2);
+    const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures) +
+                               BindsBefore(body, identifier);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;
@@ -776,6 +794,10 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     out += body + "}\n\n";
   }
 
+  // EVERY TABLE PUTS ITSELF IN THE CATALOGUE, which is what lets `RecordRef.Open(18)` reach a table
+  // the runtime does not know the name of. The entry is `constexpr` and lives in `.rodata`; what
+  // this line adds is the pointer to it.
+  out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
   return out;
 }

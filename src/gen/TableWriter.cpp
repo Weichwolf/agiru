@@ -140,7 +140,7 @@ std::string Reach(const al::TableObject &table, const std::string &type, const s
   // own `Record.FieldNo(Field)`, and a member declared anywhere in a class hides a namespace name
   // for the WHOLE class body -- so every generated table qualifies the TYPE, not just the ones with
   // a field of that name. AL names both, and the door keeps both names.
-  if (type == "FieldNo") { return "::agiru::" + bare; }
+  if (type == "FieldNo" || HiddenByABaseMember(type)) { return "::agiru::" + bare; }
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
 }
 

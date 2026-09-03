@@ -28,6 +28,14 @@ std::string TypeName(std::string_view alType);
 /// `TelemetryScope` -- and they belong with the absent rather than beside the door.
 bool IsAlTypeName(std::string_view alType);
 
+/// Whether a member of `Table<Derived>` or `Codeunit<Derived>` carries this type's name.
+///
+/// A MEMBER HIDES A NAMESPACE NAME FOR THE WHOLE CLASS BODY, and the base classes declare members
+/// AL also has types for: `Record.RecordId()` is a method and `RecordId` is a type,
+/// `Record.Field()` is a method and `Field` is the virtual table. Inside a generated class every
+/// mention of the type then finds the method, so those two are written qualified.
+bool HiddenByABaseMember(std::string_view type);
+
 std::string Literal(std::string_view text);
 
 /// \brief The C++ class name for an AL object, which is NOT the AL name.

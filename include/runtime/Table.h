@@ -33,6 +33,52 @@ template <typename T> struct TableTraits;
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
 
+/// \brief Makes a record the `xRec` of the trigger about to run.
+///
+/// \param record The record as it was BEFORE the change, which the caller owns and must outlive
+///               the trigger.
+///
+/// \note THE PLATFORM PROVIDES `xRec`, NOT THE OBJECT. A table trigger takes no parameters and AL
+///       still names two records inside it, so what supplies the second one is whoever invoked the
+///       trigger -- which here is `Validate`, `Insert(true)`, `Modify(true)` and `Delete(true)`.
+void PushBefore(const void *record);
+
+/// \brief Ends what PushBefore began.
+void PopBefore();
+
+/// \brief The record the running trigger is changing FROM.
+/// \return It, or `nullptr` outside a trigger.
+[[nodiscard]] const void *CurrentBefore();
+
+/// \brief AL `xRec` -- the record as it was before the change.
+///
+/// \tparam T The generated table class.
+/// \return The record before the change.
+/// \throws Error outside a trigger, or where the invoker has no before-image yet (board:0042).
+template <typename T> const T &Before() {
+  const void *before = CurrentBefore();
+  if (before == nullptr) {
+    throw Error("xRec is only defined inside a table trigger, and the trigger that is running was "
+                "invoked without a before-image (board:0042)");
+  }
+  return *static_cast<const T *>(before);
+}
+
+/// \brief Holds a before-image for as long as a trigger runs.
+class BeforeImage {
+public:
+  /// \brief Makes a record the running trigger's `xRec`.
+  /// \param record The record before the change.
+  explicit BeforeImage(const void *record) { PushBefore(record); }
+
+  BeforeImage(const BeforeImage &) = delete;
+  BeforeImage(BeforeImage &&) = delete;
+  BeforeImage &operator=(const BeforeImage &) = delete;
+  BeforeImage &operator=(BeforeImage &&) = delete;
+
+  ~BeforeImage() { PopBefore(); }
+};
+
 /// \brief Writes the record as a new row.
 /// \param record The record.
 /// \param table  Its declaration.
