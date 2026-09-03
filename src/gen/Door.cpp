@@ -128,7 +128,7 @@ constexpr std::array kTypes{
     std::string_view{"XmlWriteOptions"},
 };
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 27> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 31> kElsewhere{{
     {"Temporary", "runtime/Table.h"},
     {"TestPage", "runtime/test/TestPage.h"},
     {"TempStore", "runtime/Table.h"},
@@ -146,7 +146,11 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 27> kElsewhe
     {"SelectLatestVersion", "runtime/Database.h"},
     {"GetLastErrorText", "runtime/Error.h"},
     {"AssertError", "runtime/Error.h"},
-    {"platform::", "platform/Field.h"},
+    {"platform::Date", "platform/Date.h"},
+    {"platform::Field", "platform/Field.h"},
+    {"platform::Integer", "platform/Integer.h"},
+    {"platform::Tenant", "platform/Tenant.h"},
+    {"platform::User", "platform/User.h"},
     {"absent::", "dotnet/Refused.h"},
     {"DotNetGeneric", "dotnet/Generic.h"},
     {"ALConfigSettings", "dotnet/ALConfigSettings.h"},
@@ -201,12 +205,60 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   return out;
 }
 
+std::string WithoutUnusedDeclarations(std::string text) {
+  std::string out;
+  std::size_t at = 0;
+  while (at < text.size()) {
+    const std::size_t eol = text.find('\n', at);
+    const std::size_t stop = eol == std::string::npos ? text.size() : eol + 1;
+    const std::string line = text.substr(at, stop - at);
+    std::string name;
+    if (line.starts_with("using ") && line.ends_with(";\n")) {
+      const std::size_t space = line.find(' ', std::string_view("using ").size());
+      name =
+          line.substr(std::string_view("using ").size(), space - std::string_view("using ").size());
+    } else if (line.starts_with("class ") && line.ends_with(";\n")) {
+      name = line.substr(std::string_view("class ").size(),
+                         line.size() - std::string_view("class ").size() - 2);
+    }
+    if (!name.empty()) {
+      std::string elsewhere = text;
+      elsewhere.erase(at, stop - at);
+      if (!Mentions(elsewhere, name)) {
+        at = stop;
+        continue;
+      }
+    }
+    out += line;
+    at = stop;
+  }
+  return out;
+}
+
+std::string WithoutEmptyNamespaces(std::string text) {
+  for (std::size_t at = text.find("namespace agiru::app::"); at != std::string::npos;
+       at = text.find("namespace agiru::app::", at + 1)) {
+    const std::size_t open = text.find(" {\n", at);
+    if (open == std::string::npos) { break; }
+    if (text.compare(open + 3, std::string_view("} // namespace").size(), "} // namespace") != 0) {
+      continue;
+    }
+    const std::size_t shut = text.find('\n', open + 3);
+    if (shut == std::string::npos) { break; }
+    text.erase(at, shut + 1 - at);
+    at = at > 0 ? at - 1 : 0;
+  }
+  return text;
+}
+
 std::string WithDoor(std::string text, ObjectKind kind) {
   const std::size_t at = text.find(kDoorMarker);
   if (at == std::string::npos) { return text; }
   std::string without = text;
   without.erase(at, kDoorMarker.size());
-  return without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
+  const std::string whole =
+      without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
+  return WithoutEmptyNamespaces(WithoutUnusedDeclarations(whole));
 }
 
 } // namespace agiru::gen

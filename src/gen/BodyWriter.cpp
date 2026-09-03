@@ -747,7 +747,10 @@ void ControlBodies(std::string &out,
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string name = ControlTrigger(trigger.name, control.name);
       const std::string body = WriteStatements(PageNames(page, source), trigger.body, 2);
-      const std::string locals = ProcedureLocals(trigger, objects, page.name, page.procedures);
+      const std::string locals =
+          ProcedureLocals(trigger, objects, page.name, page.procedures) +
+          (source == nullptr ? std::string{}
+                             : BindsBefore(body, "tables::" + Identifier(source->name)));
       out += "void " + identifier + "::" + name + "() {";
       if (locals.empty() && body.empty()) {
         out += "}\n\n";
@@ -788,9 +791,12 @@ std::string WriteSource(const al::PageObject &page,
                               page.procedures,
                               Identifier(procedure.name)) +
            " {";
-    const std::string locals = ProcedureLocals(procedure, objects, page.name, page.procedures);
     const std::string body = WriteStatements(PageNames(page, source), procedure.body, 2) +
                              FallsOffEnd(procedure, PageNames(page, source));
+    const std::string locals =
+        ProcedureLocals(procedure, objects, page.name, page.procedures) +
+        (source == nullptr ? std::string{}
+                           : BindsBefore(body, "tables::" + Identifier(source->name)));
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;

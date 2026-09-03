@@ -49,4 +49,5 @@ private:
 template <> struct agiru::CodeunitTraits<agiru::app::codeunits::TransferOldExtTextLines> {
   static constexpr CodeunitId kId{379};
   static constexpr std::string_view kName{"Transfer Old Ext. Text Lines"};
+  static constexpr Subtype kSubtype{Subtype::Normal};
 };

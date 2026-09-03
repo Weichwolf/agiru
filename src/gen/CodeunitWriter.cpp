@@ -30,6 +30,17 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
          al::HasAttribute(procedure, "InternalEvent");
 }
 
+std::string SubtypeOf(const al::CodeunitObject &unit) {
+  const al::Property *subtype = al::Find(unit.properties, "Subtype");
+  if (subtype == nullptr) { return "Normal"; }
+  const std::string named = LowerKey(subtype->text);
+  if (named == "test") { return "Test"; }
+  if (named == "testrunner") { return "TestRunner"; }
+  if (named == "upgrade") { return "Upgrade"; }
+  if (named == "install") { return "Install"; }
+  return "Normal";
+}
+
 bool IsTestCodeunit(const al::CodeunitObject &unit) {
   const al::Property *subtype = al::Find(unit.properties, "Subtype");
   return subtype != nullptr && LowerKey(subtype->text) == "test";
@@ -1135,6 +1146,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
+  out += "  static constexpr Subtype kSubtype{Subtype::" + SubtypeOf(unit) + "};\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;

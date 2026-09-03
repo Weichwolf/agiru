@@ -4,6 +4,7 @@
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 
+#include <cstdint>
 #include <string_view>
 
 /// \file
@@ -30,6 +31,19 @@ namespace agiru {
 /// The generator specialises this beside the class, so that the class itself carries nothing but
 /// what AL wrote: its procedures and its variables. The number and the name live here, the same way
 /// a table's field and key tables do.
+/// \brief AL `Subtype` on a codeunit -- what the object is FOR.
+///
+/// `devenv-subtype-codeunit-property.md` gives five values and two of them decide how the object is
+/// run: a `Test` codeunit HOLDS test methods, a `TestRunner` codeunit RUNS test codeunits and
+/// carries `OnBeforeTestRun`/`OnAfterTestRun` instead.
+enum class Subtype : std::uint8_t {
+  Normal,     ///< The default: a general-purpose codeunit.
+  Test,       ///< Holds `[Test]` methods.
+  TestRunner, ///< Runs test codeunits.
+  Upgrade,    ///< Holds data-upgrade triggers.
+  Install,    ///< Holds extension-installation triggers.
+};
+
 template <typename T> struct CodeunitTraits;
 
 /// \brief One codeunit held by another, created the first time it is used.
