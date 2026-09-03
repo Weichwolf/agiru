@@ -8,6 +8,29 @@ Area: rt, gen
 any of them (measured 2026-09-02, after the index repair; before it the same count read 192 and
 1 342, and 105 of those were an indexing defect rather than a gap). What is left is BC's own:
 
+## Measured again, 2026-09-03
+
+`Integer`, `Date` and `User` are in, which is 80 of those declarations.
+
+| before | after | |
+|---:|---:|---|
+| 156 tables | **152** | named by nothing this run declares |
+| 437 declarations | **357** | that name one |
+
+What is left at the top: `AllObjWithCaption` 15, `All Profile` 13, `Company` 12, `BCPT Test
+Context` 11, `AllObj` 8, `Tenant Permission` 8, `Published Application` 7.
+
+**THE FIELD NUMBERS COME FROM THE PREDECESSOR AND THE FIELD NAMES FROM THE SOURCE.** No page in
+`dev-itpro` tabulates a system table's field numbers; openerp's `runtime/base/system_tables.py`
+records them and is 97 % green on the suite that reads them. Where it has a gap -- `User` has no
+field 2 -- the gap is kept, because inventing a number would put something in the metadata that
+nothing can check.
+
+**AND WHERE NOTHING STATES AN ORDER, NO ORDER IS CLAIMED.** `User.State` and `User."License Type"`
+are `Option<>`: the AL source names their members and nowhere states their ordinals, so the field
+carries the ordinal without a vocabulary. That is AL's own shape for an option with no members, and
+it costs the 16 uses of `User.State::Enabled` until the order is found rather than guessed.
+
 | named | table | kind |
 |---|---|---|
 | 39 | `User` | stored |
