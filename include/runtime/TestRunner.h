@@ -4,6 +4,7 @@
 #include "type/TransactionModel.h"
 
 #include <cstddef>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -16,9 +17,15 @@ namespace agiru {
 
 /// \brief One `[Test]` procedure.
 struct TestMethod {
-  std::string_view name;  ///< The procedure's AL name.
-  void (*invoke)();       ///< Makes the codeunit and calls the procedure.
-  TransactionModel model; ///< What its `[TransactionModel]` attribute asked for.
+  std::string_view name;                 ///< The procedure's AL name.
+  void (*invoke)();                      ///< Makes the codeunit and calls the procedure.
+  std::optional<TransactionModel> model; ///< Its `[TransactionModel]`, empty when it declares none.
+                                         ///< \warning EMPTY IS NOT `AutoRollback`. A declared
+                                         ///< `AutoRollback` discards the method's writes, as
+                                         ///< `attributes/devenv-transactionmodel-attribute.md`
+                                         ///< states; an ABSENT attribute leaves the decision to the
+                                         ///< runner's `TestIsolation`, and under `Codeunit` a
+                                         ///< passing method's writes reach the next one.
 };
 
 /// \brief Calls one `[Test]` procedure on a freshly made codeunit.

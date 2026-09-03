@@ -28,7 +28,7 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
     return TestResult{
         .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
   }
-  if (method.model == TransactionModel::AutoRollback) {
+  if (method.model.has_value() && *method.model == TransactionModel::AutoRollback) {
     scope.Discard("");
   } else {
     scope.Keep();

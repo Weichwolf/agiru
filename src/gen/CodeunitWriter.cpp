@@ -65,10 +65,11 @@ std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
   for (const std::string &attribute : procedure.attributes) {
     const std::string lowered = LowerKey(attribute);
     if (lowered.find("transactionmodel") == std::string::npos) { continue; }
-    if (lowered.find("autocommit") != std::string::npos) { return "AutoCommit"; }
-    if (lowered.find("none") != std::string::npos) { return "None"; }
+    if (lowered.find("autocommit") != std::string::npos) { return "TransactionModel::AutoCommit"; }
+    if (lowered.find("none") != std::string::npos) { return "TransactionModel::None"; }
+    return "TransactionModel::AutoRollback";
   }
-  return "AutoRollback";
+  return "{}";
 }
 
 bool IsTest(const al::ProcedureDecl &procedure) {
@@ -105,7 +106,7 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
     out += identifier;
     out += "::";
     out += Identifier(test->name);
-    out += ">, TransactionModel::";
+    out += ">, ";
     out += TransactionModelOf(*test);
     out += "},\n";
   }
