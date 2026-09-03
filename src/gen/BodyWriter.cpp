@@ -536,6 +536,49 @@ private:
     return Parens::None;
   }
 
+  std::string PropertyAssignment(const al::Expr &expression) {
+    if (expression.text != ":=" || expression.children.size() != 2) { return {}; }
+    const al::Expr &target = expression.children.front();
+    if (target.kind != al::ExprKind::Binary || target.text != "." || target.children.size() != 2 ||
+        target.children[0].kind != al::ExprKind::Name ||
+        target.children[1].kind != al::ExprKind::Name) {
+      return {};
+    }
+    if (!scope_.MemberIsCall(
+            OfVariable{.variable = target.children[0].text, .field = target.children[1].text})) {
+      return {};
+    }
+    return Binary(target, kPrimaryPrecedence, true) + "(" +
+           Expression(expression.children.back(), 0) + ")";
+  }
+
+  struct Reach {
+    std::string_view spelling;
+    const al::Expr &base;
+    const al::Expr &link;
+  };
+
+  struct How {
+    bool arrow;
+    bool parens;
+    int precedence;
+  };
+
+  void Link(std::string &out, const Reach &reach, const How &how) {
+    if (reach.spelling == ".") {
+      out += how.arrow ? "->" : ".";
+    } else {
+      out += " ";
+      out += reach.spelling;
+      out += " ";
+    }
+    out += reach.spelling == "." && reach.link.kind == al::ExprKind::Name
+               ? scope_.MemberSpelling(
+                     OfVariable{.variable = reach.base.text, .field = reach.link.text})
+               : Expression(reach.link, how.precedence + 1);
+    if (how.parens) { out += "()"; }
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -543,6 +586,10 @@ private:
       throw std::runtime_error("a binary operator with " +
                                std::to_string(expression.children.size()) +
                                " operands has no translation");
+    }
+
+    if (const std::string assigned = PropertyAssignment(expression); !assigned.empty()) {
+      return assigned;
     }
 
     const Operator *op = Find(expression.text);
@@ -561,19 +608,12 @@ private:
     const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
-      if (spelling == ".") {
-        out += handle && i == chain.size() ? "->" : ".";
-      } else {
-        out += " ";
-        out += spelling;
-        out += " ";
-      }
-      out += spelling == "." && chain[i - 1]->kind == al::ExprKind::Name
-                 ? scope_.MemberSpelling(
-                       OfVariable{.variable = walk->text, .field = chain[i - 1]->text})
-                 : Expression(*chain[i - 1], precedence + 1);
-      const bool here = calls == Parens::First ? i == chain.size() : i == 1;
-      if (calls != Parens::None && here && !asCallee) { out += "()"; }
+      Link(out,
+           {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
+           {.arrow = handle && i == chain.size(),
+            .parens = calls != Parens::None && !asCallee &&
+                      (calls == Parens::First ? i == chain.size() : i == 1),
+            .precedence = precedence});
     }
     if (precedence < outer) { out = "(" + out + ")"; }
     return out;
@@ -639,8 +679,28 @@ std::string NamedEnum(const Objects &objects, std::string_view name) {
 
 class TableNames : public Names {
 public:
-  TableNames(const al::TableObject &table, const Objects &objects)
-      : table_(table), objects_(objects) {}
+  TableNames(const al::TableObject &table,
+             const Objects &objects,
+             const al::ProcedureDecl *running = nullptr)
+      : table_(table), objects_(objects), running_(running) {}
+
+  [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
+    if (running_ == nullptr) { return nullptr; }
+    for (const al::VarDecl &declared : running_->variables) {
+      if (SameName(declared.name, name)) { return &declared; }
+    }
+    for (const al::VarDecl &declared : running_->parameters) {
+      if (SameName(declared.name, name)) { return &declared; }
+    }
+    return nullptr;
+  }
+
+  [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    const al::VarDecl *local = Local(member.variable);
+    if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
+    return IsRecord(member.variable) && DoorCalls(member.field) &&
+           FieldNamed(table_, member.field) == nullptr;
+  }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     return NamedEnum(objects_, name);
@@ -689,11 +749,6 @@ public:
     return SameName("Rec", variable) || SameName("xRec", variable);
   }
 
-  [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    return IsRecord(member.variable) && DoorCalls(member.field) &&
-           FieldNamed(table_, member.field) == nullptr;
-  }
-
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     if (!IsRecord(member.variable) || FieldNamed(table_, member.field) != nullptr) {
       return Identifier(member.field);
@@ -709,6 +764,7 @@ public:
 private:
   const al::TableObject &table_;
   const Objects &objects_;
+  const al::ProcedureDecl *running_;
 };
 
 class PageNames : public Names {
@@ -813,7 +869,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
-      const std::string body = WriteStatements(TableNames(table, objects), trigger.body, 2);
+      const std::string body =
+          WriteStatements(TableNames(table, objects, &trigger), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
       out += ProcedureLocals(trigger, objects, table.name, table.procedures, Shadowed(table));
       out += BindsBefore(body, identifier);
@@ -831,7 +888,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                               table.procedures,
                               ProcedureIdentifier(table, procedure.name)) +
            " {";
-    const std::string body = WriteStatements(TableNames(table, objects), procedure.body, 2);
+    const std::string body =
+        WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2);
     const std::string locals =
         ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table)) +
         BindsBefore(body, identifier);

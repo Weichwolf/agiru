@@ -64,6 +64,17 @@ public:
   /// \return The GUID, or the null GUID when the text does not spell one.
   [[nodiscard]] static Guid FromText(std::string_view text);
 
+  /// \brief AL assigns a Text to a Guid without a cast.
+  ///
+  /// \param text The GUID in its text form, with or without braces.
+  /// \throws Error when the text is not a GUID.
+  ///
+  /// \note NOT `explicit`, BECAUSE AL IS NOT. `Notification.ID := DuplicateSymbolNotificationId`
+  ///       assigns a `Label` holding `'8fcf129e-...'` to a Guid, and AL converts it on the spot.
+  ///       A cast here would be a deviation the reader has to know about, for a conversion the
+  ///       language performs silently.
+  Guid(std::string_view text) : Guid(FromText(text)) {}
+
   /// \return True when every byte is zero, which is AL's empty Guid.
   [[nodiscard]] constexpr bool IsNull() const {
     std::uint8_t any = 0;

@@ -40,25 +40,44 @@ public:
   /// \return The identifier; a blank GUID until one is assigned.
   [[nodiscard]] const Guid &Id() const { return id_; }
 
-  /// \brief AL `Notification.Id := X`.
-  /// \param id The identifier, which `Recall` matches on.
-  void SetId(const Guid &id) { id_ = id; }
+  /// \brief AL `Notification.Id(Id)` -- setting it.
+  ///
+  /// \param Id The identifier, which `Recall` matches on.
+  /// \return The identifier it now carries.
+  ///
+  /// \note ONE METHOD WITH AN OPTIONAL ARGUMENT, which is what `notification-id-method.md`
+  ///       documents: `[Id := ] Notification.Id([Id: Guid])`, and "this method can be invoked using
+  ///       property access syntax". AL writes `Notification.ID := X` for it, and 365 documented
+  ///       methods work the same way -- so a `SetId` here would be a name AL never uses, and the
+  ///       mechanical check against the documentation would look for it in vain.
+  const Guid &Id(const Guid &Id) {
+    id_ = Id;
+    return id_;
+  }
 
   /// \brief AL `Notification.Message` -- reading it.
   /// \return The text the client shows.
   [[nodiscard]] std::string_view Message() const { return message_; }
 
-  /// \brief AL `Notification.Message := X`.
-  /// \param message The text the client shows.
-  void SetMessage(std::string_view message) { message_ = message; }
+  /// \brief AL `Notification.Message(Message)` -- setting it.
+  /// \param Message The text the client shows.
+  /// \return The text it now carries.
+  std::string_view Message(std::string_view Message) {
+    message_ = Message;
+    return message_;
+  }
 
   /// \brief AL `Notification.Scope` -- reading it.
   /// \return Where the notification appears.
   [[nodiscard]] NotificationScope Scope() const { return scope_; }
 
-  /// \brief AL `Notification.Scope := X`.
-  /// \param scope Where the notification appears.
-  void SetScope(NotificationScope scope) { scope_ = scope; }
+  /// \brief AL `Notification.Scope(Scope)` -- setting it.
+  /// \param Scope Where the notification appears.
+  /// \return Where it now appears.
+  NotificationScope Scope(NotificationScope Scope) {
+    scope_ = Scope;
+    return scope_;
+  }
 
   /// \brief AL `Notification.SetData(Key, Value)`.
   /// \param key   The name.

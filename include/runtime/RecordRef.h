@@ -4,6 +4,7 @@
 #include "meta/TableDef.h"
 #include "platform/Field.h"
 #include "runtime/Error.h"
+#include "runtime/Record.h"
 #include "runtime/Table.h"
 #include "type/ErrorInfo.h"
 #include "type/FieldClass.h"
@@ -210,7 +211,11 @@ public:
   ///
   /// \note AL WRITES A PROPERTY SETTER AS A CALL. `FieldRef.Value(NoSeriesCode)` and
   ///       `FieldRef.Value := NoSeriesCode` are the same statement, and the BaseApp writes both.
-  template <typename T> void Value(const T &value) { SetValue(std::string_view(value)); }
+  /// \note AND `Any` IS THE PARAMETER, so it renders rather than casts. `FieldRef.Value := Amount`
+  ///       assigns a Decimal and `:= WorkDate` a Date, neither of which is a `std::string_view` --
+  ///       a cast refused both, which the property-access rule then surfaced at every such
+  ///       assignment at once.
+  template <typename T> void Value(const T &value) { SetValue(AsText(value)); }
 
   /// \brief AL `FieldRef.Value := X` -- writes the field from text.
   /// \param text The value, as the column would hold it.
