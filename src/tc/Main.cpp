@@ -395,11 +395,15 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::PageObject object = agiru::al::ParsePage(Read(path));
       ++counts.parsed;
       counts.members += object.procedures.size();
+      std::set<std::string> controlNames;
+      for (const auto &[alName, identifier] : agiru::gen::ControlIdentifiers(object)) {
+        controlNames.insert(alName);
+      }
       objects.pages.insert_or_assign(
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
                                .header = agiru::gen::PageHeaderPath(object),
-                               .fields = {}});
+                               .fields = std::move(controlNames)});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {

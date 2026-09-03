@@ -14,6 +14,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
@@ -509,13 +510,20 @@ private:
            scope_.MembersAreCalls(callee.children[0].text);
   }
 
-  bool Calls(std::string_view spelling, const al::Expr &base, const al::Expr &last) {
-    if (spelling != ".") { return false; }
-    if (base.kind == al::ExprKind::Call) { return YieldsADoorType(base); }
-    if (base.kind != al::ExprKind::Name) { return false; }
-    if (scope_.MembersAreCalls(base.text)) { return true; }
-    return last.kind == al::ExprKind::Name &&
-           scope_.MemberIsCall(OfVariable{.variable = base.text, .field = last.text});
+  enum class Parens : std::uint8_t { None, First, Last };
+
+  Parens Calls(std::string_view spelling, const al::Expr &base, const al::Expr &last) {
+    if (spelling != ".") { return Parens::None; }
+    if (base.kind == al::ExprKind::Call) {
+      return YieldsADoorType(base) ? Parens::First : Parens::None;
+    }
+    if (base.kind != al::ExprKind::Name) { return Parens::None; }
+    if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
+    if (last.kind == al::ExprKind::Name &&
+        scope_.MemberIsCall(OfVariable{.variable = base.text, .field = last.text})) {
+      return Parens::Last;
+    }
+    return Parens::None;
   }
 
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
@@ -540,7 +548,7 @@ private:
     }
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
-    const bool calls = Calls(spelling, *walk, *chain.front());
+    const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
       if (spelling == ".") {
@@ -554,7 +562,8 @@ private:
                  ? scope_.MemberSpelling(
                        OfVariable{.variable = walk->text, .field = Identifier(chain[i - 1]->text)})
                  : Expression(*chain[i - 1], precedence + 1);
-      if (calls && i == chain.size() && !asCallee) { out += "()"; }
+      const bool here = calls == Parens::First ? i == chain.size() : i == 1;
+      if (calls != Parens::None && here && !asCallee) { out += "()"; }
     }
     if (precedence < outer) { out = "(" + out + ")"; }
     return out;

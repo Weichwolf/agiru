@@ -733,7 +733,9 @@ public:
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
-    if (held != nullptr && !NamesAnObject(*held)) { return DoorCalls(member.field); }
+    if (held != nullptr && !NamesAnObject(*held)) {
+      return !NamesAControl(*held, member.field) && DoorCalls(member.field);
+    }
     if (subtype.empty() || !DoorCalls(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
@@ -743,7 +745,8 @@ public:
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
     if (declared != nullptr && !NamesAnObject(*declared)) {
-      return AsTheDoorSpellsIt(member.field);
+      return NamesAControl(*declared, member.field) ? std::string(member.field)
+                                                    : AsTheDoorSpellsIt(member.field);
     }
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
@@ -773,6 +776,13 @@ public:
     if (table == objects_.fieldEnums.end()) { return {}; }
     const auto found = table->second.find(LowerKey(std::string(field.field)));
     return found == table->second.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] bool NamesAControl(const al::VarDecl &declared, std::string_view member) const {
+    if (!NamesAPage(TypeName(declared.type)) || declared.subtype.empty()) { return false; }
+    const auto page = objects_.pages.find(LowerKey(declared.subtype));
+    if (page == objects_.pages.end()) { return false; }
+    return page->second.fields.contains(LowerKey(std::string(member)));
   }
 
   [[nodiscard]] std::string SubtypeOfRecord(std::string_view variable) const {
