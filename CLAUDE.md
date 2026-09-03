@@ -53,9 +53,16 @@ the standard guarantees; no intrinsic without a portable fallback; no dependency
 either architecture. Two front ends under `-Werror` are most of the enforcement, and the rest is
 that "it is fast on the workstation" measures nothing but the workstation.
 
-**THE SIZE IT IS BUILT FOR IS 2 TB AND 10 000 USERS, and that is what turns "fast" into a number
-somebody can be wrong about.** A BC table of 100 million rows is ordinary. Four consequences, and
-each one has already decided a design here:
+**THE SIZE IT IS BUILT FOR IS 2 TB AND 10 000 USERS.** A BC table of 100 million rows is ordinary.
+
+**AND "FAST" MEANS WHAT THE LAYER UNDERNEATH CAN DO, not what the predecessor did.** The benchmark
+for an operation is the SAME operation in plain SQL from `psql`, and what agiru adds on top is the
+number: a `Get` by primary key is one indexed lookup plus the cost of writing typed fields into a
+record, and if it is ten times the `psql` figure then ten times is the finding. That is a standard a
+measurement can fail, which "faster than Python" is not -- and it is reachable, because C/SIDE did
+exactly this in C with no dynamic layer anywhere.
+
+Four consequences, and each has already decided a design here:
 
 - **A read STREAMS.** SQL Server hands BC a server-side cursor; PostgreSQL has `DECLARE ... CURSOR`
   and `FETCH FORWARD`, so a session costs the fetch block and never the result set (board:0045). A

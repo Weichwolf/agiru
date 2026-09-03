@@ -106,6 +106,21 @@ void CreateTable(const Connection &connection, const TableDef &table) {
   }
   sql += ")";
   connection.Run(sql);
+
+  for (std::size_t k = 1; k < table.keys.size(); ++k) {
+    if (table.keys[k].fields.empty()) { continue; }
+    std::string index = "CREATE INDEX " +
+                        Quoted(std::string(table.name) + "$" + std::string(table.keys[k].name)) +
+                        " ON " + Quoted(table.name) + " (";
+    bool first = true;
+    for (const FieldNo no : table.keys[k].fields) {
+      if (!first) { index += ", "; }
+      first = false;
+      index += Quoted(table.fields[IndexOf(table, no)].name);
+    }
+    index += ")";
+    connection.Run(index);
+  }
 }
 
 void DropTable(const Connection &connection, const TableDef &table) {
