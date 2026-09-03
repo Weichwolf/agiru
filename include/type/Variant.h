@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -41,6 +42,29 @@ struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T,
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
 
+/// \brief What a Variant holding a RECORD holds.
+///
+/// \note A HANDLE AND NOT A COPY, which is what AL does. A Variant alternative that stored the
+///       record by value would need 1 609 alternatives and would copy a 240-field row every time a
+///       message was assembled; AL's Variant refers to the record and reads it back through
+///       `RecordRef.GetTable`. The table number travels with the pointer so the reader can refuse
+///       the wrong table by NUMBER rather than by a cast that cannot fail.
+///
+/// \warning IT DOES NOT OWN THE RECORD. The Variant is valid while the record it was made from is,
+///          which is AL's own lifetime and is why `LibraryVariableStorage.Enqueue(Rec)` inside a
+///          procedure whose record is local is a defect in the AL and not here.
+struct RecordInVariant {
+  const void *record; ///< The record.
+  TableId table;      ///< Which table it is, so a reader can refuse the wrong one.
+
+  /// \brief Two handles are equal when they refer to the same row of the same table.
+  /// \param o The other.
+  /// \return Whether they do.
+  [[nodiscard]] bool operator==(const RecordInVariant &o) const {
+    return record == o.record && table.Value() == o.table.Value();
+  }
+};
+
 /// \brief AL `Variant`.
 ///
 /// From `variant-data-type.md`: "Represents an AL variable object. The AL variant data type can
@@ -69,7 +93,8 @@ public:
                             Duration,
                             Guid,
                             RecordId,
-                            DateFormula>;
+                            DateFormula,
+                            RecordInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
@@ -84,6 +109,32 @@ public:
   template <typename T>
     requires detail::InVariant<T, Held>::value
   Variant(T value) : held_(std::move(value)) {}
+
+  /// \brief Holds a record.
+  ///
+  /// \tparam R The generated table class, recognised by the `kId` every one of them declares.
+  /// \param record The record, which the Variant refers to and does not copy.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  Variant(const R &record) : held_(RecordInVariant{.record = &record, .table = R::kId}) {}
+
+  /// \brief The record this Variant refers to.
+  ///
+  /// \tparam R The generated table class expected.
+  /// \return The record.
+  /// \throws Error when the Variant holds no record, or one of another table -- refused by NUMBER,
+  ///         so the message names both tables instead of a cast quietly succeeding.
+  template <typename R> [[nodiscard]] const R &AsRecord() const {
+    const auto *held = std::get_if<RecordInVariant>(&held_);
+    if (held == nullptr) { throw Error("this Variant holds no record"); }
+    if (held->table.Value() != R::kId.Value()) {
+      throw Error("this Variant holds table " + std::to_string(held->table.Value()) +
+                  " and table " + std::to_string(R::kId.Value()) + " was asked for");
+    }
+    return *static_cast<const R *>(held->record);
+  }
 
   /// \brief Holds anything that reads as text.
   ///
@@ -366,9 +417,7 @@ public:
   /// \brief AL `Variant.IsRecord()`. Indicates whether an AL variant contains a Record variable.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsRecord() const {
-    throw Error("Variant.IsRecord() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsRecord() const { return std::holds_alternative<RecordInVariant>(held_); }
 
   /// \brief AL `Variant.IsRecordRef()`. Indicates whether an AL variant contains a RecordRef
   /// variable.
