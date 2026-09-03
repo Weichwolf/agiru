@@ -523,6 +523,19 @@ void EnumHeader(const EnumIndex &enums,
   IndexedHeader(enums, subtype, headers);
 }
 
+void ReachTableNo(const al::CodeunitObject &unit,
+                  const Objects &objects,
+                  std::set<std::string> &headers) {
+  const al::Property *source = al::Find(unit.properties, "TableNo");
+  if (source == nullptr || source->value.empty()) { return; }
+  std::string name;
+  for (const al::Token &token : source->value) { name += token.text; }
+  const auto found = objects.tables.find(LowerKey(name));
+  if (found != objects.tables.end() && !found->second.header.empty()) {
+    headers.insert(found->second.header);
+  }
+}
+
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
@@ -546,17 +559,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   const auto both = [&](const al::VarDecl &declared) {
     Declared(declared, objects, ahead, reachEnum, reachPage, reachElement);
   };
-  {
-    const al::Property *source = al::Find(unit.properties, "TableNo");
-    if (source != nullptr && !source->value.empty()) {
-      std::string name;
-      for (const al::Token &token : source->value) { name += token.text; }
-      const auto found = objects.tables.find(LowerKey(name));
-      if (found != objects.tables.end() && !found->second.header.empty()) {
-        headers.insert(found->second.header);
-      }
-    }
-  }
+  ReachTableNo(unit, objects, headers);
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -724,34 +727,36 @@ public:
            type == "RecordId" || type == "ModuleInfo" || type == "Version";
   }
 
-  [[nodiscard]] bool MemberIsCall(std::string_view variable,
-                                  std::string_view member) const override {
-    if (MembersAreCalls(variable)) { return true; }
-    const std::string subtype =
-        LowerKey(std::string(variable)) == "rec" ? TableNoOf(unit_) : SubtypeOfRecord(variable);
-    const al::VarDecl *held = Declaration(variable);
-    if (held != nullptr && !NamesAnObject(*held)) { return DoorCalls(member); }
-    if (subtype.empty() || !DoorDeclares(member)) { return false; }
+  [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    if (MembersAreCalls(member.variable)) { return true; }
+    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+                                    ? TableNoOf(unit_)
+                                    : SubtypeOfRecord(member.variable);
+    const al::VarDecl *held = Declaration(member.variable);
+    if (held != nullptr && !NamesAnObject(*held)) { return DoorCalls(member.field); }
+    if (subtype.empty() || !DoorDeclares(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
-    return !table->second.fields.contains(LowerKey(std::string(member)));
+    return !table->second.fields.contains(LowerKey(std::string(member.field)));
   }
 
-  [[nodiscard]] std::string MemberSpelling(std::string_view variable,
-                                           std::string_view member) const override {
-    const al::VarDecl *declared = Declaration(variable);
-    if (declared != nullptr && !NamesAnObject(*declared)) { return AsTheDoorSpellsIt(member); }
-    const std::string subtype =
-        LowerKey(std::string(variable)) == "rec" ? TableNoOf(unit_) : SubtypeOfRecord(variable);
-    if (subtype.empty()) { return std::string(member); }
+  [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    const al::VarDecl *declared = Declaration(member.variable);
+    if (declared != nullptr && !NamesAnObject(*declared)) {
+      return AsTheDoorSpellsIt(member.field);
+    }
+    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+                                    ? TableNoOf(unit_)
+                                    : SubtypeOfRecord(member.variable);
+    if (subtype.empty()) { return std::string(member.field); }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return std::string(member);
+      return std::string(member.field);
     }
-    if (table->second.fields.contains(LowerKey(std::string(member)))) {
-      return std::string(member);
+    if (table->second.fields.contains(LowerKey(std::string(member.field)))) {
+      return std::string(member.field);
     }
-    return AsTheDoorSpellsIt(member);
+    return AsTheDoorSpellsIt(member.field);
   }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
