@@ -71,6 +71,10 @@ foreach(tier IN LISTS TIERS)
   # Its own tier, the door, and exactly what `reaches` names.
   target_include_directories(${target} PRIVATE
     "${CMAKE_SOURCE_DIR}/src/${tier}" "${CMAKE_SOURCE_DIR}/include")
+  # THE GENERATOR READS THE DOOR'S TYPE LIST OUT OF THE DIRECTORY, so it has to know where the tree
+  # is. Every entry point gets it -- the transpiler, the gates that call the writers directly -- so
+  # there is no caller who can forget to fill the list.
+  target_compile_definitions(${target} PRIVATE AGIRU_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
   file(STRINGS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches" reached REGEX "^[a-z]+$")
   foreach(dep IN LISTS reached)
     target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/src/${dep}")

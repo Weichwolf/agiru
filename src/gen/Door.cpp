@@ -2,131 +2,47 @@
 
 #include "Scope.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <filesystem>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace agiru::gen {
 
 namespace {
 
-constexpr std::array kTypes{
-    std::string_view{"Action"},
-    std::string_view{"AlArray"},
-    std::string_view{"Any"},
-    std::string_view{"AuditCategory"},
-    std::string_view{"BigInteger"},
-    std::string_view{"BigText"},
-    std::string_view{"Blob"},
-    std::string_view{"Boolean"},
-    std::string_view{"Byte"},
-    std::string_view{"Char"},
-    std::string_view{"ClientType"},
-    std::string_view{"Code"},
-    std::string_view{"CommitBehavior"},
-    std::string_view{"CompanyProperty"},
-    std::string_view{"Cookie"},
-    std::string_view{"DataClassification"},
-    std::string_view{"DataScope"},
-    std::string_view{"DataTransfer"},
-    std::string_view{"Date"},
-    std::string_view{"DateFormula"},
-    std::string_view{"DateTime"},
-    std::string_view{"Debugger"},
-    std::string_view{"Decimal"},
-    std::string_view{"DefaultLayout"},
-    std::string_view{"Dialog"},
-    std::string_view{"Dictionary"},
-    std::string_view{"Duration"},
-    std::string_view{"Enum"},
-    std::string_view{"ErrorBehavior"},
-    std::string_view{"ErrorInfo"},
-    std::string_view{"ErrorType"},
-    std::string_view{"ExecutionContext"},
-    std::string_view{"ExecutionMode"},
-    std::string_view{"FieldClass"},
-    std::string_view{"File"},
-    std::string_view{"FileUpload"},
-    std::string_view{"FilterPageBuilder"},
-    std::string_view{"Guid"},
-    std::string_view{"HttpClient"},
-    std::string_view{"HttpContent"},
-    std::string_view{"HttpHeaders"},
-    std::string_view{"HttpRequestMessage"},
-    std::string_view{"HttpRequestType"},
-    std::string_view{"HttpResponseMessage"},
-    std::string_view{"InherentPermissionsScope"},
-    std::string_view{"Integer"},
-    std::string_view{"IsolatedStorage"},
-    std::string_view{"IsolationLevel"},
-    std::string_view{"JsonArray"},
-    std::string_view{"JsonObject"},
-    std::string_view{"JsonToken"},
-    std::string_view{"JsonValue"},
-    std::string_view{"KeyRef"},
-    std::string_view{"Label"},
-    std::string_view{"List"},
-    std::string_view{"Media"},
-    std::string_view{"MediaSet"},
-    std::string_view{"ModuleInfo"},
-    std::string_view{"NavApp"},
-    std::string_view{"Notification"},
-    std::string_view{"NotificationScope"},
-    std::string_view{"NumberSequence"},
-    std::string_view{"ObjectType"},
-    std::string_view{"Option"},
-    std::string_view{"PageBackgroundTaskErrorLevel"},
-    std::string_view{"PageStyle"},
-    std::string_view{"PermissionObjectType"},
-    std::string_view{"ProductName"},
-    std::string_view{"PromptMode"},
+constexpr std::array kAlsoAMember{
+    std::string_view{"Field"},
     std::string_view{"RecordId"},
-    std::string_view{"ReportFormat"},
-    std::string_view{"ReportLayoutType"},
-    std::string_view{"SecretText"},
-    std::string_view{"SecurityFilter"},
-    std::string_view{"SecurityOperationResult"},
-    std::string_view{"SessionInformation"},
-    std::string_view{"SessionSettings"},
-    std::string_view{"Stream"},
-    std::string_view{"StringValue"},
-    std::string_view{"TableConnectionType"},
-    std::string_view{"TableFilter"},
-    std::string_view{"TaskScheduler"},
-    std::string_view{"TelemetryScope"},
-    std::string_view{"Text"},
-    std::string_view{"TextBuilder"},
-    std::string_view{"TextConst"},
-    std::string_view{"TextEncoding"},
-    std::string_view{"Time"},
-    std::string_view{"TransactionModel"},
-    std::string_view{"TransactionType"},
-    std::string_view{"Variant"},
-    std::string_view{"Verbosity"},
-    std::string_view{"Version"},
-    std::string_view{"WebServiceActionContext"},
-    std::string_view{"WebServiceActionResultCode"},
-    std::string_view{"XmlAttribute"},
-    std::string_view{"XmlAttributeCollection"},
-    std::string_view{"XmlCData"},
-    std::string_view{"XmlComment"},
-    std::string_view{"XmlDeclaration"},
-    std::string_view{"XmlDocument"},
-    std::string_view{"XmlDocumentType"},
-    std::string_view{"XmlElement"},
-    std::string_view{"XmlNameTable"},
-    std::string_view{"XmlNamespaceManager"},
-    std::string_view{"XmlNode"},
-    std::string_view{"XmlNodeList"},
-    std::string_view{"XmlProcessingInstruction"},
-    std::string_view{"XmlReadOptions"},
-    std::string_view{"XmlText"},
-    std::string_view{"XmlWriteOptions"},
+    std::string_view{"TestField"},
+    std::string_view{"TestAction"},
 };
+
+std::vector<std::string> &DoorTypes() {
+  static const std::vector<std::string> types = [] {
+    const std::filesystem::path door = std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "type";
+    if (!std::filesystem::is_directory(door)) {
+      throw std::runtime_error("the door has no type/ directory at " + door.string());
+    }
+    std::vector<std::string> found;
+    for (const auto &entry : std::filesystem::directory_iterator(door)) {
+      if (entry.path().extension() != ".h") { continue; }
+      const std::string name = entry.path().stem().string();
+      if (std::ranges::contains(kAlsoAMember, name)) { continue; }
+      found.push_back(name);
+    }
+    if (found.empty()) { throw std::runtime_error("the door declares no types"); }
+    return found;
+  }();
+  return const_cast<std::vector<std::string> &>(types);
+}
 
 constexpr std::array<std::pair<std::string_view, std::string_view>, 31> kElsewhere{{
     {"Temporary", "runtime/Table.h"},
@@ -193,8 +109,8 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
     case ObjectKind::Enum: headers.insert("meta/EnumDef.h"); break;
     default: break;
   }
-  for (const std::string_view type : kTypes) {
-    if (Mentions(text, type)) { headers.insert("type/" + std::string(type) + ".h"); }
+  for (const std::string &type : DoorTypes()) {
+    if (Mentions(text, type)) { headers.insert("type/" + type + ".h"); }
   }
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
@@ -202,36 +118,6 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   if (text.find(") {\n") != std::string_view::npos) { headers.insert("Builtins.h"); }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
-  return out;
-}
-
-std::string WithoutUnusedDeclarations(std::string text) {
-  std::string out;
-  std::size_t at = 0;
-  while (at < text.size()) {
-    const std::size_t eol = text.find('\n', at);
-    const std::size_t stop = eol == std::string::npos ? text.size() : eol + 1;
-    const std::string line = text.substr(at, stop - at);
-    std::string name;
-    if (line.starts_with("using ") && line.ends_with(";\n")) {
-      const std::size_t space = line.find(' ', std::string_view("using ").size());
-      name =
-          line.substr(std::string_view("using ").size(), space - std::string_view("using ").size());
-    } else if (line.starts_with("class ") && line.ends_with(";\n")) {
-      name = line.substr(std::string_view("class ").size(),
-                         line.size() - std::string_view("class ").size() - 2);
-    }
-    if (!name.empty()) {
-      std::string elsewhere = text;
-      elsewhere.erase(at, stop - at);
-      if (!Mentions(elsewhere, name)) {
-        at = stop;
-        continue;
-      }
-    }
-    out += line;
-    at = stop;
-  }
   return out;
 }
 
@@ -258,7 +144,27 @@ std::string WithDoor(std::string text, ObjectKind kind) {
   without.erase(at, kDoorMarker.size());
   const std::string whole =
       without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
-  return WithoutEmptyNamespaces(WithoutUnusedDeclarations(whole));
+  return WithoutEmptyNamespaces(whole);
+}
+
+void KnowDoorTypes(const std::filesystem::path &include) {
+  static constexpr std::array kAlsoAMember{
+      std::string_view{"Field"},
+      std::string_view{"RecordId"},
+      std::string_view{"TestField"},
+      std::string_view{"TestAction"},
+  };
+  DoorTypes().clear();
+  if (!std::filesystem::is_directory(include / "type")) {
+    throw std::runtime_error("the door has no type/ directory at " + include.string());
+  }
+  for (const auto &entry : std::filesystem::directory_iterator(include / "type")) {
+    if (entry.path().extension() != ".h") { continue; }
+    const std::string name = entry.path().stem().string();
+    if (std::ranges::contains(kAlsoAMember, name)) { continue; }
+    DoorTypes().push_back(name);
+  }
+  if (DoorTypes().empty()) { throw std::runtime_error("the door declares no types"); }
 }
 
 } // namespace agiru::gen

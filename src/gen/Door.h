@@ -2,6 +2,7 @@
 
 #include "Scope.h"
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 
