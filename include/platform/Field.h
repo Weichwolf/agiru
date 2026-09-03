@@ -167,9 +167,9 @@ public:
   static constexpr std::size_t kOptionStringLength = 250;
 
   /// \brief AL `Field."TableNo"`.
-  Integer TableNo{};
+  ::agiru::Integer TableNo{};
   /// \brief AL `Field."No."`.
-  Integer No{};
+  ::agiru::Integer No{};
   /// \brief AL `Field."TableName"`.
   Text<kNameLength> TableName;
   /// \brief AL `Field."FieldName"`.
@@ -177,13 +177,13 @@ public:
   /// \brief AL `Field."Type"`.
   Option<agiru::FieldType> Type;
   /// \brief AL `Field."Len"`.
-  Integer Len{};
+  ::agiru::Integer Len{};
   /// \brief AL `Field."Class"`.
   Option<FieldClass> Class;
   /// \brief AL `Field."RelationTableNo"`.
-  Integer RelationTableNo{};
+  ::agiru::Integer RelationTableNo{};
   /// \brief AL `Field."RelationFieldNo"`.
-  Integer RelationFieldNo{};
+  ::agiru::Integer RelationFieldNo{};
   /// \brief AL `Field."OptionString"`.
   Text<kOptionStringLength> OptionString;
   /// \brief AL `Field."ObsoleteState"`.
@@ -203,39 +203,39 @@ public:
   ///       `SystemFieldNumbers` the way a generated table does.
   struct Field_No {
     /// \brief The AL field number of `TableNo`.
-    static constexpr FieldNo TableNo{1};
+    static constexpr ::agiru::FieldNo TableNo{1};
     /// \brief The AL field number of `No.`.
-    static constexpr FieldNo No{2};
+    static constexpr ::agiru::FieldNo No{2};
     /// \brief The AL field number of `TableName`.
-    static constexpr FieldNo TableName{3};
+    static constexpr ::agiru::FieldNo TableName{3};
     /// \brief The AL field number of `FieldName`.
-    static constexpr FieldNo FieldName{4};
+    static constexpr ::agiru::FieldNo FieldName{4};
     /// \brief The AL field number of `Type`.
-    static constexpr FieldNo Type{5};
+    static constexpr ::agiru::FieldNo Type{5};
     /// \brief The AL field number of `Len`.
-    static constexpr FieldNo Len{6};
+    static constexpr ::agiru::FieldNo Len{6};
     /// \brief The AL field number of `Class`.
-    static constexpr FieldNo Class{7};
+    static constexpr ::agiru::FieldNo Class{7};
     /// \brief The AL field number of `RelationTableNo`.
-    static constexpr FieldNo RelationTableNo{8};
+    static constexpr ::agiru::FieldNo RelationTableNo{8};
     /// \brief The AL field number of `RelationFieldNo`.
-    static constexpr FieldNo RelationFieldNo{9};
+    static constexpr ::agiru::FieldNo RelationFieldNo{9};
     /// \brief The AL field number of `OptionString`.
-    static constexpr FieldNo OptionString{10};
+    static constexpr ::agiru::FieldNo OptionString{10};
     /// \brief The AL field number of `ObsoleteState`.
-    static constexpr FieldNo ObsoleteState{11};
+    static constexpr ::agiru::FieldNo ObsoleteState{11};
     /// \brief The AL field number of `ObsoleteReason`.
-    static constexpr FieldNo ObsoleteReason{12};
+    static constexpr ::agiru::FieldNo ObsoleteReason{12};
     /// \brief The AL field number of `Field Caption`.
-    static constexpr FieldNo FieldCaption{20};
+    static constexpr ::agiru::FieldNo FieldCaption{20};
     /// \brief The AL field number of `Enabled`.
-    static constexpr FieldNo Enabled{21};
+    static constexpr ::agiru::FieldNo Enabled{21};
     /// \brief The AL field number of `Is Part of Primary Key`.
-    static constexpr FieldNo IsPartOfPrimaryKey{22};
+    static constexpr ::agiru::FieldNo IsPartOfPrimaryKey{22};
   };
 
   /// \brief The primary key: the table and the field within it.
-  static constexpr std::array<FieldNo, 2> kKey1{{Field_No::TableNo, Field_No::No}};
+  static constexpr std::array<::agiru::FieldNo, 2> kKey1{{Field_No::TableNo, Field_No::No}};
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.

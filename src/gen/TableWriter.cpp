@@ -136,6 +136,11 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
 // fails to compile. 122 of the BaseApp's 1 545 tables hit this (measured 2026-09-01). Every runtime
 // name the class body uses after its members therefore goes through here, not just the field types.
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
+  // `FieldNo` IS HIDDEN BY THE BASE CLASS AND NOT ONLY BY A FIELD. `Table<Derived>` carries AL's
+  // own `Record.FieldNo(Field)`, and a member declared anywhere in a class hides a namespace name
+  // for the WHOLE class body -- so every generated table qualifies the TYPE, not just the ones with
+  // a field of that name. AL names both, and the door keeps both names.
+  if (type == "FieldNo") { return "::agiru::" + bare; }
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
 }
 

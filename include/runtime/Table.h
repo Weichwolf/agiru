@@ -4,6 +4,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 
@@ -180,7 +181,7 @@ public:
   /// The address of the member is enough to find its declaration, so the generated line reads like
   /// the AL line instead of naming a field number.
   template <typename FieldType>
-    requires(!std::is_same_v<FieldType, FieldNo>)
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[noreturn]] void FieldError(const FieldType &member, std::string_view text = {}) const {
     ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), text);
   }
@@ -190,7 +191,7 @@ public:
   /// \param member The field.
   /// \throws Error when the field holds its type's blank.
   template <typename FieldType>
-    requires(!std::is_same_v<FieldType, FieldNo>)
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   void TestField(const FieldType &member) const {
     ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, NumberOf(&member));
   }
@@ -202,9 +203,9 @@ public:
   /// \param expected The value it must hold, or the option member it must hold.
   /// \throws Error when the values differ.
   template <typename FieldType, typename Value>
-    requires(!std::is_same_v<FieldType, FieldNo>)
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   void TestField(const FieldType &member, const Value &expected) const {
-    const FieldNo no = NumberOf(&member);
+    const ::agiru::FieldNo no = NumberOf(&member);
     if constexpr (std::is_enum_v<Value>) {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
     } else {
@@ -217,7 +218,7 @@ public:
   /// \param member The field.
   /// \return The field's `Caption` property.
   template <typename FieldType>
-    requires(!std::is_same_v<FieldType, FieldNo>)
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[nodiscard]] std::string_view FieldCaption(const FieldType &member) const {
     return ::agiru::FieldCaption(TableTraits<Derived>::kTable, NumberOf(&member));
   }
@@ -228,14 +229,14 @@ public:
   /// \param text Optional replacement for the default wording.
   /// \throws Error always.
   /// \see agiru::FieldError
-  [[noreturn]] void FieldError(FieldNo no, std::string_view text = {}) const {
+  [[noreturn]] void FieldError(::agiru::FieldNo no, std::string_view text = {}) const {
     ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, no, text);
   }
 
   /// \brief AL `Record.TestField(Field)`.
   /// \param no The field to test.
   /// \throws Error when the field holds its type's blank.
-  void TestField(FieldNo no) const {
+  void TestField(::agiru::FieldNo no) const {
     ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, no);
   }
 
@@ -246,7 +247,7 @@ public:
   /// \throws Error when the values differ.
   template <typename Value>
     requires(!std::is_enum_v<Value>)
-  void TestField(FieldNo no, const Value &expected) const {
+  void TestField(::agiru::FieldNo no, const Value &expected) const {
     ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
   }
 
@@ -262,22 +263,766 @@ public:
   /// of wrapping the member in its option type at the call site.
   template <typename E>
     requires std::is_enum_v<E>
-  void TestField(FieldNo no, E expected) const {
+  void TestField(::agiru::FieldNo no, E expected) const {
     ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<E>{expected});
+  }
+
+  /// \brief AL `Record.FieldNo(Field)` -- the AL number of a field, named the way AL names it.
+  ///
+  /// \tparam Value The field's type.
+  /// \param member The field itself, which is how AL writes it: `Rec.FieldNo(Code)`.
+  /// \return The AL field number.
+  /// \throws Error when the address is not a field of this record.
+  /// \note IT RETURNS AN `Integer` BECAUSE AL'S DOES. `record-fieldno-method.md` gives the return
+  ///       as Integer, and AL code hands it straight to a procedure that takes one --
+  ///       `GenerateRandomCode(Rec.FieldNo(Code), DATABASE::X)`. The strong `agiru::FieldNo` stays
+  ///       where the METADATA uses it, which is where a wrong number cannot be caught any other
+  ///       way.
+  template <typename Value> [[nodiscard]] Integer FieldNo(const Value &member) const {
+    return NumberOf(&member).Value();
   }
 
   /// \brief AL `Record.FieldCaption(Field)`.
   /// \param no The field.
   /// \return The field's `Caption` property.
-  [[nodiscard]] std::string_view FieldCaption(FieldNo no) const {
+  [[nodiscard]] std::string_view FieldCaption(::agiru::FieldNo no) const {
     return ::agiru::FieldCaption(TableTraits<Derived>::kTable, no);
+  }
+
+  // WHAT A RECORD CAN DO, from `methods-auto/record/`: 111 pages over 82 names, and what a body
+  // needs first is that the NAME exists and refuses rather than failing to compile. Each takes
+  // whatever AL's overload set takes, because a variadic template is the one shape that accepts
+  // every call site while the behaviour is still a refusal (board:0035). They go one at a time as
+  // the behaviour lands, and each that does gets its documented signature and its gate case.
+  /// \brief AL `Record.AddLink(...)`. Adds a link to a record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean AddLink(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.AddLink is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.AddLoadFields(...)`. Specifies fields to be initially loaded when the record
+  /// is retrieved from its data source. Subsequent calls to AddLoadFields will not overwrite fields
+  /// already selected for the initial load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean AddLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.AddLoadFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.AreFieldsLoaded(...)`. Checks whether the specified fields are all initially
+  /// loaded.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean AreFieldsLoaded(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.AreFieldsLoaded is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Ascending(...)`. Gets or sets the order in which the system searches through
+  /// a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Ascending(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Ascending is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CalcFields(...)`. Calculates the FlowFields in a record. You specify which
+  /// fields to calculate by using parameters.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CalcFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CalcFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CalcSums(...)`. Calculates the total of a column in a table. You specify
+  /// which fields to calculate by using parameters.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CalcSums(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CalcSums is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ChangeCompany(...)`. Redirects references to table data from one company to
+  /// another.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ChangeCompany(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ChangeCompany is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ClearMarks(...)`. Removes all the marks from a record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ClearMarks(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ClearMarks is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Consistent(...)`. Marks a table as being consistent or inconsistent.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Consistent(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Consistent is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CopyFilter(...)`. Copies the filter that has been set for one field and
+  /// applies it to another field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CopyFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CopyFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CopyFilters(...)`. Copies all the filters set by the SETFILTER method
+  /// (Record) or the SETRANGE method (Record) from one record to another.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CopyFilters(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CopyFilters is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CopyLinks(...)`. Copies all the links from a specified record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CopyLinks(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CopyLinks is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CountApprox(...)`. Returns an approximate count of the number of records in
+  /// the table, for example, for updating progress bars or displaying informational messages.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CountApprox(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CountApprox is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CurrentCompany(...)`. Gets the current company of a database table record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CurrentCompany(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CurrentCompany is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CurrentKey(...)`. Gets the current key of a database table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean CurrentKey(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CurrentKey is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.DeleteLink(...)`. Deletes a specified link from a record in a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean DeleteLink(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.DeleteLink is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.DeleteLinks(...)`. Deletes all of the links that have been added to a
+  /// record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean DeleteLinks(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.DeleteLinks is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FieldActive(...)`. Checks whether a field is enabled.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FieldActive(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FieldActive is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FieldName(...)`. Gets the name of a field as a string.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FieldName(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FieldName is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FilterGroup(...)`. Gets or sets the filter group that is applied to a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FilterGroup(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FilterGroup is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Find(...)`. Finds a record in a table that is based on the values stored in
+  /// keys.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Find(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Find is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FindFirst(...)`. Finds the first record in a table based on the current key
+  /// and filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FindFirst(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FindFirst is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FindLast(...)`. Finds the last record in a table based on the current key
+  /// and filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FindLast(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FindLast is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.FullyQualifiedName(...)`. Gets the fully qualified name of a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean FullyQualifiedName(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FullyQualifiedName is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetAscending(...)`. Gets the sort order for the records returned. You can
+  /// use GETASCENDING to identify the sort order of the specified field because fields can be
+  /// sorted in ascending or descending order. For example, you can read data from an ODATA web
+  /// service where the data is sorted in ascending order on the Name field but in descending order
+  /// on the City field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetAscending(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetAscending is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetBySystemId(...)`. Gets a record by its SystemId.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetBySystemId(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetBySystemId is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetFilter(...)`. Gets a list of the filters within the current filter group
+  /// that are applied to a field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetFilters(...)`. Gets a string that contains a list of the filters within
+  /// the current filter group for all fields in a record. In addition, this method also returns the
+  /// state of the MARKEDONLY method (Record).
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetFilters(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetFilters is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetPosition(...)`. Gets a string that contains the primary key of the
+  /// current record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetPosition(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetPosition is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetRangeMax(...)`. Gets the maximum value in a range for a field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetRangeMax(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetRangeMax is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetRangeMin(...)`. Gets the minimum value in a range for a field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetRangeMin(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetRangeMin is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetView(...)`. Gets a string that describes the current sort order, key, and
+  /// filters on a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetView(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetView is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.HasFilter(...)`. Determines whether a filter is attached to a record within
+  /// the current filter group.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean HasFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.HasFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.HasLinks(...)`. Determines whether a record contains any links.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean HasLinks(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.HasLinks is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Init(...)`. Initializes a record in a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Init(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Init is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.IsTemporary(...)`. Determines whether a record refers to a temporary table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean IsTemporary(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.IsTemporary is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.LoadFields(...)`. Accesses the table's corresponding data source and loads
+  /// the values of the specified fields on the record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean LoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.LoadFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.LockTable(...)`. Starts locking on a table to protect it from write
+  /// transactions that conflict with each other.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean LockTable(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.LockTable is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Mark(...)`. Marks a record. You can also use this method to determine
+  /// whether a record is marked.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Mark(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Mark is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.MarkedOnly(...)`. Activates a special filter. After you use this function,
+  /// your view of the table includes only records marked by the Mark (Record) method.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean MarkedOnly(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.MarkedOnly is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ModifyAll(...)`. Modifies a field in all records within a range that you
+  /// specify.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ModifyAll(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ModifyAll is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ReadConsistency(...)`. Determines if the table supports read consistency.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ReadConsistency(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ReadConsistency is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ReadIsolation(...)`. Gets or sets the read isolation level.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ReadIsolation(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ReadIsolation is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ReadPermission(...)`. Determines whether a user is granted read permission
+  /// to the table that contains a record. This method can test for both full read permission and
+  /// partial read permission that has been granted with a security filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ReadPermission(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ReadPermission is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.RecordId(...)`. Gets the RecordId of the record that is currently selected
+  /// in the table. If no table is selected, an error is generated.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean RecordId(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.RecordId is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.RecordLevelLocking(...)`. Determines whether the table supports record-level
+  /// locking.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean RecordLevelLocking(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.RecordLevelLocking is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Relation(...)`. Determines the table relationship of a given field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Relation(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Relation is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Rename(...)`. Changes the value of a primary key in a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Rename(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Rename is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Reset(...)`. Removes all filters, including any special filters set by
+  /// MarkedOnly, changes fields select for loading back to all, sets the read isolation level to
+  /// the default value, and changes the current key to the primary key. Also removes any marks on
+  /// the record and clears any AL variables defined on its table definition.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Reset(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Reset is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SecurityFiltering(...)`. Gets or sets how security filters are applied to
+  /// the record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SecurityFiltering(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SecurityFiltering is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetAscending(...)`. Sets the sort order for the records returned. Use this
+  /// method after you have set the keys to sort after, using SETCURRENTKEY. The default sort order
+  /// is ascending. You can use SETASCENDING to change the sort order to descending for a specific
+  /// field, while the other fields in the specified key are sorted in ascending order.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetAscending(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetAscending is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetAutoCalcFields(...)`. Sets the FlowFields that you specify to be
+  /// automatically calculated when the record is retrieved from the database.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetAutoCalcFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetAutoCalcFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetBaseLoadFields(...)`. Sets that only fields for the base table to be
+  /// initially loaded when the record is retrieved from its data source. This will overwrite fields
+  /// previously selected for initial load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetBaseLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetBaseLoadFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetCurrentKey(...)`. Selects a key for a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetCurrentKey(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetCurrentKey is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetFilter(...)`. Assigns a filter to a field that you specify.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetLoadFields(...)`. Sets the fields to be initially loaded when the record
+  /// is retrieved from its data source. This will overwrite fields previously selected for initial
+  /// load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetLoadFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetPermissionFilter(...)`. Applies the user's security filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetPermissionFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetPermissionFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetPosition(...)`. Sets the fields in a primary key on a record to the
+  /// values specified in the supplied string. The remaining fields are not changed.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetPosition(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetPosition is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetRange(...)`. Sets a simple filter, such as a single range or a single
+  /// value, on a field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetRange(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetRange is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetRecFilter(...)`. Sets the values in the current key of the current record
+  /// as a record filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetRecFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetRecFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetView(...)`. Sets the current sort order, key, and filters on a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetView(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetView is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.TableCaption(...)`. Gets the current caption of a table as a string.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean TableCaption(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.TableCaption is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.TableName(...)`. Gets the name of a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean TableName(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.TableName is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.TransferFields(...)`. Copies all matching fields in one record to another
+  /// record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean TransferFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.TransferFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Truncate(...)`. Deletes all records in a table that fall within a specified
+  /// range, in an efficient maner. Keep in mind that Truncate allows for less concurrency than
+  /// DeleteAll, as the entire table will be locked until the transaction is committed.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Truncate(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Truncate is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Validate(...)`. Calls the OnValidate trigger for the field that you specify.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Validate(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Validate is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.WritePermission(...)`. Determines whether a user can write to a table. This
+  /// method can test for both full write permission and partial write permission that has been
+  /// granted with a security filter. A write permission consists of Insert, Delete, and Modify
+  /// permissions.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean WritePermission(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.WritePermission is declared and not implemented yet (board:0035)");
   }
 
 private:
   friend Derived;
 
   /// The AL field number of a member of this record, found by where it sits.
-  [[nodiscard]] FieldNo NumberOf(const void *member) const {
+  [[nodiscard]] ::agiru::FieldNo NumberOf(const void *member) const {
     const auto offset = static_cast<std::size_t>(static_cast<const std::byte *>(member) -
                                                  static_cast<const std::byte *>(Self()));
     const FieldDef *def = FieldAtOffset(TableTraits<Derived>::kTable, offset);

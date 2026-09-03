@@ -75,31 +75,31 @@ public:
   /// \brief The field numbers, from the predecessor's measured layout.
   struct Field_No {
     /// \brief The AL field number of `User Security ID`.
-    static constexpr FieldNo UserSecurityID{1};
+    static constexpr ::agiru::FieldNo UserSecurityID{1};
     /// \brief The AL field number of `User Name`.
-    static constexpr FieldNo UserName{3};
+    static constexpr ::agiru::FieldNo UserName{3};
     /// \brief The AL field number of `Full Name`.
-    static constexpr FieldNo FullName{4};
+    static constexpr ::agiru::FieldNo FullName{4};
     /// \brief The AL field number of `State`.
-    static constexpr FieldNo State{5};
+    static constexpr ::agiru::FieldNo State{5};
     /// \brief The AL field number of `Expiry Date`.
-    static constexpr FieldNo ExpiryDate{6};
+    static constexpr ::agiru::FieldNo ExpiryDate{6};
     /// \brief The AL field number of `Windows Security ID`.
-    static constexpr FieldNo WindowsSecurityID{7};
+    static constexpr ::agiru::FieldNo WindowsSecurityID{7};
     /// \brief The AL field number of `Change Password`.
-    static constexpr FieldNo ChangePassword{8};
+    static constexpr ::agiru::FieldNo ChangePassword{8};
     /// \brief The AL field number of `License Type`.
-    static constexpr FieldNo LicenseType{9};
+    static constexpr ::agiru::FieldNo LicenseType{9};
     /// \brief The AL field number of `Authentication Email`.
-    static constexpr FieldNo AuthenticationEmail{10};
+    static constexpr ::agiru::FieldNo AuthenticationEmail{10};
     /// \brief The AL field number of `Contact Email`.
-    static constexpr FieldNo ContactEmail{11};
+    static constexpr ::agiru::FieldNo ContactEmail{11};
     /// \brief The AL field number of `Exchange Identifier`.
-    static constexpr FieldNo ExchangeIdentifier{12};
+    static constexpr ::agiru::FieldNo ExchangeIdentifier{12};
   };
 
   /// \brief The primary key.
-  static constexpr std::array<FieldNo, 1> kKey1{{Field_No::UserSecurityID}};
+  static constexpr std::array<::agiru::FieldNo, 1> kKey1{{Field_No::UserSecurityID}};
 };
 
 /// \brief AL `User`, under the name AL gives it.

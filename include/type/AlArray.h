@@ -55,4 +55,21 @@ private:
   std::array<T, N> held_{};
 };
 
+/// \brief AL `X[i]` -- the element at a ONE-BASED index.
+///
+/// \tparam Container What is being indexed.
+/// \tparam Index     The index type.
+/// \param container The array, list or string.
+/// \param index     The ONE-BASED position.
+/// \return The element.
+///
+/// \note IT IS A FREE FUNCTION BECAUSE THE EMITTER CANNOT KNOW WHAT IT IS INDEXING. `X[i]` in AL
+///       is an array, a `List`, a `Dictionary` or a string depending on a declaration the body
+///       writer does not resolve, so it writes the call and the OVERLOAD SET decides -- which is a
+///       compiler's job and not a generator's.
+template <typename Container, typename Index>
+[[nodiscard]] decltype(auto) At(Container &container, Index index) {
+  return container[index];
+}
+
 } // namespace agiru

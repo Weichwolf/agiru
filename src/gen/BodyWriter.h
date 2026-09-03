@@ -54,6 +54,28 @@ public:
     return {};
   }
 
+  /// \brief Whether a name is a RECORD variable.
+  /// \param variable The AL name.
+  /// \return True when it was declared as `Record "X"`.
+  [[nodiscard]] virtual bool IsRecord(std::string_view variable) const {
+    static_cast<void>(variable);
+    return false;
+  }
+
+  /// \brief Whether a member of this variable is a METHOD rather than a field.
+  ///
+  /// \param variable The AL name of the variable.
+  /// \return True when `X.Member` with no parentheses is a call.
+  ///
+  /// \note AL OMITS THE PARENTHESES OF A PARAMETERLESS CALL and a reader cannot tell the two apart
+  ///       from the text: `FieldRef.Name` is a call and `Customer.Name` is a field. The RECEIVER
+  ///       decides, and a door type has no fields at all -- `RecordRef`, `FieldRef` and `KeyRef`
+  ///       carry methods and nothing else.
+  [[nodiscard]] virtual bool MembersAreCalls(std::string_view variable) const {
+    static_cast<void>(variable);
+    return false;
+  }
+
   /// \brief Whether a name is an object HANDLE rather than a value.
   ///
   /// \param name The AL name.

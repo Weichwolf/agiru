@@ -1,9 +1,12 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "type/Char.h"
+#include "type/Integer.h"
 
 #include <compare>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -42,6 +45,13 @@ class ValueAccess;
 /// BC's strings are .NET strings, and `text-strlen-method.md` gives the length of one. Storage here
 /// is UTF-8; the counting rule is .NET's.
 std::size_t Utf16Length(std::string_view s);
+
+/// \brief The code point at a ZERO-BASED UTF-16 unit position.
+/// \param s    The text.
+/// \param unit The position.
+/// \return The code point.
+/// \throws StringError when the position is outside the text or inside a surrogate pair.
+std::int32_t CodePointAt(std::string_view s, std::size_t unit);
 
 /// \brief Raises the platform's own over-length message.
 ///
@@ -111,7 +121,28 @@ public:
   [[nodiscard]] bool IsEmpty() const { return value_.empty(); }
 
   /// \return The length in UTF-16 code units, as AL's `StrLen` counts it.
-  [[nodiscard]] std::size_t Length() const { return detail::Utf16Length(value_); }
+  ///
+  /// \note AN `Integer` AND NOT A `std::size_t`, because AL's `StrLen` returns one and a body
+  ///       hands the result straight to something that takes an Integer -- or to an `Any`, where a
+  ///       `std::size_t` is not an alternative at all.
+  [[nodiscard]] Integer Length() const { return static_cast<Integer>(detail::Utf16Length(value_)); }
+
+  /// \brief AL `X[i]` on text -- the character at a ONE-BASED position.
+  ///
+  /// \param index The position, counting from one as AL counts.
+  /// \return The character.
+  /// \throws StringError when the index is outside the text.
+  [[nodiscard]] Char operator[](Integer index) const;
+
+  /// \brief Reads as text wherever text is wanted.
+  ///
+  /// \return The stored text.
+  ///
+  /// \note AL HANDS A `Code` TO A `Text` PARAMETER WITHOUT CEREMONY, and every builtin that takes
+  ///       text takes it. Without this the door refuses what AL writes constantly -- and the LENGTH
+  ///       check that matters is on the way IN, not on the way out.
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): see the note above.
+  operator std::string_view() const { return value_; }
 
 protected:
   friend class detail::ValueAccess;
@@ -126,5 +157,18 @@ protected:
 private:
   std::string value_;
 };
+
+/// \brief AL `+` on text -- concatenation.
+///
+/// \param left  The left side.
+/// \param right The right side.
+/// \return The two joined, as a plain string: AL decides the LENGTH at the assignment, not here.
+///
+/// \note AL WRITES `Code + Code` AND MEANS TEXT. `NoSeries.Code + GenerateRandomCode(...)` is the
+///       shape, and what it produces is checked against the declared length of whatever it is
+///       assigned to -- which is where `Text` and `Code` already check it.
+[[nodiscard]] inline std::string operator+(const StringValue &left, const StringValue &right) {
+  return std::string(left.Value()) + std::string(right.Value());
+}
 
 } // namespace agiru

@@ -24,11 +24,11 @@ public:
   Integer NewLineNumber{};
 
   struct Field_No {
-    static constexpr FieldNo OldLineNumber{1};
-    static constexpr FieldNo NewLineNumber{2};
+    static constexpr ::agiru::FieldNo OldLineNumber{1};
+    static constexpr ::agiru::FieldNo NewLineNumber{2};
   };
 
-  static constexpr std::array<FieldNo, 1> kKey1{{Field_No::OldLineNumber}};
+  static constexpr std::array<::agiru::FieldNo, 1> kKey1{{Field_No::OldLineNumber}};
 };
 
 inline constexpr std::array<FieldDef, 2> kLineNumberBufferFields{{

@@ -105,8 +105,8 @@ public:
 /// \tparam T A Text or Code.
 /// \return The declared length.
 /// \see `text-maxstrlen-string-method.md`
-template <typename T> constexpr std::size_t MaxStrLen(const T & /*value*/) {
-  return T::kMaxLength;
+template <typename T> constexpr Integer MaxStrLen(const T & /*value*/) {
+  return static_cast<Integer>(T::kMaxLength);
 }
 
 /// \brief AL `StrLen(String)`.
@@ -114,8 +114,8 @@ template <typename T> constexpr std::size_t MaxStrLen(const T & /*value*/) {
 /// \param value The string.
 /// \return Its length in UTF-16 code units.
 /// \see `text-strlen-method.md`
-template <typename T> std::size_t StrLen(const T &value) {
-  return value.Length();
+template <typename T> Integer StrLen(const T &value) {
+  return static_cast<Integer>(value.Length());
 }
 
 } // namespace agiru

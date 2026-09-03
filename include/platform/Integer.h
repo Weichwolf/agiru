@@ -46,11 +46,11 @@ public:
   /// \brief The field numbers.
   struct Field_No {
     /// \brief The AL field number of `Number`.
-    static constexpr FieldNo Number{1};
+    static constexpr ::agiru::FieldNo Number{1};
   };
 
   /// \brief The primary key, which is the only field there is.
-  static constexpr std::array<FieldNo, 1> kKey1{{Field_No::Number}};
+  static constexpr std::array<::agiru::FieldNo, 1> kKey1{{Field_No::Number}};
 };
 
 /// \brief AL `Integer`, under the name AL gives it.

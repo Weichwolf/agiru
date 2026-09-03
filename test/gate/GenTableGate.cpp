@@ -196,9 +196,14 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
              generated.find("FieldNo{};") != std::string::npos);
   CHECK_TRUE("and the field numbers reach past it to the runtime type",
              generated.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
-  CHECK_TRUE("while a table with no such field says it plainly",
+  // AND IT IS QUALIFIED EVEN WITHOUT A FIELD OF THAT NAME, because the BASE CLASS hides it:
+  // `Table<Derived>` carries AL's own `Record.FieldNo(Field)`, and a member declared anywhere in a
+  // class hides a namespace name for the whole class body. The negative control is therefore not
+  // "unqualified elsewhere" but "the field itself still takes AL's spelling", which the check above
+  // states.
+  CHECK_TRUE("and a table with no such field qualifies it too, because the base class hides it",
              agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {}, {})
-                     .text.find("static constexpr FieldNo Code{") != std::string::npos);
+                     .text.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
 }
 
 /// A KEY NAMED `Name` WOULD GIVE `kName`, which is already the table's own name constant. 19 of the

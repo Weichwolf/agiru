@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 /// \file
 /// \brief The base of every error the agiru runtime raises.
@@ -22,6 +23,15 @@ namespace agiru {
 class Error : public std::runtime_error {
 public:
   using std::runtime_error::runtime_error;
+
+  /// \brief An error with a message that is not a `std::string`.
+  ///
+  /// \param text The message.
+  ///
+  /// \note AL PASSES A TEXT AND THE TEXT TYPES READ AS `std::string_view`, which
+  ///       `std::runtime_error` does not take. Without this, `Error(GetLastErrorText())` -- the
+  ///       shape a test writes to re-raise -- does not compile.
+  explicit Error(std::string_view text) : std::runtime_error(std::string(text)) {}
 };
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.

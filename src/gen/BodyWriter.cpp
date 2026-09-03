@@ -7,6 +7,7 @@
 #include "Names.h"
 #include "TableWriter.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
@@ -246,6 +247,11 @@ private:
   /// `Codeunit::"Sales-Post"` -- and the kind is the keyword, not a variable. The generated tree
   /// puts each kind in its own namespace for exactly the reason AL needs the keyword: 51 names in
   /// the read roots are two kinds at once.
+  /// `DATABASE::"X"` IS A TABLE NUMBER AND NOT A TYPE. AL writes it where an Integer is wanted --
+  /// `GenerateRandomCode(FieldNo, DATABASE::"No. Series")` -- so what it becomes is the table's own
+  /// number constant, read out as the integer AL treats it as.
+  static bool NamesATableNumber(std::string_view base) { return SameName(base, "Database"); }
+
   static std::string_view KindNamespace(std::string_view base) {
     if (SameName(base, "Codeunit")) { return "codeunits"; }
     if (SameName(base, "Page")) { return "pages"; }
@@ -265,12 +271,27 @@ private:
       const std::string enumeration = scope_.FieldEnumeration(
           OfVariable{.variable = base.children[0].text, .field = base.children[1].text});
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+      // A FIELD OF A RECORD THIS RUN DOES NOT HAVE STILL HAS TO COMPILE, and it must not compile
+      // into a number. `RecordLink.Type::Note` names a platform table's field (board:0032), so the
+      // ordinal is genuinely unknown and the expression refuses where AL would have used it.
+      if (scope_.IsRecord(base.children[0].text)) {
+        return "RefusedOption(\"" + base.children[0].text + "." + base.children[1].text +
+               "::" + expression.text + "\")";
+      }
     }
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
       if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
       // A NAME THAT IS IN SCOPE IS A VARIABLE AND NOT A KIND. `Type::All` where `Type` is a field
       // stays a field; only an unresolved base can be AL's keyword.
+      // `OBJECTTYPE::Table` AND ITS NEIGHBOURS ARE DOOR OPTIONS. AL writes the platform's own
+      // option types in upper case as a scope, and each is a type the door already declares.
+      if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
+        return "::agiru::" + TypeName(base.text) + "::" + EnumeratorName(expression.text);
+      }
+      if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
+        return "tables::" + Identifier(expression.text) + "::kId.Value()";
+      }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) { return std::string(kind) + "::" + Identifier(expression.text); }
@@ -311,24 +332,58 @@ private:
     return 0;
   }
 
+  /// AL `Error(...)` IS A STATEMENT THAT RAISES, and it was emitted as a call whose value is
+  /// discarded -- an Error object built and thrown away, so the body ran on past the point AL stops
+  /// at. `agiru::Error` is the exception, so the translation is the `throw` AL means, and the
+  /// message goes through `StrSubstNo` when arguments follow it, which is AL's own overload.
+  std::string Raise(const al::Expr &expression) {
+    std::string message = expression.children.size() > 2 ? "StrSubstNo(" : "";
+    for (std::size_t i = 1; i < expression.children.size(); ++i) {
+      if (i != 1) { message += ", "; }
+      message += Expression(expression.children[i], 0);
+    }
+    if (expression.children.size() > 2) { message += ")"; }
+    return "throw Error(" + message + ")";
+  }
+
+  /// `Page.Run(Page::"X", Rec)` IS A CALL ON THE OBJECT AND NOT ON A DISPATCHER. AL names the kind
+  /// twice -- once as the receiver, once in the identity -- and what it means is "run that object".
+  /// The generated form says it once: `pages::X::Run(Rec)`.
+  std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
+    std::string out = Expression(expression.children[1], kPrimaryPrecedence) +
+                      "::" + Identifier(callee.children[1].text) + "(";
+    for (std::size_t i = 2; i < expression.children.size(); ++i) {
+      if (i != 2) { out += ", "; }
+      out += Expression(expression.children[i], 0);
+    }
+    return out + ")";
+  }
+
+  /// A CALLEE IS ALREADY A CALL, so the parentheses AL omits are not added to it a second time:
+  /// `CompanyName()` would become `CompanyName()()`.
+  std::string Callee(const al::Expr &callee) {
+    if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
+    if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
+    std::string known = scope_.Resolve(callee.text);
+    if (!known.empty()) { return known; }
+    const std::string_view builtin = BareBuiltin(callee.text);
+    return builtin.empty() ? Identifier(callee.text) : std::string(builtin);
+  }
+
   std::string Call(const al::Expr &expression) {
     const al::Expr &callee = expression.children.front();
-    // `Page.Run(Page::"X", Rec)` IS A CALL ON THE OBJECT AND NOT ON A DISPATCHER. AL names the kind
-    // twice -- once as the receiver, once in the identity -- and what it means is "run that
-    // object". The generated form says it once: `pages::X::Run(Rec)`.
+    if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&
+        scope_.Resolve(callee.text).empty()) {
+      return Raise(expression);
+    }
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[0].kind == al::ExprKind::Name &&
         !KindNamespace(callee.children[0].text).empty() && expression.children.size() > 1 &&
         expression.children[1].kind == al::ExprKind::Scope) {
-      std::string out = Expression(expression.children[1], kPrimaryPrecedence) +
-                        "::" + Identifier(callee.children[1].text) + "(";
-      for (std::size_t i = 2; i < expression.children.size(); ++i) {
-        if (i != 2) { out += ", "; }
-        out += Expression(expression.children[i], 0);
-      }
-      return out + ")";
+      return RunObject(expression, callee);
     }
-    std::string out = Expression(callee, kPrimaryPrecedence) + "(";
+    const std::string spelled = Callee(callee);
+    std::string out = spelled + "(";
     // The receiver is the left of the dot, when there is one; a bare call has none and its
     // arguments are ordinary expressions.
     std::string receiver;
@@ -351,6 +406,67 @@ private:
     return out + ")";
   }
 
+  /// The AL free functions that take NO arguments, which AL therefore writes without parentheses.
+  ///
+  /// `RecordLink.URL1 := GetUrl(DefaultClientType, CompanyName, ...)` passes two of them as VALUES,
+  /// and C++ reads a bare function name as its address. The set is every parameterless static
+  /// method in `methods-auto/` -- 42 of them, and the list is what the pages say rather than what
+  /// anybody remembered.
+  /// The door's own spelling of a parameterless builtin, or empty when it is not one.
+  ///
+  /// AL IS CASE-INSENSITIVE AND C++ IS NOT, and it bites here as it bites everywhere else: a body
+  /// writes `GetLastErrorCallstack` and the door declares `GetLastErrorCallStack`. The KNOWN name
+  /// wins, which is the same rule the variables follow.
+  static std::string_view BareBuiltin(std::string_view name) {
+    static constexpr std::array kNoArgument{
+        std::string_view{"ApplicationIdentifier"},
+        std::string_view{"ApplicationPath"},
+        std::string_view{"ClearAll"},
+        std::string_view{"ClearCollectedErrors"},
+        std::string_view{"ClearLastError"},
+        std::string_view{"CodeCoverageLoad"},
+        std::string_view{"CodeCoverageRefresh"},
+        std::string_view{"Commit"},
+        std::string_view{"CompanyName"},
+        std::string_view{"CreateEncryptionKey"},
+        std::string_view{"CreateGuid"},
+        std::string_view{"CurrentClientType"},
+        std::string_view{"CurrentDateTime"},
+        std::string_view{"CurrentExecutionMode"},
+        std::string_view{"DefaultClientType"},
+        std::string_view{"DeleteEncryptionKey"},
+        std::string_view{"EncryptionEnabled"},
+        std::string_view{"EncryptionKeyExists"},
+        std::string_view{"GetCurrentModuleExecutionContext"},
+        std::string_view{"GetExecutionContext"},
+        std::string_view{"GetLastErrorCallStack"},
+        std::string_view{"GetLastErrorCode"},
+        std::string_view{"GetLastErrorObject"},
+        std::string_view{"GetLastErrorText"},
+        std::string_view{"GuiAllowed"},
+        std::string_view{"HasCollectedErrors"},
+        std::string_view{"IsCollectingErrors"},
+        std::string_view{"IsInWriteTransaction"},
+        std::string_view{"IsServiceTier"},
+        std::string_view{"LastUsedRowVersion"},
+        std::string_view{"MinimumActiveRowVersion"},
+        std::string_view{"SelectLatestVersion"},
+        std::string_view{"SerialNumber"},
+        std::string_view{"ServiceInstanceId"},
+        std::string_view{"SessionId"},
+        std::string_view{"TemporaryPath"},
+        std::string_view{"TenantId"},
+        std::string_view{"Time"},
+        std::string_view{"Today"},
+        std::string_view{"UserId"},
+        std::string_view{"UserSecurityId"},
+        std::string_view{"WindowsLanguage"},
+    };
+    const auto *found = std::ranges::find_if(
+        kNoArgument, [name](std::string_view known) { return SameName(known, name); });
+    return found == kNoArgument.end() ? std::string_view{} : *found;
+  }
+
   std::string Name(const al::Expr &expression) {
     // AL'S BOOLEAN LITERALS ARE NOT IDENTIFIERS, and treating them as one capitalised them:
     // `IsHandled := false` became `IsHandled = False`, which is an unknown name in every body that
@@ -358,6 +474,10 @@ private:
     if (SameName(expression.text, "true")) { return "true"; }
     if (SameName(expression.text, "false")) { return "false"; }
     const std::string known = scope_.Resolve(expression.text);
+    if (known.empty()) {
+      const std::string_view builtin = BareBuiltin(expression.text);
+      if (!builtin.empty()) { return std::string(builtin) + "()"; }
+    }
     return known.empty() ? Identifier(expression.text) : known;
   }
 
@@ -387,7 +507,19 @@ private:
     return out;
   }
 
-  std::string Binary(const al::Expr &expression, int outer) {
+  /// Whether a call reaches through a door type -- `RecRef.KeyIndex(1)` gives a `KeyRef`, whose
+  /// members are all methods.
+  [[nodiscard]] bool YieldsADoorType(const al::Expr &call) const {
+    if (call.children.empty()) { return false; }
+    const al::Expr &callee = call.children.front();
+    if (callee.kind != al::ExprKind::Binary || callee.text != "." || callee.children.size() != 2) {
+      return false;
+    }
+    return callee.children[0].kind == al::ExprKind::Name &&
+           scope_.MembersAreCalls(callee.children[0].text);
+  }
+
+  std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     // AL'S CONDITIONAL OPERATOR IS C++'S, and it is the one Binary node with three children.
     // Without a case of its own the chain walk below found no chain, left `walk` pointing at this
@@ -416,6 +548,15 @@ private:
     // member object is `A->B.C`: what `A` yields is a value like any other.
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
+    // A MEMBER OF A DOOR TYPE IS A CALL, and AL wrote no parentheses because it never needs them
+    // for a parameterless one. `FieldRef.Name` and `RecRef.Name` are both calls; a field of a
+    // record is not, and the receiver is what tells them apart.
+    // AND A CALL YIELDS A DOOR TYPE TOO. `RecRef.KeyIndex(1).FieldCount` reaches through the KeyRef
+    // that `KeyIndex` returned, and that is a door type like any other -- so what decides is the
+    // LEFTMOST expression's kind, and a call on a door type yields one.
+    const bool calls = spelling == "." &&
+                       ((walk->kind == al::ExprKind::Name && scope_.MembersAreCalls(walk->text)) ||
+                        (walk->kind == al::ExprKind::Call && YieldsADoorType(*walk)));
     std::string out = Expression(*walk, precedence);
     for (std::size_t i = chain.size(); i > 0; --i) {
       if (spelling == ".") {
@@ -426,6 +567,7 @@ private:
         out += " ";
       }
       out += Expression(*chain[i - 1], precedence + 1);
+      if (calls && i == chain.size() && !asCallee) { out += "()"; }
     }
     if (precedence < outer) { out = "(" + out + ")"; }
     return out;
@@ -471,7 +613,7 @@ private:
       // does split a base64 blob across hundreds of lines joined by `+`. The depth guard below
       // exists to stop runaway recursion on a malformed tree, not to cap a legitimate expression,
       // so the chain is flattened first and the guard keeps its job.
-      case al::ExprKind::Binary: out = Binary(expression, outer); break;
+      case al::ExprKind::Binary: out = Binary(expression, outer, false); break;
     }
     return out;
   }

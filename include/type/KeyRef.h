@@ -1,7 +1,6 @@
 #pragma once
 
 #include "runtime/Error.h"
-#include "runtime/RecordRef.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
@@ -24,6 +23,12 @@
 /// \brief AL `KeyRef` -- the surface the platform documentation declares.
 
 namespace agiru {
+
+// A CIRCLE THE DECLARATIONS DO NOT HAVE. `RecordRef.KeyIndex(N)` returns a KeyRef and
+// `KeyRef.Record()` returns a RecordRef, so the two headers cannot include each other -- and they
+// do not need to: a declaration takes and returns a NAME.
+class FieldRef;
+class RecordRef;
 
 /// \brief AL `KeyRef`.
 ///

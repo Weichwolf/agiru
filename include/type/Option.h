@@ -71,9 +71,23 @@ public:
   /// \param ordinal The zero-based member number.
   constexpr explicit Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
 
+  /// \brief Assigns an ordinal.
+  ///
+  /// \param ordinal The zero-based member number.
+  /// \return This option.
+  ///
+  /// \note ASSIGNMENT AND CONVERSION ARE NOT THE SAME QUESTION. AL writes `Field.Type := TypeOf(V)`
+  ///       -- an Integer into an option field -- and the platform takes it; what AL does NOT do is
+  ///       silently read an integer as a member where one is wanted, which is why the constructor
+  ///       stays explicit and only the assignment is open.
+  constexpr Option &operator=(std::int32_t ordinal) {
+    SetOrdinal(ordinal);
+    return *this;
+  }
+
   /// \brief Assigns a named member.
   /// \param value The member.
-  /// \return This object.
+  /// \return This option.
   constexpr Option &operator=(E value) {
     SetOrdinal(static_cast<std::int32_t>(value));
     return *this;
@@ -185,5 +199,18 @@ public:
     return AsInteger() == o.AsInteger();
   }
 };
+
+/// \brief The ordinal of a member of an enumeration this run does not have.
+///
+/// \param what The AL expression, spelled as AL wrote it.
+/// \return Never.
+/// \throws Error always.
+///
+/// \note A FIELD OF AN ABSENT RECORD HAS NO ENUMERATION TO NAME. `RecordLink.Type::Note` scopes
+///       through the `Type` field of a table the platform declares and this run does not have
+///       (board:0032), so the ordinal is genuinely unknown. Emitting zero would be a wrong number
+///       that looks like a right one; this refuses at the point AL would have used it, and says
+///       which expression it was.
+[[noreturn]] Option<> RefusedOption(std::string_view what);
 
 } // namespace agiru

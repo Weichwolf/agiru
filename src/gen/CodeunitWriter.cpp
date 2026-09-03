@@ -806,6 +806,22 @@ public:
       : unit_(unit), procedure_(procedure), objects_(objects) {}
 
   /// The record variable's table, then the field, then what the field was declared as.
+  [[nodiscard]] bool IsRecord(std::string_view variable) const override {
+    const al::VarDecl *declared = Declaration(variable);
+    return declared != nullptr && TypeName(declared->type) == "Record";
+  }
+
+  /// A door type has no fields, so a member of one is a call however AL spelled it.
+  [[nodiscard]] bool MembersAreCalls(std::string_view variable) const override {
+    const al::VarDecl *declared = Declaration(variable);
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    // Every door type whose members are all methods. A `Variant` is one: AL asks it `IsOption`
+    // and `IsRecord` without parentheses, and it has no fields to confuse them with.
+    return type == "RecordRef" || type == "FieldRef" || type == "KeyRef" || type == "Variant" ||
+           type == "RecordId" || type == "ModuleInfo" || type == "Version";
+  }
+
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     const al::VarDecl *declared = Declaration(field.variable);
     if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
@@ -903,9 +919,18 @@ std::string Locals(const al::ProcedureDecl &procedure,
   if (!procedure.returnName.empty()) {
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
+  // A LOCAL NAMED AFTER ITS TYPE HIDES IT FOR EVERY LOCAL AFTER IT. AL writes
+  // `FieldRef: FieldRef;` and then declares another of the same type; the second one names the
+  // variable. It is the same rule the parameters follow, over the same scope.
+  std::set<std::string> names;
   for (const al::VarDecl &declared : procedure.variables) {
-    out += "  " + TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all)) +
-           " " + Identifier(declared.name) + "{};\n";
+    names.insert(Identifier(declared.name));
+  }
+  if (!procedure.returnName.empty()) { names.insert(Identifier(procedure.returnName)); }
+  for (const al::VarDecl &declared : procedure.variables) {
+    std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
+    if (Hidden(type, names)) { type = Qualified(type, names); }
+    out += "  " + type + " " + Identifier(declared.name) + "{};\n";
   }
   return out;
 }

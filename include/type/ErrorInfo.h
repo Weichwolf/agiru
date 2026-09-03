@@ -1,7 +1,6 @@
 #pragma once
 
 #include "runtime/Error.h"
-#include "runtime/RecordRef.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
@@ -27,6 +26,10 @@
 /// \brief AL `ErrorInfo` -- the surface the platform documentation declares.
 
 namespace agiru {
+
+// A declaration takes a NAME. `ErrorInfo.RecordId(RecordRef)` and `RecordRef` naming an ErrorInfo
+// would include each other otherwise.
+class RecordRef;
 
 /// \brief AL `ErrorInfo`.
 ///

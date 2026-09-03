@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <compare>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -19,6 +20,54 @@ bool IsAsciiDigits(std::string_view s) {
 }
 
 } // namespace
+
+// THE UTF-8 DECODER'S OWN CONSTANTS, from the encoding rather than from taste: a lead byte says
+// how many follow, and the low bits of each carry the code point six at a time.
+constexpr std::int32_t kFourByteBits = 0x07;
+constexpr unsigned char kThreeByteMark = 0xE0;
+constexpr std::int32_t kThreeByteBits = 0x0F;
+constexpr unsigned char kTwoByteMark = 0xC0;
+constexpr std::int32_t kTwoByteBits = 0x1F;
+constexpr std::int32_t kContinuationBits = 0x3F;
+constexpr int kBitsPerContinuation = 6;
+
+std::int32_t CodePointAt(std::string_view s, std::size_t unit) {
+  // THE INDEX IS IN UTF-16 UNITS, because that is what AL counts and what `Utf16Length` returns.
+  // A code point outside the BMP is two units, so it is refused rather than half-read: AL would
+  // give a surrogate and nothing here can carry one.
+  std::size_t at = 0;
+  for (std::size_t i = 0; i < s.size();) {
+    const auto lead = static_cast<unsigned char>(s[i]);
+    std::size_t width = 1;
+    std::int32_t point = lead;
+    if (lead >= kFourByteMark) {
+      width = 4;
+      point = lead & kFourByteBits;
+    } else if (lead >= kThreeByteMark) {
+      width = 3;
+      point = lead & kThreeByteBits;
+    } else if (lead >= kTwoByteMark) {
+      width = 2;
+      point = lead & kTwoByteBits;
+    }
+    for (std::size_t k = 1; k < width && i + k < s.size(); ++k) {
+      point = (point << kBitsPerContinuation) |
+              (static_cast<unsigned char>(s[i + k]) & kContinuationBits);
+    }
+    const std::size_t units = width == 4 ? 2 : 1;
+    if (unit < at + units) {
+      if (units == 2) {
+        throw StringError("the character at position " + std::to_string(unit + 1) +
+                          " is outside the basic plane and AL would give half of it");
+      }
+      return point;
+    }
+    at += units;
+    i += width;
+  }
+  throw StringError("the string index " + std::to_string(unit + 1) + " is outside 1.." +
+                    std::to_string(at));
+}
 
 std::size_t Utf16Length(std::string_view s) {
   std::size_t units = 0;

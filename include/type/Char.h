@@ -29,6 +29,18 @@ public:
   /// \param code The code point.
   constexpr explicit Char(std::int32_t code) : code_(code) {}
 
+  /// \brief Assigns a code point.
+  ///
+  /// \param code The code point.
+  /// \return This character.
+  ///
+  /// \note AL ASSIGNS AN INTEGER TO A CHAR, which is the other half of the conversion its own page
+  ///       describes: `CRLF[1] := 13` is how a body builds a line break.
+  constexpr Char &operator=(std::int32_t code) {
+    code_ = code;
+    return *this;
+  }
+
   /// \brief The code point.
   /// \return It.
   [[nodiscard]] constexpr Integer AsInteger() const { return code_; }

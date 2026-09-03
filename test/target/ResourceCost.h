@@ -65,17 +65,17 @@ public:
   Guid SystemModifiedBy{};
 
   struct Field_No : SystemFieldNumbers {
-    static constexpr FieldNo Type{1};
-    static constexpr FieldNo Code{2};
-    static constexpr FieldNo WorkTypeCode{3};
-    static constexpr FieldNo CostType{4};
-    static constexpr FieldNo DirectUnitCost{5};
-    static constexpr FieldNo UnitCost{6};
+    static constexpr ::agiru::FieldNo Type{1};
+    static constexpr ::agiru::FieldNo Code{2};
+    static constexpr ::agiru::FieldNo WorkTypeCode{3};
+    static constexpr ::agiru::FieldNo CostType{4};
+    static constexpr ::agiru::FieldNo DirectUnitCost{5};
+    static constexpr ::agiru::FieldNo UnitCost{6};
   };
 
-  static constexpr std::array<FieldNo, 3> kKey1{
+  static constexpr std::array<::agiru::FieldNo, 3> kKey1{
       {Field_No::Type, Field_No::Code, Field_No::WorkTypeCode}};
-  static constexpr std::array<FieldNo, 3> kKey2{
+  static constexpr std::array<::agiru::FieldNo, 3> kKey2{
       {Field_No::CostType, Field_No::Code, Field_No::WorkTypeCode}};
 
   static constexpr std::string_view Text000{"cannot be specified when %1 is %2"};

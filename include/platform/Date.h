@@ -54,7 +54,7 @@ namespace agiru::platform {
 /// \brief AL `Date` -- the virtual table of periods.
 ///
 /// From `devenv-date-virtual-table.md`: "gives you easy access to days, weeks, months, quarters,
-/// and years... For each period type, there are many records in the Date table."
+/// and years... For each period type, there are many records in the ::agiru::Date table."
 ///
 /// \note `Period End` IS A CLOSING DATE, and the page says so: it "returns the closing date at the
 ///       end of the period". A closing date orders AFTER every normal date of the same day, which
@@ -84,19 +84,20 @@ public:
   /// \brief The field numbers, from the predecessor's measured layout.
   struct Field_No {
     /// \brief The AL field number of `Period Type`.
-    static constexpr FieldNo PeriodType{1};
+    static constexpr ::agiru::FieldNo PeriodType{1};
     /// \brief The AL field number of `Period Start`.
-    static constexpr FieldNo PeriodStart{2};
+    static constexpr ::agiru::FieldNo PeriodStart{2};
     /// \brief The AL field number of `Period End`.
-    static constexpr FieldNo PeriodEnd{3};
+    static constexpr ::agiru::FieldNo PeriodEnd{3};
     /// \brief The AL field number of `Period No.`.
-    static constexpr FieldNo PeriodNo{4};
+    static constexpr ::agiru::FieldNo PeriodNo{4};
     /// \brief The AL field number of `Period Name`.
-    static constexpr FieldNo PeriodName{5};
+    static constexpr ::agiru::FieldNo PeriodName{5};
   };
 
   /// \brief The primary key: which kind of period, and which one.
-  static constexpr std::array<FieldNo, 2> kKey1{{Field_No::PeriodType, Field_No::PeriodStart}};
+  static constexpr std::array<::agiru::FieldNo, 2> kKey1{
+      {Field_No::PeriodType, Field_No::PeriodStart}};
 };
 
 /// \brief AL `Date`, under the name AL gives it.

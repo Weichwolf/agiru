@@ -34,13 +34,9 @@
 
 namespace agiru {
 
-namespace {
-
 [[noreturn]] void RefuseDoor(std::string_view what) {
   throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");
 }
-
-} // namespace
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 
@@ -79,11 +75,6 @@ std::string ApplicationPath() {
 std::string CaptionClassTranslate(std::string_view CaptionClassText) {
   static_cast<void>(CaptionClassText);
   RefuseDoor("System.CaptionClassTranslate(Text)");
-}
-
-void Clear(::agiru::Variant &Variable) {
-  static_cast<void>(Variable);
-  RefuseDoor("System.Clear(Array of [Any])");
 }
 
 void Clear(::agiru::SecretText &Variable) {
@@ -224,14 +215,6 @@ std::string Encrypt(std::string_view PlainTextString) {
 
 ::agiru::Boolean EncryptionKeyExists() {
   RefuseDoor("System.EncryptionKeyExists()");
-}
-
-::agiru::Boolean
-Evaluate(::agiru::Variant &Variable, std::string_view String, ::agiru::Integer Number) {
-  static_cast<void>(Variable);
-  static_cast<void>(String);
-  static_cast<void>(Number);
-  RefuseDoor("System.Evaluate(Any, Text, Integer)");
 }
 
 std::string ExportEncryptionKey(std::string_view Password) {

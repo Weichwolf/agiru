@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/Date.h"
+#include "platform/Integer.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
@@ -9,7 +11,6 @@
 #include "type/Char.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
-#include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
@@ -18,7 +19,6 @@
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
-#include "type/Integer.h"
 #include "type/KeyRef.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
@@ -50,12 +50,18 @@
 ///          leans on hardest is measured: StrSubstNo in 187 of its 2 392 test methods, WorkDate in
 ///          151, Format in 113 (board:0040).
 
-// A FREE FUNCTION REPEATS AL'S OWN PARAMETER ORDER, and 35 of them take two or more adjacent
-// parameters of one type -- `CopyStr(String, Position, Length)`, `ConvertStr(String, From, To)`.
-// Reordering them would break the name equality that makes this surface checkable against the
-// documentation at all, which is the one thing here that is not provisional.
-// NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 namespace agiru {
+
+/// \brief Refuses a door function by name.
+///
+/// \param what The AL signature, spelled as the page states it.
+/// \throws Error always.
+///
+/// \note IT IS DECLARED HERE BECAUSE THE TEMPLATES NEED IT. A builtin whose parameter is `var Any`
+///       is a template -- AL's `Clear` takes a record, a text or a list by reference and a Variant
+///       takes none of them -- so its body is in this header rather than in the source, and it has
+///       to reach the refusal from here.
+[[noreturn]] void RefuseDoor(std::string_view what);
 
 // ---- system ----
 
@@ -78,7 +84,7 @@ std::string ApplicationPath();
 /// \param Dimension The AL `Integer`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer ArrayLen(const ::agiru::Variant &Array, ::agiru::Integer Dimension);
+::agiru::Integer ArrayLen(const ::agiru::Variant &Array, ::agiru::Integer Dimension = {});
 
 /// \brief AL `System.CalcDate(DateFormula, Date)`. Calculates a new date that is based on a date
 /// expression and a reference date.
@@ -86,7 +92,7 @@ std::string ApplicationPath();
 /// \param Date The AL `Date`.
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date CalcDate(::agiru::DateFormula DateExpression, ::agiru::Date Date);
+::agiru::Date CalcDate(::agiru::DateFormula DateExpression, ::agiru::Date Date = {});
 
 /// \brief AL `System.CalcDate(Text, Date)`. Calculates a new date that is based on a date
 /// expression and a reference date.
@@ -94,7 +100,7 @@ std::string ApplicationPath();
 /// \param Date The AL `Date`.
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date);
+::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date = {});
 
 /// \brief AL `System.CanLoadType(DotNet)`. Tests if the specified .NET Framework type can be
 /// loaded.
@@ -113,9 +119,13 @@ std::string CaptionClassTranslate(std::string_view CaptionClassText);
 /// \brief AL `System.Clear(Array of [Any])`. Clears the value of a single variable. Also, it clears
 /// all the filters that were set if the variable is a record and resets the key to the primary key
 /// and the company on a record variable.
+/// \tparam Any1 What AL handed it.
 /// \param Variable The AL `Array of [Any]`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Clear(::agiru::Variant &Variable);
+template <typename Any1> void Clear(Any1 &Variable) {
+  static_cast<void>(Variable);
+  RefuseDoor("System.Clear(Array of [Any])");
+}
 
 /// \brief AL `System.Clear(SecretText)`. Clears the value of a single variable.
 /// \param Variable The AL `SecretText`.
@@ -154,7 +164,8 @@ void CodeCoverageLoad();
 /// \param MultiSession The AL `Boolean`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean CodeCoverageLog(::agiru::Boolean NewIsActive, ::agiru::Boolean MultiSession);
+::agiru::Boolean CodeCoverageLog(::agiru::Boolean NewIsActive = {},
+                                 ::agiru::Boolean MultiSession = {});
 
 /// \brief AL `System.CodeCoverageRefresh()`. Refreshes the code that has been logged.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -178,7 +189,7 @@ void CodeCoverageRefresh();
 void CopyArray(const ::agiru::Variant &NewArray,
                const ::agiru::Variant &Array,
                ::agiru::Integer Position,
-               ::agiru::Integer Length);
+               ::agiru::Integer Length = {});
 
 /// \brief AL `System.CopyStream(OutStream, InStream, Integer)`. Copies the information that is
 /// contained in an InStream to an OutStream.
@@ -189,7 +200,7 @@ void CopyArray(const ::agiru::Variant &NewArray,
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,
                             const ::agiru::InStream &InStream,
-                            ::agiru::Integer BytesToRead);
+                            ::agiru::Integer BytesToRead = {});
 
 /// \brief AL `System.CreateDateTime(Date, Time)`. Creates a DateTime object from a date and a time.
 /// \param Date The AL `Date`.
@@ -251,7 +262,8 @@ void DeleteEncryptionKey();
 /// \param Year The AL `Integer`.
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date DMY2Date(::agiru::Integer Day, ::agiru::Integer Month, ::agiru::Integer Year);
+::agiru::Date
+DMY2Date(::agiru::Integer Day, ::agiru::Integer Month = {}, ::agiru::Integer Year = {});
 
 /// \brief AL `System.DT2Date(DateTime)`. Gets the date part of a DateTime object.
 /// \param Datetime The AL `DateTime`.
@@ -272,7 +284,8 @@ void DeleteEncryptionKey();
 /// \param Year The AL `Integer`.
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date DWY2Date(::agiru::Integer WeekDay, ::agiru::Integer Week, ::agiru::Integer Year);
+::agiru::Date
+DWY2Date(::agiru::Integer WeekDay, ::agiru::Integer Week = {}, ::agiru::Integer Year = {});
 
 /// \brief AL `System.Encrypt(Text)`. Takes a string as input and returns the encrypted value of the
 /// string.
@@ -294,13 +307,19 @@ std::string Encrypt(std::string_view PlainTextString);
 
 /// \brief AL `System.Evaluate(Any, Text, Integer)`. Evaluates a string representation of a value
 /// into its typical representation. The result is assigned to a variable.
+/// \tparam Any1 What AL handed it.
 /// \param Variable The AL `Any`.
 /// \param String The AL `Text`.
 /// \param Number The AL `Integer`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean
-Evaluate(::agiru::Variant &Variable, std::string_view String, ::agiru::Integer Number);
+template <typename Any1>
+::agiru::Boolean Evaluate(Any1 &Variable, std::string_view String, ::agiru::Integer Number = {}) {
+  static_cast<void>(Variable);
+  static_cast<void>(String);
+  static_cast<void>(Number);
+  RefuseDoor("System.Evaluate(Any, Text, Integer)");
+}
 
 /// \brief AL `System.ExportEncryptionKey(Text)`. Returns a password protected temporary filepath
 /// containing the encryption key. When encrypting or decrypting data in Dynamics 365 Business
@@ -321,7 +340,7 @@ std::string ExportEncryptionKey(std::string_view Password);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void ExportObjects(std::string_view FileName,
                    ::agiru::RecordRef &ObjectRecord,
-                   ::agiru::Integer Format);
+                   ::agiru::Integer Format = {});
 
 /// \brief AL `System.Format(Any, Integer, Integer)`. Formats a value into a string.
 /// \param Value The AL `Any`.
@@ -329,8 +348,9 @@ void ExportObjects(std::string_view FileName,
 /// \param FormatNumber The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-Format(const ::agiru::Variant &Value, ::agiru::Integer Length, ::agiru::Integer FormatNumber);
+std::string Format(const ::agiru::Variant &Value,
+                   ::agiru::Integer Length = {},
+                   ::agiru::Integer FormatNumber = {});
 
 /// \brief AL `System.Format(Any, Integer, Text)`. Formats a value into a string.
 /// \param Value The AL `Any`.
@@ -345,7 +365,7 @@ Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view 
 /// collection scope.
 /// \param Clear The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void GetCollectedErrors(::agiru::Boolean Clear);
+void GetCollectedErrors(::agiru::Boolean Clear = {});
 
 /// \brief AL `System.GetDocumentUrl(Guid)`. Gets the URL for the specified temporary media object
 /// ID.
@@ -393,7 +413,7 @@ std::string GetUrl(const ::agiru::ClientType &ClientType,
                    const ::agiru::ObjectType &ObjectType,
                    ::agiru::Integer ObjectId,
                    const ::agiru::RecordRef &RecordRef,
-                   ::agiru::Boolean UseFilters);
+                   ::agiru::Boolean UseFilters = {});
 
 /// \brief AL `System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean, Text)`.
 /// Generates a URL for the specified client target that is based on the configuration of the server
@@ -420,7 +440,7 @@ std::string GetUrl(const ::agiru::ClientType &ClientType,
 /// \param NewLanguageID The AL `Integer`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID);
+::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID = {});
 
 /// \brief AL `System.GuiAllowed()`. Checks whether the AL code can show any information on the
 /// screen.
@@ -457,7 +477,7 @@ void Hyperlink(std::string_view URL);
 /// \param FileName The AL `Text`.
 /// \param Format The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void ImportObjects(std::string_view FileName, ::agiru::Integer Format);
+void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 
 /// \brief AL `System.ImportStreamWithUrlAccess(InStream, Text, Integer)`. Imports an object into a
 /// media container to be used in a temporary URL with a default expiration time.
@@ -468,7 +488,7 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Guid ImportStreamWithUrlAccess(const ::agiru::InStream &InStream,
                                         std::string_view Filename,
-                                        ::agiru::Integer MinutesToExpire);
+                                        ::agiru::Integer MinutesToExpire = {});
 
 /// \brief AL `System.IsCollectingErrors()`. Gets a value indicating whether errors are currently
 /// being collected.
@@ -521,7 +541,7 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format);
 /// method (Integer) will select a random number.
 /// \param Seed The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Randomize(::agiru::Integer Seed);
+void Randomize(::agiru::Integer Seed = {});
 
 /// \brief AL `System.RoundDateTime(DateTime, BigInteger, Text)`. Rounds a DateTime.
 /// \param Datetime The AL `DateTime`.
@@ -530,8 +550,8 @@ void Randomize(::agiru::Integer Seed);
 /// \return The AL `DateTime`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
-                                ::agiru::BigInteger Precision,
-                                std::string_view Direction);
+                                ::agiru::BigInteger Precision = {},
+                                std::string_view Direction = {});
 
 /// \brief AL `System.Sleep(Integer)`. Returns control to the operating system for a specified time.
 /// \param Duration The AL `Integer`.
@@ -570,7 +590,7 @@ std::string TemporaryPath();
 /// \param NewDate The AL `Date`.
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date WorkDate(::agiru::Date NewDate);
+::agiru::Date WorkDate(::agiru::Date NewDate = {});
 
 // ---- text ----
 
@@ -595,7 +615,8 @@ ConvertStr(std::string_view String, std::string_view FromCharacters, std::string
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string CopyStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length);
+std::string
+CopyStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length = {});
 
 /// \brief AL `Text.DelChr(Text, Text, Text)`. Deletes chars contained in the which parameter in a
 /// string based on the contents on the where parameter. If the where parameter contains an
@@ -611,7 +632,8 @@ std::string CopyStr(std::string_view String, ::agiru::Integer Position, ::agiru:
 /// \param Which The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string DelChr(std::string_view String, std::string_view Where, std::string_view Which);
+std::string
+DelChr(std::string_view String, std::string_view Where = {}, std::string_view Which = {});
 
 /// \brief AL `Text.DelStr(Text, Integer, Integer)`. Deletes a substring inside a string (text or
 /// code).
@@ -620,7 +642,8 @@ std::string DelChr(std::string_view String, std::string_view Where, std::string_
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string DelStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length);
+std::string
+DelStr(std::string_view String, ::agiru::Integer Position, ::agiru::Integer Length = {});
 
 /// \brief AL `Text.IncStr(Text)`. Increases a positive number or decrease a negative number inside
 /// a string by one (1).
@@ -661,7 +684,7 @@ std::string LowerCase(std::string_view String);
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string
-PadStr(std::string_view String, ::agiru::Integer Length, std::string_view FillCharacter);
+PadStr(std::string_view String, ::agiru::Integer Length, std::string_view FillCharacter = {});
 
 /// \brief AL `Text.SelectStr(Integer, Text)`. Retrieves a substring from a comma-separated string.
 /// \param Number The AL `Integer`.
@@ -680,8 +703,9 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
 /// \param Modulus The AL `Integer`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer
-StrCheckSum(std::string_view String, std::string_view WeightString, ::agiru::Integer Modulus);
+::agiru::Integer StrCheckSum(std::string_view String,
+                             std::string_view WeightString = {},
+                             ::agiru::Integer Modulus = {});
 
 /// \brief AL `Text.StrPos(Text, Text)`. Searches for the first occurrence of substring inside a
 /// string.
@@ -830,14 +854,14 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type);
 /// \param LockTimeout The AL `Boolean`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean LockTimeout(::agiru::Boolean LockTimeout);
+::agiru::Boolean LockTimeout(::agiru::Boolean LockTimeout = {});
 
 /// \brief AL `Database.LockTimeoutDuration(Integer)`. Gets or sets the current lock timeout
 /// duration in seconds. Setting a lock timeout of 0 or less disables the lock timeout.
 /// \param LockTimeoutDuration The AL `Integer`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer LockTimeoutDuration(::agiru::Integer LockTimeoutDuration);
+::agiru::Integer LockTimeoutDuration(::agiru::Integer LockTimeoutDuration = {});
 
 /// \brief AL `Database.MinimumActiveRowVersion()`. Returns the lowest active RowVersion in the
 /// database. This is the lowest RowVersion for an uncomitted row, meaning rows with a lower
@@ -893,7 +917,7 @@ std::string SerialNumber();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
                                std::string_view Name,
-                               ::agiru::Boolean Scoped);
+                               ::agiru::Boolean Scoped = {});
 
 /// \brief AL `Database.SetUserPassword(Guid, Text)`. Sets a password for the user iwith the given
 /// user security ID. If the given password is blank, an empty string will be stored instead of a
@@ -910,7 +934,7 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
 /// \param UserAccount The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string SID(std::string_view UserAccount);
+std::string SID(std::string_view UserAccount = {});
 
 /// \brief AL `Database.TenantId()`. Gets the ID of the tenant that has started the current session.
 /// Use this method when your code must be specific about which tenant database to access in a
@@ -949,7 +973,7 @@ std::string UserId();
 /// \param ApplicationArea The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string ApplicationArea(std::string_view ApplicationArea);
+std::string ApplicationArea(std::string_view ApplicationArea = {});
 
 /// \brief AL `Session.ApplicationIdentifier()`. Gets the application ID associated with the current
 /// thread.
@@ -1006,7 +1030,7 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 /// \param AppId The AL `Guid`.
 /// \return The AL `ExecutionContext`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::ExecutionContext GetModuleExecutionContext(::agiru::Guid AppId);
+::agiru::ExecutionContext GetModuleExecutionContext(::agiru::Guid AppId = {});
 
 /// \brief AL `Session.IsSessionActive(Integer)`. Tests if the specified SessionID is active on the
 /// server instance where it was started.
@@ -1154,7 +1178,7 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Comment The AL `Text`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment);
+::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment = {});
 
 /// \brief AL `Session.UnbindSubscription(Codeunit)`. Unbinds the event subscriber methods from in
 /// the codeunit instance. This essentially deactivates the subscriber methods for the codeunit
@@ -1212,8 +1236,8 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer StrMenu(std::string_view OptionMembers,
-                         ::agiru::Integer DefaultNumber,
-                         std::string_view Instruction);
+                         ::agiru::Integer DefaultNumber = {},
+                         std::string_view Instruction = {});
 
 // ---- file ----
 
@@ -1297,7 +1321,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \param Time The AL `Time`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time);
+::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time = {});
 
 /// \brief AL `File.Upload(Text, Text, Text, Text, Text)`. Sends a file from the client computer to
 /// the server computer. The client computer is the computer that is running the Windows client or
@@ -1347,7 +1371,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \param AllowDownloadAndPrint The AL `Boolean`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean View(std::string_view FromFile, ::agiru::Boolean AllowDownloadAndPrint);
+::agiru::Boolean View(std::string_view FromFile, ::agiru::Boolean AllowDownloadAndPrint = {});
 
 /// \brief AL `File.ViewFromStream(InStream, Text, Boolean)`. Opens a file from the server on the
 /// client computer in preview mode. The client computer is defined as the machine running the
@@ -1359,7 +1383,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ViewFromStream(const ::agiru::InStream &InStream,
                                 std::string_view FileName,
-                                ::agiru::Boolean AllowDownloadAndPrint);
+                                ::agiru::Boolean AllowDownloadAndPrint = {});
 
 // ---- secrettext ----
 
@@ -1372,5 +1396,3 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 ::agiru::SecretText SecretStrSubstNo(std::string_view String, const ::agiru::SecretText &Value1);
 
 } // namespace agiru
-
-// NOLINTEND(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)

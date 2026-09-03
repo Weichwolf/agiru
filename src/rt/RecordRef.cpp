@@ -108,6 +108,14 @@ void FieldRef::TestField() const {
   agiru::detail::TestField(record_, *table_, def_->no);
 }
 
+// A refusal uses no state, and the declaration is AL's (board:0035).
+// NOLINTBEGIN(readability-convert-member-functions-to-static)
+RecordRef FieldRef::Record() const {
+  throw Error("FieldRef.Record() is declared and not implemented yet (board:0035)");
+}
+
+// NOLINTEND(readability-convert-member-functions-to-static)
+
 void RecordRef::Open(Integer tableNo) {
   // IT LETS GO OF WHAT IT HELD FIRST, which is what Open does in AL: it re-points the reference,
   // and a failed Open must not leave it answering questions about the record it used to hold.
