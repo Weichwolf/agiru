@@ -4,6 +4,7 @@
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -26,5 +27,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
                         const EnumIndex &enums,
                         const Objects &objects);
+
+[[nodiscard]] std::set<std::string> Shadowed(const al::TableObject &table);
 
 }

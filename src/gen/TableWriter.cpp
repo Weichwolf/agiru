@@ -423,17 +423,7 @@ std::string ClassBody(const al::TableObject &table,
       out += "  void " + trigger.name + FieldIdentifier(table, field.name) + "();\n";
     }
   }
-  std::set<std::string> shadowed;
-  for (const al::FieldDecl &field : table.fields) {
-    shadowed.insert(FieldIdentifier(table, field.name));
-  }
-  for (const al::VarDecl &declared : table.variables) {
-    shadowed.insert(Identifier(declared.name));
-  }
-  for (const al::ProcedureDecl &procedure : table.procedures) {
-    shadowed.insert(Identifier(procedure.name));
-  }
-  for (const al::LabelDecl &label : table.labels) { shadowed.insert(Identifier(label.name)); }
+  const std::set<std::string> shadowed = Shadowed(table);
   std::string publics;
   std::string locals;
   for (const al::ProcedureDecl &procedure : table.procedures) {
@@ -460,6 +450,19 @@ std::string ClassBody(const al::TableObject &table,
   return out;
 }
 
+}
+
+std::set<std::string> Shadowed(const al::TableObject &table) {
+  std::set<std::string> hidden;
+  for (const al::FieldDecl &field : table.fields) {
+    hidden.insert(FieldIdentifier(table, field.name));
+  }
+  for (const al::VarDecl &declared : table.variables) { hidden.insert(Identifier(declared.name)); }
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    hidden.insert(Identifier(procedure.name));
+  }
+  for (const al::LabelDecl &label : table.labels) { hidden.insert(Identifier(label.name)); }
+  return hidden;
 }
 
 TableHeader WriteHeader(const al::TableObject &declared,

@@ -815,7 +815,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::Trigger &trigger : field.triggers) {
       const std::string body = WriteStatements(TableNames(table, objects), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
-      out += ProcedureLocals(trigger, objects, table.name, table.procedures);
+      out += ProcedureLocals(trigger, objects, table.name, table.procedures, Shadowed(table));
       out += BindsBefore(body, identifier);
       out += body;
       out += "}\n\n";
@@ -827,13 +827,14 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                               table.name,
                               identifier,
                               true,
-                              {},
+                              Shadowed(table),
                               table.procedures,
                               ProcedureIdentifier(table, procedure.name)) +
            " {";
     const std::string body = WriteStatements(TableNames(table, objects), procedure.body, 2);
-    const std::string locals = ProcedureLocals(procedure, objects, table.name, table.procedures) +
-                               BindsBefore(body, identifier);
+    const std::string locals =
+        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table)) +
+        BindsBefore(body, identifier);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;

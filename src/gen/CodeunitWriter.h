@@ -94,7 +94,8 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,
-                            const std::vector<al::ProcedureDecl> &all = {});
+                            const std::vector<al::ProcedureDecl> &all = {},
+                            const std::set<std::string> &shadowed = {});
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
                              const std::vector<al::ProcedureDecl> &procedures,

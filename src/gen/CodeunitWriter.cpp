@@ -918,7 +918,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
                    const Objects &objects,
                    const std::string &unit,
                    const std::vector<al::ProcedureDecl> &all = {},
-                   const std::string &body = {}) {
+                   const std::string &body = {},
+                   const std::set<std::string> &shadowed = {}) {
   std::string out;
   const std::string code = WithoutLiterals(body);
   const auto unused = [&body, &code](const std::string &name) {
@@ -927,7 +928,7 @@ std::string Locals(const al::ProcedureDecl &procedure,
   if (!procedure.returnName.empty()) {
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
   }
-  std::set<std::string> names;
+  std::set<std::string> names = shadowed;
   for (const al::VarDecl &declared : procedure.variables) {
     names.insert(Identifier(declared.name));
   }
@@ -1027,8 +1028,9 @@ std::string MemberDeclarations(const std::string &owner,
 std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,
-                            const std::vector<al::ProcedureDecl> &all) {
-  return Locals(procedure, objects, owner, all);
+                            const std::vector<al::ProcedureDecl> &all,
+                            const std::set<std::string> &shadowed) {
+  return Locals(procedure, objects, owner, all, {}, shadowed);
 }
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
