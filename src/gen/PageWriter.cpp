@@ -53,9 +53,10 @@ void Flatten(const std::vector<al::PageControl> &controls,
 void WriteControls(std::string &out,
                    const std::vector<const al::PageControl *> &controls,
                    std::string_view type,
+                   const std::map<std::string, std::string> &named,
                    std::set<std::string> &taken) {
   for (const al::PageControl *control : controls) {
-    const std::string identifier = Identifier(control->name);
+    const std::string identifier = ControlIdentifier(named, control->name);
     if (identifier.empty() || !taken.insert(identifier).second) { continue; }
     out += "  " + std::string(type) + " " + identifier + "{" + Literal(control->name) + "};\n";
   }
@@ -136,12 +137,15 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
   return out;
 }
 
-void ControlTriggerDeclarations(std::string &out, const std::vector<al::PageControl> &controls) {
+void ControlTriggerDeclarations(std::string &out,
+                                const std::vector<al::PageControl> &controls,
+                                const std::map<std::string, std::string> &named) {
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      out += "  void " + ControlTrigger(trigger.name, control.name) + "();\n";
+      out += "  void " + ControlTrigger(trigger.name, ControlIdentifier(named, control.name)) +
+             "();\n";
     }
-    ControlTriggerDeclarations(out, control.children);
+    ControlTriggerDeclarations(out, control.children, named);
   }
 }
 
@@ -154,6 +158,32 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   return found == objects.tables.end() ? std::string{} : found->second.identifier;
 }
 
+}
+
+std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object) {
+  std::vector<const al::PageControl *> fields;
+  std::vector<const al::PageControl *> actions;
+  Flatten(object.layout, fields, actions);
+  Flatten(object.actions, fields, actions);
+  std::vector<std::string> alNames;
+  for (const al::PageControl *control : fields) { alNames.push_back(control->name); }
+  for (const al::PageControl *control : actions) { alNames.push_back(control->name); }
+  const std::vector<std::string> made = Distinct(alNames);
+  std::map<std::string, std::string> named;
+  std::size_t at = 0;
+  for (const al::PageControl *control : fields) {
+    named.emplace(Lowered(control->name), made[at++]);
+  }
+  for (const al::PageControl *control : actions) {
+    named.emplace(Lowered(control->name), made[at++]);
+  }
+  return named;
+}
+
+std::string ControlIdentifier(const std::map<std::string, std::string> &named,
+                              std::string_view alName) {
+  const auto found = named.find(Lowered(alName));
+  return found == named.end() ? Identifier(alName) : found->second;
 }
 
 std::string PageHeaderPath(const al::PageObject &object) {
@@ -184,9 +214,10 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "namespace agiru::app::pages {\n\n";
   out += "template <typename Field, typename Action> class " + controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
-  WriteControls(out, fields, "Field", taken);
+  const std::map<std::string, std::string> named = ControlIdentifiers(object);
+  WriteControls(out, fields, "Field", named, taken);
   if (!fields.empty() && !actions.empty()) { out += "\n"; }
-  WriteControls(out, actions, "Action", taken);
+  WriteControls(out, actions, "Action", named, taken);
   out += "};\n\n";
   out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
@@ -201,8 +232,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   if (!members.empty()) { out += members + "\n"; }
 
   std::string triggers;
-  ControlTriggerDeclarations(triggers, object.layout);
-  ControlTriggerDeclarations(triggers, object.actions);
+  ControlTriggerDeclarations(triggers, object.layout, named);
+  ControlTriggerDeclarations(triggers, object.actions, named);
   if (!triggers.empty()) { out += "\n" + triggers; }
 
   std::string publics;

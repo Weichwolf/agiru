@@ -6,6 +6,7 @@
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "PageWriter.h"
 #include "Scope.h"
 #include "TableWriter.h"
 
@@ -13,6 +14,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -746,8 +748,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   return WithDoor(out, ObjectKind::Table);
 }
 
-std::string ControlTrigger(std::string_view trigger, std::string_view control) {
-  return Identifier(trigger) + Identifier(control);
+std::string ControlTrigger(std::string_view trigger, std::string_view controlIdentifier) {
+  return Identifier(trigger) + std::string(controlIdentifier);
 }
 
 namespace {
@@ -757,10 +759,11 @@ void ControlBodies(std::string &out,
                    const std::string &identifier,
                    const al::PageObject &page,
                    const al::TableObject *source,
-                   const Objects &objects) {
+                   const Objects &objects,
+                   const std::map<std::string, std::string> &named) {
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      const std::string name = ControlTrigger(trigger.name, control.name);
+      const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
       const std::string body = WriteStatements(PageNames(page, source), trigger.body, 2);
       const std::string locals =
           ProcedureLocals(trigger, objects, page.name, page.procedures) +
@@ -775,7 +778,7 @@ void ControlBodies(std::string &out,
       if (!locals.empty() && !body.empty()) { out += "\n"; }
       out += body + "}\n\n";
     }
-    ControlBodies(out, control.children, identifier, page, source, objects);
+    ControlBodies(out, control.children, identifier, page, source, objects, named);
   }
 }
 
@@ -794,8 +797,9 @@ std::string WriteSource(const al::PageObject &page,
   out += "\n";
   out += SourceIncludesOf(page.variables, page.procedures, objects);
   out += "\nnamespace agiru::app::pages {\n\n";
-  ControlBodies(out, page.layout, identifier, page, source, objects);
-  ControlBodies(out, page.actions, identifier, page, source, objects);
+  const std::map<std::string, std::string> named = ControlIdentifiers(page);
+  ControlBodies(out, page.layout, identifier, page, source, objects, named);
+  ControlBodies(out, page.actions, identifier, page, source, objects, named);
   for (const al::ProcedureDecl &procedure : page.procedures) {
     out += ProcedureSignature(procedure,
                               objects,

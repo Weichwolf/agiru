@@ -6,6 +6,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -97,6 +98,21 @@ ObjectKind KindOfNamespace(std::string_view space) {
 
 std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
+}
+
+std::vector<std::string> Distinct(const std::vector<std::string> &alNames) {
+  std::vector<std::string> made;
+  made.reserve(alNames.size());
+  std::set<std::string> taken;
+  for (const std::string &alName : alNames) {
+    const std::string plain = Identifier(alName);
+    std::string unique = plain;
+    for (int n = 2; !plain.empty() && !taken.insert(unique).second; ++n) {
+      unique = plain + "_" + std::to_string(n);
+    }
+    made.push_back(std::move(unique));
+  }
+  return made;
 }
 
 std::string EnumeratorName(std::string_view optionMember) {

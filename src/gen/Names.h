@@ -10,6 +10,8 @@ namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
 
+std::vector<std::string> Distinct(const std::vector<std::string> &alNames);
+
 std::string EnumeratorName(std::string_view optionMember);
 
 std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members);
