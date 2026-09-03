@@ -6,8 +6,10 @@
 #include "type/Decimal.h"
 
 #include "Check.h"
+#include "Cursor.h"
 #include "ResourceCost.h"
 
+#include <cstddef>
 #include <string>
 
 using agiru::CreateTable;
@@ -25,7 +27,6 @@ namespace {
 // or reads the same block twice is a defect this number is chosen to expose. A gate that inserted
 // ten rows would be green over both.
 constexpr int kRows = 150;
-constexpr int kBlock = 64;
 
 void Fill() {
   DropTable(Session::Current().Database(), agiru::TableTraits<ResourceCost>::kTable);
@@ -57,11 +58,23 @@ void TheWalkCrossesTheFetchBlock() {
     last = std::string(rec.Code.Value());
   }
   CHECK_TRUE("every row is walked exactly once", seen == kRows);
-  CHECK_TRUE("and the walk crosses the fetch block", kRows > kBlock);
+  // THE REAL BLOCK SIZE AND NOT A COPY OF IT. This compared two constants declared in this file,
+  // so raising `kFetchBlock` to 1 000 left the gate green -- a walk that never crossed a block
+  // boundary, proving what the case is named after by assertion rather than by running it.
+  CHECK_TRUE("and the walk crosses more than one fetch block",
+             static_cast<std::size_t>(kRows) > agiru::detail::kFetchBlock);
   CHECK_TEXT("the first row is the key's first", first, "R000");
   CHECK_TEXT("the last row is the key's last", last, "R149");
   CHECK_TRUE("Count agrees with the walk", static_cast<int>(rec.Count()) == kRows);
   CHECK_TRUE("and the set is not empty", !static_cast<bool>(rec.IsEmpty()));
+
+  // A SECOND `FindSet` STARTS OVER. It is the same record variable, already walked to the end, and
+  // AL's own answer is a new set -- so the old cursor is closed rather than continued. Without this
+  // the case never asked, and a FindSet that kept the spent cursor was green.
+  CHECK_TRUE("a second FindSet on the same record finds the set again",
+             static_cast<bool>(rec.FindSet()));
+  CHECK_TEXT("and starts at the beginning", std::string(rec.Code.Value()), first);
+  CHECK_TRUE("and walks the whole set again", static_cast<int>(rec.Next()) == 1);
 }
 
 // A FILTER NARROWS THE SET AND NOT THE WALK. The predicate goes into the statement, so the rows the
