@@ -67,13 +67,20 @@ void PopBefore();
 /// \tparam T The generated table class.
 /// \return The record before the change.
 /// \throws Error outside a trigger, or where the invoker has no before-image yet (board:0042).
-template <typename T> const T &Before() {
+///
+/// \warning IT IS NOT CONST, BECAUSE AL'S `xRec` IS NOT. `Currency.Table.al` declares
+///          `OnAfterInitRoundingPrecision(var Currency; var xCurrency; ...)` and passes `xRec` to
+///          that `var` parameter, so a const reference here refuses AL the language allows.
+///          Writing to it changes nothing that is written back -- the before-image is read by the
+///          trigger and discarded when it returns -- and that is AL's behaviour too, not a
+///          concession.
+template <typename T> T &Before() {
   const void *before = CurrentBefore();
   if (before == nullptr) {
     throw Error("xRec is only defined inside a table trigger, and the trigger that is running was "
                 "invoked without a before-image (board:0042)");
   }
-  return *static_cast<const T *>(before);
+  return *const_cast<T *>(static_cast<const T *>(before));
 }
 
 /// \brief Holds a before-image for as long as a trigger runs.

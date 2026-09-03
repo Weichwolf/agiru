@@ -792,7 +792,7 @@ namespace {
 std::string BindsBefore(const std::string &body, const std::string &identifier) {
   return body.find("XRec") == std::string::npos
              ? std::string{}
-             : "  const " + identifier + " &XRec = detail::Before<" + identifier + ">();\n\n";
+             : "  " + identifier + " &XRec = detail::Before<" + identifier + ">();\n\n";
 }
 }
 
@@ -805,7 +805,11 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
   out += "\n";
-  out += SourceIncludesOf(table.variables, table.procedures, objects);
+  std::vector<al::ProcedureDecl> reaching = table.procedures;
+  for (const al::FieldDecl &field : table.fields) {
+    for (const al::ProcedureDecl &trigger : field.triggers) { reaching.push_back(trigger); }
+  }
+  out += SourceIncludesOf(table.variables, reaching, objects);
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
