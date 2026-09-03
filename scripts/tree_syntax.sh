@@ -77,7 +77,15 @@ includes="$includes -include-pch $PCH"
 # header was built" -- which lands in the failure count and looks like 1 701 broken objects. That
 # happened. The lock above stops two RUNS from colliding; this stops a run from colliding with an
 # edit, which is the same mistake wearing different clothes.
-DOORPRINT=$(cat cmake/Precompiled.h include/*/*.h | sha1sum | cut -d' ' -f1)
+# EVERY DOOR HEADER AT ANY DEPTH, BY MTIME. The glob was `include/*/*.h`, which is exactly two
+# levels: it never saw `include/Builtins.h` one level up, nor `include/runtime/test/` three levels
+# down. So when `make` rewrote `Builtins.h` beside a run, the guard stayed quiet and the census came
+# back 8 437 headers "broken" -- every one of them the same invalidated PCH. And the print is over
+# mtime and size rather than content, because that is what clang compares: a rewrite that changes
+# nothing still kills the PCH.
+doorprint() { find cmake/Precompiled.h include -name '*.h' -printf '%p %s %T@\n' | sort | sha1sum |
+  cut -d' ' -f1; }
+DOORPRINT=$(doorprint)
 # AND THE TREE ITSELF, because a transpile during the run changes what is being measured and the
 # door fingerprint would not notice. The list of files and their sizes is enough and costs a
 # fraction of hashing 9 600 headers: a re-transpile rewrites files, and a rewritten file that is
@@ -153,10 +161,25 @@ xargs -a "$OUT/keys" -P "$(nproc)" -I{} sh -c '
       "$(printf "%s" "$first" | sed -E "s/:[0-9]+:[0-9]+: (fatal )?error: .*//")" \
       "$(printf "%s" "$first" | sed -E "s/^.*: (fatal )?error: //")")
     printf "%s\n" "$root" >> "$3/roots"
-    { printf "fail\n"; printf "%s\n" "$root"; } > "$hit"
+    # A STALE PCH IS NOT A VERDICT ABOUT THE HEADER, so it is not written to the cache. Caching it
+    # is how one collision poisons every later run: the key carries the door print, and a print that
+    # missed the change that invalidated the PCH will not invalidate the entry either.
+    case $first in
+      *"has been modified since the precompiled header"*) : ;;
+      *) { printf "fail\n"; printf "%s\n" "$root"; } > "$hit" ;;
+    esac
   fi
   rm -f "$err" "$unit"
 ' _ {} "$includes" "$OUT" "$OPT" "$CACHE"
+
+# A PCH THAT WENT STALE MID-RUN MAKES EVERY VERDICT AFTER IT MEANINGLESS, so the number is refused
+# rather than reported. It reads as thousands of broken objects and it is one file being touched.
+if grep -qm1 "has been modified since the precompiled header" "$OUT/errors" 2>/dev/null; then
+  printf 'tree: the precompiled header went stale mid-run -- %s header(s) failed on it alone.\n' \
+    "$(grep -c "has been modified since the precompiled header" "$OUT/errors")" >&2
+  printf 'tree: something rewrote a door header while this ran. ABORT, not a number.\n' >&2
+  exit 1
+fi
 
 # BOTH TALLIES ARE READ, NEITHER IS DERIVED, AND THEY MUST ADD UP.
 for f in passed failed; do
@@ -168,7 +191,7 @@ done
 # THE SAME PRINT AT BOTH ENDS. This compared a `cksum` against a `sha1sum` after the print changed
 # at the top and not here, so it fired on every run -- a guard that always fires says as little as
 # one that never does, and this one turned a four-minute measurement into an abort.
-if [ "$(cat cmake/Precompiled.h include/*/*.h | sha1sum | cut -d' ' -f1)" != "$DOORPRINT" ]; then
+if [ "$(doorprint)" != "$DOORPRINT" ]; then
   printf 'tree: the door changed while the run was measuring it. ABORT, not a number.\n' >&2
   exit 1
 fi
