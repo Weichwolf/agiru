@@ -579,6 +579,14 @@ private:
     if (how.parens) { out += "()"; }
   }
 
+  static std::string Number(std::string_view text) {
+    if (text.find('.') == std::string_view::npos && text.find('e') == std::string_view::npos &&
+        text.find('E') == std::string_view::npos) {
+      return std::string(text);
+    }
+    return "::agiru::Decimal::FromInvariantString(\"" + std::string(text) + "\")";
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -632,7 +640,7 @@ private:
     std::string out;
     switch (expression.kind) {
       case al::ExprKind::StringLiteral: out = Quoted(expression.text); break;
-      case al::ExprKind::NumberLiteral: out = expression.text; break;
+      case al::ExprKind::NumberLiteral: out = Number(expression.text); break;
       case al::ExprKind::TemporalLiteral: out = Temporal(expression.text); break;
       case al::ExprKind::Name: out = Name(expression); break;
       case al::ExprKind::Scope: out = Scope(expression); break;
@@ -693,6 +701,12 @@ public:
       if (SameName(declared.name, name)) { return &declared; }
     }
     return nullptr;
+  }
+
+  [[nodiscard]] std::string ExitValue() const override {
+    if (running_ == nullptr) { return {}; }
+    if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
+    return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
@@ -879,20 +893,21 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     }
   }
   for (const al::ProcedureDecl &procedure : table.procedures) {
+    const std::string body =
+        WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2) +
+        FallsOffEnd(procedure, TableNames(table, objects, &procedure));
+    const std::string locals =
+        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table)) +
+        BindsBefore(body, identifier);
     out += ProcedureSignature(procedure,
                               objects,
                               table.name,
                               identifier,
-                              true,
+                              !(locals.empty() && body.empty()),
                               Shadowed(table),
                               table.procedures,
                               ProcedureIdentifier(table, procedure.name)) +
            " {";
-    const std::string body =
-        WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2);
-    const std::string locals =
-        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table)) +
-        BindsBefore(body, identifier);
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;
