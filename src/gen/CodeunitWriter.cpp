@@ -796,6 +796,19 @@ public:
     return declared->subtype;
   }
 
+  [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
+    const auto same = [&name](const al::VarDecl &declared) {
+      return LowerKey(declared.name) == LowerKey(std::string(name));
+    };
+    for (const al::VarDecl &declared : procedure_.variables) {
+      if (same(declared)) { return &declared; }
+    }
+    for (const al::VarDecl &declared : procedure_.parameters) {
+      if (same(declared)) { return &declared; }
+    }
+    return nullptr;
+  }
+
   [[nodiscard]] const al::VarDecl *Declaration(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
       return LowerKey(declared.name) == LowerKey(std::string(name));
@@ -869,7 +882,9 @@ public:
       return {};
     }
     if (type != "Option" || declared->members.empty()) { return {}; }
-    return OptionNameOf(unit_.name, procedure_.name, *declared, unit_.procedures);
+    const bool local = Local(name) != nullptr;
+    return OptionNameOf(
+        unit_.name, local ? procedure_.name : std::string{}, *declared, unit_.procedures);
   }
 
 private:

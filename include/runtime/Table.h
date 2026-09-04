@@ -268,13 +268,14 @@ public:
   /// \note WHETHER THE TABLE HAS ONE IS A COMPILE-TIME QUESTION, not a registry lookup: the
   ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
   ///       it and a table without the trigger compiles to the same code `Insert()` does.
-  void Insert(Boolean RunTrigger) {
+  Boolean Insert(Boolean RunTrigger) {
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnInsert(); }) {
         static_cast<Derived *>(this)->OnInsert();
       }
     }
     detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    return true;
   }
 
   /// \brief AL `Record.Modify()`.

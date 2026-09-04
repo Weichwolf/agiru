@@ -162,8 +162,14 @@ public:
   constexpr Option() = default;
 
   /// \brief Holds an ordinal.
+  ///
   /// \param ordinal The zero-based member number.
-  constexpr explicit Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
+  ///
+  /// \note NOT `explicit`, BECAUSE AN OPTION VALUE IS AN INTEGER IN AL and passing one where an
+  ///       option is declared needs no cast there. `LibraryERM` hands `VATCalcType.AsInteger()` to
+  ///       a parameter declared `Option`, which is ordinary AL; the typed `Option<E>` beside this
+  ///       already takes an ordinal the same way.
+  constexpr Option(std::int32_t ordinal) : OrdinalValue(ordinal) {}
 
   /// \brief Takes a member of any generated enumeration.
   /// \tparam E The enumeration.

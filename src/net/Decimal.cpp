@@ -382,6 +382,13 @@ std::strong_ordering Decimal::operator<=>(const Decimal &o) const {
                                               : std::strong_ordering::equal;
 }
 
+Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction) {
+  if (direction == "=") { return Round(number, precision, RoundDirection::Nearest); }
+  if (direction == ">") { return Round(number, precision, RoundDirection::Up); }
+  if (direction == "<") { return Round(number, precision, RoundDirection::Down); }
+  throw DecimalError("Round: Direction takes only '=', '>' and '<'");
+}
+
 Decimal Round(const Decimal &number, const Decimal &precision, RoundDirection direction) {
   if (precision.IsZero()) { throw DecimalError("Round: precision is zero"); }
   const Decimal p = precision.Abs();

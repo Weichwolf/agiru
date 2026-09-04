@@ -179,6 +179,7 @@ private:
       for (const al::Expr &label : branch.labels) {
         if (!condition.empty()) { condition += " || "; }
         if (label.kind == al::ExprKind::Range) {
+          condition += "(";
           condition += subject;
           condition += " >= ";
           condition += Expression(label.children.front(), kComparisonPrecedence);
@@ -186,6 +187,7 @@ private:
           condition += subject;
           condition += " <= ";
           condition += Expression(label.children.back(), kComparisonPrecedence);
+          condition += ")";
           continue;
         }
         condition += subject;
@@ -335,20 +337,13 @@ private:
   static std::size_t FieldArguments(std::string_view method) {
     static constexpr auto kAll = static_cast<std::size_t>(-1);
     static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
-        {"SetRange", 1},
-        {"SetFilter", 1},
-        {"TestField", 1},
-        {"FieldError", 1},
-        {"FieldCaption", 1},
-        {"FieldName", 1},
-        {"FieldNo", 1},
-        {"Validate", 1},
-        {"SetAscending", 1},
-        {"CalcFields", kAll},
-        {"CalcSums", kAll},
-        {"SetCurrentKey", kAll},
-        {"SetLoadFields", kAll},
-        {"AddLoadFields", kAll},
+        {"SetRange", 1},         {"SetFilter", 1},        {"TestField", 1},
+        {"FieldError", 1},       {"FieldCaption", 1},     {"FieldName", 1},
+        {"FieldNo", 1},          {"Validate", 1},         {"SetAscending", 1},
+        {"CalcFields", kAll},    {"CalcSums", kAll},      {"SetCurrentKey", kAll},
+        {"SetLoadFields", kAll}, {"AddLoadFields", kAll}, {"GetRangeMin", 1},
+        {"GetRangeMax", 1},      {"GetFilter", 1},        {"GetAscending", 1},
+        {"CopyFilter", kAll},
     };
     for (const auto &[name, count] : kTakers) {
       if (SameName(name, method)) { return count; }
@@ -499,6 +494,7 @@ private:
     for (const al::Expr &item : set.children) {
       if (!out.empty()) { out += " || "; }
       if (item.kind == al::ExprKind::Range) {
+        out += "(";
         out += subject;
         out += " >= ";
         out += Expression(item.children.front(), kComparisonPrecedence);
@@ -506,6 +502,7 @@ private:
         out += subject;
         out += " <= ";
         out += Expression(item.children.back(), kComparisonPrecedence);
+        out += ")";
         continue;
       }
       out += subject;

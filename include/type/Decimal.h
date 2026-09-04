@@ -199,4 +199,18 @@ Decimal Round(const Decimal &number,
               const Decimal &precision,
               RoundDirection direction = RoundDirection::Nearest);
 
+/// \brief AL `Round(Number, Precision, Direction)` with the direction as TEXT.
+///
+/// \param number    The value.
+/// \param precision The multiple to round to.
+/// \param direction `'='` nearest, `'>'` up, `'<'` down -- one character, as AL spells it.
+/// \return The rounded value.
+/// \throws DecimalError when the precision is zero, or the direction is none of the three.
+///
+/// \note THE DOCUMENTED PARAMETER IS A TEXT. `system-round-method.md` gives
+///       `Round(Number: Decimal [, Precision: Decimal] [, Direction: Text])`, and the BaseApp
+///       passes `Currency.InvoiceRoundingDirection()`, which returns one of those characters. The
+///       enumeration beside this is the runtime's own vocabulary and not AL's.
+Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction);
+
 }
