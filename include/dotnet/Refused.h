@@ -73,6 +73,35 @@ public:
   /// \throws Error always.
   template <typename T> Refused &operator=(const T &) { Throw(); }
 
+  /// \brief Refuses to stand on either side of a `+`.
+  ///
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note AL CONCATENATES AND ADDS WITH THE SAME OPERATOR, and a refusal has to stand in both.
+  ///       Without it `"Profile:" + Absent.ProfileID` was a COMPILE error naming `std::string` and
+  ///       `Refused` -- which says nothing about the absent object, and stops a whole translation
+  ///       unit over a member that would have refused at run time anyway. Friends rather than
+  ///       members, so the refusal reaches the left-hand side too.
+  template <typename T> friend Refused operator+(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses a `+` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T> friend Refused operator+(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
 private:
   [[noreturn]] void Throw() const {
     throw Error("the .NET member " + std::string(named_.type) + "." + std::string(named_.member) +

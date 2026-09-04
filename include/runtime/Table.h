@@ -1511,7 +1511,11 @@ private:
   void AssignKey(const TableDef &table, std::size_t position, const Key &value) {
     const FieldDef *def = Field(table, table.keys[0].fields[position]);
     if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
-    *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
+    if constexpr (std::convertible_to<const Key &, std::string_view>) {
+      detail::SetFieldText(Self(), *def, std::string_view(value));
+    } else {
+      *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
+    }
   }
 };
 

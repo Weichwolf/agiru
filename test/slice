@@ -24,3 +24,7 @@ base/finance/vat/setup/table/VATBusinessPostingGroup.cpp
 base/finance/vat/setup/table/VATSetupPostingGroups.cpp
 base/finance/vat/setup/table/VATProductPostingGroup.cpp
 base/finance/vat/rate_change/table/VATRateChangeSetup.cpp
+tests/core/codeunit/ERMDocumentTotalsUT.cpp
+tests/core/codeunit/LibraryApplicationArea.cpp
+base/system/environment/configuration/table/ApplicationAreaSetup.cpp
+base/system/environment/configuration/codeunit/ApplicationAreaCache.cpp

@@ -633,13 +633,16 @@ private:
 
   std::string Added(const al::Expr &expression, int precedence) {
     const std::string rendered = Expression(expression, precedence);
-    return NamesALabel(expression) ? "std::string(" + rendered + ")" : rendered;
+    const bool wrap = expression.kind == al::ExprKind::StringLiteral ||
+                      (expression.kind == al::ExprKind::Name && scope_.IsLabel(expression.text));
+    return wrap ? "std::string(" + rendered + ")" : rendered;
   }
 
-  [[nodiscard]] bool NamesALabel(const al::Expr &expression) const {
+  [[nodiscard]] bool IsText(const al::Expr &expression) const {
+    if (expression.kind == al::ExprKind::StringLiteral) { return true; }
     if (expression.kind == al::ExprKind::Name) { return scope_.IsLabel(expression.text); }
     return expression.kind == al::ExprKind::Binary && expression.text == "+" &&
-           NamesALabel(expression.children.front());
+           (IsText(expression.children.front()) || IsText(expression.children.back()));
   }
 
   static bool IsEnumStatic(std::string_view name) {
@@ -665,7 +668,7 @@ private:
     }
 
     if (expression.text == "+" &&
-        (NamesALabel(expression.children.front()) || NamesALabel(expression.children.back()))) {
+        (IsText(expression.children.front()) || IsText(expression.children.back()))) {
       return Added(expression.children.front(), kAdditivePrecedence) + " + " +
              Added(expression.children.back(), kAdditivePrecedence + 1);
     }

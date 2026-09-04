@@ -634,9 +634,16 @@ template <typename T>
 /// \param left  The literal.
 /// \param right The text.
 /// \return The two joined.
-template <typename T>
-  requires std::convertible_to<const T &, std::string_view> && (!std::derived_from<T, StringValue>)
-[[nodiscard]] std::string operator+(const T &left, const StringValue &right) {
+/// \note THE RIGHT SIDE IS A TEMPLATE AND NOT `const StringValue &`, WHICH IS NOT A STYLE CHOICE.
+///       A base reference accepts anything CONVERTIBLE to one, and the door's refusal placeholder
+///       for an object this run does not have converts to everything -- so `"x" + Absent.Member`
+///       materialised a `StringValue` temporary, whose destructor is protected, and the error named
+///       the base class rather than the absent object. Requiring the right side to BE a
+///       StringValue-derived type takes only the real ones.
+template <typename Left, typename Right>
+  requires std::convertible_to<const Left &, std::string_view> &&
+           (!std::derived_from<Left, StringValue>) && std::derived_from<Right, StringValue>
+[[nodiscard]] std::string operator+(const Left &left, const Right &right) {
   return std::string(std::string_view(left)) + std::string(right.Value());
 }
 
