@@ -2,9 +2,12 @@
 
 #include "meta/EnumDef.h"
 #include "runtime/Error.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
+#include "type/ClientType.h"
+#include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
@@ -12,10 +15,13 @@
 #include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/ObjectType.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
+#include "type/TelemetryScope.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/Verbosity.h"
 
 #include <cctype>
 #include <cstddef>
@@ -236,6 +242,44 @@ Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view 
     rendered += SpecToken(Value, token, filler);
   }
   return Fitted(std::move(rendered), Length, numeric, filler);
+}
+
+std::string GetUrl(const ::agiru::ClientType &ClientType,
+                   std::string_view Company,
+                   const ::agiru::ObjectType &ObjectType,
+                   ::agiru::Integer ObjectId,
+                   const ::agiru::RecordRef &RecordRef,
+                   ::agiru::Boolean UseFilters,
+                   std::string_view Layout) {
+  static_cast<void>(Layout);
+  static_cast<void>(ClientType);
+  static_cast<void>(Company);
+  static_cast<void>(ObjectType);
+  static_cast<void>(ObjectId);
+  static_cast<void>(RecordRef);
+  static_cast<void>(UseFilters);
+  throw Error("System.GetUrl is declared and not implemented yet (board:0035)");
+}
+
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                const ::agiru::Verbosity &Verbosity,
+                const ::agiru::DataClassification &DataClassification,
+                const ::agiru::TelemetryScope &TelemetryScope,
+                std::string_view Dimension1,
+                std::string_view Value1,
+                std::string_view Dimension2,
+                std::string_view Value2) {
+  static_cast<void>(EventId);
+  static_cast<void>(Message);
+  static_cast<void>(Verbosity);
+  static_cast<void>(DataClassification);
+  static_cast<void>(TelemetryScope);
+  static_cast<void>(Dimension1);
+  static_cast<void>(Value1);
+  static_cast<void>(Dimension2);
+  static_cast<void>(Value2);
+  throw Error("Session.LogMessage is declared and not implemented yet (board:0035)");
 }
 
 std::string ConvertStr(std::string_view String,

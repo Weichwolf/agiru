@@ -18,12 +18,10 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
-#include "type/ObjectType.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/TableConnectionType.h"
-#include "type/TelemetryScope.h"
 #include "type/Time.h"
 #include "type/TransactionType.h"
 #include "type/Variant.h"
@@ -250,38 +248,6 @@ std::string GetLastErrorCode() {
 std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
   static_cast<void>(ExcludeCustomerContent);
   RefuseDoor("System.GetLastErrorText(Boolean)");
-}
-
-std::string GetUrl(const ::agiru::ClientType &ClientType,
-                   std::string_view Company,
-                   const ::agiru::ObjectType &ObjectType,
-                   ::agiru::Integer ObjectId,
-                   const ::agiru::RecordRef &RecordRef,
-                   ::agiru::Boolean UseFilters) {
-  static_cast<void>(ClientType);
-  static_cast<void>(Company);
-  static_cast<void>(ObjectType);
-  static_cast<void>(ObjectId);
-  static_cast<void>(RecordRef);
-  static_cast<void>(UseFilters);
-  RefuseDoor("System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean)");
-}
-
-std::string GetUrl(const ::agiru::ClientType &ClientType,
-                   std::string_view Company,
-                   const ::agiru::ObjectType &ObjectType,
-                   ::agiru::Integer ObjectId,
-                   const ::agiru::RecordRef &RecordRef,
-                   ::agiru::Boolean UseFilters,
-                   std::string_view Layout) {
-  static_cast<void>(ClientType);
-  static_cast<void>(Company);
-  static_cast<void>(ObjectType);
-  static_cast<void>(ObjectId);
-  static_cast<void>(RecordRef);
-  static_cast<void>(UseFilters);
-  static_cast<void>(Layout);
-  RefuseDoor("System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean, Text)");
 }
 
 ::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID) {
@@ -641,44 +607,6 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
   static_cast<void>(CustomDimensions);
   RefuseDoor("Session.LogAuditMessage(Text, SecurityOperationResult, AuditCategory, Integer, "
              "Integer, Dictionary of [Text, Text])");
-}
-
-void LogMessage(std::string_view EventId,
-                std::string_view Message,
-                const ::agiru::Verbosity &Verbosity,
-                const ::agiru::DataClassification &DataClassification,
-                const ::agiru::TelemetryScope &TelemetryScope,
-                const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
-  static_cast<void>(EventId);
-  static_cast<void>(Message);
-  static_cast<void>(Verbosity);
-  static_cast<void>(DataClassification);
-  static_cast<void>(TelemetryScope);
-  static_cast<void>(CustomDimensions);
-  RefuseDoor("Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, "
-             "Dictionary of [Text, Text])");
-}
-
-void LogMessage(std::string_view EventId,
-                std::string_view Message,
-                const ::agiru::Verbosity &Verbosity,
-                const ::agiru::DataClassification &DataClassification,
-                const ::agiru::TelemetryScope &TelemetryScope,
-                std::string_view Dimension1,
-                std::string_view Value1,
-                std::string_view Dimension2,
-                std::string_view Value2) {
-  static_cast<void>(EventId);
-  static_cast<void>(Message);
-  static_cast<void>(Verbosity);
-  static_cast<void>(DataClassification);
-  static_cast<void>(TelemetryScope);
-  static_cast<void>(Dimension1);
-  static_cast<void>(Value1);
-  static_cast<void>(Dimension2);
-  static_cast<void>(Value2);
-  RefuseDoor("Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text, "
-             "Text, Text, Text)");
 }
 
 void LogSecurityAudit(std::string_view Description,

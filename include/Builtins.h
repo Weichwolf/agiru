@@ -17,12 +17,10 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
-#include "type/ObjectType.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/TableConnectionType.h"
-#include "type/TelemetryScope.h"
 #include "type/Time.h"
 #include "type/TransactionType.h"
 #include "type/Variant.h"
@@ -343,46 +341,6 @@ std::string GetLastErrorCode();
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent);
-
-/// \brief AL `System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean)`. Generates
-/// a URL for the specified client target that is based on the configuration of the server instance.
-/// If the code runs in a multitenant deployment architecture, the generated URL will automatically
-/// apply to the tenant ID of the current user.
-/// \param ClientType The AL `ClientType`.
-/// \param Company The AL `Text`.
-/// \param ObjectType The AL `ObjectType`.
-/// \param ObjectId The AL `Integer`.
-/// \param RecordRef The AL `RecordRef`.
-/// \param UseFilters The AL `Boolean`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string GetUrl(const ::agiru::ClientType &ClientType,
-                   std::string_view Company,
-                   const ::agiru::ObjectType &ObjectType,
-                   ::agiru::Integer ObjectId,
-                   const ::agiru::RecordRef &RecordRef,
-                   ::agiru::Boolean UseFilters = {});
-
-/// \brief AL `System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean, Text)`.
-/// Generates a URL for the specified client target that is based on the configuration of the server
-/// instance. If the code runs in a multitenant deployment architecture, the generated URL will
-/// automatically apply to the tenant ID of the current user.
-/// \param ClientType The AL `ClientType`.
-/// \param Company The AL `Text`.
-/// \param ObjectType The AL `ObjectType`.
-/// \param ObjectId The AL `Integer`.
-/// \param RecordRef The AL `RecordRef`.
-/// \param UseFilters The AL `Boolean`.
-/// \param Layout The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string GetUrl(const ::agiru::ClientType &ClientType,
-                   std::string_view Company,
-                   const ::agiru::ObjectType &ObjectType,
-                   ::agiru::Integer ObjectId,
-                   const ::agiru::RecordRef &RecordRef,
-                   ::agiru::Boolean UseFilters,
-                   std::string_view Layout);
 
 /// \brief AL `System.GlobalLanguage(Integer)`. Gets and sets the current global language setting.
 /// \param NewLanguageID The AL `Integer`.
@@ -855,44 +813,6 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
                      ::agiru::Integer AuditMessageOperation,
                      ::agiru::Integer AuditMessageOperationResult,
                      const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
-
-/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
-/// Dictionary of [Text, Text])`. Logs a trace message to a telemetry account.
-/// \param EventId The AL `Text`.
-/// \param Message The AL `Text`.
-/// \param Verbosity The AL `Verbosity`.
-/// \param DataClassification The AL `DataClassification`.
-/// \param TelemetryScope The AL `TelemetryScope`.
-/// \param CustomDimensions The AL `Dictionary of [Text, Text]`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void LogMessage(std::string_view EventId,
-                std::string_view Message,
-                const ::agiru::Verbosity &Verbosity,
-                const ::agiru::DataClassification &DataClassification,
-                const ::agiru::TelemetryScope &TelemetryScope,
-                const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
-
-/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text,
-/// Text, Text, Text)`. Logs a trace message to a telemetry account.
-/// \param EventId The AL `Text`.
-/// \param Message The AL `Text`.
-/// \param Verbosity The AL `Verbosity`.
-/// \param DataClassification The AL `DataClassification`.
-/// \param TelemetryScope The AL `TelemetryScope`.
-/// \param Dimension1 The AL `Text`.
-/// \param Value1 The AL `Text`.
-/// \param Dimension2 The AL `Text`.
-/// \param Value2 The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void LogMessage(std::string_view EventId,
-                std::string_view Message,
-                const ::agiru::Verbosity &Verbosity,
-                const ::agiru::DataClassification &DataClassification,
-                const ::agiru::TelemetryScope &TelemetryScope,
-                std::string_view Dimension1,
-                std::string_view Value1,
-                std::string_view Dimension2,
-                std::string_view Value2);
 
 /// \brief AL `Session.LogSecurityAudit(Text, SecurityOperationResult, Text, AuditCategory, Array of
 /// [Text], Array of [Text])`. Logs an IfX audit message to a telemetry account.

@@ -118,7 +118,7 @@ private:
 ///       gain one: a Guid is 16 bytes and its text is 38, so a conversion operator would need
 ///       storage on every Guid, and a Guid sits in every record as `SystemId`. The operator carries
 ///       it instead, where the text is actually wanted.
-[[nodiscard]] inline std::string operator+(std::string left, const Guid &right) {
+[[nodiscard]] inline std::string operator+(const std::string &left, const Guid &right) {
   return left + right.ToText();
 }
 

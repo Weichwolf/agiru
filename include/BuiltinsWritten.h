@@ -1,11 +1,17 @@
 #pragma once
 
+#include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
+#include "type/ClientType.h"
+#include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/Integer.h"
+#include "type/ObjectType.h"
 #include "type/StringValue.h"
+#include "type/TelemetryScope.h"
 #include "type/Variant.h"
+#include "type/Verbosity.h"
 
 #include <optional>
 #include <string>
@@ -220,6 +226,56 @@ std::string Format(const ::agiru::Variant &Value,
 ///       zeroes, and a left-to-right reading would have found the filler too late.
 std::string
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString);
+
+/// \brief AL `System.GetUrl(ClientType [, Text, ObjectType, Integer, RecordRef, Boolean])`.
+///
+/// \param ClientType Which client the URL is for.
+/// \param Company The company, defaulting to the session's.
+/// \param ObjectType The object kind to open.
+/// \param ObjectId Its number.
+/// \param RecordRef The record to open it on.
+/// \param UseFilters Whether the record's filters travel in the URL.
+/// \return The AL `Text`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note EVERYTHING AFTER THE CLIENT TYPE IS OPTIONAL, WHICH THE SOURCE PROVES AND THE PAGE DOES
+///       NOT SAY. `system-geturl-...-method.md` marks only `UseFilters` `[Optional]`, and the
+///       BaseApp calls this with one argument 35 times, two 9 times, three once, four 24 times,
+///       five 5 times and six once (measured over `Layers/W1`, 2026-09-04). Where the
+///       documentation DESCRIBES and the source DECLARES, the source declares -- and 35 call sites
+///       that do not compile are a declaration.
+std::string GetUrl(const ::agiru::ClientType &ClientType,
+                   std::string_view Company = {},
+                   const ::agiru::ObjectType &ObjectType = {},
+                   ::agiru::Integer ObjectId = {},
+                   const ::agiru::RecordRef &RecordRef = ::agiru::RecordRef{},
+                   ::agiru::Boolean UseFilters = {},
+                   std::string_view Layout = {});
+
+/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text,
+/// Text [, Text, Text])`. Logs a trace message to a telemetry account.
+/// \param EventId The event's identifier.
+/// \param Message The message.
+/// \param Verbosity How loud it is.
+/// \param DataClassification What kind of data it carries.
+/// \param TelemetryScope Who sees it.
+/// \param Dimension1 The first custom dimension's name.
+/// \param Value1 Its value.
+/// \param Dimension2 The second dimension's name, if there is one.
+/// \param Value2 Its value.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note THE SECOND DIMENSION PAIR IS OPTIONAL, for the reason `GetUrl` above gives: the page
+///       marks none of the four, and the BaseApp passes one pair.
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                const ::agiru::Verbosity &Verbosity,
+                const ::agiru::DataClassification &DataClassification,
+                const ::agiru::TelemetryScope &TelemetryScope,
+                std::string_view Dimension1,
+                std::string_view Value1,
+                std::string_view Dimension2 = {},
+                std::string_view Value2 = {});
 
 /// \brief AL `System.Clear(Any)` -- the value back to what it was before anything was assigned.
 ///

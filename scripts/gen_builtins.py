@@ -86,6 +86,15 @@ def arity(text, at):
 # took `Format(x)` away from every caller. CONCRETE holds only what is not a template.
 BUILT = set()
 CONCRETE = set()
+# A NAME WRITTEN BY HAND TAKES THE WHOLE OVERLOAD SET, and only there. `BuiltinsWritten.h` is
+# deliberate -- every name in it was moved out of here on purpose -- so one written `GetUrl` with
+# every parameter after the first defaulted must silence the documented six-parameter form too, or
+# a five-argument call is ambiguous between them. Matching by (name, arity) everywhere would leave
+# it standing; matching by NAME everywhere is what removed `System.Format(Any, Integer, Integer)`
+# because `Record.h` declares a constrained `Format(const T &)` template. So the rule follows the
+# FILE: the hand-written door by name, every other door header by name and arity.
+WRITTEN = set()
+
 for header in sorted((ROOT / "include").rglob("*.h")):
     if header.name == "Builtins.h":
         continue
@@ -97,6 +106,8 @@ for header in sorted((ROOT / "include").rglob("*.h")):
                          text, re.M):
         found = (m.group(1), arity(text, m.end() - 1))
         BUILT.add(found)
+        if header.name == "BuiltinsWritten.h":
+            WRITTEN.add(m.group(1))
         # THE MARKER SITS ON THE SAME LINE OR TWO ABOVE. `template <typename E> std::string
         # Format(const Option<E> &)` carries it inline; `template <typename T>\n requires(...)\n
         # std::string Format(const T &)` carries it two lines up. Reading only the lines before
@@ -113,7 +124,8 @@ alldecls, allbodies, used = [], [], set()
 for owner in ("system", "text", "database", "session", "dialog", "file", "secrettext"):
     ms = [m for m in free.free(owner) if m["static"]]
     ms = [m for m in ms
-          if m["method"] not in COLLIDES and (m["method"], len(m["params"])) not in BUILT]
+          if m["method"] not in COLLIDES and m["method"] not in WRITTEN
+          and (m["method"], len(m["params"])) not in BUILT]
     decls, bodies = free.emit(owner, ms, known)
     for m in ms:
         for _, t, _ in m["params"]:
