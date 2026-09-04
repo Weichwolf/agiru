@@ -62,3 +62,8 @@ tests/core/codeunit/ERMTableFieldsUT.cpp
 tests/core/codeunit/O365EmailAsPDFUT.cpp
 base/inventory/item/table/Item.cpp
 system/system/environment/codeunit/EnvironmentInformationImpl.cpp
+system/system/utilities/codeunit/Regex.cpp
+base/pricing/asset/table/PriceAsset.cpp
+tests/core/codeunit/APIMockEvents.cpp
+base/system/security/user/table/UserSetup.cpp
+base/purchases/setup/table/PurchasesPayablesSetup.cpp

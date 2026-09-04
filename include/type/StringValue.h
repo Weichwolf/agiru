@@ -630,6 +630,19 @@ public:
     return *this;
   }
 
+  /// \brief Makes a text from anything that RENDERS as text -- a `Guid` handed to a `Text`
+  ///        parameter, which `guid-data-type.md` allows.
+  /// \tparam T The source, which must carry a `ToText()` and must not already read as text.
+  /// \param value The value.
+  /// \throws StringError when the rendering does not fit the declared length.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  explicit(false) Text(const T &value) : Text() {
+    Assign(std::string_view(value.ToText()));
+  }
+
   /// \brief Assigns anything that RENDERS as text, which is how AL assigns a GUID to a Text.
   ///
   /// \tparam T The source, which must carry a `ToText()`.
@@ -642,6 +655,7 @@ public:
   ///       so the conversion is its documented TEXT and never its storage.
   template <typename T>
     requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
             requires(const T &value) { std::string_view{value.ToText()}; }
   Text &operator=(const T &value) {
     Assign(std::string_view(value.ToText()));

@@ -202,6 +202,11 @@ public:
   Variant(const T &value)
       : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = T::Traits::kValues}) {}
 
+  /// \brief Holds an option that carries no vocabulary -- `Option<>` -- by its ordinal alone.
+  /// \param value The option.
+  Variant(const Option<> &value)
+      : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = {}}) {}
+
   /// \brief Holds a bare enumeration member, which is how AL writes one.
   ///
   /// \tparam E The generated enumeration.

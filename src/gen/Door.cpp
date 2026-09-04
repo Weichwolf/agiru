@@ -63,8 +63,7 @@ std::vector<std::string> &DoorTypes() {
     for (const auto &entry : std::filesystem::directory_iterator(door)) {
       if (entry.path().extension() != ".h") { continue; }
       const std::string name = entry.path().stem().string();
-      if (BaseMembers().contains(name)) { continue; }
-      found.push_back(name);
+      found.push_back(BaseMembers().contains(name) ? "agiru::" + name : name);
     }
     if (found.empty()) { throw std::runtime_error("the door declares no types"); }
     return found;
@@ -284,7 +283,9 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
     default: break;
   }
   for (const std::string &type : DoorTypes()) {
-    if (Mentions(text, type)) { headers.insert("type/" + type + ".h"); }
+    if (!Mentions(text, type)) { continue; }
+    const std::size_t bare = type.starts_with("agiru::") ? std::string_view{"agiru::"}.size() : 0;
+    headers.insert("type/" + type.substr(bare) + ".h");
   }
   for (const auto &[member, family] : kFamilies) {
     if (!headers.contains("type/" + std::string(member) + ".h")) { continue; }

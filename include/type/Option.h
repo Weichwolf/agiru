@@ -65,7 +65,10 @@ public:
 
   /// \brief Holds a named member.
   /// \param value The member.
-  constexpr explicit Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+  /// \note NOT EXPLICIT, for the reason `Enum` gives: AL passes the MEMBER itself where an option
+  ///       is wanted -- `UpdateDimensions(AnalysisView, DimensionCode::Code2)` -- and an explicit
+  ///       constructor refused every such argument.
+  constexpr explicit(false) Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
   /// \brief Holds the ordinal another option carries.
   ///

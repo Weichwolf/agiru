@@ -2,6 +2,7 @@
 
 #include "type/StringValue.h"
 
+#include <concepts>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -29,6 +30,12 @@ public:
   /// \brief Wraps a plain string.
   /// \param text The secret.
   explicit SecretText(std::string text) : text_(std::move(text)) {}
+
+  /// \brief AL assigns a `Text` to a `SecretText` without ceremony; so does this.
+  /// \param text The text, which is then held as a secret.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  explicit(false) SecretText(const T &text) : text_(std::string_view(text)) {}
 
   /// \brief AL `SecretText.IsEmpty()`.
   /// \return True when the secret holds no content.

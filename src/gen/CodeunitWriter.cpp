@@ -155,6 +155,9 @@ std::size_t FieldArguments(std::string_view method) {
   static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
       {"SetRange", 1},
       {"SetFilter", 1},
+      {"FindFirstField", 1},
+      {"FindNextField", 1},
+      {"FindPreviousField", 1},
       {"TestField", 1},
       {"FieldError", 1},
       {"FieldCaption", 1},
@@ -270,21 +273,19 @@ std::string OptionNameOf(const std::string &owner,
                          const std::string &within,
                          const al::VarDecl &declared,
                          const std::vector<al::ProcedureDecl> &procedures) {
-  std::string base = OptionName(owner, within, declared.name);
-  if (declared.members.empty()) { return base; }
-  const auto clashes = [&](const al::ProcedureDecl &procedure, const al::VarDecl &other) {
-    return !other.members.empty() && other.members != declared.members &&
-           OptionName(owner, procedure.name, other.name) == base;
-  };
-  for (const al::ProcedureDecl &procedure : procedures) {
-    const bool found =
-        std::ranges::any_of(procedure.parameters,
-                            [&](const al::VarDecl &o) { return clashes(procedure, o); }) ||
-        std::ranges::any_of(procedure.variables,
-                            [&](const al::VarDecl &o) { return clashes(procedure, o); });
-    if (found) { return base + EnumeratorName(declared.members.front()); }
+  static_cast<void>(procedures);
+  if (declared.members.empty()) { return OptionName(owner, within, declared.name); }
+  std::string joined;
+  for (const std::string &member : EnumeratorNames(declared.members)) { joined += member; }
+  constexpr std::size_t kReadable = 48;
+  if (joined.size() > kReadable) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const char c : joined) {
+      hash = (hash ^ static_cast<unsigned char>(c)) * 1099511628211ULL;
+    }
+    joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % 1000000007ULL);
   }
-  return base;
+  return Identifier(owner) + "Option" + joined;
 }
 
 bool Hidden(const std::string &type, const std::set<std::string> &names) {
@@ -390,7 +391,7 @@ std::string InlineOptionsIn(const std::string &owner,
     const std::string name = OptionNameOf(owner, within, declared, procedures);
     const auto seen = emitted.find(name);
     if (seen != emitted.end()) {
-      if (seen->second != declared.members) {
+      if (EnumeratorNames(seen->second) != EnumeratorNames(declared.members)) {
         throw std::runtime_error("\"" + owner +
                                  "\" declares two different options under the name " + name);
       }
@@ -1016,7 +1017,9 @@ bool Mentions(const std::string &body, const std::string &name) {
         (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
     const bool scope = after + 1 < body.size() && body[after] == ':' && body[after + 1] == ':';
     const bool scoped = at >= 2 && body[at - 1] == ':' && body[at - 2] == ':';
-    if (!before && !behind && !scope && !scoped) { return true; }
+    const bool member =
+        at >= 1 && (body[at - 1] == '.' || (at >= 2 && body[at - 1] == '>' && body[at - 2] == '-'));
+    if (!before && !behind && !scope && !scoped && !member) { return true; }
   }
   return false;
 }
@@ -1143,7 +1146,7 @@ std::string MemberDeclarations(const std::string &owner,
   const std::set<std::string> shadowed = Shadowing(variables, procedures, labels);
   std::string out;
   for (const al::VarDecl &declared : variables) {
-    std::string type = TypeOf(declared, objects, OptionName(owner, {}, declared.name));
+    std::string type = TypeOf(declared, objects, OptionNameOf(owner, {}, declared, procedures));
     if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
     const bool handle = HandleMember(declared);
     out +=
@@ -1377,7 +1380,8 @@ std::string HiddenMembers(const al::CodeunitObject &unit,
                           const std::set<std::string> &shadowed) {
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    std::string type =
+        TypeOf(declared, objects, OptionNameOf(unit.name, {}, declared, unit.procedures));
     if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
     const bool handle = HandleMember(declared);
     hidden +=

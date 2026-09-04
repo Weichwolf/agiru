@@ -182,6 +182,10 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
     return MemberText(def, static_cast<std::int32_t>(value));
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
+  } else if constexpr (requires { value.ToText(); }) {
+    return std::string(value.ToText());
+  } else if constexpr (requires { value.ToInvariantString(); }) {
+    return value.ToInvariantString();
   } else {
     return std::string(value);
   }

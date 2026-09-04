@@ -205,25 +205,29 @@ void AnInlineOptionGetsAnEnumerationOfItsOwn() {
 })";
   const std::string generated = Generated(source);
 
-  CHECK_TRUE("a codeunit variable gets an enumeration named after the codeunit and itself",
-             generated.find("enum class SomeThingMode") != std::string::npos);
-  CHECK_TRUE("a parameter gets one named after its procedure too",
-             generated.find("enum class SomeThingCheckKind") != std::string::npos);
+  // AN OPTION IS NAMED BY ITS MEMBERS, not by the variable that declares it: `Option A,B` in two
+  // procedures of one codeunit is ONE type in AL, and naming it per variable gave every value that
+  // crossed a procedure boundary a conversion error (measured 2026-09-04: 19 over the UT suite).
+  CHECK_TRUE("a codeunit variable gets an enumeration named after the codeunit and its members",
+             generated.find("enum class SomeThingOptionDraftPosted") != std::string::npos);
+  CHECK_TRUE("a parameter gets one named the same way, with a blank member spelled Blank",
+             generated.find("enum class SomeThingOptionBlankItemResource") != std::string::npos);
   CHECK_TRUE("and so does a local",
-             generated.find("enum class SomeThingCheckStep") != std::string::npos);
+             generated.find("enum class SomeThingOptionFirstSecond") != std::string::npos);
   CHECK_TRUE("the member names are kept as AL wrote them",
              generated.find("\"Draft\"") != std::string::npos &&
                  generated.find("\"Posted\"") != std::string::npos);
   CHECK_TRUE("a member that is no identifier is renamed and its ordinal kept",
              generated.find("Blank = 0,") != std::string::npos);
   CHECK_TRUE("the variable's type names its own enumeration",
-             generated.find("Option<SomeThingMode> Mode") != std::string::npos);
+             generated.find("Option<SomeThingOptionDraftPosted> Mode") != std::string::npos);
   CHECK_TRUE("and so does the parameter",
-             generated.find("Option<SomeThingCheckKind> Kind") != std::string::npos);
+             generated.find("Option<SomeThingOptionBlankItemResource> Kind") != std::string::npos);
 
   // THE NEGATIVE CONTROL. A rule that named every option the same would pass every check above.
   CHECK_TRUE("two options in one codeunit do not share an enumeration",
-             generated.find("SomeThingCheckKind") != generated.find("SomeThingCheckStep"));
+             generated.find("SomeThingOptionBlankItemResource") !=
+                 generated.find("SomeThingOptionFirstSecond"));
 }
 
 /// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide

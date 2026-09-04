@@ -532,7 +532,7 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **an out parameter never written** | a builtin with a `var` parameter that sets the value only locally | `var` is a reference and the compiler checks it -- closed in C++, provided the generator never copies |
 | **value context** | AL decides at consumption-versus-discard whether a failure throws or yields `false` | the contexts are named: assignment, `if`/`while`, `exit`, argument, `case` selector |
 | **identifier casing** | AL is case-insensitive; diverging casing produces two symbols | collapse match, once, in the generator |
-| **local option enums** | the same bare field name in two objects resolves to wrong ordinals | synthetic, unique names |
+| **local option enums** | the same bare field name in two objects resolves to wrong ordinals; and the SAME `Option A,B` in two procedures named per variable was two C++ types, so a value crossing the boundary was a conversion error (19 over the UT suite) | a synthetic name made of the UNIT and the MEMBER LIST, so equal options are one type and different ones cannot collide |
 | **platform events** | fire whether or not the object declares the trigger | the runtime fires, not the object |
 | **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
 | **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
