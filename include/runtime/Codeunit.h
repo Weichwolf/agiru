@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
+#include "type/Integer.h"
 
 #include <cstdint>
 #include <string_view>
@@ -171,7 +172,7 @@ private:
 /// \note The base holds NO data, for the same reason `Table` holds none: a generated codeunit is a
 ///       plain class whose members are exactly the variables its `.al` declares.
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
-template <typename Derived> class Codeunit {
+template <typename Derived = void> class Codeunit {
 public:
   /// \brief The codeunit's AL number.
   /// \return The number AL declared.
@@ -239,6 +240,27 @@ public:
 
 private:
   friend Derived;
+};
+
+/// \brief AL `Codeunit` with no object in reach -- the platform's `Codeunit.Run(Id, Rec)`.
+///
+/// \note THE `<>` IS THE SAME VISIBLE DEVIATION `Option<>` AND `Enum<>` CARRY: C++ cannot spell a
+///       class template with no arguments as a type. What it names is the platform half of the
+///       type -- running a codeunit BY NUMBER, which needs the catalogue (board:0038).
+template <> class Codeunit<void> {
+public:
+  /// \brief AL `Codeunit.Run(Integer [, Record])` -- runs a codeunit by its number.
+  /// \tparam Arguments The record handed to `OnRun`, if any.
+  /// \param Number The codeunit's AL number.
+  /// \param arguments The record.
+  /// \return Never.
+  /// \throws Error always -- reaching a codeunit by number needs the catalogue (board:0038).
+  template <typename... Arguments>
+  static bool Run(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Codeunit.Run(" + std::to_string(Number) +
+                ") by number needs the codeunit catalogue (board:0038)");
+  }
 };
 
 }

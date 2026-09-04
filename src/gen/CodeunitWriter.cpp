@@ -468,6 +468,18 @@ bool HandleMember(const al::VarDecl &declared) {
   return NamesAnObject(declared);
 }
 
+bool IsSystemField(std::string_view name) {
+  static constexpr std::array kSystem{std::string_view{"SystemId"},
+                                      std::string_view{"SystemCreatedAt"},
+                                      std::string_view{"SystemCreatedBy"},
+                                      std::string_view{"SystemModifiedAt"},
+                                      std::string_view{"SystemModifiedBy"},
+                                      std::string_view{"SystemRowVersion"}};
+  return std::ranges::any_of(kSystem, [name](std::string_view known) {
+    return LowerKey(std::string(known)) == LowerKey(std::string(name));
+  });
+}
+
 bool NamesAPage(std::string_view type) {
   return type == "TestPage" || type == "Page" || type == "TestRequestPage";
 }
@@ -780,6 +792,7 @@ public:
     if (held != nullptr && !NamesAnObject(*held)) {
       return !NamesAControl(*held, member.field) && DoorCalls(member.field);
     }
+    if (IsSystemField(member.field)) { return false; }
     if (subtype.empty() || !DoorCalls(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
@@ -797,14 +810,13 @@ public:
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
-    if (subtype.empty()) { return Identifier(member.field); }
+    if (subtype.empty()) { return AsTheDoorSpellsIt(Identifier(member.field)); }
     const std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
     if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
-                                  : Identifier(member.field);
+      return AsTheDoorSpellsIt(Identifier(member.field));
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }

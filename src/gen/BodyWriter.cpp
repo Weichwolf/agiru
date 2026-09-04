@@ -648,7 +648,7 @@ private:
                ? scope_.MemberSpelling(
                      OfVariable{.variable = reach.base.text, .field = reach.link.text})
                : Expression(reach.link, how.precedence + 1);
-    if (how.parens) { out += "()"; }
+    if (how.parens && !IsSystemFieldName(reach.link.text)) { out += "()"; }
   }
 
   static std::string Number(std::string_view text) {
@@ -671,6 +671,17 @@ private:
     if (expression.kind == al::ExprKind::Name) { return scope_.IsLabel(expression.text); }
     return expression.kind == al::ExprKind::Binary && expression.text == "+" &&
            (IsText(expression.children.front()) || IsText(expression.children.back()));
+  }
+
+  static bool IsSystemFieldName(std::string_view name) {
+    static constexpr std::array kSystem{std::string_view{"SystemId"},
+                                        std::string_view{"SystemCreatedAt"},
+                                        std::string_view{"SystemCreatedBy"},
+                                        std::string_view{"SystemModifiedAt"},
+                                        std::string_view{"SystemModifiedBy"},
+                                        std::string_view{"SystemRowVersion"}};
+    return std::ranges::any_of(kSystem,
+                               [name](std::string_view known) { return SameName(known, name); });
   }
 
   static bool IsEnumMethod(std::string_view name) {
@@ -699,6 +710,13 @@ private:
                          std::string_view spelling,
                          int precedence) {
     if (spelling != "." || chain.empty() || chain.back()->kind != al::ExprKind::Name) { return {}; }
+    if (walk.kind == al::ExprKind::Name && IsEnumMethod(chain.back()->text) &&
+        scope_.Resolve(walk.text).empty()) {
+      const std::string named = scope_.EnumObject(walk.text);
+      if (!named.empty()) {
+        return "::agiru::Enum<" + named + ">::" + Identifier(chain.back()->text);
+      }
+    }
     if (walk.kind == al::ExprKind::Scope && IsEnumMethod(chain.back()->text)) {
       const std::string named = Expression(walk, kPrimaryPrecedence);
       if (!named.starts_with("enums::")) { return {}; }
@@ -718,8 +736,8 @@ private:
     }
     if (!IsAlTypeName(walk.text)) { return {}; }
     const std::string holder = KindNamespace(walk.text).empty() ? "" : "<>";
-    std::string out =
-        "::agiru::" + TypeName(walk.text) + holder + "::" + Identifier(chain.back()->text);
+    std::string out = "::agiru::" + TypeName(walk.text) + holder +
+                      "::" + AsTheDoorSpellsIt(Identifier(chain.back()->text));
     for (std::size_t i = chain.size() - 1; i > 0; --i) {
       Link(out,
            {.spelling = spelling, .base = walk, .link = *chain[i - 1]},
@@ -898,7 +916,7 @@ public:
     if (kind == "tables") { index = &objects_.tables; }
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
-    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    if (index == nullptr) { return std::string(kind) + "::" + AsTheDoorSpellsIt(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
     return "absent::" + Identifier(name);
@@ -1020,7 +1038,7 @@ public:
     if (kind == "tables") { index = &objects_.tables; }
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
-    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    if (index == nullptr) { return std::string(kind) + "::" + AsTheDoorSpellsIt(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
     return "absent::" + Identifier(name);
@@ -1107,7 +1125,8 @@ namespace {
 std::string BindsBefore(const std::string &body, const std::string &identifier) {
   return body.find("XRec") == std::string::npos
              ? std::string{}
-             : "  " + identifier + " &XRec = detail::Before<" + identifier + ">();\n\n";
+             : "  tables::" + identifier + " &XRec = detail::Before<tables::" + identifier +
+                   ">();\n\n";
 }
 }
 

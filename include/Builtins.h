@@ -899,17 +899,6 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean UnbindSubscription(const ::agiru::Variant &Codeunit);
 
-/// \brief AL `Dialog.Confirm(Text, Boolean, Any)`. Creates a dialog box that prompts the user for a
-/// yes or no answer. The dialog box is centered on the screen.
-/// \param String The AL `Text`.
-/// \param Default The AL `Boolean`.
-/// \param Value1 The AL `Any`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Confirm(std::string_view String,
-                         ::agiru::Boolean Default = {},
-                         const ::agiru::Variant &Value1 = {});
-
 /// \brief AL `Dialog.LogInternalError(Text, DataClassification, Verbosity)`. Log internal errors
 /// for telemetry.
 /// \param Message The AL `Text`.

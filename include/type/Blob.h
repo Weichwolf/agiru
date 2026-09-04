@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/TextEncoding.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -54,6 +56,16 @@ public:
   /// \brief AL `Blob.CreateInStream(InStream)` -- points a stream at this BLOB to read from.
   /// \return The stream.
   [[nodiscard]] class InStream CreateInStream() const;
+
+  /// \brief AL `Blob.CreateOutStream(var OutStream [, TextEncoding])` -- the `var` form.
+  /// \param into     The stream to bind to this BLOB.
+  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  void CreateOutStream(class OutStream &into, const TextEncoding &Encoding = {});
+
+  /// \brief AL `Blob.CreateInStream(var InStream [, TextEncoding])` -- the `var` form.
+  /// \param from     The stream to bind to this BLOB.
+  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  void CreateInStream(class InStream &from, const TextEncoding &Encoding = {}) const;
 
   /// \brief AL `Blob.Export(Text)`.
   /// \param Name The full path and name of the file the bytes are written to.

@@ -5,6 +5,7 @@
 #include "type/List.h"
 
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <span>
 #include <string>
@@ -30,6 +31,18 @@ template <typename E> struct EnumTraits;
 /// \tparam E The generated enumeration, or `void` when this run never saw its declaration.
 template <typename E = void> class Enum;
 
+namespace detail {
+
+/// \brief Whether a type IS an `Enum<...>`, which decides what may convert into one.
+/// \tparam T The type.
+template <typename T> struct IsEnumHolder : std::false_type {};
+
+/// \brief The specialisation that says yes.
+/// \tparam E The enumeration.
+template <typename E> struct IsEnumHolder<Enum<E>> : std::true_type {};
+
+}
+
 /// \brief AL `Enum`.
 ///
 /// \tparam E The generated enumeration naming the values.
@@ -49,6 +62,36 @@ template <typename E> class Enum : public OrdinalValue {
 public:
   /// \brief The generated enumeration.
   using Enumeration = E;
+
+  /// \brief Takes an ORDINAL from an option of the same shape, which is what AL assigns.
+  ///
+  /// \tparam T The option's type.
+  /// \param value The option.
+  ///
+  /// \note AL ASSIGNS AN OPTION TO AN ENUM FIELD and the platform takes the ordinal across --
+  ///       `ReservationStatus` in `Item.Table.al` is assigned from a bare option field. What it
+  ///       must NOT accept is another ENUM: two enumerations that happen to share an ordinal are
+  ///       two different vocabularies, and a silent conversion between them is the wrong value
+  ///       wearing the right type. `IsEnumHolder` is what keeps that out.
+  template <typename T>
+    requires std::derived_from<T, OrdinalValue> && (!detail::IsEnumHolder<T>::value)
+  constexpr explicit Enum(const T &value) : OrdinalValue(value.AsInteger()) {}
+
+  /// \brief Takes an option's ordinal, which is the shape AL writes as an assignment.
+  /// \tparam T The option's type.
+  /// \param value The option.
+  /// \return This enum.
+  ///
+  /// \note THE CONSTRUCTOR IS EXPLICIT AND THIS IS NOT, and that split is what keeps `==`
+  ///       unambiguous: an implicit constructor gave `Enum == Option` two ways to resolve -- the
+  ///       ordinal conversion both types already carry, and the new one -- while an assignment
+  ///       operator takes part in neither.
+  template <typename T>
+    requires std::derived_from<T, OrdinalValue> && (!detail::IsEnumHolder<T>::value)
+  constexpr Enum &operator=(const T &value) {
+    SetOrdinal(value.AsInteger());
+    return *this;
+  }
 
   /// \brief The value table for that enumeration.
   using Traits = EnumTraits<E>;

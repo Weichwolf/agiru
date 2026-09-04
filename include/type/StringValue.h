@@ -690,6 +690,14 @@ public:
   /// \return True when the stored text is identical.
   [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
 
+  /// \brief Compares against a text of ANOTHER declared shape -- a `Code<100>` against a `Text<0>`.
+  /// \param o The other string value.
+  /// \return True when the stored text is identical.
+  /// \note NON-TEMPLATE ON PURPOSE. Two sized texts of different classes reached the constrained
+  ///       template below from both sides, and C++20's reversed candidate made that ambiguous;
+  ///       a non-template on each side lets the non-rewritten one win.
+  [[nodiscard]] bool operator==(const StringValue &o) const { return Stored() == o.Value(); }
+
   /// \brief Compares against a literal, which is how AL writes an emptiness test.
   /// \param value The text.
   /// \return True when the stored text is identical.

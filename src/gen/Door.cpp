@@ -12,6 +12,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -148,6 +149,54 @@ const std::map<std::string, std::string> &DoorSpellings() {
   return spellings;
 }
 
+constexpr std::array kJson{std::string_view{"JsonToken"},
+                           std::string_view{"JsonValue"},
+                           std::string_view{"JsonObject"},
+                           std::string_view{"JsonArray"}};
+constexpr std::array kHttp{std::string_view{"HttpClient"},
+                           std::string_view{"HttpContent"},
+                           std::string_view{"HttpHeaders"},
+                           std::string_view{"HttpRequestMessage"},
+                           std::string_view{"HttpResponseMessage"}};
+constexpr std::array kXml{std::string_view{"XmlDocument"},
+                          std::string_view{"XmlElement"},
+                          std::string_view{"XmlNode"},
+                          std::string_view{"XmlNodeList"},
+                          std::string_view{"XmlAttribute"},
+                          std::string_view{"XmlAttributeCollection"},
+                          std::string_view{"XmlText"},
+                          std::string_view{"XmlNameTable"},
+                          std::string_view{"XmlNamespaceManager"}};
+
+std::span<const std::string_view> DoorFamily(char which) {
+  switch (which) {
+    case 'j': return kJson;
+    case 'h': return kHttp;
+    default: return kXml;
+  }
+}
+
+constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
+    {"JsonToken", 'j'},
+    {"JsonValue", 'j'},
+    {"JsonObject", 'j'},
+    {"JsonArray", 'j'},
+    {"HttpClient", 'h'},
+    {"HttpContent", 'h'},
+    {"HttpHeaders", 'h'},
+    {"HttpRequestMessage", 'h'},
+    {"HttpResponseMessage", 'h'},
+    {"XmlDocument", 'x'},
+    {"XmlElement", 'x'},
+    {"XmlNode", 'x'},
+    {"XmlNodeList", 'x'},
+    {"XmlAttribute", 'x'},
+    {"XmlAttributeCollection", 'x'},
+    {"XmlText", 'x'},
+    {"XmlNameTable", 'x'},
+    {"XmlNamespaceManager", 'x'},
+}};
+
 constexpr std::array<std::pair<std::string_view, std::string_view>, 35> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
@@ -235,6 +284,12 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   }
   for (const std::string &type : DoorTypes()) {
     if (Mentions(text, type)) { headers.insert("type/" + type + ".h"); }
+  }
+  for (const auto &[member, family] : kFamilies) {
+    if (!headers.contains("type/" + std::string(member) + ".h")) { continue; }
+    for (const std::string_view &beside : DoorFamily(family)) {
+      headers.insert("type/" + std::string(beside) + ".h");
+    }
   }
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }

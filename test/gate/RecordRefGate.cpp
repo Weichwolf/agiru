@@ -144,8 +144,8 @@ void TheEnumAccessorsAnswerByPositionAndByOrdinal() {
              type.GetEnumValueName(0).empty() && type.GetEnumValueName(4).empty());
   CHECK_TRUE("and an ordinal the enumeration does not declare answers nothing",
              type.GetEnumValueNameFromOrdinalValue(9).empty());
-  CHECK_TRUE("the members come out in declaration order", type.OptionMembers().Count() == 3);
-  CHECK_TEXT("first", type.OptionMembers().Get(1), "Resource");
+  CHECK_TRUE("the members come out in declaration order, comma-joined as the page says",
+             type.OptionMembers().starts_with("Resource,"));
 
   // An OPTION is not an ENUM, and the platform asks that separately.
   CHECK_TRUE("an option field is not an enum field", !type.IsEnum());
@@ -258,8 +258,8 @@ void AnEnumFieldReportsOption() {
 
   // AND BOTH HAND OUT THEIR MEMBERS, which is the half `BankPmtApplRuleUT` reaches after the type
   // check: `OptionMembers` on an enum field must not be empty.
-  CHECK_TRUE("the enum names its values", declared.OptionMembers().Count() == 2);
-  CHECK_TRUE("and so does the option", option.OptionMembers().Count() == 2);
+  CHECK_TRUE("the enum names its values", declared.OptionMembers().find(',') != std::string::npos);
+  CHECK_TRUE("and so does the option", option.OptionMembers().find(',') != std::string::npos);
   CHECK_TRUE("the enum keeps its declared ordinal", declared.GetEnumValueOrdinal(2) == 10);
 }
 

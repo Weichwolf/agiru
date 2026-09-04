@@ -78,6 +78,11 @@ public:
   ///       runtime instead of at the AL line that wrote it.
   [[nodiscard]] std::string ToText() const { Throw(); }
 
+  /// \brief Refuses to state a declared length, which `MaxStrLen` asks of anything text-like.
+  /// \return Never.
+  /// \throws Error always.
+  [[nodiscard]] std::size_t Max() const { Throw(); }
+
   /// \brief Refuses an assignment.
   /// \tparam T The type the caller assigned.
   /// \return Never.

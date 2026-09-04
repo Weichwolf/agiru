@@ -685,14 +685,6 @@ void SetDocumentServiceToken(std::string_view Token) {
   RefuseDoor("Session.UnbindSubscription(Codeunit)");
 }
 
-::agiru::Boolean
-Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1) {
-  static_cast<void>(String);
-  static_cast<void>(Default);
-  static_cast<void>(Value1);
-  RefuseDoor("Dialog.Confirm(Text, Boolean, Any)");
-}
-
 void LogInternalError(std::string_view Message,
                       const ::agiru::DataClassification &DataClassificationInstance,
                       const ::agiru::Verbosity &VerbosityInstance) {

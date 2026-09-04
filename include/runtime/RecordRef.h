@@ -197,7 +197,7 @@ public:
 
   /// \brief AL `FieldRef.OptionMembers()`.
   /// \return The member names, in declaration order.
-  [[nodiscard]] List<std::string> OptionMembers() const;
+  [[nodiscard]] std::string OptionMembers() const;
 
   /// \brief AL `FieldRef.Value()`.
   /// \return The field's value, carrying its type.

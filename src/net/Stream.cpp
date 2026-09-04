@@ -71,6 +71,16 @@ OutStream Blob::CreateOutStream() {
   return OutStream{*this};
 }
 
+void Blob::CreateOutStream(OutStream &into, const TextEncoding &Encoding) {
+  static_cast<void>(Encoding);
+  into = OutStream(*this);
+}
+
+void Blob::CreateInStream(InStream &from, const TextEncoding &Encoding) const {
+  static_cast<void>(Encoding);
+  from = InStream(*this);
+}
+
 InStream Blob::CreateInStream() const {
   return InStream{*this};
 }

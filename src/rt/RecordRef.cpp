@@ -58,9 +58,12 @@ std::string_view FieldRef::GetEnumValueNameFromOrdinalValue(Integer ordinal) con
   return value != nullptr ? value->name : std::string_view{};
 }
 
-List<std::string> FieldRef::OptionMembers() const {
-  List<std::string> members;
-  for (const EnumValueDef &value : def_->values) { members.Add(std::string(value.name)); }
+std::string FieldRef::OptionMembers() const {
+  std::string members;
+  for (const EnumValueDef &value : def_->values) {
+    if (!members.empty()) { members += ','; }
+    members += value.name;
+  }
   return members;
 }
 

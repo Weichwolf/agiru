@@ -404,4 +404,64 @@ IsNull(const T &Variable) {
 ///       session -- and 23 of the cases that run today reach it through `Library - Lower
 ///       Permissions`.
 ::agiru::Guid UserSecurityId();
+
+/// \brief AL `Dialog.Confirm(Text [, Boolean] [, Any, ...])`. Asks the user a yes/no question.
+/// \tparam Values The substitution values' types.
+/// \param String The question, with `%1`-style placeholders.
+/// \param Default Which button the dialog opens on.
+/// \param values What the placeholders are replaced with.
+/// \return Never.
+/// \throws Error always -- a confirm needs a running UI (board:0030).
+/// \note VARIADIC, BECAUSE AL'S IS. The BaseApp passes up to five values, and the generated
+///       three-parameter declaration refused the fourth.
+template <typename... Values>
+::agiru::Boolean
+Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...values) {
+  static_cast<void>(Default);
+  (static_cast<void>(values), ...);
+  throw ::agiru::Error(std::string("Confirm(") + std::string(String) +
+                       ") needs a running UI (board:0030)");
+}
+
+/// \brief AL `Dialog.Confirm(Text)` -- the one-argument form.
+/// \param String The question.
+/// \return Never.
+/// \throws Error always -- a confirm needs a running UI (board:0030).
+inline ::agiru::Boolean Confirm(std::string_view String) {
+  return Confirm(String, false);
+}
+
+/// \brief A text builtin over anything that RENDERS as text, which is how AL hands a GUID to
+///        `CopyStr`, `LowerCase` or `UpperCase`.
+/// \tparam T The source, which must carry a `ToText()` and must not already read as text.
+template <typename T>
+concept RendersAsText = (!std::convertible_to<const T &, std::string_view>) &&
+                        requires(const T &value) { std::string_view{value.ToText()}; };
+
+/// \brief AL `Text.LowerCase(Text)` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \return The lower-cased rendering.
+template <RendersAsText T>::agiru::Text<0> LowerCase(const T &String) {
+  return LowerCase(std::string_view(String.ToText()));
+}
+
+/// \brief AL `Text.UpperCase(Text)` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \return The upper-cased rendering.
+template <RendersAsText T>::agiru::Text<0> UpperCase(const T &String) {
+  return UpperCase(std::string_view(String.ToText()));
+}
+
+/// \brief AL `Text.CopyStr(Text, Integer [, Integer])` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \param Position Where the copy starts, one-based.
+/// \param Length How many characters; the rest when omitted.
+/// \return The copied rendering.
+template <RendersAsText T>
+::agiru::Text<0> CopyStr(const T &String, ::agiru::Integer Position, ::agiru::Integer Length = {}) {
+  return CopyStr(std::string_view(String.ToText()), Position, Length);
+}
 }
