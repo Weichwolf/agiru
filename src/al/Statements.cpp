@@ -29,7 +29,6 @@ constexpr std::array kLevels{
     Level{.precedence = 1, .word = "<="},
     Level{.precedence = 1, .word = ">"},
     Level{.precedence = 1, .word = ">="},
-    Level{.precedence = 1, .word = "in"},
     Level{.precedence = 1, .word = "is"},
     Level{.precedence = 1, .word = "as"},
     Level{.precedence = 2, .word = "+"},
@@ -41,6 +40,7 @@ constexpr std::array kLevels{
     Level{.precedence = 3, .word = "mod"},
     Level{.precedence = 3, .word = "and"},
     Level{.precedence = 3, .word = "xor"},
+    Level{.precedence = 4, .word = "in"},
 };
 
 class Reader {

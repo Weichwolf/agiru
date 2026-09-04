@@ -640,10 +640,13 @@ private:
       out += reach.spelling;
       out += " ";
     }
+    const bool andUnderOr = reach.spelling == "||" && reach.link.kind == al::ExprKind::Binary &&
+                            reach.link.text == "and";
     out += reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(
                      OfVariable{.variable = reach.base.text, .field = reach.link.text})
-               : Expression(reach.link, how.precedence + 1);
+           : andUnderOr ? "(" + Expression(reach.link, how.precedence + 1) + ")"
+                        : Expression(reach.link, how.precedence + 1);
     if (how.parens && !IsSystemFieldName(reach.link.text)) { out += "()"; }
   }
 
@@ -781,6 +784,9 @@ private:
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
     const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
+    if (spelling == "||" && walk->kind == al::ExprKind::Binary && walk->text == "and") {
+      out = "(" + out + ")";
+    }
     for (std::size_t i = chain.size(); i > 0; --i) {
       Link(out,
            {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
