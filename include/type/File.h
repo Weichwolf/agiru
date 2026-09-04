@@ -157,7 +157,7 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Open(std::string_view Name, const ::agiru::TextEncoding &Encoding);
+  ::agiru::Boolean Open(std::string_view Name, const ::agiru::TextEncoding &Encoding = {});
 
   /// \brief AL `File.Pos()`. Gets the current position of the file pointer in an ASCII or binary
   /// file.

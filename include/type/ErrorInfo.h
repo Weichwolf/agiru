@@ -28,6 +28,14 @@
 
 namespace agiru {
 
+/// \brief Declared in `runtime/Table.h`; named here so a record can reach an error.
+/// \tparam T The table.
+template <typename T> struct TableTraits;
+
+}
+
+namespace agiru {
+
 class RecordRef;
 
 /// \brief AL `ErrorInfo`.
@@ -101,6 +109,23 @@ public:
   /// \return The AL `ErrorInfo`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::ErrorInfo Create();
+
+  /// \brief AL `ErrorInfo.Create(Text, Boolean, Record)`. An error carrying the record it is about.
+  /// \tparam R The record's type -- any table, which is why it is a template.
+  /// \param Message     The message.
+  /// \param Collectible Whether the error is collected rather than raised.
+  /// \param Record      The record.
+  /// \return Never.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  template <typename R>
+    requires requires { ::agiru::TableTraits<R>::kTable; }
+  static ::agiru::ErrorInfo
+  Create(std::string_view Message, ::agiru::Boolean Collectible, const R &Record) {
+    static_cast<void>(Collectible);
+    static_cast<void>(Record);
+    throw Error("ErrorInfo.Create(" + std::string(Message) +
+                ", Boolean, Record) is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `ErrorInfo.Create(String, Boolean, Record, Integer, Integer, String, Verbosity,
   /// DataClassification, Dictionary of [Text, Text])`. Creates a new ErrorInfo object.

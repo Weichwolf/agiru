@@ -350,6 +350,14 @@ private:
         Advance();
         Expr scope{.kind = ExprKind::Scope, .text = Peek().text, .children = {}};
         Advance();
+        while (AtPunctuation(".") && position_ + 2 < tokens_.size() &&
+               tokens_[position_ + 1].kind != TokenKind::Punctuation &&
+               !(tokens_[position_ + 2].kind == TokenKind::Punctuation &&
+                 tokens_[position_ + 2].text == "(")) {
+          Advance();
+          scope.text = Peek().text;
+          Advance();
+        }
         scope.children.push_back(std::move(value));
         value = std::move(scope);
         continue;

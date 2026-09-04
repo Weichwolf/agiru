@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/test/TestAction.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
@@ -44,12 +45,12 @@ public:
   /// \brief AL `TestRequestPage.OK()` -- closes the request page and runs the report.
   /// \return Whether it ran.
   /// \throws Error until a report can be run (board:0034).
-  Boolean OK() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestAction OK() { throw Error("a TestRequestPage needs a report (board:0034)"); }
 
   /// \brief AL `TestRequestPage.Cancel()` -- closes the request page without running.
   /// \return Whether it closed.
   /// \throws Error until a report can be run (board:0034).
-  Boolean Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestAction Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
 
   /// \brief AL `TestRequestPage.GoToRecord(Record)` -- positions the request page on a record.
   /// \tparam Source The record's type.

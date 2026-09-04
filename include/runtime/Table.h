@@ -1788,7 +1788,16 @@ public:
   ///
   /// \note Sharing is why the version rides on the store rather than on the record: after this,
   ///       two variables mutate one set of rows and each must see the other's changes.
-  void Copy(const Temporary &from, bool share) {
+  /// \brief AL `Record.Copy(Record)` from a record that is NOT temporary: the fields come over and
+  ///        the store stays this one's, because there is no store on the other side to share.
+  /// \param from  The record.
+  /// \param share Ignored -- a database record has no store to share.
+  void Copy(const T &from, bool share = false) {
+    static_cast<void>(share);
+    T::operator=(from);
+  }
+
+  void Copy(const Temporary &from, bool share = false) {
     static_cast<T &>(*this) = static_cast<const T &>(from);
     if (!share || store_ == from.store_) { return; }
     Release();

@@ -841,6 +841,10 @@ Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebu
       text += member;
       text += "\"}};\n";
     }
+    text += "  [[nodiscard]] const ::agiru::dotnet::Refused *begin() const {\n";
+    text += "    return ::agiru::dotnet::Refused{{.type = \"" + type +
+            "\", .member = \"GetEnumerator\"}}();\n  }\n";
+    text += "  [[nodiscard]] const ::agiru::dotnet::Refused *end() const { return begin(); }\n";
     text += "};\n";
   }
   return counted;
