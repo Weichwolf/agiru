@@ -683,6 +683,60 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   }
 }
 
+void IndexReports(const Run &run, agiru::gen::Objects &objects) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Report.al")) {
+    const agiru::gen::ObjectDeclaration declared =
+        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Report);
+    if (!declared.found || declared.id == 0) { continue; }
+    const std::string identifier = agiru::gen::Identifier(declared.name);
+    objects.reports.insert_or_assign(
+        agiru::gen::LowerKey(declared.name),
+        agiru::gen::TableRef{
+            .identifier = "reports::" + identifier,
+            .header =
+                agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Report) +
+                "/" + identifier + ".h",
+            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}}});
+  }
+}
+
+void WriteReports(Run &run, const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (const auto &[key, ref] : objects.reports) {
+    const std::string identifier = ref.identifier.substr(std::string("reports::").size());
+    const auto number = ref.fields.find("id");
+    std::string out = "// Generated from the report's declaration. Do not edit.\n\n";
+    out += "#pragma once\n\n";
+    out += "#include \"meta/Ids.h\"\n";
+    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include <string_view>\n\n";
+    out += "namespace agiru::app::reports {\n\n";
+    out += "class " + identifier + " {\npublic:\n";
+    out += "  static constexpr ReportId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
+    out += "  static constexpr ReportId Id() { return kId; }\n\n";
+    for (const std::string_view member :
+         {"Run",          "RunModal",       "RunRequestPage",       "Print",       "Execute",
+          "SaveAs",       "SaveAsPdf",      "SaveAsExcel",          "SaveAsWord",  "SaveAsHtml",
+          "SaveAsXml",    "RdlcLayout",     "WordLayout",           "ExcelLayout", "DefaultLayout",
+          "SetTableView", "UseRequestPage", "TargetFormat",         "ObjectId",    "Language",
+          "FormatRegion", "Preview",        "GetSubstituteReportId"}) {
+      out += "  template <typename... Arguments> std::string ";
+      out += member;
+      out += "(Arguments &&...arguments) const {\n";
+      out += "    (static_cast<void>(arguments), ...);\n";
+      out += "    throw ::agiru::Error(\"Report.";
+      out += member;
+      out += " is declared and not implemented yet (board:0034)\");\n";
+      out += "  }\n\n";
+    }
+    out += "};\n\n";
+    out += "} // namespace agiru::app::reports\n";
+    Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
+  }
+}
+
 void ScanCodeunits(Run &run,
                    Counts &counts,
                    Gathered &gathered,
@@ -925,6 +979,8 @@ int Scan(const Job &job) {
     Counts extensions;
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
+    IndexReports(run, objects);
+    WriteReports(run, objects);
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;

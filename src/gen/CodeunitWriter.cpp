@@ -794,6 +794,7 @@ public:
     if (kind == "tables") { index = &objects_.tables; }
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (kind == "reports") { index = &objects_.reports; }
     if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
@@ -1116,7 +1117,8 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
-  static const std::regex named(R"(\b(codeunits|pages|tables|interfaces)::([A-Za-z0-9_]+))");
+  static const std::regex named(
+      R"(\b(codeunits|pages|tables|interfaces|reports)::([A-Za-z0-9_]+))");
   std::set<std::string> headers;
   for (std::sregex_iterator it(text.begin(), text.end(), named), end; it != end; ++it) {
     const std::string kind = (*it)[1].str();
@@ -1126,6 +1128,7 @@ std::string BodyIncludes(const std::string &text, const Objects &objects) {
     if (kind == "pages") { index = &objects.pages; }
     if (kind == "tables") { index = &objects.tables; }
     if (kind == "interfaces") { index = &objects.interfaces; }
+    if (kind == "reports") { index = &objects.reports; }
     if (index == nullptr) { continue; }
     std::string qualified = kind;
     qualified += "::";

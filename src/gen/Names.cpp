@@ -337,6 +337,15 @@ ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
 
   ObjectDeclaration declared;
   declared.found = true;
+  {
+    std::istringstream words{std::string(line)};
+    std::string keyword;
+    std::string number;
+    words >> keyword >> number;
+    declared.id = number.find_first_not_of("0123456789") == std::string::npos && !number.empty()
+                      ? std::stoi(number)
+                      : 0;
+  }
   const std::size_t quote = line.find('"');
   if (quote != std::string_view::npos) {
     const std::size_t close = line.find('"', quote + 1);

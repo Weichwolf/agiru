@@ -34,6 +34,7 @@ ObjectKind KindOfNamespace(std::string_view space);
 
 struct ObjectDeclaration {
   bool found = false;
+  int id = 0;
   std::string name;
   std::string nameSpace;
 };

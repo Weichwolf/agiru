@@ -42,10 +42,19 @@ struct TableIdTag;    ///< \internal
 struct FieldNoTag;    ///< \internal
 struct CodeunitIdTag; ///< \internal
 struct PageIdTag;     ///< \internal
+struct ReportIdTag;   ///< \internal
 
 using TableId = Id<TableIdTag>;       ///< An AL table number.
 using FieldNo = Id<FieldNoTag>;       ///< An AL field number, unique within its table.
 using CodeunitId = Id<CodeunitIdTag>; ///< An AL codeunit number.
 using PageId = Id<PageIdTag>;         ///< An AL page number.
+
+/// \brief An AL report number.
+///
+/// \note THE IDENTITY IS ALL A REPORT HAS HERE, AND THAT IS THE WHOLE POINT. `Report::"X"` in AL is
+///       an object REFERENCE -- a number the caller hands to `Report.Run`, to a Job Queue Entry's
+///       `Object ID to Run`, or to a `TestField`. Nothing about the dataitems or the layout is
+///       needed for that, and board:0034 keeps the rest a hole with a count.
+using ReportId = Id<ReportIdTag>;
 
 }
