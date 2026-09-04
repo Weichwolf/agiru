@@ -303,18 +303,6 @@ bool Hidden(const std::string &type, const std::set<std::string> &names) {
   return false;
 }
 
-std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
-                                const std::vector<al::ProcedureDecl> &procedures,
-                                const std::vector<al::LabelDecl> &labels) {
-  std::set<std::string> names;
-  for (const al::VarDecl &declared : variables) { names.insert(Identifier(declared.name)); }
-  for (const al::ProcedureDecl &procedure : procedures) {
-    names.insert(Identifier(procedure.name));
-  }
-  for (const al::LabelDecl &label : labels) { names.insert(Identifier(label.name)); }
-  return names;
-}
-
 std::string Qualified(const std::string &type, const std::set<std::string> &names) {
   std::string out;
   for (std::size_t i = 0; i < type.size();) {
@@ -1029,6 +1017,18 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   return WithDoor(out, ObjectKind::Codeunit);
 }
 
+std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
+                                const std::vector<al::ProcedureDecl> &procedures,
+                                const std::vector<al::LabelDecl> &labels) {
+  std::set<std::string> names;
+  for (const al::VarDecl &declared : variables) { names.insert(Identifier(declared.name)); }
+  for (const al::ProcedureDecl &procedure : procedures) {
+    names.insert(Identifier(procedure.name));
+  }
+  for (const al::LabelDecl &label : labels) { names.insert(Identifier(label.name)); }
+  return names;
+}
+
 std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                const Objects &objects,
                                const std::string &owner,
@@ -1279,6 +1279,29 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
                          .dotnet = std::move(dotnet)};
 }
 
+namespace {
+
+std::string HiddenMembers(const al::CodeunitObject &unit,
+                          const Objects &objects,
+                          const std::set<std::string> &shadowed) {
+  std::string hidden;
+  for (const al::VarDecl &declared : unit.variables) {
+    std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
+    const bool handle = HandleMember(declared);
+    hidden +=
+        "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) + ";\n";
+  }
+  if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
+  for (const al::LabelDecl &label : unit.labels) {
+    hidden += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
+              Literal(label.text) + "};\n";
+  }
+  return hidden;
+}
+
+}
+
 CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                              const std::string &sourcePath,
                              const Objects &objects) {
@@ -1317,19 +1340,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     first = false;
   }
 
-  std::string hidden;
-  for (const al::VarDecl &declared : unit.variables) {
-    std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
-    if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
-    const bool handle = HandleMember(declared);
-    hidden +=
-        "  " + (handle ? "Instance<" + type + ">" : type) + " " + Identifier(declared.name) + ";\n";
-  }
-  if (!unit.labels.empty() && !hidden.empty()) { hidden += "\n"; }
-  for (const al::LabelDecl &label : unit.labels) {
-    hidden += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
-              Literal(label.text) + "};\n";
-  }
+  const std::string hidden = HiddenMembers(unit, objects, shadowed);
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!procedure.isLocal) { continue; }

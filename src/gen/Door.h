@@ -2,7 +2,6 @@
 
 #include "Scope.h"
 
-#include <filesystem>
 #include <string>
 #include <string_view>
 
@@ -19,5 +18,7 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 [[nodiscard]] bool DoorDeclares(std::string_view name);
 
 [[nodiscard]] bool DoorCalls(std::string_view name);
+
+[[nodiscard]] bool HiddenByABaseMember(std::string_view name);
 
 }

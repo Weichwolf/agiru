@@ -78,6 +78,10 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const std::vector<al::ProcedureDecl> &all = {},
                                  const std::string &spelled = {});
 
+std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
+                                const std::vector<al::ProcedureDecl> &procedures,
+                                const std::vector<al::LabelDecl> &labels);
+
 std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                const Objects &objects,
                                const std::string &owner,

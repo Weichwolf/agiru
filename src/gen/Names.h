@@ -24,8 +24,6 @@ std::string TypeName(std::string_view alType);
 
 bool IsAlTypeName(std::string_view alType);
 
-bool HiddenByABaseMember(std::string_view type);
-
 std::string Literal(std::string_view text);
 
 std::string ClassName(std::string_view identifier, ObjectKind kind);

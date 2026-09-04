@@ -306,11 +306,6 @@ bool IsAlTypeName(std::string_view alType) {
   return CanonicalType(alType) != nullptr;
 }
 
-bool HiddenByABaseMember(std::string_view type) {
-  constexpr std::array kHidden{std::string_view{"Field"}, std::string_view{"RecordId"}};
-  return std::ranges::contains(kHidden, type);
-}
-
 namespace {
 
 std::string_view KeywordOf(ObjectKind kind) {

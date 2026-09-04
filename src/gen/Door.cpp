@@ -2,7 +2,6 @@
 
 #include "Scope.h"
 
-#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
@@ -11,6 +10,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -21,12 +21,34 @@ namespace agiru::gen {
 
 namespace {
 
-constexpr std::array kAlsoAMember{
-    std::string_view{"Field"},
-    std::string_view{"RecordId"},
-    std::string_view{"TestField"},
-    std::string_view{"TestAction"},
-};
+std::string TextOf(const std::filesystem::path &file) {
+  const std::ifstream in(file);
+  std::stringstream held;
+  held << in.rdbuf();
+  return held.str();
+}
+
+const std::set<std::string> &BaseMembers() {
+  static const std::set<std::string> members = [] {
+    const std::filesystem::path bases =
+        std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "runtime";
+    if (!std::filesystem::is_directory(bases)) {
+      throw std::runtime_error("the door has no runtime/ directory at " + bases.string());
+    }
+    std::string whole;
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(bases)) {
+      if (entry.path().extension() == ".h") { whole += TextOf(entry.path()); }
+    }
+    std::set<std::string> found;
+    static const std::regex declared(R"([\w>&*:\s]\s([A-Z][A-Za-z0-9]*)\s*\()");
+    for (std::sregex_iterator at(whole.begin(), whole.end(), declared), end; at != end; ++at) {
+      found.insert((*at)[1].str());
+    }
+    if (found.empty()) { throw std::runtime_error("the object bases declare no members"); }
+    return found;
+  }();
+  return members;
+}
 
 std::vector<std::string> &DoorTypes() {
   static const std::vector<std::string> types = [] {
@@ -38,7 +60,7 @@ std::vector<std::string> &DoorTypes() {
     for (const auto &entry : std::filesystem::directory_iterator(door)) {
       if (entry.path().extension() != ".h") { continue; }
       const std::string name = entry.path().stem().string();
-      if (std::ranges::contains(kAlsoAMember, name)) { continue; }
+      if (BaseMembers().contains(name)) { continue; }
       found.push_back(name);
     }
     if (found.empty()) { throw std::runtime_error("the door declares no types"); }
@@ -238,6 +260,10 @@ bool DoorDeclares(std::string_view name) {
     key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
   return DoorSpellings().contains(key);
+}
+
+bool HiddenByABaseMember(std::string_view name) {
+  return BaseMembers().contains(std::string(name));
 }
 
 bool DoorCalls(std::string_view name) {

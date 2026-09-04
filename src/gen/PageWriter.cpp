@@ -309,6 +309,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   const std::string table = SourceTable(object, objects);
   if (!table.empty()) { out += "  " + table + " Rec;\n\n"; }
 
+  const std::set<std::string> shadowed =
+      Shadowing(object.variables, object.procedures, object.labels);
   const std::string members =
       MemberDeclarations(object.name, object.variables, object.labels, object.procedures, objects);
   if (!members.empty()) { out += members + "\n"; }
@@ -322,7 +324,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   std::string locals;
   for (const al::ProcedureDecl &procedure : object.procedures) {
     (procedure.isLocal ? locals : publics) +=
-        ProcedureDeclaration(procedure, objects, object.name, {}, object.procedures);
+        ProcedureDeclaration(procedure, objects, object.name, shadowed, object.procedures);
   }
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
