@@ -67,3 +67,9 @@ base/pricing/asset/table/PriceAsset.cpp
 tests/core/codeunit/APIMockEvents.cpp
 base/system/security/user/table/UserSetup.cpp
 base/purchases/setup/table/PurchasesPayablesSetup.cpp
+base/pricing/source/codeunit/PriceSourceList.cpp
+base/pricing/source/codeunit/PriceSourceJobTask.cpp
+tests/core/codeunit/AnalysisViewTableUT.cpp
+tests/core/codeunit/APISetupUT.cpp
+tests/core/codeunit/CopyPurchSalesDocUT.cpp
+tests/core/codeunit/DataExchToRapidStartUT.cpp
