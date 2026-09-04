@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <string>
+#include <utility>
 
 namespace agiru::gen {
 namespace {
@@ -40,6 +41,15 @@ constexpr std::array kRefused{
     std::string_view{"testtablerelation"},
     std::string_view{"title"},
     std::string_view{"tooltipml"},
+    std::string_view{"externalname"},
+    std::string_view{"externaltype"},
+    std::string_view{"externalaccess"},
+    std::string_view{"publickeytoken"},
+    std::string_view{"enableexternalassemblies"},
+};
+
+constexpr std::array kRefusedValue{
+    std::pair{std::string_view{"scope"}, std::string_view{"onprem"}},
 };
 
 }
@@ -49,7 +59,14 @@ void CollectRefused(const std::vector<al::Property> &properties,
                     std::vector<RefusedProperty> &into) {
   for (const al::Property &property : properties) {
     const std::string key = LowerKey(property.name);
-    if (std::ranges::find(kRefused, key) == kRefused.end()) { continue; }
+    if (std::ranges::find(kRefused, key) == kRefused.end()) {
+      const std::string value = LowerKey(property.text);
+      bool named = false;
+      for (const auto &[name, only] : kRefusedValue) {
+        named = named || (key == name && value == only);
+      }
+      if (!named) { continue; }
+    }
     into.push_back(RefusedProperty{.property = property.name, .where = std::string(where)});
   }
 }

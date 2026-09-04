@@ -8,6 +8,9 @@ Class:    activation
 
 # A `Unique` key is a constraint, and a duplicate insert fails
 
+**The metadata half is done:** carried as `KeyDef::unique`; `UNIQUE` in the emitted index remains.
+
+
 > **Version**: Available or changed with **runtime version 3.0**.
 >
 > Sets a value that indicates whether a SQL Server unique constraint that corresponds to the key

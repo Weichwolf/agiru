@@ -8,6 +8,9 @@ Class:    activation
 
 # A field refuses a value above its `MaxValue`, at the same boundary as `MinValue`
 
+**The metadata half is done:** carried as `FieldDef::maxValue`, the text AL wrote; the parsed bound and the UI boundary remain.
+
+
 `MaxValue` is `MinValue`'s partner with the same four types and the same enforcement point: Integer,
 Decimal, Date (`December 31, 9999`) and Time (`23:59:59`).
 

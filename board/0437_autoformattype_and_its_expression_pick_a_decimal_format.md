@@ -8,6 +8,9 @@ Class:    activation
 
 # `AutoFormatType` and its expression pick a decimal's format
 
+**The metadata half is done:** carried as `FieldDef::autoFormatType` and `autoFormatExpression`, the text AL wrote; the formatting remains.
+
+
 **Two pages, one item**: each is written in terms of the other and the documentation's own syntax
 block shows them together. Neither formats anything alone.
 

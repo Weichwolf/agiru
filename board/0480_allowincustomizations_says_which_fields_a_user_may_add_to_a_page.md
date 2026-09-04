@@ -8,6 +8,9 @@ Class:    activation
 
 # `AllowInCustomizations` says which fields a user may add to a page
 
+**The metadata half is done:** carried as `FieldDef::allowInCustomizations` and `TableDef::allowInCustomizations`, the text AL wrote; the customisation half remains.
+
+
 > **Version**: runtime 16.0. Applies to: **Table, Table field.**
 >
 > `ToBeClassified` (**the default**) -- **"the fields can be used as source expressions for new page

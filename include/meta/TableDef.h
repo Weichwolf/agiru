@@ -131,6 +131,63 @@ struct FieldDef {
   /// \brief The `DecimalPlaces` property, as AL wrote it: `2` or `2:5`.
   std::string_view decimalPlaces{};
 
+  /// \brief The `BlankNumbers` property, as AL wrote it: `DontBlank`, `BlankNeg`,
+  /// `BlankNegAndZero`,
+  ///        `BlankZero` or `BlankPos`.
+  ///
+  /// \warning IT BELONGS TO THE FIELD'S RENDERING PATH and never to `Format(Decimal)`, which is
+  ///          given a value and not a field (board:0323).
+  std::string_view blankNumbers{};
+
+  /// \brief The `Compressed` property: whether a BLOB is stored compressed. The default is true,
+  ///        which is BC's own (board:0372).
+  bool compressed = true;
+
+  /// \brief The `Numeric` property: the client accepts only digits (board:0320).
+  bool numeric = false;
+
+  /// \brief The `CharAllowed` property, as AL wrote it: `A-Z0-9` -- pairs of range ends.
+  std::string_view charAllowed{};
+
+  /// \brief The `ValuesAllowed` property, as AL wrote it: the comma list of permitted values.
+  std::string_view valuesAllowed{};
+
+  /// \brief The `ClosingDates` property: the field takes BC's closing dates (board:0326).
+  bool closingDates = false;
+
+  /// \brief The `ExtendedDataType` property, as AL wrote it: `EMail`, `URL`, `Ratio`, `Masked`,
+  ///        `Person`, `PhoneNo`, `Barcode` or `None`.
+  std::string_view extendedDataType{};
+
+  /// \brief The `MaskType` property, as AL wrote it.
+  std::string_view maskType{};
+
+  /// \brief The `LookupPageId` property: the list the dropdown opens (board:0334).
+  PageId lookupPageId{};
+
+  /// \brief The `DrillDownPageId` property: the rows behind a value (board:0335).
+  PageId drillDownPageId{};
+
+  /// \brief The `OptimizeForTextSearch` property (board:0370).
+  bool optimizeForTextSearch = false;
+
+  /// \brief The `CaptionClass` property, as AL wrote it: the expression a caption is built from.
+  std::string_view captionClass{};
+
+  /// \brief The `Width` property: the column width the client shows, 0 when none is declared.
+  std::uint16_t width = 0;
+
+  /// \brief The `AutoFormatType` and `AutoFormatExpression` properties, as AL wrote them.
+  std::string_view autoFormatType{};
+  std::string_view autoFormatExpression{}; ///< \see autoFormatType
+
+  /// \brief The `AllowInCustomizations` property, as AL wrote it: `Never`, `Always` or a value in
+  ///        between (board:0480).
+  std::string_view allowInCustomizations{};
+
+  /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.
+  std::string_view access{};
+
   /// \brief The `ObsoleteState` property, as AL wrote it -- `Pending` or `Removed`, else empty.
   std::string_view obsoleteState{};
 
@@ -155,6 +212,17 @@ struct FieldDef {
 }
 
 /// \brief One key's declaration. The first key of a table is its primary key.
+/// \brief The most fields a PRIMARY key may name.
+///
+/// `devenv-table-keys.md`: a table's primary key is up to 16 fields. A `static_assert` beside every
+/// table is where that is checked, because it is knowable at translation time (board:0520).
+inline constexpr std::size_t kMaximumPrimaryKeyFields = 16;
+
+/// \brief The most keys a table may declare, the primary key included.
+///
+/// `devenv-table-keys.md`: 40. `Sales Line` declares 17, which is the widest in the BaseApp.
+inline constexpr std::size_t kMaximumKeys = 40;
+
 struct KeyDef {
   std::string_view name{};           ///< The AL key name, `Key1` by convention.
   std::span<const FieldNo> fields{}; ///< The key fields, in declaration order.
@@ -171,6 +239,13 @@ struct KeyDef {
 
   /// \brief The `MaintainSqlIndex` property: whether the declared key becomes an index at all.
   bool maintainSqlIndex = true;
+
+  /// \brief The `Unique` property: the index is emitted with `UNIQUE` (board:0350).
+  bool unique = false;
+
+  /// \brief The `IncludedFields` property, as AL wrote it -- kept SEPARATE from the key's own
+  ///        fields, because `SetCurrentKey` never selects a key by them (board:0351).
+  std::string_view includedFields{};
 };
 
 /// \brief How many system fields the platform adds to every table.
@@ -203,6 +278,34 @@ struct TableDef {
 
   /// \brief The `DataPerCompany` property: whether each company gets its own rows.
   bool dataPerCompany = true;
+
+  /// \brief The `ReplicateData` property: whether cloud migration copies this table's rows.
+  ///
+  /// \note CARRIED AND ACTED ON BY NOTHING (board:0358). 1 064 declarations make a refusal a
+  ///       translation error on two thirds of the schema, and the bit is what a backup, a fixture
+  ///       load or a determinism digest would otherwise have to invent a list for.
+  bool replicateData = true;
+
+  /// \brief The `DataAccessIntent` property, as AL wrote it: `ReadOnly` or `ReadWrite`.
+  ///
+  /// \note CARRIED AND ROUTED BY NOTHING (board:0368): routing a read-only intent at a replica
+  ///       needs a replica, and there is one database here.
+  std::string_view dataAccessIntent{};
+
+  /// \brief The `CompressionType` property, as AL wrote it (board:0373).
+  std::string_view compressionType{};
+
+  /// \brief The `DataCaptionFields` property, as AL wrote it: the fields a record's caption is
+  ///        built from, in order (board:0374).
+  std::string_view dataCaptionFields{};
+
+  /// \brief The `MovedFrom` and `MovedTo` properties, as AL wrote them: the app id an object came
+  ///        from or went to (board:0357).
+  std::string_view movedFrom{};
+  std::string_view movedTo{}; ///< \see movedFrom
+
+  /// \brief The `AllowInCustomizations` property on the TABLE (board:0480).
+  std::string_view allowInCustomizations{};
 
   /// \brief The `ObsoleteState` property, as AL wrote it.
   std::string_view obsoleteState{};

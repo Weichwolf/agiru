@@ -8,6 +8,9 @@ Class:    activation
 
 # `OptimizeForTextSearch` puts a field in the search index
 
+**The metadata half is done:** carried as `FieldDef::optimizeForTextSearch`; what it becomes in PostgreSQL remains.
+
+
 > **Version**: runtime 14.0. Applies to: **Table field**.
 >
 > Include the field in the **optimized text search index** to allow faster search in the UI. The

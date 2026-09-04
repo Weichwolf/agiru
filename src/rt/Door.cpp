@@ -451,7 +451,7 @@ ErrorInfo::Create(std::string_view Message,
                   ::agiru::Integer PageNo,
                   std::string_view ControlName,
                   const ::agiru::Verbosity &Verbosity,
-                  const ::agiru::Variant &DataClassification,
+                  ::agiru::DataClassification DataClassification,
                   const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
   static_cast<void>(Message);
   static_cast<void>(Collectible);
@@ -472,8 +472,9 @@ void ErrorInfo::CustomDimensions(
   RefuseDoor("ErrorInfo.CustomDimensions(Dictionary of [Text, Text])");
 }
 
-::agiru::Variant ErrorInfo::DataClassification(const ::agiru::Variant &DataClassification) {
-  static_cast<void>(DataClassification);
+::agiru::DataClassification
+ErrorInfo::DataClassification(::agiru::DataClassification NewDataClassification) {
+  static_cast<void>(NewDataClassification);
   RefuseDoor("ErrorInfo.DataClassification(DataClassification)");
 }
 
@@ -4617,7 +4618,7 @@ std::string ErrorInfo::ControlName() {
   RefuseDoor("ErrorInfo.CustomDimensions()");
 }
 
-::agiru::Variant ErrorInfo::DataClassification() {
+::agiru::DataClassification ErrorInfo::DataClassification() {
   RefuseDoor("ErrorInfo.DataClassification()");
 }
 

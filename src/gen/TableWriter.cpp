@@ -243,6 +243,15 @@ DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumI
     if (!out.empty()) { out += ", "; }
     out += "." + std::string(member) + " = " + Literal(value);
   };
+  const auto number =
+      [&out](std::string_view member, const std::string &value, std::string_view cast) {
+        if (value.empty()) { return; }
+        if (value.find_first_not_of("0123456789") != std::string::npos) { return; }
+        if (value == "0") { return; }
+        if (!out.empty()) { out += ", "; }
+        out += "." + std::string(member) + " = ";
+        out += cast.empty() ? value : std::string(cast) + "{" + value + "}";
+      };
   const auto flag = [&out](std::string_view member, bool value, bool absent) {
     if (value == absent) { return; }
     if (!out.empty()) { out += ", "; }
@@ -265,6 +274,23 @@ DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumI
   text("minValue", PropertyText(field, "MinValue"));
   text("maxValue", PropertyText(field, "MaxValue"));
   text("decimalPlaces", PropertyText(field, "DecimalPlaces"));
+  text("blankNumbers", PropertyText(field, "BlankNumbers"));
+  flag("compressed", PropertyIs(field, "Compressed", true), true);
+  flag("numeric", PropertyIs(field, "Numeric", false), false);
+  text("charAllowed", PropertyText(field, "CharAllowed"));
+  text("valuesAllowed", PropertyText(field, "ValuesAllowed"));
+  flag("closingDates", PropertyIs(field, "ClosingDates", false), false);
+  text("extendedDataType", PropertyText(field, "ExtendedDataType"));
+  text("maskType", PropertyText(field, "MaskType"));
+  number("lookupPageId", PropertyText(field, "LookupPageId"), "::agiru::PageId");
+  number("drillDownPageId", PropertyText(field, "DrillDownPageId"), "::agiru::PageId");
+  flag("optimizeForTextSearch", PropertyIs(field, "OptimizeForTextSearch", false), false);
+  text("captionClass", PropertyText(field, "CaptionClass"));
+  number("width", PropertyText(field, "Width"), "");
+  text("autoFormatType", PropertyText(field, "AutoFormatType"));
+  text("autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
+  text("allowInCustomizations", PropertyText(field, "AllowInCustomizations"));
+  text("access", PropertyText(field, "Access"));
   text("obsoleteState", PropertyText(field, "ObsoleteState"));
   text("obsoleteReason", PropertyText(field, "ObsoleteReason"));
   text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
@@ -607,6 +633,9 @@ TableHeader WriteHeader(const al::TableObject &declared,
     if (sums != nullptr) { out += ", .sumIndexFields = " + Literal(sums->text); }
     if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
     if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
+    if (said("Unique", false)) { out += ", .unique = true"; }
+    const al::Property *included = Find(table.keys[i].properties, "IncludedFields");
+    if (included != nullptr) { out += ", .includedFields = " + Literal(included->text); }
     out += "},\n";
   }
   out += "}};\n\n";
@@ -625,6 +654,19 @@ TableHeader WriteHeader(const al::TableObject &declared,
   if (!kind.empty()) { out += "    .tableType = " + Literal(kind) + ",\n"; }
   const std::string perCompany = property("DataPerCompany");
   if (LowerKey(perCompany) == "false") { out += "    .dataPerCompany = false,\n"; }
+  const std::string replicate = property("ReplicateData");
+  if (LowerKey(replicate) == "false") { out += "    .replicateData = false,\n"; }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
+        std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"},
+        std::pair<std::string_view, std::string_view>{"DataCaptionFields", "dataCaptionFields"},
+        std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
+        std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"},
+        std::pair<std::string_view, std::string_view>{"AllowInCustomizations",
+                                                      "allowInCustomizations"}}) {
+    const std::string said = property(name);
+    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
+  }
   const std::string obsolete = property("ObsoleteState");
   if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
   out += "};\n\n";
@@ -656,6 +698,21 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += " declares ";
   out += std::to_string(sorted.size() - kSystemFieldCount);
   out += " fields, and the platform adds its own\");\n\n";
+  out += "static_assert(k";
+  out += tableIdentifier;
+  out += "Keys.size() <= ::agiru::kMaximumKeys,\n";
+  out += "              \"a table declares at most 40 keys (devenv-table-keys.md)\");\n";
+  if (!table.keys.empty()) {
+    out += "static_assert(";
+    out += tableIdentifier;
+    out += "::" + KeyArrayName(0) + ".size() <= ::agiru::kMaximumPrimaryKeyFields,\n";
+    out += "              \"a primary key names at most 16 fields "
+           "(devenv-table-keys.md)\");\n";
+    out += "static_assert(!k";
+    out += tableIdentifier;
+    out += "Keys.empty(), \"keys[0] IS the primary key, so a table has one\");\n";
+  }
+  out += "\n";
   out += "} // namespace agiru::app::tables\n\n";
 
   out += "template <> struct agiru::TableTraits<agiru::app::tables::" + tableIdentifier + "> {\n";

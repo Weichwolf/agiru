@@ -8,6 +8,8 @@ Class:    silent-wrong-data
 
 # `ReplicateData` is a cloud-migration flag, and it is carried rather than acted on
 
+**Done.** `ReplicateData` reaches `TableDef::replicateData`, emitted only where AL says `false`.
+
 > **Version**: runtime 2.0. Applies to: Table.
 >
 > **True** if the table data is replicated to the cloud service, otherwise **false**. **The default

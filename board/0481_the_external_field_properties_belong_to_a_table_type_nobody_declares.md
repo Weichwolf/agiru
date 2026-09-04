@@ -8,6 +8,10 @@ Class:    silent-wrong-data
 
 # The external-field properties belong to a table type nobody declares
 
+**All six are refused now**, on `src/gen/Refused.cpp`'s list: `ExternalName`, `ExternalType`,
+`ExternalAccess`, `PublicKeyToken` and `EnableExternalAssemblies`. What remains is board:0364's
+decision, which is what would turn two of them back into carried metadata.
+
 **Six pages, one item**: the remaining properties describing a field or type that lives OUTSIDE the
 Business Central database -- an external SQL table, a Dataverse entity, or a .NET assembly.
 

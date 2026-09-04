@@ -8,6 +8,9 @@ Class:    activation
 
 # A `NotBlank` field refuses an empty entry, and only from the UI
 
+**The metadata half is done:** carried as `FieldDef::notBlank`; the input-boundary check remains.
+
+
 > You can use this property together with the **InitValue** property to make sure that an entry is
 > made in this field. **This setting is evaluated for controls and fields during validation.
 > Validation occurs only if the field or control value is updated through the UI** ... **If a field

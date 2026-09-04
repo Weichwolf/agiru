@@ -8,6 +8,9 @@ Class:    activation
 
 # `DrillDownPageId` names the page behind a value
 
+**The metadata half is done:** carried as `FieldDef::drillDownPageId`, a strong `PageId`; the drilldown remains.
+
+
 > Sets the ID of the page to use as a drill-down.
 >
 > Drill-downs are a system-wide feature of fields (**normal fields and FlowFields**) that let you see

@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `IncludedFields` are carried by the index and ignored by `SetCurrentKey`
 
+**The metadata half is done:** carried as `KeyDef::includedFields`, kept SEPARATE from the key's own fields as the item asks; the index half remains.
+
+
 > **Version**: Available or changed with **runtime version 8.0**.
 >
 > Sets the fields that are included as **non-key columns** in the index on SQL Server.

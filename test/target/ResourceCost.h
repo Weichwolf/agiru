@@ -112,11 +112,13 @@ inline constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::
     Declare<&ResourceCost::DirectUnitCost>(ResourceCost::Field_No::DirectUnitCost,
                                            "Direct Unit Cost",
                                            "Direct Unit Cost",
-                                           offsetof(ResourceCost, DirectUnitCost)),
+                                           offsetof(ResourceCost, DirectUnitCost),
+                                           Declared{.autoFormatType = "2"}),
     Declare<&ResourceCost::UnitCost>(ResourceCost::Field_No::UnitCost,
                                      "Unit Cost",
                                      "Unit Cost",
-                                     offsetof(ResourceCost, UnitCost)),
+                                     offsetof(ResourceCost, UnitCost),
+                                     Declared{.autoFormatType = "2"}),
 }});
 
 inline constexpr std::array<KeyDef, 2> kResourceCostKeys{{
@@ -143,6 +145,12 @@ static_assert(std::is_standard_layout_v<ResourceCost>,
               "which is what keeps it so");
 static_assert(kResourceCostFields.size() == 6 + kSystemFieldCount,
               "table 202 declares 6 fields, and the platform adds its own");
+
+static_assert(kResourceCostKeys.size() <= ::agiru::kMaximumKeys,
+              "a table declares at most 40 keys (devenv-table-keys.md)");
+static_assert(ResourceCost::kKey1.size() <= ::agiru::kMaximumPrimaryKeyFields,
+              "a primary key names at most 16 fields (devenv-table-keys.md)");
+static_assert(!kResourceCostKeys.empty(), "keys[0] IS the primary key, so a table has one");
 
 } // namespace agiru::app::tables
 

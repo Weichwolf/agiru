@@ -8,6 +8,9 @@ Class:    activation
 
 # `DataCaptionFields` names what stands beside a page caption
 
+**The metadata half is done:** carried as `TableDef::dataCaptionFields`, the text AL wrote; the span and the caption remain.
+
+
 > Sets the fields that appear **to the left of the caption** on pages that display the contents of
 > this table. Applies to: **Table, Page, Request Page.**
 

@@ -8,6 +8,9 @@ Class:    activation
 
 # `SumIndexFields` declares what a key aggregates
 
+**The metadata half is done:** carried as `KeyDef::sumIndexFields`, the text AL wrote; the span of `FieldNo` remains.
+
+
 > Specify which fields should be the "aggregation fields" in a **SumIndexField Technology (SIFT)**
 > index, if applicable.
 >

@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # A primary key is up to sixteen fields, and a table has at most forty keys
 
+**The four `static_assert`s are emitted** beside every table: 40 keys, 16 primary-key fields,
+and a primary key that exists. What remains is the schema writer reading `unique`.
+
 board:0045 is "a key is an index and a read is a cursor" and CLAUDE.md counts the population: **1 609
 tables declare 3 272 keys; `Sales Line` alone has 17.** This page is the specification, and it carries
 four numeric limits that are `static_assert`s and one behaviour the schema writer is currently getting

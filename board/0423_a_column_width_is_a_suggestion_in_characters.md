@@ -8,6 +8,9 @@ Class:    activation
 
 # A column width is a suggestion, measured in characters
 
+**The metadata half is done:** carried as `FieldDef::width`; the control half remains.
+
+
 > Specifies a suggested column width **as an integer number of characters**. Applies to: **Table
 > fields** (runtime 1.0), **Page fields** and **Page labels** (runtime 4.4).
 >

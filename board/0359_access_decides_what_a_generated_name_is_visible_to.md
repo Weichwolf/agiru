@@ -8,6 +8,9 @@ Class:    activation
 
 # `Access` decides what a generated name is visible to
 
+**The metadata half is done:** carried as `FieldDef::access`, the text AL wrote; the C++ member access remains.
+
+
 > **Version**: runtime 4.0. Applies to: Codeunit, Query, Table, **Table field**, Enum Type,
 > Interface, Permission Set.
 >

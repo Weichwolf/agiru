@@ -8,6 +8,9 @@ Class:    activation
 
 # A `CharAllowed` field refuses a character outside its declared ranges
 
+**The metadata half is done:** carried as `FieldDef::charAllowed`, the text AL wrote; the range expansion remains.
+
+
 > Sets the range of characters the user can enter into this field or control.
 >
 > You can specify multiple ranges of characters by entering the parameters **in pairs**. For example,

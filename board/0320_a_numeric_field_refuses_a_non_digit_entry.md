@@ -8,6 +8,9 @@ Class:    activation
 
 # A `Numeric` field refuses a non-digit entry from the UI
 
+**The metadata half is done:** carried as `FieldDef::numeric`; the input-boundary predicate remains.
+
+
 > Sets a value that requires that users enter only numbers in the field.
 
 `Numeric = true` on a **Text** or **Code** field, which is the only place it means anything -- an

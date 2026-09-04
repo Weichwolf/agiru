@@ -8,6 +8,9 @@ Class:    activation
 
 # A `ClosingDates` field accepts a closing date, and every other Date field refuses one
 
+**The metadata half is done:** carried as `FieldDef::closingDates`; the check where a Date reaches the field remains.
+
+
 > Sets a value that determines whether users can enter a closing date in this field. The default
 > value is False.
 >

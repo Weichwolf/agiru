@@ -369,4 +369,10 @@ template <typename T> void Clear(T &Variable) {
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date Today();
+
+/// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on.
+/// \return The AL `Text` naming the user this session runs as.
+/// \note IT COMES FROM THE SESSION and not from a constant: a user is a property of the session,
+///       and 23 of the 61 UT cases that run today reach it through `Library - Utility`.
+::agiru::Text<0> UserId();
 }

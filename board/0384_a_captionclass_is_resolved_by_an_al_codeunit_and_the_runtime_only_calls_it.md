@@ -8,6 +8,9 @@ Class:    activation
 
 # A `CaptionClass` is resolved by an AL codeunit, and the runtime only calls it
 
+**The metadata half is done:** carried as `FieldDef::captionClass`, the text AL wrote; evaluating it remains.
+
+
 > Controls the caption that is used in the label of a field in a database table or in the label of a
 > control on a page. Applies to: **Table field, Page Label, Page Field.**
 >

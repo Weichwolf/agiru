@@ -8,6 +8,7 @@
 #include "Names.h"
 #include "PageWriter.h"
 #include "Parser.h"
+#include "Refused.h"
 #include "Scope.h"
 #include "TableWriter.h"
 
@@ -240,7 +241,13 @@ bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) 
 struct Gathered {
   agiru::gen::DotNetUse dotnet;
   agiru::gen::DotNetUse absent;
+  std::vector<agiru::gen::RefusedProperty> refused;
 };
+
+void Absorb(std::vector<agiru::gen::RefusedProperty> &into,
+            const std::vector<agiru::gen::RefusedProperty> &from) {
+  into.insert(into.end(), from.begin(), from.end());
+}
 
 void Absorb(agiru::gen::DotNetUse &into, const agiru::gen::DotNetUse &from) {
   for (const auto &[type, members] : from) { into[type].insert(members.begin(), members.end()); }
@@ -450,6 +457,7 @@ void WritePages(Run &run,
   for (std::size_t i = 0; i < pages.objects.size(); ++i) {
     const agiru::gen::PageHeader written =
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
+    Absorb(gathered.refused, agiru::gen::Refused(pages.objects[i]));
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
     const std::filesystem::path header = agiru::gen::PageHeaderPath(pages.objects[i]);
@@ -544,6 +552,7 @@ void WriteTable(Run &run,
       agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
       agiru::gen::Identifier(table.name);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
+  Absorb(gathered.refused, agiru::gen::Refused(table));
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
@@ -778,6 +787,7 @@ void ScanCodeunits(Run &run,
     try {
       const std::string relative = std::filesystem::relative(path, run.root).string();
       const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, objects);
+      Absorb(gathered.refused, agiru::gen::Refused(*unit));
       for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
       Absorb(gathered.dotnet, header.dotnet);
       Absorb(gathered.absent, header.absent);
@@ -1054,6 +1064,18 @@ int Scan(const Job &job) {
                                                             untranslated.end());
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
     for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
+  }
+  {
+    std::map<std::string, std::size_t> refused;
+    for (const agiru::gen::RefusedProperty &found : gathered.refused) { ++refused[found.property]; }
+    std::println("refused   {} property declaration(s) the transpiler will not act on",
+                 gathered.refused.size());
+    std::vector<std::pair<std::string, std::size_t>> ranked(refused.begin(), refused.end());
+    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
+    for (const agiru::gen::RefusedProperty &found : gathered.refused) {
+      std::println("          {} in {}", found.property, found.where);
+    }
   }
   ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
   if (allCodeunits.emitted != 0) {

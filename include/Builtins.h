@@ -717,12 +717,6 @@ std::string TenantId();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::string_view Name);
 
-/// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on to the
-/// current session.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string UserId();
-
 /// \brief AL `Database.UserSecurityId()`. Gets the unique identifier of the user that is logged on
 /// to the current session.
 /// \return The AL `Guid`.

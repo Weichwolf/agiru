@@ -8,6 +8,9 @@ Class:    activation
 
 # `LookupPageId` names the page a field looks up through
 
+**The metadata half is done:** carried as `FieldDef::lookupPageId`, a strong `PageId`; opening the page remains.
+
+
 > Sets the ID of the page you want to use as a lookup. By default, a lookup provides a list of
 > records in the table.
 >

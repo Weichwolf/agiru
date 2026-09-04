@@ -274,9 +274,26 @@ struct Declared {
   std::string_view minValue{};                                  ///< `MinValue`, as AL wrote it.
   std::string_view maxValue{};                                  ///< `MaxValue`, as AL wrote it.
   std::string_view decimalPlaces{};                             ///< `DecimalPlaces`.
-  std::string_view obsoleteState{};                             ///< `ObsoleteState`.
-  std::string_view obsoleteReason{};                            ///< `ObsoleteReason`.
-  std::string_view obsoleteTag{};                               ///< `ObsoleteTag`.
+  std::string_view blankNumbers{};                              ///< `BlankNumbers`.
+  bool compressed = true;                                       ///< `Compressed`, BLOB only.
+  bool numeric = false;                                         ///< `Numeric`.
+  std::string_view charAllowed{};                               ///< `CharAllowed`, as AL wrote it.
+  std::string_view valuesAllowed{};         ///< `ValuesAllowed`, as AL wrote it.
+  bool closingDates = false;                ///< `ClosingDates`.
+  std::string_view extendedDataType{};      ///< `ExtendedDataType`, as AL wrote it.
+  std::string_view maskType{};              ///< `MaskType`, as AL wrote it.
+  PageId lookupPageId{};                    ///< `LookupPageId`.
+  PageId drillDownPageId{};                 ///< `DrillDownPageId`.
+  bool optimizeForTextSearch = false;       ///< `OptimizeForTextSearch`.
+  std::string_view captionClass{};          ///< `CaptionClass`.
+  std::uint16_t width = 0;                  ///< `Width`, 0 when none is declared.
+  std::string_view autoFormatType{};        ///< `AutoFormatType`.
+  std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
+  std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
+  std::string_view access{};                ///< `Access`, as AL wrote it.
+  std::string_view obsoleteState{};         ///< `ObsoleteState`.
+  std::string_view obsoleteReason{};        ///< `ObsoleteReason`.
+  std::string_view obsoleteTag{};           ///< `ObsoleteTag`.
 };
 
 template <auto Member>
@@ -305,6 +322,23 @@ constexpr FieldDef Declare(FieldNo no,
       .minValue = declared.minValue,
       .maxValue = declared.maxValue,
       .decimalPlaces = declared.decimalPlaces,
+      .blankNumbers = declared.blankNumbers,
+      .compressed = declared.compressed,
+      .numeric = declared.numeric,
+      .charAllowed = declared.charAllowed,
+      .valuesAllowed = declared.valuesAllowed,
+      .closingDates = declared.closingDates,
+      .extendedDataType = declared.extendedDataType,
+      .maskType = declared.maskType,
+      .lookupPageId = declared.lookupPageId,
+      .drillDownPageId = declared.drillDownPageId,
+      .optimizeForTextSearch = declared.optimizeForTextSearch,
+      .captionClass = declared.captionClass,
+      .width = declared.width,
+      .autoFormatType = declared.autoFormatType,
+      .autoFormatExpression = declared.autoFormatExpression,
+      .allowInCustomizations = declared.allowInCustomizations,
+      .access = declared.access,
       .obsoleteState = declared.obsoleteState,
       .obsoleteReason = declared.obsoleteReason,
       .obsoleteTag = declared.obsoleteTag,

@@ -5,6 +5,7 @@
 #include "type/Boolean.h"
 #include "type/Byte.h"
 #include "type/Char.h"
+#include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
@@ -122,7 +123,7 @@ public:
          ::agiru::Integer PageNo,
          std::string_view ControlName,
          const ::agiru::Verbosity &Verbosity,
-         const ::agiru::Variant &DataClassification,
+         ::agiru::DataClassification DataClassification,
          const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
 
   /// \brief AL `ErrorInfo.CustomDimensions(Dictionary of [Text, Text])`. Set of additional
@@ -148,9 +149,9 @@ public:
   /// syntax block brackets: `[X := ] ErrorInfo.DataClassification([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Variant DataClassification();
+  [[nodiscard]] ::agiru::DataClassification DataClassification();
 
-  ::agiru::Variant DataClassification(const ::agiru::Variant &DataClassification);
+  ::agiru::DataClassification DataClassification(::agiru::DataClassification NewDataClassification);
 
   /// \brief AL `ErrorInfo.DetailedMessage(Text)`. Specifies a detailed error message.
   /// \param DetailedMessage The AL `Text`.

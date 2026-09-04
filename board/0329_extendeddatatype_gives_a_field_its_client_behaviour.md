@@ -8,6 +8,9 @@ Class:    activation
 
 # `ExtendedDatatype` gives a field its client behaviour
 
+**The metadata half is done:** carried as `FieldDef::extendedDataType`, the text AL wrote; the control half remains.
+
+
 > Sets the extended data type of a control. By applying special meaning or semantics to a field, the
 > value of the table field is converted to a text field of the new data type that may apply special
 > validation, a different way of displaying the value or interacting with the field.

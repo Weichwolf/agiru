@@ -83,6 +83,17 @@ public:
     return *this;
   }
 
+  /// \brief Assigns a VALUE into the instance, which is what AL writes for a record variable.
+  /// \param value What to hold.
+  /// \return This handle.
+  /// \note AL SPELLS BOTH SIDES THE SAME. `CurrentAllProfile := AllProfile` is an assignment
+  ///       between two variables of one table, and only one of them is held through an `Instance`
+  ///       -- so the handle has to take the bare value or the generated line does not compile.
+  Instance &operator=(const T &value) {
+    *operator->() = value;
+    return *this;
+  }
+
   /// \brief Takes over another's instance.
   /// \param other The one to take from.
   Instance(Instance &&other) noexcept : held_(other.held_), free_(other.free_) {
