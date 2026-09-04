@@ -723,6 +723,12 @@ public:
            type == "RecordId" || type == "ModuleInfo" || type == "Version";
   }
 
+  [[nodiscard]] bool IsLabel(std::string_view name) const override {
+    const std::string key = LowerKey(std::string(name));
+    return std::ranges::any_of(
+        unit_.labels, [&key](const al::LabelDecl &label) { return LowerKey(label.name) == key; });
+  }
+
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"

@@ -38,6 +38,8 @@ constexpr int kConditionalPrecedence = 1;
 constexpr int kEqualityPrecedence = 3;
 constexpr int kComparisonPrecedence = 4;
 constexpr int kUnaryPrecedence = 8;
+
+constexpr int kAdditivePrecedence = 5;
 constexpr int kPrimaryPrecedence = 9;
 
 constexpr std::array kOperators{
@@ -337,13 +339,30 @@ private:
   static std::size_t FieldArguments(std::string_view method) {
     static constexpr auto kAll = static_cast<std::size_t>(-1);
     static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
-        {"SetRange", 1},         {"SetFilter", 1},        {"TestField", 1},
-        {"FieldError", 1},       {"FieldCaption", 1},     {"FieldName", 1},
-        {"FieldNo", 1},          {"Validate", 1},         {"SetAscending", 1},
-        {"CalcFields", kAll},    {"CalcSums", kAll},      {"SetCurrentKey", kAll},
-        {"SetLoadFields", kAll}, {"AddLoadFields", kAll}, {"GetRangeMin", 1},
-        {"GetRangeMax", 1},      {"GetFilter", 1},        {"GetAscending", 1},
-        {"CopyFilter", kAll},    {"FieldActive", 1},
+        {"SetRange", 1},
+        {"SetFilter", 1},
+        {"TestField", 1},
+        {"FieldError", 1},
+        {"FieldCaption", 1},
+        {"FieldName", 1},
+        {"FieldNo", 1},
+        {"Validate", 1},
+        {"SetAscending", 1},
+        {"CalcFields", kAll},
+        {"CalcSums", kAll},
+        {"SetCurrentKey", kAll},
+        {"SetLoadFields", kAll},
+        {"AddLoadFields", kAll},
+        {"GetRangeMin", 1},
+        {"GetRangeMax", 1},
+        {"GetFilter", 1},
+        {"GetAscending", 1},
+        {"CopyFilter", kAll},
+        {"FieldActive", 1},
+        {"ModifyAll", 1},
+        {"Relation", 1},
+        {"SetAutoCalcFields", kAll},
+        {"AreFieldsLoaded", kAll},
     };
     for (const auto &[name, count] : kTakers) {
       if (SameName(name, method)) { return count; }
@@ -606,6 +625,17 @@ private:
     return "::agiru::Decimal::FromInvariantString(\"" + std::string(text) + "\")";
   }
 
+  std::string Added(const al::Expr &expression, int precedence) {
+    const std::string rendered = Expression(expression, precedence);
+    return NamesALabel(expression) ? "std::string(" + rendered + ")" : rendered;
+  }
+
+  [[nodiscard]] bool NamesALabel(const al::Expr &expression) const {
+    if (expression.kind == al::ExprKind::Name) { return scope_.IsLabel(expression.text); }
+    return expression.kind == al::ExprKind::Binary && expression.text == "+" &&
+           NamesALabel(expression.children.front());
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -617,6 +647,12 @@ private:
 
     if (const std::string assigned = PropertyAssignment(expression); !assigned.empty()) {
       return assigned;
+    }
+
+    if (expression.text == "+" &&
+        (NamesALabel(expression.children.front()) || NamesALabel(expression.children.back()))) {
+      return Added(expression.children.front(), kAdditivePrecedence) + " + " +
+             Added(expression.children.back(), kAdditivePrecedence + 1);
     }
 
     const Operator *op = Find(expression.text);
@@ -804,6 +840,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] bool IsLabel(std::string_view name) const override {
+    return std::ranges::any_of(
+        table_.labels, [name](const al::LabelDecl &label) { return SameName(label.name, name); });
+  }
+
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::FieldDecl *field = FieldNamed(table_, name);
     if (field == nullptr) { return {}; }
@@ -871,6 +912,11 @@ public:
       }
     }
     return false;
+  }
+
+  [[nodiscard]] bool IsLabel(std::string_view name) const override {
+    return std::ranges::any_of(
+        page_.labels, [name](const al::LabelDecl &label) { return SameName(label.name, name); });
   }
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
