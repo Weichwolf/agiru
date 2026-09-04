@@ -293,17 +293,29 @@ void StampInserted(void *record, const TableDef &table) {
 
 }
 
-void RuntimeInit(void *record, const TableDef &table) {
+namespace {
+
+void Defaulted(void *record, const TableDef &table, bool sparePrimaryKey) {
   const std::span<const FieldNo> key =
       table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
   for (const FieldDef &def : table.fields) {
-    if (std::ranges::find(key, def.no) != key.end()) { continue; }
+    if (sparePrimaryKey && std::ranges::find(key, def.no) != key.end()) { continue; }
     if (def.initValue.has_value()) {
       SetFieldText(record, def, *def.initValue);
     } else {
       ClearField(record, def);
     }
   }
+}
+
+}
+
+void RuntimeInit(void *record, const TableDef &table) {
+  Defaulted(record, table, true);
+}
+
+void RuntimeClear(void *record, const TableDef &table) {
+  Defaulted(record, table, false);
 }
 
 void RuntimeInsert(void *record, const TableDef &table) {

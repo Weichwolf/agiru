@@ -262,9 +262,13 @@ private:
               ";\n";
         break;
       case al::StmtKind::Break: out = Pad(indent) + "break;\n"; break;
-      case al::StmtKind::Expression:
+      case al::StmtKind::Expression: {
+        const bool was = discarded_;
+        discarded_ = true;
         out = Pad(indent) + Expression(statement.expression, 0) + ";\n";
+        discarded_ = was;
         break;
+      }
     }
     return out;
   }
@@ -411,8 +415,21 @@ private:
     return builtin.empty() ? Identifier(callee.text) : std::string(builtin);
   }
 
+  std::string Tried(const al::Expr &expression) {
+    const al::Expr &callee = expression.children.front();
+    if (discarded_ || callee.kind != al::ExprKind::Name || !scope_.IsTryFunction(callee.text)) {
+      return {};
+    }
+    const bool was = discarded_;
+    discarded_ = true;
+    const std::string inner = Call(expression);
+    discarded_ = was;
+    return "::agiru::Tried([&] { return " + inner + "; })";
+  }
+
   std::string Call(const al::Expr &expression) {
     const al::Expr &callee = expression.children.front();
+    if (const std::string tried = Tried(expression); !tried.empty()) { return tried; }
     if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&
         scope_.Resolve(callee.text).empty()) {
       return Raise(expression);
@@ -654,6 +671,32 @@ private:
                                [name](std::string_view known) { return SameName(known, name); });
   }
 
+  std::string TypeStatic(const al::Expr &walk,
+                         const std::vector<const al::Expr *> &chain,
+                         std::string_view spelling,
+                         int precedence) {
+    if (spelling != "." || chain.empty() || chain.back()->kind != al::ExprKind::Name) { return {}; }
+    if (walk.kind == al::ExprKind::Scope && IsEnumStatic(chain.back()->text)) {
+      const std::string enumeration = Expression(walk, kPrimaryPrecedence);
+      return enumeration.starts_with("enums::")
+                 ? "Enum<" + enumeration + ">::" + Identifier(chain.back()->text)
+                 : std::string{};
+    }
+    if (walk.kind != al::ExprKind::Name || !scope_.Resolve(walk.text).empty() ||
+        !IsAlTypeName(walk.text) || !DoorCalls(chain.back()->text)) {
+      return {};
+    }
+    const std::string holder = KindNamespace(walk.text).empty() ? "" : "<>";
+    std::string out =
+        "::agiru::" + TypeName(walk.text) + holder + "::" + Identifier(chain.back()->text);
+    for (std::size_t i = chain.size() - 1; i > 0; --i) {
+      Link(out,
+           {.spelling = spelling, .base = walk, .link = *chain[i - 1]},
+           {.arrow = false, .parens = false, .precedence = precedence});
+    }
+    return out;
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -684,12 +727,9 @@ private:
       chain.push_back(&walk->children.back());
       walk = &walk->children.front();
     }
-    if (spelling == "." && !chain.empty() && chain.back()->kind == al::ExprKind::Name &&
-        walk->kind == al::ExprKind::Scope && IsEnumStatic(chain.back()->text)) {
-      const std::string enumeration = Expression(*walk, kPrimaryPrecedence);
-      if (enumeration.starts_with("enums::")) {
-        return "Enum<" + enumeration + ">::" + Identifier(chain.back()->text);
-      }
+    if (const std::string reached = TypeStatic(*walk, chain, spelling, precedence);
+        !reached.empty()) {
+      return reached;
     }
 
     const bool handle =
@@ -748,6 +788,7 @@ private:
 
   const Names &scope_;
   int depth_ = 0;
+  bool discarded_ = false;
 };
 
 }

@@ -1,8 +1,10 @@
 #pragma once
 
+#include "runtime/Table.h"
 #include "type/BigInteger.h"
 #include "type/Date.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include <optional>
@@ -218,6 +220,36 @@ std::string Format(const ::agiru::Variant &Value,
 ///       zeroes, and a left-to-right reading would have found the filler too late.
 std::string
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString);
+
+/// \brief AL `System.Clear(Any)` -- the value back to what it was before anything was assigned.
+///
+/// \tparam T The variable's type.
+/// \param Variable The variable.
+///
+/// `system-clear-joker-method.md`: "For a composite data type, such as a record or an array, all
+/// elements are cleared. Furthermore, all fields in a record will be initialized with the InitValue
+/// Property of the field." It also names the Guid case -- "converts the GUID to zeros" -- and the
+/// codeunit one, where "only the reference to the codeunit is deleted and not the codeunit itself".
+///
+/// \note THE COMPOSITE CASES ARE COMPILE-TIME BRANCHES AND NOT A RUNTIME TAG. A record is
+///       recognised by the `TableTraits` its generator specialises and an array by the length its
+///       declaration carries, so a `Clear` over a scalar compiles to one assignment and a `Clear`
+///       over a record to one walk of its field table.
+///
+/// \note IT IS NOT `Init`. That one spares the primary key, which the page for it says outright;
+///       this one clears everything, which the page for THIS one says just as plainly.
+template <typename T> void Clear(T &Variable) {
+  if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
+    ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);
+  } else if constexpr (requires {
+                         T::Length();
+                         Variable[::agiru::Integer{1}];
+                       }) {
+    for (::agiru::Integer at = 1; at <= T::Length(); ++at) { Clear(Variable[at]); }
+  } else {
+    Variable = T{};
+  }
+}
 
 /// \brief AL `Database.CompanyName()`. Gets the current company name.
 /// \return The AL `Text`.

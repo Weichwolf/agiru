@@ -1080,7 +1080,15 @@ public:
   /// the same table as a RecordRef variable.
   /// \param Rec The AL `Record`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetTable(const ::agiru::RecordRef &Rec) {
+  /// \note THE PARAMETER IS A TEMPLATE, BECAUSE AL'S IS A `Record` AND NOT A `RecordRef`. The
+  ///       generated tables are 1 609 unrelated classes with no common base a signature could name;
+  ///       what they share is the `kId` every one of them declares, which is what this asks for.
+  ///       A `RecordRef` parameter took none of them and made every call site a compile error.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  void SetTable(const R &Rec) {
     static_cast<void>(Rec);
     throw Error("RecordRef.SetTable(Record) is declared and not implemented yet (board:0035)");
   }

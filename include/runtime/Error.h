@@ -47,6 +47,42 @@ public:
 ///
 /// \note IT RAISES WHEN NOTHING RAISED. "The statement did not observe an error" is itself a test
 ///       failure, and a silent pass there would make an asserterror that stopped working invisible.
+/// \brief AL's `[TryFunction]` call where the return value IS used -- the error is caught.
+///
+/// \tparam Body The call, as a callable.
+/// \param  body The call.
+/// \return True when it completed, false when it raised.
+///
+/// `devenv-handling-errors-using-try-methods.md`: "A method that is designated as a try method has
+/// a Boolean return value" and "if a try method call uses the return value in an `OK:=` statement
+/// or a conditional statement such as `if-then`, errors are caught."
+///
+/// \note WHETHER THE VALUE IS USED IS A PROPERTY OF THE CALL AND NOT OF THE METHOD, and the same
+///       page is explicit about the other half: "if a try method call doesn't use the return value,
+///       the try method operates like an ordinary method, and errors are exposed as usual". So the
+///       generator wraps the CALL and the method itself always raises.
+///
+/// \note IT DOES NOT ROLL BACK, WHICH IS WHERE IT DIFFERS FROM `asserterror`. The page says
+///       "changes to the database that are made with a try method aren't rolled back" -- and that
+///       is why this is not the same function with a different name.
+namespace detail {
+
+/// \brief Keeps an error's text where `GetLastErrorText()` reads it.
+/// \param text The message.
+void RememberError(std::string_view text);
+
+}
+
+template <typename Body> [[nodiscard]] bool Tried(Body body) {
+  try {
+    body();
+  } catch (const Error &e) {
+    detail::RememberError(e.what());
+    return false;
+  }
+  return true;
+}
+
 template <typename Body> void AssertError(Body body) {
   detail::Scope scope;
   try {

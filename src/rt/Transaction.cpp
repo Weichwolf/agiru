@@ -77,6 +77,14 @@ void Scope::Discard(std::string_view why) {
 
 namespace agiru {
 
+namespace detail {
+
+void RememberError(std::string_view text) {
+  Session::Current().Transaction().SetLastError(std::string(text));
+}
+
+}
+
 std::string GetLastErrorText() {
   return std::string(Session::Current().Transaction().LastError());
 }

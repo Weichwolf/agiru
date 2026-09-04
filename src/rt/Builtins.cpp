@@ -71,11 +71,6 @@ std::string CaptionClassTranslate(std::string_view CaptionClassText) {
   RefuseDoor("System.CaptionClassTranslate(Text)");
 }
 
-void Clear(::agiru::SecretText &Variable) {
-  static_cast<void>(Variable);
-  RefuseDoor("System.Clear(SecretText)");
-}
-
 void ClearAll() {
   RefuseDoor("System.ClearAll()");
 }

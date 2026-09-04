@@ -93,22 +93,6 @@ std::string ApplicationPath();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string CaptionClassTranslate(std::string_view CaptionClassText);
 
-/// \brief AL `System.Clear(Array of [Any])`. Clears the value of a single variable. Also, it clears
-/// all the filters that were set if the variable is a record and resets the key to the primary key
-/// and the company on a record variable.
-/// \tparam Any1 What AL handed it.
-/// \param Variable The AL `Array of [Any]`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename Any1> void Clear(Any1 &Variable) {
-  static_cast<void>(Variable);
-  RefuseDoor("System.Clear(Array of [Any])");
-}
-
-/// \brief AL `System.Clear(SecretText)`. Clears the value of a single variable.
-/// \param Variable The AL `SecretText`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Clear(::agiru::SecretText &Variable);
-
 /// \brief AL `System.ClearAll()`. Clears all internal variables (except REC variables), keys, and
 /// filters in the object and in any associated objects, such as reports, pages, codeunits, and so
 /// on that contain AL code.

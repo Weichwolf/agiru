@@ -186,6 +186,18 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 ///       says of `SystemId`.
 void RuntimeInit(void *record, const TableDef &table);
 
+/// \brief AL `Clear(Record)` -- every field to its `InitValue` or its type's default, key and all.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+///
+/// \note IT DIFFERS FROM `Init` IN EXACTLY ONE THING: the primary key. `system-clear-joker-`
+///       `method.md` says "For a composite data type, such as a record or an array, ALL elements
+///       are cleared. Furthermore, all fields in a record will be initialized with the InitValue
+///       Property of the field" -- no exception for the key, where `record-init-method.md` names
+///       one.
+void RuntimeClear(void *record, const TableDef &table);
+
 /// \brief Holds the field number a `Validate` is running for, and restores it afterwards.
 ///
 /// `devenv-system-defined-variables.md` gives `CurrFieldNo` as "the field number of the current
@@ -1791,5 +1803,16 @@ private:
   TempStore<T> *store_;
   std::size_t position_{0};
 };
+
+/// \brief A temporary record's declaration is its table's declaration.
+///
+/// \tparam T The generated table class.
+///
+/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the table:
+/// the same table is read from the database through one variable and held in memory through
+/// another, and both have the same fields, keys and captions. So the traits forward rather than
+/// being specialised again -- and `RecordRef.GetTable(TempRec)` finds the same metadata it would
+/// find for the row on disk.
+template <typename T> struct TableTraits<Temporary<T>> : TableTraits<T> {};
 
 }

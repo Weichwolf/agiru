@@ -402,9 +402,16 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
   return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
 }
 
+bool IsTryFunction(const al::ProcedureDecl &procedure) {
+  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
+    return LowerKey(attribute) == "tryfunction";
+  });
+}
+
 std::string Returns(const al::ProcedureDecl &procedure,
                     const Objects &objects,
                     const std::set<std::string> &shadowed = {}) {
+  if (IsTryFunction(procedure)) { return "::agiru::Boolean"; }
   if (procedure.returnType.empty()) { return "void"; }
   const std::string type = TypeOf(procedure.returned, objects);
   return Hidden(type, shadowed) ? Qualified(type, shadowed) : type;
@@ -723,6 +730,13 @@ public:
            type == "RecordId" || type == "ModuleInfo" || type == "Version";
   }
 
+  [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
+    const std::string key = LowerKey(std::string(name));
+    return std::ranges::any_of(unit_.procedures, [&key](const al::ProcedureDecl &declared) {
+      return LowerKey(declared.name) == key && ::agiru::gen::IsTryFunction(declared);
+    });
+  }
+
   [[nodiscard]] bool IsLabel(std::string_view name) const override {
     const std::string key = LowerKey(std::string(name));
     return std::ranges::any_of(
@@ -918,6 +932,7 @@ private:
 };
 
 std::string FallsOff(const al::ProcedureDecl &procedure, const Names &names) {
+  if (IsTryFunction(procedure)) { return "  return true;\n"; }
   if (procedure.returnType.empty() && procedure.returned.type.empty()) { return {}; }
   if (!procedure.body.empty() && procedure.body.back().kind == al::StmtKind::Exit) { return {}; }
   return "  return" + names.ExitValue() + ";\n";

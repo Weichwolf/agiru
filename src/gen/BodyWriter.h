@@ -73,6 +73,11 @@ public:
     static_cast<void>(name);
     return false;
   }
+
+  [[nodiscard]] virtual bool IsTryFunction(std::string_view name) const {
+    static_cast<void>(name);
+    return false;
+  }
 };
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent);

@@ -70,6 +70,18 @@ public:
   ///       session and a hardcoded GUID inside a call could never become one.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
 
+  /// \brief AL `UserId()`.
+  ///
+  /// \return The name of the user this session runs as.
+  ///
+  /// \note IT IS `SYSTEM` UNTIL THERE IS AN AUTHENTICATION STORY, and that is measured rather than
+  ///       chosen: the predecessor returns exactly this constant unless a test overrides it, and
+  ///       reached 97.0 % of the UT subset over it (`~/Git/openerp`,
+  ///       `builtins/_system.py:_al_user_id`). It sits beside `UserSecurityId()` for the reason
+  ///       that one gives -- a user is a property of a SESSION, and a constant inside a function
+  ///       could never become one.
+  [[nodiscard]] std::string_view UserId() const { return userId_; }
+
   /// \brief AL `WorkDate()` -- the date a session posts under.
   ///
   /// \return The work date; today's date until one is set.
@@ -129,6 +141,7 @@ private:
   Boundaries boundaries_;
   Session *previous_;
   Guid userSecurityId_;
+  std::string userId_{"SYSTEM"};
   Date workDate_;
   std::string company_;
   TenantSettings tenant_;

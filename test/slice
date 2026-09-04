@@ -28,3 +28,5 @@ tests/core/codeunit/ERMDocumentTotalsUT.cpp
 tests/core/codeunit/LibraryApplicationArea.cpp
 base/system/environment/configuration/table/ApplicationAreaSetup.cpp
 base/system/environment/configuration/codeunit/ApplicationAreaCache.cpp
+base/system/environment/configuration/codeunit/ApplicationAreaMgmtFacade.cpp
+base/system/environment/configuration/codeunit/ApplicationAreaMgmt.cpp

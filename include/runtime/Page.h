@@ -54,7 +54,14 @@ public:
 
 /// \brief What every AL page can do, without the generated class saying any of it.
 /// \tparam Derived The generated page class.
-template <typename Derived> class Page {
+/// \note THE PARAMETER DEFAULTS TO `void`, WHICH IS WHAT LETS AL'S OWN SPELLING THROUGH. AL writes
+///       `Page.RunModal(Id, Rec)` -- a static on the TYPE -- and it writes `page 21 "Customer
+///       Card"` whose generated class derives from `Page<Customer_Card>`. A class template and a
+///       class of the same name cannot both exist in C++, so the statics live on the template and
+///       the generator spells the static form `Page<>::RunModal`. `Id()` and `Name()` are the two
+///       that need a Derived, and asking for them on `Page<>` is a compile error rather than a
+///       wrong number.
+template <typename Derived = void> class Page {
 public:
   /// \brief The page's AL number.
   /// \return The number AL declared.

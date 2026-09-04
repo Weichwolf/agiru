@@ -4,8 +4,10 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 
+#include <concepts>
 #include <cstddef>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 /// \file
@@ -26,6 +28,24 @@ template <typename T> class List {
 public:
   /// \brief An empty list.
   List() = default;
+
+  /// \brief A list of elements that convert to this one's.
+  ///
+  /// \tparam U The other element type.
+  /// \param other The other list.
+  ///
+  /// \note AL HAS ONE `List of [Text]` AND THIS TREE HAS TWO SPELLINGS OF ITS ELEMENT.
+  ///       `Text.Split` returns the runtime's own text -- `StringValue.h` cannot name `Text<0>`,
+  ///       which is declared in a header that includes IT -- and an AL variable is declared
+  ///       `List of [Text]`, which is `List<Text<0>>`. The two are the same list in AL, so the
+  ///       conversion is elementwise and implicit, not a cast the generator has to write.
+  template <typename U>
+    requires(!std::is_same_v<U, T>) && std::convertible_to<const U &, T>
+  List(const List<U> &other) {
+    for (::agiru::Integer at = 1; at <= other.Count(); ++at) {
+      values_.emplace_back(other.Get(at));
+    }
+  }
 
   /// \brief AL `List.Add(Value)`.
   /// \param value The element to append.
