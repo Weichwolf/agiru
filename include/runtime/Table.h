@@ -666,6 +666,17 @@ public:
     throw Error("Record.Consistent is declared and not implemented yet (board:0035)");
   }
 
+  /// \brief AL `Record.Copy(...)`. Makes this record refer to another's rows, or copies its
+  /// values.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Copy(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Copy is declared and not implemented yet (board:0035)");
+  }
+
   /// \brief AL `Record.CopyFilter(...)`. Copies the filter that has been set for one field and
   /// applies it to another field.
   /// \tparam Arguments Whatever AL's overload set takes.

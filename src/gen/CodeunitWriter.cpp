@@ -794,7 +794,8 @@ public:
     if (subtype.empty()) { return Identifier(member.field); }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return Identifier(member.field);
+      return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
+                                  : Identifier(member.field);
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "runtime/Codeunit.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
@@ -280,6 +281,38 @@ void LogMessage(std::string_view EventId,
                 std::string_view Value1,
                 std::string_view Dimension2 = {},
                 std::string_view Value2 = {});
+
+/// \brief AL `Session.BindSubscription(Codeunit)`. Binds a codeunit's `[EventSubscriber]`
+/// methods so the events they subscribe to reach them.
+///
+/// \tparam T The generated codeunit class.
+/// \param Codeunit The codeunit instance whose subscribers are bound.
+/// \return The AL `Boolean`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note THE PARAMETER IS A TEMPLATE, BECAUSE AL'S IS A `Codeunit` AND NOT A `Variant`. The
+///       generated codeunits are unrelated classes with no common base a signature could name, and
+///       a `Variant` takes none of them -- which made all 30 call sites over the 78 UT codeunits a
+///       compile error. What they share is the `CodeunitTraits` their generator specialises.
+template <typename T>
+  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+BindSubscription(T &Codeunit) {
+  static_cast<void>(Codeunit);
+  throw ::agiru::Error("Session.BindSubscription is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `Session.UnbindSubscription(Codeunit)`. Unbinds what `BindSubscription` bound.
+/// \tparam T The generated codeunit class.
+/// \param Codeunit The codeunit instance.
+/// \return The AL `Boolean`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+template <typename T>
+  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+UnbindSubscription(T &Codeunit) {
+  static_cast<void>(Codeunit);
+  throw ::agiru::Error(
+      "Session.UnbindSubscription is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `System.Clear(Any)` -- the value back to what it was before anything was assigned.
 ///

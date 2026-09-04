@@ -957,10 +957,11 @@ public:
       const auto field = fields->find(LowerKey(std::string(member.field)));
       return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
     }
-    if (!IsRecord(member.variable) || FieldNamed(table_, member.field) != nullptr) {
+    if (IsRecord(member.variable) && FieldNamed(table_, member.field) != nullptr) {
       return Identifier(member.field);
     }
-    return AsTheDoorSpellsIt(member.field);
+    return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
+                                : Identifier(member.field);
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
