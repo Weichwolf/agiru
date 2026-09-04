@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `MaintainSiftIndex` says whether the aggregate is stored or computed
 
+**The metadata half is done.** `MaintainSiftIndex` reaches `KeyDef::maintainSiftIndex`; what is missing is the aggregate.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Sets the value to determine whether SIFT structures (indexed views) should be created in SQL Server
 > to support the corresponding `SumIndexFields` part of the key. **The default is true.**
 >

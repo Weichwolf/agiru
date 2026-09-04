@@ -70,7 +70,7 @@ std::set<std::string> TestPageSurface() {
                                              "Last",
                                              "Previous",
                                              "Prev",
-                                             "GotoRecord",
+                                             "GoToRecord",
                                              "GoToKey",
                                              "Trap",
                                              "OK",
@@ -87,7 +87,9 @@ std::set<std::string> TestPageSurface() {
                                              "ValidationErrorCount",
                                              "FindFirstField",
                                              "FindNextField",
-                                             "FindPreviousField"};
+                                             "FindPreviousField",
+                                             "Edit",
+                                             "RunPageBackgroundTask"};
   return surface;
 }
 

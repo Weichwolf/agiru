@@ -72,6 +72,12 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.CreateTempFile()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.CreateTempFile([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean CreateTempFile();
+
   ::agiru::Boolean CreateTempFile(const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.Download(Text, Text, Text, Text, Text)`. Sends a file from a server computer
@@ -190,6 +196,12 @@ public:
   /// \param Mode The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.TextMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.TextMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean TextMode();
+
   ::agiru::Boolean TextMode(::agiru::Boolean Mode);
 
   /// \brief AL `File.Trunc()`. Truncate an ASCII or binary file to the current position of the file
@@ -351,6 +363,12 @@ public:
   /// \param Mode The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.WriteMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.WriteMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean WriteMode();
+
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 };
 

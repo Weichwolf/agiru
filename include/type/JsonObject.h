@@ -283,7 +283,7 @@ public:
 
   /// \brief AL `JsonObject.Keys()`. Gets a set of keys of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Keys();
+  [[nodiscard]] ::agiru::List<std::string> Keys();
 
   /// \brief AL `JsonObject.Path()`. Retrieves the JSON path of the object relative to the root of
   /// its containing tree.
@@ -463,7 +463,7 @@ public:
 
   /// \brief AL `JsonObject.Values()`. Gets a set of values of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Values();
+  [[nodiscard]] ::agiru::List<::agiru::JsonToken> Values();
 
   /// \brief AL `JsonObject.WriteTo(OutStream)`. Serializes and writes the JSON data of the
   /// JsonObject to a given OutStream object.

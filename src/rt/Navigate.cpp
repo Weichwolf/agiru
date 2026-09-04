@@ -44,14 +44,16 @@ std::string SelectFrom(const Selection &made, const TableDef &table) {
 }
 
 bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    const std::optional<std::string_view> value = cursor.Value(i);
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    const std::optional<std::string_view> value = cursor.Value(column);
+    ++column;
     if (!value.has_value()) {
-      throw Error("the column " + std::string(table.fields[i].name) +
-                  " came back null, and an AL "
-                  "field has no null");
+      throw Error("the column " + std::string(def.name) +
+                  " came back null, and an AL field has no null");
     }
-    SetFieldText(record, table.fields[i], *value);
+    SetFieldText(record, def, *value);
   }
   return true;
 }
@@ -102,13 +104,16 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
   sql += " LIMIT 1";
   const Result result = Session::Current().Database().Execute(sql, made.binds);
   if (result.Rows() == 0) { return false; }
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    const std::optional<std::string_view> value = result.Value(0, i);
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    const std::optional<std::string_view> value = result.Value(0, column);
+    ++column;
     if (!value.has_value()) {
-      throw Error("the column " + std::string(table.fields[i].name) +
+      throw Error("the column " + std::string(def.name) +
                   " came back null, and an AL field has no null");
     }
-    SetFieldText(record, table.fields[i], *value);
+    SetFieldText(record, def, *value);
   }
   return true;
 }

@@ -220,6 +220,57 @@ InitValue(const al::FieldDecl &field, const OptionField *option, const EnumIndex
              : std::optional<std::string>(std::to_string(value->second));
 }
 
+std::string PropertyText(const al::FieldDecl &field, std::string_view name) {
+  const al::Property *found = Find(field.properties, name);
+  if (found == nullptr) { return {}; }
+  for (const al::Token &token : found->value) {
+    if (token.kind == al::TokenKind::String) { return token.text; }
+  }
+  return found->text;
+}
+
+bool PropertyIs(const al::FieldDecl &field, std::string_view name, bool absent) {
+  const std::string text = PropertyText(field, name);
+  if (text.empty()) { return absent; }
+  return LowerKey(text) == "true";
+}
+
+std::string
+DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumIndex &enums) {
+  std::string out;
+  const auto text = [&out](std::string_view member, const std::string &value) {
+    if (value.empty()) { return; }
+    if (!out.empty()) { out += ", "; }
+    out += "." + std::string(member) + " = " + Literal(value);
+  };
+  const auto flag = [&out](std::string_view member, bool value, bool absent) {
+    if (value == absent) { return; }
+    if (!out.empty()) { out += ", "; }
+    out += "." + std::string(member) + " = " + (value ? "true" : "false");
+  };
+  const std::optional<std::string> initial = InitValue(field, option, enums);
+  if (initial.has_value()) { out += ".initValue = " + Literal(*initial); }
+  const std::string kind = LowerKey(PropertyText(field, "FieldClass"));
+  if (kind == "flowfield" || kind == "flowfilter") {
+    if (!out.empty()) { out += ", "; }
+    out += ".fieldClass = ::agiru::FieldClass::";
+    out += kind == "flowfield" ? "FlowField" : "FlowFilter";
+  }
+  text("calcFormula", PropertyText(field, "CalcFormula"));
+  flag("notBlank", PropertyIs(field, "NotBlank", false), false);
+  flag("autoIncrement", PropertyIs(field, "AutoIncrement", false), false);
+  flag("editable", PropertyIs(field, "Editable", true), true);
+  flag("validateTableRelation", PropertyIs(field, "ValidateTableRelation", true), true);
+  flag("blankZero", PropertyIs(field, "BlankZero", false), false);
+  text("minValue", PropertyText(field, "MinValue"));
+  text("maxValue", PropertyText(field, "MaxValue"));
+  text("decimalPlaces", PropertyText(field, "DecimalPlaces"));
+  text("obsoleteState", PropertyText(field, "ObsoleteState"));
+  text("obsoleteReason", PropertyText(field, "ObsoleteReason"));
+  text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
+  return out;
+}
+
 std::string FieldTable(const al::TableObject &table,
                        const std::vector<const al::FieldDecl *> &sorted,
                        const std::string &tableIdentifier,
@@ -249,8 +300,8 @@ std::string FieldTable(const al::TableObject &table,
     out += ", ";
     out += identifier;
     out += ")";
-    const std::optional<std::string> initial = InitValue(*field, OptionOf(options, *field), enums);
-    if (initial.has_value()) { out += ", " + Literal(*initial); }
+    const std::string declared = DeclaredBlock(*field, OptionOf(options, *field), enums);
+    if (!declared.empty()) { out += ", Declared{" + declared + "}"; }
     out += "),\n";
   }
   return out + "}});\n\n";
@@ -544,10 +595,19 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
-    const al::Property *clustered = Find(table.keys[i].properties, "Clustered");
+    const auto said = [&](std::string_view name, bool absent) {
+      const al::Property *found = Find(table.keys[i].properties, name);
+      return found == nullptr ? absent : LowerKey(found->text) == "true";
+    };
+    const al::Property *sums = Find(table.keys[i].properties, "SumIndexFields");
     out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableIdentifier +
-           "::" + KeyArrayName(i) + ", .clustered = " +
-           (clustered != nullptr && clustered->text == "true" ? "true" : "false") + "},\n";
+           "::" + KeyArrayName(i) +
+           ", .clustered = " + (said("Clustered", false) ? "true" : "false");
+    if (!said("Enabled", true)) { out += ", .enabled = false"; }
+    if (sums != nullptr) { out += ", .sumIndexFields = " + Literal(sums->text); }
+    if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
+    if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
+    out += "},\n";
   }
   out += "}};\n\n";
 
@@ -556,7 +616,18 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "    .name = " + tableIdentifier + "::kName,\n";
   out += "    .caption = " + tableIdentifier + "::kName,\n";
   out += "    .fields = k" + tableIdentifier + "Fields,\n";
-  out += "    .keys = k" + tableIdentifier + "Keys,\n};\n\n";
+  out += "    .keys = k" + tableIdentifier + "Keys,\n";
+  const auto property = [&table](std::string_view name) {
+    const al::Property *found = Find(table.properties, name);
+    return found == nullptr ? std::string{} : found->text;
+  };
+  const std::string kind = property("TableType");
+  if (!kind.empty()) { out += "    .tableType = " + Literal(kind) + ",\n"; }
+  const std::string perCompany = property("DataPerCompany");
+  if (LowerKey(perCompany) == "false") { out += "    .dataPerCompany = false,\n"; }
+  const std::string obsolete = property("ObsoleteState");
+  if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
+  out += "};\n\n";
 
   out += "static_assert(FieldsAreSorted(k";
   out += tableIdentifier;

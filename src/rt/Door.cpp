@@ -1095,7 +1095,7 @@ void HttpHeaders::Clear() {
   RefuseDoor("HttpHeaders.GetValues(Text, List of [Text])");
 }
 
-void HttpHeaders::Keys() {
+::agiru::List<std::string> HttpHeaders::Keys() {
   RefuseDoor("HttpHeaders.Keys()");
 }
 
@@ -1129,7 +1129,7 @@ void HttpHeaders::Keys() {
   RefuseDoor("HttpRequestMessage.GetCookie(Text, Cookie)");
 }
 
-void HttpRequestMessage::GetCookieNames() {
+::agiru::List<std::string> HttpRequestMessage::GetCookieNames() {
   RefuseDoor("HttpRequestMessage.GetCookieNames()");
 }
 
@@ -1187,7 +1187,7 @@ std::string HttpRequestMessage::Method(std::string_view NewMethod) {
   RefuseDoor("HttpResponseMessage.GetCookie(Text, Cookie)");
 }
 
-void HttpResponseMessage::GetCookieNames() {
+::agiru::List<std::string> HttpResponseMessage::GetCookieNames() {
   RefuseDoor("HttpResponseMessage.GetCookieNames()");
 }
 
@@ -1965,7 +1965,7 @@ std::string JsonObject::GetText(std::string_view Key, ::agiru::Boolean DefaultIf
   RefuseDoor("JsonObject.GetTime(Text, Boolean)");
 }
 
-void JsonObject::Keys() {
+::agiru::List<std::string> JsonObject::Keys() {
   RefuseDoor("JsonObject.Keys()");
 }
 
@@ -2101,7 +2101,7 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.SelectTokens(Text, List of [JsonToken])");
 }
 
-void JsonObject::Values() {
+::agiru::List<::agiru::JsonToken> JsonObject::Values() {
   RefuseDoor("JsonObject.Values()");
 }
 
@@ -2491,7 +2491,7 @@ std::string NavApp::GetArchiveVersion() {
   RefuseDoor("NavApp.GetArchiveVersion()");
 }
 
-void NavApp::GetCallerCallstackModuleInfos() {
+::agiru::List<::agiru::ModuleInfo> NavApp::GetCallerCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallerCallstackModuleInfos()");
 }
 
@@ -2500,7 +2500,7 @@ void NavApp::GetCallerCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallerModuleInfo(ModuleInfo)");
 }
 
-void NavApp::GetCallstackModuleInfos() {
+::agiru::List<::agiru::ModuleInfo> NavApp::GetCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallstackModuleInfos()");
 }
 
@@ -2553,7 +2553,7 @@ std::string NavApp::GetResourceAsText(std::string_view ResourceName,
   RefuseDoor("NavApp.IsUnlicensed(Guid)");
 }
 
-void NavApp::ListResources(std::string_view Filter) {
+::agiru::List<std::string> NavApp::ListResources(std::string_view Filter) {
   static_cast<void>(Filter);
   RefuseDoor("NavApp.ListResources(Text)");
 }
@@ -2767,7 +2767,7 @@ std::string TestHttpRequestMessage::Path() {
   RefuseDoor("TestHttpRequestMessage.Path()");
 }
 
-void TestHttpRequestMessage::QueryParameters() {
+::agiru::Dictionary<std::string, std::string> TestHttpRequestMessage::QueryParameters() {
   RefuseDoor("TestHttpRequestMessage.QueryParameters()");
 }
 
@@ -4603,6 +4603,170 @@ std::string XmlText::Value(std::string_view NewValue) {
 
 ::agiru::RecordRef KeyRef::Record() {
   RefuseDoor("KeyRef.Record()");
+}
+
+::agiru::Boolean ErrorInfo::Collectible() {
+  RefuseDoor("ErrorInfo.Collectible()");
+}
+
+std::string ErrorInfo::ControlName() {
+  RefuseDoor("ErrorInfo.ControlName()");
+}
+
+::agiru::Dictionary<std::string, std::string> ErrorInfo::CustomDimensions() {
+  RefuseDoor("ErrorInfo.CustomDimensions()");
+}
+
+::agiru::Variant ErrorInfo::DataClassification() {
+  RefuseDoor("ErrorInfo.DataClassification()");
+}
+
+std::string ErrorInfo::DetailedMessage() {
+  RefuseDoor("ErrorInfo.DetailedMessage()");
+}
+
+::agiru::ErrorType ErrorInfo::ErrorType() {
+  RefuseDoor("ErrorInfo.ErrorType()");
+}
+
+::agiru::Integer ErrorInfo::FieldNo() {
+  RefuseDoor("ErrorInfo.FieldNo()");
+}
+
+::agiru::Integer ErrorInfo::PageNo() {
+  RefuseDoor("ErrorInfo.PageNo()");
+}
+
+::agiru::Guid ErrorInfo::SystemId() {
+  RefuseDoor("ErrorInfo.SystemId()");
+}
+
+::agiru::Integer ErrorInfo::TableId() {
+  RefuseDoor("ErrorInfo.TableId()");
+}
+
+std::string ErrorInfo::Title() {
+  RefuseDoor("ErrorInfo.Title()");
+}
+
+::agiru::Verbosity ErrorInfo::Verbosity() {
+  RefuseDoor("ErrorInfo.Verbosity()");
+}
+
+std::string SessionSettings::Company() {
+  RefuseDoor("SessionSettings.Company()");
+}
+
+::agiru::Integer SessionSettings::LanguageId() {
+  RefuseDoor("SessionSettings.LanguageId()");
+}
+
+::agiru::Integer SessionSettings::LocaleId() {
+  RefuseDoor("SessionSettings.LocaleId()");
+}
+
+::agiru::Guid SessionSettings::ProfileAppId() {
+  RefuseDoor("SessionSettings.ProfileAppId()");
+}
+
+std::string SessionSettings::ProfileId() {
+  RefuseDoor("SessionSettings.ProfileId()");
+}
+
+::agiru::Boolean SessionSettings::ProfileSystemScope() {
+  RefuseDoor("SessionSettings.ProfileSystemScope()");
+}
+
+std::string SessionSettings::TimeZone() {
+  RefuseDoor("SessionSettings.TimeZone()");
+}
+
+::agiru::Boolean File::CreateTempFile() {
+  RefuseDoor("File.CreateTempFile()");
+}
+
+::agiru::Boolean File::TextMode() {
+  RefuseDoor("File.TextMode()");
+}
+
+::agiru::Boolean File::WriteMode() {
+  RefuseDoor("File.WriteMode()");
+}
+
+std::string XmlDeclaration::Encoding() {
+  RefuseDoor("XmlDeclaration.Encoding()");
+}
+
+std::string XmlDeclaration::Standalone() {
+  RefuseDoor("XmlDeclaration.Standalone()");
+}
+
+std::string XmlDeclaration::Version() {
+  RefuseDoor("XmlDeclaration.Version()");
+}
+
+::agiru::Boolean NavApp::IsUnlicensed() {
+  RefuseDoor("NavApp.IsUnlicensed()");
+}
+
+::agiru::Boolean TextBuilder::AppendLine() {
+  RefuseDoor("TextBuilder.AppendLine()");
+}
+
+::agiru::Integer TextBuilder::Capacity() {
+  RefuseDoor("TextBuilder.Capacity()");
+}
+
+::agiru::Boolean DataTransfer::UpdateAuditFields() {
+  RefuseDoor("DataTransfer.UpdateAuditFields()");
+}
+
+::agiru::Boolean Dialog::HideSubsequentDialogs() {
+  RefuseDoor("Dialog.HideSubsequentDialogs()");
+}
+
+std::string FilterPageBuilder::PageCaption() {
+  RefuseDoor("FilterPageBuilder.PageCaption()");
+}
+
+::agiru::Duration HttpClient::Timeout() {
+  RefuseDoor("HttpClient.Timeout()");
+}
+
+std::string HttpRequestMessage::Method() {
+  RefuseDoor("HttpRequestMessage.Method()");
+}
+
+::agiru::XmlNameTable XmlNamespaceManager::NameTable() {
+  RefuseDoor("XmlNamespaceManager.NameTable()");
+}
+
+::agiru::Boolean XmlReadOptions::PreserveWhitespace() {
+  RefuseDoor("XmlReadOptions.PreserveWhitespace()");
+}
+
+::agiru::Boolean XmlWriteOptions::PreserveWhitespace() {
+  RefuseDoor("XmlWriteOptions.PreserveWhitespace()");
+}
+
+std::string XmlAttribute::Value() {
+  RefuseDoor("XmlAttribute.Value()");
+}
+
+std::string XmlCData::Value() {
+  RefuseDoor("XmlCData.Value()");
+}
+
+std::string XmlComment::Value() {
+  RefuseDoor("XmlComment.Value()");
+}
+
+std::string XmlText::Value() {
+  RefuseDoor("XmlText.Value()");
+}
+
+::agiru::Boolean TestHttpResponseMessage::IsSuccessfulRequest() {
+  RefuseDoor("TestHttpResponseMessage.IsSuccessfulRequest()");
 }
 
 }

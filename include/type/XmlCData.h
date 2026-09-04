@@ -129,6 +129,12 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlCData.Value()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlCData.Value([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Value();
+
   std::string Value(std::string_view NewValue);
 
   /// \brief AL `XmlCData.WriteTo(OutStream)`. Serializes and saves the current node to the given

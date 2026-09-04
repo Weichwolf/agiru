@@ -59,6 +59,13 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean IsBlockedByEnvironment(::agiru::Boolean SetIsBlockedByEnvironment);
 
+  /// \brief AL `TestHttpResponseMessage.IsSuccessfulRequest()` -- the READING form, which the
+  /// documentation's syntax block brackets: `[X := ]
+  /// TestHttpResponseMessage.IsSuccessfulRequest([NewX])`.
+  /// \return Whether the request the mock answers is a successful one.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean IsSuccessfulRequest();
+
   /// \brief AL `TestHttpResponseMessage.IsSuccessfulRequest(Boolean)`. Gets or sets a value that
   /// indicates if the HTTP request was successful or not. By setting this value it is possible to
   /// mock the return value of the HttpClient call.

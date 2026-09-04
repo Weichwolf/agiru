@@ -50,6 +50,16 @@ public:
   /// \return Whether it closed.
   /// \throws Error until a report can be run (board:0034).
   Boolean Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+
+  /// \brief AL `TestRequestPage.GoToRecord(Record)` -- positions the request page on a record.
+  /// \tparam Source The record's type.
+  /// \param Record The record to stand on.
+  /// \return Whether the request page could.
+  /// \throws Error until a report runs (board:0034).
+  template <typename Source> Boolean GoToRecord(const Source &Record) {
+    static_cast<void>(Record);
+    throw Error("a TestRequestPage needs a report (board:0034)");
+  }
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.
@@ -169,7 +179,7 @@ public:
 
   /// \brief AL `Page.GetBackgroundParameters()`. Gets the page background task input parameters.
   /// \throws Error until the UI runs (board:0030).
-  void GetBackgroundParameters() {
+  ::agiru::Dictionary<std::string, std::string> GetBackgroundParameters() {
     throw Error("Page.GetBackgroundParameters() needs a running UI (board:0030)");
   }
 
@@ -185,6 +195,14 @@ public:
     throw Error("Page.GetRecord(Record) needs a running UI (board:0030)");
   }
 
+  /// \brief AL `Page.LookupMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.LookupMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] ::agiru::Boolean LookupMode() const {
+    throw Error("Page.LookupMode() needs a running UI (board:0030)");
+  }
+
   /// \brief AL `Page.LookupMode(Boolean)`. Gets or sets the default lookup mode for the page.
   /// \param NewLookupMode The AL `Boolean`.
   /// \return The AL `Boolean`.
@@ -192,6 +210,14 @@ public:
   ::agiru::Boolean LookupMode(::agiru::Boolean NewLookupMode) {
     static_cast<void>(NewLookupMode);
     throw Error("Page.LookupMode(Boolean) needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `Page.ObjectId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.ObjectId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] std::string ObjectId() const {
+    throw Error("Page.ObjectId() needs a running UI (board:0030)");
   }
 
   /// \brief AL `Page.ObjectId(Boolean)`. Returns a string in the "Page xxx" format, where xxx is
@@ -202,6 +228,14 @@ public:
   std::string ObjectId(::agiru::Boolean UseNames) {
     static_cast<void>(UseNames);
     throw Error("Page.ObjectId(Boolean) needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `Page.PromptMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.PromptMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] ::agiru::PromptMode PromptMode() const {
+    throw Error("Page.PromptMode() needs a running UI (board:0030)");
   }
 
   /// \brief AL `Page.PromptMode(PromptMode)`. The mode of a PromptDialog page that prompts the user
@@ -266,6 +300,14 @@ public:
   template <typename Record> void SetTableView(Record &record) {
     static_cast<void>(record);
     throw Error("Page.SetTableView(Record) needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `Page.Update()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.Update([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] ::agiru::Boolean Update() const {
+    throw Error("Page.Update() needs a running UI (board:0030)");
   }
 
   /// \brief AL `Page.Update(Boolean)`. Saves the current record and then updates the controls on

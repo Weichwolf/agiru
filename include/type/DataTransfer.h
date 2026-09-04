@@ -97,6 +97,12 @@ public:
   /// \param UpdateAuditFields The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `DataTransfer.UpdateAuditFields()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] DataTransfer.UpdateAuditFields([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean UpdateAuditFields();
+
   ::agiru::Boolean UpdateAuditFields(::agiru::Boolean UpdateAuditFields);
 };
 

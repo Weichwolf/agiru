@@ -66,6 +66,12 @@ public:
   /// \param HideSubsequentDialogs The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `Dialog.HideSubsequentDialogs()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] Dialog.HideSubsequentDialogs([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean HideSubsequentDialogs();
+
   ::agiru::Boolean HideSubsequentDialogs(::agiru::Boolean HideSubsequentDialogs);
 
   /// \brief AL `Dialog.LogInternalError(Text, DataClassification, Verbosity)`. Log internal errors

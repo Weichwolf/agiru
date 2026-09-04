@@ -68,6 +68,12 @@ public:
   /// \param NewValue The AL `XmlNameTable`.
   /// \return The AL `XmlNameTable`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlNamespaceManager.NameTable()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] XmlNamespaceManager.NameTable([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::XmlNameTable NameTable();
+
   ::agiru::XmlNameTable NameTable(const ::agiru::XmlNameTable &NewValue);
 
   /// \brief AL `XmlNamespaceManager.PopScope()`. Pops a namespace scope off the stack.

@@ -64,7 +64,7 @@ public:
   /// which calls GetCallerModuleInfo, then GetCallerModuleInfo will return information about
   /// extension A and B.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static void GetCallerCallstackModuleInfos();
+  static ::agiru::List<::agiru::ModuleInfo> GetCallerCallstackModuleInfos();
 
   /// \brief AL `NavApp.GetCallerModuleInfo(ModuleInfo)`. Gets information about the extension that
   /// contains the method that called the currently running method. For example, if method 1 (in
@@ -78,7 +78,7 @@ public:
   /// \brief AL `NavApp.GetCallstackModuleInfos()`. Gets application information about each method
   /// in the current callstack.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static void GetCallstackModuleInfos();
+  static ::agiru::List<::agiru::ModuleInfo> GetCallstackModuleInfos();
 
   /// \brief AL `NavApp.GetCurrentModuleInfo(ModuleInfo)`. Gets information about the application
   /// that contains the AL object that is currently running.
@@ -142,13 +142,23 @@ public:
   /// \param AppId The AL `Guid`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `NavApp.IsUnlicensed()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] NavApp.IsUnlicensed([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] static ::agiru::Boolean IsUnlicensed();
+
   static ::agiru::Boolean IsUnlicensed(::agiru::Guid AppId);
 
   /// \brief AL `NavApp.ListResources(Text)`. Gets an optionally filtered list of resources packaged
   /// with this app.
   /// \param Filter The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static void ListResources(std::string_view Filter);
+  /// \brief AL `NavApp.ListResources()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] NavApp.ListResources([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  static ::agiru::List<std::string> ListResources(std::string_view Filter = {});
 
   /// \brief AL `NavApp.LoadPackageData(Integer)`. Loads default, or starting, table data into the
   /// specified table of an extension during installation.

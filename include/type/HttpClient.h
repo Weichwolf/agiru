@@ -136,6 +136,12 @@ public:
   /// \param SetTimeout The AL `Duration`.
   /// \return The AL `Duration`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `HttpClient.Timeout()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] HttpClient.Timeout([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Duration Timeout();
+
   ::agiru::Duration Timeout(::agiru::Duration SetTimeout);
 
   /// \brief AL `HttpClient.UseDefaultNetworkWindowsAuthentication()`. Sets the HttpClient

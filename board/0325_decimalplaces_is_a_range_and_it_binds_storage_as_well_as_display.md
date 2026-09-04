@@ -8,6 +8,10 @@ Class:    silent-wrong-data
 
 # `DecimalPlaces` is a range, and it binds storage as well as display
 
+**The metadata half is done.** `DecimalPlaces` reaches `FieldDef::decimalPlaces` as AL wrote it; what is missing is
+parsing the range and binding storage to it.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Sets **display and storage** requirements for the Decimal Data Type.
 
 The value is a MINIMUM and a MAXIMUM, and the syntax carries four shapes:

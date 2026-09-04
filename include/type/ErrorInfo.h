@@ -76,12 +76,24 @@ public:
   /// \param Collectible The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.Collectible()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.Collectible([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean Collectible();
+
   ::agiru::Boolean Collectible(::agiru::Boolean Collectible);
 
   /// \brief AL `ErrorInfo.ControlName(Text)`. Specifies the control name that the error relates to.
   /// \param ControlName The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.ControlName()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.ControlName([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string ControlName();
+
   std::string ControlName(std::string_view ControlName);
 
   /// \brief AL `ErrorInfo.Create()`. Creates a new ErrorInfo object with Collectible set to true.
@@ -117,6 +129,12 @@ public:
   /// dimensions, specified as a dictionary that relates to the error.
   /// \param CustomDimensions The AL `Dictionary of [Text, Text]`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.CustomDimensions()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.CustomDimensions([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Dictionary<std::string, std::string> CustomDimensions();
+
   void CustomDimensions(const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
 
   /// \brief AL `ErrorInfo.DataClassification(DataClassification)`. Specifies the classification of
@@ -126,12 +144,24 @@ public:
   /// \param DataClassification The AL `DataClassification`.
   /// \return The AL `DataClassification`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.DataClassification()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] ErrorInfo.DataClassification([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Variant DataClassification();
+
   ::agiru::Variant DataClassification(const ::agiru::Variant &DataClassification);
 
   /// \brief AL `ErrorInfo.DetailedMessage(Text)`. Specifies a detailed error message.
   /// \param DetailedMessage The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.DetailedMessage()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.DetailedMessage([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string DetailedMessage();
+
   std::string DetailedMessage(std::string_view DetailedMessage);
 
   /// \brief AL `ErrorInfo.ErrorType(ErrorType)`. Specifies type of the error. 'Client' shows the
@@ -140,12 +170,24 @@ public:
   /// \param ErrorType The AL `ErrorType`.
   /// \return The AL `ErrorType`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.ErrorType()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.ErrorType([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::ErrorType ErrorType();
+
   ::agiru::ErrorType ErrorType(const ::agiru::ErrorType &ErrorType);
 
   /// \brief AL `ErrorInfo.FieldNo(Integer)`. Specifies the field ID that the error relates to.
   /// \param FieldNo The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.FieldNo()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.FieldNo([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer FieldNo();
+
   ::agiru::Integer FieldNo(::agiru::Integer FieldNo);
 
   /// \brief AL `ErrorInfo.Message(Text)`. Specifies the message that will be sent to telemetry. For
@@ -159,6 +201,12 @@ public:
   /// \param PageNo The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.PageNo()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.PageNo([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer PageNo();
+
   ::agiru::Integer PageNo(::agiru::Integer PageNo);
 
   /// \brief AL `ErrorInfo.RecordId(RecordId)`. Specifies the record ID of the record that the error
@@ -173,18 +221,36 @@ public:
   /// \param SystemId The AL `Guid`.
   /// \return The AL `Guid`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.SystemId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.SystemId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Guid SystemId();
+
   ::agiru::Guid SystemId(::agiru::Guid SystemId);
 
   /// \brief AL `ErrorInfo.TableId(Integer)`. Specifies the table ID that the error relates to.
   /// \param TableId The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.TableId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.TableId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer TableId();
+
   ::agiru::Integer TableId(::agiru::Integer TableId);
 
   /// \brief AL `ErrorInfo.Title(Text)`. Specifies the title of the error.
   /// \param Title The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.Title()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.Title([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Title();
+
   std::string Title(std::string_view Title);
 
   /// \brief AL `ErrorInfo.Verbosity(Verbosity)`. Specifies the severity level of the error. This
@@ -193,6 +259,12 @@ public:
   /// \param Verbosity The AL `Verbosity`.
   /// \return The AL `Verbosity`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.Verbosity()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.Verbosity([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Verbosity Verbosity();
+
   ::agiru::Verbosity Verbosity(const ::agiru::Verbosity &Verbosity);
 };
 

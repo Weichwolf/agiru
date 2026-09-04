@@ -8,6 +8,7 @@
 
 #include "Rows.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <print>
@@ -93,9 +94,12 @@ std::string ColumnType(const FieldDef &def) {
 
 void CreateTable(const Connection &connection, const TableDef &table) {
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    if (i != 0) { sql += ", "; }
-    sql += Quoted(table.fields[i].name) + " " + ColumnType(table.fields[i]) + " NOT NULL";
+  bool written = false;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (written) { sql += ", "; }
+    written = true;
+    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL";
   }
   if (!table.keys.empty()) {
     sql += ", PRIMARY KEY (";
@@ -112,6 +116,7 @@ void CreateTable(const Connection &connection, const TableDef &table) {
 
   for (std::size_t k = 1; k < table.keys.size(); ++k) {
     if (table.keys[k].fields.empty()) { continue; }
+    if (!table.keys[k].enabled || !table.keys[k].maintainSqlIndex) { continue; }
     std::string index = "CREATE INDEX " +
                         Quoted(std::string(table.name) + "$" + std::string(table.keys[k].name)) +
                         " ON " + Quoted(table.name) + " (";
@@ -130,20 +135,40 @@ void DropTable(const Connection &connection, const TableDef &table) {
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
 }
 
+std::size_t StoredCount(const TableDef &table) {
+  return static_cast<std::size_t>(std::ranges::count_if(table.fields, Stored));
+}
+
+std::string StoredColumns(const TableDef &table) {
+  std::string columns;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (!columns.empty()) { columns += ", "; }
+    columns += Quoted(field.name);
+  }
+  return columns;
+}
+
+std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
+  std::size_t column = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (field.no == no) { return column; }
+    ++column;
+  }
+  throw Error("the key names a field the schema does not store");
+}
+
 void InsertRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values) {
-  if (values.size() != table.fields.size()) {
+  if (values.size() != StoredCount(table)) {
     throw Error("Insert: the value count does not match the declaration");
   }
-  std::string columns;
+  const std::string columns = StoredColumns(table);
   std::string placeholders;
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    if (i != 0) {
-      columns += ", ";
-      placeholders += ", ";
-    }
-    columns += Quoted(table.fields[i].name);
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    if (i != 0) { placeholders += ", "; }
     placeholders += Placeholder(i + 1);
   }
   connection.Run("INSERT INTO " + Quoted(table.name) + " (" + columns + ") VALUES (" +
@@ -154,11 +179,7 @@ void InsertRow(const Connection &connection,
 std::optional<FieldValues> GetRow(const Connection &connection,
                                   const TableDef &table,
                                   std::span<const std::optional<std::string>> key) {
-  std::string columns;
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    if (i != 0) { columns += ", "; }
-    columns += Quoted(table.fields[i].name);
-  }
+  const std::string columns = StoredColumns(table);
   const Result result = connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) +
                                                " WHERE " + KeyPredicate(table, 1),
                                            key);
@@ -169,21 +190,26 @@ std::optional<FieldValues> GetRow(const Connection &connection,
 bool ModifyRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values) {
-  if (values.size() != table.fields.size()) {
+  if (values.size() != StoredCount(table)) {
     throw Error("Modify: the value count does not match the declaration");
   }
   std::string assignments;
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    if (i != 0) { assignments += ", "; }
-    assignments += Quoted(table.fields[i].name) + " = " + Placeholder(i + 1);
+  std::size_t at = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (at != 0) { assignments += ", "; }
+    assignments += Quoted(field.name) + " = " + Placeholder(at + 1);
+    ++at;
   }
 
   FieldValues bound(values.begin(), values.end());
-  for (const FieldNo no : table.keys[0].fields) { bound.push_back(values[IndexOf(table, no)]); }
+  for (const FieldNo no : table.keys[0].fields) {
+    bound.push_back(values[StoredIndexOf(table, no)]);
+  }
 
   const Result result =
       connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
-                             KeyPredicate(table, table.fields.size() + 1) + " RETURNING 1",
+                             KeyPredicate(table, values.size() + 1) + " RETURNING 1",
                          bound);
   return result.Rows() != 0;
 }

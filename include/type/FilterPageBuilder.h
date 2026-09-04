@@ -115,6 +115,12 @@ public:
   /// \param PageCaption The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `FilterPageBuilder.PageCaption()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] FilterPageBuilder.PageCaption([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string PageCaption();
+
   std::string PageCaption(std::string_view PageCaption);
 
   /// \brief AL `FilterPageBuilder.RunModal()`. Builds and runs the filter page that includes the

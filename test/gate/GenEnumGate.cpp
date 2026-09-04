@@ -35,6 +35,18 @@ bool Has(const std::string &text, std::string_view needle) {
   return text.find(needle) != std::string::npos;
 }
 
+/// `Sales Line` is 10 000 lines and every case below needs it, so it is parsed ONCE. Parsing it
+/// per case cost 32 s of a gate suite that has to stay inside a minute.
+const agiru::al::TableObject &SalesLine() {
+  static const agiru::al::TableObject parsed = agiru::al::ParseTable(Read(kTablePath));
+  return parsed;
+}
+
+const agiru::al::EnumObject &SalesLineType() {
+  static const agiru::al::EnumObject parsed = agiru::al::ParseEnum(Read(kEnumPath));
+  return parsed;
+}
+
 agiru::gen::EnumIndex IndexOf(const agiru::al::EnumObject &object) {
   agiru::gen::EnumIndex index;
   index.insert_or_assign(agiru::gen::LowerKey(object.name),
@@ -45,7 +57,7 @@ agiru::gen::EnumIndex IndexOf(const agiru::al::EnumObject &object) {
 }
 
 void TheDeclaredOrdinalSurvivesTheTranslation() {
-  const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
+  const agiru::al::EnumObject &object = SalesLineType();
   CHECK_TRUE("the enum object parses whole", object.values.size() == 7);
   CHECK_TRUE("and it is the sparse one", object.values.back().ordinal == 10);
 
@@ -79,8 +91,8 @@ void TheValueTableIsEmittedSortedEvenWhenAlIsNot() {
 }
 
 void ATableReachesTheEnumObjectByNameAndByHeader() {
-  const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
-  const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
+  const agiru::al::EnumObject &object = SalesLineType();
+  const agiru::al::TableObject &table = SalesLine();
   const agiru::gen::TableHeader header =
       agiru::gen::WriteHeader(table, std::string(kTablePath), IndexOf(object), {});
 
@@ -100,7 +112,7 @@ void ATableReachesTheEnumObjectByNameAndByHeader() {
 /// THE NEGATIVE CONTROL. Without the index the reference cannot be resolved, and the generator has
 /// to SAY so rather than write a type that is not there and let the tree find out later.
 void AnEnumTheRunNeverSawIsReported() {
-  const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
+  const agiru::al::TableObject &table = SalesLine();
   const agiru::gen::TableHeader header =
       agiru::gen::WriteHeader(table, std::string(kTablePath), agiru::gen::EnumIndex{}, {});
 
@@ -133,8 +145,8 @@ void TheTypeNameIsCanonicalWhateverAlWrote() {
 /// enum object on the right -- and answering only for inline OPTIONS left the right-hand side
 /// spelled as the field, which is not a scope.
 void AnEnumFieldScopesThroughItsEnumeration() {
-  const agiru::al::EnumObject object = agiru::al::ParseEnum(Read(kEnumPath));
-  const agiru::al::TableObject table = agiru::al::ParseTable(Read(kTablePath));
+  const agiru::al::EnumObject &object = SalesLineType();
+  const agiru::al::TableObject &table = SalesLine();
   const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath), {});
 
   CHECK_TRUE("the enum object parses", !object.values.empty());

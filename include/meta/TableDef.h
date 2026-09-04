@@ -2,6 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "type/FieldClass.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -65,12 +66,12 @@ enum class FieldType : std::uint8_t {
 /// \note `offset` is what lets the runtime reach a field by number without a virtual call and
 ///       without a map, and it is why a generated record must be standard-layout.
 struct FieldDef {
-  FieldNo no;               ///< The AL field number.
-  std::string_view name;    ///< The AL name, spaces and all: `"Work Type Code"`.
-  std::string_view caption; ///< The `Caption` property, which AL error messages quote.
-  FieldType type;           ///< The AL data type.
-  std::uint16_t length;     ///< Declared length for Code and Text, 0 otherwise.
-  std::size_t offset;       ///< `offsetof` within the generated record.
+  FieldNo no{};               ///< The AL field number.
+  std::string_view name{};    ///< The AL name, spaces and all: `"Work Type Code"`.
+  std::string_view caption{}; ///< The `Caption` property, which AL error messages quote.
+  FieldType type{};           ///< The AL data type.
+  std::uint16_t length{};     ///< Declared length for Code and Text, 0 otherwise.
+  std::size_t offset{};       ///< `offsetof` within the generated record.
 
   /// \brief The declared values of an Option or Enum field, empty otherwise.
   ///
@@ -78,7 +79,7 @@ struct FieldDef {
   /// of the table: one `.rodata` run for the whole table instead of a copy per instance. An error
   /// message needs them, since AL renders either enumeration by its value name and never by its
   /// ordinal.
-  std::span<const EnumValueDef> values;
+  std::span<const EnumValueDef> values{};
 
   /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
   ///
@@ -92,14 +93,84 @@ struct FieldDef {
   ///
   /// \note EMPTY IS NOT ABSENT. `InitValue = ''` on a Code field is a declaration and an absent
   ///       property is not, and a bare `string_view` could not tell them apart.
-  std::optional<std::string_view> initValue;
+  std::optional<std::string_view> initValue{};
+
+  /// \brief The `FieldClass` property: whether the field is stored, computed or a filter.
+  ///
+  /// `properties/devenv-fieldclass-property.md`. A `FlowField` is COMPUTED and has no column
+  /// (board:0047); a `FlowFilter` holds a filter and has none either. 2 712 declarations under the
+  /// read roots.
+  ::agiru::FieldClass fieldClass = ::agiru::FieldClass::Normal;
+
+  /// \brief The `CalcFormula` property, as AL wrote it, for a FlowField.
+  std::string_view calcFormula{};
+
+  /// \brief The `NotBlank` property: the field refuses the empty value. 949 declarations.
+  bool notBlank = false;
+
+  /// \brief The `AutoIncrement` property: the platform assigns the number. 151 declarations.
+  bool autoIncrement = false;
+
+  /// \brief The `Editable` property. A table field's `false` is a UI refusal and not a write one.
+  bool editable = true;
+
+  /// \brief The `ValidateTableRelation` property, which `Validate` reads before the trigger.
+  bool validateTableRelation = true;
+
+  /// \brief The `BlankZero` property: a zero renders as nothing.
+  bool blankZero = false;
+
+  /// \brief The `MinValue` and `MaxValue` properties, as AL wrote them.
+  ///
+  /// \warning THEY ARE INPUT BOUNDS AND NOT WRITE BOUNDS. The client refuses a value outside them
+  ///          before it takes it; a programmatic `Validate` does not (openerp, measured). They are
+  ///          carried so the page layer can enforce what the page enforces.
+  std::string_view minValue{};
+  std::string_view maxValue{}; ///< \see minValue
+
+  /// \brief The `DecimalPlaces` property, as AL wrote it: `2` or `2:5`.
+  std::string_view decimalPlaces{};
+
+  /// \brief The `ObsoleteState` property, as AL wrote it -- `Pending` or `Removed`, else empty.
+  std::string_view obsoleteState{};
+
+  /// \brief The `ObsoleteReason` property: the text a diagnostic prints.
+  std::string_view obsoleteReason{};
+
+  /// \brief The `ObsoleteTag` property: the version the removal is scheduled for.
+  std::string_view obsoleteTag{};
 };
+
+/// \brief Whether a field is a COLUMN.
+///
+/// \param field The field.
+/// \return True when the database holds it.
+///
+/// A `FlowField` is computed and a `FlowFilter` holds a filter, so neither is stored -- 2 153 of
+/// them under `Layers/W1`, and a column for each would always read its default (board:0047). A
+/// field whose `ObsoleteState` is `Removed` is gone from the schema too, which is what removed
+/// means.
+[[nodiscard]] constexpr bool Stored(const FieldDef &field) {
+  return field.fieldClass == ::agiru::FieldClass::Normal && field.obsoleteState != "Removed";
+}
 
 /// \brief One key's declaration. The first key of a table is its primary key.
 struct KeyDef {
-  std::string_view name;           ///< The AL key name, `Key1` by convention.
-  std::span<const FieldNo> fields; ///< The key fields, in declaration order.
-  bool clustered;                  ///< The `Clustered` property.
+  std::string_view name{};           ///< The AL key name, `Key1` by convention.
+  std::span<const FieldNo> fields{}; ///< The key fields, in declaration order.
+  bool clustered{};                  ///< The `Clustered` property.
+
+  /// \brief The `Enabled` property: a disabled key is declared and NOT maintained as an index.
+  bool enabled = true;
+
+  /// \brief The `SumIndexFields` property, as AL wrote it: what the SIFT aggregate sums.
+  std::string_view sumIndexFields{};
+
+  /// \brief The `MaintainSiftIndex` property: whether the aggregate is stored or computed.
+  bool maintainSiftIndex = true;
+
+  /// \brief The `MaintainSqlIndex` property: whether the declared key becomes an index at all.
+  bool maintainSqlIndex = true;
 };
 
 /// \brief How many system fields the platform adds to every table.
@@ -120,11 +191,21 @@ inline constexpr std::size_t kSystemFieldCount = 5;
 
 /// \brief One table's declaration.
 struct TableDef {
-  TableId id;                       ///< The AL table number.
-  std::string_view name;            ///< The AL name: `"Resource Cost"`.
-  std::string_view caption;         ///< The `Caption` property.
-  std::span<const FieldDef> fields; ///< Every declared field, in declaration order.
-  std::span<const KeyDef> keys;     ///< Every declared key; `keys[0]` is the primary key.
+  TableId id{};                       ///< The AL table number.
+  std::string_view name{};            ///< The AL name: `"Resource Cost"`.
+  std::string_view caption{};         ///< The `Caption` property.
+  std::span<const FieldDef> fields{}; ///< Every declared field, in declaration order.
+  std::span<const KeyDef> keys{};     ///< Every declared key; `keys[0]` is the primary key.
+
+  /// \brief The `TableType` property, as AL wrote it: `Normal`, `Temporary`, `CRM`, `ExternalSQL`
+  ///        or `MicrosoftGraph`. Only `Normal` is storage as this tree knows it. 237 declarations.
+  std::string_view tableType{};
+
+  /// \brief The `DataPerCompany` property: whether each company gets its own rows.
+  bool dataPerCompany = true;
+
+  /// \brief The `ObsoleteState` property, as AL wrote it.
+  std::string_view obsoleteState{};
 };
 
 /// \brief Finds a field by its AL number.

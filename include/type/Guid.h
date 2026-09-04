@@ -56,7 +56,7 @@ public:
   ///       field in a key, because they are partially sequential instead of fully random." The
   ///       leading 48 bits are a millisecond timestamp and the rest is random -- the version 7
   ///       layout -- which is what gives a key inserted in creation order a rising prefix.
-  [[nodiscard]] static Guid CreateSequential();
+  [[nodiscard]] static Guid CreateSequentialGuid();
 
   /// \brief Reads the standard textual representation.
   ///

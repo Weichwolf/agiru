@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `BlankZero` renders a zero as nothing, and a `false` with it
 
+**The metadata half is done.** `BlankZero` reaches `FieldDef::blankZero`; what is missing is the RENDERING.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Indicates whether the system displays zeros (0) and No. **True** if zeros and No are not
 > displayed; otherwise, **false**.
 

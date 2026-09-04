@@ -77,7 +77,10 @@ public:
   [[nodiscard]] Integer Position() const { return static_cast<Integer>(position_) + 1; }
 
   /// \brief AL `InStream.ResetPosition()` -- starts again from the beginning.
-  void ResetPosition() { position_ = 0; }
+  ::agiru::Boolean ResetPosition() {
+    position_ = 0;
+    return true;
+  }
 
   /// \brief AL `InStream.ReadText(var Text [, Length])`.
   ///

@@ -1,10 +1,13 @@
 #pragma once
 
 #include "meta/EnumDef.h"
+#include "type/Integer.h"
+#include "type/List.h"
 
 #include <compare>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -42,9 +45,6 @@ template <typename E = void> class Enum;
 /// \note The default is ordinal 0 whether or not the enumeration declares it, which is what an
 ///       integer column stores for an unset field. IsDeclared() says which of the two it is.
 ///
-/// \note `Names()` and `Ordinals()` are NOT here yet. Both return a `List of [...]` and there is no
-///       List type in the runtime, so writing them would mean inventing a return the platform does
-///       not document. The AL surface baseline counts what is reachable, and it counts them absent.
 template <typename E> class Enum : public OrdinalValue {
 public:
   /// \brief The generated enumeration.
@@ -157,6 +157,24 @@ public:
   [[nodiscard]] constexpr std::string_view Caption() const {
     const EnumValueDef *value = ValueOf(Traits::kValues, AsInteger());
     return value != nullptr ? value->caption : std::string_view{};
+  }
+
+  /// \brief AL `Enum.Names()`.
+  /// \return The value names, in the order the enumeration declares them.
+  [[nodiscard]] static ::agiru::List<std::string> Names() {
+    ::agiru::List<std::string> names;
+    for (const EnumValueDef &value : Traits::kValues) { names.Add(std::string(value.name)); }
+    return names;
+  }
+
+  /// \brief AL `Enum.Ordinals()`.
+  /// \return The declared ordinals, in the order the enumeration declares them.
+  /// \note THE ORDINAL IS DECLARED AND NOT COUNTED, so this is not `0..n-1`: `value(10; No)`
+  ///       contributes 10, and 103 of the BaseApp's 576 enumerations have gaps.
+  [[nodiscard]] static ::agiru::List<::agiru::Integer> Ordinals() {
+    ::agiru::List<::agiru::Integer> ordinals;
+    for (const EnumValueDef &value : Traits::kValues) { ordinals.Add(value.ordinal); }
+    return ordinals;
   }
 
   /// \brief Compares against a named value, the way AL writes `Type = Type::Service`.

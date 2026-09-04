@@ -107,6 +107,30 @@ void EnumsOrderByOrdinal() {
   CHECK_TRUE("equality follows the ordinal", Answer::FromInteger(10) == Answer{YesNo::No});
 }
 
+void NamesAndOrdinalsListWhatTheEnumerationDeclares() {
+  // `enum-names-method.md` and `enum-ordinals-method.md`. THE ORDER IS THE DECLARED ORDER and the
+  // two lists line up index for index -- a caller reads name[i] against ordinal[i], which is the
+  // only reason the pair is usable.
+  const agiru::List<std::string> names = PrintOption::Names();
+  const agiru::List<agiru::Integer> ordinals = PrintOption::Ordinals();
+  CHECK_TRUE("every declared value is named", names.Count() == 4);
+  CHECK_TRUE("and carries its ordinal", ordinals.Count() == 4);
+  CHECK_TEXT("the first name is the first declaration", names.Get(1), "Pre-Assigned No.");
+  CHECK_TEXT("with its AL spelling, punctuation and all", names.Get(2), "No.");
+  CHECK_TEXT("the last is the last", names.Get(4), "Neither");
+
+  // THE ORDINAL IS DECLARED AND NOT COUNTED, which is the case this pair exists for: an
+  // enumeration that starts at 1 answers 1, not 0.
+  CHECK_TRUE("the first ordinal is the declared one", ordinals.Get(1) == 1);
+  CHECK_TRUE("and the last one too", ordinals.Get(4) == 4);
+
+  // And the same over a SPARSE enumeration, where position and ordinal part company outright.
+  const agiru::List<agiru::Integer> gapped = Answer::Ordinals();
+  CHECK_TRUE("a gap does not close", gapped.Get(2) == 10);
+  CHECK_TEXT(
+      "and the name beside it is still the second declaration", Answer::Names().Get(2), "No");
+}
+
 } // namespace
 
 int main() {
@@ -117,5 +141,6 @@ int main() {
     TheNameKeepsTheAlSpelling();
     LookupFindsEveryDeclaredOrdinal();
     EnumsOrderByOrdinal();
+    NamesAndOrdinalsListWhatTheEnumerationDeclares();
   });
 }

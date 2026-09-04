@@ -50,11 +50,13 @@ void AnInitValueIsTranslatedIntoTheColumnsOwnSpelling() {
 })",
                                    {});
   CHECK_TRUE("a Boolean carries its literal",
-             text.find("offsetof(Gate, DirectPosting), \"true\")") != std::string::npos);
+             text.find("offsetof(Gate, DirectPosting), Declared{.initValue = \"true\"})") !=
+                 std::string::npos);
   CHECK_TRUE("a Code carries the quoted text, spaces and all",
-             text.find("offsetof(Gate, Filler), \" \")") != std::string::npos);
+             text.find("offsetof(Gate, Filler), Declared{.initValue = \" \"})") !=
+                 std::string::npos);
   CHECK_TRUE("AN OPTION CARRIES ITS ORDINAL AND NOT ITS MEMBER NAME",
-             text.find("offsetof(Gate, Kind), \"2\")") != std::string::npos);
+             text.find("offsetof(Gate, Kind), Declared{.initValue = \"2\"})") != std::string::npos);
   CHECK_TRUE("a field that declares none carries nothing",
              text.find("offsetof(Gate, Code)),") != std::string::npos);
 }
@@ -78,7 +80,8 @@ void AnEnumInitValueResolvesThroughTheEnumIndex() {
 })",
                                    enums);
   CHECK_TRUE("the DECLARED ordinal is emitted, not the position",
-             text.find("offsetof(Gate, Answer), \"10\")") != std::string::npos);
+             text.find("offsetof(Gate, Answer), Declared{.initValue = \"10\"})") !=
+                 std::string::npos);
 }
 
 // AND AN ENUM THIS RUN DOES NOT CARRY YIELDS NOTHING RATHER THAN A GUESS. The table already reports

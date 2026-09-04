@@ -145,7 +145,10 @@ namespace {
 FieldValues ValuesOf(const void *record, const TableDef &table) {
   FieldValues values;
   values.reserve(table.fields.size());
-  for (const FieldDef &def : table.fields) { values.emplace_back(StorageText(record, def)); }
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    values.emplace_back(StorageText(record, def));
+  }
   return values;
 }
 
@@ -339,8 +342,11 @@ bool RuntimeGet(void *record, const TableDef &table) {
   const FieldValues key = KeyOf(record, table);
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
   if (!row.has_value()) { return false; }
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    SetFieldText(record, table.fields[i], Required((*row)[i], table.fields[i]));
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    SetFieldText(record, def, Required((*row)[column], def));
+    ++column;
   }
   return true;
 }

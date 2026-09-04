@@ -71,6 +71,12 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Encoding()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Encoding([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Encoding();
+
   std::string Encoding(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.GetDocument(XmlDocument)`. Gets the XmlDocument for this node.
@@ -139,12 +145,24 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Standalone()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Standalone([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Standalone();
+
   std::string Standalone(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.Version(Text)`. Gets or sets the version property for this document.
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Version()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Version([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Version();
+
   std::string Version(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.WriteTo(OutStream)`. Serializes and saves the current node to the

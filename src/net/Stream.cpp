@@ -75,4 +75,12 @@ InStream Blob::CreateInStream() const {
   return InStream{*this};
 }
 
+std::string Blob::Export(std::string_view Name) {
+  throw Error("Blob.Export(" + std::string(Name) + ") needs a client (board:0030)");
+}
+
+std::string Blob::Import(std::string_view Name) {
+  throw Error("Blob.Import(" + std::string(Name) + ") needs a client (board:0030)");
+}
+
 }

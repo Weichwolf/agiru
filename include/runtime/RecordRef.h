@@ -245,12 +245,9 @@ public:
   }
 
   /// \brief AL `FieldRef.Class()`. Gets the value of the FieldClass Property of the field that is
-  /// currently selected. This method returns an error if no field is selected.
-  /// \return The AL `FieldClass`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::FieldClass Class() const {
-    throw Error("FieldRef.Class() is declared and not implemented yet (board:0035)");
-  }
+  /// currently selected.
+  /// \return The AL `FieldClass` the table declared for this field.
+  [[nodiscard]] ::agiru::FieldClass Class() const { return def_->fieldClass; }
 
   /// \brief AL `FieldRef.FieldError(ErrorInfo)`. Stops the execution of the code, causing a
   /// run-time error, and creates an error message for a field.

@@ -44,6 +44,12 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TextBuilder.AppendLine()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] TextBuilder.AppendLine([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean AppendLine();
+
   ::agiru::Boolean AppendLine(std::string_view Text);
 
   /// \brief AL `TextBuilder.Capacity(Integer)`. Gets or sets the maximum number of characters that
@@ -51,6 +57,12 @@ public:
   /// \param NewCapacity The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TextBuilder.Capacity()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] TextBuilder.Capacity([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer Capacity();
+
   ::agiru::Integer Capacity(::agiru::Integer NewCapacity);
 
   /// \brief AL `TextBuilder.Clear()`. Removes all characters from the current TextBuilder instance.

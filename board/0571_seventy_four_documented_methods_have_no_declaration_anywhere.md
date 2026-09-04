@@ -6,7 +6,26 @@ Source:   developer/methods-auto/ -- 74 method pages across 11 types
 Verdict:  fehlt
 Class:    activation
 
-# Seventy-four documented methods have no declaration anywhere
+# Fifty-two documented methods have no declaration anywhere
+
+**22 of the original 74 are declared now** and the item keeps the rest. What closed, and what the
+closing found:
+
+| what | note |
+|---|---|
+| `blob.Export`, `blob.Import` | declared, refusing: writing a client file needs a client (board:0030) |
+| `enum.Names`, `enum.Ordinals` | **implemented**, not refused -- `EnumTraits::kValues` already carries name and ordinal, so both are a walk over `.rodata`. The item's reason for their absence ("there is no List type in the runtime") had stopped being true |
+| `media.ImportStream`, `media.ExportStream`, `media.FindOrphans` | declared, refusing (board:0031) |
+| `mediaset.ImportStream`, `mediaset.FindOrphans` | the same |
+| `testpage.Edit`, `testpage.RunPageBackgroundTask` | declared, refusing until a page runs (board:0030) |
+| `testpage.GoToRecord`, `testpart.GoToRecord` | **already there under a different casing** -- `GotoRecord`. Renamed to AL's spelling; `TestPart` is the same template, so one rename closed both |
+| `testrequestpage.GoToRecord` | declared on `TestRequestPage` |
+| `guid.CreateSequentialGuid` | **already there as `Guid::CreateSequential`** and computing. Renamed to AL's spelling |
+
+**Two of the 22 were NAMING defects and not gaps**, which the mechanical pass could not tell apart:
+`GotoRecord` and `CreateSequential` were written and reachable, under a name AL does not use. That is
+CLAUDE.md's name-equality invariant failing silently -- the code worked and the documentation check
+could not see it.
 
 The third finding of the mechanical pass over `methods-auto/`: **74 of the 1 300 documented
 `Type.Method` have no declaration of that NAME anywhere in `include/`** -- not on their own type, not

@@ -8,6 +8,11 @@ Class:    silent-wrong-data
 
 # `FieldClass` reaches the metadata, and `FieldRef.Class` stops answering `Normal`
 
+**The metadata half is done.** `FieldClass` reaches `FieldDef::fieldClass`, and a `FlowField` or `FlowFilter` is no longer a
+column in `CREATE TABLE`, the `SELECT` list, `INSERT`, `UPDATE`, `Get` or a cursor read. What is
+missing is `FieldRef.Class` answering it.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Sets the class of the field. **Normal** -- a data entry field. **FlowField** -- a calculated field.
 > **FlowFilter** -- to compute the results of FlowFields.
 

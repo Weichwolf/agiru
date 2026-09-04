@@ -476,6 +476,20 @@ item that cannot say this is not understood yet, and writing that line is most o
 can aim at. **Grep the history before filing**: a removal was a decision. **A defect found while
 working on something else becomes an item in the same round**, even if it closes in that round.
 
+**Three rules for an item whose table a SCRIPT filled, because all three cost a round here.**
+
+- **A generated row carries its source, not only the header.** Two rows of one sweep were wrong --
+  `MediaSet.Insert` returns `Boolean` and not `Guid`, `GetCollectedErrors` a `List of [ErrorInfo]`
+  and not of `Text` -- under an item saying five rows had been read by hand. With the page path
+  beside the row a wrong row is a `grep`; without it, a find.
+- **A mechanical pass cannot tell a NAMING DEFECT from a GAP, so it folds case before reporting
+  one.** `GoToRecord` and `CreateSequentialGuid` were filed as absent while both were written and
+  reachable, spelled `GotoRecord` and `CreateSequential`. That is the name-equality invariant
+  failing silently: another item, another fix, and the counter it belongs to is not this one.
+- **A reason ages and a finding does not.** `Enum.Names()` was filed unwritable "because there is no
+  List type in the runtime", and `include/type/List.h` was there by the time anyone read it. A
+  reason carries the date it was true on, or the item carries only its finding.
+
 ## How the work goes
 
 **Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild

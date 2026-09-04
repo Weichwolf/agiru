@@ -112,12 +112,12 @@ public:
   /// \brief AL `Notification.Send()`.
   ///
   /// \note IT RECORDS RATHER THAN REACHING A CLIENT, for the reason the type's own note gives.
-  void Send();
+  ::agiru::Boolean Send();
 
   /// \brief AL `Notification.Recall()`.
   ///
   /// \note It withdraws what `Send` recorded, so a test sees the same sequence a client would.
-  void Recall();
+  ::agiru::Boolean Recall();
 
 private:
   Guid id_;

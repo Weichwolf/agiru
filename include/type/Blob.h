@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -53,6 +54,21 @@ public:
   /// \brief AL `Blob.CreateInStream(InStream)` -- points a stream at this BLOB to read from.
   /// \return The stream.
   [[nodiscard]] class InStream CreateInStream() const;
+
+  /// \brief AL `Blob.Export(Text)`.
+  /// \param Name The full path and name of the file the bytes are written to.
+  /// \return The name of the file that was written.
+  /// \throws Error always.
+  /// \warning REFUSED. Writing a client file needs a client (board:0030); the refusal names the
+  ///          file, so a caller learns WHICH export it lost.
+  std::string Export(std::string_view Name);
+
+  /// \brief AL `Blob.Import(Text)`.
+  /// \param Name The full path and name of the file the bytes are read from.
+  /// \return The name of the file that was read.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason Export gives.
+  std::string Import(std::string_view Name);
 
   /// \brief Compares two BLOBs.
   /// \param o The other BLOB.

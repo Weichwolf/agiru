@@ -127,7 +127,8 @@ def parse(md):
             name, altype = p, "Variant"
         out.append((name.strip(), altype.strip(), isvar))
     ret = ""
-    r = re.search(r"## Return Value\n\*\[?O?p?t?i?o?n?a?l?\]? ?([A-Za-z][A-Za-z0-9]*)\*\s*\n&emsp;Type: \[([A-Za-z]+)\]", text)
+    r = re.search(r"## Return Value\n\*\[?O?p?t?i?o?n?a?l?\]? ?([A-Za-z][A-Za-z0-9]*)\*\s*\n"
+                  r"&emsp;Type: \[((?:[^\[\]]+|\[[^\[\]]*\])+)\]", text)
     if r: ret = r.group(2)
     static = "An instance of the" not in text.split("## Parameters",1)[-1].split("*")[0:1] and \
              not re.search(r"\*%s\*\s*\n&emsp;Type: \[%s\]" % (re.escape(owner), re.escape(owner)), text)

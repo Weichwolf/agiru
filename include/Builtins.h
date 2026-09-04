@@ -12,11 +12,13 @@
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
+#include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
+#include "type/List.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -304,8 +306,9 @@ void ExportObjects(std::string_view FileName,
 /// \brief AL `System.GetCollectedErrors(Boolean)`. Gets all collected errors in the current
 /// collection scope.
 /// \param Clear The AL `Boolean`.
+/// \return The AL `List of [ErrorInfo]`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void GetCollectedErrors(::agiru::Boolean Clear = {});
+::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear = {});
 
 /// \brief AL `System.GetDocumentUrl(Guid)`. Gets the URL for the specified temporary media object
 /// ID.

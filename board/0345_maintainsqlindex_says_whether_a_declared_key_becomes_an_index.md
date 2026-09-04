@@ -8,6 +8,11 @@ Class:    silent-wrong-data
 
 # `MaintainSqlIndex` says whether a declared key becomes an index
 
+**The metadata half is done.** `MaintainSqlIndex` reaches `KeyDef::maintainSqlIndex` AND is acted on -- a key that says
+`false`, and a disabled key, gets no index. What is missing is the gate's negative control: that
+`SetCurrentKey` onto such a key still orders by it.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Set to **True** to create the SQL Server index on the field list defined in the key property. If
 > set to **false**, no index is created. **The default is true.**
 >

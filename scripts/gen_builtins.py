@@ -142,7 +142,8 @@ needed = {x for t in used for x in re.findall(r"[A-Za-z][A-Za-z0-9]*", door.cpp_
 # here, and it went stale the moment a function moved to `BuiltinsWritten.h`: `Byte.h` and `Char.h`
 # stayed behind with nothing declaring either, which `misc-include-cleaner` reports and which costs
 # every one of the generated translation units that parse this door.
-inc = "".join(f'#include "{existing[t]}"\n' for t in sorted(needed) if t in existing)
+inc = "".join(f'#include "{h}"\n'
+              for h in sorted({existing[t] for t in needed if t in existing}))
 
 # THE WRITTEN DOOR IS NOT INCLUDED FROM HERE, IT STANDS BESIDE IT. This header once pulled
 # `BuiltinsWritten.h` in so that one include reached every builtin, and nothing in it named anything

@@ -8,6 +8,7 @@
 #include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/Integer.h"
+#include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"

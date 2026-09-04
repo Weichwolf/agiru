@@ -53,7 +53,7 @@ public:
 
   /// \brief AL `HttpRequestMessage.GetCookieNames()`. Gets the list of cookie names.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetCookieNames();
+  [[nodiscard]] ::agiru::List<std::string> GetCookieNames();
 
   /// \brief AL `HttpRequestMessage.GetHeaders(HttpHeaders)`. Gets a reference to the collection of
   /// HTTP request headers.
@@ -78,6 +78,12 @@ public:
   /// \param NewMethod The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `HttpRequestMessage.Method()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] HttpRequestMessage.Method([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Method();
+
   std::string Method(std::string_view NewMethod);
 
   /// \brief AL `HttpRequestMessage.RemoveCookie(Text)`. Removes the specified cookie given a name.

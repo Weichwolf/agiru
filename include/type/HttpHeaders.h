@@ -102,7 +102,7 @@ public:
 
   /// \brief AL `HttpHeaders.Keys()`. Gets the key name of all the headers
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Keys();
+  [[nodiscard]] ::agiru::List<std::string> Keys();
 
   /// \brief AL `HttpHeaders.Remove(Text)`. Removes the specified header from the HttpHeaders
   /// collection.

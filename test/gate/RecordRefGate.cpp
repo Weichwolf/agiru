@@ -183,20 +183,37 @@ struct Painted : agiru::Table<Painted> {
 
   agiru::Enum<Kind> Kind;
   agiru::Option<Shade> Shade;
+  agiru::Integer Painted_Count;
+  agiru::Date Painted_On;
 
   struct Field_No {
     static constexpr agiru::FieldNo Kind{1};
     static constexpr agiru::FieldNo Shade{2};
+    static constexpr agiru::FieldNo Painted_Count{3};
+    static constexpr agiru::FieldNo Painted_On{4};
   };
 
   static constexpr std::array<agiru::FieldNo, 1> kKey1{{Field_No::Kind}};
 };
 
-inline constexpr std::array<agiru::FieldDef, 2> kPaintedFields{{
+inline constexpr std::array<agiru::FieldDef, 4> kPaintedFields{{
     agiru::Declare<&Painted::Kind>(
         Painted::Field_No::Kind, "Kind", "Kind", offsetof(Painted, Kind)),
     agiru::Declare<&Painted::Shade>(
         Painted::Field_No::Shade, "Shade", "Shade", offsetof(Painted, Shade)),
+    agiru::Declare<&Painted::Painted_Count>(
+        Painted::Field_No::Painted_Count,
+        "Painted Count",
+        "Painted Count",
+        offsetof(Painted, Painted_Count),
+        agiru::Declared{.fieldClass = agiru::FieldClass::FlowField,
+                        .calcFormula = "Count(\"Painted\")"}),
+    agiru::Declare<&Painted::Painted_On>(
+        Painted::Field_No::Painted_On,
+        "Painted On",
+        "Painted On",
+        offsetof(Painted, Painted_On),
+        agiru::Declared{.fieldClass = agiru::FieldClass::FlowFilter}),
 }};
 
 inline constexpr std::array<agiru::KeyDef, 1> kPaintedKeys{{
@@ -246,6 +263,21 @@ void AnEnumFieldReportsOption() {
   CHECK_TRUE("the enum keeps its declared ordinal", declared.GetEnumValueOrdinal(2) == 10);
 }
 
+void AFieldAnswersTheClassItsTableDeclared() {
+  Painted rec;
+  RecordRef ref;
+  ref.GetTable(rec);
+
+  CHECK_TRUE("a FlowField says so", ref.Field(3).Class() == agiru::FieldClass::FlowField);
+  CHECK_TRUE("a FlowFilter says so", ref.Field(4).Class() == agiru::FieldClass::FlowFilter);
+
+  // THE NEGATIVE CONTROL IS THE ORDINARY FIELD. `devenv-fieldclass-property.md` makes Normal the
+  // default, so a Class() that returned a hardcoded Normal passes on field 1 and fails on the two
+  // above -- which is why the ordinary field is checked LAST and never alone.
+  CHECK_TRUE("and a field that declares none is Normal",
+             ref.Field(1).Class() == agiru::FieldClass::Normal);
+}
+
 /// THE FIELD TYPE'S NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. AL compares the result of
 /// `FieldRef.Type()` against `Field.Type::Code` directly, so a dense 0, 1, 2 ... of this tree's own
 /// invention would make every such comparison quietly false -- the silent-wrong-data class, and one
@@ -290,5 +322,6 @@ int main() {
     AnEnumFieldReportsOption();
     TheFieldTypeCarriesThePlatformsOwnNumbers();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
+    AFieldAnswersTheClassItsTableDeclared();
   });
 }
