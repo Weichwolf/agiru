@@ -47,3 +47,16 @@ tests/core/codeunit/SCMWhseUOMRndingUT.cpp
 tests/core/codeunit/BankPmtApplRuleUT.cpp
 base/finance/vat/setup/table/VATSetup.cpp
 base/bank/bank_account/table/BankAccountPostingGroup.cpp
+library_variable_storage/system/test_libraries/utilities/codeunit/LibraryVariableStorage.cpp
+tests/core/codeunit/LibraryPurchase.cpp
+base/foundation/address/table/CountryRegion.cpp
+base/pricing/asset/codeunit/PriceAssetItem.cpp
+base/finance/vat/setup/table/VATPostingSetup.cpp
+base/bank/bank_account/table/PaymentMethod.cpp
+tests/core/codeunit/ActiveDirectoryMockEvents.cpp
+tests/core/codeunit/AutomPaymentRegistrationUT.cpp
+tests/core/codeunit/CreditTransferRegisterUT.cpp
+tests/core/codeunit/DataExchExpLatinCharUT.cpp
+tests/core/codeunit/ERMPaymentMethodUT.cpp
+tests/core/codeunit/ERMTableFieldsUT.cpp
+tests/core/codeunit/O365EmailAsPDFUT.cpp
