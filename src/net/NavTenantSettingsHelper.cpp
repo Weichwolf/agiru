@@ -43,4 +43,17 @@ void NavTenantSettingsHelper::EnableM365Collaboration() {
               "tenant service to change");
 }
 
+std::string NavTenantSettingsHelper::GetLinkedPowerPlatformEnvironmentId() {
+  throw Error(
+      "NavTenantSettingsHelper.GetLinkedPowerPlatformEnvironmentId() names a Power Platform "
+      "environment this deployment does not have (board:0035)");
+}
+
+std::string
+NavTenantSettingsHelper::GetEnvironmentApplicationSetting(std::string_view SettingName) {
+  throw Error("NavTenantSettingsHelper.GetEnvironmentApplicationSetting(" +
+              std::string(SettingName) +
+              ") is the service's setting and not this deployment's (board:0035)");
+}
+
 }

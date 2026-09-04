@@ -54,6 +54,14 @@ guessed: with it, a slice member whose closure is incomplete cannot be in the sl
 may only GROW, so nothing may leave. Today `ERM Document Totals UT` is in it and its closure is not
 complete, so the two rules cannot both hold.
 
+**The loop that grows the slice (2026-09-04, evening).** A candidate joins `test/slice`, the tree
+builds, `agiru run-tests` runs; a `symbol lookup error` names the OWNER of the missing definition,
+and the owner's own `.cpp` is the next candidate if it compiles clean. Run over 35 candidates it kept
+23 and named the same handful of owners every time -- `Library - ERM`, `Library - Sales`,
+`Library - Purchase`, `Library - Variable Storage`, `Library - Random`, `API Mock Events`,
+`Environment Information Impl.` -- which is the closure this item is waiting on, sized from the
+run rather than from `nm`.
+
 ## What the chain actually is, measured 2026-09-04
 
 `Clear(Any)` was a door refusal and is now implemented, which let `ERM Document Totals UT` run

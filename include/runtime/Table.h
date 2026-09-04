@@ -1640,14 +1640,16 @@ public:
   ~Temporary() { Release(); }
 
   /// \brief AL `Record.Insert()` on a temporary record.
+  /// \return True, which is what `if TempRec.Insert() then` reads on success.
   /// \throws Error when a row already carries this primary key, as AL does.
-  void Insert() {
+  Boolean Insert() {
     const auto at = LowerBound();
     if (at != store_->rows.end() && detail::SameKey<T>(*at, *this)) {
       throw Error("the record already exists");
     }
     store_->rows.insert(at, static_cast<const T &>(*this));
     ++store_->version;
+    return true;
   }
 
   /// \brief AL `Record.Get(...)` on a temporary record.

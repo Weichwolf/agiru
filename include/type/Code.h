@@ -116,7 +116,6 @@ public:
   /// \return True when the stored text is identical, so `"01"` differs from `"1"`.
   [[nodiscard]] bool operator==(const Code &o) const { return Stored() == o.Stored(); }
 
-
   /// \brief Compares against a literal, which is how AL writes an emptiness test.
   /// \param value The text.
   /// \return True when the stored text is identical.

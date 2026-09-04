@@ -690,7 +690,6 @@ public:
   /// \return True when the stored text is identical.
   [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
 
-
   /// \brief Compares against a literal, which is how AL writes an emptiness test.
   /// \param value The text.
   /// \return True when the stored text is identical.
@@ -856,18 +855,23 @@ template <typename Left, typename Right>
   return std::string(std::string_view(left)) + std::string(right.Value());
 }
 
-
 /// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a
 ///        `Text<0>` -- by their stored text.
 /// \param a One.
 /// \param b The other.
 /// \return True when the stored text is identical.
 ///
-/// \note A FREE FUNCTION ON THE BASE, and that is the whole trick: each class's own `operator==`
-///       takes its own type, so `Code == Text` needs a conversion on one side whichever member is
-///       chosen, and C++20's reversed candidate then makes the two members ambiguous. This one
-///       needs only a derived-to-base conversion on each argument, which beats a user-defined one.
-[[nodiscard]] inline bool operator==(const StringValue &a, const StringValue &b) {
+/// \note A FREE TEMPLATE ON THE EXACT TYPES, and that is the whole trick: each class's own
+///       `operator==` takes its own type, so `Code == Text` needs a user-defined conversion on one
+///       side whichever member is chosen -- and a free function on the BASE was no better, since
+///       the member is exact on its own side. Deduced to the two exact types it is exact on both,
+///       which beats every candidate that converts anything.
+/// \tparam A One string value's type.
+/// \tparam B The other's, which must differ -- the class's own `operator==` takes the same type.
+template <typename A, typename B>
+  requires std::derived_from<A, StringValue> && std::derived_from<B, StringValue> &&
+           (!std::same_as<A, B>)
+[[nodiscard]] bool operator==(const A &a, const B &b) {
   return a.Value() == b.Value();
 }
 

@@ -33,6 +33,17 @@ public:
   /// \return What the tenant says.
   [[nodiscard]] static Boolean IsSandbox();
 
+  /// \brief .NET `NavTenantSettingsHelper.GetLinkedPowerPlatformEnvironmentId()`.
+  /// \return Never.
+  /// \throws Error always -- there is no linked Power Platform environment here (board:0035).
+  [[nodiscard]] static std::string GetLinkedPowerPlatformEnvironmentId();
+
+  /// \brief .NET `NavTenantSettingsHelper.GetEnvironmentApplicationSetting(Text)`.
+  /// \param SettingName The setting asked for.
+  /// \return Never.
+  /// \throws Error always -- the environment application settings are the service's (board:0035).
+  [[nodiscard]] static std::string GetEnvironmentApplicationSetting(std::string_view SettingName);
+
   /// \brief The environment's name.
   /// \return What the tenant says; empty when self-hosted.
   [[nodiscard]] static std::string GetEnvironmentName();

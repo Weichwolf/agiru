@@ -421,7 +421,7 @@ private:
     std::string known = scope_.Resolve(callee.text);
     if (!known.empty()) { return known; }
     const std::string_view builtin = BareBuiltin(callee.text);
-    return builtin.empty() ? Identifier(callee.text) : std::string(builtin);
+    return builtin.empty() ? AsTheDoorSpellsIt(Identifier(callee.text)) : std::string(builtin);
   }
 
   std::string Tried(const al::Expr &expression) {
@@ -540,6 +540,7 @@ private:
   }
 
   std::string Name(const al::Expr &expression) {
+    if (SameName(expression.text, "this")) { return "(*this)"; }
     if (SameName(expression.text, "true")) { return "true"; }
     if (SameName(expression.text, "false")) { return "false"; }
     const std::string known = scope_.Resolve(expression.text);
@@ -793,8 +794,8 @@ private:
       Link(out,
            {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
            {.arrow = handle && i == chain.size(),
-            .parens = calls != Parens::None && !asCallee &&
-                      (calls == Parens::First ? i == chain.size() : i == 1),
+            .parens = calls != Parens::None && (calls == Parens::First || i == 1) &&
+                      !(asCallee && i == 1),
             .precedence = precedence});
     }
     if (precedence < outer) { out = "(" + out + ")"; }
@@ -912,6 +913,14 @@ public:
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     const al::VarDecl *local = Local(member.variable);
     if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
+    if (local != nullptr &&
+        (TypeName(local->type) == "Page" || TypeName(local->type) == "TestPage" ||
+         TypeName(local->type) == "TestRequestPage")) {
+      const auto page = objects_.pages.find(LowerKey(local->subtype));
+      const bool control = page != objects_.pages.end() &&
+                           page->second.fields.contains(LowerKey(std::string(member.field)));
+      return !control && DoorCalls(member.field);
+    }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
     }
@@ -1000,7 +1009,14 @@ public:
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::FieldDecl *field = FieldNamed(table_, name);
-    if (field == nullptr) { return {}; }
+    if (field == nullptr) {
+      for (const al::VarDecl *where : {Local(name), Global(name)}) {
+        if (where != nullptr && TypeName(where->type) == "Enum" && !where->subtype.empty()) {
+          return "enums::" + Identifier(where->subtype);
+        }
+      }
+      return {};
+    }
     if (Find(field->properties, "OptionMembers") != nullptr) {
       return OptionEnumName(table_.name, field->name);
     }
@@ -1175,7 +1191,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
       const std::string body =
           WriteStatements(TableNames(table, objects, &trigger), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
-      out += ProcedureLocals(trigger, objects, table.name, table.procedures, Shadowed(table));
+      out += ProcedureLocals(trigger, objects, table.name, table.procedures, Shadowed(table), body);
       out += BindsBefore(body, identifier);
       out += body;
       out += "}\n\n";
@@ -1231,7 +1247,7 @@ void ControlBodies(std::string &out,
       const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
       const std::string body = WriteStatements(PageNames(page, source, objects), trigger.body, 2);
       const std::string locals =
-          ProcedureLocals(trigger, objects, page.name, page.procedures) +
+          ProcedureLocals(trigger, objects, page.name, page.procedures, {}, body) +
           (source == nullptr ? std::string{}
                              : BindsBefore(body, "tables::" + Identifier(source->name)));
       out += "void ";
@@ -1282,7 +1298,7 @@ std::string WriteSource(const al::PageObject &page,
                               Spelling{.spelled = Identifier(procedure.name), .body = body}) +
            " {";
     const std::string locals =
-        ProcedureLocals(procedure, objects, page.name, page.procedures) +
+        ProcedureLocals(procedure, objects, page.name, page.procedures, {}, body) +
         (source == nullptr ? std::string{}
                            : BindsBefore(body, "tables::" + Identifier(source->name)));
     if (locals.empty() && body.empty()) {

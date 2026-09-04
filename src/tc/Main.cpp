@@ -1002,6 +1002,9 @@ int Scan(const Job &job) {
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
+    for (const agiru::al::TableObject &table : parsedTables.objects) {
+      NoteFieldEnums(table, objects.fieldEnums);
+    }
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       everyTable.insert_or_assign(agiru::gen::LowerKey(table.name), &table);

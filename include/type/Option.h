@@ -168,6 +168,20 @@ public:
   /// \brief Orders two options by ordinal.
   /// \param o The other option.
   /// \return The ordering.
+  /// \brief Orders against a NUMBER, which AL allows because an option converts to its ordinal.
+  /// \param o The number.
+  /// \return The ordering of the ordinal against it.
+  /// \note WITHOUT THIS, `Option > 0` WAS AMBIGUOUS between converting the option to an integer
+  ///       and converting the integer to an option; naming the number's comparison settles it.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::int32_t o) const {
+    return AsInteger() <=> o;
+  }
+
+  /// \brief Compares against a number by ordinal.
+  /// \param o The number.
+  /// \return True when the ordinal is that number.
+  [[nodiscard]] constexpr bool operator==(std::int32_t o) const { return AsInteger() == o; }
+
   [[nodiscard]] constexpr std::strong_ordering operator<=>(const Option &o) const {
     return AsInteger() <=> o.AsInteger();
   }
@@ -236,6 +250,20 @@ public:
   /// \brief Orders two untyped options by ordinal.
   /// \param o The other.
   /// \return The ordering.
+  /// \brief Orders against a NUMBER, which AL allows because an option converts to its ordinal.
+  /// \param o The number.
+  /// \return The ordering of the ordinal against it.
+  /// \note WITHOUT THIS, `Option > 0` WAS AMBIGUOUS between converting the option to an integer
+  ///       and converting the integer to an option; naming the number's comparison settles it.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::int32_t o) const {
+    return AsInteger() <=> o;
+  }
+
+  /// \brief Compares against a number by ordinal.
+  /// \param o The number.
+  /// \return True when the ordinal is that number.
+  [[nodiscard]] constexpr bool operator==(std::int32_t o) const { return AsInteger() == o; }
+
   [[nodiscard]] constexpr std::strong_ordering operator<=>(const Option &o) const {
     return AsInteger() <=> o.AsInteger();
   }

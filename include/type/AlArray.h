@@ -1,7 +1,9 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "type/Char.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <array>
 #include <cstddef>
@@ -184,6 +186,25 @@ template <typename T, std::size_t N>
 template <typename Container, typename Index>
 [[nodiscard]] decltype(auto) At(Container &container, Index index) {
   return container[index];
+}
+
+/// \brief AL `Text[Index]` -- one character of a string value, one-based.
+/// \tparam S A `Text` or `Code`.
+/// \param value The string.
+/// \param index The one-based position.
+/// \return The character there.
+/// \throws Error when the position is outside the string, which is what AL raises.
+/// \note THE GENERATOR SPELLS EVERY INDEX AS `At(...)`, because AL's `[]` reaches arrays and
+///       strings alike; this is the string half of that one spelling.
+template <typename S>
+  requires std::derived_from<S, StringValue>
+[[nodiscard]] Char At(const S &value, Integer index) {
+  const std::string_view text = value.Value();
+  if (index < 1 || static_cast<std::size_t>(index) > text.size()) {
+    throw Error("Index " + std::to_string(index) + " is outside the text of length " +
+                std::to_string(text.size()));
+  }
+  return static_cast<Char>(static_cast<unsigned char>(text[static_cast<std::size_t>(index) - 1]));
 }
 
 }

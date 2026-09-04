@@ -127,6 +127,14 @@ public:
     throw Error("Page.CancelBackgroundTask(Integer) needs a running UI (board:0030)");
   }
 
+  /// \brief AL `Page.Caption()` -- the READING form, which the documentation's syntax block
+  /// brackets: `[X := ] Page.Caption([NewCaption])`.
+  /// \return The caption the page shows.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] std::string Caption() const {
+    throw Error("Page.Caption() needs a running UI (board:0030)");
+  }
+
   /// \brief AL `Page.Caption(Text)`. The caption shown in the title bar. For example, the default
   /// value in English (United States) is the same as the name of the page.
   /// \param NewCaption The AL `Text`.
