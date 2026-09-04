@@ -636,6 +636,15 @@ private:
            NamesALabel(expression.children.front());
   }
 
+  static bool IsEnumStatic(std::string_view name) {
+    static constexpr std::array kStatics{std::string_view{"FromInteger"},
+                                         std::string_view{"Names"},
+                                         std::string_view{"Ordinals"},
+                                         std::string_view{"AsInteger"}};
+    return std::ranges::any_of(kStatics,
+                               [name](std::string_view known) { return SameName(known, name); });
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -666,6 +675,14 @@ private:
       chain.push_back(&walk->children.back());
       walk = &walk->children.front();
     }
+    if (spelling == "." && !chain.empty() && chain.back()->kind == al::ExprKind::Name &&
+        walk->kind == al::ExprKind::Scope && IsEnumStatic(chain.back()->text)) {
+      const std::string enumeration = Expression(*walk, kPrimaryPrecedence);
+      if (enumeration.starts_with("enums::")) {
+        return "Enum<" + enumeration + ">::" + Identifier(chain.back()->text);
+      }
+    }
+
     const bool handle =
         spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
     const Parens calls = Calls(spelling, *walk, *chain.front());

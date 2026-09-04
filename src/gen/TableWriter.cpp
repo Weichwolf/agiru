@@ -612,7 +612,11 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
-  GatherAbsentIn(table.variables, table.procedures, objects, dotnet, absent);
+  std::vector<al::ProcedureDecl> bodies = table.procedures;
+  for (const al::FieldDecl &field : table.fields) {
+    bodies.insert(bodies.end(), field.triggers.begin(), field.triggers.end());
+  }
+  GatherAbsentIn(table.variables, bodies, objects, dotnet, absent);
   return TableHeader{.text = WithDoor(out, ObjectKind::Table),
                      .unresolvedEnums = Unresolved(table, enums),
                      .dotnet = dotnet,
