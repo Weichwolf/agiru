@@ -558,26 +558,27 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "  static constexpr const TableDef &kTable = agiru::app::tables::k" + tableIdentifier +
          "Table;\n";
   std::string validators;
+  std::size_t validated = 0;
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       if (LowerKey(trigger.name) != "onvalidate") { continue; }
       const std::string member = FieldIdentifier(table, field.name);
-      validators += "      {agiru::app::tables::";
+      validators += "      {.field = agiru::app::tables::";
       validators += tableIdentifier;
       validators += "::Field_No::";
       validators += member;
-      validators += ", [](agiru::app::tables::";
+      validators += ",\n       .run = [](agiru::app::tables::";
       validators += tableIdentifier;
       validators += " &record) { record.OnValidate";
       validators += member;
       validators += "(); }},\n";
+      ++validated;
     }
   }
   if (!validators.empty()) {
     out +=
         "  static constexpr std::array<agiru::OnValidateOf<agiru::app::tables::" + tableIdentifier +
-        ">, " + std::to_string(std::count(validators.begin(), validators.end(), '\n')) +
-        "> kOnValidate{{\n" + validators + "  }};\n";
+        ">, " + std::to_string(validated) + "> kOnValidate{{\n" + validators + "  }};\n";
   }
   out += "};\n";
   DotNetUse dotnet;

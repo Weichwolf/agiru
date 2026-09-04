@@ -8,14 +8,13 @@
 #include "Filter.h"
 #include "Where.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
 
 namespace agiru::detail {
-
-namespace {
 
 std::string Quoted(std::string_view identifier) {
   std::string out = "\"";
@@ -30,6 +29,8 @@ std::string Quoted(std::string_view identifier) {
   return out;
 }
 
+namespace {
+
 const FieldDef &FieldOf(const TableDef &table, FieldNo no) {
   for (const FieldDef &def : table.fields) {
     if (def.no == no) { return def; }
@@ -42,10 +43,11 @@ std::vector<FieldNo> OrderedBy(const RecordState *state, const TableDef &table) 
   if (state != nullptr && !state->key.empty()) {
     named.reserve(state->key.size());
     for (const SortField &one : state->key) { named.push_back(one.field); }
-    return named;
   }
   if (table.keys.empty()) { return named; }
-  named.assign(table.keys[0].fields.begin(), table.keys[0].fields.end());
+  for (const FieldNo no : table.keys[0].fields) {
+    if (std::ranges::find(named, no) == named.end()) { named.push_back(no); }
+  }
   return named;
 }
 
@@ -80,7 +82,8 @@ Selection Select(const RecordState *state, const TableDef &table) {
   Selection made;
   Narrow(made, state, table);
   const bool ascending = state == nullptr || state->ascending;
-  for (const FieldNo no : OrderedBy(state, table)) {
+  made.sorted = OrderedBy(state, table);
+  for (const FieldNo no : made.sorted) {
     if (!made.order.empty()) { made.order += ", "; }
     made.order += Quoted(FieldOf(table, no).name);
     if (!ascending) { made.order += " DESC"; }

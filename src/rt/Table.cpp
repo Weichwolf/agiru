@@ -116,6 +116,8 @@ DateTime DateTimeFromStorageText(std::string_view text) {
       TimeFromStorageText(text.substr(kTimeAt)));
 }
 
+}
+
 std::string StorageText(const void *record, const FieldDef &def) {
   switch (def.type) {
     case FieldType::Option:
@@ -135,6 +137,8 @@ std::string StorageText(const void *record, const FieldDef &def) {
     default: return FieldText(record, def);
   }
 }
+
+namespace {
 
 FieldValues ValuesOf(const void *record, const TableDef &table) {
   FieldValues values;

@@ -155,6 +155,23 @@ bool RuntimeGet(void *record, const TableDef &table);
 ///       is written against.
 bool RuntimeFindSet(void *record, const TableDef &table);
 
+/// \brief Reads the ONE row `Which` names, out of the rows this record's filters and key select.
+///
+/// \param record The record, whose state carries the filters and the key, and whose key FIELDS
+///        carry the values `=`, `<` and `>` compare against.
+/// \param table  Its declaration.
+/// \param which  `-`, `+`, or any combination of `=`, `<` and `>`, tried in the written order.
+/// \return True when a row matched.
+/// \throws Error when `-` or `+` is combined with anything, which `record-find-method.md` forbids,
+///         and when a character is none of the five.
+///
+/// \note `-` IS `FindSet` AND NOT A SECOND READER. The page says `Find` pages where `FindSet` takes
+///        the set at once, and a server-side cursor IS paging -- so the first row of the set is the
+///        first row of the table, and `Next` steps on from it the way AL's own `Find('-')` does.
+///        `+` reads ONE row through a reversed sort and leaves NO cursor: it is the end of the set,
+///        which is where `Next` must answer 0.
+bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
+
 /// \brief Steps the open cursor and reads the row it lands on.
 ///
 /// \param record The record, positioned by a previous `RuntimeFindSet`.
@@ -694,38 +711,25 @@ public:
     throw Error("Record.FilterGroup is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Find(...)`. Finds a record in a table that is based on the values stored in
-  /// keys.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Find(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Find is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.Find([Which])` -- reads the one row `Which` names.
+  ///
+  /// \param which Which row: `-` the first, `+` the last, and `=`, `<`, `>` relative to the key
+  ///        values already in the record, combinable and tried in the written order.
+  /// \return True when a row matched.
+  /// \see `record-find-method.md`, which tabulates the five characters.
+  Boolean Find(std::string_view which = "=") {
+    return detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which);
   }
 
-  /// \brief AL `Record.FindFirst(...)`. Finds the first record in a table based on the current key
-  /// and filter.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FindFirst(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.FindFirst is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.FindFirst()` -- the first row of the set.
+  /// \return True when a row matched.
+  /// \note The page says to use this rather than `Find('-')` when only the first row is wanted,
+  ///       and not to combine it with `repeat..until`. It is the same read either way.
+  Boolean FindFirst() { return Find("-"); }
 
-  /// \brief AL `Record.FindLast(...)`. Finds the last record in a table based on the current key
-  /// and filter.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FindLast(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.FindLast is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.FindLast()` -- the last row of the set.
+  /// \return True when a row matched.
+  Boolean FindLast() { return Find("+"); }
 
   /// \brief AL `Record.FindSet()`. Opens the set the filters and the key select and positions on
   ///        its first row.

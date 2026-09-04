@@ -1,3 +1,4 @@
+#include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
@@ -6,6 +7,7 @@
 #include "runtime/Table.h"
 
 #include "Cursor.h"
+#include "Rows.h"
 #include "Selection.h"
 
 #include <cstddef>
@@ -54,6 +56,90 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
   return true;
 }
 
+}
+
+namespace {
+
+const FieldDef &Sorted(const TableDef &table, FieldNo no) {
+  for (const FieldDef &def : table.fields) {
+    if (def.no == no) { return def; }
+  }
+  throw Error("the sort path names a field the table lacks");
+}
+
+std::string Reversed(const Selection &made, const TableDef &table, bool descending) {
+  std::string order;
+  for (const FieldNo no : made.sorted) {
+    if (!order.empty()) { order += ", "; }
+    order += Quoted(Sorted(table, no).name);
+    if (descending) { order += " DESC"; }
+  }
+  return order;
+}
+
+void Compare(Selection &made, const TableDef &table, const void *record, std::string_view op) {
+  std::string columns;
+  std::string values;
+  for (const FieldNo no : made.sorted) {
+    if (!columns.empty()) {
+      columns += ", ";
+      values += ", ";
+    }
+    const FieldDef &def = Sorted(table, no);
+    columns += Quoted(def.name);
+    made.binds.emplace_back(StorageText(record, def));
+    values += "$" + std::to_string(made.binds.size());
+  }
+  if (columns.empty()) { return; }
+  if (!made.where.empty()) { made.where += " AND "; }
+  made.where += "(" + columns + ") " + std::string(op) + " (" + values + ")";
+}
+
+bool ReadOne(void *record, const TableDef &table, const Selection &made, const std::string &order) {
+  std::string sql = "SELECT " + Columns(table) + " FROM " + Name(table);
+  if (!made.where.empty()) { sql += " WHERE " + made.where; }
+  if (!order.empty()) { sql += " ORDER BY " + order; }
+  sql += " LIMIT 1";
+  const Result result = Session::Current().Database().Execute(sql, made.binds);
+  if (result.Rows() == 0) { return false; }
+  for (std::size_t i = 0; i < table.fields.size(); ++i) {
+    const std::optional<std::string_view> value = result.Value(0, i);
+    if (!value.has_value()) {
+      throw Error("the column " + std::string(table.fields[i].name) +
+                  " came back null, and an AL field has no null");
+    }
+    SetFieldText(record, table.fields[i], *value);
+  }
+  return true;
+}
+
+}
+
+bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
+  RecordState *state = StateOf(record);
+  if (which.empty()) { which = "="; }
+  for (const char step : which) {
+    if ((step == '-' || step == '+') && which.size() != 1) {
+      throw Error("Record.Find: '-' and '+' can only be used alone, and this one reads \"" +
+                  std::string(which) + "\"");
+    }
+    if (step == '-') { return RuntimeFindSet(record, table); }
+    state->open.Forget();
+    state->positioned = false;
+    Selection made = Select(state, table);
+    switch (step) {
+      case '+': break;
+      case '=': Compare(made, table, record, "="); break;
+      case '>': Compare(made, table, record, ">"); break;
+      case '<': Compare(made, table, record, "<"); break;
+      default:
+        throw Error("Record.Find: '" + std::string(1, step) +
+                    "' is not one of the characters record-find-method.md declares");
+    }
+    const bool backwards = step == '+' || step == '<';
+    if (ReadOne(record, table, made, Reversed(made, table, backwards))) { return true; }
+  }
+  return false;
 }
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
