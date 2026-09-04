@@ -70,8 +70,17 @@ if [ -z "$FULL" ]; then
   # `git diff` DOES NOT SEE A FILE THAT IS NOT TRACKED YET, so a brand-new source -- exactly the
   # kind most likely to carry a finding -- would never be checked. `git status --porcelain` lists
   # modified and untracked alike, which is what "changed" has to mean here.
+  # AND A DELETED FILE IS NOT A UNIT OF ANALYSIS. `git status` lists it, clang-tidy cannot find it
+  # in `compile_commands.json`, and the whole run dies on
+  # `unable to handle compilation, expected exactly one compiler job in ''` -- which names neither
+  # the file nor the reason. Moving one source to another directory was enough.
   ours=$(git status --porcelain -- 'src/*' 'include/*' 'test/*' 2>/dev/null |
     sed 's/^...//' | grep -E '\.(cpp|h)$' | grep -v '^test/target/' || true)
+  kept=""
+  for f in $ours; do
+    [ -f "$f" ] && kept="$kept $f"
+  done
+  ours=$kept
 fi
 # THE UNIT COUNT COMES FROM compile_commands.json, WHICH WILL ONE DAY CARRY apps/ TOO. The day
 # AGIRU_BUILD_APPS defaults on, this number jumps by some thousands while the analysis still skips

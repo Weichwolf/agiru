@@ -6,7 +6,9 @@
 # signatures are AL's own. `ConvertStr(String: Text, FromCharacters: Text, ToCharacters: Text)` is
 # `methods-auto/text/text-convertstr-text-text-method.md`, and a type invented to tell the second
 # from the third would break the name equality the documentation check hangs on -- CLAUDE.md's
-# first architectural invariant.
+# first architectural invariant. `Field.Get(TableNo, No)` is the same case: both are declared
+# `Integer` in `devenv-field-virtual-table.md`. `TableId` and `FieldNo` exist and are the right
+# types EVERYWHERE ELSE; at this boundary the signature is AL's.
 #
 # It is a directory rather than a NOLINT because a NOLINT costs a number in `test/todo-baseline`,
 # and that number may only fall. It is narrowed to a directory rather than to `src/rt` because a
