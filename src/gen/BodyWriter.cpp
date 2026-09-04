@@ -899,10 +899,12 @@ public:
   }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
-    if (Local(name) != nullptr) { return false; }
+    if (const al::VarDecl *local = Local(name); local != nullptr) {
+      return TypeName(local->type) == "Interface";
+    }
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return DeclaresAnObject(declared);
+        return DeclaresAnObject(declared) || TypeName(declared.type) == "Interface";
       }
     }
     return false;
@@ -997,7 +999,7 @@ public:
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     for (const al::VarDecl &declared : page_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return DeclaresAnObject(declared);
+        return DeclaresAnObject(declared) || TypeName(declared.type) == "Interface";
       }
     }
     return false;
@@ -1109,14 +1111,15 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     const std::string locals =
         ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table), body) +
         BindsBefore(body, identifier);
-    out += ProcedureSignature(procedure,
-                              objects,
-                              table.name,
-                              identifier,
-                              !(locals.empty() && body.empty()),
-                              Shadowed(table),
-                              table.procedures,
-                              ProcedureIdentifier(table, procedure.name)) +
+    out += ProcedureSignature(
+               procedure,
+               objects,
+               table.name,
+               identifier,
+               !(locals.empty() && body.empty()),
+               Shadowed(table),
+               table.procedures,
+               Spelling{.spelled = ProcedureIdentifier(table, procedure.name), .body = body}) +
            " {";
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
@@ -1190,6 +1193,8 @@ std::string WriteSource(const al::PageObject &page,
   ControlBodies(out, page.layout, identifier, page, source, objects, named);
   ControlBodies(out, page.actions, identifier, page, source, objects, named);
   for (const al::ProcedureDecl &procedure : page.procedures) {
+    const std::string body = WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
+                             FallsOffEnd(procedure, PageNames(page, source, objects));
     out += ProcedureSignature(procedure,
                               objects,
                               page.name,
@@ -1197,10 +1202,8 @@ std::string WriteSource(const al::PageObject &page,
                               true,
                               {},
                               page.procedures,
-                              Identifier(procedure.name)) +
+                              Spelling{.spelled = Identifier(procedure.name), .body = body}) +
            " {";
-    const std::string body = WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
-                             FallsOffEnd(procedure, PageNames(page, source, objects));
     const std::string locals =
         ProcedureLocals(procedure, objects, page.name, page.procedures) +
         (source == nullptr ? std::string{}

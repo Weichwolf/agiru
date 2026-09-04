@@ -95,13 +95,13 @@ private:
 template <typename T, std::size_t N> class AlArray : public AlArray<T, 0> {
 public:
   /// \brief An array of the declared size, empty.
-  AlArray() : AlArray<T, 0>(held_.data(), N) {}
+  AlArray() : AlArray<T, 0>(nullptr, N) { this->Refer(held_.data(), N); }
 
   /// \brief A copy, pointing at ITS OWN storage.
   /// \param other The array copied.
   /// \note THE BASE'S POINTER IS NOT COPIED, IT IS REMADE. A defaulted copy would leave two arrays
   ///       referring to one buffer, and the second write would land in the first array.
-  AlArray(const AlArray &other) : AlArray<T, 0>(held_.data(), N), held_(other.held_) {
+  AlArray(const AlArray &other) : AlArray<T, 0>(nullptr, N), held_(other.held_) {
     this->Refer(held_.data(), static_cast<std::size_t>(other.Length()));
   }
 
@@ -141,7 +141,7 @@ public:
   ///          parameter's 17 it would read ten elements the caller never filled.
   template <std::size_t M>
     requires(M != N && M != 0)
-  AlArray(const AlArray<T, M> &other) : AlArray<T, 0>(held_.data(), N) {
+  AlArray(const AlArray<T, M> &other) : AlArray<T, 0>(nullptr, N) {
     const auto taken =
         static_cast<std::size_t>(other.Length()) < N ? static_cast<std::size_t>(other.Length()) : N;
     for (std::size_t item = 0; item < taken; ++item) {

@@ -73,6 +73,38 @@ public:
   ///       assignment and argument passing two different things, which they are not in AL.
   constexpr Enum(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
+  /// \brief Holds the ordinal another enum carries.
+  ///
+  /// \tparam F The other enum's enumeration.
+  /// \param other The other enum.
+  ///
+  /// \note AL PASSES AN ENUM TO AN ENUM PARAMETER WHATEVER DECLARED IT, and the BaseApp's own test
+  ///       library is where that is declared: `LibraryInventory.CreateItemChargeAssignment` takes a
+  ///       `Enum "Sales Document Type"` and hands it to `InsertItemChargeAssignment`, whose
+  ///       parameter is a `Enum "Sales Applies-to Document Type"`. Two declarations are two C++
+  ///       types, and refusing the pass would be a rule AL does not have.
+  ///
+  /// \warning IT IS THE ORDINAL THAT TRAVELS AND NOT THE VALUE'S NAME. Two enums whose values carry
+  ///          different numbers convert to each other's WRONG value, and AL does the same -- which
+  ///          is why the pair above declares the same ordinals at both ends.
+  template <typename F>
+    requires(!std::is_same_v<F, E>)
+  constexpr Enum(const Enum<F> &other) : OrdinalValue(other.AsInteger()) {}
+
+  /// \brief Assigns the ordinal another enum carries.
+  /// \tparam F The other enum's enumeration.
+  /// \param other The other enum.
+  /// \return This enum.
+  /// \note IT IS DECLARED EVEN THOUGH THE CONSTRUCTOR WOULD SERVE, because without it the
+  ///       assignment is AMBIGUOUS: the other enum reads as an `Integer` through `OrdinalValue` and
+  ///       converts to this one, and neither path is better.
+  template <typename F>
+    requires(!std::is_same_v<F, E>)
+  constexpr Enum &operator=(const Enum<F> &other) {
+    SetOrdinal(other.AsInteger());
+    return *this;
+  }
+
   /// \brief Returns an enum with the integer value.
   ///
   /// \param value The ordinal.

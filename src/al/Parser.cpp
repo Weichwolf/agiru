@@ -6,6 +6,7 @@
 #include "Token.h"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cstddef>
 #include <string>
@@ -500,6 +501,31 @@ private:
     }
   }
 
+  static bool TakesASubtype(std::string_view type) {
+    static constexpr std::array kWithOne{
+        std::string_view{"Record"},
+        std::string_view{"Codeunit"},
+        std::string_view{"Page"},
+        std::string_view{"Report"},
+        std::string_view{"Query"},
+        std::string_view{"XmlPort"},
+        std::string_view{"Enum"},
+        std::string_view{"Interface"},
+        std::string_view{"TestPage"},
+        std::string_view{"TestRequestPage"},
+        std::string_view{"ControlAddIn"},
+        std::string_view{"DotNet"},
+        std::string_view{"RecordRef"},
+        std::string_view{"FilterPageBuilder"},
+        std::string_view{"TestAction"},
+        std::string_view{"TestField"},
+        std::string_view{"Automation"},
+        std::string_view{"Label"},
+    };
+    return std::ranges::any_of(kWithOne,
+                               [type](std::string_view known) { return SameName(known, type); });
+  }
+
   VarDecl ReadType() {
     VarDecl declared;
     ReadDimensions(declared);
@@ -529,8 +555,9 @@ private:
       }
       while (!AtEnd() && !AtPunctuation("]")) { Advance(); }
       Expect("]");
-    } else if (Peek().kind == TokenKind::Identifier || Peek().kind == TokenKind::QuotedIdentifier ||
-               Peek().kind == TokenKind::Integer) {
+    } else if (TakesASubtype(declared.type) &&
+               (Peek().kind == TokenKind::Identifier ||
+                Peek().kind == TokenKind::QuotedIdentifier || Peek().kind == TokenKind::Integer)) {
       declared.subtype = ReadSubtypeName();
     }
     while (AtKeyword("temporary")) {

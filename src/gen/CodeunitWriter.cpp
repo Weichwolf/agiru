@@ -14,6 +14,7 @@
 #include <cctype>
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -327,9 +328,13 @@ std::string Qualified(const std::string &type, const std::set<std::string> &name
 
 std::string Unsized(const std::string &type) {
   const std::size_t at = type.rfind(", ");
-  return type.starts_with("AlArray<") && type.ends_with(">") && at != std::string::npos
-             ? type.substr(0, at) + ", 0>"
-             : type;
+  if (type.starts_with("AlArray<") && type.ends_with(">") && at != std::string::npos) {
+    return type.substr(0, at) + ", 0>";
+  }
+  if (!type.ends_with(">") || std::ranges::count(type, '<') != 1) { return type; }
+  const std::size_t opens = type.find('<');
+  const std::string_view head{type.data(), opens + 1};
+  return head.ends_with("Text<") || head.ends_with("Code<") ? std::string(head) + "0>" : type;
 }
 
 std::string Signature(const al::VarDecl &declared,
@@ -338,16 +343,21 @@ std::string Signature(const al::VarDecl &declared,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
   if (Hidden(type, names)) { type = Qualified(type, names); }
-  if (declared.byReference && !declared.dimensions.empty()) { type = Unsized(type); }
+  if (declared.byReference) { type = Unsized(type); }
   return type + (declared.byReference ? " &" : " ");
 }
+
+std::string WithoutLiterals(const std::string &body);
+
+bool Mentions(const std::string &body, const std::string &name);
 
 std::string Parameters(const al::ProcedureDecl &procedure,
                        const Objects &objects,
                        bool named,
                        const std::string &unit,
                        const std::set<std::string> &shadowed = {},
-                       const std::vector<al::ProcedureDecl> &all = {}) {
+                       const std::vector<al::ProcedureDecl> &all = {},
+                       const std::optional<std::string> &body = std::nullopt) {
   std::set<std::string> names = shadowed;
   for (const al::VarDecl &parameter : procedure.parameters) {
     names.insert(Identifier(parameter.name));
@@ -355,6 +365,10 @@ std::string Parameters(const al::ProcedureDecl &procedure,
   std::string out;
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
+    if (named && body.has_value() &&
+        !Mentions(WithoutLiterals(*body), Identifier(procedure.parameters[i].name))) {
+      out += "[[maybe_unused]] ";
+    }
     out += Signature(procedure.parameters[i],
                      objects,
                      names,
@@ -1029,12 +1043,13 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
-    out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures) + ") {";
     const std::string body =
         publisher ? std::string{}
                   : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
                         FallsOff(procedure, CodeunitNames(unit, procedure, objects));
+    out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
+           "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures, body) +
+           ") {";
     const std::string locals =
         publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures, body);
     if (locals.empty() && body.empty()) {
@@ -1073,12 +1088,12 @@ std::string ProcedureSignature(const al::ProcedureDecl &procedure,
                                bool named,
                                const std::set<std::string> &shadowed,
                                const std::vector<al::ProcedureDecl> &all,
-                               const std::string &spelled) {
+                               const Spelling &how) {
   std::set<std::string> hiding = shadowed;
   hiding.insert(Identifier(procedure.name));
-  const std::string name = spelled.empty() ? Identifier(procedure.name) : spelled;
+  const std::string name = how.spelled.empty() ? Identifier(procedure.name) : how.spelled;
   return Returns(procedure, objects, hiding) + " " + qualifier + "::" + name + "(" +
-         Parameters(procedure, objects, named, owner, hiding, all) + ")";
+         Parameters(procedure, objects, named, owner, hiding, all, how.body) + ")";
 }
 
 std::string FallsOffEnd(const al::ProcedureDecl &procedure, const Names &names) {

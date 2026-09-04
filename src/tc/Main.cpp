@@ -519,6 +519,12 @@ void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects)
          Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(held.objects[i])},
          agiru::gen::WriteEnum(held.objects[i], held.paths[i], objects));
     ++run.written;
+    const std::string source = agiru::gen::WriteEnumSource(held.objects[i], held.paths[i], objects);
+    if (source.empty()) { continue; }
+    Keep(run,
+         Output{.directory = run.output, .relative = agiru::gen::EnumSourcePath(held.objects[i])},
+         source);
+    ++run.written;
   }
 }
 
