@@ -48,7 +48,7 @@ void TheDeclaredOrdinalSurvivesTheTranslation() {
   CHECK_TRUE("the enum object parses whole", object.values.size() == 7);
   CHECK_TRUE("and it is the sparse one", object.values.back().ordinal == 10);
 
-  const std::string written = agiru::gen::WriteEnum(object, std::string(kEnumPath));
+  const std::string written = agiru::gen::WriteEnum(object, std::string(kEnumPath), {});
   CHECK_TRUE("the last enumerator carries 10 and not its position",
              Has(written, "AllocationAccount = 10,"));
   CHECK_TRUE("the value table carries the same ordinal",
@@ -66,7 +66,7 @@ void TheValueTableIsEmittedSortedEvenWhenAlIsNot() {
   // writes, so the generator sorts and the ENUMERATORS keep AL's order.
   const agiru::al::EnumObject object =
       agiru::al::ParseEnum(Read("Foundation/Enums/FlushingMethodFilter.Enum.al"));
-  const std::string written = agiru::gen::WriteEnum(object, "FlushingMethodFilter.Enum.al");
+  const std::string written = agiru::gen::WriteEnum(object, "FlushingMethodFilter.Enum.al", {});
 
   const std::size_t fifty = written.find(".ordinal = 50");
   const std::size_t five = written.find(".ordinal = 5,");

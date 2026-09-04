@@ -124,7 +124,8 @@ const std::map<std::string, std::string> &DoorSpellings() {
   return spellings;
 }
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 32> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 33> kElsewhere{{
+    {"Implementation", "runtime/Implementation.h"},
     {"Temporary", "runtime/Table.h"},
     {"StateHandle", "runtime/RecordState.h"},
     {"TestPage", "runtime/test/TestPage.h"},

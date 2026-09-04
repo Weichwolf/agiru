@@ -104,7 +104,7 @@ public:
     if (AtKeyword("implements")) {
       Advance();
       while (!AtEnd() && !AtPunctuation("{")) {
-        (void)ExpectName();
+        unit.implements.push_back(ExpectName());
         if (AtPunctuation(",")) { Advance(); }
       }
     }
@@ -147,7 +147,7 @@ public:
     if (AtKeyword("implements")) {
       Advance();
       while (!AtEnd() && !AtPunctuation("{")) {
-        (void)ExpectName();
+        object.implements.push_back(ExpectName());
         if (AtPunctuation(",")) { Advance(); }
       }
     }

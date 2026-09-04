@@ -465,7 +465,13 @@ void WritePages(Run &run,
   }
 }
 
-void ScanEnums(Run &run, Counts &counts, const Extensions &store, agiru::gen::EnumIndex &index) {
+struct Enums {
+  std::vector<agiru::al::EnumObject> objects;
+  std::vector<std::string> paths;
+};
+
+void ScanEnums(
+    Run &run, Counts &counts, const Extensions &store, agiru::gen::EnumIndex &index, Enums &held) {
   std::vector<agiru::al::EnumObject> objects;
   std::vector<std::string> paths;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Enum.al")) {
@@ -497,10 +503,16 @@ void ScanEnums(Run &run, Counts &counts, const Extensions &store, agiru::gen::En
                                                .header = agiru::gen::EnumHeaderPath(object)});
   }
   if (run.output.empty()) { return; }
-  for (std::size_t i = 0; i < objects.size(); ++i) {
+  held.objects = std::move(objects);
+  held.paths = std::move(paths);
+}
+
+void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (std::size_t i = 0; i < held.objects.size(); ++i) {
     Keep(run,
-         Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(objects[i])},
-         agiru::gen::WriteEnum(objects[i], paths[i]));
+         Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(held.objects[i])},
+         agiru::gen::WriteEnum(held.objects[i], held.paths[i], objects));
     ++run.written;
   }
 }
@@ -908,7 +920,8 @@ int Scan(const Job &job) {
     Counts extensions;
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
-    ScanEnums(run, enums, store, index);
+    Enums heldEnums;
+    ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
@@ -919,6 +932,7 @@ int Scan(const Job &job) {
     Pages parsed = IndexPages(run, pages, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
+    WriteEnums(run, heldEnums, objects);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
     WritePages(run, parsed, objects, gathered, everyTable);

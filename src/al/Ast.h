@@ -72,6 +72,7 @@ struct CodeunitObject {
   int id = 0;
   std::string name;
   std::string nameSpace;
+  std::vector<std::string> implements;
   std::vector<Property> properties;
   std::vector<ProcedureDecl> procedures;
   std::vector<VarDecl> variables;
@@ -88,6 +89,7 @@ struct EnumObject {
   int id = 0;
   std::string name;
   std::string nameSpace;
+  std::vector<std::string> implements;
   std::vector<Property> properties;
   std::vector<EnumValueDecl> values;
 };

@@ -141,9 +141,10 @@ const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
 
 std::string InterfaceType(const al::VarDecl &declared, const Objects &objects) {
   const auto found = objects.interfaces.find(LowerKey(declared.subtype));
-  return (found != objects.interfaces.end() ? found->second.identifier
+  return "::agiru::Implementation<" +
+         (found != objects.interfaces.end() ? found->second.identifier
                                             : "absent::" + Identifier(declared.subtype)) +
-         " *";
+         ">";
 }
 
 constexpr std::size_t kEveryArgument = static_cast<std::size_t>(-1);
@@ -539,6 +540,12 @@ void ReachTableNo(const al::CodeunitObject &unit,
 
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
+  for (const std::string &face : unit.implements) {
+    const auto found = objects.interfaces.find(LowerKey(face));
+    if (found != objects.interfaces.end() && !found->second.header.empty()) {
+      headers.insert(found->second.header);
+    }
+  }
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared) || HandleMember(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
@@ -846,10 +853,17 @@ public:
     const auto same = [&name](const al::VarDecl &declared) {
       return LowerKey(declared.name) == LowerKey(std::string(name));
     };
-    if (std::ranges::any_of(procedure_.variables, same)) { return false; }
-    if (std::ranges::any_of(procedure_.parameters, same)) { return false; }
+    const auto face = [](const al::VarDecl &declared) {
+      return TypeName(declared.type) == "Interface";
+    };
+    for (const al::VarDecl &declared : procedure_.variables) {
+      if (same(declared)) { return face(declared); }
+    }
+    for (const al::VarDecl &declared : procedure_.parameters) {
+      if (same(declared)) { return face(declared); }
+    }
     for (const al::VarDecl &declared : unit_.variables) {
-      if (same(declared)) { return NamesAnObject(declared); }
+      if (same(declared)) { return NamesAnObject(declared) || face(declared); }
     }
     return false;
   }
@@ -1282,7 +1296,13 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "namespace agiru::app::codeunits {\n\n";
   const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
   out += "class " + unitClass + ";\n" + ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
-  out += "class " + unitClass + " : public Codeunit<" + unitClass + "> {\npublic:\n";
+  out += "class " + unitClass + " : public Codeunit<" + unitClass + ">";
+  for (const std::string &face : unit.implements) {
+    const auto found = objects.interfaces.find(LowerKey(face));
+    if (found == objects.interfaces.end()) { continue; }
+    out += ", public " + found->second.identifier;
+  }
+  out += " {\npublic:\n";
 
   const std::string source = SourceTableOf(unit, objects);
   if (!source.empty()) { out += "  " + source + " Rec;\n\n"; }
