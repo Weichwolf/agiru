@@ -914,6 +914,7 @@ public:
     if (const al::VarDecl *local = Local(name); local != nullptr) {
       return Identifier(local->name);
     }
+    if (LocalLabel(name)) { return Identifier(std::string(name)); }
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
         return "Var_Block->" + VariableIdentifier(table_, declared.name);
@@ -931,9 +932,18 @@ public:
     return {};
   }
 
+  [[nodiscard]] bool LocalLabel(std::string_view name) const {
+    return running_ != nullptr &&
+           std::ranges::any_of(running_->labels, [name](const al::LabelDecl &label) {
+             return SameName(label.name, name);
+           });
+  }
+
   [[nodiscard]] bool IsLabel(std::string_view name) const override {
-    return std::ranges::any_of(
-        table_.labels, [name](const al::LabelDecl &label) { return SameName(label.name, name); });
+    return LocalLabel(name) ||
+           std::ranges::any_of(table_.labels, [name](const al::LabelDecl &label) {
+             return SameName(label.name, name);
+           });
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {

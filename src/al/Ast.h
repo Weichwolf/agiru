@@ -47,6 +47,7 @@ struct ProcedureDecl {
   std::string name;
   std::vector<Parameter> parameters;
   std::vector<VarDecl> variables;
+  std::vector<LabelDecl> labels;
   std::string returnName;
   std::string returnType;
   std::string returnSubtype;

@@ -432,8 +432,7 @@ private:
       procedure.returned.name = procedure.returnName;
     }
     if (AtPunctuation(";")) { Advance(); }
-    std::vector<LabelDecl> locals;
-    procedure.tokens = SkipBeginEnd(locals, procedure.variables);
+    procedure.tokens = SkipBeginEnd(procedure.labels, procedure.variables);
     procedure.body = ParseStatements(procedure.tokens);
     return procedure;
   }

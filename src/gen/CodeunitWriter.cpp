@@ -761,8 +761,9 @@ public:
 
   [[nodiscard]] bool IsLabel(std::string_view name) const override {
     const std::string key = LowerKey(std::string(name));
-    return std::ranges::any_of(
-        unit_.labels, [&key](const al::LabelDecl &label) { return LowerKey(label.name) == key; });
+    const auto named = [&key](const al::LabelDecl &label) { return LowerKey(label.name) == key; };
+    return std::ranges::any_of(procedure_.labels, named) ||
+           std::ranges::any_of(unit_.labels, named);
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
@@ -1015,12 +1016,17 @@ std::string Locals(const al::ProcedureDecl &procedure,
   for (const al::VarDecl &declared : procedure.variables) {
     names.insert(Identifier(declared.name));
   }
+  for (const al::LabelDecl &label : procedure.labels) { names.insert(Identifier(label.name)); }
   if (!procedure.returnName.empty()) { names.insert(Identifier(procedure.returnName)); }
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
     if (Hidden(type, names)) { type = Qualified(type, names); }
     out +=
         "  " + unused(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
+  }
+  for (const al::LabelDecl &label : procedure.labels) {
+    out += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
+           Literal(label.text) + "};\n";
   }
   return out;
 }
