@@ -76,6 +76,11 @@ def parse(md):
     # that a comma follows is an optionality marker, and its match closes it.
     cleaned = []
     drop = []
+    # WHERE THE OPTIONAL PART BEGINS. AL marks it with a bracket -- `PadStr(String, Length [,
+    # FillCharacter])` -- and a call may leave everything after it out. Dropping the parameters was
+    # wrong (the signature lost them) and keeping them without a default is wrong too (the call does
+    # not compile), so the position is remembered and the tail gets defaults.
+    optional_from = None
     depth = 0
     i = 0
     while i < len(inner):
@@ -84,6 +89,7 @@ def parse(md):
             depth += 1
             if not "".join(cleaned).rstrip().endswith("of"):
                 drop.append(depth)
+                optional_from = len(cleaned) if optional_from is None else optional_from
                 i += 1
                 continue
         if c == "]":
@@ -125,8 +131,13 @@ def parse(md):
     if r: ret = r.group(2)
     static = "An instance of the" not in text.split("## Parameters",1)[-1].split("*")[0:1] and \
              not re.search(r"\*%s\*\s*\n&emsp;Type: \[%s\]" % (re.escape(owner), re.escape(owner)), text)
+    # How many of the parameters AL requires; the rest carry a default.
+    required = len(out)
+    if optional_from is not None:
+        head = "".join(cleaned[:optional_from])
+        required = head.count(",") + (1 if head.strip() else 0)
     return dict(owner=owner, method=method, brief=brief, params=out, ret=ret, static=static,
-                doc=md.name, dir=md.parent.name)
+                required=min(required, len(out)), doc=md.name, dir=md.parent.name)
 
 def build(typename):
     d = DOC/typename.lower()
@@ -169,7 +180,16 @@ def emit(name, methods, known):
         for _, _, t in ps:
             if declarable(t): named.add(cpp_type(t).replace("::agiru::", ""))
         if declarable(m["ret"]): named.add(cpp_type(m["ret"]).replace("::agiru::", ""))
-        args = ", ".join(f"{p} {n}" for n, p, _ in ps)
+        required = m.get("required", len(ps))
+        shortest = min((len(o["params"]) for o in methods if o["method"] == m["method"]),
+                       default=len(ps))
+        overloaded = shortest < len(ps)
+        defaults = [i >= required and not (p.endswith("&") and not p.startswith("const")) and not overloaded
+                    for i, (_, p, _) in enumerate(ps)]
+        for i in range(len(defaults) - 2, -1, -1):
+            defaults[i] = defaults[i] and defaults[i + 1]
+        args = ", ".join(f"{p} {n}" + (" = {}" if defaults[i] else "")
+                         for i, (n, p, _) in enumerate(ps))
         al = f"{name}.{m['method']}(" + ", ".join(t for _, _, t in ps) + ")"
         doc = [f"  /// \\brief AL `{al}`." + (f" {m['brief']}" if m["brief"] else "")]
         for n, _, t in ps:

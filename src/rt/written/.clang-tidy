@@ -1,0 +1,17 @@
+# THE AL FREE FUNCTIONS THAT ARE WRITTEN RATHER THAN GENERATED, and nothing else, live here.
+#
+# `bugprone-easily-swappable-parameters` is ON everywhere in this tree and stays on -- `TableId`,
+# `FieldNo` and `EntryNo` are all int32 and AL swaps them silently, which is what the strong types
+# are for. It is switched off in this ONE directory because the finding here is not a defect: the
+# signatures are AL's own. `ConvertStr(String: Text, FromCharacters: Text, ToCharacters: Text)` is
+# `methods-auto/text/text-convertstr-text-text-method.md`, and a type invented to tell the second
+# from the third would break the name equality the documentation check hangs on -- CLAUDE.md's
+# first architectural invariant.
+#
+# It is a directory rather than a NOLINT because a NOLINT costs a number in `test/todo-baseline`,
+# and that number may only fall. It is narrowed to a directory rather than to `src/rt` because a
+# directory whose whole contents are AL signatures is the narrowest point available -- the same
+# move as `misc-include-cleaner.IgnoreHeaders` in the root config, at the same scale.
+InheritParentConfig: true
+Checks: >
+  -bugprone-easily-swappable-parameters

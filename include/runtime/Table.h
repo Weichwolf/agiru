@@ -1543,14 +1543,6 @@ public:
     Insert();
   }
 
-  /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` on a temporary record.
-  /// \param RunTrigger         Whether the table's `OnInsert` runs.
-  /// \param InsertWithSystemId Whether an assigned SystemId is kept.
-  void Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
-    static_cast<void>(InsertWithSystemId);
-    Insert(RunTrigger);
-  }
-
   /// \brief AL `Record.Modify(RunTrigger)` on a temporary record.
   /// \param RunTrigger Whether the table's `OnModify` runs.
   /// \return True when a row carried this primary key.

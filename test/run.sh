@@ -22,5 +22,10 @@ for c in $cases; do
   n=$((n + 1))
   if ! "$c"; then red=$((red + 1)); fi
 done
+
+# THE DOOR'S GENERATOR IS A CASE TOO, and it is a script rather than a binary because what it
+# asserts is about FILES: that running the generator leaves them as they are.
+n=$((n + 1))
+if ! sh "$(dirname "$0")/door-reproduces.sh"; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]

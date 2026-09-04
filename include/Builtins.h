@@ -1,7 +1,5 @@
 #pragma once
 
-#include "platform/Date.h"
-#include "platform/Integer.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
@@ -11,6 +9,7 @@
 #include "type/Char.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
+#include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
@@ -19,6 +18,7 @@
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
+#include "type/Integer.h"
 #include "type/KeyRef.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
@@ -32,7 +32,8 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
-#include <optional>
+#include "BuiltinsWritten.h"
+
 #include <string>
 #include <string_view>
 
@@ -53,15 +54,6 @@
 
 namespace agiru {
 
-/// \brief Refuses a door function by name.
-///
-/// \param what The AL signature, spelled as the page states it.
-/// \throws Error always.
-///
-/// \note IT IS DECLARED HERE BECAUSE THE TEMPLATES NEED IT. A builtin whose parameter is `var Any`
-///       is a template -- AL's `Clear` takes a record, a text or a list by reference and a Variant
-///       takes none of them -- so its body is in this header rather than in the source, and it has
-///       to reach the refusal from here.
 [[noreturn]] void RefuseDoor(std::string_view what);
 
 /// \brief AL `System.Abs(Decimal)`. Calculates the absolute value of a number (Decimal, Integer or
@@ -76,14 +68,6 @@ namespace agiru {
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string ApplicationPath();
-
-/// \brief AL `System.ArrayLen(Array of [Any], Integer)`. Returns the total number of elements in an
-/// array or the number of elements in a specific dimension.
-/// \param Array The AL `Array of [Any]`.
-/// \param Dimension The AL `Integer`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer ArrayLen(const ::agiru::Variant &Array, ::agiru::Integer Dimension = {});
 
 /// \brief AL `System.CalcDate(DateFormula, Date)`. Calculates a new date that is based on a date
 /// expression and a reference date.
@@ -395,6 +379,12 @@ std::string GetLastErrorCode();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Variant GetLastErrorObject();
 
+/// \brief AL `System.GetLastErrorText(Boolean)`. Gets the last error that occurred in the debugger.
+/// \param ExcludeCustomerContent The AL `Boolean`.
+/// \return The AL `Text`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent);
+
 /// \brief AL `System.GetUrl(ClientType, Text, ObjectType, Integer, RecordRef, Boolean)`. Generates
 /// a URL for the specified client target that is based on the configuration of the server instance.
 /// If the code runs in a multitenant deployment architecture, the generated URL will automatically
@@ -591,139 +581,6 @@ std::string TemporaryPath();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date WorkDate(::agiru::Date NewDate = {});
 
-/// \brief AL `Text.ConvertStr(Text, Text, Text)`. Replaces all chars in source found in
-/// FromCharacters with the corresponding char in ToCharacters and returns the converted string. If
-/// the length of the FromCharacters parameter and the ToChars parameter are different, an exception
-/// is thrown. If the parameter FromCharacters or the parameter ToChars is empty, the source is
-/// returned unmodified. Each element in source is only converted ONCE a double-replacement cannot
-/// happen.
-/// \param String The AL `Text`.
-/// \param FromCharacters The AL `Text`.
-/// \param ToCharacters The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-ConvertStr(std::string_view String, std::string_view FromCharacters, std::string_view ToCharacters);
-
-/// \brief AL `Text.CopyStr(Text, Integer, Integer)`. Copies a substring of any length from a
-/// specific position in a string (text or code) to a new string.
-/// \param String The AL `Text`.
-/// \param Position The AL `Integer`.
-/// \param Length The AL `Integer`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string CopyStr(std::string_view String,
-                    ::agiru::Integer Position,
-                    std::optional<::agiru::Integer> Length = std::nullopt);
-
-/// \brief AL `Text.DelChr(Text, Text, Text)`. Deletes chars contained in the which parameter in a
-/// string based on the contents on the where parameter. If the where parameter contains an
-/// equal-sign, then all occurrences of characters in which is deleted from the current value. If
-/// the where parameter contains a less-than, then the characters are only deleted when they are
-/// first in the string. If the where parameter contains a greater-than, then the characters are
-/// only deleted when they are the last in the string. If the where parameter contains any other
-/// char, an exception is thrown. If the where parameter or the which parameter is empty, the source
-/// is returned unmodified. The which parameter is to be considered as an array of chars to delete
-/// where the order does not matter.
-/// \param String The AL `Text`.
-/// \param Where Where to delete, as a set of `=`, `<` and `>`; nothing means `=`.
-/// \param Which The characters to delete; nothing means a space.
-/// \return The AL `Text`.
-/// \note OMITTED IS NOT EMPTY. The page's sentence about an empty parameter is about a caller who
-///       PASSES `''`, and AL's own defaults are `=` and a space -- which is what makes
-///       `DelChr(S)` strip every space and `DelChr(S, '<>')` trim both ends.
-std::string DelChr(std::string_view String,
-                   std::optional<std::string_view> Where = std::nullopt,
-                   std::optional<std::string_view> Which = std::nullopt);
-
-/// \brief AL `Text.DelStr(Text, Integer, Integer)`. Deletes a substring inside a string (text or
-/// code).
-/// \param String The AL `Text`.
-/// \param Position The AL `Integer`.
-/// \param Length The AL `Integer`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string DelStr(std::string_view String,
-                   ::agiru::Integer Position,
-                   std::optional<::agiru::Integer> Length = std::nullopt);
-
-/// \brief AL `Text.IncStr(Text)`. Increases a positive number or decrease a negative number inside
-/// a string by one (1).
-/// \param String The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string IncStr(std::string_view String);
-
-/// \brief AL `Text.IncStr(Text, BigInteger)`. Increments the last positive number by the provided
-/// increment. The result of the increment must be zero or positive, otherwise an error is thrown.
-/// \param String The AL `Text`.
-/// \param Increment The AL `BigInteger`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string IncStr(std::string_view String, ::agiru::BigInteger Increment);
-
-/// \brief AL `Text.InsStr(Text, Text, Integer)`. Inserts a substring into a string.
-/// \param String The AL `Text`.
-/// \param SubString The AL `Text`.
-/// \param Position The AL `Integer`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Position);
-
-/// \brief AL `Text.LowerCase(Text)`. Converts all letters in a string to lowercase.
-/// \param String The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string LowerCase(std::string_view String);
-
-/// \brief AL `Text.PadStr(Text, Integer, Text)`. Changes the length of a string to a specified
-/// length. If the string is shorter than the specified length, length spaces are added at the end
-/// of the string to match the length. If the string is longer than the specified length, the string
-/// is truncated. If the specified length is less than 0, an exception is thrown.
-/// \param String The AL `Text`.
-/// \param Length The AL `Integer`.
-/// \param FillCharacter The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string PadStr(std::string_view String,
-                   ::agiru::Integer Length,
-                   std::optional<std::string_view> FillCharacter = std::nullopt);
-
-/// \brief AL `Text.SelectStr(Integer, Text)`. Retrieves a substring from a comma-separated string.
-/// \param Number The AL `Integer`.
-/// \param CommaString The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
-
-/// \brief AL `Text.StrCheckSum(Text, Text, Integer)`. Calculates a checksum for a string that
-/// contains a number. If the source is empty, 0 is returned. Each char in the source and in the
-/// weight must be a numeric character 0-9, otherwise an exception is thrown. If the WeightString
-/// parameter is shorter then the source, it is padded with '1' up until the length of source. If
-/// the WeightString parameter is longer than the source, an exception is thrown.
-/// \param String The AL `Text`.
-/// \param WeightString The AL `Text`.
-/// \param Modulus The number in the checksum formula; nothing means 10, which the page gives as
-///                the default.
-/// \return The AL `Integer`.
-::agiru::Integer StrCheckSum(std::string_view String,
-                             std::string_view WeightString = {},
-                             std::optional<::agiru::Integer> Modulus = std::nullopt);
-
-/// \brief AL `Text.StrPos(Text, Text)`. Searches for the first occurrence of substring inside a
-/// string.
-/// \param String The AL `Text`.
-/// \param SubString The AL `Text`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer StrPos(std::string_view String, std::string_view SubString);
-
-/// \brief AL `Text.UpperCase(Text)`. Converts all letters in a string to uppercase.
-/// \param String The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string UpperCase(std::string_view String);
-
 /// \brief AL `Database.AlterKey(KeyRef, Boolean)`. Alter a table's key in SQL, either disabling or
 /// enabling it. Any alteration only pertains to the current transaction and will be reverted at the
 /// end of the current transaction. Any alteration will fail if it's called on System or non-SQL
@@ -763,7 +620,8 @@ std::string CompanyName();
 /// \param TransactionType The AL `TransactionType`.
 /// \return The AL `TransactionType`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::TransactionType CurrentTransactionType(const ::agiru::TransactionType &TransactionType);
+::agiru::TransactionType
+CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
 
 /// \brief AL `Database.DataFileInformation(Boolean, Text, Text, Boolean, Boolean, Boolean, Text,
 /// DateTime, Record)`. Specifies data from a file that has been exported from a database.
@@ -801,11 +659,11 @@ std::string CompanyName();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
                             std::string &FileName,
-                            std::string_view Description,
-                            ::agiru::Boolean IncludeApplication,
-                            ::agiru::Boolean IncludeApplicationData,
-                            ::agiru::Boolean IncludeGlobalData,
-                            const ::agiru::RecordRef &CompanyRecord);
+                            std::string_view Description = {},
+                            ::agiru::Boolean IncludeApplication = {},
+                            ::agiru::Boolean IncludeApplicationData = {},
+                            ::agiru::Boolean IncludeGlobalData = {},
+                            const ::agiru::RecordRef &CompanyRecord = {});
 
 /// \brief AL `Database.GetDefaultTableConnection(TableConnectionType)`. Gets the default table
 /// connection based on the specified connection type. You must already have registered a table
@@ -835,9 +693,9 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
                             std::string &FileName,
-                            ::agiru::Boolean IncludeApplicationData,
-                            ::agiru::Boolean IncludeGlobalData,
-                            const ::agiru::RecordRef &CompanyRecord);
+                            ::agiru::Boolean IncludeApplicationData = {},
+                            ::agiru::Boolean IncludeGlobalData = {},
+                            const ::agiru::RecordRef &CompanyRecord = {});
 
 /// \brief AL `Database.IsInWriteTransaction()`. Checks whether or not you are in a write
 /// transaction.
@@ -1053,7 +911,7 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
                      const ::agiru::AuditCategory &SecurityAuditCategory,
                      ::agiru::Integer AuditMessageOperation,
                      ::agiru::Integer AuditMessageOperationResult,
-                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
 
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
 /// Dictionary of [Text, Text])`. Logs a trace message to a telemetry account.
@@ -1106,8 +964,8 @@ void LogSecurityAudit(std::string_view Description,
                       const ::agiru::SecurityOperationResult &Result,
                       std::string_view ResultDescription,
                       const ::agiru::AuditCategory &AuditCategory,
-                      const ::agiru::Variant &TargetType,
-                      const ::agiru::Variant &TargetName);
+                      const ::agiru::Variant &TargetType = {},
+                      const ::agiru::Variant &TargetName = {});
 
 /// \brief AL `Session.SendTraceTag(Text, Text, Verbosity, Text, DataClassification)`. Send a trace
 /// tag to the telemetry service.
@@ -1121,7 +979,7 @@ void SendTraceTag(std::string_view Tag,
                   std::string_view Category,
                   const ::agiru::Verbosity &Verbosity,
                   std::string_view Message,
-                  const ::agiru::DataClassification &DataClassification);
+                  const ::agiru::DataClassification &DataClassification = {});
 
 /// \brief AL `Session.SetDocumentServiceToken(Text)`. Sets the document service token in the
 /// current session.
@@ -1194,8 +1052,9 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Value1 The AL `Any`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean
-Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1);
+::agiru::Boolean Confirm(std::string_view String,
+                         ::agiru::Boolean Default = {},
+                         const ::agiru::Variant &Value1 = {});
 
 /// \brief AL `Dialog.LogInternalError(Text, DataClassification, Verbosity)`. Log internal errors
 /// for telemetry.
@@ -1223,7 +1082,7 @@ void LogInternalError(std::string_view Message,
 /// \param String The AL `Text`.
 /// \param Value The AL `Any`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Message(std::string_view String, const ::agiru::Variant &Value);
+void Message(std::string_view String, const ::agiru::Variant &Value = {});
 
 /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series of
 /// options.
@@ -1386,6 +1245,6 @@ void Message(std::string_view String, const ::agiru::Variant &Value);
 /// \param Value1 The AL `SecretText`.
 /// \return The AL `SecretText`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::SecretText SecretStrSubstNo(std::string_view String, const ::agiru::SecretText &Value1);
-
+::agiru::SecretText SecretStrSubstNo(std::string_view String,
+                                     const ::agiru::SecretText &Value1 = {});
 }
