@@ -14,6 +14,7 @@
 #include <cctype>
 #include <cstddef>
 #include <map>
+#include <regex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -761,6 +762,19 @@ public:
     return AsTheDoorSpellsIt(Identifier(member.field));
   }
 
+  [[nodiscard]] std::string ObjectNamed(std::string_view kind,
+                                        std::string_view name) const override {
+    const TableIndex *index = nullptr;
+    if (kind == "codeunits") { index = &objects_.codeunits; }
+    if (kind == "tables") { index = &objects_.tables; }
+    if (kind == "pages") { index = &objects_.pages; }
+    if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    const auto found = index->find(LowerKey(std::string(name)));
+    if (found != index->end()) { return found->second.identifier; }
+    return "absent::" + Identifier(name);
+  }
+
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     const auto found = objects_.enums.find(LowerKey(std::string(name)));
     return found == objects_.enums.end() ? std::string{} : "enums::" + Identifier(name);
@@ -968,10 +982,11 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
-  out += SourceIncludes(unit, objects);
+  const std::size_t includeAt = out.size();
   const std::string catalogue = TestCatalogueOf(unit, identifier);
   if (!catalogue.empty()) { out += "\n#include <array>\n"; }
   out += "\nnamespace agiru::app::codeunits {\n\n";
+  const std::size_t bodyAt = out.size();
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
@@ -996,6 +1011,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   out += catalogue;
   out += "} // namespace agiru::app::codeunits\n";
+  out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Codeunit);
 }
 
@@ -1046,6 +1062,30 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const std::vector<al::ProcedureDecl> &all,
                             const std::set<std::string> &shadowed) {
   return Locals(procedure, objects, owner, all, {}, shadowed);
+}
+
+std::string BodyIncludes(const std::string &text, const Objects &objects) {
+  static const std::regex named(R"(\b(codeunits|pages|tables|interfaces)::([A-Za-z0-9_]+))");
+  std::set<std::string> headers;
+  for (std::sregex_iterator it(text.begin(), text.end(), named), end; it != end; ++it) {
+    const std::string kind = (*it)[1].str();
+    const std::string identifier = (*it)[2].str();
+    const TableIndex *index = nullptr;
+    if (kind == "codeunits") { index = &objects.codeunits; }
+    if (kind == "pages") { index = &objects.pages; }
+    if (kind == "tables") { index = &objects.tables; }
+    if (kind == "interfaces") { index = &objects.interfaces; }
+    if (index == nullptr) { continue; }
+    for (const auto &[key, ref] : *index) {
+      if (ref.identifier == kind + "::" + identifier && !ref.header.empty()) {
+        headers.insert(ref.header);
+        break;
+      }
+    }
+  }
+  std::string out;
+  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  return out;
 }
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,

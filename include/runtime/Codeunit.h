@@ -178,7 +178,12 @@ public:
   ///          inside rolls the database back to the point the run began and reports `false`, which
   ///          is why `if not Codeunit.Run(...) then` is AL's idiom for "try this". The text is left
   ///          where `GetLastErrorText()` reads it.
-  [[nodiscard]] bool Run() {
+  /// \note NOT `[[nodiscard]]`, BECAUSE AL DISCARDS IT. `CODEUNIT.RUN(CODEUNIT::X, Rec)` is a
+  ///       STATEMENT in the BaseApp far more often than it is a condition -- the return says
+  ///       whether the codeunit committed, and a caller that does not ask still wants it run.
+  ///       Marking it would make `-Werror` reject ordinary AL, and wrapping every statement in a
+  ///       cast to get past that buried the AL line the reader is looking for.
+  bool Run() {
     detail::Scope scope;
     try {
       static_cast<Derived *>(this)->OnRun();
@@ -197,7 +202,7 @@ public:
   /// \return True when `OnRun` completed; false when it raised.
   ///
   /// \warning Reports rather than propagates, for the reason Run() gives.
-  template <typename Record> [[nodiscard]] bool Run(Record &rec) {
+  template <typename Record> bool Run(Record &rec) {
     detail::Scope scope;
     try {
       static_cast<Derived *>(this)->OnRun(rec);

@@ -273,6 +273,13 @@ std::vector<const void *> &BeforeStack() {
 }
 }
 
+std::string_view FieldNameOf(const TableDef &table, FieldNo no) {
+  for (const FieldDef &def : table.fields) {
+    if (def.no.Value() == no.Value()) { return def.name; }
+  }
+  throw Error("FieldName: the table declares no such field");
+}
+
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   static_cast<void>(record);
   static_cast<void>(table);

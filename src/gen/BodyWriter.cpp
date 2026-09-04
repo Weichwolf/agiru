@@ -317,7 +317,7 @@ private:
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) {
-        const std::string named = std::string(kind) + "::" + Identifier(expression.text);
+        const std::string named = scope_.ObjectNamed(kind, expression.text);
         return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
       }
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
@@ -367,7 +367,7 @@ private:
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
         named.children.front().kind == al::ExprKind::Name) {
       const std::string_view kind = KindNamespace(named.children.front().text);
-      if (!kind.empty()) { subject = std::string(kind) + "::" + Identifier(named.text) + "{}"; }
+      if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     }
     std::string out = subject + "." + Identifier(callee.children[1].text) + "(";
     for (std::size_t i = 2; i < expression.children.size(); ++i) {
@@ -549,6 +549,11 @@ private:
   std::string PropertyAssignment(const al::Expr &expression) {
     if (expression.text != ":=" || expression.children.size() != 2) { return {}; }
     const al::Expr &target = expression.children.front();
+    if (target.kind == al::ExprKind::Name && scope_.Resolve(target.text).empty() &&
+        DoorCalls(target.text)) {
+      return AsTheDoorSpellsIt(Identifier(target.text)) + "(" +
+             Expression(expression.children.back(), 0) + ")";
+    }
     if (target.kind != al::ExprKind::Binary || target.text != "." || target.children.size() != 2 ||
         target.children[0].kind != al::ExprKind::Name ||
         target.children[1].kind != al::ExprKind::Name) {
@@ -726,6 +731,19 @@ public:
            FieldNamed(table_, member.field) == nullptr;
   }
 
+  [[nodiscard]] std::string ObjectNamed(std::string_view kind,
+                                        std::string_view name) const override {
+    const TableIndex *index = nullptr;
+    if (kind == "codeunits") { index = &objects_.codeunits; }
+    if (kind == "tables") { index = &objects_.tables; }
+    if (kind == "pages") { index = &objects_.pages; }
+    if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    const auto found = index->find(LowerKey(std::string(name)));
+    if (found != index->end()) { return found->second.identifier; }
+    return "absent::" + Identifier(name);
+  }
+
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     return NamedEnum(objects_, name);
   }
@@ -795,6 +813,19 @@ class PageNames : public Names {
 public:
   PageNames(const al::PageObject &page, const al::TableObject *source, const Objects &objects)
       : page_(page), source_(source), objects_(objects) {}
+
+  [[nodiscard]] std::string ObjectNamed(std::string_view kind,
+                                        std::string_view name) const override {
+    const TableIndex *index = nullptr;
+    if (kind == "codeunits") { index = &objects_.codeunits; }
+    if (kind == "tables") { index = &objects_.tables; }
+    if (kind == "pages") { index = &objects_.pages; }
+    if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    const auto found = index->find(LowerKey(std::string(name)));
+    if (found != index->end()) { return found->second.identifier; }
+    return "absent::" + Identifier(name);
+  }
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     return NamedEnum(objects_, name);

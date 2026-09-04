@@ -34,6 +34,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual std::string ObjectNamed(std::string_view kind,
+                                                std::string_view name) const {
+    return std::string(kind) + "::" + Identifier(name);
+  }
+
   [[nodiscard]] virtual std::string EnumObject(std::string_view name) const {
     static_cast<void>(name);
     return {};

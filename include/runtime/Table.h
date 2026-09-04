@@ -115,6 +115,13 @@ public:
 ///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
 void CheckRelation(const void *record, const TableDef &table, FieldNo no);
 
+/// \brief The AL name of a field, by number.
+/// \param table The declaration.
+/// \param no    The field.
+/// \return The name.
+/// \throws Error when the table carries no such field.
+[[nodiscard]] std::string_view FieldNameOf(const TableDef &table, FieldNo no);
+
 void RuntimeInsert(void *record, const TableDef &table);
 
 /// \brief Overwrites the row this record's primary key selects.
@@ -655,14 +662,26 @@ public:
     throw Error("Record.FieldActive is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.FieldName(...)`. Gets the name of a field as a string.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FieldName(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.FieldName is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.FieldName(Field)`. The field's AL name.
+  ///
+  /// \tparam FieldType The member's type, which names the field.
+  /// \param member The field, named the way AL names it: `Rec.FieldName("Document Type")`.
+  /// \return The name, spaces and all.
+  ///
+  /// \note IT IS THE NAME AND NOT THE CAPTION. `FieldCaption` beside it returns what a message
+  ///       quotes; this returns what the declaration spells, which is what a test comparing field
+  ///       lists needs.
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  [[nodiscard]] std::string_view FieldName(const FieldType &member) const {
+    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, NumberOf(&member));
+  }
+
+  /// \brief AL `Record.FieldName(FieldNo)`.
+  /// \param no The field number.
+  /// \return The name.
+  [[nodiscard]] std::string_view FieldName(::agiru::FieldNo no) const {
+    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, no);
   }
 
   /// \brief AL `Record.FilterGroup(...)`. Gets or sets the filter group that is applied to a table.
