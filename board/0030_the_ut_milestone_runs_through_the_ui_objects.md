@@ -19,6 +19,14 @@ Measured 2026-09-02 over `src/Layers/W1/Tests`, on the files the milestone's pop
 | XmlDocument | 1 | 11 |
 | Interface | 1 | 53 |
 
+**Counted per PROCEDURE rather than per file, 2026-09-04: 479 of the 2 291 `[Test]` procedures
+name a `TestPage` variable -- 20.9 %.** So the milestone's ceiling without a page runtime is 1 812
+of 2 291, and the four codeunits that carry the most of it are `ERM General Journal UT` (94 of 195),
+`VAT Return Period UT` (46 of 64), `ERM VAT VIES Lookup UT` (36 of 40) and `Price List Line UT`
+(28 of 137). The same measurement puts 501 procedures behind `[HandlerFunctions]` (board:0054), and
+202 of the 266 handlers declared take a page or a request page -- so the two ceilings are mostly the
+same procedures.
+
 **The two columns disagree, and the left one is the goal.** `DotNet` blocks more generated files
 than anything else in the tree and appears in SIX of the milestone's files; `TestPage` blocks a
 third as many files tree-wide and appears in HALF of them. Ordering the work by what the whole tree
