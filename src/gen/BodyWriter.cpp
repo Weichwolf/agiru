@@ -241,8 +241,8 @@ private:
         break;
       }
       case al::StmtKind::ForEach:
-        out = Pad(indent) + "for (auto &" + Expression(statement.expression, 0) + " : " +
-              Expression(statement.labels.front(), 0) + ") {\n" +
+        out = Pad(indent) + "for ([[maybe_unused]] auto &" + Expression(statement.expression, 0) +
+              " : " + Expression(statement.labels.front(), 0) + ") {\n" +
               Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
         break;
       case al::StmtKind::Case: out = CaseChain(statement, indent); break;
@@ -1107,7 +1107,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
         WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2) +
         FallsOffEnd(procedure, TableNames(table, objects, &procedure));
     const std::string locals =
-        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table)) +
+        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table), body) +
         BindsBefore(body, identifier);
     out += ProcedureSignature(procedure,
                               objects,

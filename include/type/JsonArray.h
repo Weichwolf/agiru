@@ -122,6 +122,23 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::JsonToken Clone();
 
+  /// \brief AL `foreach Token in Array` -- the first element.
+  ///
+  /// \return Never.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ///
+  /// \note AL'S `foreach` IS A RANGE AND THE DOOR HAS TO OFFER ONE. The BaseApp writes
+  ///       `foreach X in Y` 316 times under `Layers/W1` and the generator emits a range-for, which
+  ///       asks the type for `begin`. Without it the error is "invalid range expression", which
+  ///       names the C++ construct and not the AL one -- and it stops the whole translation unit,
+  ///       where a refusal stops one statement and says which.
+  [[nodiscard]] ::agiru::JsonToken *begin();
+
+  /// \brief AL `foreach Token in Array` -- past the last element.
+  /// \return Never.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::JsonToken *end();
+
   /// \brief AL `JsonArray.Count()`. Gets the number of elements in the JsonArray.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).

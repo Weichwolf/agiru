@@ -53,6 +53,35 @@ unbounded string VALUE and belongs beside `StringValue`, leaving `Text.h` with
 the sized `Text<N>` alone. Then the fifteen methods return it and a chain of AL
 text methods reads as AL wrote it.
 
+## Step two is done: the METHODS return a text, and `Text<0>` moved
+
+2026-09-04, the same day: `Text<0>` is declared in `StringValue.h` beside the
+class it derives from, and `Text.h` keeps the sized `Text<N>` alone. The sixteen
+text methods -- `Replace`, `Substring`, `Trim`, `TrimStart`, `TrimEnd`,
+`PadLeft`, `PadRight`, `Remove`, `Insert`, `ToLower`, `ToUpper` and their
+overloads -- return `Text<0>` and their bodies moved OUT of the class body, below
+`Text<0>`, because a member defined inside a class needs its return type
+complete. `LowerCase(X).Replace("{", "").Replace("}", "")` resolves end to end.
+
+## Step three is the ARGUMENT side, and it is the same door-wide decision
+
+`LowerCase(Guid)` still does not compile. AL converts a Guid to text where text
+is wanted -- BC's own tests rely on it, `CopyStr(CreateGuid(), 1, 20)` compiles
+there -- and C++ allows only ONE user-defined conversion on the way to a
+parameter. `Guid` -> `Text<0>` -> `std::string_view` is two, so no conversion
+operator on `Guid` can reach a `std::string_view` parameter.
+
+**THE PARAMETER IS WHAT HAS TO CHANGE, NOT THE ARGUMENT.** A door text parameter
+declared `const StringValue &` takes a literal (one conversion, through
+`Text<0>`), a `std::string`, a `Code<n>`, a `Text<n>` (both derived, no
+conversion at all) and a `Guid` -- once `Guid` grows `operator Text<0>()`,
+because base binding is not a user conversion. That is the same reach AL's `Text`
+parameter has, and it is why the parameter and the return are one decision.
+
+The alternative -- an overload per builtin per convertible type -- is 17
+functions times the types AL converts, and it is the shape this tree calls
+cleverness.
+
 ## The choice, and why it is not obviously the small one
 
 **`Text<0>` IS THE AL TYPE AND `std::string` IS NOT.** The door already declares

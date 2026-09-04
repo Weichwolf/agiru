@@ -101,7 +101,8 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,
                             const std::vector<al::ProcedureDecl> &all = {},
-                            const std::set<std::string> &shadowed = {});
+                            const std::set<std::string> &shadowed = {},
+                            const std::string &body = {});
 
 [[nodiscard]] std::string BodyIncludes(const std::string &text, const Objects &objects);
 

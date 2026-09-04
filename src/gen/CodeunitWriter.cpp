@@ -976,8 +976,13 @@ std::string Locals(const al::ProcedureDecl &procedure,
                    const std::set<std::string> &shadowed = {}) {
   std::string out;
   const std::string code = WithoutLiterals(body);
-  const auto unused = [&body, &code](const std::string &name) {
-    return body.empty() || Mentions(code, name) ? std::string{} : std::string("[[maybe_unused]] ");
+  const auto shadows = [&code](const std::string &name) {
+    return code.find("for ([[maybe_unused]] auto &" + name + " :") != std::string::npos;
+  };
+  const auto unused = [&body, &code, &shadows](const std::string &name) {
+    if (body.empty()) { return std::string{}; }
+    return Mentions(code, name) && !shadows(name) ? std::string{}
+                                                  : std::string("[[maybe_unused]] ");
   };
   if (!procedure.returnName.empty()) {
     out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
@@ -1097,8 +1102,9 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const Objects &objects,
                             const std::string &owner,
                             const std::vector<al::ProcedureDecl> &all,
-                            const std::set<std::string> &shadowed) {
-  return Locals(procedure, objects, owner, all, {}, shadowed);
+                            const std::set<std::string> &shadowed,
+                            const std::string &body) {
+  return Locals(procedure, objects, owner, all, body, shadowed);
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {

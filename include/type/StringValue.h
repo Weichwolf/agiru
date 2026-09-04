@@ -233,6 +233,10 @@ std::strong_ordering CompareCode(std::string_view a, std::string_view b);
 
 }
 
+/// \brief AL `Text[N]`; `Text<0>` is the unbounded one and is defined below.
+/// \tparam N The declared length, in UTF-16 code units.
+template <std::size_t N> class Text;
+
 /// \brief The part of a string field that does not depend on its declared length.
 ///
 /// It exists so the runtime can read any Text[N] or Code[N] through one pointer: the field table
@@ -355,69 +359,53 @@ public:
   /// \param Count The length the result is padded to.
   /// \return The padded text, or this text when it is already that long.
   /// \see `text-padleft-method.md`
-  [[nodiscard]] std::string PadLeft(Integer Count) const {
-    return detail::PadText(value_, Count, detail::PadSide::Left, Char{' '});
-  }
+  [[nodiscard]] Text<0> PadLeft(Integer Count) const;
 
   /// \brief AL `Text.PadLeft(Integer, Char)`.
   /// \param Count   The length the result is padded to.
   /// \param Padding The padding character.
   /// \return The padded text, or this text when it is already that long.
   /// \see `text-padleft-method.md`
-  [[nodiscard]] std::string PadLeft(Integer Count, Char Padding) const {
-    return detail::PadText(value_, Count, detail::PadSide::Left, Padding);
-  }
+  [[nodiscard]] Text<0> PadLeft(Integer Count, Char Padding) const;
 
   /// \brief AL `Text.PadRight(Integer)` -- left-aligns by padding with spaces.
   /// \param Count The length the result is padded to.
   /// \return The padded text, or this text when it is already that long.
   /// \see `text-padright-method.md`
-  [[nodiscard]] std::string PadRight(Integer Count) const {
-    return detail::PadText(value_, Count, detail::PadSide::Right, Char{' '});
-  }
+  [[nodiscard]] Text<0> PadRight(Integer Count) const;
 
   /// \brief AL `Text.PadRight(Integer, Char)`.
   /// \param Count   The length the result is padded to.
   /// \param Padding The padding character.
   /// \return The padded text, or this text when it is already that long.
   /// \see `text-padright-method.md`
-  [[nodiscard]] std::string PadRight(Integer Count, Char Padding) const {
-    return detail::PadText(value_, Count, detail::PadSide::Right, Padding);
-  }
+  [[nodiscard]] Text<0> PadRight(Integer Count, Char Padding) const;
 
   /// \brief AL `Text.Remove(Integer)` -- everything from a position onwards.
   /// \param StartIndex The one-based position to begin deleting at.
   /// \return What is left.
   /// \see `text-remove-method.md`
-  [[nodiscard]] std::string Remove(Integer StartIndex) const {
-    return detail::RemoveText(value_, StartIndex, std::nullopt);
-  }
+  [[nodiscard]] Text<0> Remove(Integer StartIndex) const;
 
   /// \brief AL `Text.Remove(Integer, Integer)`.
   /// \param StartIndex The one-based position to begin deleting at.
   /// \param Count      How many characters to delete.
   /// \return What is left.
   /// \see `text-remove-method.md`
-  [[nodiscard]] std::string Remove(Integer StartIndex, Integer Count) const {
-    return detail::RemoveText(value_, StartIndex, Count);
-  }
+  [[nodiscard]] Text<0> Remove(Integer StartIndex, Integer Count) const;
 
   /// \brief AL `Text.Replace(Text, Text)` -- every occurrence.
   /// \param OldValue The string to replace.
   /// \param NewValue What replaces it.
   /// \return The result.
   /// \see `text-replace-method.md`
-  [[nodiscard]] std::string Replace(std::string_view OldValue, std::string_view NewValue) const {
-    return detail::ReplaceText(value_, {.from = OldValue, .to = NewValue});
-  }
+  [[nodiscard]] Text<0> Replace(std::string_view OldValue, std::string_view NewValue) const;
 
   /// \brief AL `Text.Substring(Integer)` -- everything from a position onwards.
   /// \param StartIndex The one-based position the substring starts at.
   /// \return The substring.
   /// \see `text-substring-method.md`
-  [[nodiscard]] std::string Substring(Integer StartIndex) const {
-    return detail::SubstringText(value_, StartIndex, std::nullopt);
-  }
+  [[nodiscard]] Text<0> Substring(Integer StartIndex) const;
 
   /// \brief AL `Text.Substring(Integer, Integer)`.
   /// \param StartIndex The one-based position the substring starts at.
@@ -426,9 +414,7 @@ public:
   /// \see `text-substring-method.md`
   /// \note A COUNT PAST THE END IS NOT AN ERROR since application version 27.1, which the page
   ///       states outright; it yields the rest of the text.
-  [[nodiscard]] std::string Substring(Integer StartIndex, Integer Count) const {
-    return detail::SubstringText(value_, StartIndex, Count);
-  }
+  [[nodiscard]] Text<0> Substring(Integer StartIndex, Integer Count) const;
 
   /// \brief AL `Text.Split()` -- at white space.
   /// \return The pieces, in order.
@@ -466,50 +452,40 @@ public:
   /// \warning IT LOWERS ASCII ONLY. The platform lowers by the invariant culture, which covers
   /// every
   ///          cased script; anything above 127 is left alone here and is board:0041.
-  [[nodiscard]] std::string ToLower() const { return detail::LowerText(value_); }
+  [[nodiscard]] Text<0> ToLower() const;
 
   /// \brief AL `Text.ToUpper()`.
   /// \return This text in upper case.
   /// \see `text-toupper-method.md`
   /// \warning IT RAISES ASCII ONLY, for the reason ToLower gives.
-  [[nodiscard]] std::string ToUpper() const { return detail::UpperText(value_); }
+  [[nodiscard]] Text<0> ToUpper() const;
 
   /// \brief AL `Text.Trim()` -- white space off both ends.
   /// \return The trimmed text.
   /// \see `text-trim-method.md`
-  [[nodiscard]] std::string Trim() const {
-    return detail::TrimText(value_, detail::TrimSides::Both, {});
-  }
+  [[nodiscard]] Text<0> Trim() const;
 
   /// \brief AL `Text.TrimStart()` -- white space off the front.
   /// \return The trimmed text.
   /// \see `text-trimstart-method.md`
-  [[nodiscard]] std::string TrimStart() const {
-    return detail::TrimText(value_, detail::TrimSides::Start, {});
-  }
+  [[nodiscard]] Text<0> TrimStart() const;
 
   /// \brief AL `Text.TrimStart(Text)`.
   /// \param Chars The characters to strip.
   /// \return The trimmed text.
   /// \see `text-trimstart-method.md`
-  [[nodiscard]] std::string TrimStart(std::string_view Chars) const {
-    return detail::TrimText(value_, detail::TrimSides::Start, Chars);
-  }
+  [[nodiscard]] Text<0> TrimStart(std::string_view Chars) const;
 
   /// \brief AL `Text.TrimEnd()` -- white space off the back.
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
-  [[nodiscard]] std::string TrimEnd() const {
-    return detail::TrimText(value_, detail::TrimSides::End, {});
-  }
+  [[nodiscard]] Text<0> TrimEnd() const;
 
   /// \brief AL `Text.TrimEnd(Text)`.
   /// \param Chars The characters to strip.
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
-  [[nodiscard]] std::string TrimEnd(std::string_view Chars) const {
-    return detail::TrimText(value_, detail::TrimSides::End, Chars);
-  }
+  [[nodiscard]] Text<0> TrimEnd(std::string_view Chars) const;
 
   /// \brief AL `+=` on text -- appends.
   ///
@@ -599,6 +575,220 @@ private:
   std::string value_;
   std::size_t max_ = 0;
 };
+
+/// \brief AL `Text` -- a text with no declared length, and the base every sized one derives from.
+///
+/// \note THE SIZED ONES DERIVE FROM IT BECAUSE AL PASSES ONE FOR THE OTHER. `var CityTxt: Text`
+///       takes `Customer.City`, a `Text[30]`, in the BaseApp's own Customer table -- so a reference
+///       to the unbounded type must bind to the sized one, and only a base can do that. What keeps
+///       the assignment honest through such a reference is `Max()`, which is the VALUE's and not
+///       the reference's.
+template <> class Text<0> : public StringValue {
+public:
+  /// \brief The declared length, which is none.
+  static constexpr std::size_t kMaxLength = 0;
+
+  /// \brief An empty text.
+  Text() = default;
+
+  /// \brief Constructs from anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
+  /// \param value The text.
+  ///
+  /// \note ONE CONSTRAINED TEMPLATE AND NOT TWO OVERLOADS, because two were ambiguous: a string
+  ///       literal reaches `std::string_view` and `const std::string &` equally well. And NOT
+  ///       EXPLICIT, because AL assigns text without ceremony -- a body writes
+  ///       `AssignCompany(X, CompanyName())` where the parameter is a `Text` and the builtin
+  ///       returns a string.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Text(const T &value) {
+    Assign(std::string_view(value));
+  }
+
+  /// \brief Copies the text, keeping this one's declared length.
+  /// \param o The other text.
+  Text(const Text &o) = default;
+
+  /// \brief Moves the text.
+  /// \param o The other text.
+  Text(Text &&o) = default;
+
+  ~Text() = default;
+
+  /// \brief Assigns anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
+  /// \param value The text.
+  /// \return This object.
+  /// \throws StringError when it does not fit the declared length.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value));
+    return *this;
+  }
+
+  /// \brief Assigns another text, checking THIS one's declared length.
+  ///
+  /// \param o The other text.
+  /// \return This object.
+  /// \throws StringError when it does not fit.
+  ///
+  /// \note IT IS DECLARED RATHER THAN DEFAULTED, and that is the whole point of the hierarchy: the
+  ///       compiler's own copy assignment would take the source's bytes without asking whether they
+  ///       fit the target, which is exactly the check AL makes.
+  Text &operator=(const Text &o) {
+    if (this != &o) { Assign(o.Value()); }
+    return *this;
+  }
+
+  /// \brief The same, moving nothing: the length still has to be checked.
+  /// \param o The other text.
+  /// \return This object.
+  Text &operator=(Text &&o) noexcept(false) {
+    if (this != &o) { Assign(o.Value()); }
+    return *this;
+  }
+
+  /// \brief Assigns text, checking the declared length.
+  /// \param value The text.
+  /// \throws StringError when it is longer than the declared length.
+  void Assign(std::string_view value) {
+    detail::CheckLength(value, Max());
+    Set(std::string(value));
+  }
+
+  /// \brief Orders two texts lexicographically.
+  /// \param o The other text.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(const Text &o) const {
+    return Stored().compare(o.Stored()) <=> 0;
+  }
+
+  /// \brief Compares two texts for equality.
+  /// \param o The other text.
+  /// \return True when the stored text is identical.
+  [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
+
+  /// \brief Compares against a literal, which is how AL writes an emptiness test.
+  /// \param value The text.
+  /// \return True when the stored text is identical.
+  /// \note CONSTRAINED, for the reason the constructor is: with a converting constructor in
+  ///       place, a plain equality against a string view is ambiguous with the one against another
+  ///       Text for anything that reaches both, and a string literal reaches both.
+  /// \tparam T The source, which must read as a `std::string_view` and must not be a string type
+  ///           itself: a sized `Text` reaches both this and the one above, and C++20's reversed
+  ///           candidate then makes the two ambiguous.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view> &&
+             (!std::derived_from<T, StringValue>)
+  [[nodiscard]] bool operator==(const T &value) const {
+    return Stored() == std::string_view(value);
+  }
+
+protected:
+  /// \brief A text with a declared length, for the sized specialisation.
+  /// \param max The declared length.
+  explicit Text(std::size_t max) : StringValue(max) {}
+};
+
+/// \brief The out-of-line half of `StringValue::ToLower`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::ToLower() const {
+  return detail::LowerText(value_);
+}
+
+/// \brief The out-of-line half of `StringValue::ToUpper`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::ToUpper() const {
+  return detail::UpperText(value_);
+}
+
+/// \brief The out-of-line half of `StringValue::PadLeft`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadLeft(Integer Count) const {
+  return detail::PadText(value_, Count, detail::PadSide::Left, Char{' '});
+}
+
+/// \brief The out-of-line half of `StringValue::PadLeft`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadLeft(Integer Count, Char Padding) const {
+  return detail::PadText(value_, Count, detail::PadSide::Left, Padding);
+}
+
+/// \brief The out-of-line half of `StringValue::PadRight`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadRight(Integer Count) const {
+  return detail::PadText(value_, Count, detail::PadSide::Right, Char{' '});
+}
+
+/// \brief The out-of-line half of `StringValue::PadRight`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadRight(Integer Count, Char Padding) const {
+  return detail::PadText(value_, Count, detail::PadSide::Right, Padding);
+}
+
+/// \brief The out-of-line half of `StringValue::Remove`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Remove(Integer StartIndex) const {
+  return detail::RemoveText(value_, StartIndex, std::nullopt);
+}
+
+/// \brief The out-of-line half of `StringValue::Remove`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Remove(Integer StartIndex, Integer Count) const {
+  return detail::RemoveText(value_, StartIndex, Count);
+}
+
+/// \brief The out-of-line half of `StringValue::Replace`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Replace(std::string_view OldValue, std::string_view NewValue) const {
+  return detail::ReplaceText(value_, {.from = OldValue, .to = NewValue});
+}
+
+/// \brief The out-of-line half of `StringValue::Substring`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Substring(Integer StartIndex) const {
+  return detail::SubstringText(value_, StartIndex, std::nullopt);
+}
+
+/// \brief The out-of-line half of `StringValue::Substring`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Substring(Integer StartIndex, Integer Count) const {
+  return detail::SubstringText(value_, StartIndex, Count);
+}
+
+/// \brief The out-of-line half of `StringValue::Trim`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Trim() const {
+  return detail::TrimText(value_, detail::TrimSides::Both, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimStart`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimStart() const {
+  return detail::TrimText(value_, detail::TrimSides::Start, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimStart`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimStart(std::string_view Chars) const {
+  return detail::TrimText(value_, detail::TrimSides::Start, Chars);
+}
+
+/// \brief The out-of-line half of `StringValue::TrimEnd`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimEnd() const {
+  return detail::TrimText(value_, detail::TrimSides::End, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimEnd`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimEnd(std::string_view Chars) const {
+  return detail::TrimText(value_, detail::TrimSides::End, Chars);
+}
 
 /// \brief AL `+` on text -- concatenation.
 ///

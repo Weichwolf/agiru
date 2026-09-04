@@ -1383,6 +1383,14 @@ void JsonArray::Add(::agiru::Time Value) {
   RefuseDoor("JsonArray.Clone()");
 }
 
+::agiru::JsonToken *JsonArray::begin() {
+  RefuseDoor("JsonArray.begin()");
+}
+
+::agiru::JsonToken *JsonArray::end() {
+  RefuseDoor("JsonArray.end()");
+}
+
 ::agiru::Integer JsonArray::Count() {
   RefuseDoor("JsonArray.Count()");
 }
