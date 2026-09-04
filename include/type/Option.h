@@ -67,6 +67,26 @@ public:
   /// \param value The member.
   constexpr explicit Option(E value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
 
+  /// \brief Holds the ordinal another option carries.
+  ///
+  /// \tparam F The other option's enumeration.
+  /// \param other The other option.
+  ///
+  /// \note AL PASSES AN OPTION TO AN OPTION PARAMETER WHATEVER DECLARED IT, because
+  ///       `option-data-type.md` makes an option "a zero-based enumerator type" and nothing more --
+  ///       an integer carrying a name table. The BaseApp does it constantly: `General Ledger
+  ///       Setup` reads `NotificationType` from its own `Option Error,Notification` and hands it to
+  ///       `UserSetupManagement.CheckAllowedPostingDatesRange`, whose parameter declares the same
+  ///       two members again. Two declarations are two C++ types, and refusing the pass would be a
+  ///       rule AL does not have.
+  ///
+  /// \warning IT IS THE ORDINAL THAT TRAVELS AND NOT THE MEMBER. Two options whose members are in
+  ///          a different order convert to each other's WRONG member, and AL does the same -- which
+  ///          is why the BaseApp declares the two lists identically at both ends.
+  template <typename F>
+    requires(!std::is_same_v<F, E>)
+  constexpr Option(const Option<F> &other) : OrdinalValue(other.AsInteger()) {}
+
   /// \brief Holds an ordinal, declared or not.
   ///
   /// \param ordinal The zero-based member number.
@@ -89,6 +109,23 @@ public:
   ///       stays explicit and only the assignment is open.
   constexpr Option &operator=(std::int32_t ordinal) {
     SetOrdinal(ordinal);
+    return *this;
+  }
+
+  /// \brief Assigns the ordinal another option carries.
+  ///
+  /// \tparam F The other option's enumeration.
+  /// \param other The other option.
+  /// \return This option.
+  ///
+  /// \note IT IS DECLARED EVEN THOUGH THE CONSTRUCTOR ABOVE WOULD SERVE, because without it the
+  ///       assignment is AMBIGUOUS: the other option reads as an `Integer` through `OrdinalValue`,
+  ///       which the ordinal assignment takes, and it converts to this option, which the copy
+  ///       assignment takes. Two viable paths and no best one. This one is exact.
+  template <typename F>
+    requires(!std::is_same_v<F, E>)
+  constexpr Option &operator=(const Option<F> &other) {
+    SetOrdinal(other.AsInteger());
     return *this;
   }
 

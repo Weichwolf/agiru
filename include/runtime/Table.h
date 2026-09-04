@@ -1119,7 +1119,11 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean RecordId(Arguments &&...arguments) const {
+  /// \note THE RETURN IS A `RecordId` AND NOT THE REFUSAL'S USUAL `Boolean`.
+  ///       `record-recordid-method.md` names the type, and AL hands the result straight to a
+  ///       parameter that takes one -- so a `Boolean` there is a compile error at every call site
+  ///       and the refusal never gets the chance to say what it is.
+  template <typename... Arguments>::agiru::RecordId RecordId(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.RecordId is declared and not implemented yet (board:0035)");
   }

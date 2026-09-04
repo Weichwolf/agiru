@@ -671,6 +671,18 @@ private:
                                [name](std::string_view known) { return SameName(known, name); });
   }
 
+  static bool IsBuiltinFamily(std::string_view name) {
+    static constexpr std::array kFamilies{std::string_view{"System"},
+                                          std::string_view{"Text"},
+                                          std::string_view{"Database"},
+                                          std::string_view{"Session"},
+                                          std::string_view{"Dialog"},
+                                          std::string_view{"File"},
+                                          std::string_view{"SecretText"}};
+    return std::ranges::any_of(kFamilies,
+                               [name](std::string_view known) { return SameName(known, name); });
+  }
+
   std::string TypeStatic(const al::Expr &walk,
                          const std::vector<const al::Expr *> &chain,
                          std::string_view spelling,
@@ -683,9 +695,13 @@ private:
                  : std::string{};
     }
     if (walk.kind != al::ExprKind::Name || !scope_.Resolve(walk.text).empty() ||
-        !IsAlTypeName(walk.text) || !DoorCalls(chain.back()->text)) {
+        !DoorCalls(chain.back()->text)) {
       return {};
     }
+    if (IsBuiltinFamily(walk.text)) {
+      return chain.size() == 1 ? AsTheDoorSpellsIt(Identifier(chain.back()->text)) : std::string{};
+    }
+    if (!IsAlTypeName(walk.text)) { return {}; }
     const std::string holder = KindNamespace(walk.text).empty() ? "" : "<>";
     std::string out =
         "::agiru::" + TypeName(walk.text) + holder + "::" + Identifier(chain.back()->text);
@@ -1068,6 +1084,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::ProcedureDecl &trigger : field.triggers) { reaching.push_back(trigger); }
   }
   out += SourceIncludesOf(table.variables, reaching, objects);
+  const std::size_t bodyAt = out.size();
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
@@ -1107,6 +1124,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
 
   out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
+  out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);
 }
 
