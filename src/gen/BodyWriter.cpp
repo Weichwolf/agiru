@@ -298,16 +298,22 @@ private:
            "::" + AsTheDoorSpellsIt(member_) + "}";
   }
 
+  static const al::Expr &Indexed(const al::Expr &expression) {
+    return expression.kind == al::ExprKind::Index && !expression.children.empty()
+               ? expression.children.front()
+               : expression;
+  }
+
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
-        base.children[0].kind == al::ExprKind::Name &&
+        Indexed(base.children[0]).kind == al::ExprKind::Name &&
         base.children[1].kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.FieldEnumeration(
-          OfVariable{.variable = base.children[0].text, .field = base.children[1].text});
+          OfVariable{.variable = Indexed(base.children[0]).text, .field = base.children[1].text});
       if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
-      if (scope_.IsRecord(base.children[0].text)) {
-        return "RefusedOption(\"" + base.children[0].text + "." + base.children[1].text +
+      if (scope_.IsRecord(Indexed(base.children[0]).text)) {
+        return "RefusedOption(\"" + Indexed(base.children[0]).text + "." + base.children[1].text +
                "::" + expression.text + "\")";
       }
     }

@@ -178,6 +178,10 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
     return value.ToInvariantString();
   } else if constexpr (std::is_same_v<T, Boolean>) {
     return ToText(value);
+  } else if constexpr (std::is_enum_v<T>) {
+    return MemberText(def, static_cast<std::int32_t>(value));
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return std::to_string(value);
   } else {
     return std::string(value);
   }
@@ -233,7 +237,11 @@ template <typename T>
 ///          dependent; the full function is board:0007. What is here covers `Format(<option>)`,
 ///          which is what an error message uses.
 template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
-  return std::string(value.Caption());
+  if constexpr (std::is_void_v<E>) {
+    return std::to_string(value.AsInteger());
+  } else {
+    return std::string(value.Caption());
+  }
 }
 
 /// \brief One argument of `StrSubstNo`, rendered the way AL renders it.
