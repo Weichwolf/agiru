@@ -325,12 +325,20 @@ std::string Qualified(const std::string &type, const std::set<std::string> &name
   return out;
 }
 
+std::string Unsized(const std::string &type) {
+  const std::size_t at = type.rfind(", ");
+  return type.starts_with("AlArray<") && type.ends_with(">") && at != std::string::npos
+             ? type.substr(0, at) + ", 0>"
+             : type;
+}
+
 std::string Signature(const al::VarDecl &declared,
                       const Objects &objects,
                       const std::set<std::string> &names,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
   if (Hidden(type, names)) { type = Qualified(type, names); }
+  if (declared.byReference && !declared.dimensions.empty()) { type = Unsized(type); }
   return type + (declared.byReference ? " &" : " ");
 }
 

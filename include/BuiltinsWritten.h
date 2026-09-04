@@ -14,9 +14,11 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include <concepts>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief The AL free functions that are WRITTEN rather than generated.
@@ -296,14 +298,29 @@ void LogMessage(std::string_view EventId,
 ///
 /// \note IT IS NOT `Init`. That one spares the primary key, which the page for it says outright;
 ///       this one clears everything, which the page for THIS one says just as plainly.
+namespace detail {
+
+/// \brief Whether a type is one of AL's arrays.
+///
+/// \tparam T The type.
+///
+/// It asks for the pair only an array has: a length, and an index that yields the ELEMENT ITSELF.
+/// A text has a length and an index too, and its index yields a `Char` by value -- so asking for
+/// the length alone caught every `Text` and `Code` as well.
+template <typename T>
+concept IsAlArray = requires(T &array, ::agiru::Integer at) {
+  array.Length();
+  { array[at] } -> std::same_as<decltype(array[at])>;
+  requires std::is_lvalue_reference_v<decltype(array[at])>;
+};
+
+}
+
 template <typename T> void Clear(T &Variable) {
   if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
     ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);
-  } else if constexpr (requires {
-                         T::Length();
-                         Variable[::agiru::Integer{1}];
-                       }) {
-    for (::agiru::Integer at = 1; at <= T::Length(); ++at) { Clear(Variable[at]); }
+  } else if constexpr (detail::IsAlArray<T>) {
+    for (::agiru::Integer at = 1; at <= Variable.Length(); ++at) { Clear(Variable[at]); }
   } else {
     Variable = T{};
   }
