@@ -92,3 +92,5 @@ base/pricing/source/codeunit/PriceSourceCustDiscGr.cpp
 base/pricing/source/codeunit/PriceSourceCustomer.cpp
 base/pricing/source/codeunit/PriceSourceCustPriceGr.cpp
 base/pricing/source/codeunit/PriceSourceVendor.cpp
+base/finance/dimension/codeunit/DimensionManagement.cpp
+tests/core/codeunit/WFBufferTablePageUT.cpp
