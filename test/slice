@@ -60,3 +60,5 @@ tests/core/codeunit/DataExchExpLatinCharUT.cpp
 tests/core/codeunit/ERMPaymentMethodUT.cpp
 tests/core/codeunit/ERMTableFieldsUT.cpp
 tests/core/codeunit/O365EmailAsPDFUT.cpp
+base/inventory/item/table/Item.cpp
+system/system/environment/codeunit/EnvironmentInformationImpl.cpp
