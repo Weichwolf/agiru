@@ -49,7 +49,37 @@ line does.
 
 `_format.py` is the one that is not a function but a LANGUAGE: `Format(Value, Length, FormatStr)`
 carries BC's own format specifiers, and openerp needed 14 functions and a spec parser for it.
-It gets its own item when it is reached; board:0007 already holds the decimal half of it.
+~~It gets its own item when it is reached~~ -- **it is reached, and it has one: board:0066.**
+board:0007 holds the decimal half of it.
+
+## The rest of the surface, ranked over the milestone rather than guessed at, 2026-09-04
+
+Counting the `[Test]` procedures of the 80 UT codeunits (board:0058) that name each subject, so that
+nothing below sits on the board as an unranked "missing":
+
+| subject | procedures | codeunits | `Layers/W1` | who owns it |
+|---|---:|---:|---:|---|
+| `Validate` | 750 | 47 | -- | board:0029, board:0043 |
+| `TestField` | 484 | 43 | -- | present |
+| `asserterror` | 348 | 53 | -- | present; board:0055 for the text |
+| `StrSubstNo` | 184 | 35 | 14 800 | **board:0066** |
+| `Format` | 108 | 20 | 11 992 | **board:0066** |
+| `CalcDate` / `DateFormula` | 54 | 11 | -- | this item |
+| `CalcFields` / `CalcSums` | 44 | 10 | -- | board:0047 |
+| `InStream` / `OutStream` | 27 | 6 | 1 710 declarations | this item -- `File` alone carries 59 door refusals |
+| `TempBlob` / `Blob` | 25 | 4 | -- | board:0017 |
+| `TransferFields` | 9 | 5 | 857 | this item |
+| `File.` | 6 | 2 | -- | this item |
+| `Notification` | 4 | 3 | -- | board:0054 |
+| `ErrorInfo`, collectible errors | 0 | 0 | 382 / 32 | unclaimed, and correctly last |
+| `IsolatedStorage`, `NumberSequence`, `TaskScheduler` | 0 | 0 | 36 / 41 / -- | unclaimed, and correctly last |
+
+**Three things this ranking settles.** `Validate` and `TestField` dominate and both already have
+items. `ErrorInfo` and the collectible-error API are a documented feature
+(`devenv-actionable-errors.md`, `devenv-error-collection.md`) with 21 refusing door members and
+**zero** reach into the milestone -- so they stay unclaimed on purpose rather than by oversight. And
+the streams are the one middle case: small in the milestone, 1 710 declarations in W1, and the
+largest single refusing type in the door after the Json and Xml families.
 
 ## What is true when this closes
 
@@ -57,3 +87,34 @@ It gets its own item when it is reached; board:0007 already holds the decimal ha
 - The generator resolves a builtin call by NAME and refuses an unknown one loudly, rather than
   emitting an identifier that the C++ compiler will refuse two steps later with no AL name in the
   message.
+
+## `NumberSequence` IS A DATABASE SEQUENCE AND ITS VALUE SURVIVES A ROLLBACK
+
+`devenv-number-sequences.md` (read 2026-09-04, board:0071) settles what the nine refusing
+`NumberSequence` methods (`coverage/methods-auto-mnop.md`) are refusing:
+
+> Business Central number sequences are built on **SQL Server sequences**, which means that they are
+> **not associated with any tables**. ... Numbers are used sequentially, but **numbers can be
+> skipped** ... gaps ... can occur when transactions are rolled back or numbers are allocated but not
+> used.
+
+and, on `Current`:
+
+> Gets the current value from the number sequence, without doing any increment. **The value is
+> retrieved out of transaction. The value will not be returned on transaction rollback.**
+
+**PostgreSQL's `CREATE SEQUENCE` is the same object with the same guarantee**, including
+`nextval`'s immunity to rollback -- so this is one of the few AL primitives that maps onto the
+target database without a decision. `Insert`, `Exists`, `Delete`, `Next` and `Current` become DDL and
+one function call each.
+
+**And it is the counter-example that makes CLAUDE.md's rule concrete.** "Nothing in a process is
+authoritative -- a number series, a lock, the rowversion ... shared state lives in the database or it
+is wrong the moment a second tier starts." A `NumberSequence` is that state done right: it is in the
+database, it is outside the transaction, and it is why `Allow Gaps in Nos.` exists at all -- the
+page states the trade plainly, that continuous numbering locks the `No. Series Line` row "until the
+transaction completes. This can potentially block other users from being able to work."
+
+So the application's `No. Series` (continuous, locking) and the platform's `NumberSequence`
+(gapped, non-blocking) are two mechanisms with a documented reason to choose between, and only the
+second is agiru's to build.

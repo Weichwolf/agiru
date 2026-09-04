@@ -26,6 +26,8 @@ struct PlatformField {
 
 [[nodiscard]] bool PlatformFieldNamed(const PlatformField &wanted);
 
+[[nodiscard]] std::string PlatformFieldSpelling(const PlatformField &wanted);
+
 [[nodiscard]] bool HiddenByABaseMember(std::string_view name);
 
 }

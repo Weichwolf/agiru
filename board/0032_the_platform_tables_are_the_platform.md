@@ -225,3 +225,33 @@ it is a function of the filter language that an index-range decision will want a
 - A write to a virtual table REFUSES with the documented reason.
 - The 87 shrink, and the count in the transpiler's report is what says by how much.
 - No name of an application table appears anywhere in `src/`.
+
+## THE DATE VIRTUAL TABLE IS COMPUTED, AND ITS `Period End` IS A CLOSING DATE
+
+`devenv-date-virtual-table.md` (read 2026-09-04, board:0071) gives table **2000000007** in full:
+
+| field | |
+|---|---|
+| `Period Type` | Days, weeks, months, quarters or years |
+| `Period Start` | the first day of the period |
+| `Period End` | the last day -- and **"The `Period End` field returns the CLOSING DATE at the end of the period"** (board:0016) |
+| `Period No.` | the number of the period |
+| `Period Name` | its name |
+
+"For each period type, there are many records in the Date table", and the filters that matter are on
+`Period Type`, `Period Start` and `Period End`.
+
+**It is the second virtual table whose rows are COMPUTED from a filter rather than stored**, after
+`Integer` -- and the two are the same mechanism: a filter over the primary key defines a finite set,
+and the runtime yields it without touching the database. `src/rt/Filter.cpp`'s `IntegerIntervals`
+already does exactly that arithmetic for `Integer`; `Date` needs the same over a period type and a
+date range.
+
+**And the closing-date row is the one to be careful with.** board:0016 is about a closing date
+surviving a filter, a key and a SIFT bucket; here the platform GENERATES one as an ordinary field
+value, so any code that reads `Period End` and compares it to a posting date is comparing against a
+closing date. That is not a defect in either place -- it is why the closing date has to be a real
+part of the `Date` value rather than a rendering.
+
+`devenv-virtual-tables.md` and `devenv-integer-virtual-table.md` are this item's other two rows and
+are already read.

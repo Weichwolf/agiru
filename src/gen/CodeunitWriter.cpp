@@ -798,6 +798,9 @@ public:
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
     if (subtype.empty()) { return Identifier(member.field); }
+    const std::string platform =
+        PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
+    if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
       return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))

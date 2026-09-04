@@ -49,3 +49,41 @@ is the other kind of bad. Neither is obviously right, and 18 files is not enough
 - The rule is stated in one sentence a reader can apply to a file they have not seen.
 - A collision the rule does not cover is a translation ERROR naming the object and the member, not
   a C++ diagnostic in a generated file.
+
+## `this` IS AN AL KEYWORD SINCE 2024 WAVE 2, AND THE TRANSPILER DOES NOT KNOW IT
+
+`devenv-al-this-keyword.md` (read 2026-09-04, board:0071 -- a root concept page that had only a
+group verdict):
+
+> The `this` keyword can be used in codeunits in AL as a self-reference, and it allows passing the
+> current object as an argument to methods. ... **The newest version of the System Application has
+> been updated to use the `this` keyword** for referencing methods and globals within the same
+> object.
+
+Measured 2026-09-04 over `~/Git/BCApps/src`: **2 600 uses of `this.<Member>`**, and they are exactly
+where the page says -- the System Application and the newer apps, in shapes like
+`this.GeneratePDF := GeneratePDFValue;` (`SalesCrMemoPEPPOL30NO.XmlPort.al:2439`) and
+`this.MockDate := MockDate;` (`XRechnungStructValidations.Codeunit.al:104`).
+
+**`grep -rn '"this"' src/al/ src/gen/` returns nothing.** So `this` is lexed as an ordinary
+identifier and `.` is emitted as `.` (`src/gen/BodyWriter.cpp:57`), which produces `this.Member` in
+C++ -- where `this` is a POINTER and `.` does not apply. **2 600 translation units fail to compile**,
+loudly, which is the good direction but is a hole with a count.
+
+**Why it belongs to THIS item.** The subject here is that a generated name never collides with what
+the class already means, and `this` is the sharpest case: it is a C++ keyword whose meaning in the
+generated class is ALMOST what AL means by it -- self-reference -- but through a pointer rather than
+a reference. The two spellings differ by exactly the arrow.
+
+**The choice**: the name resolver rewrites the identifier `this` to `(*this)`, which makes
+`this.Member` become `(*this).Member` and keeps every other emission untouched. Not `this->`, because
+the `.` comes from the operator table and rewriting the OPERATOR would change every member access in
+the tree; rewriting the operand changes one identifier. The shape is also what the second use of the
+keyword needs -- "passing the current object as an argument" -- since `f(this)` in AL passes the
+object and `f(*this)` is its C++ spelling.
+
+**Gate**: a codeunit that writes `this.Field := X` and one that passes `this` to a procedure taking
+its own type. **The negative control** is the second: a resolver that only handles `this.` in a
+member access compiles the first and not the second.
+
+Classification: **activation** -- 2 600 files do not translate today, so nothing regresses.

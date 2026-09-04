@@ -36,7 +36,7 @@ single-row `Insert`/`Get`/`Modify`/`Delete` by primary key and no set operation 
 |---|---|
 | `FindSet` | requests ALL matching rows in one query; `FindSet(true)` reads them `UPDLOCK` |
 | `Find` | pages instead, and RESPECTS THE FILTERS -- `record-find-method.md` says so in as many words |
-| `DeleteAll()` | does NOT run `OnDelete`; `DeleteAll(true)` does. Table-extension `OnBeforeDelete`/`OnAfterDelete` run either way |
+| `DeleteAll()` | does NOT run `OnDelete`; `DeleteAll(true)` does. The table's `OnBeforeDeleteEvent`/`OnAfterDeleteEvent` run either way -- they are PLATFORM trigger events and not the table's trigger (board:0057), which is why a `tableextension` still sees the delete |
 | `ModifyAll` | **never** runs `OnValidate`, and runs `OnModify` only with `RunTrigger`. A row already holding the value is written anyway |
 | `SetFilter(F,'')` | is NOT a filter on the empty value -- it is no filter |
 | `SetRange` | REPLACES the field's filter rather than merging |
@@ -108,3 +108,84 @@ only the filtered rows and the negative control asserts the rest survive; `Modif
 `OnValidate`; `CopyFilters` from an unfiltered source clears; and `Reset` shows the whole table again.
 
 The measurement is `agiru run-tests` over the 2 291, before and after.
+
+## `ModifyAll` AND `DeleteAll` FALL BACK TO ROW-BY-ROW, AND FOUR OF THE FIVE REASONS ARE KNOWN AT TRANSLATION TIME
+
+`administration/optimize-sql-al-Database-methods-and-performance-on-server.md` (read 2026-09-04 --
+`dev-itpro/administration/` was outside board:0071's first denominator) states the rule exactly:
+
+> Using **ModifyAll** and **DeleteAll** can improve performance by limiting the amount of SQL calls
+> needed. However, **ModifyAll** and **DeleteAll** revert to individual calls if any of the following
+> conditions exist:
+>
+> - There's trigger code on the table.
+> - There are event subscribers to `OnBeforeModify`, `OnAfterModify`, `OnGlobalModify`,
+>   `OnBeforeDelete`, `OnAfterDelete`, `OnGlobalDelete`, and `OnDatabaseModify`.
+> - Security filtering is active.
+> - The table contains `Media` or `MediaSet` data type fields.
+> - There are fields that are added through companion tables.
+
+**This is not a performance note, it is the SEMANTICS**: whether the triggers and events fire for
+each row is the same question as whether one SQL statement runs. `Record.DeleteAll(true)` runs them
+and `DeleteAll()` does not, which board:0044 already carries -- but the list above says the platform
+ALSO drops to row-by-row when a subscriber exists, whether or not the caller asked for triggers.
+
+**Four of the five are decidable when the tree is compiled**, and that is this tree's habit:
+
+| condition | when it is known |
+|---|---|
+| the table declares `OnModify` / `OnDelete` | translation time -- it is in the `.al` |
+| a subscriber exists for one of the seven events | translation time -- board:0057's subscriber table is `constexpr` |
+| the table has a `Media` or `MediaSet` field | translation time -- the field table (board:0031) |
+| the table has companion-table fields | translation time -- board:0033 merges extensions |
+| security filtering is active | RUN time -- board:0062, per session |
+
+So the generator can emit, beside each table, a `constexpr bool kBulkDeleteIsSafe` and the runtime
+needs one further check. **A `static_assert` cannot state it** -- it is a property of the whole
+program rather than of one object -- but a `constexpr` beside the table is the same idea one step
+weaker, and it turns a decision the runtime would otherwise make by walking metadata into a load of
+one byte.
+
+## THE OTHER RULES ON THE SAME PAGE
+
+- **A record is CLONED by `Copy`, by `RecordRef.GetTable`, and by being passed WITHOUT `var`** -- and
+  "cloning a record before a **Modify** or **Delete** operation issues an extra SQL statement, since
+  the SQL `SELECT` query is restarted every time the table is cloned". So AL's parameter mode has a
+  measurable cost at the database, and the documented fix is to open the loop `FindSet(true)` and
+  modify the SAME variable. That is a shape the generator must not accidentally break by copying
+  where AL passed by reference -- CLAUDE.md's first tabulated trap, seen from the performance side.
+- **`LockTable` costs no SQL statement of its own**: "It causes any subsequent reading from any
+  tables to be done with an update lock." Confirms board:0012's tri-state exactly.
+- **Every `Insert`, `Modify` and `Delete` is its own SQL statement**, and a table with SIFT indexes
+  pays more per write (board:0019).
+
+## `DeleteAll(true)` PASSES A COPY OF THE VARIABLE, AND THERE IS NO PERFORMANCE REASON FOR IT
+
+`devenv-insert-modify-modifyall-delete-and-deleteall-methods.md` (read 2026-09-04, board:0071):
+
+> When you use `DeleteAll(true)`, **a copy of the AL variable with its initial values is created**.
+> This means that when you use `DeleteAll(true)` to run the `OnDelete` trigger, all the changes that
+> were made to the variables in the method or codeunit that's making the call, **can't be seen in the
+> `OnDelete` trigger**. If you want to see the changes that you made to the variables, you must use
+> `Delete(true)` in a loop. **There's no difference in performance between using `DeleteAll(true)` and
+> using `Delete(true)` in a loop.**
+
+**That last sentence removes the only reason an implementer would have to deviate.** `DeleteAll(true)`
+and `Delete(true)` in a loop cost the same, and they differ ONLY in what the trigger can see -- so a
+runtime that implements the first as the second is wrong in a way that costs nothing to be right
+about. The BaseApp's `OnDelete` triggers read record globals; handing them the caller's mutated
+variable instead of a fresh copy changes what they delete.
+
+This is the same distinction the previous section is about, one level in: `DeleteAll` WITHOUT
+triggers is one SQL statement when the five conditions allow it; `DeleteAll(true)` is a loop over a
+COPY. Two different mechanisms behind one name.
+
+The same page settles three smaller things:
+
+- **`Delete` takes filters into consideration** -- so `Rec.Delete()` after a `SetRange` is not simply
+  "delete the row with this primary key".
+- **`ModifyAll` returns nothing and does not raise on an empty set**, which makes it the one write
+  in the family with no value context.
+- **`Insert` may be given a `SystemId`, and "after the `SystemId` is set on a record, it can't be
+  changed"** -- an immutability rule board:0013 owes, and the reason
+  `record-insert-boolean-boolean-method.md` is the page CLAUDE.md names as the overload that matters.

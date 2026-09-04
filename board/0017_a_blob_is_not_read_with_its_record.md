@@ -43,3 +43,13 @@ after.
 
 A BLOB field is empty after a GET and holds its bytes after CALCFIELDS, in a gate against
 PostgreSQL, and the SELECT is shown not to have named the column.
+
+## A BLOB DECLARES WHAT IT HOLDS, read 2026-09-04 (board:0071)
+
+`properties/devenv-subtype-blob-property.md`: a `BLOB` field carries a `SubType` -- `UserDefined`
+(the default), `Bitmap`, `Memo` or `Json`. It is a declaration and therefore `constexpr` beside the
+field like every other property (board:0067), and it decides what a client does with the bytes:
+`Bitmap` is an image a page renders, `Json` is text a `JsonObject` reads back, `Memo` is text.
+
+It does not change how the BLOB is STORED or when it is read, which is this item's subject -- so it
+is recorded here as a field-table column to carry rather than as behaviour to build.

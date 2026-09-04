@@ -932,6 +932,13 @@ public:
     return {};
   }
 
+  [[nodiscard]] const al::VarDecl *Global(std::string_view name) const {
+    for (const al::VarDecl &declared : table_.variables) {
+      if (SameName(declared.name, name)) { return &declared; }
+    }
+    return nullptr;
+  }
+
   [[nodiscard]] bool LocalLabel(std::string_view name) const {
     return running_ != nullptr &&
            std::ranges::any_of(running_->labels, [name](const al::LabelDecl &label) {
@@ -969,6 +976,12 @@ public:
     }
     if (IsRecord(member.variable) && FieldNamed(table_, member.field) != nullptr) {
       return Identifier(member.field);
+    }
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where == nullptr) { continue; }
+      const std::string platform =
+          PlatformFieldSpelling(PlatformField{.table = where->subtype, .field = member.field});
+      if (!platform.empty()) { return platform; }
     }
     return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
                                 : Identifier(member.field);

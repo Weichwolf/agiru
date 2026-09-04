@@ -43,5 +43,54 @@ set that is too NARROW must be impossible, not merely unlikely, or a field silen
 default. So the emitted set is a `static_assert`-checked superset of what the body names, and the
 gate is a case that reads a field left out of the set and does not compile.
 
+## THE FEATURE'S MAIN DOCUMENTED BENEFIT DOES NOT EXIST HERE, and that re-ranks it
+
+`devenv-partial-records.md`, read in full 2026-09-04 (board:0071):
+
+> The most significant performance gains can be seen with table extensions -- by not loading
+> unnecessary fields in table extensions. **Table extensions that don't have any fields for loading
+> won't be part of the data join**, which saves time.
+
+In BC a `tableextension` is a SEPARATE SQL table joined to the base on every read, so the win is
+skipping joins. **agiru merges extensions at translation time (board:0033): one class, one table,
+one row.** There are no joins to skip. So what is left of the feature here is column WIDTH on a wide
+table -- `Purchase Line` at 217 fields -- which is real and is smaller than the page's numbers
+suggest, and the page's own "nine times faster" measurement is not transferable.
+
+Two more rules from the page:
+
+- **`SetLoadFields()` with no arguments resets to a full load**, and so does `Reset()` -- which is
+  already in board:0044's list of what `Reset` clears.
+- "When iterating over records ... an **enumerator** is created based on the selected fields, then a
+  row is fetched when `Next` is called" -- the cursor board:0045 builds, stated from the other side.
+
 **Order.** After board:0047, because a FlowField is not a column and must not be in any load set,
-and after board:0044's navigation is gated -- which it now is.
+and after board:0044's navigation is gated -- which it now is. And after the measurement above is
+taken, because the item may be worth less than it looks.
+
+## AN UNLOADED FIELD FETCHES ITSELF, AND THE SET WIDENS FOR THAT RECORD INSTANCE
+
+`devenv-partial-records-faq.md` (read 2026-09-04, board:0071) answers the question this item's design
+turns on:
+
+> **Do I need to change any code to keep my solution functional?** No. **If a field that's not
+> selected for loading is accessed, the data will be fetched automatically for the current record.
+> The field will then be selected for loading on future requests by using this record instance.**
+> However, you may still get the message *Record has been modified by another user*, like you could
+> before. But now, the message can also appear **in read-only scenarios where the record isn't
+> locked.**
+
+**So partial loading is an OPTIMISATION and never a restriction**: reading an unloaded field is
+legal, it costs one extra round trip, and the field JOINS the load set for that record instance from
+then on. A loop that touches a field on the first row pays once and not per row.
+
+That settles the shape here. `SetLoadFields` decides the INITIAL projection; the record carries the
+set and widens it on demand; and the generator's translation-time knowledge of which fields a
+procedure touches (this item's own subject) is a way to get the initial set right, not a way to
+forbid the rest.
+
+**And the second sentence is a warning worth carrying into the design.** The
+"Record has been modified by another user" check compares the row as it was read; a partially loaded
+record read the row at one moment and fetches a missing field at another, so the check can fire
+without any lock and without any other user -- which is why the answer here must re-read against
+the rowversion (board:0013) rather than against the fields it happens to hold.

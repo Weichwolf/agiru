@@ -5,8 +5,26 @@ Area: rt, gen, cli
 # A table number finds its declaration
 
 `RecordRef.Open(TableNo)` and `RecordId.GetRecord()` both start from a NUMBER and have to arrive at
-a record. Today both refuse, and they refuse honestly -- there is no way from `27` to the
-declaration of `Item`, because nothing in this tree holds the set of tables.
+a record. ~~Today both refuse~~ -- **the first one landed**, and this item is re-measured rather
+than left reading as though nothing had happened.
+
+**Done** (verified 2026-09-04 by the sweep, board:0071): `src/rt/RecordRef.cpp:110` opens against the
+catalogue and refuses an unknown number with the number in the text -- "this installation carries no
+table 4711". `Number`, `Name`, `Field` by number and by name, `FieldCount`, `FieldExist` and
+`FieldIndex` all answer over the declaration it found, and `RecordRefGate.cpp` covers them.
+
+**What is left is the two BRIDGES and the row half:**
+
+- `GetTable(Record)` and `SetTable(Record)` -- the conversion between a typed record and a
+  `RecordRef`, which is 5 of the 24 UT call sites this item counted.
+- `RecordId.GetRecord()`, still absent -- and the reason `include/type/RecordId.h:26` gives has
+  expired: "there is no RecordRef in this runtime" was true when it was written.
+- `Get(RecordId)`, `GetBySystemId`, `RecordId()`, `Caption()`, `FullyQualifiedName()`.
+- `Open(Integer [, Temporary] [, CompanyName])` takes three arguments in the documentation and one
+  in the door, so a `RecordRef` cannot be opened temporary or against another company
+  (board:0047, board:0060, board:0072).
+- The five `System*No()` methods, which return the FIELD NUMBER of each system field -- metadata
+  `agiru::kSystemFields` already holds (board:0013).
 
 ## What the references say
 

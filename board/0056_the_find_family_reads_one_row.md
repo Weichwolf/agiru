@@ -4,6 +4,12 @@ Area: rt
 
 # `Find`, `FindFirst` and `FindLast` read one row, and a discarded one raises
 
+**THREE OF THE FIVE ROWS BELOW ARE DONE, and the table is left standing rather than quietly
+edited.** `Find`, `FindFirst` and `FindLast` landed at HEAD (`FindGate.cpp`), so what is left of
+this item is `Init` -- which the sweep re-read on 2026-09-04 and confirms still refuses -- and
+`DeleteAll(Boolean)`, whose refusal now correctly cites board:0044. The counts in the table are the
+population each was measured against and stay as the record of what the work was worth.
+
 `FindSet` works and the whole rest of the find family refuses. Counted 2026-09-04 -- the sites are
 `.Method(` over `Layers/W1`, the UT column over the 78 codeunits of the milestone:
 

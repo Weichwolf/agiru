@@ -63,3 +63,26 @@ A field trigger that reads `xRec` after a `Validate` sees the value the field ha
 read, changed and modified twice in a row sees its OWN previous row and not the one read before it
 (WI-1156). A fresh variable's `xRec` is blank and not a mirror (WI-1078). `Copy` carries the image
 (WI-1137). The negative control removes the capture and each must go red.
+
+## `xRec` MAY SHARE STATE WITH `Rec`, AND THE PLATFORM SAYS SO
+
+`devenv-system-defined-variables.md` (read 2026-09-04, board:0071) lists the six variables the
+platform declares -- `Rec`, `xRec`, `CurrPage`, `CurrReport`, `RequestOptionsPage`, and `CurrFieldNo`
+("**Retained for compatibility reasons**") -- and adds a warning this item should carry:
+
+> **Avoid modifications to the `xRec` variable because the record might share some of the underlying
+> state with the `Rec` variable** for performance and compatibility reasons, and **changes can
+> unexpectedly propagate to the `Rec` variable.**
+
+**So BC does not guarantee that `xRec` is an independent copy.** That matters here in both
+directions: it means a runtime that makes `xRec` a full copy is SAFER than the platform and cannot
+be wrong about a read; and it means any AL that writes to `xRec` is relying on undefined behaviour,
+so reproducing the sharing would reproduce a hazard rather than a semantic.
+
+The decision follows: **`xRec` is an independent copy here**, and the deviation is named. It costs one
+record's worth of bytes at the trigger boundary, which board:0006 counts, and it removes a class of
+defect the predecessor spent four items on (WI-781, WI-1078, WI-1137, WI-1156).
+
+`CurrFieldNo` being "retained for compatibility" is worth noting too: it is the field number of the
+current field during a validate, and the BaseApp still branches on it, so it is carried without being
+extended.

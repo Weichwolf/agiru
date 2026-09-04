@@ -62,9 +62,24 @@ for the duration of a test, which means event dispatch has to exist before those
 `Commit` at 55 is already there (board:0040's first form was filed for it and deleted after
 checking).
 
-**The population count differs by one and the number that matters does not.** This walk finds 87
-codeunits whose name ends in UT; the transpiler reports 86. One of them declares no `[Test]` method
-at all, so both agree on 2 392, which is what the milestone counts.
+**~~The population count differs by one and the number that matters does not.~~ THIS PARAGRAPH IS
+WRONG AND THE RANKING ABOVE INHERITS IT.** Re-measured 2026-09-04: `scripts/builtin_rank.py` selects
+its files with `re.search(r'codeunit \d+ "?[^"\n]*UT"?$', ..., re.I)` and **`re.I` makes every name
+ending in "ut" match**. The seven files it adds over the milestone's own rule are `SalesStockout`,
+`SCMStockout`, `JobsStockout`, `ServiceStockout`, `OfficeAddinPopout`, `ReportLayout` -- *Stockout*,
+*Popout*, *Layout* -- and `LibraryTablesUT`, which carries no `Subtype = Test` because it is a
+library.
+
+| rule | codeunits | `[Test]` |
+|---|---:|---:|
+| this script | 87 | 2 392 |
+| `Subtype = Test` + a name ending ` UT`, `-UT` or `.UT` | **80** | **2 305** |
+
+So the ranking's denominator is 87 wrong files short of the milestone's, the explanation "one of
+them declares no `[Test]` method" was a guess that fit, and the counts in the table above are over
+2 392 procedures of which 87 are not in the milestone at all. **The ORDER the ranking gives is
+almost certainly unchanged** -- `StrSubstNo` and `WorkDate` do not owe their rank to six codeunits --
+but the numbers are not the milestone's until the script takes its population from board:0058.
 
 ## How
 
@@ -76,6 +91,8 @@ at all, so both agree on 2 392, which is what the milestone counts.
 
 ## What will be true
 
+- [ ] The population comes from board:0058's one script and not from a regular expression written
+      here, so the ranking's denominator is the milestone's.
 - [ ] The builtins the UT tree calls are counted over the whole tree, and the count is a baseline.
 - [ ] The top of that ranking is implemented and gated.
 - [ ] **Negative control**: an unimplemented builtin refuses by NAME rather than compiling to

@@ -95,6 +95,30 @@ indirection that C++ shows.
 
 **5. Dispatch is one virtual call**, which is what C/SIDE did natively.
 
+## AN INTERFACE CAN EXTEND ANOTHER, AND `is` / `as` TEST AND CAST IT
+
+`devenv-interfaces-in-al-extend.md` and `devenv-interfaces-in-al-operators.md`, read 2026-09-04
+(board:0071), add two things this item does not carry -- and both land on the DERIVATION this item
+already chose:
+
+- **An interface may extend another interface**, so the 207 interfaces are a hierarchy rather than a
+  flat set. In C++ that is inheritance between abstract classes, which the choice above already
+  gives for free.
+- **`is` and `as` are operators on an interface variable AND on a `Variant`:**
+
+  ```al
+  if intf is IBar then ...          // does this implementation also satisfy IBar?
+  exit(intf as IBar);               // "throws an error if 'intf' doesn't implement 'IBar'"
+  ```
+
+  `is` is `dynamic_cast<IBar *>(p) != nullptr` and `as` is the same cast with a raise on null -- so
+  they need the vtable this item's `implements`-as-inheritance already puts on the 691 implementing
+  codeunits, and **nothing else**. That is worth recording because it is the one place where the
+  "no virtual functions" rule for TABLES could have been mistaken for a rule about codeunits: `as`
+  cannot work without RTTI, and a table never needs it.
+- The `Variant` form means `Variant` must be able to answer "does the value you hold implement this
+  interface", which is a question `include/type/Variant.h` cannot ask today.
+
 ## What is true when this closes
 
 - `.Interface.al` is parsed and counted in the population baseline beside tables, codeunits and
@@ -104,3 +128,54 @@ indirection that C++ shows.
   rather than a runtime lookup -- which is the trade this tree made by leaving Python.
 - An interface-typed variable dispatches to the codeunit assigned to it, and how it is held is
   written down in one sentence with the cost named.
+
+## THE ENUM-TO-INTERFACE BINDING IS A THREE-LEVEL FALLBACK, read 2026-09-04 (board:0071)
+
+`src/gen/EnumWriter.cpp:ImplementationBodies` emits a `switch (value)` over the values that declare
+`Implementation` and ends in `throw Error("this value of X names no implementation of Y")`. The
+platform documents TWO more levels below that switch, and both are declarations the parser already
+sees:
+
+| the case | property | pages | agiru today |
+|---|---|---|---|
+| the value names its own | `Implementation` on the VALUE | `devenv-implementation-property.md` | the `switch` case |
+| the value names none | **`DefaultImplementation` on the ENUM** | `devenv-defaultimplementation-property.md` | **throws** |
+| the ORDINAL matches no declared value | **`UnknownValueImplementation` on the ENUM** | `devenv-unknownvalueimplementation-property.md` | **throws** |
+
+The property page's own example is the whole rule in six lines:
+
+```al
+e := SomeEnum::Yes;  ifoo := e;  ifoo.Foo();  // => YesFooImpl,     from Implementation on the value
+e := SomeEnum::No;   ifoo := e;  ifoo.Foo();  // => DefaultFooImpl, from DefaultImplementation
+e := 2;              ifoo := e;  ifoo.Foo();  // => UnknownFooImpl, from UnknownValueImplementation
+```
+
+**The third line is the one that decides the shape.** `e := 2` is an ordinal no value declares --
+which is ordinary once an enum is `Extensible` and an extension has been removed -- so the binding
+cannot be a switch over declared values with a `throw` underneath it. It is a lookup with two
+defaults, and the `default:` label is where the second one goes.
+
+Measured 2026-09-04 over `~/Git/BCApps/src`: **40 `DefaultImplementation`** and **9
+`UnknownValueImplementation`** declarations, against 629 `Implementation` bindings. Small, and every
+one of them is a live path that currently raises instead of dispatching.
+
+## AND THE DISPATCH ALLOCATES ON EVERY ASSIGNMENT
+
+`ImplementationOf` emits `return new agiru::app::<Codeunit>{};` (`src/gen/EnumWriter.cpp:107`) and
+`Implementation<I>::Forget()` deletes it. Nothing leaks -- but an interface assignment inside a loop
+is one heap allocation per turn, which is the rule CLAUDE.md states as "no allocation on the hot
+path", and a BC posting routine assigns an interface variable per document line.
+
+**The shape that removes it:** a codeunit with no state is a value, and the binding can be a
+`constexpr` table of `I *(*)()` factories indexed by ordinal, returning a pointer into a
+`thread_local` instance per implementing codeunit -- one per session, not one per assignment. That
+also makes the fallback levels above a lookup rather than a control-flow construct: the table's
+entry for an unbound ordinal IS the default, filled in by the generator.
+
+**One thing this item must settle before that is built.** `Implementation`'s copy constructor holds
+NOTHING -- "A copy holds nothing of its own" (`include/runtime/Implementation.h:32`) -- so
+`A := B` between two interface variables leaves `A` unbound and the next `A.Foo()` raises "this
+interface variable has no implementation assigned yet". AL's own semantics for that assignment are
+not stated on any page read so far, and the answer decides whether the holder can be a non-owning
+pointer at all. **It is named here rather than assumed**, because a factory table makes the copy
+free and the current design makes it impossible -- and picking the wrong one is a rewrite.

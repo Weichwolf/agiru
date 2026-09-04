@@ -265,33 +265,38 @@ bool DoorDeclares(std::string_view name) {
   return DoorSpellings().contains(key);
 }
 
-bool PlatformFieldNamed(const PlatformField &wanted) {
-  const std::string_view table = wanted.table;
-  const std::string_view field = wanted.field;
-  static std::map<std::string, std::set<std::string>> members;
+const std::map<std::string, std::string> &PlatformMembers(std::string_view table) {
+  static std::map<std::string, std::map<std::string, std::string>> members;
   const std::string key = LowerKey(std::string(table));
   const auto held = members.find(key);
-  const std::set<std::string> *found = nullptr;
-  if (held != members.end()) {
-    found = &held->second;
-  } else {
-    const std::filesystem::path page = std::filesystem::path(AGIRU_SOURCE_DIR) / "include" /
-                                       "platform" / (Identifier(table) + ".h");
-    std::set<std::string> declared;
-    if (std::filesystem::is_regular_file(page)) {
-      static const std::regex member(R"(^\s*[\w:<>,&*\s]+?\s([A-Z][A-Za-z0-9]*)\s*(\{\})?;\s*$)");
-      std::ifstream file(page);
-      std::string line;
-      while (std::getline(file, line)) {
-        std::smatch matched;
-        if (std::regex_match(line, matched, member)) {
-          declared.insert(LowerKey(matched[1].str()));
-        }
-      }
+  if (held != members.end()) { return held->second; }
+  const std::filesystem::path page =
+      std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "platform" / (Identifier(table) + ".h");
+  std::map<std::string, std::string> declared;
+  if (std::filesystem::is_regular_file(page)) {
+    static const std::regex member(R"(^\s*[\w:<>,&*\s]+?\s([A-Z][A-Za-z0-9]*_?)\s*(\{\})?;\s*$)");
+    std::ifstream file(page);
+    std::string line;
+    while (std::getline(file, line)) {
+      std::smatch matched;
+      if (!std::regex_match(line, matched, member)) { continue; }
+      std::string name = matched[1].str();
+      std::string bare = name;
+      if (bare.ends_with("_")) { bare.pop_back(); }
+      declared.insert_or_assign(LowerKey(bare), name);
     }
-    found = &members.emplace(key, std::move(declared)).first->second;
   }
-  return found->contains(LowerKey(std::string(field)));
+  return members.emplace(key, std::move(declared)).first->second;
+}
+
+bool PlatformFieldNamed(const PlatformField &wanted) {
+  return PlatformMembers(wanted.table).contains(LowerKey(std::string(wanted.field)));
+}
+
+std::string PlatformFieldSpelling(const PlatformField &wanted) {
+  const auto &declared = PlatformMembers(wanted.table);
+  const auto found = declared.find(LowerKey(std::string(wanted.field)));
+  return found == declared.end() ? std::string{} : found->second;
 }
 
 bool HiddenByABaseMember(std::string_view name) {
