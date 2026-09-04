@@ -1,12 +1,9 @@
 #pragma once
 
-#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
-#include "type/Byte.h"
-#include "type/Char.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
@@ -21,7 +18,6 @@
 #include "type/Integer.h"
 #include "type/KeyRef.h"
 #include "type/ObjectType.h"
-#include "type/RecordId.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -31,8 +27,6 @@
 #include "type/TransactionType.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
-
-#include "BuiltinsWritten.h"
 
 #include <string>
 #include <string_view>
@@ -324,25 +318,6 @@ std::string ExportEncryptionKey(std::string_view Password);
 void ExportObjects(std::string_view FileName,
                    ::agiru::RecordRef &ObjectRecord,
                    ::agiru::Integer Format = {});
-
-/// \brief AL `System.Format(Any, Integer, Integer)`. Formats a value into a string.
-/// \param Value The AL `Any`.
-/// \param Length The AL `Integer`.
-/// \param FormatNumber The AL `Integer`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string Format(const ::agiru::Variant &Value,
-                   ::agiru::Integer Length = {},
-                   ::agiru::Integer FormatNumber = {});
-
-/// \brief AL `System.Format(Any, Integer, Text)`. Formats a value into a string.
-/// \param Value The AL `Any`.
-/// \param Length The AL `Integer`.
-/// \param FormatString The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
-Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString);
 
 /// \brief AL `System.GetCollectedErrors(Boolean)`. Gets all collected errors in the current
 /// collection scope.

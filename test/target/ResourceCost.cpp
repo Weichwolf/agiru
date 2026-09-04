@@ -12,6 +12,8 @@
 #include "runtime/Table.h"
 #include "type/Code.h"
 
+#include "BuiltinsWritten.h"
+
 namespace agiru::app::tables {
 
 void ResourceCost::OnValidateCode() {

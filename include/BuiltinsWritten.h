@@ -3,6 +3,7 @@
 #include "type/BigInteger.h"
 #include "type/Date.h"
 #include "type/Integer.h"
+#include "type/Variant.h"
 
 #include <optional>
 #include <string>
@@ -161,6 +162,62 @@ std::string UpperCase(std::string_view String);
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date WorkDate(::agiru::Date NewDate = {});
+
+/// \brief AL `System.Format(Any, Integer, Integer)`. Formats a value into a string.
+///
+/// \param Value The AL `Any`.
+/// \param Length The AL `Text` length wanted; 0 for the whole of it.
+/// \param FormatNumber The standard format, from the tables in `devenv-format-property.md`.
+/// \return The AL `Text`.
+/// \throws Error when the format number is one no table declares for that type, and when the value
+///         is a record -- `Format(Record)` renders the primary key and no key exists at this layer.
+///
+/// \note THE STANDARD FORMATS ARE TABULATED AND THIS FOLLOWS THE TABLE. `devenv-format-property.md`
+///       gives one table per type: 0 is the display format, 1 the edit format, 2 the AL CODE
+///       CONSTANT format and 9 the XML format. The two that matter most are documented outright for
+///       either enumeration -- `<Text>` for 0 and 1, `<Number>` for 2 and 9 -- which is what makes
+///       `Assert.Equal`'s `Format(Left, 0, 2) = Format(Right, 0, 2)` a comparison of ORDINALS. The
+///       predecessor paid for the other direction: it rendered the ordinal for every format, and
+///       every `StrSubstNo` that substituted an enum leaked a number into the message.
+///
+/// \warning FORMATS 0 AND 1 ARE THE REGION'S AND THIS RUNTIME HAS NO REGION (board:0007). A date
+///          reads `05-04-21` in Europe and `04/05/21` in the US, and a decimal's separators change
+///          with it. Until a session carries a language, 0 and 1 render what 9 does for the types
+///          whose display format is regional -- which is a WRONG answer rather than a plausible
+///          one, and the tests that compare a formatted date will say so.
+///
+/// \note THE LENGTH TRUNCATES AND DOES NOT PAD. AL's own `Format(<caption>, 10)` into a `Code[10]`
+///       is the case that needs it; padding every shorter result to the length is what the
+///       predecessor measured as a regression across its asserts, so this cuts and leaves the rest
+///       alone. A length of 0 is no length at all, which is AL's own default.
+std::string Format(const ::agiru::Variant &Value,
+                   ::agiru::Integer Length = {},
+                   ::agiru::Integer FormatNumber = {});
+
+/// \brief AL `System.Format(Any, Integer, Text)`. Formats a value with a format SPECIFICATION.
+///
+/// \param Value The AL `Any`.
+/// \param Length The AL `Text` length wanted; 0 for whatever the specification produces.
+/// \param FormatString The specification, built the way `devenv-format-property.md` builds one:
+///        literal characters, and elements in angle brackets each optionally carrying an argument
+///        after a comma.
+/// \return The AL `Text`.
+/// \throws Error when the specification names an element this runtime does not render yet, and
+///         when an element wants a type the value is not.
+///
+/// \note THE ELEMENT IS REFUSED BY NAME RATHER THAN IGNORED. A specification that is half
+///       understood renders a plausible string that no test can tell from a right one, which is
+///       the class of defect this tree moves to the front. What is rendered today is
+///       `<Integer>`, `<Sign>`, `<Text>`, `<Standard Format,n>`, `<Filler Character,c>` and the
+///       numeric date and time elements; the rest -- `<Month Text>`, `<Precision,m:n>`,
+///       `<Second dec.>`, `<Comma,.>` -- name themselves in the error (board:0007). Measured over
+///       `Layers/W1`: `<Integer,n><Filler Character,0>` is the commonest specification at 26 sites.
+///
+/// \note THE FILLER IS READ FROM THE WHOLE SPECIFICATION BEFORE ANYTHING IS RENDERED, because AL
+///       writes it AFTER what it fills: `'<Integer,2><Filler Character,0>'` pads the integer with
+///       zeroes, and a left-to-right reading would have found the filler too late.
+std::string
+Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString);
 
 /// \brief AL `Database.CompanyName()`. Gets the current company name.
 /// \return The AL `Text`.

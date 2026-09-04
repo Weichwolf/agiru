@@ -213,7 +213,10 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
   }
-  if (text.find(") {\n") != std::string_view::npos) { headers.insert("Builtins.h"); }
+  if (text.find(") {\n") != std::string_view::npos) {
+    headers.insert("Builtins.h");
+    headers.insert("BuiltinsWritten.h");
+  }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   return out;

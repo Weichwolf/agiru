@@ -1,13 +1,13 @@
 #pragma once
 
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "type/Boolean.h"
-#include "type/Code.h"
 #include "type/Decimal.h"
 #include "type/Option.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include <compare>
@@ -253,10 +253,38 @@ template <typename T> [[nodiscard]] std::string AsText(const T &value) {
     return value.ToText();
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
+  } else if constexpr (Enumeration<T>) {
+    const EnumValueDef *member = ValueOf(MembersOf<T>(), static_cast<std::int32_t>(value));
+    return member == nullptr
+               ? std::to_string(static_cast<std::int32_t>(value))
+               : std::string(member->caption.empty() ? member->name : member->caption);
   } else if constexpr (std::is_enum_v<T>) {
     return std::to_string(static_cast<std::underlying_type_t<T>>(value));
   } else {
     return Format(value);
+  }
+}
+
+/// \brief One value as a FILTER writes it, which is not always how a message writes it.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return The text the filter language holds.
+///
+/// \warning AN ENUMERATION FILTERS BY ITS ORDINAL AND RENDERS BY ITS CAPTION, AND THE TWO ARE NOT
+///          THE SAME TEXT. `option-data-type.md` calls an option "a zero-based enumerator type" and
+///          the column holds that number, so `SetRange(Type, Type::Resource)` is `"Type" = 0`;
+///          `Format(Type)` is `Resource`, which is what an error message says. The predecessor put
+///          one function on both jobs and the caption reached the value side: its RequestPage XML
+///          carried `Email` where the column wanted `3`, and `Evaluate` refused it (openerp
+///          WI-1008). Here the filter asks for this and a message asks for `AsText`.
+template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
+  if constexpr (Enumeration<T>) {
+    return std::to_string(static_cast<std::int32_t>(value));
+  } else if constexpr (requires { value.AsInteger(); }) {
+    return std::to_string(value.AsInteger());
+  } else {
+    return AsText(value);
   }
 }
 

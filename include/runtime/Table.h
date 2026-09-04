@@ -1196,7 +1196,7 @@ public:
   /// \param member The field.
   /// \param value  The value.
   template <typename Field, typename Value> void SetRange(const Field &member, const Value &value) {
-    detail::Narrow(State(), NumberOf(&member), detail::Literally(AsText(value)));
+    detail::Narrow(State(), NumberOf(&member), detail::Literally(FilterText(value)));
   }
 
   /// \brief AL `Record.SetRange(Field, From, To)` -- the field must lie in that range.
@@ -1209,7 +1209,7 @@ public:
   void SetRange(const Field &member, const Value &from, const Value &to) {
     detail::Narrow(State(),
                    NumberOf(&member),
-                   detail::Literally(AsText(from)) + ".." + detail::Literally(AsText(to)));
+                   detail::Literally(FilterText(from)) + ".." + detail::Literally(FilterText(to)));
   }
 
   /// \brief AL `Record.SetRecFilter(...)`. Sets the values in the current key of the current record

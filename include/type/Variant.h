@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
@@ -9,12 +10,16 @@
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
+#include "type/Enum.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/Time.h"
 
 #include <concepts>
+#include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -71,6 +76,78 @@ struct RecordInVariant {
   return a.record == b.record && a.table.Value() == b.table.Value();
 }
 
+/// \brief What a Variant holding an OPTION or an ENUM holds.
+///
+/// \note ONE ALTERNATIVE FOR BOTH, BECAUSE AL HAS ONE PREDICATE FOR BOTH. `variant-isoption` is
+///       documented and there is no `IsEnum` beside it -- the sixty-eight `IsX` pages name every
+///       other type and not that one. An Enum in a Variant answers `IsOption()`, so telling the two
+///       apart here would invent a distinction the platform does not offer.
+///
+/// \note IT IS NOT AN Integer, AND `Assert.Equal` IS WHY IT MAY NOT BECOME ONE. That procedure
+///       reads `IsNumber := Value.IsDecimal or Value.IsInteger or Value.IsChar` and then compares
+///       `TypeOf(Left) = TypeOf(Right)` -- so an option and an integer of the same ordinal are NOT
+///       equal in AL, and a Variant that stored an option as its number would make them equal.
+///
+/// \note THE NAME TABLE TRAVELS AS A SPAN OVER `.rodata`. It is the same `constexpr` array the
+///       enumeration already emits, so holding one costs a pointer and a length and no copy.
+struct OrdinalInVariant {
+  std::int32_t ordinal;                 ///< The declared number.
+  std::span<const EnumValueDef> values; ///< The declared members, for the rendering.
+};
+
+/// \brief Two enumeration values are equal when their ordinals are.
+///
+/// \param a One value.
+/// \param b The other.
+/// \return Whether they hold the same ordinal.
+///
+/// \note THE NAME TABLE IS NOT PART OF THE COMPARISON. `Assert.Equal` compares `Format(v, 0, 2)`,
+///       which is the ORDINAL for either enumeration -- so `"Sales Document Type"::Invoice` and
+///       `"Purchase Document Type"::Invoice` compare equal there, and a table identity carried here
+///       would refuse a pair AL accepts. It is also why this is free rather than defaulted: a
+///       `std::span` has no `operator==`.
+[[nodiscard]] inline bool operator==(const OrdinalInVariant &a, const OrdinalInVariant &b) {
+  return a.ordinal == b.ordinal;
+}
+
+/// \brief Whether a type is one of the runtime's two enumeration holders.
+///
+/// \tparam T The type.
+///
+/// It names neither `Option` nor `Enum`: both derive from `OrdinalValue` and both publish the
+/// `Traits` their generator specialised, and that pair is what this needs. A third holder built the
+/// same way would be taken without being listed.
+template <typename T>
+concept HoldsAnOrdinal = std::derived_from<T, OrdinalValue> && requires {
+  { T::Traits::kValues } -> std::convertible_to<std::span<const EnumValueDef>>;
+};
+
+/// \brief Whether an enumeration declares its members through either traits template.
+/// \tparam E The generated enumeration.
+template <typename E>
+concept Enumeration = std::is_enum_v<E> && (requires {
+  { EnumTraits<E>::kValues } -> std::convertible_to<std::span<const EnumValueDef>>;
+} || requires {
+  { OptionTraits<E>::kValues } -> std::convertible_to<std::span<const EnumValueDef>>;
+});
+
+/// \brief The declared members of an enumeration, whichever of the two declared it.
+///
+/// \tparam E The generated enumeration.
+/// \return The member table, which lives in `.rodata` and is never copied.
+///
+/// \note THE TWO TRAITS ARE ONE QUESTION HERE. The generator specialises `EnumTraits` for an enum
+///       OBJECT and `OptionTraits` for a field's own option list, and a given enumeration belongs
+///       to exactly one of them -- so everything that only wants the members asks this rather than
+///       knowing which kind it was handed.
+template <Enumeration E> [[nodiscard]] constexpr std::span<const EnumValueDef> MembersOf() {
+  if constexpr (requires { EnumTraits<E>::kValues; }) {
+    return EnumTraits<E>::kValues;
+  } else {
+    return OptionTraits<E>::kValues;
+  }
+}
+
 /// \brief AL `Variant`.
 ///
 /// From `variant-data-type.md`: "Represents an AL variable object. The AL variant data type can
@@ -100,6 +177,7 @@ public:
                             Guid,
                             RecordId,
                             DateFormula,
+                            OrdinalInVariant,
                             RecordInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
@@ -115,6 +193,26 @@ public:
   template <typename T>
     requires detail::InVariant<T, Held>::value
   Variant(T value) : held_(std::move(value)) {}
+
+  /// \brief Holds an option or an enum, with the member table it was declared with.
+  ///
+  /// \tparam T The holder, `Option<E>` or `Enum<E>`.
+  /// \param value The value.
+  template <HoldsAnOrdinal T>
+  Variant(const T &value)
+      : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = T::Traits::kValues}) {}
+
+  /// \brief Holds a bare enumeration member, which is how AL writes one.
+  ///
+  /// \tparam E The generated enumeration.
+  /// \param value The member.
+  ///
+  /// \note AL PASSES THE MEMBER ITSELF -- `Assert.AreEqual(Enum::"Statement Type"::Bank, Rec.Type,
+  ///       Msg)` hands `Any` a member and not a variable of the enum.
+  template <Enumeration E>
+  Variant(E value)
+      : held_(OrdinalInVariant{.ordinal = static_cast<std::int32_t>(value),
+                               .values = MembersOf<E>()}) {}
 
   /// \brief Holds a record.
   ///
@@ -203,6 +301,10 @@ public:
 
   /// \brief AL `Variant.IsGuid()`. \return True when it holds one.
   [[nodiscard]] bool IsGuid() const { return Is<Guid>(); }
+
+  /// \brief AL `Variant.IsOption()`. \return True when it holds an option OR an enum.
+  /// \note An Enum answers this one, because the platform documents no `IsEnum` beside it.
+  [[nodiscard]] bool IsOption() const { return Is<OrdinalInVariant>(); }
 
   /// \brief AL `Variant.IsRecordId()`. \return True when it holds one.
   [[nodiscard]] bool IsRecordId() const { return Is<RecordId>(); }
@@ -395,13 +497,6 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean IsObjectType() const {
     throw Error("Variant.IsObjectType() is declared and not implemented yet (board:0035)");
-  }
-
-  /// \brief AL `Variant.IsOption()`. Indicates whether an AL variant contains an Option variable.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsOption() const {
-    throw Error("Variant.IsOption() is declared and not implemented yet (board:0035)");
   }
 
   /// \brief AL `Variant.IsOutStream()`. Indicates whether an AL variant contains an OutStream

@@ -10,6 +10,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 
+#include "BuiltinsWritten.h"
 #include "LineNumberBuffer.h"
 
 namespace agiru::app::codeunits {

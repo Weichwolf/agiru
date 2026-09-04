@@ -225,22 +225,6 @@ void ExportObjects(std::string_view FileName,
   RefuseDoor("System.ExportObjects(Text, Record, Integer)");
 }
 
-std::string
-Format(const ::agiru::Variant &Value, ::agiru::Integer Length, ::agiru::Integer FormatNumber) {
-  static_cast<void>(Value);
-  static_cast<void>(Length);
-  static_cast<void>(FormatNumber);
-  RefuseDoor("System.Format(Any, Integer, Integer)");
-}
-
-std::string
-Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString) {
-  static_cast<void>(Value);
-  static_cast<void>(Length);
-  static_cast<void>(FormatString);
-  RefuseDoor("System.Format(Any, Integer, Text)");
-}
-
 void GetCollectedErrors(::agiru::Boolean Clear) {
   static_cast<void>(Clear);
   RefuseDoor("System.GetCollectedErrors(Boolean)");

@@ -126,14 +126,19 @@ for owner in ("system", "text", "database", "session", "dialog", "file", "secret
     allbodies += bodies
 
 needed = {x for t in used for x in re.findall(r"[A-Za-z][A-Za-z0-9]*", door.cpp_type(t))}
-needed |= {"Variant", "Integer", "Boolean", "Date", "Time", "DateTime", "Duration", "Decimal",
-           "BigInteger", "Guid", "Byte", "Char", "DateFormula", "RecordId"}
+# THE DOOR INCLUDES WHAT IT NAMES AND NOT A FIXED LIST. A pinned union of the value types stood
+# here, and it went stale the moment a function moved to `BuiltinsWritten.h`: `Byte.h` and `Char.h`
+# stayed behind with nothing declaring either, which `misc-include-cleaner` reports and which costs
+# every one of the generated translation units that parse this door.
 inc = "".join(f'#include "{existing[t]}"\n' for t in sorted(needed) if t in existing)
 
+# THE WRITTEN DOOR IS NOT INCLUDED FROM HERE, IT STANDS BESIDE IT. This header once pulled
+# `BuiltinsWritten.h` in so that one include reached every builtin, and nothing in it named anything
+# that header declares -- an include a client cannot see the reason for. `Door.cpp` names both
+# beside each other in a generated file instead, which is the same rule every other header follows:
+# a file includes what it names.
 head = '''#pragma once
 
-#include "BuiltinsWritten.h"
-#include "runtime/Error.h"
 ''' + inc + '''
 #include <string>
 #include <string_view>
