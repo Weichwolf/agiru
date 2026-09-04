@@ -327,7 +327,12 @@ public:
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   std::string OptionCaption() const {
-    throw Error("FieldRef.OptionCaption() is declared and not implemented yet (board:0035)");
+    std::string out;
+    for (const EnumValueDef &value : def_->values) {
+      if (!out.empty()) { out += ','; }
+      out += value.name;
+    }
+    return out;
   }
 
   /// \brief AL `FieldRef.OptionString()`. The 'OptionString' property has been deprecated and will
