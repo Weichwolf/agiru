@@ -202,12 +202,10 @@ describes, the runtime must do, whether or not a test asks for it.
    their AL names, and only then is the documentation check mechanical -- a type named differently
    breaks it for ALL of its methods. The predecessor allowed `Record`->`Table`,
    `RecordRef`->`_RecordRefProxy`, `List`->`AlList` and lost the check each time.
-
    **THE STRONGER REASON IS THE READER.** Nobody will write an agiru module by hand: it will be
    written by a model, and AL is in its training data while agiru never will be. So **a reader who
-   knows AL and has never seen agiru must open one file and know how to write the next.**
-
-   Three things follow: **consistency beats cleverness** -- if `FieldError(Code)` names the field,
+   knows AL and has never seen agiru must open one file and know how to write the next.** Three
+   things follow: **consistency beats cleverness** -- if `FieldError(Code)` names the field,
    so do `TestField`, `FieldCaption` and `Validate`; **where idiomatic C++ can produce the AL shape
    it does** -- `FieldError(Code)`, `Rec.Insert()`, the platform half in the base class where AL
    keeps it; and **where it cannot, the deviation is VISIBLE and uniform rather than clever** --
@@ -501,8 +499,13 @@ list names the deeper roots and those come first.
 if taken first -- 2 717 page HEADERS with zero page sources, so 790 761 lines of AL on the floor;
 `<memory>` in one door header costing 1.2 s of every one of 7 885 translation units.
 
-**A LONG RUN GOES IN THE BACKGROUND AND THE WORK CONTINUES.** `make lint FULL=1` is five minutes, a
-full sweep an hour; waiting for either is never the next step.
+**A LONG RUN GOES IN THE BACKGROUND AND THE BOARD IS WHAT FILLS THE WAIT.** `make tree` is minutes
+on two cores, `make lint FULL=1` five, a full sweep an hour, and waiting for any of them is never
+the next step. What fills it is ANALYSIS -- the AL population counted, the platform page read, the
+predecessor's board grepped -- written into the item, so the fix that follows is typing. And the
+documentation is SWEPT rather than only consulted: `record-init-method.md` says `Init` leaves the
+primary key and the timestamp alone, and `Init` refuses outright in 53 of the 78 UT codeunits. No
+error message would have said so -- a refusal nothing reaches looks like a feature that works.
 
 **AN UNDO IS A RESULT**, taken back with the measurement in the commit rather than softened.
 

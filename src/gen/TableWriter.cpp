@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -196,9 +197,34 @@ al::TableObject WithSystemFields(al::TableObject table) {
   return table;
 }
 
+std::optional<std::string>
+InitValue(const al::FieldDecl &field, const OptionField *option, const EnumIndex &enums) {
+  const al::Property *declared = Find(field.properties, "InitValue");
+  if (declared == nullptr) { return std::nullopt; }
+  std::string written = declared->text;
+  for (const al::Token &token : declared->value) {
+    if (token.kind == al::TokenKind::String) { written = token.text; }
+  }
+  if (option != nullptr) {
+    for (std::size_t i = 0; i < option->members.size(); ++i) {
+      if (LowerKey(option->members[i]) == LowerKey(written)) { return std::to_string(i); }
+    }
+    return std::nullopt;
+  }
+  if (!IsEnumField(field)) { return written; }
+  const auto found = enums.find(LowerKey(field.subtype));
+  if (found == enums.end()) { return std::nullopt; }
+  const auto value = found->second.ordinals.find(LowerKey(written));
+  return value == found->second.ordinals.end()
+             ? std::nullopt
+             : std::optional<std::string>(std::to_string(value->second));
+}
+
 std::string FieldTable(const al::TableObject &table,
                        const std::vector<const al::FieldDecl *> &sorted,
-                       const std::string &tableIdentifier) {
+                       const std::string &tableIdentifier,
+                       const std::vector<OptionField> &options,
+                       const EnumIndex &enums) {
   const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
   std::string out = "inline constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
                     tableIdentifier + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
@@ -222,7 +248,10 @@ std::string FieldTable(const al::TableObject &table,
     out += tableIdentifier;
     out += ", ";
     out += identifier;
-    out += ")),\n";
+    out += ")";
+    const std::optional<std::string> initial = InitValue(*field, OptionOf(options, *field), enums);
+    if (initial.has_value()) { out += ", " + Literal(*initial); }
+    out += "),\n";
   }
   return out + "}});\n\n";
 }
@@ -506,7 +535,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
 
   out += ClassBody(table, tableIdentifier, options, enums, objects);
 
-  out += FieldTable(table, sorted, tableIdentifier);
+  out += FieldTable(table, sorted, tableIdentifier, options, enums);
 
   out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";

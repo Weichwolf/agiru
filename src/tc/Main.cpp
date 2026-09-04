@@ -498,9 +498,14 @@ void ScanEnums(
   }
 
   for (const agiru::al::EnumObject &object : objects) {
+    std::map<std::string, int> ordinals;
+    for (const agiru::al::EnumValueDecl &value : object.values) {
+      ordinals.insert_or_assign(agiru::gen::LowerKey(value.name), value.ordinal);
+    }
     index.insert_or_assign(agiru::gen::LowerKey(object.name),
                            agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
-                                               .header = agiru::gen::EnumHeaderPath(object)});
+                                               .header = agiru::gen::EnumHeaderPath(object),
+                                               .ordinals = std::move(ordinals)});
   }
   if (run.output.empty()) { return; }
   held.objects = std::move(objects);

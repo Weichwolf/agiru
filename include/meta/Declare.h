@@ -26,6 +26,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -243,6 +244,7 @@ template <typename Class, typename Value> struct MemberOwnerOf<Value Class::*> {
 /// \param name    The AL name, spaces and all.
 /// \param caption The `Caption` property.
 /// \param offset  `offsetof` the member within the record.
+/// \param initValue The `InitValue` property in the column's own spelling, or nothing.
 /// \return The field's declaration.
 ///
 /// The type tag, the declared length and an enumeration's values are DERIVED from the member's
@@ -256,8 +258,11 @@ template <typename Class, typename Value> struct MemberOwnerOf<Value Class::*> {
 ///       checksum rather than a duplication. With C++26 reflection (P2996) it would go; measured
 ///       2026-09-01, neither clang-19 nor gcc-14 has it (board:0015).
 template <auto Member>
-constexpr FieldDef
-Declare(FieldNo no, std::string_view name, std::string_view caption, std::size_t offset) {
+constexpr FieldDef Declare(FieldNo no,
+                           std::string_view name,
+                           std::string_view caption,
+                           std::size_t offset,
+                           std::optional<std::string_view> initValue = std::nullopt) {
   using Value = typename MemberOwnerOf<decltype(Member)>::Field;
   return FieldDef{
       .no = no,
@@ -267,6 +272,7 @@ Declare(FieldNo no, std::string_view name, std::string_view caption, std::size_t
       .length = FieldTypeOf<Value>::kLength,
       .offset = offset,
       .values = FieldTypeOf<Value>::kValues,
+      .initValue = initValue,
   };
 }
 

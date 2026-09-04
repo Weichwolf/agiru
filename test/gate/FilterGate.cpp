@@ -22,7 +22,8 @@ const FieldDef &TextField() {
                             .type = FieldType::Text,
                             .length = 50,
                             .offset = 0,
-                            .values = {}};
+                            .values = {},
+                            .initValue = {}};
   return def;
 }
 
@@ -33,7 +34,8 @@ const FieldDef &NumberField() {
                             .type = FieldType::Integer,
                             .length = 0,
                             .offset = 0,
-                            .values = {}};
+                            .values = {},
+                            .initValue = {}};
   return def;
 }
 

@@ -44,9 +44,10 @@ agiru::gen::Objects Tables() {
       // read roots are a table AND a codeunit at once, and `enums::` already told them apart.
       agiru::gen::TableRef{
           .identifier = "tables::LineNumberBuffer", .header = "LineNumberBuffer.h", .fields = {}});
-  objects.enums.insert_or_assign(
-      "sales line type",
-      agiru::gen::EnumRef{.identifier = "SalesLineType", .header = "SalesLineType.h"});
+  objects.enums.insert_or_assign("sales line type",
+                                 agiru::gen::EnumRef{.identifier = "SalesLineType",
+                                                     .header = "SalesLineType.h",
+                                                     .ordinals = {}});
   return objects;
 }
 

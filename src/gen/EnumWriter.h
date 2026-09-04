@@ -12,6 +12,7 @@ struct Objects;
 struct EnumRef {
   std::string identifier;
   std::string header;
+  std::map<std::string, int> ordinals;
 };
 
 using EnumIndex = std::map<std::string, EnumRef>;

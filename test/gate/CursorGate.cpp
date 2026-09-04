@@ -9,8 +9,10 @@
 #include "Filter.h"
 #include "Where.h"
 
+#include <cstddef>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using agiru::Connection;
@@ -70,7 +72,8 @@ void TheFilterBindsItsValues(const Connection &connection) {
                             .type = agiru::FieldType::Integer,
                             .length = 0,
                             .offset = 0,
-                            .values = {}};
+                            .values = {},
+                            .initValue = {}};
   const agiru::detail::Clause clause = Where(def, ParseFilter("10..20|>195"), 1);
   Cursor cursor(
       connection, "SELECT n FROM cursor_gate WHERE " + clause.sql + " ORDER BY n", clause.binds);
@@ -87,7 +90,8 @@ void AWildcardBecomesALikeAndAnEmptyValueIsAValue(const Connection &connection) 
                             .type = agiru::FieldType::Text,
                             .length = 0,
                             .offset = 0,
-                            .values = {}};
+                            .values = {},
+                            .initValue = {}};
   {
     const agiru::detail::Clause clause = Where(def, ParseFilter("row 1*"), 1);
     Cursor cursor(
@@ -113,8 +117,8 @@ void AWildcardBecomesALikeAndAnEmptyValueIsAValue(const Connection &connection) 
     Cursor cursor(
         connection, "SELECT n FROM cursor_gate WHERE " + clause.sql + " ORDER BY n", clause.binds);
     CHECK_TRUE("a value carrying SQL's own wildcard finds itself", cursor.Step());
-    CHECK_TRUE("and it is the row it names",
-               cursor.Value(0).has_value() && *cursor.Value(0) == "901");
+    const std::optional<std::string_view> found = cursor.Value(0);
+    CHECK_TRUE("and it is the row it names", found.has_value() && *found == "901");
   }
 }
 

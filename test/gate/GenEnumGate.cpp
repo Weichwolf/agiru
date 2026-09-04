@@ -39,7 +39,8 @@ agiru::gen::EnumIndex IndexOf(const agiru::al::EnumObject &object) {
   agiru::gen::EnumIndex index;
   index.insert_or_assign(agiru::gen::LowerKey(object.name),
                          agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
-                                             .header = agiru::gen::EnumHeaderPath(object)});
+                                             .header = agiru::gen::EnumHeaderPath(object),
+                                             .ordinals = {}});
   return index;
 }
 

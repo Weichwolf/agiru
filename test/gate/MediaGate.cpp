@@ -30,7 +30,8 @@ FieldDef Declared(FieldType type) {
                   .type = type,
                   .length = 0,
                   .offset = 0,
-                  .values = std::span<const agiru::EnumValueDef>{}};
+                  .values = std::span<const agiru::EnumValueDef>{},
+                  .initValue = {}};
 }
 
 /// A Media FIELD HOLDS AN IDENTIFIER, NOT BYTES. The media object lives in the tenant media table

@@ -76,9 +76,15 @@ if [ -z "$FULL" ]; then
   # the file nor the reason. Moving one source to another directory was enough.
   ours=$(git status --porcelain -- 'src/*' 'include/*' 'test/*' 2>/dev/null |
     sed 's/^...//' | grep -E '\.(cpp|h)$' | grep -v '^test/target/' || true)
+  # ONE FILE PER LINE AND NOT ONE LINE OF FILES. Joined with spaces, `printf '%s\n' "$ours"` prints
+  # a SINGLE line, so `grep '.cpp$'` asks whether the LAST name ends in `.cpp` and answers for all
+  # of them: with a `.cpp` last, every changed HEADER was handed to clang-tidy as though it were a
+  # translation unit -- which is where "redefinition of 'FieldDef'" came from, a header parsed twice
+  # outside any TU. With a `.h` last, the grep matched nothing and the run analysed NOTHING and
+  # reported a pass. That is CLAUDE.md's blind gate, and it was live in both directions.
   kept=""
   for f in $ours; do
-    [ -f "$f" ] && kept="$kept $f"
+    [ -f "$f" ] && kept=$(printf '%s\n%s' "$kept" "$f")
   done
   ours=$kept
 fi
@@ -98,6 +104,8 @@ units=$(grep '"file"' compile_commands.json | grep -v '/apps/' | sort -u | wc -l
 # every gate.
 if [ -z "$FULL" ]; then
   : > "$REPORT/tidy.log"
+  # A CHANGED HEADER IS NOT A UNIT OF ANALYSIS, it is checked through the sources that include it.
+  # What the gate must not do is call that a pass when nothing was checked at all -- see below.
   for f in $(printf '%s\n' "$ours" | grep '\.cpp$' || true); do
     # shellcheck disable=SC2086
     "$TIDY" -p . --quiet $ONEBUDGET "$f" >> "$REPORT/tidy.log" 2>&1 || true
@@ -116,6 +124,15 @@ grep 'warning:\|error:' "$REPORT/tidy.log" | sed 's/ \[/\t[/' | sort -u > "$REPO
 found=$(wc -l < "$REPORT/tidy.unique" | tr -d ' ')
 
 if [ -z "$FULL" ]; then
+  # AND A RUN THAT ANALYSED NOTHING IS NOT A PASS. Changed headers with no changed source is the
+  # ordinary way to reach it, and it has to say so rather than print a zero that reads like green.
+  checked=$(printf '%s\n' "$ours" | grep -c '\.cpp$' || true)
+  changed=$(printf '%s\n' "$ours" | grep -c . || true)
+  if [ "$checked" -eq 0 ] && [ "$changed" -gt 0 ]; then
+    printf 'lint: %s changed file(s), NONE of them a translation unit -- nothing was analysed.\n' \
+      "$changed"
+    printf 'lint: a changed header is checked through a source that includes it. `FULL=1` does.\n'
+  fi
   printf 'lint: %s finding(s) over %s changed file(s)\n' \
     "$found" "$(printf '%s\n' "$ours" | grep -c . || echo 0)"
   printf 'lint: THIS IS NOT THE BASELINE. `make lint FULL=1` reads the whole tree and writes it.\n'

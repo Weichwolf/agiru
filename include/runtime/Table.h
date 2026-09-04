@@ -172,6 +172,20 @@ bool RuntimeFindSet(void *record, const TableDef &table);
 ///        which is where `Next` must answer 0.
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 
+/// \brief AL `Record.Init()` -- every field to its `InitValue` or its type's default.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+///
+/// \note THE PRIMARY KEY IS LEFT ALONE, and `record-init-method.md` says so outright: "Primary key
+///       and timestamp fields aren't initialized." That is what makes `Init` usable between two
+///       `Insert`s in a loop -- the caller has already set the key.
+///
+/// \note THE TIMESTAMP IS NOT AMONG THE FIVE SYSTEM FIELDS YET (board:0013), so the exception the
+///       page names for it has nothing to skip; the five it does carry are initialised, as the page
+///       says of `SystemId`.
+void RuntimeInit(void *record, const TableDef &table);
+
 /// \brief Steps the open cursor and reads the row it lands on.
 ///
 /// \param record The record, positioned by a previous `RuntimeFindSet`.
@@ -918,15 +932,13 @@ public:
     throw Error("Record.HasLinks is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Init(...)`. Initializes a record in a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Init(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Init is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.Init()` -- every field to its default, the primary key excepted.
+  ///
+  /// \note IT IS NOT NEEDED BEFORE EVERY `Insert`: the page says the fields already carry their
+  ///       defaults or their `InitValue`. What it is for is the SECOND turn of a loop, and a record
+  ///       handed in as a parameter.
+  /// \see `record-init-method.md`, `properties/devenv-initvalue-property.md`
+  void Init() { detail::RuntimeInit(Self(), TableTraits<Derived>::kTable); }
 
   /// \brief AL `Record.IsTemporary(...)`. Determines whether a record refers to a temporary table.
   /// \tparam Arguments Whatever AL's overload set takes.

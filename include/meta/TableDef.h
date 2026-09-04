@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -78,6 +79,20 @@ struct FieldDef {
   /// message needs them, since AL renders either enumeration by its value name and never by its
   /// ordinal.
   std::span<const EnumValueDef> values;
+
+  /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
+  ///
+  /// `devenv-initvalue-property.md`: "Sets the initial value of this field when a user creates a
+  /// new record", and it is what `Init`, `Clear` and `ClearAll` reach for. 815 fields declare one
+  /// under `Layers/W1` (measured 2026-09-04), most of them `true` on a Boolean.
+  ///
+  /// \note THE MEMBER NAME IS RESOLVED TO ITS ORDINAL BY THE GENERATOR. AL writes
+  ///       `InitValue = "Gen. Prod. Posting Group"` and the column holds a number, so the
+  ///       translation happens where the enumeration is in scope and not at run time.
+  ///
+  /// \note EMPTY IS NOT ABSENT. `InitValue = ''` on a Code field is a declaration and an absent
+  ///       property is not, and a bare `string_view` could not tell them apart.
+  std::optional<std::string_view> initValue;
 };
 
 /// \brief One key's declaration. The first key of a table is its primary key.

@@ -19,10 +19,12 @@
 
 #include "Rows.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -207,6 +209,35 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
 
 namespace {
 
+void ClearField(void *record, const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Code:
+    case FieldType::Text:
+      ValueAccess::Store(*reinterpret_cast<StringValue *>(At(record, def)), std::string{});
+      return;
+    case FieldType::Decimal: *reinterpret_cast<Decimal *>(At(record, def)) = Decimal{}; return;
+    case FieldType::Boolean: *reinterpret_cast<Boolean *>(At(record, def)) = false; return;
+    case FieldType::Integer: *reinterpret_cast<Integer *>(At(record, def)) = 0; return;
+    case FieldType::BigInteger: *reinterpret_cast<BigInteger *>(At(record, def)) = 0; return;
+    case FieldType::Option:
+    case FieldType::Enum:
+      ValueAccess::Store(*reinterpret_cast<OrdinalValue *>(At(record, def)), 0);
+      return;
+    case FieldType::Date: *reinterpret_cast<Date *>(At(record, def)) = Date{}; return;
+    case FieldType::Time: *reinterpret_cast<Time *>(At(record, def)) = Time{}; return;
+    case FieldType::DateTime: *reinterpret_cast<DateTime *>(At(record, def)) = DateTime{}; return;
+    case FieldType::Duration: *reinterpret_cast<Duration *>(At(record, def)) = Duration{}; return;
+    case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid{}; return;
+    default:
+      throw Error("Init: field " + std::string(def.name) +
+                  " has a type this runtime cannot return to its default yet");
+  }
+}
+
+}
+
+namespace {
+
 template <typename T> T *SystemField(void *record, const TableDef &table, FieldNo no) {
   const FieldDef *def = Field(table, no);
   return def != nullptr ? reinterpret_cast<T *>(static_cast<std::byte *>(record) + def->offset)
@@ -241,6 +272,19 @@ void StampInserted(void *record, const TableDef &table) {
   StampModified(record, table, now, user);
 }
 
+}
+
+void RuntimeInit(void *record, const TableDef &table) {
+  const std::span<const FieldNo> key =
+      table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
+  for (const FieldDef &def : table.fields) {
+    if (std::ranges::find(key, def.no) != key.end()) { continue; }
+    if (def.initValue.has_value()) {
+      SetFieldText(record, def, *def.initValue);
+    } else {
+      ClearField(record, def);
+    }
+  }
 }
 
 void RuntimeInsert(void *record, const TableDef &table) {
