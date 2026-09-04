@@ -236,6 +236,19 @@ void ClearField(void *record, const FieldDef &def) {
 
 }
 
+std::int32_t &Validating() {
+  static thread_local std::int32_t field = 0;
+  return field;
+}
+
+ValidatingField::ValidatingField(::agiru::FieldNo no) : was_(Validating()) {
+  Validating() = no.Value();
+}
+
+ValidatingField::~ValidatingField() {
+  Validating() = was_;
+}
+
 void ClearKeyField(void *record, const TableDef &table, std::size_t position) {
   const FieldDef *def = Field(table, table.keys[0].fields[position]);
   if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
@@ -350,6 +363,14 @@ void PopBefore() {
 
 const void *CurrentBefore() {
   return BeforeStack().empty() ? nullptr : BeforeStack().back();
+}
+
+}
+
+namespace agiru {
+
+::agiru::Integer CurrFieldNo() {
+  return detail::Validating();
 }
 
 }

@@ -444,6 +444,7 @@ private:
         std::string_view{"CompanyName"},
         std::string_view{"CreateEncryptionKey"},
         std::string_view{"CreateGuid"},
+        std::string_view{"CurrFieldNo"},
         std::string_view{"CurrentClientType"},
         std::string_view{"CurrentDateTime"},
         std::string_view{"CurrentExecutionMode"},
@@ -717,6 +718,9 @@ public:
     }
     for (const al::VarDecl &declared : running_->parameters) {
       if (SameName(declared.name, name)) { return &declared; }
+    }
+    if (!running_->returnName.empty() && SameName(running_->returnName, name)) {
+      return &running_->returned;
     }
     return nullptr;
   }

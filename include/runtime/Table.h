@@ -186,6 +186,31 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 ///       says of `SystemId`.
 void RuntimeInit(void *record, const TableDef &table);
 
+/// \brief Holds the field number a `Validate` is running for, and restores it afterwards.
+///
+/// `devenv-system-defined-variables.md` gives `CurrFieldNo` as "the field number of the current
+/// field in the current table". A trigger that runs another `Validate` nests, so this is a stack
+/// discipline and not an assignment -- and the BaseApp nests constantly.
+std::int32_t &Validating();
+
+class ValidatingField {
+public:
+  /// \brief Makes this field the current one.
+  /// \param no The field being validated.
+  explicit ValidatingField(::agiru::FieldNo no);
+
+  ValidatingField(const ValidatingField &) = delete;
+  ValidatingField(ValidatingField &&) = delete;
+  ValidatingField &operator=(const ValidatingField &) = delete;
+  ValidatingField &operator=(ValidatingField &&) = delete;
+
+  /// \brief Restores whatever field was current before.
+  ~ValidatingField();
+
+private:
+  std::int32_t was_;
+};
+
 /// \brief Returns one field of the primary key to its type's default.
 ///
 /// \param record   The record.
@@ -431,9 +456,17 @@ public:
   /// \throws Error when the values differ.
   template <typename FieldType, typename Value>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  /// \note THE FIELD'S OWN TYPE IS THE WRAPPER, and guessing `Option` was wrong for half of them.
+  ///       AL writes `TestField(Status, "Price Status"::Active)` -- a bare member -- and the
+  ///       holder it belongs in is whatever the field is declared as: `Option<E>` for a field with
+  ///       an `OptionMembers` list, `Enum<E>` for one whose type is an enum OBJECT. Wrapping every
+  ///       member in `Option<E>` asked for an `OptionTraits` the generator never specialises for an
+  ///       enum object, and the error landed in `Option.h` rather than at the call.
   void TestField(const FieldType &member, const Value &expected) const {
     const ::agiru::FieldNo no = NumberOf(&member);
-    if constexpr (std::is_enum_v<Value>) {
+    if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
+    } else if constexpr (std::is_enum_v<Value>) {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
     } else {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
@@ -1341,6 +1374,7 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     const Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before);
+    const detail::ValidatingField current(no);
     member = value;
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
@@ -1362,6 +1396,7 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     const Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before);
+    const detail::ValidatingField current(no);
     detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
     RunOnValidate(no);
   }
@@ -1479,6 +1514,19 @@ private:
     *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
   }
 };
+
+/// \brief AL `CurrFieldNo` -- the field a `Validate` is running for, or 0 outside one.
+///
+/// \return The field number.
+///
+/// `devenv-system-defined-variables.md` lists it among the system-defined variables: "the field
+/// number of the current field in the current table". The BaseApp reads it to tell an interactive
+/// validation from a programmatic one -- `if CurrFieldNo <> 0 then` guards a dialog.
+///
+/// \note IT IS SPELLED WITH PARENTHESES AND AL SPELLS IT WITHOUT. AL has system VARIABLES and C++
+///       has none that could be per-session without a global; the generator adds the parentheses,
+///       which is a visible and uniform deviation rather than a clever one.
+[[nodiscard]] ::agiru::Integer CurrFieldNo();
 
 /// \brief The rows a temporary record holds, and how often they changed.
 ///
