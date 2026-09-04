@@ -73,3 +73,4 @@ tests/core/codeunit/AnalysisViewTableUT.cpp
 tests/core/codeunit/APISetupUT.cpp
 tests/core/codeunit/CopyPurchSalesDocUT.cpp
 tests/core/codeunit/DataExchToRapidStartUT.cpp
+tests/core/codeunit/LibraryUTUtility.cpp
