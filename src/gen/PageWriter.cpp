@@ -261,6 +261,24 @@ std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &obje
   return named;
 }
 
+std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object,
+                                                      const Objects &objects) {
+  std::map<std::string, std::string> named = ControlIdentifiers(object);
+  const al::Property *source = al::Find(object.properties, "SourceTable");
+  if (source == nullptr) { return named; }
+  std::string table;
+  for (const al::Token &token : source->value) { table += token.text; }
+  const auto found = objects.tables.find(LowerKey(table));
+  if (found == objects.tables.end()) { return named; }
+  std::set<std::string> taken;
+  for (const auto &[key, identifier] : named) { taken.insert(identifier); }
+  for (const auto &[field, identifier] : found->second.fields) {
+    if (named.contains(field) || !taken.insert(identifier).second) { continue; }
+    named.emplace(field, identifier);
+  }
+  return named;
+}
+
 std::string ControlIdentifier(const std::map<std::string, std::string> &named,
                               std::string_view alName) {
   const auto found = named.find(Lowered(alName));
@@ -297,11 +315,15 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
       "class " +
       controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
-  const std::map<std::string, std::string> named = ControlIdentifiers(object);
+  const std::map<std::string, std::string> named = ControlIdentifiers(object, objects);
   WriteControls(out, all.fields, "Field_Kind", named, taken);
   if (!all.fields.empty() && !all.actions.empty()) { out += "\n"; }
   WriteControls(out, all.actions, "Action_Kind", named, taken);
   WriteParts(out, all.parts, objects, named, taken);
+  for (const auto &[field, identifier] : named) {
+    if (!taken.insert(identifier).second) { continue; }
+    out += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
+  }
   out += "};\n\n";
   out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";

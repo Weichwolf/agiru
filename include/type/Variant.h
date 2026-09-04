@@ -202,6 +202,15 @@ public:
   Variant(const T &value)
       : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = T::Traits::kValues}) {}
 
+  /// \brief Holds a door enumeration that has no value table -- `TransactionType`,
+  ///        `TextEncoding` -- by its ordinal alone, which is what AL hands `Any`.
+  /// \tparam F The enumeration.
+  /// \param value The member.
+  template <typename F>
+    requires std::is_enum_v<F> && (!Enumeration<F>)
+  Variant(F value)
+      : held_(OrdinalInVariant{.ordinal = static_cast<std::int32_t>(value), .values = {}}) {}
+
   /// \brief Holds an option that carries no vocabulary -- `Option<>` -- by its ordinal alone.
   /// \param value The option.
   Variant(const Option<> &value)

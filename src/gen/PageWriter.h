@@ -21,6 +21,9 @@ std::string PageHeaderPath(const al::PageObject &object);
 
 [[nodiscard]] std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object);
 
+[[nodiscard]] std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object,
+                                                                    const Objects &objects);
+
 [[nodiscard]] std::string ControlIdentifier(const std::map<std::string, std::string> &named,
                                             std::string_view alName);
 

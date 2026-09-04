@@ -48,6 +48,25 @@ template <typename E = void> class Option;
 ///       alternative was to emit `OrdinalValue`, which is correct and does not read like AL.
 template <> class Option<void> : public OrdinalValue {
 public:
+  /// \brief AL `Option.FromInteger(Integer)` on an option with no vocabulary.
+  /// \param ordinal The number.
+  /// \return An option standing on it.
+  [[nodiscard]] static constexpr Option FromInteger(std::int32_t ordinal) {
+    return Option{ordinal};
+  }
+
+  /// \brief Compares two options of ANY vocabularies by ordinal, which is all AL compares.
+  /// \param a One.
+  /// \param b The other.
+  /// \return True when the ordinals are equal.
+  /// \note ON THE BASE, so that `Option<A> == Option<B>` has ONE candidate; each derived class's
+  /// own
+  ///       `operator==(const Option &)` reached the other side through a conversion and the two
+  ///       were ambiguous.
+  friend constexpr bool operator==(const Option<void> &a, const Option<void> &b) {
+    return a.AsInteger() == b.AsInteger();
+  }
+
   /// \brief The zero ordinal.
   constexpr Option() = default;
 
@@ -162,6 +181,14 @@ public:
   template <typename T>
     requires std::derived_from<T, OrdinalValue> && (!std::same_as<T, Option>)
   constexpr explicit(false) Option(const T &value) : Option<void>(value.AsInteger()) {}
+
+  /// \brief Takes a bare enumerator of ANOTHER option, by ordinal -- `FieldError(Rec, Text,
+  ///        OtherOption::Member)` is how the BaseApp hands one over.
+  /// \tparam F The other enumeration.
+  /// \param value The member.
+  template <typename F>
+    requires std::is_enum_v<F> && (!std::same_as<F, E>)
+  constexpr explicit(false) Option(F value) : Option<void>(static_cast<std::int32_t>(value)) {}
 
   /// \brief Holds the ordinal another option carries.
   ///

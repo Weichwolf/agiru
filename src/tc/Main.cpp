@@ -402,7 +402,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       agiru::al::PageObject object = agiru::al::ParsePage(Read(path));
       ++counts.parsed;
       counts.members += object.procedures.size();
-      std::map<std::string, std::string> controlNames = agiru::gen::ControlIdentifiers(object);
+      std::map<std::string, std::string> controlNames =
+          agiru::gen::ControlIdentifiers(object, objects);
       objects.pages.insert_or_assign(
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
@@ -1015,6 +1016,12 @@ int Scan(const Job &job) {
     }
     Pages parsed = IndexPages(run, pages, objects);
     extensions.emitted += MergePageExtensions(store, parsed);
+    for (const agiru::al::PageObject &page : parsed.objects) {
+      const auto found = objects.pages.find(agiru::gen::LowerKey(page.name));
+      if (found != objects.pages.end()) {
+        found->second.fields = agiru::gen::ControlIdentifiers(page, objects);
+      }
+    }
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     WriteEnums(run, heldEnums, objects);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);

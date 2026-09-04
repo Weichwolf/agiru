@@ -817,7 +817,10 @@ public:
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
-    if (subtype.empty()) { return DoorMemberSpelling(member.field); }
+    if (subtype.empty()) {
+      return DoorCalls(member.field) ? AsTheDoorSpellsIt(Identifier(member.field))
+                                     : Identifier(member.field);
+    }
     const std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
     if (!platform.empty()) { return platform; }

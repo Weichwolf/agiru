@@ -43,7 +43,7 @@ public:
   ///       put the second behind the first for all 7 885 of them.
   template <typename Info>
     requires requires(Info &info) { std::string_view{info.Message()}; }
-  explicit Error(Info &info) : std::runtime_error(std::string(info.Message())) {}
+  explicit Error(Info info) : std::runtime_error(std::string(info.Message())) {}
 };
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.
