@@ -382,6 +382,10 @@ std::strong_ordering Decimal::operator<=>(const Decimal &o) const {
                                               : std::strong_ordering::equal;
 }
 
+Decimal Round(const Decimal &number) {
+  return Round(number, Decimal::FromInvariantString("0.01"));
+}
+
 Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction) {
   if (direction == "=") { return Round(number, precision, RoundDirection::Nearest); }
   if (direction == ">") { return Round(number, precision, RoundDirection::Up); }

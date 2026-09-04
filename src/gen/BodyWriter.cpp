@@ -828,6 +828,7 @@ public:
   }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
+    if (Local(name) != nullptr) { return false; }
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
         return DeclaresAnObject(declared);

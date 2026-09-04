@@ -214,4 +214,19 @@ Decimal Round(const Decimal &number,
 ///       enumeration beside this is the runtime's own vocabulary and not AL's.
 Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction);
 
+/// \brief AL `Round(Number)` -- rounded to the precision the platform decides.
+///
+/// \param number The value.
+/// \return The rounded value.
+///
+/// \warning IT ROUNDS TO TWO DECIMAL PLACES, WHICH IS THE DOCUMENTED FALLBACK AND NOT THE FIRST
+///          CHOICE. `system-round-method.md` gives two steps for an absent precision: "The method
+///          ReadRounding in Codeunit 45 ... returns the Amount Rounding Precision field from the
+///          GLSetup table", and "if you have customized Codeunit 45 and it does not implement the
+///          ReadRounding method, then the precision is specified as 2 digits after the decimal."
+///          Nothing wires that codeunit into the runtime yet, so this tree is in the second case --
+///          and it may not name Codeunit 45 or GLSetup itself, because the runtime knows no AL
+///          object. What it needs is a SLOT the transpiled codeunit registers into (board:0007).
+[[nodiscard]] Decimal Round(const Decimal &number);
+
 }
