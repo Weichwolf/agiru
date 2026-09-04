@@ -772,8 +772,8 @@ public:
     const al::VarDecl *declared = Declaration(variable);
     if (declared == nullptr) { return false; }
     const std::string type = TypeName(declared->type);
-    return type == "RecordRef" || type == "FieldRef" || type == "KeyRef" || type == "Variant" ||
-           type == "RecordId" || type == "ModuleInfo" || type == "Version";
+    if (NamesAnObject(*declared)) { return false; }
+    return IsAlTypeName(type) && type != "Option" && type != "Enum";
   }
 
   [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
@@ -797,6 +797,9 @@ public:
                                     : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) {
+      return !NamesAControl(*held, member.field) && DoorCalls(member.field);
+    }
+    if (held != nullptr && NamesAPage(TypeName(held->type))) {
       return !NamesAControl(*held, member.field) && DoorCalls(member.field);
     }
     if (IsSystemField(member.field)) { return false; }
@@ -1044,7 +1047,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
                                                   : std::string("[[maybe_unused]] ");
   };
   if (!procedure.returnName.empty()) {
-    out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
+    out += "  " + unused(Identifier(procedure.returnName)) + Returns(procedure, objects) + " " +
+           Identifier(procedure.returnName) + "{};\n";
   }
   std::set<std::string> names = shadowed;
   for (const al::VarDecl &declared : procedure.variables) {

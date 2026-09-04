@@ -305,14 +305,15 @@ public:
   /// \return True when the ordinal is that number.
   [[nodiscard]] constexpr bool operator==(std::int32_t o) const { return AsInteger() == o; }
 
-  [[nodiscard]] constexpr std::strong_ordering operator<=>(const Option &o) const {
+  template <std::same_as<Option> O>
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const O &o) const {
     return AsInteger() <=> o.AsInteger();
   }
 
   /// \brief Compares two options by ordinal.
   /// \param o The other option.
   /// \return True when the ordinals are equal.
-  [[nodiscard]] constexpr bool operator==(const Option &o) const {
+  template <std::same_as<Option> O> [[nodiscard]] constexpr bool operator==(const O &o) const {
     return AsInteger() == o.AsInteger();
   }
 };

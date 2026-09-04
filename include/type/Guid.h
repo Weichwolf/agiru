@@ -77,6 +77,13 @@ public:
   ///       language performs silently.
   Guid(std::string_view text) : Guid(FromText(text)) {}
 
+  /// \brief A GUID from a string LITERAL -- `exit('bf856162-…')` from a procedure returning Guid.
+  /// \param text The literal.
+  /// \note A SECOND CONSTRUCTOR RATHER THAN A CAST AT THE CALL SITE: a literal reaches
+  ///       `std::string_view` by one user-defined conversion and `Guid` by another, and C++ allows
+  ///       only one of those in an implicit conversion sequence.
+  Guid(const char *text) : Guid(std::string_view(text)) {}
+
   /// \return True when every byte is zero, which is AL's empty Guid.
   [[nodiscard]] constexpr bool IsNull() const {
     std::uint8_t any = 0;

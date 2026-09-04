@@ -194,7 +194,7 @@ private:
         }
         condition += subject;
         condition += " == ";
-        condition += Expression(label, kEqualityPrecedence);
+        condition += Expression(label, kEqualityPrecedence + 1);
       }
       out += out.empty() ? Pad(indent) + "if (" : " else if (";
       out += condition + ") {\n" + Statements(branch.body, indent + 2) + Pad(indent) + "}";
@@ -910,6 +910,15 @@ public:
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     const al::VarDecl *local = Local(member.variable);
     if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
+    if (local == nullptr) {
+      if (const al::VarDecl *global = Global(member.variable);
+          global != nullptr && TypeName(global->type) == "Record" && !global->subtype.empty()) {
+        const auto found = objects_.tables.find(LowerKey(global->subtype));
+        const bool field = found != objects_.tables.end() &&
+                           found->second.fields.contains(LowerKey(std::string(member.field)));
+        return !field && DoorCalls(member.field);
+      }
+    }
     if (local != nullptr &&
         (TypeName(local->type) == "Page" || TypeName(local->type) == "TestPage" ||
          TypeName(local->type) == "TestRequestPage")) {

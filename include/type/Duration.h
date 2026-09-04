@@ -40,6 +40,12 @@ public:
   /// \param milliseconds How long, negative for a duration that runs backwards.
   constexpr Duration(std::int64_t milliseconds) : milliseconds_(milliseconds) {}
 
+  /// \brief Reads as its milliseconds, which is how AL assigns a Duration to a BigInteger.
+  /// \return The milliseconds.
+  /// \note `DurationAsInt := CurrentDateTime - StartTime` in `Config. Package Management`; the
+  ///       duration IS a number of milliseconds in AL (`duration-data-type.md`).
+  constexpr explicit(false) operator std::int64_t() const { return milliseconds_; }
+
   /// \return The count of milliseconds, which is what the page says a Duration IS.
   [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }
 

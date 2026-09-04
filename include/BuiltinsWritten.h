@@ -7,6 +7,7 @@
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
+#include "type/Dictionary.h"
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
@@ -404,6 +405,29 @@ IsNull(const T &Variable) {
 ///       session -- and 23 of the cases that run today reach it through `Library - Lower
 ///       Permissions`.
 ::agiru::Guid UserSecurityId();
+
+/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
+///        Dictionary of [Text, Text])` -- the dictionary form of the custom dimensions.
+/// \param EventId            The event id.
+/// \param Message            The message.
+/// \param Verbosity          The verbosity.
+/// \param DataClassification The classification.
+/// \param Scope              The telemetry scope.
+/// \param CustomDimensions   The dimensions, as a dictionary.
+/// \note Telemetry has no sink here yet (board:0035), so the call is accepted and records nothing.
+inline void LogMessage(std::string_view EventId,
+                       std::string_view Message,
+                       ::agiru::Verbosity Verbosity,
+                       ::agiru::DataClassification DataClassification,
+                       ::agiru::TelemetryScope Scope,
+                       const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+  static_cast<void>(EventId);
+  static_cast<void>(Message);
+  static_cast<void>(Verbosity);
+  static_cast<void>(DataClassification);
+  static_cast<void>(Scope);
+  static_cast<void>(CustomDimensions);
+}
 
 /// \brief AL `Dialog.Confirm(Text [, Boolean] [, Any, ...])`. Asks the user a yes/no question.
 /// \tparam Values The substitution values' types.

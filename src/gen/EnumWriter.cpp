@@ -108,6 +108,20 @@ std::string ImplementationBodies(const al::EnumObject &object,
       out += unit->second.identifier;
       out += "{};\n";
     }
+    std::string fallback;
+    if (const al::Property *given = al::Find(object.properties, "DefaultImplementation");
+        given != nullptr) {
+      const std::size_t at = given->text.find('=');
+      if (at != std::string::npos) {
+        std::string named = given->text.substr(at + 1);
+        while (!named.empty() && named.front() == ' ') { named.erase(0, 1); }
+        while (!named.empty() && named.back() == ' ') { named.pop_back(); }
+        const auto unit = objects.codeunits.find(LowerKey(named));
+        if (unit != objects.codeunits.end()) { fallback = unit->second.identifier; }
+      }
+    }
+    out += fallback.empty() ? "    default: break;\n"
+                            : "    default: return new agiru::app::" + fallback + "{};\n";
     out += "  }\n  throw agiru::Error(\"this value of ";
     out += object.name;
     out += " names no implementation of ";
