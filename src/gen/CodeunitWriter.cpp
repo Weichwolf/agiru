@@ -1117,6 +1117,15 @@ TableIndex PlatformTables() {
   return tables;
 }
 
+FieldEnums PlatformFieldEnums() {
+  FieldEnums enums;
+  enums["field"]["type"] = "::agiru::FieldType";
+  enums["field"]["class"] = "::agiru::platform::FieldClass";
+  enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
+  enums["2000000041"] = enums["field"];
+  return enums;
+}
+
 namespace {
 
 void FaceReach(const al::VarDecl &declared,

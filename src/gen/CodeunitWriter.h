@@ -43,6 +43,8 @@ struct Objects {
 
 [[nodiscard]] TableIndex PlatformTables();
 
+[[nodiscard]] FieldEnums PlatformFieldEnums();
+
 struct InterfaceHeader {
   std::string text;
 

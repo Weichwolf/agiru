@@ -884,6 +884,7 @@ int Scan(const Job &job) {
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
   objects.tables = agiru::gen::PlatformTables();
+  objects.fieldEnums = agiru::gen::PlatformFieldEnums();
 
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;

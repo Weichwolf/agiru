@@ -236,6 +236,23 @@ public:
 
   /// \brief The primary key: the table and the field within it.
   static constexpr std::array<::agiru::FieldNo, 2> kKey1{{Field_No::TableNo, Field_No::No}};
+
+  /// \brief AL `Field.Get(TableNo, No)` -- the field of a table, by number.
+  ///
+  /// \param TableNo The table.
+  /// \param No      The field within it.
+  /// \return True when this installation carries that field.
+  ///
+  /// \note IT READS THE CATALOGUE AND NOT THE DATABASE, which is what makes `Field` VIRTUAL.
+  ///       There is no `Field` table in PostgreSQL and there must not be: every row it could hold
+  ///       is already `constexpr` data in `.rodata`, emitted beside the table it describes. Asking
+  ///       SQL for it produced `relation "Field" does not exist`, which is the right error for the
+  ///       wrong question.
+  ///
+  /// \warning IT HIDES `Table<Field>::Get` RATHER THAN OVERRIDING IT, because `Table` is CRTP and
+  ///          has no virtuals -- that is the point of it. A `Field` reached through a `RecordRef`
+  ///          therefore still goes to SQL, and that is board:0052.
+  Boolean Get(::agiru::Integer TableNo, ::agiru::Integer No);
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.

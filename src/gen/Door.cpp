@@ -52,9 +52,37 @@ std::set<std::string> &Callables() {
   return callable;
 }
 
+void NoteEnumerators(const std::string &line,
+                     bool &inside,
+                     std::map<std::string, std::string> &found) {
+  static const std::regex member(R"(^\s*([A-Z][A-Za-z0-9]*)\s*[,=])");
+  if (!inside) {
+    inside = line.find("enum class") != std::string::npos && line.find(';') == std::string::npos;
+    return;
+  }
+  if (line.find("};") != std::string::npos) {
+    inside = false;
+    return;
+  }
+  std::smatch matched;
+  if (!std::regex_search(line, matched, member)) { return; }
+  const std::string name = matched[1].str();
+  std::string key;
+  for (const char c : name) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  const auto standing = found.find(key);
+  if (standing == found.end()) {
+    found.emplace(key, name);
+  } else if (standing->second != name) {
+    standing->second.clear();
+  }
+}
+
 void NoteSpellings(const std::string &line, std::map<std::string, std::string> &found) {
   static const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*[({;])");
-  if (line.starts_with("//")) { return; }
+  const std::size_t first = line.find_first_not_of(" \t");
+  if (first != std::string::npos && line.compare(first, 2, "//") == 0) { return; }
   for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
     const std::string name = (*it)[1].str();
     if ((*it)[0].str().back() == '(') { Callables().insert(name); }
@@ -81,7 +109,11 @@ std::map<std::string, std::string> ReadSpellings() {
     if (entry.path().extension() != ".h") { continue; }
     std::ifstream file(entry.path());
     std::string line;
-    while (std::getline(file, line)) { NoteSpellings(line, found); }
+    bool inEnum = false;
+    while (std::getline(file, line)) {
+      NoteSpellings(line, found);
+      NoteEnumerators(line, inEnum, found);
+    }
   }
   if (found.empty()) { throw std::runtime_error("the door declares no names"); }
   return found;

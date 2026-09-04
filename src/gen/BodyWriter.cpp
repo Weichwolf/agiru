@@ -287,6 +287,13 @@ private:
     return {};
   }
 
+  static std::string AsOption(const std::string &enumeration, std::string_view member) {
+    const std::string member_ = EnumeratorName(member);
+    if (!enumeration.starts_with("::agiru::")) { return enumeration + "::" + member_; }
+    return "::agiru::Option<" + enumeration + ">{" + enumeration +
+           "::" + AsTheDoorSpellsIt(member_) + "}";
+  }
+
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
@@ -294,7 +301,7 @@ private:
         base.children[1].kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.FieldEnumeration(
           OfVariable{.variable = base.children[0].text, .field = base.children[1].text});
-      if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+      if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
       if (scope_.IsRecord(base.children[0].text)) {
         return "RefusedOption(\"" + base.children[0].text + "." + base.children[1].text +
                "::" + expression.text + "\")";
@@ -302,9 +309,9 @@ private:
     }
     if (base.kind == al::ExprKind::Name) {
       const std::string enumeration = scope_.Enumeration(base.text);
-      if (!enumeration.empty()) { return enumeration + "::" + EnumeratorName(expression.text); }
+      if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
       const std::string named = scope_.EnumObject(base.text);
-      if (!named.empty()) { return named + "::" + EnumeratorName(expression.text); }
+      if (!named.empty()) { return AsOption(named, expression.text); }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) {
