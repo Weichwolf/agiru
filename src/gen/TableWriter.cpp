@@ -356,6 +356,10 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
   }
   const TableRef *ref = ReachObject(declared, objects);
   if (ref == nullptr || ref->header.empty()) { return; }
+  if (alType == "Interface") {
+    reached.headers.insert(ref->header);
+    return;
+  }
   const std::size_t colons = ref->identifier.find("::");
   if (colons == std::string::npos) { return; }
   reached.ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));

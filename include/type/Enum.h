@@ -91,6 +91,19 @@ public:
     requires(!std::is_same_v<F, E>)
   constexpr Enum(const Enum<F> &other) : OrdinalValue(other.AsInteger()) {}
 
+  /// \brief Holds a value of ANOTHER enumeration, by its ordinal.
+  ///
+  /// \tparam F The other enumeration.
+  /// \param value The value.
+  ///
+  /// \note AL WRITES THE MEMBER ITSELF WHERE A DIFFERENT ENUM IS WANTED, which is the same
+  ///       permission the whole-value form above has: `LibrarySales` hands
+  ///       `"Sales Applies-to Document Type"::Invoice` to a parameter declared
+  ///       `Enum "Sales Document Type"`.
+  template <typename F>
+    requires(std::is_enum_v<F> && !std::is_same_v<F, E>)
+  constexpr Enum(F value) : OrdinalValue(static_cast<std::int32_t>(value)) {}
+
   /// \brief Assigns the ordinal another enum carries.
   /// \tparam F The other enum's enumeration.
   /// \param other The other enum.

@@ -202,10 +202,22 @@ public:
   /// \return True when `OnRun` completed; false when it raised.
   ///
   /// \warning Reports rather than propagates, for the reason Run() gives.
+  /// \note THE RECORD GOES INTO THE CODEUNIT'S OWN `Rec` AND COMES BACK OUT, which is what AL's
+  ///       `TableNo` property is for. `codeunitinstance-run-method.md` names the parameter "a
+  ///       record from the table that is associated with the codeunit" and declares it `var`, so
+  ///       the codeunit reads it as `Rec`, writes into `Rec`, and the caller sees the result.
+  ///       `OnRun` itself takes NO argument -- an `OnRun(Rec)` was a shape AL does not have, and it
+  ///       made every `Codeunit.Run(Rec)` in the tree a compile error.
   template <typename Record> bool Run(Record &rec) {
     detail::Scope scope;
     try {
-      static_cast<Derived *>(this)->OnRun(rec);
+      if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
+        static_cast<Derived *>(this)->Rec = rec;
+      }
+      static_cast<Derived *>(this)->OnRun();
+      if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
+        rec = static_cast<Derived *>(this)->Rec;
+      }
     } catch (const Error &e) {
       scope.Discard(e.what());
       return false;

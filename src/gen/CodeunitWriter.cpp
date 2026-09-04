@@ -133,9 +133,10 @@ bool NamesAnObject(const al::VarDecl &declared) {
 
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
-  const TableIndex &index = type == "Codeunit" ? objects.codeunits
-                            : type == "Page"   ? objects.pages
-                                               : objects.tables;
+  const TableIndex &index = type == "Codeunit"    ? objects.codeunits
+                            : type == "Page"      ? objects.pages
+                            : type == "Interface" ? objects.interfaces
+                                                  : objects.tables;
   const auto found = index.find(LowerKey(declared.subtype));
   return found != index.end() ? &found->second : nullptr;
 }
@@ -555,6 +556,14 @@ void ReachTableNo(const al::CodeunitObject &unit,
   }
 }
 
+void Reaching(const al::VarDecl &declared, const Objects &objects, std::set<std::string> &headers) {
+  const std::string kind = TypeName(declared.type);
+  const bool whole = kind == "Interface" && !declared.subtype.empty();
+  if (!whole && (!NamesAnObject(declared) || HandleMember(declared))) { return; }
+  const TableRef *ref = Reach(declared, objects);
+  if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+}
+
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   for (const std::string &face : unit.implements) {
@@ -563,11 +572,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
       headers.insert(found->second.header);
     }
   }
-  const auto reach = [&](const al::VarDecl &declared) {
-    if (!NamesAnObject(declared) || HandleMember(declared)) { return; }
-    const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
-  };
+  const auto reach = [&](const al::VarDecl &declared) { Reaching(declared, objects, headers); };
   const auto reachEnum = [&](const std::string &subtype) {
     EnumHeader(objects.enums, subtype, headers);
   };
