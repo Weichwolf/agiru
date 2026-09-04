@@ -1,5 +1,6 @@
 #include "runtime/Session.h"
 
+#include "Builtins.h"
 #include "runtime/Database.h"
 
 #include <string>
@@ -28,6 +29,15 @@ Session &Session::Current() {
 
 bool Session::HasCurrent() {
   return g_current != nullptr;
+}
+
+Date Session::WorkDate() const {
+  return workDate_.IsUndefined() ? Today() : workDate_;
+}
+
+Date Session::WorkDate(Date date) {
+  workDate_ = date;
+  return WorkDate();
 }
 
 }

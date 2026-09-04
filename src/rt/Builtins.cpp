@@ -401,10 +401,6 @@ std::string TemporaryPath() {
   RefuseDoor("System.TemporaryPath()");
 }
 
-::agiru::Date Today() {
-  RefuseDoor("System.Today()");
-}
-
 ::agiru::Date Variant2Date(const ::agiru::Variant &Variant) {
   static_cast<void>(Variant);
   RefuseDoor("System.Variant2Date(Variant)");
@@ -417,11 +413,6 @@ std::string TemporaryPath() {
 
 ::agiru::Integer WindowsLanguage() {
   RefuseDoor("System.WindowsLanguage()");
-}
-
-::agiru::Date WorkDate(::agiru::Date NewDate) {
-  static_cast<void>(NewDate);
-  RefuseDoor("System.WorkDate(Date)");
 }
 
 void AlterKey(const ::agiru::KeyRef &KeyRef, ::agiru::Boolean Enable) {
@@ -439,10 +430,6 @@ void AlterKey(const ::agiru::KeyRef &KeyRef, ::agiru::Boolean Enable) {
 void CheckLicenseFile(::agiru::Integer KeyNumber) {
   static_cast<void>(KeyNumber);
   RefuseDoor("Database.CheckLicenseFile(Integer)");
-}
-
-std::string CompanyName() {
-  RefuseDoor("Database.CompanyName()");
 }
 
 ::agiru::Boolean CopyCompany(std::string_view SourceName, std::string_view DestinationName) {

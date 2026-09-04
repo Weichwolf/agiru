@@ -5,6 +5,7 @@
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 #include "type/Boolean.h"
+#include "type/Date.h"
 #include "type/Guid.h"
 
 #include <string>
@@ -69,6 +70,33 @@ public:
   ///       session and a hardcoded GUID inside a call could never become one.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
 
+  /// \brief AL `WorkDate()` -- the date a session posts under.
+  ///
+  /// \return The work date; today's date until one is set.
+  ///
+  /// \note IT IS A PROPERTY OF THE SESSION, which is what AL means by it: `WORKDATE := 010124D`
+  ///       changes what THIS session posts under and nothing else. A test library sets it and every
+  ///       posting after that reads it, which is why it cannot live in a function.
+  [[nodiscard]] Date WorkDate() const;
+
+  /// \brief AL `WorkDate(Date)` -- sets it.
+  /// \param date The new work date; the blank date restores today's.
+  /// \return The date it now carries.
+  Date WorkDate(Date date);
+
+  /// \brief AL `CompanyName()` -- the company this session works in.
+  ///
+  /// \return The name; empty until one is opened.
+  ///
+  /// \warning THE COMPANY IS NOT YET A SCHEMA. BC keeps one set of tables per company and the
+  ///          CRONUS load carries them under `"CRONUS International Ltd"`; this returns the name a
+  ///          session was opened with and nothing reads it for a table yet (board:0004).
+  [[nodiscard]] std::string_view CompanyName() const { return company_; }
+
+  /// \brief Names the company this session works in.
+  /// \param name The company.
+  void CompanyName(std::string_view name) { company_ = name; }
+
   /// \brief Whether this session runs as the service rather than a self-hosted instance.
   ///
   /// \return False unless the host said otherwise.
@@ -101,6 +129,8 @@ private:
   Boundaries boundaries_;
   Session *previous_;
   Guid userSecurityId_;
+  Date workDate_;
+  std::string company_;
   TenantSettings tenant_;
 };
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "type/BigInteger.h"
+#include "type/Date.h"
 #include "type/Integer.h"
 
 #include <optional>
@@ -155,4 +156,19 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string UpperCase(std::string_view String);
 
+/// \brief AL `System.WorkDate(Date)`. Gets and sets the work date for the current session.
+/// \param NewDate The AL `Date`.
+/// \return The AL `Date`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+::agiru::Date WorkDate(::agiru::Date NewDate = {});
+
+/// \brief AL `Database.CompanyName()`. Gets the current company name.
+/// \return The AL `Text`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+std::string CompanyName();
+
+/// \brief AL `System.Today()`. Gets the current date set in the operating system.
+/// \return The AL `Date`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+::agiru::Date Today();
 }

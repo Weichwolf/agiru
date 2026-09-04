@@ -488,6 +488,9 @@ private:
     if (known.empty()) {
       const std::string_view builtin = BareBuiltin(expression.text);
       if (!builtin.empty()) { return std::string(builtin) + "()"; }
+      if (scope_.MemberIsCall(OfVariable{.variable = "Rec", .field = expression.text})) {
+        return Identifier(expression.text) + "()";
+      }
     }
     return known.empty() ? Identifier(expression.text) : known;
   }
@@ -724,9 +727,24 @@ public:
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 
+  [[nodiscard]] const std::map<std::string, std::string> *
+  FieldsOf(std::string_view variable) const {
+    if (IsRecord(variable)) { return nullptr; }
+    const al::VarDecl *local = Local(variable);
+    if (local == nullptr || TypeName(local->type) != "Record" || local->subtype.empty()) {
+      return nullptr;
+    }
+    const auto found = objects_.tables.find(LowerKey(local->subtype));
+    return found == objects_.tables.end() || found->second.fields.empty() ? nullptr
+                                                                          : &found->second.fields;
+  }
+
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     const al::VarDecl *local = Local(member.variable);
     if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
+    if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
+      return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
+    }
     return IsRecord(member.variable) && DoorCalls(member.field) &&
            FieldNamed(table_, member.field) == nullptr;
   }
@@ -792,6 +810,10 @@ public:
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
+      const auto field = fields->find(LowerKey(std::string(member.field)));
+      return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
+    }
     if (!IsRecord(member.variable) || FieldNamed(table_, member.field) != nullptr) {
       return Identifier(member.field);
     }

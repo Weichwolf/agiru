@@ -12,3 +12,8 @@ tests/core/codeunit/LibraryUtilityUT.cpp
 library_assert/system/test_libraries/utilities/codeunit/LibraryAssert.cpp
 foundation_test_library/test_libraries/foundation/no_series/codeunit/LibraryNoSeries.cpp
 base/finance/currency/table/Currency.cpp
+tests/core/codeunit/AssistedSetupDemodataUT.cpp
+tests/core/codeunit/LibraryLowerPermissions.cpp
+permissions_mock/system/test_libraries/security/access_control/codeunit/PermissionsMock.cpp
+tests/core/codeunit/SCMCostingUT.cpp
+base/finance/vat/setup/table/VATAssistedSetupBusGrp.cpp

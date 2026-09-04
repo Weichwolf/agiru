@@ -1,5 +1,6 @@
 #include "runtime/Error.h"
 #include "runtime/Session.h"
+#include "runtime/Storage.h"
 #include "runtime/TestRunner.h"
 #include "runtime/test/RunnerDatabase.h"
 
@@ -108,6 +109,7 @@ int RunTests(const Options &options) {
   const std::string master = options.database.empty() ? std::string(kDatabase) : options.database;
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
   const agiru::Session session(runner.Dsn());
+  agiru::ProvisionInstalled(session.Database());
   const agiru::TestRun run = agiru::RunRegisteredTests(options.codeunit);
   for (const agiru::TestResult &result : run.results) {
     if (result.passed) { continue; }

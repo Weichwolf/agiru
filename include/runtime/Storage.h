@@ -27,6 +27,18 @@ void CreateTable(const Connection &connection, const TableDef &table);
 /// \throws DatabaseError when the statement fails.
 void DropTable(const Connection &connection, const TableDef &table);
 
+/// \brief Creates every table this binary carries that the database does not have.
+///
+/// \param into The database.
+/// \throws DatabaseError when a statement fails.
+///
+/// \note IT IS THE TEST RUNNER'S OWN DATABASE, not the master. A test writes rows, and a table this
+///       build knows and PostgreSQL does not is `relation "Sales Header" does not exist` -- an
+///       error about provisioning that reads like a defect in the code under test. The declarations
+///       are `constexpr` data in `.rodata`, so this is a walk over the catalogue and not a schema
+///       kept anywhere.
+void ProvisionInstalled(const Connection &into);
+
 /// \brief The SQL column type an AL field type maps to.
 ///
 /// \param def The field.

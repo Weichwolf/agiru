@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
 
@@ -9,6 +10,8 @@
 
 #include <cstddef>
 #include <optional>
+#include <print>
+#include <set>
 #include <span>
 #include <string>
 #include <string_view>
@@ -199,6 +202,23 @@ std::string_view Required(const std::optional<std::string> &value, const FieldDe
     throw Error("the column for field '" + std::string(def.name) + "' is null");
   }
   return *value;
+}
+
+void ProvisionInstalled(const Connection &into) {
+  const Result standing =
+      into.Execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
+  std::set<std::string> there;
+  for (std::size_t row = 0; row < standing.Rows(); ++row) {
+    const std::optional<std::string_view> name = standing.Value(row, 0);
+    if (name.has_value()) { there.emplace(*name); }
+  }
+  std::size_t made = 0;
+  for (const TableEntry *entry : InstalledTables()) {
+    if (there.contains(std::string(entry->table->name))) { continue; }
+    CreateTable(into, *entry->table);
+    ++made;
+  }
+  if (made != 0) { std::println("{} table(s) created in the runner's database", made); }
 }
 
 }

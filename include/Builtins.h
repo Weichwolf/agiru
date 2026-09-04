@@ -553,11 +553,6 @@ void Sleep(::agiru::Integer Duration);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string TemporaryPath();
 
-/// \brief AL `System.Today()`. Gets the current date set in the operating system.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date Today();
-
 /// \brief AL `System.Variant2Date(Variant)`. Gets a date from a variant.
 /// \param Variant The AL `Variant`.
 /// \return The AL `Date`.
@@ -574,12 +569,6 @@ std::string TemporaryPath();
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer WindowsLanguage();
-
-/// \brief AL `System.WorkDate(Date)`. Gets and sets the work date for the current session.
-/// \param NewDate The AL `Date`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date WorkDate(::agiru::Date NewDate = {});
 
 /// \brief AL `Database.AlterKey(KeyRef, Boolean)`. Alter a table's key in SQL, either disabling or
 /// enabling it. Any alteration only pertains to the current transaction and will be reverted at the
@@ -601,11 +590,6 @@ void AlterKey(const ::agiru::KeyRef &KeyRef, ::agiru::Boolean Enable);
 /// \param KeyNumber The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void CheckLicenseFile(::agiru::Integer KeyNumber);
-
-/// \brief AL `Database.CompanyName()`. Gets the current company name.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string CompanyName();
 
 /// \brief AL `Database.CopyCompany(Text, Text)`. Creates a new company and copies all data from an
 /// existing company in the same database.

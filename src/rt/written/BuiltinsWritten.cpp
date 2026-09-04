@@ -1,7 +1,10 @@
 #include "BuiltinsWritten.h"
 
 #include "runtime/Error.h"
+#include "runtime/Session.h"
 #include "type/BigInteger.h"
+#include "type/Date.h"
+#include "type/DateTime.h"
 #include "type/Integer.h"
 #include "type/StringValue.h"
 
@@ -175,6 +178,19 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString) {
 
 std::string UpperCase(std::string_view String) {
   return detail::UpperText(String);
+}
+
+::agiru::Date WorkDate(::agiru::Date NewDate) {
+  Session &session = Session::Current();
+  return NewDate.IsUndefined() ? session.WorkDate() : session.WorkDate(NewDate);
+}
+
+std::string CompanyName() {
+  return std::string(Session::Current().CompanyName());
+}
+
+::agiru::Date Today() {
+  return ::agiru::CurrentDateTime().Date();
 }
 
 }
