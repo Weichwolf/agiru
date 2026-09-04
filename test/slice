@@ -44,3 +44,6 @@ tests/core/codeunit/LibrarySetupStorageUT.cpp
 tests/core/codeunit/LibraryTablesUT.cpp
 tests/core/codeunit/NonDeductibleUT.cpp
 tests/core/codeunit/SCMWhseUOMRndingUT.cpp
+tests/core/codeunit/BankPmtApplRuleUT.cpp
+base/finance/vat/setup/table/VATSetup.cpp
+base/bank/bank_account/table/BankAccountPostingGroup.cpp
