@@ -397,4 +397,11 @@ IsNull(const T &Variable) {
 /// \note IT COMES FROM THE SESSION and not from a constant: a user is a property of the session,
 ///       and 23 of the 61 UT cases that run today reach it through `Library - Utility`.
 ::agiru::Text<0> UserId();
+
+/// \brief AL `Database.UserSecurityId()`. Gets the security id of the user who is logged on.
+/// \return The AL `Guid` this session's user carries.
+/// \note IT COMES FROM THE SESSION for the reason `UserId()` gives -- a user is a property of the
+///       session -- and 23 of the cases that run today reach it through `Library - Lower
+///       Permissions`.
+::agiru::Guid UserSecurityId();
 }

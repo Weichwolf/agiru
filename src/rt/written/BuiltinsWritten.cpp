@@ -463,4 +463,8 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
   return ::agiru::Text<0>{Session::Current().UserId()};
 }
 
+::agiru::Guid UserSecurityId() {
+  return Session::Current().UserSecurityId();
+}
+
 }

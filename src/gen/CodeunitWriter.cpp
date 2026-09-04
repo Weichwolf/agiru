@@ -1257,6 +1257,7 @@ TableIndex PlatformTables() {
   add("Integer", "2000000026");
   add("Date", "2000000007");
   add("User", "2000000120");
+  add("User Personalization", "2000000073");
   return tables;
 }
 

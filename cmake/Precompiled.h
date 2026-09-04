@@ -25,6 +25,7 @@
 #include "platform/Integer.h"
 #include "platform/Tenant.h"
 #include "platform/User.h"
+#include "platform/UserPersonalization.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"

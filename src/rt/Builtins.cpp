@@ -536,10 +536,6 @@ void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::st
   RefuseDoor("Database.UnregisterTableConnection(TableConnectionType, Text)");
 }
 
-::agiru::Guid UserSecurityId() {
-  RefuseDoor("Database.UserSecurityId()");
-}
-
 std::string ApplicationArea(std::string_view ApplicationArea) {
   static_cast<void>(ApplicationArea);
   RefuseDoor("Session.ApplicationArea(Text)");

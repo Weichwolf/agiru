@@ -148,7 +148,7 @@ const std::map<std::string, std::string> &DoorSpellings() {
   return spellings;
 }
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 35> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -174,6 +174,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhe
     {"platform::Integer", "platform/Integer.h"},
     {"platform::Tenant", "platform/Tenant.h"},
     {"platform::User", "platform/User.h"},
+    {"platform::UserPersonalization", "platform/UserPersonalization.h"},
     {"absent::", "dotnet/Refused.h"},
     {"DotNetGeneric", "dotnet/Generic.h"},
     {"ALConfigSettings", "dotnet/ALConfigSettings.h"},
