@@ -1076,8 +1076,11 @@ std::string BodyIncludes(const std::string &text, const Objects &objects) {
     if (kind == "tables") { index = &objects.tables; }
     if (kind == "interfaces") { index = &objects.interfaces; }
     if (index == nullptr) { continue; }
+    std::string qualified = kind;
+    qualified += "::";
+    qualified += identifier;
     for (const auto &[key, ref] : *index) {
-      if (ref.identifier == kind + "::" + identifier && !ref.header.empty()) {
+      if (ref.identifier == qualified && !ref.header.empty()) {
         headers.insert(ref.header);
         break;
       }
