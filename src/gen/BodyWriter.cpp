@@ -343,7 +343,7 @@ private:
         {"CalcFields", kAll},    {"CalcSums", kAll},      {"SetCurrentKey", kAll},
         {"SetLoadFields", kAll}, {"AddLoadFields", kAll}, {"GetRangeMin", 1},
         {"GetRangeMax", 1},      {"GetFilter", 1},        {"GetAscending", 1},
-        {"CopyFilter", kAll},
+        {"CopyFilter", kAll},    {"FieldActive", 1},
     };
     for (const auto &[name, count] : kTakers) {
       if (SameName(name, method)) { return count; }
@@ -362,8 +362,14 @@ private:
   }
 
   std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
-    std::string out = Expression(expression.children[1], kPrimaryPrecedence) +
-                      "::" + Identifier(callee.children[1].text) + "(";
+    const al::Expr &named = expression.children[1];
+    std::string subject = Expression(named, kPrimaryPrecedence);
+    if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
+        named.children.front().kind == al::ExprKind::Name) {
+      const std::string_view kind = KindNamespace(named.children.front().text);
+      if (!kind.empty()) { subject = std::string(kind) + "::" + Identifier(named.text) + "{}"; }
+    }
+    std::string out = subject + "." + Identifier(callee.children[1].text) + "(";
     for (std::size_t i = 2; i < expression.children.size(); ++i) {
       if (i != 2) { out += ", "; }
       out += Expression(expression.children[i], 0);
