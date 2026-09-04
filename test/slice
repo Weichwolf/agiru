@@ -74,3 +74,6 @@ tests/core/codeunit/APISetupUT.cpp
 tests/core/codeunit/CopyPurchSalesDocUT.cpp
 tests/core/codeunit/DataExchToRapidStartUT.cpp
 tests/core/codeunit/LibraryUTUtility.cpp
+base/pricing/source/codeunit/PriceSourceJob.cpp
+base/inventory/counting/history/table/PstdPhysInvtOrderLine.cpp
+tests/core/codeunit/SimpleDataExchangeUIUT.cpp
