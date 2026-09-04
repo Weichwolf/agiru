@@ -135,7 +135,10 @@ void TheKeyIsEnforcedByTheDatabase() {
 }
 
 void DeleteRemovesIt() {
-  const ResourceCost rec = Sample();
+  // NOT `const`: AL has no const record, and `Delete(RunTrigger)` runs `OnDelete`, which is AL code
+  // that may write into the row it is about to remove. One overload const and the other not would
+  // make which one is chosen depend on the caller's declaration.
+  ResourceCost rec = Sample();
   rec.Delete();
   ResourceCost read;
   CHECK_TRUE("and it is gone", !read.Get(rec.Type, rec.Code, rec.WorkTypeCode));

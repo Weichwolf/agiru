@@ -734,7 +734,9 @@ public:
     }
     if (subtype.empty() || !DoorCalls(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
-    if (table == objects_.tables.end() || table->second.fields.empty()) { return false; }
+    if (table == objects_.tables.end() || table->second.fields.empty()) {
+      return !PlatformFieldNamed(PlatformField{.table = subtype, .field = member.field});
+    }
     return !table->second.fields.contains(LowerKey(std::string(member.field)));
   }
 

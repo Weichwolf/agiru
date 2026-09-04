@@ -236,6 +236,12 @@ void ClearField(void *record, const FieldDef &def) {
 
 }
 
+void ClearKeyField(void *record, const TableDef &table, std::size_t position) {
+  const FieldDef *def = Field(table, table.keys[0].fields[position]);
+  if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
+  ClearField(record, *def);
+}
+
 namespace {
 
 template <typename T> T *SystemField(void *record, const TableDef &table, FieldNo no) {

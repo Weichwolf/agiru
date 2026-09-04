@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
 #include "type/Integer.h"
@@ -81,7 +82,11 @@ public:
   /// \param arguments The record, when there is one.
   /// \return The action the user closed it with.
   /// \throws Error until the UI runs (board:0030).
-  template <typename... Arguments> static Integer RunModal(Arguments &&...arguments) {
+  /// \note IT RETURNS AN `Action` AND NOT AN `Integer`. Every `RunModal` page names
+  ///       `Type: Action` as its return, and AL compares it against `Action::LookupOK` --
+  ///       `if Page.RunModal(...) = Action::LookupOK then` is how the whole BaseApp reads a
+  ///       lookup. An `Integer` there is not comparable to an `Action` and never was.
+  template <typename... Arguments> static ::agiru::Action RunModal(Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Page.RunModal needs a running UI (board:0030)");
   }

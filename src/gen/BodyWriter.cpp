@@ -745,6 +745,10 @@ public:
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
     }
+    if (local != nullptr && TypeName(local->type) == "Record") {
+      return DoorCalls(member.field) &&
+             !PlatformFieldNamed(PlatformField{.table = local->subtype, .field = member.field});
+    }
     return IsRecord(member.variable) && DoorCalls(member.field) &&
            FieldNamed(table_, member.field) == nullptr;
   }
@@ -776,6 +780,9 @@ public:
   }
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    if (const al::VarDecl *local = Local(name); local != nullptr) {
+      return Identifier(local->name);
+    }
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
         return "Var_Block->" + VariableIdentifier(table_, declared.name);

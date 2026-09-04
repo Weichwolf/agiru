@@ -17,3 +17,10 @@ tests/core/codeunit/LibraryLowerPermissions.cpp
 permissions_mock/system/test_libraries/security/access_control/codeunit/PermissionsMock.cpp
 tests/core/codeunit/SCMCostingUT.cpp
 base/finance/vat/setup/table/VATAssistedSetupBusGrp.cpp
+tests/core/codeunit/ERMVATToolUT.cpp
+tests/core/codeunit/LibraryTestInitialize.cpp
+tests/core/codeunit/LibrarySetupStorage.cpp
+base/finance/vat/setup/table/VATBusinessPostingGroup.cpp
+base/finance/vat/setup/table/VATSetupPostingGroups.cpp
+base/finance/vat/setup/table/VATProductPostingGroup.cpp
+base/finance/vat/rate_change/table/VATRateChangeSetup.cpp

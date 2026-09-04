@@ -186,6 +186,18 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 ///       says of `SystemId`.
 void RuntimeInit(void *record, const TableDef &table);
 
+/// \brief Returns one field of the primary key to its type's default.
+///
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param position Which field of the primary key, counting from zero.
+/// \throws Error when the key names a field the table lacks.
+///
+/// AL's `Get` may be handed fewer values than the key has fields, and the page says the rest are
+/// "treated as default value" -- so the tail is cleared rather than left holding whatever the
+/// record carried.
+void ClearKeyField(void *record, const TableDef &table, std::size_t position);
+
 /// \brief Steps the open cursor and reads the row it lands on.
 ///
 /// \param record The record, positioned by a previous `RuntimeFindSet`.
@@ -293,7 +305,14 @@ public:
   ///       by the platform." A `const` Insert could not do that, and a caller reading
   ///       `Rec.SystemId` after `Rec.Insert()` -- which the BaseApp does -- would see the blank
   ///       GUID it went in with.
-  void Insert() { detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable); }
+  /// \note EVERY OVERLOAD RETURNS `Ok`. `record-insert--method.md`,
+  ///       `record-modify-method.md` and `record-delete-method.md` all read
+  ///       `[Ok := ] Record.X(...)`, and AL writes `exit(Modify())` -- 226 sites under Layers/W1.
+  ///       A `void` here made every one of them a compile error.
+  Boolean Insert() {
+    detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    return true;
+  }
 
   /// \brief AL `Record.Insert(RunTrigger)`.
   ///
@@ -317,36 +336,40 @@ public:
   }
 
   /// \brief AL `Record.Modify()`.
+  /// \return True. The FALSE answer is board:0055: it wants the duplicate-key and not-found cases
+  ///         told apart from a real database failure, and the SQL layer does not do that yet.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
   /// \note Not `const`, for the reason Insert() gives: SystemModifiedAt and SystemModifiedBy are
   ///       written by the platform on every modify.
-  void Modify() {
+  Boolean Modify() {
     if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
       throw Error("the record does not exist");
     }
+    return true;
   }
 
   /// \brief AL `Record.Modify(RunTrigger)`.
   /// \param RunTrigger True to run the table's `OnModify` trigger first.
   /// \throws Error when no row carries this primary key, and whatever the trigger raises.
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
-  void Modify(Boolean RunTrigger) {
+  Boolean Modify(Boolean RunTrigger) {
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnModify(); }) {
         static_cast<Derived *>(this)->OnModify();
       }
     }
-    Modify();
+    return Modify();
   }
 
   /// \brief AL `Record.Delete()`.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
-  void Delete() const {
+  Boolean Delete() {
     if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
       throw Error("the record does not exist");
     }
+    return true;
   }
 
   /// \brief AL `Record.Delete(RunTrigger)`.
@@ -355,13 +378,13 @@ public:
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
   ///       record it is about to remove, and a great many of them do.
-  void Delete(Boolean RunTrigger) {
+  Boolean Delete(Boolean RunTrigger) {
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnDelete(); }) {
         static_cast<Derived *>(this)->OnDelete();
       }
     }
-    Delete();
+    return Delete();
   }
 
   /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.
@@ -1402,18 +1425,32 @@ protected:
   /// \brief Writes the primary key fields from the values AL's `Get` was handed.
   ///
   /// \tparam Keys The key field types, in key order.
-  /// \param  keys The primary key values.
-  /// \throws Error when the argument count does not match the primary key.
+  /// \param  keys The primary key values, which may be FEWER than the key has fields.
+  /// \throws Error when more values are handed than the key has fields.
+  ///
+  /// \note FEWER IS LEGAL AND THE PAGE SAYS SO. `record-get-method.md`: "Get doesn't require
+  ///       specifying all fields of the key in the call; any omitted field is treated as default
+  ///       value (for example, '' for text/code, false for boolean). You can only omit from the END
+  ///       of the key, not a field in the middle." So the omitted tail is CLEARED rather than left
+  ///       standing -- a record that already held a value there would otherwise search for a row
+  ///       the caller never named.
+  ///
+  /// \note `Get()` WITH NO ARGUMENTS AT ALL IS THE SETUP-TABLE IDIOM. Every `... Setup` table in
+  ///       the BaseApp has a single row under a blank primary key, and `GLSetup.Get()` is how AL
+  ///       reads it. Refusing it failed all 30 procedures of `ERM VAT Tool - UT` at once.
   ///
   /// \note Shared with the temporary store, which assigns the key the same way and then searches
   ///       its own rows rather than the database. Doing it twice was the alternative.
   template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
     const TableDef &table = TableTraits<Derived>::kTable;
-    if (table.keys.empty() || table.keys[0].fields.size() != sizeof...(Keys)) {
-      throw Error("Get: the argument count does not match the primary key");
+    if (table.keys.empty() || table.keys[0].fields.size() < sizeof...(Keys)) {
+      throw Error("Get: more values than the primary key has fields");
     }
     std::size_t position = 0;
     (AssignKey(table, position++, keys), ...);
+    for (std::size_t rest = sizeof...(Keys); rest < table.keys[0].fields.size(); ++rest) {
+      detail::ClearKeyField(Self(), table, rest);
+    }
   }
 
 private:

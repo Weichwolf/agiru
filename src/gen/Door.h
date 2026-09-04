@@ -19,6 +19,13 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] bool DoorCalls(std::string_view name);
 
+struct PlatformField {
+  std::string_view table;
+  std::string_view field;
+};
+
+[[nodiscard]] bool PlatformFieldNamed(const PlatformField &wanted);
+
 [[nodiscard]] bool HiddenByABaseMember(std::string_view name);
 
 }
