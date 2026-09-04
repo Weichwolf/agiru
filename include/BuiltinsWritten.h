@@ -296,7 +296,9 @@ void LogMessage(std::string_view EventId,
 ///       a `Variant` takes none of them -- which made all 30 call sites over the 78 UT codeunits a
 ///       compile error. What they share is the `CodeunitTraits` their generator specialises.
 template <typename T>
-  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+  requires requires(T &held) {
+    ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
+  } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 BindSubscription(T &Codeunit) {
   static_cast<void>(Codeunit);
   throw ::agiru::Error("Session.BindSubscription is declared and not implemented yet (board:0035)");
@@ -308,7 +310,9 @@ BindSubscription(T &Codeunit) {
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename T>
-  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+  requires requires(T &held) {
+    ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
+  } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 UnbindSubscription(T &Codeunit) {
   static_cast<void>(Codeunit);
   throw ::agiru::Error(
@@ -369,6 +373,24 @@ template <typename T> void Clear(T &Variable) {
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date Today();
+
+/// \brief AL `System.IsNull(DotNet)`. Whether a .NET variable holds no object.
+///
+/// \tparam T The rebuilt .NET class, or a refused one.
+/// \param Variable The variable.
+/// \return Never.
+///
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note THE PARAMETER IS A TEMPLATE, NOT A `Variant`. The .NET stand-ins this run emits are
+///       unrelated structs with no common base, so a `Variant` signature takes none of them --
+///       the same shape `BindSubscription` needed for the generated codeunits.
+template <typename T>
+  requires(!std::convertible_to<const T &, ::agiru::Variant>)::agiru::Boolean
+IsNull(const T &Variable) {
+  static_cast<void>(Variable);
+  throw ::agiru::Error("System.IsNull(DotNet) is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on.
 /// \return The AL `Text` naming the user this session runs as.

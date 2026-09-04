@@ -196,6 +196,12 @@ public:
   /// \param Message The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `ErrorInfo.Message()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] ErrorInfo.Message([NewMessage])`.
+  /// \return The message the error carries.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Message();
+
   std::string Message(std::string_view Message);
 
   /// \brief AL `ErrorInfo.PageNo(Integer)`. Specifies the page number that the error relates to.

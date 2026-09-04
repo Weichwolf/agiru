@@ -68,6 +68,16 @@ public:
     Throw();
   }
 
+  /// \brief Refuses to be rendered as text.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT EXISTS SO THAT `StrSubstNo` REFUSES RATHER THAN FAILING TO COMPILE. `AsText` asks
+  ///       for a `ToText()` before it reaches `Format`, and without one a message that names a
+  ///       .NET member is a compile error inside a template -- a diagnostic pointing at the
+  ///       runtime instead of at the AL line that wrote it.
+  [[nodiscard]] std::string ToText() const { Throw(); }
+
   /// \brief Refuses an assignment.
   /// \tparam T The type the caller assigned.
   /// \return Never.

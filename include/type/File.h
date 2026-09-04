@@ -52,7 +52,7 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Create(std::string_view Name, const ::agiru::TextEncoding &Encoding);
+  ::agiru::Boolean Create(std::string_view Name, const ::agiru::TextEncoding &Encoding = {});
 
   /// \brief AL `File.CreateInStream(InStream)`. Creates an InStream object for a file. This enables
   /// you to import or read data from the file.

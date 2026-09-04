@@ -21,6 +21,15 @@ namespace agiru {
 ///       would leave the caller's BLOB empty and every test of it green for the wrong reason.
 class OutStream {
 public:
+  /// \brief A stream bound to nothing yet.
+  ///
+  /// \note AL DECLARES THE VARIABLE BEFORE IT HAS A SOURCE. `ProfileConfigurationOutStream:
+  ///       OutStream;` is a `var` line and the source arrives later, through
+  ///       `File.CreateOutStream(...)` or `Blob.CreateOutStream()`. So the type has to be default
+  ///       constructible; what it writes to until then is nothing, and every operation on it
+  ///       refuses.
+  OutStream() = default;
+
   /// \brief A stream that writes into a BLOB.
   /// \param into The BLOB.
   explicit OutStream(Blob &into) : blob_(&into) {}
@@ -54,12 +63,21 @@ public:
 private:
   [[noreturn]] static void RefuseTyped();
 
-  Blob *blob_;
+  Blob *blob_ = nullptr;
 };
 
 /// \brief AL `InStream` -- what a BLOB is read through.
 class InStream {
 public:
+  /// \brief A stream bound to nothing yet.
+  ///
+  /// \note AL DECLARES THE VARIABLE BEFORE IT HAS A SOURCE. `ProfileConfigurationOutStream:
+  ///       OutStream;` is a `var` line and the source arrives later, through
+  ///       `File.CreateInStream(...)` or `Blob.CreateInStream()`. So the type has to be default
+  ///       constructible; what it reads to until then is nothing, and every operation on it
+  ///       refuses.
+  InStream() = default;
+
   /// \brief A stream that reads from a BLOB.
   /// \param from The BLOB.
   explicit InStream(const Blob &from) : blob_(&from) {}
@@ -107,7 +125,7 @@ public:
 private:
   [[noreturn]] static void RefuseTyped();
 
-  const Blob *blob_;
+  const Blob *blob_ = nullptr;
   std::size_t position_ = 0;
 };
 

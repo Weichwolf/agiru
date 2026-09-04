@@ -32,6 +32,18 @@ public:
   ///       `std::runtime_error` does not take. Without this, `Error(GetLastErrorText())` -- the
   ///       shape a test writes to re-raise -- does not compile.
   explicit Error(std::string_view text) : std::runtime_error(std::string(text)) {}
+
+  /// \brief AL `Error(ErrorInfo)` -- the error an `ErrorInfo` describes.
+  ///
+  /// \tparam Info Anything that carries a `Message()`, which is what `ErrorInfo` is here.
+  /// \param  info The described error.
+  ///
+  /// \note IT IS A TEMPLATE SO THAT THE DOOR STAYS CHEAP. `runtime/Error.h` is included by every
+  ///       generated translation unit and `type/ErrorInfo.h` is not; naming the type here would
+  ///       put the second behind the first for all 7 885 of them.
+  template <typename Info>
+    requires requires(Info &info) { std::string_view{info.Message()}; }
+  explicit Error(Info &info) : std::runtime_error(std::string(info.Message())) {}
 };
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.

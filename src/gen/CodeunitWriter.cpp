@@ -996,7 +996,8 @@ bool Mentions(const std::string &body, const std::string &name) {
     const bool behind =
         after < body.size() &&
         (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
-    if (!before && !behind) { return true; }
+    const bool scope = after + 1 < body.size() && body[after] == ':' && body[after + 1] == ':';
+    if (!before && !behind && !scope) { return true; }
   }
   return false;
 }

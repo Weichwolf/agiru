@@ -493,6 +493,10 @@ std::string ErrorInfo::DetailedMessage(std::string_view DetailedMessage) {
   RefuseDoor("ErrorInfo.FieldNo(Integer)");
 }
 
+std::string ErrorInfo::Message() {
+  RefuseDoor("ErrorInfo.Message()");
+}
+
 std::string ErrorInfo::Message(std::string_view Message) {
   static_cast<void>(Message);
   RefuseDoor("ErrorInfo.Message(Text)");

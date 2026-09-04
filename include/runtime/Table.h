@@ -566,7 +566,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean AddLink(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer AddLink(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.AddLink is declared and not implemented yet (board:0035)");
   }
@@ -651,7 +651,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ClearMarks(Arguments &&...arguments) const {
+  template <typename... Arguments> void ClearMarks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.ClearMarks is declared and not implemented yet (board:0035)");
   }
@@ -661,7 +661,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Consistent(Arguments &&...arguments) const {
+  template <typename... Arguments> void Consistent(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.Consistent is declared and not implemented yet (board:0035)");
   }
@@ -672,7 +672,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Copy(Arguments &&...arguments) const {
+  template <typename... Arguments> void Copy(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.Copy is declared and not implemented yet (board:0035)");
   }
@@ -683,7 +683,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CopyFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void CopyFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CopyFilter is declared and not implemented yet (board:0035)");
   }
@@ -705,7 +705,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CopyLinks(Arguments &&...arguments) const {
+  template <typename... Arguments> void CopyLinks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CopyLinks is declared and not implemented yet (board:0035)");
   }
@@ -716,7 +716,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CountApprox(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer CountApprox(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CountApprox is declared and not implemented yet (board:0035)");
   }
@@ -726,7 +726,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CurrentCompany(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string CurrentCompany(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CurrentCompany is declared and not implemented yet (board:0035)");
   }
@@ -736,7 +736,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CurrentKey(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string CurrentKey(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CurrentKey is declared and not implemented yet (board:0035)");
   }
@@ -746,7 +746,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean DeleteLink(Arguments &&...arguments) const {
+  template <typename... Arguments> void DeleteLink(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.DeleteLink is declared and not implemented yet (board:0035)");
   }
@@ -757,7 +757,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean DeleteLinks(Arguments &&...arguments) const {
+  template <typename... Arguments> void DeleteLinks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.DeleteLinks is declared and not implemented yet (board:0035)");
   }
@@ -799,7 +799,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FilterGroup(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer FilterGroup(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.FilterGroup is declared and not implemented yet (board:0035)");
   }
@@ -896,7 +896,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FullyQualifiedName(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string FullyQualifiedName(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.FullyQualifiedName is declared and not implemented yet (board:0035)");
   }
@@ -931,7 +931,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetFilter is declared and not implemented yet (board:0035)");
   }
@@ -943,7 +943,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetFilters(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetFilters(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetFilters is declared and not implemented yet (board:0035)");
   }
@@ -954,7 +954,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetPosition(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetPosition(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetPosition is declared and not implemented yet (board:0035)");
   }
@@ -964,7 +964,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetRangeMax(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Variant GetRangeMax(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetRangeMax is declared and not implemented yet (board:0035)");
   }
@@ -974,7 +974,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetRangeMin(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Variant GetRangeMin(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetRangeMin is declared and not implemented yet (board:0035)");
   }
@@ -985,7 +985,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetView(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetView(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetView is declared and not implemented yet (board:0035)");
   }
@@ -1046,7 +1046,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean LockTable(Arguments &&...arguments) const {
+  template <typename... Arguments> void LockTable(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.LockTable is declared and not implemented yet (board:0035)");
   }
@@ -1087,7 +1087,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ModifyAll(Arguments &&...arguments) const {
+  template <typename... Arguments> void ModifyAll(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.ModifyAll is declared and not implemented yet (board:0035)");
   }
@@ -1155,7 +1155,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Relation(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer Relation(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.Relation is declared and not implemented yet (board:0035)");
   }
@@ -1196,7 +1196,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetAscending(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetAscending(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetAscending is declared and not implemented yet (board:0035)");
   }
@@ -1263,7 +1263,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetPermissionFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetPermissionFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetPermissionFilter is declared and not implemented yet (board:0035)");
   }
@@ -1274,7 +1274,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetPosition(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetPosition(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetPosition is declared and not implemented yet (board:0035)");
   }
@@ -1317,7 +1317,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetRecFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetRecFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetRecFilter is declared and not implemented yet (board:0035)");
   }
@@ -1327,29 +1327,21 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetView(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetView(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetView is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.TableCaption(...)`. Gets the current caption of a table as a string.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TableCaption(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.TableCaption is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.
+  /// \return The `Caption` the table declares, which is its name when it declares none.
+  [[nodiscard]] std::string TableCaption() const {
+    return std::string(TableTraits<Derived>::kTable.caption);
   }
 
-  /// \brief AL `Record.TableName(...)`. Gets the name of a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TableName(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.TableName is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.TableName()`. Gets the name of a table.
+  /// \return The AL name, spaces and all.
+  [[nodiscard]] std::string TableName() const {
+    return std::string(TableTraits<Derived>::kTable.name);
   }
 
   /// \brief AL `Record.TransferFields(...)`. Copies all matching fields in one record to another
@@ -1358,7 +1350,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TransferFields(Arguments &&...arguments) const {
+  template <typename... Arguments> void TransferFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.TransferFields is declared and not implemented yet (board:0035)");
   }
@@ -1402,7 +1394,13 @@ public:
     const Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before);
     const detail::ValidatingField current(no);
-    member = value;
+    if constexpr (requires { member = value; }) {
+      member = value;
+    } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
+      member = Field::FromInteger(value.AsInteger());
+    } else {
+      member = static_cast<Field>(value);
+    }
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
       RunOnValidate(no);
@@ -1599,6 +1597,18 @@ public:
   Temporary(Temporary &&o) noexcept
       : T(std::move(static_cast<T &>(o))), store_(o.store_), position_(o.position_) {
     o.store_ = nullptr;
+  }
+
+  /// \brief Takes a plain record's FIELDS, the way AL's `TempRec := Rec` does.
+  /// \param o The record to copy the fields of.
+  /// \return This record.
+  ///
+  /// \note THE STORE IS NOT PART OF THE ASSIGNMENT. AL copies a record's fields and nothing else;
+  ///       where the rows live belongs to the VARIABLE, so a temporary that is assigned from a
+  ///       database record keeps its own store and gains that record's values.
+  Temporary &operator=(const T &o) {
+    T::operator=(o);
+    return *this;
   }
 
   /// \brief Assigns a record, and with it whichever store that record is on.

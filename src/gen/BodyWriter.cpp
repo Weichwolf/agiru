@@ -450,6 +450,7 @@ private:
     std::string receiver;
     std::string reach = ".";
     std::size_t fields = 0;
+    const al::Expr *holder = nullptr;
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
       fields = FieldArguments(callee.children[1].text);
@@ -462,6 +463,7 @@ private:
         }
         receiver = Expression(*owner, kPrimaryPrecedence);
         reach = owner->kind == al::ExprKind::Name && scope_.IsHandle(owner->text) ? "->" : ".";
+        holder = owner;
       }
     }
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
@@ -470,7 +472,11 @@ private:
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
       if (isField && expression.children[i].kind == al::ExprKind::Name &&
           scope_.Resolve(expression.children[i].text).empty()) {
-        out += receiver + reach + Identifier(expression.children[i].text);
+        out += receiver + reach;
+        out += holder != nullptr && holder->kind == al::ExprKind::Name
+                   ? scope_.MemberSpelling(
+                         OfVariable{.variable = holder->text, .field = expression.children[i].text})
+                   : Identifier(expression.children[i].text);
         continue;
       }
       out += Expression(expression.children[i], 0);
@@ -667,12 +673,12 @@ private:
            (IsText(expression.children.front()) || IsText(expression.children.back()));
   }
 
-  static bool IsEnumStatic(std::string_view name) {
-    static constexpr std::array kStatics{std::string_view{"FromInteger"},
+  static bool IsEnumMethod(std::string_view name) {
+    static constexpr std::array kMethods{std::string_view{"FromInteger"},
                                          std::string_view{"Names"},
                                          std::string_view{"Ordinals"},
                                          std::string_view{"AsInteger"}};
-    return std::ranges::any_of(kStatics,
+    return std::ranges::any_of(kMethods,
                                [name](std::string_view known) { return SameName(known, name); });
   }
 
@@ -693,11 +699,15 @@ private:
                          std::string_view spelling,
                          int precedence) {
     if (spelling != "." || chain.empty() || chain.back()->kind != al::ExprKind::Name) { return {}; }
-    if (walk.kind == al::ExprKind::Scope && IsEnumStatic(chain.back()->text)) {
-      const std::string enumeration = Expression(walk, kPrimaryPrecedence);
-      return enumeration.starts_with("enums::")
-                 ? "Enum<" + enumeration + ">::" + Identifier(chain.back()->text)
-                 : std::string{};
+    if (walk.kind == al::ExprKind::Scope && IsEnumMethod(chain.back()->text)) {
+      const std::string named = Expression(walk, kPrimaryPrecedence);
+      if (!named.starts_with("enums::")) { return {}; }
+      const std::size_t member = named.find("::", std::string_view{"enums::"}.size());
+      if (member == std::string::npos) {
+        return "Enum<" + named + ">::" + Identifier(chain.back()->text);
+      }
+      return "::agiru::Enum<" + named.substr(0, member) + ">{" + named + "}." +
+             Identifier(chain.back()->text);
     }
     if (walk.kind != al::ExprKind::Name || !scope_.Resolve(walk.text).empty() ||
         !DoorCalls(chain.back()->text)) {

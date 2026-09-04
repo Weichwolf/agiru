@@ -630,6 +630,24 @@ public:
     return *this;
   }
 
+  /// \brief Assigns anything that RENDERS as text, which is how AL assigns a GUID to a Text.
+  ///
+  /// \tparam T The source, which must carry a `ToText()`.
+  /// \param value The value.
+  /// \return This object.
+  /// \throws StringError when the rendering does not fit the declared length.
+  ///
+  /// \note `guid-data-type.md`: "You can assign and compare the Text data type and the GUID data
+  ///       type." A `Guid` is not convertible to `std::string_view` -- it holds sixteen bytes --
+  ///       so the conversion is its documented TEXT and never its storage.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
+    return *this;
+  }
+
   /// \brief Assigns another text, checking THIS one's declared length.
   ///
   /// \param o The other text.

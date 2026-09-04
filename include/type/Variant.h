@@ -789,6 +789,25 @@ public:
     Refuse();
   }
 
+  /// \brief Reads as an enumeration or an option, which a Variant holds by ORDINAL.
+  ///
+  /// \tparam T The `Enum<E>` or `Option<E>` wanted.
+  /// \return That enumeration standing on the ordinal the Variant carries.
+  /// \throws Error when the Variant holds something that is not an ordinal.
+  ///
+  /// \note AN ENUM IS NOT ONE OF THE ALTERNATIVES. What a Variant stores for one is its
+  ///       `OrdinalInVariant` -- the number plus the value table -- because the enumeration is a
+  ///       generated type the Variant cannot name. So the way back is `FromInteger`, and
+  ///       `Validate(Type, GetRangeMin(Type))` in `Library - ERM` is what needs it.
+  template <typename T>
+    requires(!detail::InVariant<T, Held>::value) &&
+            requires(std::int32_t ordinal) { T::FromInteger(ordinal); }
+  operator T() const {
+    const OrdinalInVariant *held = std::get_if<OrdinalInVariant>(&held_);
+    if (held == nullptr) { Refuse(); }
+    return T::FromInteger(held->ordinal);
+  }
+
   /// \brief Compares two Variants.
   /// \param o The other.
   /// \return True when they hold the same type and the same value.

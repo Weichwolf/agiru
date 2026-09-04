@@ -30,3 +30,17 @@ base/system/environment/configuration/table/ApplicationAreaSetup.cpp
 base/system/environment/configuration/codeunit/ApplicationAreaCache.cpp
 base/system/environment/configuration/codeunit/ApplicationAreaMgmtFacade.cpp
 base/system/environment/configuration/codeunit/ApplicationAreaMgmt.cpp
+tests/core/codeunit/LibraryERM.cpp
+tests/core/codeunit/LibrarySales.cpp
+tests/core/codeunit/LibraryNonDeductibleVAT.cpp
+tests/core/codeunit/LibraryERMCountryData.cpp
+system_test_library/system/test_libraries/environment/codeunit/EnvironmentInfoTestLibrary.cpp
+base/system/environment/configuration/codeunit/ConfPersonalizationMgt.cpp
+tests/core/codeunit/BankRecTestReportUT.cpp
+tests/core/codeunit/BatchProcessingUT.cpp
+tests/core/codeunit/DataExchColumnDefUT.cpp
+tests/core/codeunit/DataExchMappingUT.cpp
+tests/core/codeunit/LibrarySetupStorageUT.cpp
+tests/core/codeunit/LibraryTablesUT.cpp
+tests/core/codeunit/NonDeductibleUT.cpp
+tests/core/codeunit/SCMWhseUOMRndingUT.cpp
