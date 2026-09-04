@@ -31,6 +31,28 @@ declares). The methods exist on one and the calls land on the other.
 `).Method(` only, so a method on a bare procedure result reached through a
 variable is not in it.
 
+## Step one is done: the BUILTINS return a text
+
+2026-09-04: the eleven text-returning builtins in the hand-written door --
+`LowerCase`, `UpperCase`, `ConvertStr`, `CopyStr`, `DelChr`, `DelStr`, `IncStr`,
+`InsStr`, `PadStr`, `SelectStr`, `CompanyName` -- return `Text<0>` instead of
+`std::string`. The whole tree still builds and every gate stays green, because
+`Text<0>` derives from `StringValue` and `StringValue` reads as a
+`std::string_view`, which is what every consumer wanted.
+
+**IT IS NOT ENOUGH, AND THE NEXT STEP IS THE HEADER ORDER.** `LowerCase(X).Replace
+("{", "").Replace("}", "")` still fails on the SECOND `Replace`, because
+`StringValue`'s own text methods -- `Replace`, `Substring`, `Trim`, `TrimStart`,
+`TrimEnd`, `PadLeft`, `PadRight`, `Remove` and the rest, fifteen of them -- return
+`std::string` too. They cannot return `Text<0>` where they stand: that type is
+declared in `Text.h`, which includes `StringValue.h`, and a member defined inside
+the class body needs the return type COMPLETE.
+
+So the step is a header move rather than a signature change: `Text<0>` is the
+unbounded string VALUE and belongs beside `StringValue`, leaving `Text.h` with
+the sized `Text<N>` alone. Then the fifteen methods return it and a chain of AL
+text methods reads as AL wrote it.
+
 ## The choice, and why it is not obviously the small one
 
 **`Text<0>` IS THE AL TYPE AND `std::string` IS NOT.** The door already declares

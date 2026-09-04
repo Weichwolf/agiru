@@ -10,6 +10,7 @@
 #include "type/ObjectType.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
+#include "type/Text.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
@@ -45,7 +46,7 @@ namespace agiru {
 /// \param ToCharacters The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string
+::agiru::Text<0>
 ConvertStr(std::string_view String, std::string_view FromCharacters, std::string_view ToCharacters);
 
 /// \brief AL `Text.CopyStr(Text, Integer, Integer)`. Copies a substring of any length from a
@@ -55,9 +56,9 @@ ConvertStr(std::string_view String, std::string_view FromCharacters, std::string
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string CopyStr(std::string_view String,
-                    ::agiru::Integer Position,
-                    std::optional<::agiru::Integer> Length = std::nullopt);
+::agiru::Text<0> CopyStr(std::string_view String,
+                         ::agiru::Integer Position,
+                         std::optional<::agiru::Integer> Length = std::nullopt);
 
 /// \brief AL `Text.DelChr(Text, Text, Text)`. Deletes chars contained in the which parameter in a
 /// string based on the contents on the where parameter. If the where parameter contains an
@@ -75,9 +76,9 @@ std::string CopyStr(std::string_view String,
 /// \note OMITTED IS NOT EMPTY. The page's sentence about an empty parameter is about a caller who
 ///       PASSES `''`, and AL's own defaults are `=` and a space -- which is what makes
 ///       `DelChr(S)` strip every space and `DelChr(S, '<>')` trim both ends.
-std::string DelChr(std::string_view String,
-                   std::optional<std::string_view> Where = std::nullopt,
-                   std::optional<std::string_view> Which = std::nullopt);
+::agiru::Text<0> DelChr(std::string_view String,
+                        std::optional<std::string_view> Where = std::nullopt,
+                        std::optional<std::string_view> Which = std::nullopt);
 
 /// \brief AL `Text.DelStr(Text, Integer, Integer)`. Deletes a substring inside a string (text or
 /// code).
@@ -86,22 +87,22 @@ std::string DelChr(std::string_view String,
 /// \param Length The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string DelStr(std::string_view String,
-                   ::agiru::Integer Position,
-                   std::optional<::agiru::Integer> Length = std::nullopt);
+::agiru::Text<0> DelStr(std::string_view String,
+                        ::agiru::Integer Position,
+                        std::optional<::agiru::Integer> Length = std::nullopt);
 
 /// \brief AL `Text.IncStr(Text)`. Increases a positive number or decrease a negative number inside
 /// a string by one (1).
 /// \param String The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string IncStr(std::string_view String);
+::agiru::Text<0> IncStr(std::string_view String);
 
 /// \brief AL `Text.IncStr(Text, BigInteger)`. Increases the number in a string by a given amount.
 /// \param String The AL `Text`.
 /// \param Increment The AL `BigInteger`.
 /// \return The AL `Text`.
-std::string IncStr(std::string_view String, ::agiru::BigInteger Increment);
+::agiru::Text<0> IncStr(std::string_view String, ::agiru::BigInteger Increment);
 
 /// \brief AL `Text.InsStr(Text, Text, Integer)`. Inserts a substring into a string.
 /// \param String The AL `Text`.
@@ -109,13 +110,14 @@ std::string IncStr(std::string_view String, ::agiru::BigInteger Increment);
 /// \param Position The AL `Integer`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Position);
+::agiru::Text<0>
+InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Position);
 
 /// \brief AL `Text.LowerCase(Text)`. Converts all letters in a string to lowercase.
 /// \param String The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string LowerCase(std::string_view String);
+::agiru::Text<0> LowerCase(std::string_view String);
 
 /// \brief AL `Text.PadStr(Text, Integer, Text)`. Changes the length of a string to a specified
 /// length. If the string is shorter than the specified length, length spaces are added at the end
@@ -126,16 +128,16 @@ std::string LowerCase(std::string_view String);
 /// \param FillCharacter The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string PadStr(std::string_view String,
-                   ::agiru::Integer Length,
-                   std::optional<std::string_view> FillCharacter = std::nullopt);
+::agiru::Text<0> PadStr(std::string_view String,
+                        ::agiru::Integer Length,
+                        std::optional<std::string_view> FillCharacter = std::nullopt);
 
 /// \brief AL `Text.SelectStr(Integer, Text)`. Retrieves a substring from a comma-separated string.
 /// \param Number The AL `Integer`.
 /// \param CommaString The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
+::agiru::Text<0> SelectStr(::agiru::Integer Number, std::string_view CommaString);
 
 /// \brief AL `Text.StrCheckSum(Text, Text, Integer)`. Calculates a checksum for a string that
 /// contains a number. If the source is empty, 0 is returned. Each char in the source and in the
@@ -163,7 +165,7 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString);
 /// \param String The AL `Text`.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string UpperCase(std::string_view String);
+::agiru::Text<0> UpperCase(std::string_view String);
 
 /// \brief AL `System.WorkDate(Date)`. Gets and sets the work date for the current session.
 /// \param NewDate The AL `Date`.
@@ -310,7 +312,7 @@ template <typename T> void Clear(T &Variable) {
 /// \brief AL `Database.CompanyName()`. Gets the current company name.
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string CompanyName();
+::agiru::Text<0> CompanyName();
 
 /// \brief AL `System.Today()`. Gets the current date set in the operating system.
 /// \return The AL `Date`.

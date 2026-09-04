@@ -19,6 +19,7 @@
 #include "type/RecordId.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
+#include "type/Text.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
@@ -282,9 +283,9 @@ void LogMessage(std::string_view EventId,
   throw Error("Session.LogMessage is declared and not implemented yet (board:0035)");
 }
 
-std::string ConvertStr(std::string_view String,
-                       std::string_view FromCharacters,
-                       std::string_view ToCharacters) {
+::agiru::Text<0> ConvertStr(std::string_view String,
+                            std::string_view FromCharacters,
+                            std::string_view ToCharacters) {
   if (FromCharacters.size() != ToCharacters.size()) {
     throw Error("ConvertStr: FromCharacters and ToCharacters must be the same length");
   }
@@ -297,9 +298,9 @@ std::string ConvertStr(std::string_view String,
   return out;
 }
 
-std::string CopyStr(std::string_view String,
-                    ::agiru::Integer Position,
-                    std::optional<::agiru::Integer> Length) {
+::agiru::Text<0> CopyStr(std::string_view String,
+                         ::agiru::Integer Position,
+                         std::optional<::agiru::Integer> Length) {
   if (Position < 1) { throw Error("CopyStr: the position must be 1 or more"); }
   if (Length.has_value() && *Length < 0) { throw Error("CopyStr: the length must be 0 or more"); }
   const auto at = static_cast<std::size_t>(Position);
@@ -310,9 +311,9 @@ std::string CopyStr(std::string_view String,
   return std::string(String.substr(from, upto - from));
 }
 
-std::string DelChr(std::string_view String,
-                   std::optional<std::string_view> Where,
-                   std::optional<std::string_view> Which) {
+::agiru::Text<0> DelChr(std::string_view String,
+                        std::optional<std::string_view> Where,
+                        std::optional<std::string_view> Which) {
   const std::string_view where = Where.value_or("=");
   const std::string_view which = Which.value_or(" ");
   if (where.empty() || which.empty()) { return std::string(String); }
@@ -339,7 +340,7 @@ std::string DelChr(std::string_view String,
   return std::string(String.substr(from, upto - from));
 }
 
-std::string
+::agiru::Text<0>
 DelStr(std::string_view String, ::agiru::Integer Position, std::optional<::agiru::Integer> Length) {
   if (Position < 1) { throw Error("DelStr: the position must be 1 or more"); }
   if (Length.has_value() && *Length < 1) { throw Error("DelStr: the length must be 1 or more"); }
@@ -351,11 +352,11 @@ DelStr(std::string_view String, ::agiru::Integer Position, std::optional<::agiru
   return std::string(String.substr(0, from)) + std::string(String.substr(upto));
 }
 
-std::string IncStr(std::string_view String) {
+::agiru::Text<0> IncStr(std::string_view String) {
   return IncStr(String, 1);
 }
 
-std::string IncStr(std::string_view String, ::agiru::BigInteger Increment) {
+::agiru::Text<0> IncStr(std::string_view String, ::agiru::BigInteger Increment) {
   const std::size_t last = String.find_last_of("0123456789");
   if (last == std::string_view::npos) { return {}; }
   std::size_t first = last;
@@ -368,20 +369,21 @@ std::string IncStr(std::string_view String, ::agiru::BigInteger Increment) {
   return std::string(String.substr(0, first)) + grown + std::string(String.substr(last + 1));
 }
 
-std::string InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Position) {
+::agiru::Text<0>
+InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Position) {
   if (Position < 1) { throw Error("InsStr: the position must be 1 or more"); }
   const std::size_t at = detail::ByteOfUnit(String, static_cast<std::size_t>(Position));
   return std::string(String.substr(0, at)) + std::string(SubString) +
          std::string(String.substr(at));
 }
 
-std::string LowerCase(std::string_view String) {
+::agiru::Text<0> LowerCase(std::string_view String) {
   return detail::LowerText(String);
 }
 
-std::string PadStr(std::string_view String,
-                   ::agiru::Integer Length,
-                   std::optional<std::string_view> FillCharacter) {
+::agiru::Text<0> PadStr(std::string_view String,
+                        ::agiru::Integer Length,
+                        std::optional<std::string_view> FillCharacter) {
   if (Length < 0) { throw Error("PadStr: the length must be 0 or more"); }
   const std::string_view filler = FillCharacter.value_or(" ");
   if (detail::Utf16Length(filler) != 1) {
@@ -395,7 +397,7 @@ std::string PadStr(std::string_view String,
   return out;
 }
 
-std::string SelectStr(::agiru::Integer Number, std::string_view CommaString) {
+::agiru::Text<0> SelectStr(::agiru::Integer Number, std::string_view CommaString) {
   if (Number < 1) { throw Error("SelectStr: the number must be 1 or more"); }
   std::size_t at = 0;
   for (::agiru::Integer i = 1;; ++i) {
@@ -440,7 +442,7 @@ std::string SelectStr(::agiru::Integer Number, std::string_view CommaString) {
   return detail::IndexOfText(String, SubString, 1);
 }
 
-std::string UpperCase(std::string_view String) {
+::agiru::Text<0> UpperCase(std::string_view String) {
   return detail::UpperText(String);
 }
 
@@ -449,7 +451,7 @@ std::string UpperCase(std::string_view String) {
   return NewDate.IsUndefined() ? session.WorkDate() : session.WorkDate(NewDate);
 }
 
-std::string CompanyName() {
+::agiru::Text<0> CompanyName() {
   return std::string(Session::Current().CompanyName());
 }
 
