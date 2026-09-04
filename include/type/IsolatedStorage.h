@@ -15,6 +15,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/SecretText.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -77,7 +78,7 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Boolean
-  Get(std::string_view Key, const ::agiru::DataScope &DataScope, std::string &Value);
+  Get(std::string_view Key, const ::agiru::DataScope &DataScope, ::agiru::Text<0> &Value);
 
   /// \brief AL `IsolatedStorage.Get(Text, SecretText)`. Gets the value associated with the
   /// specified key.
@@ -92,7 +93,7 @@ public:
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Get(std::string_view Key, std::string &Value);
+  static ::agiru::Boolean Get(std::string_view Key, ::agiru::Text<0> &Value);
 
   /// \brief AL `IsolatedStorage.Set(Text, SecretText, DataScope)`. Sets the value associated with
   /// the specified key.

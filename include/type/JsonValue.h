@@ -14,6 +14,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -237,7 +238,7 @@ public:
   /// \param Data The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &Data);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &Data);
 };
 
 }

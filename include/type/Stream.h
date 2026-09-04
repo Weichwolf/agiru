@@ -4,6 +4,7 @@
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <cstddef>
 #include <string>
@@ -105,12 +106,12 @@ public:
   /// \param text   Receives what was read.
   /// \param length How many characters at most; the whole rest when omitted.
   /// \return How many characters were read.
-  Integer ReadText(std::string &text, Integer length);
+  Integer ReadText(::agiru::Text<0> &text, Integer length);
 
   /// \brief AL `InStream.ReadText(var Text)` -- the whole rest of the stream.
   /// \param text Receives what was read.
   /// \return How many characters were read.
-  Integer ReadText(std::string &text);
+  Integer ReadText(::agiru::Text<0> &text);
 
   /// \brief AL `InStream.Read(var Value)` for a typed value.
   /// \tparam T The value's type.

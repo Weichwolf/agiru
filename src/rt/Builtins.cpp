@@ -24,6 +24,7 @@
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/TableConnectionType.h"
+#include "type/Text.h"
 #include "type/Time.h"
 #include "type/TransactionType.h"
 #include "type/Variant.h"
@@ -391,12 +392,12 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
 }
 
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
-                                     std::string &FileName,
-                                     std::string &Description,
+                                     ::agiru::Text<0> &FileName,
+                                     ::agiru::Text<0> &Description,
                                      ::agiru::Boolean &HasApplication,
                                      ::agiru::Boolean &HasApplicationData,
                                      ::agiru::Boolean &HasGlobalData,
-                                     std::string &tenantId,
+                                     ::agiru::Text<0> &tenantId,
                                      ::agiru::DateTime &exportDate,
                                      ::agiru::RecordRef &CompanyRecord) {
   static_cast<void>(ShowDialog);
@@ -413,7 +414,7 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
 }
 
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             std::string_view Description,
                             ::agiru::Boolean IncludeApplication,
                             ::agiru::Boolean IncludeApplicationData,
@@ -442,7 +443,7 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) 
 }
 
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             ::agiru::Boolean IncludeApplicationData,
                             ::agiru::Boolean IncludeGlobalData,
                             const ::agiru::RecordRef &CompanyRecord) {
@@ -730,7 +731,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                           std::string_view DialogTitle,
                           std::string_view ToFolder,
                           std::string_view ToFilter,
-                          std::string &ToFile) {
+                          ::agiru::Text<0> &ToFile) {
   static_cast<void>(FromFile);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -743,7 +744,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,
                                     std::string_view ToFilter,
-                                    std::string &ToFile) {
+                                    ::agiru::Text<0> &ToFile) {
   static_cast<void>(InStream);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -791,7 +792,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                         std::string_view FromFolder,
                         std::string_view FromFilter,
                         std::string_view FromFile,
-                        std::string &ToFile) {
+                        ::agiru::Text<0> &ToFile) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);
   static_cast<void>(FromFilter);
@@ -809,7 +810,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
 ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                   std::string_view FromFolder,
                                   std::string_view FromFilter,
-                                  std::string &FromFile,
+                                  ::agiru::Text<0> &FromFile,
                                   ::agiru::InStream &InStream) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);

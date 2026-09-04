@@ -13,6 +13,7 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -43,7 +44,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Get(std::string_view Key, std::string &Result);
+  ::agiru::Boolean Get(std::string_view Key, ::agiru::Text<0> &Result);
 };
 
 }

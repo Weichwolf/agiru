@@ -59,13 +59,13 @@ void ReadingWalksTheStreamAndStopsAtItsEnd() {
   CHECK_TRUE("and it starts at position one, as AL counts", in.Position() == 1);
   CHECK_TRUE("nothing has been read yet, so it is not at the end", !in.EOS());
 
-  std::string read;
+  agiru::Text<0> read;
   CHECK_TRUE("a bounded read takes that many", in.ReadText(read, 3) == 3);
-  CHECK_TEXT("from the front", read, "abc");
+  CHECK_TEXT("from the front", read.Value(), "abc");
   CHECK_TRUE("and the position moves", in.Position() == 4);
 
   CHECK_TRUE("the rest comes out in one read", in.ReadText(read) == 3);
-  CHECK_TEXT("and it is the rest", read, "def");
+  CHECK_TEXT("and it is the rest", read.Value(), "def");
   CHECK_TRUE("now it is at the end", in.EOS());
   CHECK_TRUE("and a further read takes nothing", in.ReadText(read) == 0);
 

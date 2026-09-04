@@ -14,6 +14,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -60,7 +61,7 @@ public:
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer
-  GetSubText(std::string &Variable, ::agiru::Integer Position, ::agiru::Integer Length);
+  GetSubText(::agiru::Text<0> &Variable, ::agiru::Integer Position, ::agiru::Integer Length);
 
   /// \brief AL `BigText.Length()`. Retrieves the length of the text stored in this BigText
   /// instance.

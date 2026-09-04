@@ -338,7 +338,8 @@ private:
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) { return Kinded(kind, expression.text); }
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
-        return "::agiru::" + TypeName(base.text) + "::" + EnumeratorName(expression.text);
+        return "::agiru::" + TypeName(base.text) +
+               "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
       }
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
         return "tables::" + Identifier(expression.text) + "::kId.Value()";
@@ -347,6 +348,9 @@ private:
     const std::string resolved = Expression(base, kPrimaryPrecedence);
     if (resolved.find("::") == std::string::npos) {
       return "RefusedOption(\"" + base.text + "::" + expression.text + "\")";
+    }
+    if (resolved.starts_with("::agiru::")) {
+      return resolved + "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
     }
     return resolved + "::" + EnumeratorName(expression.text);
   }
@@ -863,6 +867,16 @@ public:
              const al::ProcedureDecl *running = nullptr)
       : table_(table), objects_(objects), running_(running) {}
 
+  [[nodiscard]] bool ShadowedByALocal(const std::string &identifier) const {
+    if (running_ == nullptr) { return false; }
+    for (const std::vector<al::VarDecl> *group : {&running_->variables, &running_->parameters}) {
+      for (const al::VarDecl &declared : *group) {
+        if (Identifier(declared.name) == identifier) { return true; }
+      }
+    }
+    return !running_->returnName.empty() && Identifier(running_->returnName) == identifier;
+  }
+
   [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
     if (running_ == nullptr) { return nullptr; }
     for (const al::VarDecl &declared : running_->variables) {
@@ -949,7 +963,10 @@ public:
       }
     }
     const al::FieldDecl *field = FieldNamed(table_, name);
-    if (field != nullptr) { return FieldIdentifier(table_, field->name); }
+    if (field != nullptr) {
+      const std::string spelled = FieldIdentifier(table_, field->name);
+      return ShadowedByALocal(spelled) ? "this->" + spelled : spelled;
+    }
     for (const al::LabelDecl &label : table_.labels) {
       if (SameName(label.name, name)) { return label.name; }
     }
@@ -1016,8 +1033,15 @@ public:
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
-    if (!IsRecord(field.variable)) { return {}; }
-    return Enumeration(field.field);
+    if (IsRecord(field.variable)) { return Enumeration(field.field); }
+    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
+      const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
+      if (table == objects_.fieldEnums.end()) { return {}; }
+      const auto found = table->second.find(LowerKey(std::string(field.field)));
+      return found == table->second.end() ? std::string{} : found->second;
+    }
+    return {};
   }
 
 private:

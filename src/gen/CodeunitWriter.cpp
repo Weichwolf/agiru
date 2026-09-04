@@ -468,6 +468,12 @@ bool HandleMember(const al::VarDecl &declared) {
   return NamesAnObject(declared);
 }
 
+std::string DoorMemberSpelling(std::string_view field) {
+  const std::string plain = Identifier(field);
+  const std::string spelled = AsTheDoorSpellsIt(plain);
+  return DoorCalls(field) && !IsAlTypeName(spelled) ? spelled : plain;
+}
+
 bool IsSystemField(std::string_view name) {
   static constexpr std::array kSystem{std::string_view{"SystemId"},
                                       std::string_view{"SystemCreatedAt"},
@@ -810,13 +816,13 @@ public:
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
-    if (subtype.empty()) { return AsTheDoorSpellsIt(Identifier(member.field)); }
+    if (subtype.empty()) { return DoorMemberSpelling(member.field); }
     const std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
     if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return AsTheDoorSpellsIt(Identifier(member.field));
+      return DoorMemberSpelling(member.field);
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }

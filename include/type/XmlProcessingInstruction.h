@@ -14,6 +14,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -72,7 +73,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean GetData(std::string &Result);
+  ::agiru::Boolean GetData(::agiru::Text<0> &Result);
 
   /// \brief AL `XmlProcessingInstruction.GetDocument(XmlDocument)`. Gets the XmlDocument for this
   /// node.
@@ -93,7 +94,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean GetTarget(std::string &Result);
+  ::agiru::Boolean GetTarget(::agiru::Text<0> &Result);
 
   /// \brief AL `XmlProcessingInstruction.Remove()`. Removes this node from its parent element.
   /// \return The AL `Boolean`.
@@ -171,7 +172,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &Text);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &Text);
 
   /// \brief AL `XmlProcessingInstruction.WriteTo(XmlWriteOptions, OutStream)`. Serializes and saves
   /// the current node to the given variable.
@@ -188,7 +189,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text);
+  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
 };
 
 }

@@ -15,6 +15,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/TextEncoding.h"
 #include "type/Time.h"
 #include "type/Variant.h"
@@ -94,7 +95,7 @@ public:
                                    std::string_view DialogTitle,
                                    std::string_view ToFolder,
                                    std::string_view ToFilter,
-                                   std::string &ToFile);
+                                   ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from
   /// server computer to the client computer. The client computer is the computer that is running
@@ -110,7 +111,7 @@ public:
                                              std::string_view DialogTitle,
                                              std::string_view ToFolder,
                                              std::string_view ToFilter,
-                                             std::string &ToFile);
+                                             ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.Erase(Text)`. Deletes a file.
   /// \param Name The AL `Text`.
@@ -223,7 +224,7 @@ public:
                                  std::string_view FromFolder,
                                  std::string_view FromFilter,
                                  std::string_view FromFile,
-                                 std::string &ToFile);
+                                 ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.UploadIntoStream(Text, InStream)`. Sends a file from the client computer to
   /// the corresponding server. The client computer is the computer that is running a browser that
@@ -249,7 +250,7 @@ public:
   static ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                            std::string_view FromFolder,
                                            std::string_view FromFilter,
-                                           std::string &FromFile,
+                                           ::agiru::Text<0> &FromFile,
                                            ::agiru::InStream &InStream);
 
   /// \brief AL `File.View(Text, Boolean)`. Opens a file from server computer on the client computer

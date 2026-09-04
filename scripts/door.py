@@ -47,7 +47,7 @@ def cpp_param(altype, isvar):
         t = t[:-1].strip()
     c = cpp_type(t)
     if c == "std::string":
-        return "std::string &" if isvar else "std::string_view"
+        return "::agiru::Text<0> &" if isvar else "std::string_view"
     if t in SCALAR or t == "Option":
         return f"{c} &" if isvar else c
     return f"{c} &" if isvar else f"const {c} &"

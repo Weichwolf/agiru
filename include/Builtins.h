@@ -541,12 +541,12 @@ CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
-                                     std::string &FileName,
-                                     std::string &Description,
+                                     ::agiru::Text<0> &FileName,
+                                     ::agiru::Text<0> &Description,
                                      ::agiru::Boolean &HasApplication,
                                      ::agiru::Boolean &HasApplicationData,
                                      ::agiru::Boolean &HasGlobalData,
-                                     std::string &tenantId,
+                                     ::agiru::Text<0> &tenantId,
                                      ::agiru::DateTime &exportDate,
                                      ::agiru::RecordRef &CompanyRecord);
 
@@ -562,7 +562,7 @@ CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             std::string_view Description = {},
                             ::agiru::Boolean IncludeApplication = {},
                             ::agiru::Boolean IncludeApplicationData = {},
@@ -596,7 +596,7 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type);
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             ::agiru::Boolean IncludeApplicationData = {},
                             ::agiru::Boolean IncludeGlobalData = {},
                             const ::agiru::RecordRef &CompanyRecord = {});
@@ -959,7 +959,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                           std::string_view DialogTitle,
                           std::string_view ToFolder,
                           std::string_view ToFilter,
-                          std::string &ToFile);
+                          ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from server
 /// computer to the client computer. The client computer is the computer that is running the Windows
@@ -975,7 +975,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,
                                     std::string_view ToFilter,
-                                    std::string &ToFile);
+                                    ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.Erase(Text)`. Deletes a file.
 /// \param Name The AL `Text`.
@@ -1034,7 +1034,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                         std::string_view FromFolder,
                         std::string_view FromFilter,
                         std::string_view FromFile,
-                        std::string &ToFile);
+                        ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.UploadIntoStream(Text, InStream)`. Sends a file from the client computer to the
 /// corresponding server. The client computer is the computer that is running a browser that
@@ -1058,7 +1058,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
 ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                   std::string_view FromFolder,
                                   std::string_view FromFilter,
-                                  std::string &FromFile,
+                                  ::agiru::Text<0> &FromFile,
                                   ::agiru::InStream &InStream);
 
 /// \brief AL `File.View(Text, Boolean)`. Opens a file from server computer on the client computer

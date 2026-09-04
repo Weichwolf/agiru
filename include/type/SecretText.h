@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/StringValue.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>

@@ -49,17 +49,17 @@ Integer InStream::Length() const {
   return static_cast<Integer>(blob_->Length());
 }
 
-Integer InStream::ReadText(std::string &text, Integer length) {
+Integer InStream::ReadText(::agiru::Text<0> &text, Integer length) {
   const std::size_t left =
       blob_->Length() - (position_ < blob_->Length() ? position_ : blob_->Length());
   const std::size_t want = length < 0 ? 0 : static_cast<std::size_t>(length);
   const std::size_t take = want < left ? want : left;
-  text.assign(reinterpret_cast<const char *>(blob_->Bytes().data()) + position_, take);
+  text = std::string_view(reinterpret_cast<const char *>(blob_->Bytes().data()) + position_, take);
   position_ += take;
   return static_cast<Integer>(take);
 }
 
-Integer InStream::ReadText(std::string &text) {
+Integer InStream::ReadText(::agiru::Text<0> &text) {
   return ReadText(text, static_cast<Integer>(blob_->Length() - position_));
 }
 

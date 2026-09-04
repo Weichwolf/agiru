@@ -17,6 +17,7 @@
 #include "type/RecordId.h"
 #include "type/SecretText.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -477,7 +478,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &String);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &String);
 
   /// \brief AL `JsonObject.WriteToYaml(OutStream)`. Serializes and writes the content of the
   /// JsonObject as YAML text to a given OutStream object.
@@ -491,7 +492,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteToYaml(std::string &String);
+  ::agiru::Boolean WriteToYaml(::agiru::Text<0> &String);
 
   /// \brief AL `JsonObject.WriteWithSecretsTo(Dictionary of [Text, SecretText], SecretText)`.
   /// Replaces the placeholder values based on their paths with the provided secrets and then

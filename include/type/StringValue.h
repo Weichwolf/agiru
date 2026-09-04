@@ -690,13 +690,6 @@ public:
   /// \return True when the stored text is identical.
   [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
 
-  /// \brief Compares against a text of ANOTHER declared shape -- a `Code<100>` against a `Text<0>`.
-  /// \param o The other string value.
-  /// \return True when the stored text is identical.
-  /// \note NON-TEMPLATE ON PURPOSE. Two sized texts of different classes reached the constrained
-  ///       template below from both sides, and C++20's reversed candidate made that ambiguous;
-  ///       a non-template on each side lets the non-rewritten one win.
-  [[nodiscard]] bool operator==(const StringValue &o) const { return Stored() == o.Value(); }
 
   /// \brief Compares against a literal, which is how AL writes an emptiness test.
   /// \param value The text.
@@ -861,6 +854,21 @@ template <typename Left, typename Right>
            (!std::derived_from<Left, StringValue>) && std::derived_from<Right, StringValue>
 [[nodiscard]] std::string operator+(const Left &left, const Right &right) {
   return std::string(std::string_view(left)) + std::string(right.Value());
+}
+
+
+/// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a
+///        `Text<0>` -- by their stored text.
+/// \param a One.
+/// \param b The other.
+/// \return True when the stored text is identical.
+///
+/// \note A FREE FUNCTION ON THE BASE, and that is the whole trick: each class's own `operator==`
+///       takes its own type, so `Code == Text` needs a conversion on one side whichever member is
+///       chosen, and C++20's reversed candidate then makes the two members ambiguous. This one
+///       needs only a derived-to-base conversion on each argument, which beats a user-defined one.
+[[nodiscard]] inline bool operator==(const StringValue &a, const StringValue &b) {
+  return a.Value() == b.Value();
 }
 
 }

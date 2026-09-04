@@ -13,6 +13,7 @@
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/RecordId.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -53,7 +54,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean LookupNamespace(std::string_view Prefix, std::string &Result);
+  ::agiru::Boolean LookupNamespace(std::string_view Prefix, ::agiru::Text<0> &Result);
 
   /// \brief AL `XmlNamespaceManager.LookupPrefix(Text, Text)`. Finds the prefix declared for the
   /// given namespace URI.
@@ -61,7 +62,7 @@ public:
   /// \param Result The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean LookupPrefix(std::string_view Uri, std::string &Result);
+  ::agiru::Boolean LookupPrefix(std::string_view Uri, ::agiru::Text<0> &Result);
 
   /// \brief AL `XmlNamespaceManager.NameTable(XmlNameTable)`. Gets or sets the XmlNameTable
   /// associated with this object.

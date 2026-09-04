@@ -8,6 +8,11 @@ Class:    silent-wrong-data
 
 # The six system-defined variables exist, and `xRec` shares state with `Rec`
 
+**`xRec` stands on the trigger's before-image** (`detail::Before<T>()`), spelled fully qualified
+so a local named like the table cannot shadow the type. `CurrPage`, `CurrReport` and
+`RequestOptionsPage` remain.
+
+
 board:0042 is "`xRec` is the record before the change" -- and CLAUDE.md records what it cost the
 predecessor: **four rounds** (openerp WI-781, WI-1078, WI-1137, WI-1156). **This page is the platform's
 own statement**, and it contains one sentence that explains all four.
