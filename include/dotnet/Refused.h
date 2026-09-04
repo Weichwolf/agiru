@@ -2,6 +2,7 @@
 
 #include "runtime/Error.h"
 
+#include <compare>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -100,6 +101,32 @@ public:
   template <typename T> friend Refused operator+(const T &left, const Refused &right) {
     static_cast<void>(left);
     right.Throw();
+  }
+
+  /// \brief Refuses to be ordered against anything.
+  /// \tparam T The other operand's type.
+  /// \param left  The refusal.
+  /// \param right The other operand.
+  /// \return Never.
+  /// \throws Error always.
+  /// \note AL COMPARES WHATEVER IT HAS, and a member of an object this run does not carry stands
+  ///       in a comparison as readily as in a sum. `<=>` gives all six at once, so the refusal is
+  ///       written once rather than six times.
+  template <typename T>
+  friend std::strong_ordering operator<=>(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to be compared for equality.
+  /// \tparam T The other operand's type.
+  /// \param left  The refusal.
+  /// \param right The other operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T> friend bool operator==(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
   }
 
 private:

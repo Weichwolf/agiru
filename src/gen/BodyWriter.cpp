@@ -308,6 +308,14 @@ private:
                : expression;
   }
 
+  std::string Kinded(std::string_view kind, const std::string &name) {
+    if (kind == "enums" && scope_.EnumObject(name).empty()) {
+      return "RefusedOption(\"" + name + "\")";
+    }
+    const std::string named = scope_.ObjectNamed(kind, name);
+    return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
+  }
+
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
@@ -328,10 +336,7 @@ private:
       if (!named.empty()) { return AsOption(named, expression.text); }
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
-      if (!kind.empty()) {
-        const std::string named = scope_.ObjectNamed(kind, expression.text);
-        return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
-      }
+      if (!kind.empty()) { return Kinded(kind, expression.text); }
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
         return "::agiru::" + TypeName(base.text) + "::" + EnumeratorName(expression.text);
       }

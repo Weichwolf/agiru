@@ -107,4 +107,27 @@ private:
   std::array<std::uint8_t, kSize> bytes_{};
 };
 
+/// \brief AL `+` on text and a Guid.
+///
+/// \param left  The text.
+/// \param right The Guid.
+/// \return The two joined, the Guid in its braced canonical form.
+///
+/// \note AL CONVERTS A GUID TO TEXT WHERE TEXT IS WANTED, which BC's own tests rely on --
+///       `CopyStr(CreateGuid(), 1, 20)` compiles there. C++ has no such conversion and must not
+///       gain one: a Guid is 16 bytes and its text is 38, so a conversion operator would need
+///       storage on every Guid, and a Guid sits in every record as `SystemId`. The operator carries
+///       it instead, where the text is actually wanted.
+[[nodiscard]] inline std::string operator+(std::string left, const Guid &right) {
+  return left + right.ToText();
+}
+
+/// \brief AL `+` on a Guid and text.
+/// \param left  The Guid.
+/// \param right The text.
+/// \return The two joined.
+[[nodiscard]] inline std::string operator+(const Guid &left, std::string_view right) {
+  return left.ToText() + std::string(right);
+}
+
 }
