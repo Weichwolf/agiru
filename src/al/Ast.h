@@ -175,6 +175,8 @@ const Trigger *Find(const std::vector<Trigger> &triggers, std::string_view name)
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name);
 
+std::vector<std::string> AttributeArguments(const ProcedureDecl &procedure, std::string_view name);
+
 std::vector<std::string> ListValue(const Property &property);
 
 }

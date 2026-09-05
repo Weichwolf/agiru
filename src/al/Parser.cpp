@@ -575,7 +575,16 @@ private:
     while (!AtEnd() && depth > 0) {
       if (AtPunctuation("[")) { ++depth; }
       if (AtPunctuation("]")) { --depth; }
-      if (depth > 0) { written += Peek().text; }
+      if (depth > 0) {
+        const Token &token = Peek();
+        if (token.kind == TokenKind::String) {
+          written += "'" + token.text + "'";
+        } else if (token.kind == TokenKind::QuotedIdentifier) {
+          written += "\"" + token.text + "\"";
+        } else {
+          written += token.text;
+        }
+      }
       Advance();
     }
     return written;
@@ -947,6 +956,43 @@ EnumExtensionObject ParseEnumExtension(std::string_view source) {
 
 PageExtensionObject ParsePageExtension(std::string_view source) {
   return Parser(Tokenize(source)).ParsePageExtension();
+}
+
+std::vector<std::string> AttributeArguments(const ProcedureDecl &procedure, std::string_view name) {
+  for (const std::string &attribute : procedure.attributes) {
+    const std::size_t open = attribute.find('(');
+    if (!SameName(open == std::string::npos ? attribute : attribute.substr(0, open), name)) {
+      continue;
+    }
+    std::vector<std::string> arguments;
+    if (open == std::string::npos) { return arguments; }
+    std::string current;
+    char quote = 0;
+    for (std::size_t i = open + 1; i < attribute.size(); ++i) {
+      const char c = attribute[i];
+      if (quote != 0) {
+        if (c == quote) {
+          quote = 0;
+        } else {
+          current += c;
+        }
+        continue;
+      }
+      if (c == '\'' || c == '"') {
+        quote = c;
+        continue;
+      }
+      if (c == ',' || (c == ')' && i + 1 == attribute.size())) {
+        arguments.push_back(current);
+        current.clear();
+        continue;
+      }
+      current += c;
+    }
+    if (!current.empty()) { arguments.push_back(current); }
+    return arguments;
+  }
+  return {};
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

@@ -93,6 +93,83 @@ bool DeclaresOnRun(const al::CodeunitObject &unit) {
   });
 }
 
+std::string RaisingBody(const al::ProcedureDecl &procedure,
+                        const std::string &identifier,
+                        std::string_view kind) {
+  std::string out = "  static constexpr std::array<std::string_view, " +
+                    std::to_string(procedure.parameters.size()) + "> kNames{";
+  for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
+    if (i != 0) { out += ", "; }
+    out += Literal(procedure.parameters[i].name);
+  }
+  const std::string traits = "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier + ">";
+  out += "};\n  ::agiru::detail::RaiseEvent(::agiru::" + std::string(kind) + ", " + traits +
+         "::kId.Value(), " + traits + "::kName, " + Literal(procedure.name) + ", kNames";
+  for (const al::VarDecl &parameter : procedure.parameters) {
+    out += ", " + Identifier(parameter.name);
+  }
+  return out + ");\n";
+}
+
+std::string EventObjectOf(std::string_view objectType) {
+  const std::string kind = LowerKey(std::string(objectType.substr(objectType.find("::") + 2)));
+  if (kind == "codeunit") { return "EventObject::Codeunit"; }
+  if (kind == "table") { return "EventObject::Table"; }
+  if (kind == "page") { return "EventObject::Page"; }
+  if (kind == "report") { return "EventObject::Report"; }
+  if (kind == "xmlport") { return "EventObject::XmlPort"; }
+  if (kind == "query") { return "EventObject::Query"; }
+  throw std::runtime_error("[EventSubscriber] names an object type the runtime has no kind for: " +
+                           std::string(objectType));
+}
+
+std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
+  std::vector<const al::ProcedureDecl *> subscribers;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (al::HasAttribute(procedure, "EventSubscriber")) { subscribers.push_back(&procedure); }
+  }
+  if (subscribers.empty()) { return {}; }
+  std::string out = "\nnamespace {\n\n";
+  for (std::size_t i = 0; i < subscribers.size(); ++i) {
+    out += "constexpr std::array<std::string_view, " +
+           std::to_string(subscribers[i]->parameters.size()) + "> kSubscriber" +
+           std::to_string(i + 1) + "Names{";
+    for (std::size_t k = 0; k < subscribers[i]->parameters.size(); ++k) {
+      if (k != 0) { out += ", "; }
+      out += Literal(subscribers[i]->parameters[k].name);
+    }
+    out += "};\n";
+  }
+  out += "\nconstexpr std::array<Subscription, " + std::to_string(subscribers.size()) +
+         "> kSubscriptions{{\n";
+  for (std::size_t i = 0; i < subscribers.size(); ++i) {
+    const std::vector<std::string> arguments =
+        al::AttributeArguments(*subscribers[i], "EventSubscriber");
+    if (arguments.size() < 3) {
+      throw std::runtime_error("[EventSubscriber] on " + subscribers[i]->name + " in " + unit.name +
+                               " carries " + std::to_string(arguments.size()) +
+                               " argument(s), and the attribute takes at least three");
+    }
+    const std::string reference = arguments[1];
+    const std::size_t colons = reference.find("::");
+    const std::string objectName =
+        colons == std::string::npos ? reference : reference.substr(colons + 2);
+    out += "    {" + EventObjectOf(arguments[0]) + ", 0, " + Literal(objectName) + ", " +
+           Literal(arguments[2]) + ", " + Literal(arguments.size() > 3 ? arguments[3] : "") +
+           ", kSubscriber" + std::to_string(i + 1) + "Names, &detail::InvokeSubscriber<" +
+           identifier + ", &" + identifier + "::" + Identifier(subscribers[i]->name) + ">},\n";
+  }
+  out += "}};\n\n";
+  const al::Property *instance = al::Find(unit.properties, "EventSubscriberInstance");
+  const bool manual = instance != nullptr && LowerKey(instance->text) == "manual";
+  out += "const SubscriptionCatalogue kSubscriptionCatalogue{\n    CodeunitTraits<" + identifier +
+         ">::kId,\n    CodeunitTraits<" + identifier + ">::kName,\n    kSubscriptions,\n    " +
+         (manual ? "true" : "false") + ",\n    []() -> void * { return new " + identifier +
+         "(); },\n    [](void *instance) { delete static_cast<" + identifier +
+         " *>(instance); }};\n\n} // namespace\n";
+  return out;
+}
+
 std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
@@ -1099,20 +1176,20 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
   const std::size_t includeAt = out.size();
-  const std::string catalogue = TestCatalogueOf(unit, identifier);
-  if (!catalogue.empty()) { out += "\n#include <array>\n"; }
+  const std::string catalogue =
+      TestCatalogueOf(unit, identifier) + SubscriptionCatalogueOf(unit, identifier);
+  if (!catalogue.empty()) { out += "\n#include <array>\n#include <string_view>\n"; }
   out += "\nnamespace agiru::app::codeunits {\n\n";
   const std::size_t bodyAt = out.size();
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
     const std::string body =
-        publisher ? std::string{}
+        publisher ? RaisingBody(procedure, identifier, "EventObject::Codeunit")
                   : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
                         FallsOff(procedure, CodeunitNames(unit, procedure, objects));
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures, body) +
-           ") {";
+           "(" + Parameters(procedure, objects, true, unit.name, {}, unit.procedures, body) + ") {";
     const std::string locals =
         publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures, body);
     if (locals.empty() && body.empty()) {
@@ -1462,8 +1539,11 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
 
   bool previousWasTrigger = false;
   bool first = true;
+  const auto platformCalls = [](const al::ProcedureDecl &procedure) {
+    return al::HasAttribute(procedure, "EventSubscriber");
+  };
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    if (procedure.isLocal) { continue; }
+    if (procedure.isLocal && !platformCalls(procedure)) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
     out += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
     previousWasTrigger = procedure.isTrigger;
@@ -1473,7 +1553,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   const std::string hidden = HiddenMembers(unit, objects, shadowed);
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    if (!procedure.isLocal) { continue; }
+    if (!procedure.isLocal || platformCalls(procedure)) { continue; }
     locals += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
   }
   if (!hidden.empty() || !locals.empty()) {

@@ -238,3 +238,33 @@ event and a business event is real and is not a population.
 
 **`var IsHandled` at 35 392** is board:0516's trap counted directly -- one AL procedure in
 seventy-three takes a parameter with that name, and every one is a `var` the generator must not copy.
+
+## The shape it takes, decided 2026-09-05 before the code
+
+- **The catalogue mirrors `TestCatalogue`**: beside each codeunit with a subscriber, a
+  `constexpr std::array<Subscription, N>` of {publisher object kind, publisher object id or name,
+  event name, element name, the subscriber's parameter NAMES, a thunk} and one
+  `const SubscriptionCatalogue` that registers itself the way the test catalogue does. Same
+  mechanism, same file, same reader.
+- **A thunk is `InvokeSubscriber<T, &T::Proc>` and deduces the parameter types from the member
+  pointer.** The publisher raises with an array of `void *` and its own parameter names; the thunk
+  binds each of ITS parameters by name (case-folded) to the publisher's pointer, casts to the
+  parameter type, and calls. A `var` parameter is the caller's variable, so `IsHandled` works
+  without machinery; a by-value one is copied. A subscriber may name FEWER parameters than the
+  publisher, which the BaseApp does constantly (`OnBeforePostSalesDoc` with one of nine).
+- **The publisher's emitted body raises instead of being empty**: `detail::Raise(kId, "Name",
+  kNames, {&a, &b, ...})`, and the dispatcher walks the registered subscriptions for that
+  (kind, id, name, element) in id order of the SUBSCRIBER codeunit -- declared order, never load
+  order.
+- **Instances**: `EventSubscriberInstance = StaticAutomatic` (the default; 3 declarations say it,
+  the rest imply it) gets one instance per session per subscriber codeunit, made on first
+  dispatch and held `thread_local`; `Manual` (361) dispatches only to instances a
+  `BindSubscription` registered for the session, in binding order, until `UnbindSubscription`.
+- **Two phases by population**: custom events first (2 700 subscriptions on codeunit- and
+  table-declared publishers), then the platform table events the runtime raises from `Insert`,
+  `Modify`, `Delete`, `Rename` and `Validate` (705 subscriptions; `devenv-event-types.md:109`
+  tabulates the signatures), then page events (400).
+- **Not carried in the first cut, and refused loudly when reached**: `IncludeSender` (the
+  publisher passes itself as a leading `Sender`), `GlobalVarAccess` (4 declarations), the two
+  skip flags, isolated events.
+

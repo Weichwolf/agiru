@@ -7,6 +7,7 @@
 #include "runtime/RecordState.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/IsolationLevel.h"
 #include "type/Option.h"
 
 #include <compare>
@@ -906,11 +907,11 @@ public:
   /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
   ///         do yet (board:0044).
   void DeleteAll(Boolean RunTrigger) {
-    if (RunTrigger) {
-      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
-                  "(board:0044)");
+    if (!RunTrigger) {
+      DeleteAll();
+      return;
     }
-    DeleteAll();
+    while (FindFirst()) { Delete(true); }
   }
 
   /// \brief AL `Record.FullyQualifiedName(...)`. Gets the fully qualified name of a table.
@@ -1106,9 +1107,26 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void ModifyAll(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ModifyAll is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.ModifyAll(Field, NewValue [, RunTrigger])` -- sets one field on every
+  ///        record the filters select (`record-modifyall-method.md`).
+  /// \tparam Field The field's type.
+  /// \tparam Value The value's type.
+  /// \param member     The field itself, the way AL names it: `Rec.ModifyAll(Status, X)`.
+  /// \param value      The new value.
+  /// \param RunTrigger Whether `OnValidate` and `OnModify` run per record.
+  /// \note A WALK AND NOT ONE `UPDATE`, so the triggers and the rowversion are the ordinary
+  ///       ones; the single statement is the measured optimisation this can take later.
+  template <typename Field, typename Value>
+  void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
+    if (!FindSet()) { return; }
+    do {
+      if (RunTrigger) {
+        Validate(member, value);
+      } else {
+        member = value;
+      }
+      Modify(RunTrigger);
+    } while (Next() != 0);
   }
 
   /// \brief AL `Record.ReadConsistency(...)`. Determines if the table supports read consistency.
@@ -1126,9 +1144,16 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ReadIsolation(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ReadIsolation is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.ReadIsolation([IsolationLevel])` -- sets the isolation the record's
+  ///        reads ask for, and answers the level in force (`record-readisolation-method.md`).
+  /// \param level The level wanted; `Default` follows the table's tri-state (board:0012).
+  /// \return The level now set.
+  /// \note CARRIED, NOT ENFORCED YET: PostgreSQL has no dirty read and the tri-state per table is
+  ///       board:0012's; what a record asks for is kept in its state so the reads can honour it
+  ///       when that lands. The name is AL's exactly, getter and setter in one.
+  IsolationLevel ReadIsolation(IsolationLevel level = IsolationLevel::Default) {
+    if (level != IsolationLevel::Default) { State().isolation = level; }
+    return State().isolation;
   }
 
   /// \brief AL `Record.ReadPermission(...)`. Determines whether a user is granted read permission

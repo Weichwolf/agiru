@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/Codeunit.h"
+#include "runtime/Events.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
@@ -301,8 +302,13 @@ template <typename T>
     ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
   } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 BindSubscription(T &Codeunit) {
-  static_cast<void>(Codeunit);
-  throw ::agiru::Error("Session.BindSubscription is declared and not implemented yet (board:0035)");
+  if constexpr (requires { ::agiru::CodeunitTraits<T>::kId; }) {
+    return ::agiru::detail::BindSubscriptions(::agiru::CodeunitTraits<T>::kId, &Codeunit);
+  } else {
+    auto &held = *Codeunit.operator->();
+    return ::agiru::detail::BindSubscriptions(
+        ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(held)>>::kId, &held);
+  }
 }
 
 /// \brief AL `Session.UnbindSubscription(Codeunit)`. Unbinds what `BindSubscription` bound.
@@ -315,9 +321,13 @@ template <typename T>
     ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
   } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 UnbindSubscription(T &Codeunit) {
-  static_cast<void>(Codeunit);
-  throw ::agiru::Error(
-      "Session.UnbindSubscription is declared and not implemented yet (board:0035)");
+  if constexpr (requires { ::agiru::CodeunitTraits<T>::kId; }) {
+    return ::agiru::detail::UnbindSubscriptions(::agiru::CodeunitTraits<T>::kId, &Codeunit);
+  } else {
+    auto &held = *Codeunit.operator->();
+    return ::agiru::detail::UnbindSubscriptions(
+        ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(held)>>::kId, &held);
+  }
 }
 
 /// \brief AL `System.Clear(Any)` -- the value back to what it was before anything was assigned.
