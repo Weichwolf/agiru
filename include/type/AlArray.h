@@ -245,6 +245,14 @@ public:
   /// \param value The text. \param index The one-based position.
   CharAt(S &value, Integer index) : value_(&value), index_(index) {}
 
+  /// \brief AL `Text[Index] := OtherText[OtherIndex]` -- one position copied into another.
+  /// \tparam O The other text's type.
+  /// \param other The other position.
+  /// \return This position.
+  template <typename O> CharAt &operator=(const CharAt<O> &other) {
+    return *this = static_cast<Char>(other);
+  }
+
   /// \brief AL `Text[Index] := Char`.
   /// \param character The character.
   /// \return This position.
