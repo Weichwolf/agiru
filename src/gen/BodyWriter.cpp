@@ -1557,9 +1557,7 @@ void ControlBodies(std::string &out,
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
-      const std::string body =
-          WriteStatements(PageNames(page, source, objects, &trigger), trigger.body, 2) +
-          FallsOffEnd(trigger, PageNames(page, source, objects, &trigger));
+      const std::string body = WriteStatements(PageNames(page, source, objects), trigger.body, 2);
       const std::string locals =
           ProcedureLocals(trigger,
                           objects,

@@ -48,6 +48,10 @@ struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T,
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
 
+/// \brief The runtime's codeunit traits, declared here so a Variant can constrain on them.
+/// \tparam T The codeunit's class.
+template <typename T> struct CodeunitTraits;
+
 /// \brief What a Variant holding a RECORD holds.
 ///
 /// \note A HANDLE AND NOT A COPY, which is what AL does. A Variant alternative that stored the
@@ -102,6 +106,24 @@ struct RecordRefInVariant {
 ///
 /// \note THE NAME TABLE TRAVELS AS A SPAN OVER `.rodata`. It is the same `constexpr` array the
 ///       enumeration already emits, so holding one costs a pointer and a length and no copy.
+/// \brief A codeunit a Variant holds: WHICH codeunit, and the instance it stands for.
+///
+/// \note AL PASSES A CODEUNIT VARIABLE INTO A VARIANT PARAMETER -- `GenJnlPostPreview.Preview` is
+///       one of 30-odd call sites that hand a codeunit to a runner. What the runner needs is the
+///       object's IDENTITY, so that is what travels; the instance is carried opaquely beside it
+///       for whoever can already run one.
+struct CodeunitInVariant {
+  std::int32_t id;      ///< The AL object number.
+  const void *instance; ///< The instance, for a runner that knows the type.
+};
+
+/// \brief Two codeunit values are equal when they name the same object and instance.
+/// \param a One value. \param b The other.
+/// \return Whether they are the same.
+[[nodiscard]] inline bool operator==(const CodeunitInVariant &a, const CodeunitInVariant &b) {
+  return a.id == b.id && a.instance == b.instance;
+}
+
 struct OrdinalInVariant {
   std::int32_t ordinal;                 ///< The declared number.
   std::span<const EnumValueDef> values; ///< The declared members, for the rendering.
@@ -192,7 +214,8 @@ public:
                             Blob,
                             OrdinalInVariant,
                             RecordInVariant,
-                            RecordRefInVariant>;
+                            RecordRefInVariant,
+                            CodeunitInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
@@ -288,6 +311,16 @@ public:
       { R::kId } -> std::convertible_to<TableId>;
     }
   Variant(const R &record) : held_(RecordInVariant{.record = &record, .table = R::kId}) {}
+
+  /// \brief AL puts a CODEUNIT into a Variant, and this is that.
+  /// \tparam C The codeunit's class -- anything the runtime knows an object number for.
+  /// \param unit The instance, kept as an address beside its number.
+  template <typename C>
+    requires requires {
+      { ::agiru::CodeunitTraits<C>::kId } -> std::convertible_to<CodeunitId>;
+    }
+  Variant(const C &unit)
+      : held_(CodeunitInVariant{.id = ::agiru::CodeunitTraits<C>::kId.Value(), .instance = &unit}) {}
 
   /// \brief AL `Rec := Variant` -- reads as the record the Variant refers to.
   ///
@@ -463,13 +496,9 @@ public:
   /// \brief AL `Variant.IsCodeunit()`. Indicates whether an AL variant contains a Codeunit
   /// variable.
   /// \return The AL `Boolean`.
-  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
-  ///       that type, so the assignment refuses at COMPILE time and no such value
-  ///       can be inside one (board:0035).
   ::agiru::Boolean IsCodeunit() const {
-    return false;
+    return std::holds_alternative<CodeunitInVariant>(held_);
   }
-
   /// \brief AL `Variant.IsDataClassification()`. Indicates whether an AL variant contains a
   /// DataClassification variable.
   /// \return The AL `Boolean`.

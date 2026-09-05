@@ -67,6 +67,20 @@ public:
     Throw();
   }
 
+  /// \brief Refuses to be walked with `foreach`.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note AL WALKS A .NET COLLECTION WITH `foreach`, and without a `begin` the diagnostic named
+  ///       the range rather than the member -- `foreach Str in DotNetString.Split(...)` stopped a
+  ///       translation unit over a member that would have refused at run time anyway.
+  [[noreturn]] const Refused *begin() const { Throw(); }
+
+  /// \brief The other half of the range, which is never reached.
+  /// \return Never.
+  /// \throws Error always.
+  [[noreturn]] const Refused *end() const { Throw(); }
+
   /// \brief Refuses to be rendered as text.
   /// \return Never.
   /// \throws Error always.

@@ -99,6 +99,21 @@ public:
   ///        assign, the handles stay.
   /// \tparam U The other handle's record type.
   /// \param other The other handle.
+  /// \brief AL assigns a record to a variable of a DERIVED record type -- `TempItem := Item`,
+  ///        where the left is `Record Item temporary`.
+  /// \tparam U The base record's type.
+  /// \param value The record, whose fields are copied.
+  /// \return This handle.
+  ///
+  /// \note TEMPORARINESS IS NOT PART OF THE VALUE. The assignment copies the FIELDS, and the
+  ///       left-hand side stays as temporary as it was declared.
+  template <typename U>
+    requires(!std::same_as<U, T> && std::is_base_of_v<U, T>)
+  Instance &operator=(const U &value) {
+    static_cast<U &>(*operator->()) = value;
+    return *this;
+  }
+
   template <typename U>
     requires(!std::same_as<U, T>)
   Instance &operator=(Instance<U> &other) {

@@ -123,6 +123,22 @@ public:
   /// \brief AL `Time - Time` -- how long lies between them.
   /// \param o The earlier time.
   /// \return The difference, which the page's own CompareTime example compares against 86 399 999.
+  /// \brief AL `Time += Integer` -- milliseconds, in place.
+  /// \param milliseconds The milliseconds.
+  /// \return This time.
+  constexpr Time &operator+=(std::int32_t milliseconds) {
+    *this = *this + milliseconds;
+    return *this;
+  }
+
+  /// \brief AL `Time -= Integer` -- milliseconds, in place.
+  /// \param milliseconds The milliseconds.
+  /// \return This time.
+  constexpr Time &operator-=(std::int32_t milliseconds) {
+    *this = *this - milliseconds;
+    return *this;
+  }
+
   [[nodiscard]] constexpr Duration operator-(const Time &o) const {
     return Duration{static_cast<std::int64_t>(milliseconds_) -
                     static_cast<std::int64_t>(o.milliseconds_)};

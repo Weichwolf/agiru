@@ -13,6 +13,8 @@
 /// \file
 /// \brief AL's Option -- a zero-based enumerator carrying a name table.
 
+#include <string>
+
 namespace agiru {
 
 /// \brief The declared members of one AL option, as static const data.
@@ -385,6 +387,37 @@ public:
 ///       (board:0032), so the ordinal is genuinely unknown. Emitting zero would be a wrong number
 ///       that looks like a right one; this refuses at the point AL would have used it, and says
 ///       which expression it was.
-[[noreturn]] Option<> RefusedOption(std::string_view what);
+/// \brief What `RefusedOption` hands back: a value that refuses to become anything.
+///
+/// \note IT IS NOT AN `Option<>`, and that is the point. AL scopes an absent enumeration in every
+///       position an enumeration stands in -- an argument typed `Enum`, an `Option` field, a
+///       comparison -- and a fixed return type only fits the first of them. Refusing THE
+///       CONVERSION fits them all, and still refuses at the point AL would have used the ordinal.
+class RefusedOptionValue {
+public:
+  /// \brief Carries the AL expression that named the absent enumeration.
+  /// \param what The expression, spelled as AL wrote it.
+  explicit RefusedOptionValue(std::string_view what) : what_(what) {}
+
+  /// \brief Refuses to become a value of any type.
+  /// \tparam T The type the caller wants.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
+  operator T() const {
+    Throw();
+  }
+
+private:
+  [[noreturn]] void Throw() const;
+
+  std::string what_;
+};
+
+/// \brief The ordinal of a member of an enumeration this run does not have.
+/// \param what The AL expression, spelled as AL wrote it.
+/// \return A value that refuses wherever it is used.
+[[nodiscard]] RefusedOptionValue RefusedOption(std::string_view what);
 
 }
