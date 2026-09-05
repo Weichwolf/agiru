@@ -19,12 +19,24 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace agiru::gen {
 
 namespace {
+
+bool SameName(std::string_view a, std::string_view b) {
+  if (a.size() != b.size()) { return false; }
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
 
 std::string TableNoOf(const al::CodeunitObject &unit) {
   const al::Property *source = al::Find(unit.properties, "TableNo");
@@ -133,7 +145,7 @@ std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::s
     if (al::HasAttribute(procedure, "EventSubscriber")) { subscribers.push_back(&procedure); }
   }
   if (subscribers.empty()) { return {}; }
-  std::string out = "\nnamespace {\n\n";
+  std::string out = "\nnamespace {\nnamespace " + identifier + "_subscriptions {\n\n";
   for (std::size_t i = 0; i < subscribers.size(); ++i) {
     out += "constexpr std::array<std::string_view, " +
            std::to_string(subscribers[i]->parameters.size()) + "> kSubscriber" +
@@ -170,14 +182,15 @@ std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::s
          ">::kId,\n    CodeunitTraits<" + identifier + ">::kName,\n    kSubscriptions,\n    " +
          (manual ? "true" : "false") + ",\n    []() -> void * { return new " + identifier +
          "(); },\n    [](void *instance) { delete static_cast<" + identifier +
-         " *>(instance); }};\n\n} // namespace\n";
+         " *>(instance); }};\n\n} // namespace " + identifier + "_subscriptions\n} // namespace\n";
   return out;
 }
 
 std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
-  std::string out = "\nnamespace {\n\nconstexpr std::array<TestMethod, ";
+  std::string out =
+      "\nnamespace {\nnamespace " + identifier + "_tests {\n\nconstexpr std::array<TestMethod, ";
   out += std::to_string(tests.size());
   out += "> kTestMethods{{\n";
   for (const al::ProcedureDecl *test : tests) {
@@ -201,7 +214,8 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
   out += DeclaresOnRun(unit) ? "                                  &InvokeTest<" + identifier +
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
-  out += "                                  kTestMethods};\n\n} // namespace\n";
+  out += "                                  kTestMethods};\n\n} // namespace " + identifier +
+         "_tests\n} // namespace\n";
   return out;
 }
 
@@ -701,6 +715,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
     both(procedure.returned);
+    if (!procedure.returned.byReference) { reach(procedure.returned); }
   }
   std::string out = std::string(kDoorMarker);
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
@@ -897,6 +912,19 @@ public:
     return !table->second.fields.contains(LowerKey(std::string(member.field)));
   }
 
+  [[nodiscard]] bool IsVariable(std::string_view name) const override {
+    return Declaration(name) != nullptr;
+  }
+
+  [[nodiscard]] bool ReturnsAHandle(std::string_view procedure) const override {
+    for (const al::ProcedureDecl &declared : unit_.procedures) {
+      if (LowerKey(declared.name) == LowerKey(std::string(procedure))) {
+        return TypeName(declared.returned.type) == "Interface";
+      }
+    }
+    return false;
+  }
+
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
     const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
@@ -983,7 +1011,7 @@ public:
 
   [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     for (const al::VarDecl &declared : procedure_.variables) {
       if (same(declared)) { return &declared; }
@@ -996,7 +1024,7 @@ public:
 
   [[nodiscard]] const al::VarDecl *Declaration(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     for (const al::VarDecl &declared : procedure_.variables) {
       if (same(declared)) { return &declared; }
@@ -1015,7 +1043,7 @@ public:
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     const auto face = [](const al::VarDecl &declared) {
       return TypeName(declared.type) == "Interface";
@@ -1034,29 +1062,22 @@ public:
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : procedure_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
     for (const al::VarDecl &declared : procedure_.parameters) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
-    if (!procedure_.returnName.empty() &&
-        LowerKey(procedure_.returnName) == LowerKey(std::string(name))) {
+    if (!procedure_.returnName.empty() && SameName(procedure_.returnName, name)) {
       return Identifier(procedure_.returnName);
     }
     for (const al::VarDecl &declared : unit_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
     for (const al::LabelDecl &label : unit_.labels) {
-      if (LowerKey(label.name) == LowerKey(std::string(name))) { return Identifier(label.name); }
+      if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &other : unit_.procedures) {
-      if (LowerKey(other.name) == LowerKey(std::string(name))) { return Identifier(other.name); }
+      if (SameName(other.name, name)) { return Identifier(other.name); }
     }
     if (LowerKey(std::string(name)) == "rec" && al::Find(unit_.properties, "TableNo") != nullptr) {
       return "Rec";
@@ -1188,6 +1209,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
+    const CodeunitNames names(unit, procedure, objects);
     const std::string body =
         publisher ? RaisingBody(procedure,
                                 "EventObject::Codeunit",
@@ -1195,8 +1217,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                     ">::kId.Value()",
                                 "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
                                     ">::kName")
-                  : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
-                        FallsOff(procedure, CodeunitNames(unit, procedure, objects));
+                  : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
            "(" + Parameters(procedure, objects, true, unit.name, {}, unit.procedures, body) + ") {";
     const std::string locals =
@@ -1280,39 +1301,62 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
   return Locals(procedure, objects, owner, all, body, shadowed);
 }
 
-std::string BodyIncludes(const std::string &text, const Objects &objects) {
-  static const std::regex named(
-      R"(\b(codeunits|pages|tables|interfaces|reports)::([A-Za-z0-9_]+))");
-  std::set<std::string> headers;
-  for (std::sregex_iterator it(text.begin(), text.end(), named), end; it != end; ++it) {
-    const std::string kind = (*it)[1].str();
-    const std::string identifier = (*it)[2].str();
-    const TableIndex *index = nullptr;
-    if (kind == "codeunits") { index = &objects.codeunits; }
-    if (kind == "pages") { index = &objects.pages; }
-    if (kind == "tables") { index = &objects.tables; }
-    if (kind == "interfaces") { index = &objects.interfaces; }
-    if (kind == "reports") { index = &objects.reports; }
-    if (index == nullptr) { continue; }
-    std::string qualified = kind;
-    qualified += "::";
-    qualified += identifier;
+namespace {
+
+struct HeaderIndex {
+  const Objects *objects = nullptr;
+  std::size_t indexed = 0;
+  std::unordered_map<std::string, std::string> byIdentifier;
+};
+
+std::size_t Indexed(const Objects &objects) {
+  return objects.codeunits.size() + objects.pages.size() + objects.tables.size() +
+         objects.interfaces.size() + objects.reports.size() + objects.enums.size();
+}
+
+const HeaderIndex &HeadersOf(const Objects &objects) {
+  static HeaderIndex cached;
+  if (cached.objects == &objects && cached.indexed == Indexed(objects)) { return cached; }
+  cached = HeaderIndex{.objects = &objects, .indexed = Indexed(objects), .byIdentifier = {}};
+  for (const TableIndex *index : {&objects.codeunits,
+                                  &objects.pages,
+                                  &objects.tables,
+                                  &objects.interfaces,
+                                  &objects.reports}) {
     for (const auto &[key, ref] : *index) {
-      if (ref.identifier == qualified && !ref.header.empty()) {
-        headers.insert(ref.header);
-        break;
-      }
+      if (!ref.header.empty()) { cached.byIdentifier.emplace(ref.identifier, ref.header); }
     }
   }
-  static const std::regex enumerated(R"(\benums::([A-Za-z0-9_]+))");
-  for (std::sregex_iterator it(text.begin(), text.end(), enumerated), end; it != end; ++it) {
-    const std::string identifier = (*it)[1].str();
-    for (const auto &[key, ref] : objects.enums) {
-      if (ref.identifier == identifier && !ref.header.empty()) {
-        headers.insert(ref.header);
-        break;
-      }
+  for (const auto &[key, ref] : objects.enums) {
+    if (!ref.header.empty()) {
+      cached.byIdentifier.emplace("enums::" + ref.identifier, ref.header);
     }
+  }
+  return cached;
+}
+
+bool IdentifierChar(char c) {
+  return (std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '_';
+}
+
+}
+
+std::string BodyIncludes(const std::string &text, const Objects &objects) {
+  static constexpr std::array<std::string_view, 6> kKinds{
+      "codeunits", "pages", "tables", "interfaces", "reports", "enums"};
+  const HeaderIndex &known = HeadersOf(objects);
+  std::set<std::string> headers;
+  for (std::size_t at = text.find("::"); at != std::string::npos; at = text.find("::", at + 2)) {
+    std::size_t begin = at;
+    while (begin > 0 && IdentifierChar(text[begin - 1])) { --begin; }
+    if (begin == at) { continue; }
+    const std::string_view kind(text.data() + begin, at - begin);
+    if (std::ranges::find(kKinds, kind) == kKinds.end()) { continue; }
+    std::size_t finish = at + 2;
+    while (finish < text.size() && IdentifierChar(text[finish])) { ++finish; }
+    if (finish == at + 2) { continue; }
+    const auto found = known.byIdentifier.find(std::string(text, begin, finish - begin));
+    if (found != known.byIdentifier.end()) { headers.insert(found->second); }
   }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }

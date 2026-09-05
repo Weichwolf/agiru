@@ -550,6 +550,25 @@ Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: 7 885
 at ~1 s each is over an hour. Hence `ccache`, hence `lld`, hence the door's parse cost is a measured
 quantity and `make lint` has a node budget.
 
+- **EVERY MINUTE TAKEN OFF COMPILE AND TRANSPILE NOW IS DAYS AND WEEKS OVER THE WHOLE RUN.** This
+  loop is driven by a model and runs hundreds of iterations; compile time is ITS bottleneck, so
+  a build-time saving ranks with a semantic fix and is measured the same way (seconds per unit,
+  minutes per full build, `build/times.log`).
+- **INCREMENTAL FIRST, FULL ONLY WHEN NECESSARY, AND A FULL BUILD ALWAYS IN THE BACKGROUND with
+  the next edit going on beside it.** A change in `src/rt` or `src/gen` is a library rebuild and a
+  relink; a change in a DOOR header is every generated unit, so a door change is tried on ONE
+  generated translation unit with `-fsyntax-only` first and batched with the other door changes
+  of the round. The transpiler runs nearly every iteration while the generator is being worked on,
+  so it is measured like a build step and kept in seconds (board:0589).
+- **A DOOR EDIT IS THE EXPENSIVE EDIT: it invalidates the precompiled header and every unity group.**
+  So door edits are BATCHED per round, each is tried on one generated unit with `-fsyntax-only`
+  (3 s) before the full build, and the full build runs in the background while the next round is
+  prepared. A `src/rt` or `src/gen` edit is a library and a relink; a slice change is one unity
+  group (16 sources, ~30 s). Anything over a few minutes in the foreground is a finding.
+- **`make` LOGS ITS WALL TIME to `build/times.log`** -- timestamp, seconds, slice size -- and the
+  number is watched like a baseline: compile time is THE bottleneck of a loop a model drives, and
+  a door header that costs every generated unit a second is a finding (board:0589 carries the
+  measurements: 8.2 s per 1 000-line table source, 6.6 s of it the door parse).
 - **libstdc++-14 has no `mdspan` and no `flat_map`** (measured; `__cpp_lib_*` undefined under both
   g++-14 and clang++-19). Present and used: `expected`, `print`, `format`, `ranges::to`.
 - **`__int128` is a GNU extension** that `-Wpedantic` rejects on g++ and accepts on clang. Written

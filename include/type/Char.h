@@ -1,9 +1,12 @@
 #pragma once
 
+#include "runtime/Error.h"
 #include "type/Integer.h"
 
+#include <compare>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 /// \file
 /// \brief AL `Char` -- one character.
@@ -50,7 +53,30 @@ public:
   /// \return How they order.
   [[nodiscard]] constexpr auto operator<=>(const Char &o) const = default;
 
+  /// \brief AL `Char >= '0'`: a Char against a one-character text literal, which AL reads as a
+  ///        Char. A longer text refuses, the way AL's conversion does.
+  /// \param text The literal.
+  /// \return The ordering of this against the literal's one character.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::string_view text) const {
+    return code_ <=> OneOf(text);
+  }
+
+  /// \brief AL `Char = 'a'`.
+  /// \param text The literal.
+  /// \return Whether it is that one character.
+  [[nodiscard]] constexpr bool operator==(std::string_view text) const {
+    return code_ == OneOf(text);
+  }
+
 private:
+  static constexpr std::int32_t OneOf(std::string_view text) {
+    if (text.size() != 1) {
+      throw Error("a Char is compared with a text that is not one character: '" +
+                  std::string(text) + "'");
+    }
+    return static_cast<unsigned char>(text[0]);
+  }
+
   std::int32_t code_ = 0;
 };
 

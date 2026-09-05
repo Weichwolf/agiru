@@ -116,11 +116,14 @@ std::string Temporal(const std::string &literal) {
   const std::string digits = upper.substr(0, end);
   const bool zero = digits.find_first_not_of("0.") == std::string::npos;
   if (suffix == "DT") {
-    return zero ? "DateTime{}" : "RefusedTemporal<DateTime>(\"" + literal + "\")";
+    return zero ? "::agiru::DateTime{}"
+                : "::agiru::RefusedTemporal<::agiru::DateTime>(\"" + literal + "\")";
   }
   if (suffix == "D") {
-    if (zero) { return "Date{}"; }
-    if (digits.size() != kDateDigits) { return "RefusedTemporal<Date>(\"" + literal + "\")"; }
+    if (zero) { return "::agiru::Date{}"; }
+    if (digits.size() != kDateDigits) {
+      return "::agiru::RefusedTemporal<::agiru::Date>(\"" + literal + "\")";
+    }
     return "Date::FromYmd(" + digits.substr(0, kYearDigits) + ", " +
            digits.substr(kYearDigits, kPairDigits) + ", " +
            digits.substr(kYearDigits + kPairDigits, kPairDigits) + ")";
@@ -408,7 +411,9 @@ private:
       const std::string_view kind = KindNamespace(named.children.front().text);
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     }
-    std::string out = subject + "." + Identifier(callee.children[1].text) + "(";
+    const std::string member = Identifier(callee.children[1].text);
+    std::string out =
+        subject + "." + (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
     for (std::size_t i = 2; i < expression.children.size(); ++i) {
       if (i != 2) { out += ", "; }
       out += Expression(expression.children[i], 0);
@@ -420,6 +425,10 @@ private:
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
     std::string known = scope_.Resolve(callee.text);
+    if (!known.empty() && scope_.IsVariable(callee.text) && DoorCalls(callee.text)) {
+      const std::string rec = scope_.Resolve("Rec");
+      if (!rec.empty()) { return rec + "." + AsTheDoorSpellsIt(Identifier(callee.text)); }
+    }
     if (!known.empty()) { return known; }
     const std::string_view builtin = BareBuiltin(callee.text);
     return builtin.empty() ? AsTheDoorSpellsIt(Identifier(callee.text)) : std::string(builtin);
@@ -783,6 +792,13 @@ private:
       return assigned;
     }
 
+    if (expression.text == ":=") {
+      const std::string left = Expression(expression.children.front(), kPrimaryPrecedence);
+      if (left == Expression(expression.children.back(), kPrimaryPrecedence)) {
+        return "static_cast<void>(" + left + ")";
+      }
+    }
+
     if (expression.text == "+" &&
         (IsText(expression.children.front()) || IsText(expression.children.back()))) {
       return Added(expression.children.front(), kAdditivePrecedence) + " + " +
@@ -806,7 +822,10 @@ private:
     }
 
     const bool handle =
-        spelling == "." && walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text);
+        spelling == "." && ((walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text)) ||
+                            (walk->kind == al::ExprKind::Call && !walk->children.empty() &&
+                             walk->children.front().kind == al::ExprKind::Name &&
+                             scope_.ReturnsAHandle(walk->children.front().text)));
     const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
     if (spelling == "||" && walk->kind == al::ExprKind::Binary && walk->text == "and") {
@@ -923,6 +942,18 @@ public:
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
     const auto *fields = FieldsOf(member.variable);
     return fields != nullptr && fields->contains(LowerKey(std::string(member.field)));
+  }
+
+  [[nodiscard]] bool IsVariable(std::string_view name) const override {
+    return Local(name) != nullptr || Global(name) != nullptr;
+  }
+
+  [[nodiscard]] bool MembersAreCalls(std::string_view variable) const override {
+    const al::VarDecl *declared = Local(variable);
+    if (declared == nullptr) { declared = Global(variable); }
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    return IsAlTypeName(type) && type != "Option" && type != "Enum" && declared->subtype.empty();
   }
 
   [[nodiscard]] const std::map<std::string, std::string> *
@@ -1228,14 +1259,17 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::ProcedureDecl &trigger : field.triggers) { reaching.push_back(trigger); }
   }
   out += SourceIncludesOf(table.variables, reaching, objects);
+  out += "\n" + TableDefinitions(table, objects.enums);
   const std::size_t bodyAt = out.size();
+  const std::set<std::string> shadowedByFields = Shadowed(table);
   out += "\nnamespace agiru::app::tables {\n\n";
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       const std::string body =
           WriteStatements(TableNames(table, objects, &trigger), trigger.body, 2);
       out += "void " + identifier + "::" + trigger.name + Identifier(field.name) + "() {\n";
-      out += ProcedureLocals(trigger, objects, table.name, table.procedures, Shadowed(table), body);
+      out +=
+          ProcedureLocals(trigger, objects, table.name, table.procedures, shadowedByFields, body);
       out += BindsBefore(body, identifier);
       out += body;
       out += "}\n\n";
@@ -1255,7 +1289,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
         IsPublisher(procedure)
             ? std::string{}
             : ProcedureLocals(
-                  procedure, objects, table.name, table.procedures, Shadowed(table), body) +
+                  procedure, objects, table.name, table.procedures, shadowedByFields, body) +
                   BindsBefore(body, identifier);
     out += ProcedureSignature(
                procedure,
@@ -1263,7 +1297,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                table.name,
                identifier,
                !(locals.empty() && body.empty()),
-               Shadowed(table),
+               shadowedByFields,
                table.procedures,
                Spelling{.spelled = ProcedureIdentifier(table, procedure.name), .body = body}) +
            " {";
@@ -1276,7 +1310,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     out += body + "}\n\n";
   }
 
-  out += "namespace {\nconst RegisterTable<" + identifier + "> kInCatalogue;\n} // namespace\n\n";
+  out += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterTable<" + identifier +
+         "> kInCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   out += "} // namespace agiru::app::tables\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);

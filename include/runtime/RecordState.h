@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -135,8 +134,9 @@ struct TempTable {
   const TempOps *ops;    ///< How to reach the rows.
   void *rows;            ///< The rows, owned here.
   std::uint64_t version; ///< Rises on every structural change, so a walk can notice.
+  std::size_t held;      ///< How many records share it; the last one frees it.
 
-  TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_), version(0) {}
+  TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_), version(0), held(0) {}
 
   TempTable(const TempTable &) = delete;
   TempTable(TempTable &&) = delete;
@@ -146,11 +146,67 @@ struct TempTable {
   ~TempTable() { ops->destroy(rows); }
 };
 
+/// \brief A counted reference to a `TempTable`: copying shares the rows, the last holder frees
+///        them. Intrusive rather than a shared pointer because `<memory>` pulls `<format>` into
+///        every generated translation unit (measured 2026-09-06: ~1 s per file, board:0589).
+class TempHandle {
+public:
+  TempHandle() = default;
+
+  explicit TempHandle(TempTable *table) : table_(table) { Acquire(); }
+
+  TempHandle(const TempHandle &o) : table_(o.table_) { Acquire(); }
+
+  TempHandle(TempHandle &&o) noexcept : table_(o.table_) { o.table_ = nullptr; }
+
+  TempHandle &operator=(const TempHandle &o) {
+    if (this != &o) {
+      Release();
+      table_ = o.table_;
+      Acquire();
+    }
+    return *this;
+  }
+
+  TempHandle &operator=(TempHandle &&o) noexcept {
+    if (this != &o) {
+      Release();
+      table_ = o.table_;
+      o.table_ = nullptr;
+    }
+    return *this;
+  }
+
+  ~TempHandle() { Release(); }
+
+  /// \return The table, or null.
+  [[nodiscard]] TempTable *get() const { return table_; }
+
+  /// \return Whether a table is held.
+  [[nodiscard]] explicit operator bool() const { return table_ != nullptr; }
+
+  /// \param o Null.
+  /// \return Whether none is held.
+  [[nodiscard]] bool operator==(std::nullptr_t o) const { return table_ == o; }
+
+private:
+  void Acquire() {
+    if (table_ != nullptr) { ++table_->held; }
+  }
+
+  void Release() {
+    if (table_ != nullptr && --table_->held == 0) { delete table_; }
+    table_ = nullptr;
+  }
+
+  TempTable *table_ = nullptr;
+};
+
 struct RecordState {
   /// \brief The temporary rows, when the record is `temporary`; null for a database record.
   ///        Temporariness is STATE and never type: a `Temporary<T>` installs it, and a `T &`
   ///        parameter bound to one keeps behaving as one (board:0583).
-  std::shared_ptr<TempTable> temporary;
+  TempHandle temporary;
   std::vector<std::size_t> view;        ///< The rows a `Find` selected, sorted, by index.
   std::size_t at = 0;                   ///< Where in `view` the record stands.
   std::uint64_t viewVersion = 0;        ///< The `TempTable::version` the view was built at.
@@ -210,7 +266,7 @@ public:
   ///        shares (`record-copy-method.md`).
   StateHandle &operator=(const StateHandle &o) {
     if (this != &o) {
-      std::shared_ptr<TempTable> keep = state_ == nullptr ? nullptr : state_->temporary;
+      TempHandle keep = state_ == nullptr ? TempHandle{} : state_->temporary;
       StateHandle copy(o);
       Swap(copy);
       if (state_ != nullptr || keep != nullptr) {

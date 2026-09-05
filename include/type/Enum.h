@@ -237,6 +237,17 @@ public:
   /// \brief Compares two enums by ordinal.
   /// \param o The other enum.
   /// \return True when the ordinals are equal.
+  /// \brief Two DIFFERENT enumerations compare by ordinal -- what AL does for a
+  ///        `"Purchase Applies-to Document Type"` against `"Purchase Document Type"` (board:0084).
+  /// \tparam F The other enumeration.
+  /// \param o The other value.
+  /// \return Whether the ordinals agree.
+  template <typename F>
+    requires(!std::same_as<F, E>)
+  [[nodiscard]] constexpr bool operator==(const Enum<F> &o) const {
+    return AsInteger() == o.AsInteger();
+  }
+
   [[nodiscard]] constexpr bool operator==(const Enum &o) const {
     return AsInteger() == o.AsInteger();
   }

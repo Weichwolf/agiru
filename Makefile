@@ -14,7 +14,9 @@ B    := $(SELF)/build
 # to. Deleting does not destroy: every line removed is in the commit that added it, which is where
 # a reason belongs. The door keeps its Doxygen, and `make lint` counts what is undocumented there.
 all: comments db   ## strip the comments, then the library, the transpiler and the client
-	@cmake --build $(B) -j $(shell nproc)
+	@start=$$(date +%s); cmake --build $(B) -j $(shell nproc); status=$$?; end=$$(date +%s); \
+	  printf '%s all %ss %s slice sources exit %s\n' "$$(date +%FT%T)" "$$((end - start))" \
+	    "$$(grep -vc '^#' $(SELF)/test/slice)" "$$status" >> $(B)/times.log; exit $$status
 
 # THE FORMATTER RUNS AFTER THE STRIP, because removing a line changes what fits on the next one and
 # `make lint` would otherwise fail on a tree `make` just wrote. The two together are idempotent.

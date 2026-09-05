@@ -68,6 +68,7 @@ struct Counts {
   std::size_t unitParsed = 0;
   std::size_t emitted = 0;
   std::size_t unitLost = 0;
+  std::size_t moved = 0;
 };
 
 bool IsUnitTest(std::string_view name) {
@@ -236,6 +237,11 @@ bool Note(Run &run, const std::filesystem::path &path, const std::exception &e) 
                                  .path = std::filesystem::relative(path, run.root).string(),
                                  .detail = e.what()});
   return false;
+}
+
+bool IsMoved(const std::vector<agiru::al::Property> &properties) {
+  const agiru::al::Property *state = agiru::al::Find(properties, "ObsoleteState");
+  return state != nullptr && agiru::gen::LowerKey(state->text) == "moved";
 }
 
 struct Gathered {
@@ -620,6 +626,10 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
     ++counts.files;
     try {
       agiru::al::TableObject table = agiru::al::ParseTable(Read(path));
+      if (IsMoved(table.properties)) {
+        ++counts.moved;
+        continue;
+      }
       ++counts.parsed;
       counts.members += table.fields.size();
       std::map<std::string, std::string> fieldNames;
@@ -969,6 +979,7 @@ void Add(Counts &into, const Counts &one) {
   into.unitParsed += one.unitParsed;
   into.unitLost += one.unitLost;
   into.emitted += one.emitted;
+  into.moved += one.moved;
 }
 
 int Scan(const Job &job) {
@@ -1154,6 +1165,9 @@ int Scan(const Job &job) {
   }
   ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
   if (allCodeunits.emitted != 0) {
+    std::println("moved     {} table(s) and extension(s) declare ObsoleteState = Moved and are "
+                 "left to the app their MovedTo names",
+                 allTables.moved);
     std::println("emitted   {} of {} codeunits; the rest name what the runtime cannot do yet",
                  allCodeunits.emitted,
                  allCodeunits.parsed);

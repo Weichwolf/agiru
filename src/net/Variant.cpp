@@ -9,3 +9,17 @@ void Variant::Refuse() {
 }
 
 }
+
+namespace agiru {
+
+Variant::Variant(const Variant &o) = default;
+Variant::Variant(Variant &&o) noexcept = default;
+Variant &Variant::operator=(const Variant &o) = default;
+Variant &Variant::operator=(Variant &&o) noexcept = default;
+Variant::~Variant() = default;
+
+bool Variant::operator==(const Variant &o) const {
+  return held_ == o.held_;
+}
+
+}

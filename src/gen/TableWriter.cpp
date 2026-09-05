@@ -20,6 +20,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -85,21 +86,48 @@ const OptionField *OptionOf(const std::vector<OptionField> &options, const al::F
 
 }
 
-std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
+namespace {
+
+struct FieldIdentifiers {
+  const al::TableObject *table = nullptr;
+  std::size_t fields = 0;
+  std::unordered_map<std::string, std::string> byName;
+  std::unordered_map<std::string, std::string> byBare;
+};
+
+const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
+  static FieldIdentifiers cached;
+  if (cached.table == &table && cached.fields == table.fields.size()) { return cached; }
+  cached =
+      FieldIdentifiers{.table = &table, .fields = table.fields.size(), .byName = {}, .byBare = {}};
   std::set<std::string> taken;
   for (const SystemFieldDecl &system : kSystemFields) {
     taken.insert(LowerKey(std::string(system.name)));
   }
-  std::string collapsed;
   for (const al::FieldDecl &field : table.fields) {
     const std::string bare = Identifier(field.name);
+    const std::string lowerBare = LowerKey(bare);
     const bool platform = field.number >= kSystemFields.front().no.Value();
-    const bool collides = !taken.insert(LowerKey(bare)).second && !platform;
+    const bool collides = !taken.insert(lowerBare).second && !platform;
     const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
-    if (LowerKey(field.name) == LowerKey(name)) { return spelled; }
-    if (collapsed.empty() && LowerKey(bare) == LowerKey(Identifier(name))) { collapsed = spelled; }
+    cached.byName.emplace(LowerKey(field.name), spelled);
+    cached.byBare.emplace(lowerBare, spelled);
   }
-  return collapsed.empty() ? Identifier(name) : collapsed;
+  return cached;
+}
+
+}
+
+std::string FieldIdentifier(const al::TableObject &table, const std::string &name) {
+  const FieldIdentifiers &known = IdentifiersOf(table);
+  if (const auto found = known.byName.find(LowerKey(name)); found != known.byName.end()) {
+    return found->second;
+  }
+  const std::string bare = Identifier(name);
+  if (const auto found = known.byBare.find(LowerKey(bare)); found != known.byBare.end()) {
+    return found->second;
+  }
+  return bare;
 }
 
 namespace {
@@ -330,7 +358,7 @@ std::string FieldTable(const al::TableObject &table,
                        const std::vector<OptionField> &options,
                        const EnumIndex &enums) {
   const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
-  std::string out = "inline constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
+  std::string out = "constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
                     tableIdentifier + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
                     ">{{\n";
   for (const al::FieldDecl *field : sorted) {
@@ -389,9 +417,7 @@ std::string Disambiguated(const std::string &bare,
 }
 
 bool NamedByAField(const al::TableObject &table, const std::string &spelled) {
-  return std::ranges::any_of(table.fields, [&](const al::FieldDecl &field) {
-    return LowerKey(Identifier(field.name)) == LowerKey(spelled);
-  });
+  return IdentifiersOf(table).byBare.contains(LowerKey(spelled));
 }
 
 }
@@ -624,50 +650,15 @@ std::set<std::string> Shadowed(const al::TableObject &table) {
   return hidden;
 }
 
-TableHeader WriteHeader(const al::TableObject &declared,
-                        const std::string &sourcePath,
-                        const EnumIndex &enums,
-                        const Objects &objects) {
+std::string TableDefinitions(const al::TableObject &declared, const EnumIndex &enums) {
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
-
-  std::string out;
-  out += "// Generated from " + sourcePath + ". Do not edit.\n";
-  out += "\n";
-  out += "#pragma once\n\n";
-  out += Includes(table, options, enums);
-  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
-  out += "#include <string_view>\n#include <type_traits>\n\n";
-  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
-    out += "#include \"absent/Types.h\"\n\n";
-  }
-  out += Declarations(table, objects);
-
-  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
-
-  out += "namespace agiru::app::tables {\n\n";
-  for (const OptionField &option : options) {
-    const std::vector<std::string> names = EnumeratorNames(option.members);
-    out += "enum class " + option.enumName + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
-    }
-    out += "};\n\n";
-  }
-  out += "} // namespace agiru::app::tables\n\n";
-
-  for (const OptionField &option : options) {
-    WriteOptionTraits(out, option);
-    out += "\n";
-  }
-
-  out += ClassBody(table, tableIdentifier, options, enums, objects);
-
+  std::string out = "namespace agiru::app::tables {\n\n";
   out += FieldTable(table, sorted, tableIdentifier, options, enums);
 
-  out += "inline constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
+  out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
     const auto said = [&](std::string_view name, bool absent) {
@@ -691,7 +682,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
   out += "}};\n\n";
 
-  out += "inline constexpr TableDef k" + tableIdentifier + "Table{\n";
+  out += "constexpr TableDef k" + tableIdentifier + "Table{\n";
   out += "    .id = " + tableIdentifier + "::kId,\n";
   out += "    .name = " + tableIdentifier + "::kName,\n";
   out += "    .caption = " + tableIdentifier + "::kName,\n";
@@ -777,6 +768,52 @@ TableHeader WriteHeader(const al::TableObject &declared,
     out += "Keys.empty(), \"keys[0] IS the primary key, so a table has one\");\n";
   }
   out += "\n";
+  out += "} // namespace agiru::app::tables\n\n";
+  return out;
+}
+
+TableHeader WriteHeader(const al::TableObject &declared,
+                        const std::string &sourcePath,
+                        const EnumIndex &enums,
+                        const Objects &objects) {
+  const al::TableObject table = WithSystemFields(declared);
+  const std::string tableIdentifier = Identifier(table.name);
+  const std::vector<OptionField> options = OptionFields(table);
+  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
+
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#pragma once\n\n";
+  out += Includes(table, options, enums);
+  out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
+  out += "#include <string_view>\n#include <type_traits>\n\n";
+  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
+    out += "#include \"absent/Types.h\"\n\n";
+  }
+  out += Declarations(table, objects);
+
+  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
+
+  out += "namespace agiru::app::tables {\n\n";
+  for (const OptionField &option : options) {
+    const std::vector<std::string> names = EnumeratorNames(option.members);
+    out += "enum class " + option.enumName + " : std::int32_t {\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
+    }
+    out += "};\n\n";
+  }
+  out += "} // namespace agiru::app::tables\n\n";
+
+  for (const OptionField &option : options) {
+    WriteOptionTraits(out, option);
+    out += "\n";
+  }
+
+  out += ClassBody(table, tableIdentifier, options, enums, objects);
+
+  out += "extern const TableDef k" + tableIdentifier + "Table;\n\n";
   out += "} // namespace agiru::app::tables\n\n";
 
   out += "template <> struct agiru::TableTraits<agiru::app::tables::" + tableIdentifier + "> {\n";

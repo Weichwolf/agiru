@@ -171,6 +171,18 @@ private:
 ///
 /// \note The base holds NO data, for the same reason `Table` holds none: a generated codeunit is a
 ///       plain class whose members are exactly the variables its `.al` declares.
+/// \brief AL `X[i]` on an array a codeunit holds by handle -- `array[2] of Record` as a global is
+///        an `Instance<AlArray<...>>`, and the one `At` spelling reaches through it.
+/// \tparam C     The array type held.
+/// \tparam Index The index type.
+/// \param held  The handle.
+/// \param index The ONE-BASED position.
+/// \return The element.
+template <typename C, typename Index>
+[[nodiscard]] decltype(auto) At(Instance<C> &held, Index index) {
+  return (*held)[index];
+}
+
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
 template <typename Derived = void> class Codeunit {
 public:

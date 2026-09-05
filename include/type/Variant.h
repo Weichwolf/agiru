@@ -185,6 +185,18 @@ public:
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
 
+  /// \brief Copies. OUT OF LINE, with the destructor and the comparison: the `std::variant`
+  ///        machinery behind them is instantiated once in `src/net/Variant.cpp` rather than in
+  ///        every generated translation unit (measured 2026-09-06: ~1.1 s per file, board:0589).
+  Variant(const Variant &o);
+  /// \brief Moves.
+  Variant(Variant &&o) noexcept;
+  /// \brief Assigns a copy.
+  Variant &operator=(const Variant &o);
+  /// \brief Assigns a move.
+  Variant &operator=(Variant &&o) noexcept;
+  ~Variant();
+
   /// \brief Holds a value.
   /// \tparam T The AL type, which must be one of the alternatives EXACTLY.
   /// \param value The value.
@@ -251,6 +263,22 @@ public:
     }
   operator const R &() const {
     return AsRecord<R>();
+  }
+
+  /// \brief AL `Proc(var Rec: Record X)` given a Variant that holds one: the Variant refers to
+  ///        the caller's record, so the var parameter IS that record and writes reach it.
+  /// \tparam R The generated table class the parameter is.
+  /// \return The record referred to.
+  /// \throws Error when the Variant holds no record, or one of another table.
+  /// \note THE CONST IS CAST AWAY, because a Variant stores the address of a record it was
+  ///       handed by reference and AL's `var` semantics are exactly "that variable" -- a Variant
+  ///       built from a temporary would dangle, which is the same defect as in AL.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  operator R &() {
+    return const_cast<R &>(AsRecord<R>()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
   }
 
   /// \brief The record this Variant refers to.
@@ -840,7 +868,7 @@ public:
   /// \brief Compares two Variants.
   /// \param o The other.
   /// \return True when they hold the same type and the same value.
-  [[nodiscard]] bool operator==(const Variant &o) const = default;
+  [[nodiscard]] bool operator==(const Variant &o) const;
 
 private:
   [[noreturn]] static void Refuse();

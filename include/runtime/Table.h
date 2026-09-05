@@ -1468,6 +1468,8 @@ public:
       member = value;
     } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
       member = Field::FromInteger(value.AsInteger());
+    } else if constexpr (std::integral<Value> && requires { member = Field::FromInteger(value); }) {
+      member = Field::FromInteger(value);
     } else {
       member = static_cast<Field>(value);
     }
@@ -1766,5 +1768,13 @@ public:
 /// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the
 /// table, so the field table, the keys and the `OnValidate` map are the same.
 template <typename T> struct TableTraits<Temporary<T>> : TableTraits<T> {};
+
+template <typename T> class Instance;
+
+/// \brief A record a codeunit holds by handle (`Instance<T>`, board:0018) declares what its
+///        table declares, so `Rec.Copy(GlobalRec)` and `Variant(GlobalRec)` see the table.
+template <typename T>
+  requires requires { TableTraits<T>::kTable; }
+struct TableTraits<Instance<T>> : TableTraits<T> {};
 
 }

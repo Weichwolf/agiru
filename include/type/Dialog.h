@@ -109,6 +109,11 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void Open(std::string_view String, ::agiru::Variant &Variable1);
 
+  /// \brief AL `Dialog.Open(Text)` -- the same without a variable to show; `Window.Open(Msg)` is
+  ///        the BaseApp's usual form.
+  /// \param String The dialog text.
+  void Open(std::string_view String);
+
   /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series
   /// of options.
   /// \param OptionMembers The AL `Text`.

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <string>
 
@@ -118,6 +119,24 @@ public:
   /// \param o The other.
   /// \return True when they are the same length.
   [[nodiscard]] constexpr bool operator==(const Duration &o) const = default;
+
+  /// \brief AL `Duration >= Integer`, `Duration / Integer` and the rest, with an integral operand
+  ///        -- exact, so the `int64` conversion above and the constructor from one never compete.
+  template <std::integral I> [[nodiscard]] constexpr std::strong_ordering operator<=>(I o) const {
+    return milliseconds_ <=> static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr bool operator==(I o) const {
+    return milliseconds_ == static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator/(I divisor) const {
+    return *this / static_cast<std::int64_t>(divisor);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator*(I factor) const {
+    return *this * static_cast<std::int64_t>(factor);
+  }
 
 private:
   std::int64_t milliseconds_{0};

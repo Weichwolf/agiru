@@ -618,6 +618,7 @@ private:
           }
           Advance();
         }
+        while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
       } else {
         const VarDecl declared = ReadType();
         for (const std::string &name : names) {
@@ -854,8 +855,7 @@ private:
         Expect(")");
         if (AtKeyword("var")) {
           Advance();
-          std::vector<LabelDecl> labels;
-          ParseVarsInto(labels, trigger.variables);
+          ParseVarsInto(trigger.labels, trigger.variables);
         }
         trigger.tokens = SkipBeginEnd();
         trigger.body = ParseStatements(trigger.tokens);

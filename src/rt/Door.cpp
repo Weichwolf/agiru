@@ -374,6 +374,11 @@ void Dialog::Message(std::string_view String, const ::agiru::Variant &Value) {
   RefuseDoor("Dialog.Message(Text, Any)");
 }
 
+void Dialog::Open(std::string_view String) {
+  RefuseDoor("Dialog.Open(Text)");
+  static_cast<void>(String);
+}
+
 void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
   static_cast<void>(String);
   static_cast<void>(Variable1);

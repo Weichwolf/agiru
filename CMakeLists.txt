@@ -133,6 +133,19 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
       continue()
     endif()
     list(APPEND slice_sources "${CMAKE_SOURCE_DIR}/apps/${line}")
+    # A UNITY GROUP IS A DIRECTORY, IN BUCKETS OF 16 IN SLICE ORDER. Batches numbered over the
+    # whole list shift whenever a source enters the middle, and every batch after it recompiles;
+    # a group keyed by directory and rank keeps a new source's cost to its own bucket
+    # (board:0589).
+    get_filename_component(slice_dir "${line}" DIRECTORY)
+    string(MAKE_C_IDENTIFIER "${slice_dir}" slice_dir_id)
+    if(NOT DEFINED slice_rank_${slice_dir_id})
+      set(slice_rank_${slice_dir_id} 0)
+    endif()
+    math(EXPR slice_bucket "${slice_rank_${slice_dir_id}} / 16")
+    math(EXPR slice_rank_${slice_dir_id} "${slice_rank_${slice_dir_id}} + 1")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/apps/${line}" PROPERTIES
+      UNITY_GROUP "${slice_dir}/${slice_bucket}")
   endforeach()
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})
@@ -152,6 +165,11 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
     # including what it uses -- that stands as its own rule -- it is what makes the loop bearable
     # while the tree is still repaired file by file.
     target_precompile_headers(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    # THE DOOR IS PARSED ONCE PER BATCH, NOT ONCE PER FILE. Measured 2026-09-06 on a 1 022-line
+    # table source: 8.2 s, of which 6.6 s parse the door and 0.5 s are the back end. A unity batch
+    # of 16 pays that parse once for 16 sources; every generated file keeps its file-scope names in
+    # a namespace of its own so the batch has nothing to collide on (board:0589).
+    set_target_properties(agiru_slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
     target_link_libraries(agiru PRIVATE agiru_slice)
   endif()
 endif()

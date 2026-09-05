@@ -1,3 +1,5 @@
+#include "Temporary.h"
+
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
@@ -6,13 +8,11 @@
 #include "runtime/Table.h"
 
 #include "Filter.h"
-#include "Temporary.h"
 
 #include <algorithm>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -112,9 +112,8 @@ void Build(Held held, const TableDef &table) {
   }
   const std::vector<FieldNo> by = OrderOf(state.viewKey, table);
   std::ranges::stable_sort(state.view, [&](std::size_t a, std::size_t b) {
-    const std::strong_ordering order =
-        Ordered(held.temp->ops->at(held.temp->rows, a), held.temp->ops->at(held.temp->rows, b),
-                table, by);
+    const std::strong_ordering order = Ordered(
+        held.temp->ops->at(held.temp->rows, a), held.temp->ops->at(held.temp->rows, b), table, by);
     return state.viewAscending ? order < 0 : order > 0;
   });
   state.viewVersion = held.temp->version;
@@ -147,8 +146,10 @@ void Refresh(Held held, const TableDef &table, const void *record) {
   }
   held.state->at = at;
   const bool same = at < held.state->view.size() &&
-                    Ordered(held.temp->ops->at(held.temp->rows, held.state->view[at]), record,
-                            table, PrimaryKey(table)) == 0;
+                    Ordered(held.temp->ops->at(held.temp->rows, held.state->view[at]),
+                            record,
+                            table,
+                            PrimaryKey(table)) == 0;
   if (!same) { held.state->at = at == 0 ? 0 : at - 1; }
 }
 
@@ -166,7 +167,7 @@ const TempTable *TempOf(const void *record) {
 
 void RuntimeMakeTemporary(void *record, const TempOps *ops) {
   RecordState *state = StateOf(record);
-  state->temporary = std::make_shared<TempTable>(ops, ops->make());
+  state->temporary = TempHandle(new TempTable(ops, ops->make()));
   state->view.clear();
   state->positioned = false;
 }
@@ -275,7 +276,9 @@ bool TempFind(void *record, const TableDef &table, std::string_view which) {
     Snapshot(held, table);
     const std::vector<std::size_t> &view = held.state->view;
     if (view.empty()) { continue; }
-    const auto rowOf = [&](std::size_t at) { return held.temp->ops->at(held.temp->rows, view[at]); };
+    const auto rowOf = [&](std::size_t at) {
+      return held.temp->ops->at(held.temp->rows, view[at]);
+    };
     switch (step) {
       case '-': Land(held, record, 0); return true;
       case '+': Land(held, record, view.size() - 1); return true;

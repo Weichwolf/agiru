@@ -334,4 +334,24 @@ public:
   ///       initialisation and both of those make it fail from the caller's context.
 };
 
+/// \brief AL `Page.Run(Number, ...)` and `Page.RunModal(Number, ...)` by object NUMBER, the way
+///        `Codeunit<void>` carries `Codeunit.Run(Number)`: refused until the page catalogue exists
+///        (board:0038).
+template <> class Page<void> {
+public:
+  template <typename... Arguments>
+  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.Run(" + std::to_string(Number) +
+                ") by number needs the page catalogue (board:0038)");
+  }
+
+  template <typename... Arguments>
+  static ::agiru::Action RunModal(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.RunModal(" + std::to_string(Number) +
+                ") by number needs the page catalogue (board:0038)");
+  }
+};
+
 }

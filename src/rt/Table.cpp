@@ -8,12 +8,16 @@
 #include "runtime/Record.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Media.h"
+#include "type/MediaSet.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 
@@ -232,6 +236,12 @@ void ClearField(void *record, const FieldDef &def) {
     case FieldType::DateTime: *reinterpret_cast<DateTime *>(At(record, def)) = DateTime{}; return;
     case FieldType::Duration: *reinterpret_cast<Duration *>(At(record, def)) = Duration{}; return;
     case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid{}; return;
+    case FieldType::DateFormula:
+      *reinterpret_cast<DateFormula *>(At(record, def)) = DateFormula{};
+      return;
+    case FieldType::Blob: *reinterpret_cast<Blob *>(At(record, def)) = Blob{}; return;
+    case FieldType::Media: *reinterpret_cast<Media *>(At(record, def)) = Media{}; return;
+    case FieldType::MediaSet: *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{}; return;
     default:
       throw Error("Init: field " + std::string(def.name) +
                   " has a type this runtime cannot return to its default yet");

@@ -366,7 +366,9 @@ concept IsAlArray = requires(T &array, ::agiru::Integer at) {
 }
 
 template <typename T> void Clear(T &Variable) {
-  if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
+  if constexpr (requires { Variable.operator->(); } && requires { *Variable; }) {
+    Clear(*Variable);
+  } else if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
     ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);
   } else if constexpr (detail::IsAlArray<T>) {
     for (::agiru::Integer at = 1; at <= Variable.Length(); ++at) { Clear(Variable[at]); }

@@ -87,3 +87,13 @@ its own type. **The negative control** is the second: a resolver that only handl
 member access compiles the first and not the second.
 
 Classification: **activation** -- 2 600 files do not translate today, so nothing regresses.
+
+## Measured 2026-09-06: a field and a procedure of one name, called from outside
+
+`Location` declares the field `"Pick According to FEFO"` and the procedure `PickAccordingToFEFO()`;
+both fold to `PickAccordingToFEFO`. Inside the table the call resolves to `..._Proc`
+(`ProcedureIdentifier`), but a CALL on a record variable from another object --
+`Location.PickAccordingToFEFO()` -- goes through `MemberSpelling`, which names the FIELD, and
+`Boolean` is not callable (bulk run over 388 table sources). The member spelling has to know it is
+a call: a called member that the table declares as a procedure is the procedure's identifier.
+
