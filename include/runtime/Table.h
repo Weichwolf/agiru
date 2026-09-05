@@ -1533,7 +1533,12 @@ protected:
   }
 
 private:
-  [[nodiscard]] void *Self() { return static_cast<Derived *>(this); }
+  [[nodiscard]] void *Self() {
+    static_assert(offsetof(Derived, State_Block) == 0,
+                  "a record's State_Block is its first member: the runtime reaches the state at "
+                  "offset 0 of whatever record it is handed, generated or platform");
+    return static_cast<Derived *>(this);
+  }
 
   /// The record variable's own state, made on the first call.
   ///

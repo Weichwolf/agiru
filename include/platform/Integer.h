@@ -3,6 +3,7 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
 
@@ -39,6 +40,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"Integer"};
+
+  detail::StateHandle State_Block;
 
   /// \brief AL `Integer.Number`.
   ::agiru::Integer Number{};

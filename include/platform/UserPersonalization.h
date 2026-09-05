@@ -3,6 +3,7 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Code.h"
 #include "type/Guid.h"
@@ -37,6 +38,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"User Personalization"};
+
+  detail::StateHandle State_Block;
 
   /// \brief The declared length of `Profile ID`.
   static constexpr std::size_t kProfileIdLength = 30;

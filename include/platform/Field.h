@@ -4,6 +4,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/DateTime.h"
@@ -158,6 +159,8 @@ public:
   static constexpr TableId kId{2000000041};
   /// \brief The AL name.
   static constexpr std::string_view kName{"Field"};
+
+  detail::StateHandle State_Block;
 
   /// \brief The declared lengths, which are AL's and not this file's.
   static constexpr std::size_t kNameLength = 30;
