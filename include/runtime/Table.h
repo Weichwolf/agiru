@@ -1557,6 +1557,15 @@ private:
 ///       which is a visible and uniform deviation rather than a clever one.
 [[nodiscard]] ::agiru::Integer CurrFieldNo();
 
+/// \brief AL `CurrFieldNo := FieldNo(...)` -- the BaseApp ASSIGNS the system variable to make a
+///        later `Validate` behave as if the user had entered that field.
+/// \param no The field number the running trigger should report.
+/// \throws Error always -- setting the current field outside the trigger machinery is board:0042.
+inline void CurrFieldNo(::agiru::Integer no) {
+  throw Error("CurrFieldNo := " + std::to_string(no) +
+              " needs the validating-field machinery (board:0042)");
+}
+
 /// \brief The rows a temporary record holds, and how often they changed.
 ///
 /// \tparam T The generated table class.

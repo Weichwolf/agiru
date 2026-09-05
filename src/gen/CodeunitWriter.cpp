@@ -772,7 +772,7 @@ public:
     const al::VarDecl *declared = Declaration(variable);
     if (declared == nullptr) { return false; }
     const std::string type = TypeName(declared->type);
-    if (NamesAnObject(*declared)) { return false; }
+    if (NamesAnObject(*declared) || NamesAPage(type)) { return false; }
     return IsAlTypeName(type) && type != "Option" && type != "Enum";
   }
 
@@ -1046,6 +1046,9 @@ std::string Locals(const al::ProcedureDecl &procedure,
     return Mentions(code, name) && !shadows(name) ? std::string{}
                                                   : std::string("[[maybe_unused]] ");
   };
+  const auto local = [&body](const std::string &) {
+    return body.empty() ? std::string{} : std::string("[[maybe_unused]] ");
+  };
   if (!procedure.returnName.empty()) {
     out += "  " + unused(Identifier(procedure.returnName)) + Returns(procedure, objects) + " " +
            Identifier(procedure.returnName) + "{};\n";
@@ -1060,7 +1063,7 @@ std::string Locals(const al::ProcedureDecl &procedure,
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
     if (Hidden(type, names)) { type = Qualified(type, names); }
     out +=
-        "  " + unused(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
+        "  " + local(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
   }
   for (const al::LabelDecl &label : procedure.labels) {
     out += "  static constexpr std::string_view " + Identifier(label.name) + "{" +

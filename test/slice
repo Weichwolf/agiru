@@ -94,3 +94,6 @@ base/pricing/source/codeunit/PriceSourceCustPriceGr.cpp
 base/pricing/source/codeunit/PriceSourceVendor.cpp
 base/finance/dimension/codeunit/DimensionManagement.cpp
 tests/core/codeunit/WFBufferTablePageUT.cpp
+tests/core/codeunit/LibraryPriceCalculation.cpp
+base/pricing/source/table/PriceSource.cpp
+base/inventory/counting/comment/table/PhysInvtCommentLine.cpp

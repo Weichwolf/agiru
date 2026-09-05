@@ -36,6 +36,8 @@ struct Named {
 
 /// \brief A .NET member this runtime has not rebuilt, callable in any shape and refusing all of
 ///        them.
+struct RefusedResult;
+
 class Refused {
 public:
   /// \brief A member of a .NET type that is not rebuilt.
@@ -47,10 +49,7 @@ public:
   /// \param arguments The arguments, read only to be discarded -- what is refused is the CALL.
   /// \return Never.
   /// \throws Error always.
-  template <typename... Arguments> Refused operator()(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    Throw();
-  }
+  template <typename... Arguments> RefusedResult operator()(Arguments &&...arguments) const;
 
   /// \brief Refuses to become a value of any type.
   /// \tparam T The type the caller wants.
@@ -152,5 +151,50 @@ private:
 
   Named named_;
 };
+
+/// \brief What a refused .NET call RETURNS: a value that refuses everything, and that carries the
+///        members AL reaches next in the same expression.
+///
+/// \note `Match.Groups.Item(i).Captures.Count` is one AL expression over four .NET members, and
+///       the transpiler names only the FIRST on the stub type; the rest hang off the result of a
+///       call it has already refused. So the result carries the members BCApps reaches that way
+///       (measured 2026-09-05 over the UT census), each a refusal of its own, and a name outside
+///       this list is a compile error naming the member -- which is the census's next entry.
+struct RefusedResult : Refused {
+  using Refused::Refused;
+  Refused Groups{{.type = "<result>", .member = "Groups"}};             ///< The chained member.
+  Refused Captures{{.type = "<result>", .member = "Captures"}};         ///< The chained member.
+  Refused Item{{.type = "<result>", .member = "Item"}};                 ///< The chained member.
+  Refused Result{{.type = "<result>", .member = "Result"}};             ///< The chained member.
+  Refused Name{{.type = "<result>", .member = "Name"}};                 ///< The chained member.
+  Refused Value{{.type = "<result>", .member = "Value"}};               ///< The chained member.
+  Refused Count{{.type = "<result>", .member = "Count"}};               ///< The chained member.
+  Refused Length{{.type = "<result>", .member = "Length"}};             ///< The chained member.
+  Refused Reference{{.type = "<result>", .member = "Reference"}};       ///< The chained member.
+  Refused LastChild{{.type = "<result>", .member = "LastChild"}};       ///< The chained member.
+  Refused FirstChild{{.type = "<result>", .member = "FirstChild"}};     ///< The chained member.
+  Refused WorkbookPart{{.type = "<result>", .member = "WorkbookPart"}}; ///< The chained member.
+  Refused Workbook{{.type = "<result>", .member = "Workbook"}};         ///< The chained member.
+  Refused Success{{.type = "<result>", .member = "Success"}};           ///< The chained member.
+  Refused Index{{.type = "<result>", .member = "Index"}};               ///< The chained member.
+  Refused Key{{.type = "<result>", .member = "Key"}};                   ///< The chained member.
+  Refused Keys{{.type = "<result>", .member = "Keys"}};                 ///< The chained member.
+  Refused Values{{.type = "<result>", .member = "Values"}};             ///< The chained member.
+  Refused Attributes{{.type = "<result>", .member = "Attributes"}};     ///< The chained member.
+  Refused InnerText{{.type = "<result>", .member = "InnerText"}};       ///< The chained member.
+  Refused OuterXml{{.type = "<result>", .member = "OuterXml"}};         ///< The chained member.
+  Refused ChildNodes{{.type = "<result>", .member = "ChildNodes"}};     ///< The chained member.
+  Refused ParentNode{{.type = "<result>", .member = "ParentNode"}};     ///< The chained member.
+  Refused Text{{.type = "<result>", .member = "Text"}};                 ///< The chained member.
+  Refused ToString{{.type = "<result>", .member = "ToString"}};         ///< The chained member.
+  Refused GetType{{.type = "<result>", .member = "GetType"}};           ///< The chained member.
+  Refused Equals{{.type = "<result>", .member = "Equals"}};             ///< The chained member.
+  Refused Dispose{{.type = "<result>", .member = "Dispose"}};           ///< The chained member.
+};
+
+template <typename... Arguments> RefusedResult Refused::operator()(Arguments &&...arguments) const {
+  (static_cast<void>(arguments), ...);
+  Throw();
+}
 
 }

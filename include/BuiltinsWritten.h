@@ -415,12 +415,16 @@ IsNull(const T &Variable) {
 /// \param Scope              The telemetry scope.
 /// \param CustomDimensions   The dimensions, as a dictionary.
 /// \note Telemetry has no sink here yet (board:0035), so the call is accepted and records nothing.
-inline void LogMessage(std::string_view EventId,
-                       std::string_view Message,
-                       ::agiru::Verbosity Verbosity,
-                       ::agiru::DataClassification DataClassification,
-                       ::agiru::TelemetryScope Scope,
-                       const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+/// \tparam K The dictionary's key type -- `Text<0>` from a generated variable, `std::string` from
+///           the door; both spell AL's `Text`.
+/// \tparam V The dictionary's value type.
+template <typename K, typename V>
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                ::agiru::Verbosity Verbosity,
+                ::agiru::DataClassification DataClassification,
+                ::agiru::TelemetryScope Scope,
+                const ::agiru::Dictionary<K, V> &CustomDimensions) {
   static_cast<void>(EventId);
   static_cast<void>(Message);
   static_cast<void>(Verbosity);
