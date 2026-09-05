@@ -70,6 +70,17 @@ struct RecordInVariant {
 /// \param b The other.
 /// \return Whether they refer to the same record.
 ///
+/// \brief A `RecordRef` a Variant refers to -- AL `Variant := RecRef` keeps the reference.
+struct RecordRefInVariant {
+  const class RecordRef *ref; ///< The RecordRef, which lives in the caller's variable.
+};
+
+/// \brief Compares two held RecordRefs by identity.
+/// \param a One. \param b The other. \return Whether they are the same RecordRef.
+[[nodiscard]] inline bool operator==(const RecordRefInVariant &a, const RecordRefInVariant &b) {
+  return a.ref == b.ref;
+}
+
 /// \note FREE AND NOT A MEMBER, so `RecordInVariant` stays an aggregate. A member `operator==`
 ///       makes it a class with behaviour, and its two data members then have to be private -- which
 ///       would buy accessors for a pair that IS the value.
@@ -180,7 +191,8 @@ public:
                             DateFormula,
                             Blob,
                             OrdinalInVariant,
-                            RecordInVariant>;
+                            RecordInVariant,
+                            RecordRefInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
@@ -241,6 +253,31 @@ public:
   Variant(E value)
       : held_(OrdinalInVariant{.ordinal = static_cast<std::int32_t>(value),
                                .values = MembersOf<E>()}) {}
+
+  /// \brief Holds a RecordRef by reference (`Variant := RecRef`).
+  /// \param ref The RecordRef.
+  Variant(const class RecordRef &ref) : held_(RecordRefInVariant{.ref = &ref}) {}
+
+  /// \brief AL `RecRef := Variant`: the RecordRef the Variant refers to.
+  /// \tparam T `RecordRef`, deduced at the assignment.
+  /// \return The RecordRef.
+  /// \throws Error when the Variant holds no RecordRef.
+  template <typename T>
+    requires std::same_as<T, class RecordRef>
+  operator T &() const {
+    const auto *held = std::get_if<RecordRefInVariant>(&held_);
+    if (held == nullptr) { throw Error("this Variant holds no RecordRef"); }
+    return const_cast<T &>(*held->ref); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  }
+
+  /// \brief Holds a record a codeunit keeps by handle (`Instance<T>`): the record behind it.
+  /// \tparam H The handle type.
+  /// \param handle The handle.
+  template <typename H>
+    requires requires(H &h) {
+      { *h } -> std::convertible_to<const Variant &>;
+    } && (!std::same_as<std::remove_cvref_t<H>, Variant>)
+  Variant(H &handle) : Variant(*handle) {}
 
   /// \brief Holds a record.
   ///

@@ -353,12 +353,12 @@ const std::map<std::string, std::string> &PlatformMembers(std::string_view table
 }
 
 bool PlatformFieldNamed(const PlatformField &wanted) {
-  return PlatformMembers(wanted.table).contains(LowerKey(std::string(wanted.field)));
+  return PlatformMembers(wanted.table).contains(LowerKey(Identifier(wanted.field)));
 }
 
 std::string PlatformFieldSpelling(const PlatformField &wanted) {
   const auto &declared = PlatformMembers(wanted.table);
-  const auto found = declared.find(LowerKey(std::string(wanted.field)));
+  const auto found = declared.find(LowerKey(Identifier(wanted.field)));
   return found == declared.end() ? std::string{} : found->second;
 }
 

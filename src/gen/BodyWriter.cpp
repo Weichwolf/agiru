@@ -650,7 +650,7 @@ private:
     if (expression.text != ":=" || expression.children.size() != 2) { return {}; }
     const al::Expr &target = expression.children.front();
     if (target.kind == al::ExprKind::Name && scope_.Resolve(target.text).empty() &&
-        DoorCalls(target.text)) {
+        DoorCalls(target.text) && !IsSystemFieldName(target.text)) {
       return AsTheDoorSpellsIt(Identifier(target.text)) + "(" +
              Expression(expression.children.back(), 0) + ")";
     }
@@ -677,6 +677,7 @@ private:
     bool arrow;
     bool parens;
     int precedence;
+    bool callee = false;
   };
 
   void Link(std::string &out, const Reach &reach, const How &how) {
@@ -689,9 +690,13 @@ private:
     }
     const bool andUnderOr = reach.spelling == "||" && reach.link.kind == al::ExprKind::Binary &&
                             reach.link.text == "and";
-    out += reach.spelling == "." && reach.link.kind == al::ExprKind::Name
-               ? scope_.MemberSpelling(
-                     OfVariable{.variable = reach.base.text, .field = reach.link.text})
+    const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
+    const bool procedureBesideAField =
+        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
+        reach.base.kind == al::ExprKind::Name && scope_.HasField(member);
+    out += procedureBesideAField ? Identifier(reach.link.text) + "_Proc"
+           : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
+               ? scope_.MemberSpelling(member)
            : andUnderOr ? "(" + Expression(reach.link, how.precedence + 1) + ")"
                         : Expression(reach.link, how.precedence + 1);
     if (how.parens && !IsSystemFieldName(reach.link.text)) { out += "()"; }
@@ -850,7 +855,8 @@ private:
            {.arrow = handle && i == chain.size(),
             .parens = calls != Parens::None && (calls == Parens::First || i == 1) &&
                       !(asCallee && i == 1),
-            .precedence = precedence});
+            .precedence = precedence,
+            .callee = asCallee && i == 1});
     }
     if (precedence < outer) { out = "(" + out + ")"; }
     return out;
@@ -1141,6 +1147,13 @@ public:
     for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
       if (where == nullptr || TypeName(where->type) != "Record") { continue; }
       const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
+      if (table == objects_.fieldEnums.end()) { break; }
+      const auto found = table->second.find(LowerKey(std::string(field.field)));
+      if (found != table->second.end()) { return found->second; }
+    }
+    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
+      const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
       if (table == objects_.fieldEnums.end()) { return {}; }
       const auto found = table->second.find(LowerKey(std::string(field.field)));
       return found == table->second.end() ? std::string{} : found->second;
@@ -1226,8 +1239,15 @@ public:
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
-    if (!IsRecord(field.variable)) { return {}; }
-    return Enumeration(field.field);
+    if (IsRecord(field.variable)) { return Enumeration(field.field); }
+    for (const al::VarDecl &where : page_.variables) {
+      if (!SameName(where.name, field.variable) || TypeName(where.type) != "Record") { continue; }
+      const auto table = objects_.fieldEnums.find(LowerKey(where.subtype));
+      if (table == objects_.fieldEnums.end()) { break; }
+      const auto found = table->second.find(LowerKey(std::string(field.field)));
+      if (found != table->second.end()) { return found->second; }
+    }
+    return {};
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {

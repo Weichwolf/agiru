@@ -365,6 +365,16 @@ concept IsAlArray = requires(T &array, ::agiru::Integer at) {
 
 }
 
+/// \brief AL `Round(Duration, Precision)`: a Duration is a number of milliseconds and rounds as
+/// one.
+/// \param number    The duration.
+/// \param precision The precision.
+/// \return The rounded milliseconds.
+template <std::same_as<::agiru::Duration> D>
+::agiru::Decimal Round(const D &number, const ::agiru::Decimal &precision) {
+  return ::agiru::Round(::agiru::Decimal{static_cast<std::int64_t>(number)}, precision);
+}
+
 template <typename T> void Clear(T &Variable) {
   if constexpr (requires { Variable.operator->(); } && requires { *Variable; }) {
     Clear(*Variable);

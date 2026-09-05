@@ -48,6 +48,10 @@ public:
   /// \return It.
   [[nodiscard]] constexpr Integer AsInteger() const { return code_; }
 
+  /// \brief AL `Integer := Char` -- a Char is its code where an Integer is asked for.
+  /// \return The code.
+  [[nodiscard]] constexpr operator std::int32_t() const { return code_; }
+
   /// \brief Compares two characters.
   /// \param o The other.
   /// \return How they order.

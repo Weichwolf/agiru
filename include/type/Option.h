@@ -125,6 +125,21 @@ public:
   /// \return The ordinal.
   [[nodiscard]] constexpr operator std::int32_t() const { return AsInteger(); }
 
+  /// \brief AL `Option += Integer` and `Option -= Integer`: an option is its ordinal under
+  ///        arithmetic, and the result stays an option.
+  /// \param by How far.
+  /// \return This.
+  template <std::integral I> constexpr Option &operator+=(I by) {
+    *this = FromInteger(AsInteger() + static_cast<std::int32_t>(by));
+    return *this;
+  }
+
+  /// \copydoc operator+=
+  template <std::integral I> constexpr Option &operator-=(I by) {
+    *this = FromInteger(AsInteger() - static_cast<std::int32_t>(by));
+    return *this;
+  }
+
   /// \brief Compares against a member of any enumeration.
   /// \tparam E The enumeration.
   /// \param value The member.

@@ -95,6 +95,17 @@ public:
     return *this;
   }
 
+  /// \brief AL `TempRec := Rec` between two records a codeunit holds by handle: the records
+  ///        assign, the handles stay.
+  /// \tparam U The other handle's record type.
+  /// \param other The other handle.
+  template <typename U>
+    requires(!std::same_as<U, T>)
+  Instance &operator=(Instance<U> &other) {
+    *operator->() = static_cast<U &>(other);
+    return *this;
+  }
+
   /// \brief Takes over another's instance.
   /// \param other The one to take from.
   Instance(Instance &&other) noexcept : held_(other.held_), free_(other.free_) {
