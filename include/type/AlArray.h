@@ -278,6 +278,14 @@ public:
   /// \return The character.
   [[nodiscard]] operator Char() const { return Read(); }
 
+  /// \brief Reads the character as its code point -- AL assigns `Text[i]` straight to an Integer.
+  /// \return The code point.
+  ///
+  /// \note IT SITS BESIDE THE ORDERING OVERLOADS AND NOT INSTEAD OF THEM. On its own it turned
+  ///       `Text[i] >= '0'` into a pointer comparison; with `<=>` present the character wins the
+  ///       comparison and this only carries the value where AL wants a number.
+  [[nodiscard]] operator std::int32_t() const { return static_cast<std::int32_t>(Read()); }
+
   /// \brief Compares the character standing there.
   /// \param other The other character.
   /// \return Whether they are the same.
