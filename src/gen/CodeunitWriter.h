@@ -16,6 +16,7 @@ struct TableRef {
   std::string header;
 
   std::map<std::string, std::string> fields;
+  std::map<std::string, std::string> procedures;
 };
 
 using TableIndex = std::map<std::string, TableRef>;

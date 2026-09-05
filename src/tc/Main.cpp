@@ -307,7 +307,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
                                .header = agiru::gen::OutputDirectory(
                                              object.nameSpace, agiru::gen::ObjectKind::Interface) +
                                          "/" + identifier + ".h",
-                               .fields = {}});
+                               .fields = {},
+                               .procedures = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -442,7 +443,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
                                .header = agiru::gen::PageHeaderPath(object),
-                               .fields = std::move(controlNames)});
+                               .fields = std::move(controlNames),
+                               .procedures = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -642,7 +644,8 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       }
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table),
-                                     .fields = std::move(fieldNames)};
+                                     .fields = std::move(fieldNames),
+                                     .procedures = {}};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.fieldEnums);
@@ -720,22 +723,60 @@ UnitTestPopulation UnitTestsIn(const std::string &source) {
   return found.tests != 0 ? found : UnitTestPopulation{};
 }
 
+std::map<std::string, std::string> DeclaredProcedures(std::string_view source) {
+  std::map<std::string, std::string> procedures;
+  static constexpr std::string_view kKeyword = "procedure";
+  for (std::size_t at = source.find(kKeyword); at != std::string_view::npos;
+       at = source.find(kKeyword, at + kKeyword.size())) {
+    const bool wordStart = at == 0 || std::isalnum(static_cast<unsigned char>(source[at - 1])) == 0;
+    std::size_t cursor = at + kKeyword.size();
+    if (!wordStart || cursor >= source.size() ||
+        std::isspace(static_cast<unsigned char>(source[cursor])) == 0) {
+      continue;
+    }
+    while (cursor < source.size() &&
+           std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
+      ++cursor;
+    }
+    std::string named;
+    if (cursor < source.size() && source[cursor] == '"') {
+      const std::size_t close = source.find('"', cursor + 1);
+      if (close == std::string_view::npos) { continue; }
+      named = std::string(source.substr(cursor + 1, close - cursor - 1));
+    } else {
+      std::size_t end = cursor;
+      while (end < source.size() &&
+             (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
+        ++end;
+      }
+      named = std::string(source.substr(cursor, end - cursor));
+    }
+    if (!named.empty()) {
+      procedures.emplace(agiru::gen::LowerKey(named), agiru::gen::Identifier(named));
+    }
+  }
+  return procedures;
+}
+
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
+    const std::string source = Read(path);
     const agiru::gen::ObjectDeclaration declared =
-        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Codeunit);
+        agiru::gen::DeclarationOf(source, agiru::gen::ObjectKind::Codeunit);
     if (!declared.found) { continue; }
     const std::string &name = declared.name;
     const std::string &nameSpace = declared.nameSpace;
 
     const std::string identifier = agiru::gen::Identifier(name);
+    const std::map<std::string, std::string> procedures = DeclaredProcedures(source);
     objects.codeunits.insert_or_assign(
         agiru::gen::LowerKey(name),
         agiru::gen::TableRef{
             .identifier = "codeunits::" + identifier,
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h",
-            .fields = {}});
+            .fields = {},
+            .procedures = std::move(procedures)});
   }
 }
 
@@ -752,7 +793,8 @@ void IndexReports(const Run &run, agiru::gen::Objects &objects) {
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Report) +
                 "/" + identifier + ".h",
-            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}}});
+            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
+            .procedures = {}});
   }
 }
 

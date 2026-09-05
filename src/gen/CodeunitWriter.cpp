@@ -937,6 +937,14 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
+    if (declared != nullptr && TypeName(declared->type) == "Codeunit" &&
+        !declared->subtype.empty()) {
+      const auto unit = objects_.codeunits.find(LowerKey(declared->subtype));
+      if (unit != objects_.codeunits.end()) {
+        const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
+        if (found != unit->second.procedures.end()) { return found->second; }
+      }
+    }
     if (declared != nullptr && !NamesAnObject(*declared)) {
       const std::string control = ControlNamed(*declared, member.field);
       return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
@@ -1439,7 +1447,10 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
-    const TableRef ref{.identifier = "platform::" + Identifier(name), .header = {}, .fields = {}};
+    const TableRef ref{.identifier = "platform::" + Identifier(name),
+                       .header = {},
+                       .fields = {},
+                       .procedures = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };

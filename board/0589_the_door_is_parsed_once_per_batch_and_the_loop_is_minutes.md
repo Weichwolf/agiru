@@ -49,3 +49,17 @@ unity batch does not already give for this tree's shape.
 
 `make` logs every build to `build/times.log`; `chain2.sh` logs the transpile there too.
 
+## Measured 2026-09-06, unity live
+
+`CMAKE_CXX_SCAN_FOR_MODULES` was on: every source got a second preprocessor pass for modules
+nobody uses, and CMake refuses to unity-batch a scanned source -- so `UNITY_BUILD` had been a
+line in CMakeLists and nothing in `build.ninja` for a day. With the scan off and groups keyed
+by app/module in buckets of 16:
+
+| step | before | after |
+|---|---:|---:|
+| full slice build, 440 sources | 984 s | **560 s** |
+| one source added to the slice (`settle.sh` round) | 30-120 s | **5 s** |
+
+The rule that came out of it stands in CLAUDE.md: a build option is proved by `build.ninja`.
+

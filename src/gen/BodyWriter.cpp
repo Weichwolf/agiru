@@ -34,7 +34,6 @@ struct Operator {
   int precedence;
 };
 
-constexpr int kConditionalPrecedence = 1;
 constexpr int kEqualityPrecedence = 3;
 constexpr int kComparisonPrecedence = 4;
 constexpr int kUnaryPrecedence = 8;
@@ -438,6 +437,11 @@ private:
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
     std::string known = scope_.Resolve(callee.text);
+    if (!known.empty() && !scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
+        scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
+        !IsAlTypeName(callee.text) && DoorCalls(callee.text)) {
+      return "::agiru::" + AsTheDoorSpellsIt(Identifier(callee.text));
+    }
     if (!known.empty() && scope_.IsVariable(callee.text) && DoorCalls(callee.text)) {
       const std::string rec = scope_.Resolve("Rec");
       if (!rec.empty()) { return rec + "." + AsTheDoorSpellsIt(Identifier(callee.text)); }
@@ -574,6 +578,7 @@ private:
     if (known.empty()) {
       const std::string_view builtin = BareBuiltin(expression.text);
       if (!builtin.empty()) { return std::string(builtin) + "()"; }
+      if (IsSystemFieldName(expression.text)) { return Identifier(expression.text); }
       if (scope_.MemberIsCall(OfVariable{.variable = "Rec", .field = expression.text})) {
         return Identifier(expression.text) + "()";
       }
@@ -863,11 +868,11 @@ private:
   }
 
   std::string Conditional(const al::Expr &expression, int outer) {
-    std::string out = Expression(expression.children[0], kConditionalPrecedence + 1) + " ? " +
-                      Expression(expression.children[1], 0) + " : " +
-                      Expression(expression.children[2], kConditionalPrecedence);
-    if (kConditionalPrecedence < outer) { out = "(" + out + ")"; }
-    return out;
+    static_cast<void>(outer);
+    const std::string whenTrue = Expression(expression.children[1], 0);
+    return "[&]() -> decltype(" + whenTrue + ") { if (" + Expression(expression.children[0], 0) +
+           ") { return " + whenTrue + "; } return " + Expression(expression.children[2], 0) +
+           "; }()";
   }
 
   std::string Expression(const al::Expr &expression, int outer) {

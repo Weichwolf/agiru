@@ -9,6 +9,9 @@ cmake_minimum_required(VERSION 3.28)
 project(agiru CXX)
 
 set(CMAKE_CXX_STANDARD 23)
+# NO MODULE SCANNING: nothing here is a C++20 module, the scan is a second preprocessor pass over
+# every translation unit, and CMake refuses to unity-batch a scanned source (board:0589).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -137,7 +140,9 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
     # whole list shift whenever a source enters the middle, and every batch after it recompiles;
     # a group keyed by directory and rank keeps a new source's cost to its own bucket
     # (board:0589).
-    get_filename_component(slice_dir "${line}" DIRECTORY)
+    # The group key is the source's app and module (`base/sales`), not its leaf directory: a leaf
+    # holds two or three slice sources on average and amortises the door parse over as few.
+    string(REGEX REPLACE "^([^/]+/[^/]+).*$" "\\1" slice_dir "${line}")
     string(MAKE_C_IDENTIFIER "${slice_dir}" slice_dir_id)
     if(NOT DEFINED slice_rank_${slice_dir_id})
       set(slice_rank_${slice_dir_id} 0)
