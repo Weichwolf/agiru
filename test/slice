@@ -102,3 +102,8 @@ base/pricing/source/enum/PriceSourceType.cpp
 base/inventory/counting/document/table/PhysInvtOrderHeader.cpp
 tests/core/codeunit/PriceSourceUT.cpp
 tests/core/codeunit/PhysInvtOrderTABUT.cpp
+system/system/utilities/table/RegexOptions.cpp
+base/pricing/price_list/table/PriceListLine.cpp
+base/pricing/worksheet/table/PriceWorksheetLine.cpp
+tests/core/codeunit/PriceListLineUT.cpp
+tests/core/codeunit/PriceWorksheetLineUT.cpp
