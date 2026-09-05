@@ -1129,10 +1129,11 @@ public:
         return !field && DoorCalls(member.field);
       }
     }
-    if (local != nullptr &&
-        (TypeName(local->type) == "Page" || TypeName(local->type) == "TestPage" ||
-         TypeName(local->type) == "TestRequestPage")) {
-      const auto page = objects_.pages.find(LowerKey(local->subtype));
+    const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
+    if (held != nullptr &&
+        (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
+         TypeName(held->type) == "TestRequestPage")) {
+      const auto page = objects_.pages.find(LowerKey(held->subtype));
       const bool control = page != objects_.pages.end() &&
                            page->second.fields.contains(LowerKey(std::string(member.field)));
       return !control && DoorCalls(member.field);
