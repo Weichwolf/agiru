@@ -13,6 +13,10 @@
 
 namespace agiru {
 
+/// \brief The runtime's table traits, declared here so a handle can constrain on them.
+/// \tparam T The record's class.
+template <typename T> struct TableTraits;
+
 /// \brief WHY AN EVENT PUBLISHER'S BODY IS EMPTY, AND WHY ITS PARAMETERS HAVE NO NAMES.
 ///
 /// A procedure marked `[IntegrationEvent]` or `[BusinessEvent]` is a PUBLISHER. AL gives it an
@@ -107,8 +111,14 @@ public:
   ///
   /// \note TEMPORARINESS IS NOT PART OF THE VALUE. The assignment copies the FIELDS, and the
   ///       left-hand side stays as temporary as it was declared.
+  ///
+  /// \warning THE CONSTRAINT NAMES ONLY `U`, NEVER `T`. A constraint that asked whether `T`
+  ///          derives from `U` is checked when the CONTAINING class declares its own copy
+  ///          assignment, and at that point `T` is often only forward-declared -- which is a hard
+  ///          error inside `std::is_base_of` rather than a substitution failure (measured
+  ///          2026-09-05 over eight tables).
   template <typename U>
-    requires(!std::same_as<U, T> && std::is_base_of_v<U, T>)
+    requires(!std::same_as<U, T>) && requires { ::agiru::TableTraits<U>::kTable; }
   Instance &operator=(const U &value) {
     static_cast<U &>(*operator->()) = value;
     return *this;
