@@ -1374,8 +1374,8 @@ public:
   /// \param member The field.
   /// \param from   The lower bound.
   /// \param to     The upper bound.
-  template <typename Field, typename Value>
-  void SetRange(const Field &member, const Value &from, const Value &to) {
+  template <typename Field, typename From, typename To>
+  void SetRange(const Field &member, const From &from, const To &to) {
     detail::Narrow(State(),
                    NumberOf(&member),
                    detail::Literally(FilterText(from)) + ".." + detail::Literally(FilterText(to)));

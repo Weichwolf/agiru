@@ -1237,11 +1237,24 @@ private:
 };
 
 namespace {
+bool MentionsXRec(const std::string &body) {
+  for (std::size_t at = body.find("XRec"); at != std::string::npos;
+       at = body.find("XRec", at + 1)) {
+    const bool before = at > 0 && (std::isalnum(static_cast<unsigned char>(body[at - 1])) != 0 ||
+                                   body[at - 1] == '_');
+    const std::size_t after = at + 4;
+    const bool behind =
+        after < body.size() &&
+        (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
+    if (!before && !behind) { return true; }
+  }
+  return false;
+}
+
 std::string BindsBefore(const std::string &body, const std::string &identifier) {
-  return body.find("XRec") == std::string::npos
-             ? std::string{}
-             : "  tables::" + identifier + " &XRec = detail::Before<tables::" + identifier +
-                   ">();\n\n";
+  return !MentionsXRec(body) ? std::string{}
+                             : "  tables::" + identifier +
+                                   " &XRec = detail::Before<tables::" + identifier + ">();\n\n";
 }
 }
 

@@ -77,6 +77,17 @@ public:
   ///       runtime instead of at the AL line that wrote it.
   [[nodiscard]] std::string ToText() const { Throw(); }
 
+  /// \brief AL `-Query.Column`, `not Query.Column`: a unary operator on a refused member refuses
+  ///        the same way, when it is reached.
+  /// \return Never.
+  [[noreturn]] Refused operator-() const { Throw(); }
+
+  /// \copydoc operator-
+  [[noreturn]] Refused operator!() const { Throw(); }
+
+  /// \copydoc operator-
+  [[noreturn]] Refused operator+() const { Throw(); }
+
   /// \brief Refuses to state a declared length, which `MaxStrLen` asks of anything text-like.
   /// \return Never.
   /// \throws Error always.

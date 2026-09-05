@@ -444,3 +444,4 @@ system/system/utilities/codeunit/TempBlobImpl.cpp
 base/finance/general_ledger/setup/table/GeneralLedgerSetup.cpp
 base/sales/receivables/table/CustLedgerEntry.cpp
 base/finance/currency/table/CurrencyExchangeRate.cpp
+base/purchases/vendor/table/Vendor.cpp

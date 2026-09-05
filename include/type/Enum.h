@@ -106,6 +106,20 @@ public:
   /// \brief The zero ordinal.
   constexpr Enum() = default;
 
+  /// \brief AL `for Value := A to B do` over an enumeration steps by ordinal.
+  /// \return This, one ordinal further.
+  constexpr Enum &operator++() {
+    *this = FromInteger(AsInteger() + 1);
+    return *this;
+  }
+
+  /// \brief The step down.
+  /// \return This, one ordinal back.
+  constexpr Enum &operator--() {
+    *this = FromInteger(AsInteger() - 1);
+    return *this;
+  }
+
   /// \brief Holds a named value.
   ///
   /// \param value The value.

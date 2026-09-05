@@ -80,6 +80,20 @@ public:
   /// \brief The zero ordinal.
   constexpr Option() = default;
 
+  /// \brief AL `for Value := A to B do` over an enumeration steps by ordinal.
+  /// \return This, one ordinal further.
+  constexpr Option &operator++() {
+    *this = FromInteger(AsInteger() + 1);
+    return *this;
+  }
+
+  /// \brief The step down.
+  /// \return This, one ordinal back.
+  constexpr Option &operator--() {
+    *this = FromInteger(AsInteger() - 1);
+    return *this;
+  }
+
   /// \brief Holds an ordinal.
   ///
   /// \param ordinal The zero-based member number.

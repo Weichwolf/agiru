@@ -1166,16 +1166,19 @@ std::string Locals(const al::ProcedureDecl &procedure,
   const auto local = [&body](const std::string &) {
     return body.empty() ? std::string{} : std::string("[[maybe_unused]] ");
   };
-  if (!procedure.returnName.empty()) {
-    out += "  " + unused(Identifier(procedure.returnName)) + Returns(procedure, objects) + " " +
-           Identifier(procedure.returnName) + "{};\n";
-  }
   std::set<std::string> names = shadowed;
   for (const al::VarDecl &declared : procedure.variables) {
     names.insert(Identifier(declared.name));
   }
   for (const al::LabelDecl &label : procedure.labels) { names.insert(Identifier(label.name)); }
   if (!procedure.returnName.empty()) { names.insert(Identifier(procedure.returnName)); }
+  if (!procedure.returnName.empty()) {
+    out +=
+        "  " + unused(Identifier(procedure.returnName)) +
+        (Hidden(Returns(procedure, objects), names) ? Qualified(Returns(procedure, objects), names)
+                                                    : Returns(procedure, objects)) +
+        " " + Identifier(procedure.returnName) + "{};\n";
+  }
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
     if (Hidden(type, names)) { type = Qualified(type, names); }
