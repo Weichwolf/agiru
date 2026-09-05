@@ -1362,15 +1362,48 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    return IsRecord(member.variable) && DoorCalls(member.field) &&
-           FieldNamed(*source_, member.field) == nullptr;
+    if (IsRecord(member.variable)) {
+      return DoorCalls(member.field) && FieldNamed(*source_, member.field) == nullptr;
+    }
+    if (SameName("CurrPage", member.variable)) {
+      return DoorCalls(member.field) && ControlOf(member.field).empty();
+    }
+    const auto *fields = FieldsOfRecord(member.variable);
+    return fields != nullptr && DoorCalls(member.field) &&
+           !fields->contains(LowerKey(std::string(member.field)));
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (SameName("CurrPage", member.variable)) {
+      const std::string control = ControlOf(member.field);
+      return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
+    }
+    if (const auto *fields = FieldsOfRecord(member.variable); fields != nullptr) {
+      const auto field = fields->find(LowerKey(std::string(member.field)));
+      return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
+    }
     if (!IsRecord(member.variable) || FieldNamed(*source_, member.field) != nullptr) {
       return Identifier(member.field);
     }
     return AsTheDoorSpellsIt(member.field);
+  }
+
+  [[nodiscard]] std::string ControlOf(std::string_view name) const {
+    const auto page = objects_.pages.find(LowerKey(page_.name));
+    if (page == objects_.pages.end()) { return {}; }
+    const auto found = page->second.fields.find(LowerKey(std::string(name)));
+    return found == page->second.fields.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] const std::map<std::string, std::string> *
+  FieldsOfRecord(std::string_view variable) const {
+    for (const al::VarDecl &declared : page_.variables) {
+      if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") { continue; }
+      const auto table = objects_.tables.find(LowerKey(declared.subtype));
+      if (table == objects_.tables.end()) { return nullptr; }
+      return &table->second.fields;
+    }
+    return nullptr;
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {

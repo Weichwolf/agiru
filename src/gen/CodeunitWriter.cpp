@@ -864,7 +864,9 @@ public:
   }
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
-    if (LowerKey(std::string(variable)) == "rec") { return !TableNoOf(unit_).empty(); }
+    if (LowerKey(std::string(variable)) == "rec") {
+      return !TableNoOf(unit_).empty() || !SubtypeOfRecord(variable).empty();
+    }
     const al::VarDecl *declared = Declaration(variable);
     return declared != nullptr && TypeName(declared->type) == "Record";
   }
@@ -893,7 +895,8 @@ public:
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
-    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
+                                        LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
@@ -943,7 +946,8 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
-    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
+                                        LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
     if (subtype.empty()) { return false; }
@@ -969,7 +973,8 @@ public:
       const std::string control = ControlNamed(*declared, member.field);
       return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
     }
-    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
+                                        LowerKey(std::string(member.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(member.variable);
     if (subtype.empty()) {
