@@ -50,6 +50,11 @@ constexpr std::array kRefused{
 
 constexpr std::array kRefusedValue{
     std::pair{std::string_view{"scope"}, std::string_view{"onprem"}},
+    std::pair{std::string_view{"tabletype"}, std::string_view{"crm"}},
+    std::pair{std::string_view{"tabletype"}, std::string_view{"cds"}},
+    std::pair{std::string_view{"tabletype"}, std::string_view{"externalsql"}},
+    std::pair{std::string_view{"tabletype"}, std::string_view{"exchange"}},
+    std::pair{std::string_view{"tabletype"}, std::string_view{"microsoftgraph"}},
 };
 
 }

@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <stdexcept>
 #include <string>
@@ -137,6 +138,56 @@ public:
   /// \param b Right operand.
   /// \return The quotient.
   friend Decimal operator/(Decimal a, const Decimal &b) { return a /= b; }
+
+  /// \brief AL `Integer := Decimal` -- rounds to the nearest whole number, 5 away from zero, the
+  ///        way `Round(Value, 1)` does (`system-round-method.md`, board:0582).
+  /// \return The rounded value as an Integer.
+  /// \note THE MIXED OPERATORS BELOW EXIST BECAUSE OF THIS CONVERSION: without them `Decimal / int`
+  ///       is ambiguous between `Decimal / Decimal` and `int / int`, which is how the first attempt
+  ///       was refuted. An exact overload for each integral operand settles the overload set.
+  operator std::int32_t() const;
+
+  /// \brief Mixed arithmetic with an integral operand, exact so the conversion above cannot
+  /// compete.
+  template <std::integral I> friend Decimal operator+(Decimal a, I b) { return a += Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator-(Decimal a, I b) { return a -= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator*(Decimal a, I b) { return a *= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator/(Decimal a, I b) { return a /= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator+(I a, const Decimal &b) {
+    return Decimal{a} + b;
+  }
+
+  template <std::integral I> friend Decimal operator-(I a, const Decimal &b) {
+    return Decimal{a} - b;
+  }
+
+  template <std::integral I> friend Decimal operator*(I a, const Decimal &b) {
+    return Decimal{a} * b;
+  }
+
+  template <std::integral I> friend Decimal operator/(I a, const Decimal &b) {
+    return Decimal{a} / b;
+  }
+
+  template <std::integral I> Decimal &operator+=(I o) { return *this += Decimal{o}; }
+
+  template <std::integral I> Decimal &operator-=(I o) { return *this -= Decimal{o}; }
+
+  template <std::integral I> Decimal &operator*=(I o) { return *this *= Decimal{o}; }
+
+  template <std::integral I> Decimal &operator/=(I o) { return *this /= Decimal{o}; }
+
+  template <std::integral I> [[nodiscard]] std::strong_ordering operator<=>(I o) const {
+    return *this <=> Decimal{o};
+  }
+
+  template <std::integral I> [[nodiscard]] bool operator==(I o) const {
+    return *this == Decimal{o};
+  }
 
   /// \brief Orders by value rather than by representation, so `1.50` equals `1.5`.
   /// \param o The other value.

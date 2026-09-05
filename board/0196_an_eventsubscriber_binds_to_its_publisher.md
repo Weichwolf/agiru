@@ -59,3 +59,9 @@ false and is SKIPPED when it is true.
 
 **The negative control is the skip pair** -- they must differ. A dispatcher that always runs the
 subscriber passes the first case and proves nothing about the flags.
+
+## Measured 2026-09-05, by the attribute census the transpiler now prints on every run
+
+**3 794 `[EventSubscriber]` declarations in the read roots, and the generator acts on none of
+them** -- `attributes acted on 4 of 28 kind(s)`; the four are the three publisher kinds and
+`Test`. The count is printed under board:0190 and may only fall.

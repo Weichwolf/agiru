@@ -65,6 +65,18 @@ enum class FieldType : std::uint8_t {
 ///
 /// \note `offset` is what lets the runtime reach a field by number without a virtual call and
 ///       without a map, and it is why a generated record must be standard-layout.
+/// \brief AL's `TableType` values, `devenv-tabletype-property.md`, in the order the page lists
+/// them.
+enum class TableType : std::uint8_t {
+  Normal,
+  CRM,
+  CDS,
+  ExternalSQL,
+  Exchange,
+  MicrosoftGraph,
+  Temporary,
+};
+
 struct FieldDef {
   FieldNo no{};               ///< The AL field number.
   std::string_view name{};    ///< The AL name, spaces and all: `"Work Type Code"`.
@@ -273,9 +285,10 @@ struct TableDef {
   std::span<const FieldDef> fields{}; ///< Every declared field, in declaration order.
   std::span<const KeyDef> keys{};     ///< Every declared key; `keys[0]` is the primary key.
 
-  /// \brief The `TableType` property, as AL wrote it: `Normal`, `Temporary`, `CRM`, `ExternalSQL`
-  ///        or `MicrosoftGraph`. Only `Normal` is storage as this tree knows it. 237 declarations.
-  std::string_view tableType{};
+  /// \brief The `TableType` property. `Normal` is a relation; `Temporary` is an in-memory row set
+  ///        (board:0032) and gets a relation until that exists; the external kinds are refused by
+  ///        the transpiler because they name a database this tree does not have (board:0364).
+  TableType tableType = TableType::Normal;
 
   /// \brief The `DataPerCompany` property: whether each company gets its own rows.
   bool dataPerCompany = true;
@@ -296,9 +309,9 @@ struct TableDef {
   /// \brief The `CompressionType` property, as AL wrote it (board:0373).
   std::string_view compressionType{};
 
-  /// \brief The `DataCaptionFields` property, as AL wrote it: the fields a record's caption is
-  ///        built from, in order (board:0374).
-  std::string_view dataCaptionFields{};
+  /// \brief The `DataCaptionFields` property: the fields a record's caption is built from, by
+  ///        number and in declaration order; empty where the primary key stands in (board:0374).
+  std::span<const FieldNo> dataCaptionFields{};
 
   /// \brief The `MovedFrom` and `MovedTo` properties, as AL wrote them: the app id an object came
   ///        from or went to (board:0357).

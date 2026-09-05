@@ -388,6 +388,17 @@ public:
   /// \throws Error with the platform's own wording when the field holds its zero.
   void TestField() const;
 
+  /// \brief AL `FieldRef.TestField(Any)` -- `fieldref-testfield-*-method.md`, one page per type:
+  ///        raises unless the field holds exactly the expected value.
+  /// \tparam V Any value type a Variant can hold.
+  /// \param Expected The value the field must hold.
+  /// \throws Error naming the field, the way `Record.TestField(Field, Value)` does.
+  template <typename V> void TestField(const V &Expected) const {
+    if (!(Value() == ::agiru::Variant(Expected))) {
+      throw Error(std::string(Name()) + " must be equal to '" + ::agiru::AsText(Expected) + "'");
+    }
+  }
+
 private:
   void *record_ = nullptr;
   const TableDef *table_ = nullptr;

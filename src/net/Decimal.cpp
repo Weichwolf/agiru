@@ -6,6 +6,7 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -412,6 +413,18 @@ Decimal Round(const Decimal &number, const Decimal &precision, RoundDirection di
 
   const Decimal result = steps * p;
   return number.IsNegative() ? -result : result;
+}
+
+Decimal::operator std::int32_t() const {
+  const Decimal whole = Round(*this, Decimal{std::int64_t{1}}, RoundDirection::Nearest);
+  U128 units = whole.units_;
+  for (std::uint8_t digit = 0; digit < whole.scale_; ++digit) { units /= 10; }
+  constexpr U128 kLimit = static_cast<U128>(std::numeric_limits<std::int32_t>::max());
+  if (units > kLimit + (whole.negative_ ? 1 : 0)) {
+    throw DecimalError(ToInvariantString() + " does not fit an Integer");
+  }
+  const auto magnitude = static_cast<std::int64_t>(units);
+  return static_cast<std::int32_t>(whole.negative_ ? -magnitude : magnitude);
 }
 
 }

@@ -12,6 +12,7 @@
 #include "Token.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -533,6 +534,18 @@ std::string ClassConstants(const al::TableObject &table) {
     out += "}};\n";
   }
 
+  if (const al::Property *caption = Find(table.properties, "DataCaptionFields");
+      caption != nullptr) {
+    const std::vector<std::string> names = CommaSeparatedNames(caption->text);
+    out += "  static constexpr std::array<" + Reach(table, "FieldNo", "FieldNo") + ", " +
+           std::to_string(names.size()) + "> kDataCaptionFields{{";
+    for (std::size_t f = 0; f < names.size(); ++f) {
+      if (f != 0) { out += ", "; }
+      out += "Field_No::" + FieldIdentifier(table, names[f]);
+    }
+    out += "}};\n";
+  }
+
   if (!table.labels.empty()) { out += "\n"; }
   for (const al::LabelDecl &label : table.labels) {
     out += "  static constexpr std::string_view " + label.name + "{" + Literal(label.text) + "};\n";
@@ -689,16 +702,29 @@ TableHeader WriteHeader(const al::TableObject &declared,
     return found == nullptr ? std::string{} : found->text;
   };
   const std::string kind = property("TableType");
-  if (!kind.empty()) { out += "    .tableType = " + Literal(kind) + ",\n"; }
+  if (!kind.empty()) {
+    static constexpr std::array kTableTypes{
+        "Normal", "CRM", "CDS", "ExternalSQL", "Exchange", "MicrosoftGraph", "Temporary"};
+    const auto spelled = std::ranges::find_if(
+        kTableTypes, [&](const char *name) { return LowerKey(name) == LowerKey(kind); });
+    out += "    .tableType = TableType::" +
+           (spelled == kTableTypes.end() ? kind : std::string(*spelled)) + ",\n";
+  }
   const std::string perCompany = property("DataPerCompany");
   if (LowerKey(perCompany) == "false") { out += "    .dataPerCompany = false,\n"; }
   const std::string replicate = property("ReplicateData");
   if (LowerKey(replicate) == "false") { out += "    .replicateData = false,\n"; }
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
-        std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"},
-        std::pair<std::string_view, std::string_view>{"DataCaptionFields", "dataCaptionFields"},
-        std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
+        std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"}}) {
+    const std::string said = property(name);
+    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
+  }
+  if (!property("DataCaptionFields").empty()) {
+    out += "    .dataCaptionFields = " + tableIdentifier + "::kDataCaptionFields,\n";
+  }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
         std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"},
         std::pair<std::string_view, std::string_view>{"AllowInCustomizations",
                                                       "allowInCustomizations"}}) {

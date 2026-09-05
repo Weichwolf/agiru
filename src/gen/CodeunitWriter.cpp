@@ -578,7 +578,9 @@ void ReachTableNo(const al::CodeunitObject &unit,
 void Reaching(const al::VarDecl &declared, const Objects &objects, std::set<std::string> &headers) {
   const std::string kind = TypeName(declared.type);
   const bool whole = kind == "Interface" && !declared.subtype.empty();
-  if (!whole && (!NamesAnObject(declared) || HandleMember(declared))) { return; }
+  if (!whole && (!NamesAnObject(declared) || (HandleMember(declared) && !declared.temporary))) {
+    return;
+  }
   const TableRef *ref = Reach(declared, objects);
   if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
 }

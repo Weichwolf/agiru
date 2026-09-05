@@ -242,7 +242,25 @@ struct Gathered {
   agiru::gen::DotNetUse dotnet;
   agiru::gen::DotNetUse absent;
   std::vector<agiru::gen::RefusedProperty> refused;
+  std::map<std::string, std::size_t> attributes;
 };
+
+constexpr std::array kActedOnAttributes{
+    std::string_view{"businessevent"},
+    std::string_view{"integrationevent"},
+    std::string_view{"internalevent"},
+    std::string_view{"test"},
+    std::string_view{"transactionmodel"},
+};
+
+template <typename Object>
+void CountAttributes(const Object &unit, std::map<std::string, std::size_t> &into) {
+  for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
+    for (const std::string &attribute : procedure.attributes) {
+      ++into[agiru::gen::LowerKey(attribute.substr(0, attribute.find('(')))];
+    }
+  }
+}
 
 void Absorb(std::vector<agiru::gen::RefusedProperty> &into,
             const std::vector<agiru::gen::RefusedProperty> &from) {
@@ -459,6 +477,7 @@ void WritePages(Run &run,
     const agiru::gen::PageHeader written =
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
     Absorb(gathered.refused, agiru::gen::Refused(pages.objects[i]));
+    CountAttributes(pages.objects[i], gathered.attributes);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
     const std::filesystem::path header = agiru::gen::PageHeaderPath(pages.objects[i]);
@@ -554,6 +573,7 @@ void WriteTable(Run &run,
       agiru::gen::Identifier(table.name);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   Absorb(gathered.refused, agiru::gen::Refused(table));
+  CountAttributes(table, gathered.attributes);
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
@@ -784,6 +804,7 @@ void ScanCodeunits(Run &run,
     }
     counts.tests += tests;
     if (population.files != 0) { counts.unitParsed += tests; }
+    CountAttributes(*unit, gathered.attributes);
     if (run.output.empty()) { continue; }
     try {
       const std::string relative = std::filesystem::relative(path, run.root).string();
@@ -1095,6 +1116,23 @@ int Scan(const Job &job) {
     for (const agiru::gen::RefusedProperty &found : gathered.refused) {
       std::println("          {} in {}", found.property, found.where);
     }
+  }
+  {
+    std::size_t dropped = 0;
+    std::vector<std::pair<std::string, std::size_t>> ranked;
+    for (const auto &[name, count] : gathered.attributes) {
+      if (std::ranges::find(kActedOnAttributes, name) != kActedOnAttributes.end()) { continue; }
+      dropped += count;
+      ranked.emplace_back(name, count);
+    }
+    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    std::println("attributes acted on {} of {} kind(s) declared; {} declaration(s) of {} kind(s) "
+                 "are read and dropped (board:0190)",
+                 gathered.attributes.size() - ranked.size(),
+                 gathered.attributes.size(),
+                 dropped,
+                 ranked.size());
+    for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
   }
   ReportUnresolved("extension(s)", "object(s) no app declares", orphans);
   if (allCodeunits.emitted != 0) {

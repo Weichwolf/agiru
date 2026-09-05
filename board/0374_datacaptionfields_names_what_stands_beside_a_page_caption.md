@@ -8,7 +8,7 @@ Class:    activation
 
 # `DataCaptionFields` names what stands beside a page caption
 
-**The metadata half is done:** carried as `TableDef::dataCaptionFields`, the text AL wrote; the span and the caption remain.
+**The metadata half is done:** carried as `TableDef::dataCaptionFields`, a `std::span<const FieldNo>` resolved by the generator (2026-09-05); the caption rule per page type remains.
 
 
 > Sets the fields that appear **to the left of the caption** on pages that display the contents of
