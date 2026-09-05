@@ -94,6 +94,17 @@ private:
   void (*free_)(void *);
 };
 
+/// \brief AL lets a caller hand an EXPRESSION to a publisher's `var` parameter -- `CurrFieldNo()`
+///        into `var CurrFieldNo: Integer` -- because the publisher's own body is empty and a
+///        subscriber that writes it writes a copy. This gives the expression an address for the
+///        length of the call.
+/// \tparam T The value's type.
+/// \param value The expression's value.
+/// \return A reference to it.
+template <typename T> T &Materialised(T &&value) {
+  return static_cast<T &>(value);
+}
+
 namespace detail {
 
 /// \brief Dispatches one event to every bound subscriber, in subscriber-codeunit order.

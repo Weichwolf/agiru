@@ -363,6 +363,26 @@ public:
     throw Error("FieldRef.SetFilter(Text, Any) is declared and not implemented yet (board:0035)");
   }
 
+  /// \brief AL `FieldRef.SetFilter(Text, Any, Any, ...)` -- the filter text with its `%1`
+  ///        substitutions, any number of them.
+  /// \tparam Values The substituted values.
+  /// \param String The filter, with placeholders.
+  /// \param Value1 The first value.
+  /// \param Value2 The second.
+  /// \param rest   Any more.
+  template <typename... Values>
+  void SetFilter(std::string_view String,
+                 const ::agiru::Variant &Value1,
+                 const ::agiru::Variant &Value2,
+                 const Values &...rest) const {
+    static_cast<void>(Value1);
+    static_cast<void>(Value2);
+    (static_cast<void>(rest), ...);
+    throw Error("FieldRef.SetFilter(Text, Any, Any, ...) is declared and not implemented yet "
+                "(board:0035): " +
+                std::string(String));
+  }
+
   /// \brief AL `FieldRef.SetRange(Any, Any)`. Sets a simple filter on a field, such as a single
   /// range or a single value.
   /// \param FromValue The AL `Any`.

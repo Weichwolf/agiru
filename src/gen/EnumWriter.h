@@ -13,6 +13,7 @@ struct EnumRef {
   std::string identifier;
   std::string header;
   std::map<std::string, int> ordinals;
+  std::map<std::string, std::string> members;
 };
 
 using EnumIndex = std::map<std::string, EnumRef>;

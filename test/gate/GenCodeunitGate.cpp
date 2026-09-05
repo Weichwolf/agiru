@@ -49,7 +49,8 @@ agiru::gen::Objects Tables() {
   objects.enums.insert_or_assign("sales line type",
                                  agiru::gen::EnumRef{.identifier = "SalesLineType",
                                                      .header = "SalesLineType.h",
-                                                     .ordinals = {}});
+                                                     .ordinals = {},
+                                                     .members = {}});
   return objects;
 }
 

@@ -25,3 +25,16 @@ Enum, temporal literals, the shadow check, XRec, the platform spellings) took 42
 
 The settle loop (`settle.sh`) reaches them one at a time as the loader asks; this item holds
 the list so each fix is a class and not a file.
+
+## 2026-09-06, after four rounds
+
+Of the 36, **16 compile** after: the bare system field as a member, `_Proc` for a called member
+beside a field of its name (and only for a PROCEDURE -- a door method beside a field calls
+`Table<X>::` explicitly), a codeunit member call folded to its declared spelling through a
+procedure map read from the text, an enum member folded to its declared spelling, a publisher's
+`var` parameter taking an expression (`Materialised`), `Option += Integer`, a field named like a
+free builtin yielding the call, `SecurityFiltering::Ignored` scoped through the method. What is
+left: `GenericDictionary2` (the stub census), an XMLport (board:0065), `AllObjWithCaption`
+(board:0032), the tautological Option comparison, board:0586's option types, and a handful of
+one-file shapes the settle loop names as it reaches them.
+

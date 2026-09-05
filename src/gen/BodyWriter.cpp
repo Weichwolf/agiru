@@ -297,8 +297,8 @@ private:
     return {};
   }
 
-  static std::string AsOption(const std::string &enumeration, std::string_view member) {
-    const std::string member_ = EnumeratorName(member);
+  std::string AsOption(const std::string &enumeration, std::string_view member) const {
+    const std::string member_ = scope_.EnumMember(enumeration, member);
     if (!enumeration.starts_with("::agiru::")) {
       const bool isEnum = enumeration.starts_with("enums::") || enumeration.contains("::enums::");
       return std::string(isEnum ? "::agiru::Enum<" : "::agiru::Option<") + enumeration + ">{" +
@@ -440,7 +440,7 @@ private:
     if (!known.empty() && !scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
         HiddenByABaseMember(callee.text)) {
-      return "this->Table<" + scope_.ThisTable() +
+      return "this->::agiru::Table<::agiru::app::tables::" + scope_.ThisTable() +
              ">::" + AsTheDoorSpellsIt(Identifier(callee.text));
     }
     if (!known.empty() && !scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
@@ -503,8 +503,22 @@ private:
         holder = owner;
       }
     }
+    const std::vector<bool> publisherVars = callee.kind == al::ExprKind::Name
+                                                ? scope_.VarParametersOfPublisher(callee.text)
+                                                : std::vector<bool>{};
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
+      const al::Expr &argument = expression.children[i];
+      const bool named =
+          argument.kind == al::ExprKind::Name &&
+          (!scope_.Resolve(argument.text).empty() || IsSystemFieldName(argument.text) ||
+           SameName(argument.text, "Rec") || SameName(argument.text, "xRec"));
+      const bool lvalue = named || argument.kind == al::ExprKind::Index ||
+                          (argument.kind == al::ExprKind::Binary && argument.text == ".");
+      if (i - 1 < publisherVars.size() && publisherVars[i - 1] && !lvalue) {
+        out += "::agiru::Materialised(" + Expression(argument, 0) + ")";
+        continue;
+      }
       const bool isField =
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
       if (isField && expression.children[i].kind == al::ExprKind::Name &&
@@ -586,6 +600,11 @@ private:
       if (!builtin.empty()) { return std::string(builtin) + "()"; }
       if (IsSystemFieldName(expression.text)) { return Identifier(expression.text); }
       if (scope_.MemberIsCall(OfVariable{.variable = "Rec", .field = expression.text})) {
+        if (!scope_.ThisTable().empty() && HiddenByABaseMember(expression.text) &&
+            scope_.HasField(OfVariable{.variable = "Rec", .field = expression.text})) {
+          return "this->::agiru::Table<::agiru::app::tables::" + scope_.ThisTable() +
+                 ">::" + AsTheDoorSpellsIt(Identifier(expression.text)) + "()";
+        }
         return Identifier(expression.text) + "()";
       }
     }
@@ -702,10 +721,21 @@ private:
     const bool andUnderOr = reach.spelling == "||" && reach.link.kind == al::ExprKind::Binary &&
                             reach.link.text == "and";
     const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
-    const bool procedureBesideAField =
+    const bool calledBesideAField =
         how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
         reach.base.kind == al::ExprKind::Name && scope_.HasField(member);
-    out += procedureBesideAField ? Identifier(reach.link.text) + "_Proc"
+    std::string besideAField;
+    if (calledBesideAField) {
+      besideAField = scope_.ProcedureOf(member);
+      if (besideAField.empty() && HiddenByABaseMember(reach.link.text)) {
+        const std::string table = scope_.TableOf(reach.base.text);
+        if (!table.empty()) {
+          besideAField = "::agiru::Table<::agiru::app::tables::" + table +
+                         ">::" + AsTheDoorSpellsIt(Identifier(reach.link.text));
+        }
+      }
+    }
+    out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(member)
            : andUnderOr ? "(" + Expression(reach.link, how.precedence + 1) + ")"
@@ -990,6 +1020,54 @@ public:
 
   [[nodiscard]] std::string ThisTable() const override { return Identifier(table_.name); }
 
+  [[nodiscard]] std::string ProcedureOf(const OfVariable &member) const override {
+    if (IsRecord(member.variable)) {
+      for (const al::ProcedureDecl &procedure : table_.procedures) {
+        if (SameName(procedure.name, member.field)) {
+          return ProcedureIdentifier(table_, procedure.name);
+        }
+      }
+      return {};
+    }
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
+      const auto table = objects_.tables.find(LowerKey(where->subtype));
+      if (table == objects_.tables.end()) { break; }
+      const auto found = table->second.procedures.find(LowerKey(std::string(member.field)));
+      return found == table->second.procedures.end() ? std::string{} : found->second;
+    }
+    return {};
+  }
+
+  [[nodiscard]] std::string TableOf(std::string_view variable) const override {
+    if (IsRecord(variable)) { return Identifier(table_.name); }
+    for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
+      const auto table = objects_.tables.find(LowerKey(where->subtype));
+      if (table == objects_.tables.end()) { break; }
+      const std::string &id = table->second.identifier;
+      return id.starts_with("tables::") ? id.substr(8) : std::string{};
+    }
+    return {};
+  }
+
+  [[nodiscard]] std::string EnumMember(std::string_view enumeration,
+                                       std::string_view member) const override {
+    return DeclaredEnumMember(objects_, enumeration, member);
+  }
+
+  [[nodiscard]] std::vector<bool> VarParametersOfPublisher(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : table_.procedures) {
+      if (!SameName(procedure.name, name) || !IsPublisher(procedure)) { continue; }
+      std::vector<bool> vars;
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        vars.push_back(parameter.byReference);
+      }
+      return vars;
+    }
+    return {};
+  }
+
   [[nodiscard]] bool MembersAreCalls(std::string_view variable) const override {
     const al::VarDecl *declared = Local(variable);
     if (declared == nullptr) { declared = Global(variable); }
@@ -1151,6 +1229,16 @@ public:
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Codeunit" || where->subtype.empty()) {
+        continue;
+      }
+      const auto unit = objects_.codeunits.find(LowerKey(where->subtype));
+      if (unit == objects_.codeunits.end()) { break; }
+      const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
+      if (found != unit->second.procedures.end()) { return found->second; }
+      break;
+    }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       const auto field = fields->find(LowerKey(std::string(member.field)));
       return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
@@ -1195,6 +1283,11 @@ private:
 
 class PageNames : public Names {
 public:
+  [[nodiscard]] std::string EnumMember(std::string_view enumeration,
+                                       std::string_view member) const override {
+    return DeclaredEnumMember(objects_, enumeration, member);
+  }
+
   PageNames(const al::PageObject &page, const al::TableObject *source, const Objects &objects)
       : page_(page), source_(source), objects_(objects) {}
 

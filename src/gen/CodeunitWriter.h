@@ -127,6 +127,9 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
 
 [[nodiscard]] std::string BodyIncludes(const std::string &text, const Objects &objects);
 
+[[nodiscard]] std::string
+DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::string_view member);
+
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
                              const std::vector<al::ProcedureDecl> &procedures,
                              const Objects &objects);

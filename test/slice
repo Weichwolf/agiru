@@ -463,3 +463,4 @@ foundation/foundation/no_series/table/NoSeriesRelationship.cpp
 base/inventory/ledger/table/ItemLedgerEntry.cpp
 base/manufacturing/capacity/table/CapacityLedgerEntry.cpp
 base/manufacturing/family/table/Family.cpp
+base/sales/document/table/SalesHeader.cpp

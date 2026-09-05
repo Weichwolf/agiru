@@ -916,6 +916,23 @@ public:
     return Declaration(name) != nullptr;
   }
 
+  [[nodiscard]] std::string EnumMember(std::string_view enumeration,
+                                       std::string_view member) const override {
+    return DeclaredEnumMember(objects_, enumeration, member);
+  }
+
+  [[nodiscard]] std::vector<bool> VarParametersOfPublisher(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : unit_.procedures) {
+      if (!SameName(procedure.name, name) || !IsPublisher(procedure)) { continue; }
+      std::vector<bool> vars;
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        vars.push_back(parameter.byReference);
+      }
+      return vars;
+    }
+    return {};
+  }
+
   [[nodiscard]] bool ReturnsAHandle(std::string_view procedure) const override {
     for (const al::ProcedureDecl &declared : unit_.procedures) {
       if (LowerKey(declared.name) == LowerKey(std::string(procedure))) {
@@ -1353,6 +1370,25 @@ bool IdentifierChar(char c) {
   return (std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '_';
 }
 
+}
+
+std::string
+DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::string_view member) {
+  static const Objects *cachedFor = nullptr;
+  static std::size_t cachedSize = 0;
+  static std::unordered_map<std::string, const EnumRef *> byIdentifier;
+  if (cachedFor != &objects || cachedSize != objects.enums.size()) {
+    byIdentifier.clear();
+    for (const auto &[key, ref] : objects.enums) {
+      byIdentifier.emplace("enums::" + ref.identifier, &ref);
+    }
+    cachedFor = &objects;
+    cachedSize = objects.enums.size();
+  }
+  const auto found = byIdentifier.find(std::string(enumeration));
+  if (found == byIdentifier.end()) { return EnumeratorName(member); }
+  const auto spelled = found->second->members.find(LowerKey(std::string(member)));
+  return spelled == found->second->members.end() ? EnumeratorName(member) : spelled->second;
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {

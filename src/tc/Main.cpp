@@ -545,13 +545,17 @@ void ScanEnums(
 
   for (const agiru::al::EnumObject &object : objects) {
     std::map<std::string, int> ordinals;
+    std::map<std::string, std::string> members;
     for (const agiru::al::EnumValueDecl &value : object.values) {
       ordinals.insert_or_assign(agiru::gen::LowerKey(value.name), value.ordinal);
+      members.insert_or_assign(agiru::gen::LowerKey(value.name),
+                               agiru::gen::EnumeratorName(value.name));
     }
     index.insert_or_assign(agiru::gen::LowerKey(object.name),
                            agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
                                                .header = agiru::gen::EnumHeaderPath(object),
-                                               .ordinals = std::move(ordinals)});
+                                               .ordinals = std::move(ordinals),
+                                               .members = std::move(members)});
   }
   if (run.output.empty()) { return; }
   held.objects = std::move(objects);
@@ -642,10 +646,15 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
       for (const agiru::SystemFieldDecl &field : agiru::kSystemFields) {
         fieldNames.emplace(agiru::gen::LowerKey(std::string(field.name)), std::string(field.name));
       }
+      std::map<std::string, std::string> procedureNames;
+      for (const agiru::al::ProcedureDecl &procedure : table.procedures) {
+        procedureNames.emplace(agiru::gen::LowerKey(procedure.name),
+                               agiru::gen::ProcedureIdentifier(table, procedure.name));
+      }
       const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
                                      .header = TableHeaderPath(table),
                                      .fields = std::move(fieldNames),
-                                     .procedures = {}};
+                                     .procedures = std::move(procedureNames)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.fieldEnums);

@@ -68,7 +68,8 @@ void AnEnumInitValueResolvesThroughTheEnumIndex() {
   enums.insert_or_assign("gate answer",
                          agiru::gen::EnumRef{.identifier = "GateAnswer",
                                              .header = "GateAnswer.h",
-                                             .ordinals = {{"yes", 0}, {"no", 10}}});
+                                             .ordinals = {{"yes", 0}, {"no", 10}},
+                                             .members = {}});
   const std::string text = Emitted(R"(table 90001 "Gate"
 {
     fields

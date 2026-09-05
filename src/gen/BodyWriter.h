@@ -76,6 +76,27 @@ public:
 
   [[nodiscard]] virtual std::string ThisTable() const { return {}; }
 
+  [[nodiscard]] virtual std::string ProcedureOf(const OfVariable &member) const {
+    static_cast<void>(member);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::string TableOf(std::string_view variable) const {
+    static_cast<void>(variable);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::string EnumMember(std::string_view enumeration,
+                                               std::string_view member) const {
+    static_cast<void>(enumeration);
+    return EnumeratorName(member);
+  }
+
+  [[nodiscard]] virtual std::vector<bool> VarParametersOfPublisher(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
   [[nodiscard]] virtual bool IsVariable(std::string_view name) const {
     static_cast<void>(name);
     return false;
