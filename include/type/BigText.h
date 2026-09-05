@@ -37,13 +37,13 @@ public:
   /// \param String The AL `BigText`.
   /// \param Position The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AddText(const ::agiru::BigText &String, ::agiru::Integer Position);
+  void AddText(const ::agiru::BigText &String, ::agiru::Integer Position = {});
 
   /// \brief AL `BigText.AddText(Text, Integer)`. Adds a text string to a BigText variable.
   /// \param String The AL `Text`.
   /// \param Position The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AddText(std::string_view String, ::agiru::Integer Position);
+  void AddText(std::string_view String, ::agiru::Integer Position = {});
 
   /// \brief AL `BigText.GetSubText(BigText, Integer, Integer)`. Gets part of a BigText variable.
   /// \param Variable The AL `BigText`.
@@ -52,7 +52,7 @@ public:
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer
-  GetSubText(::agiru::BigText &Variable, ::agiru::Integer Position, ::agiru::Integer Length);
+  GetSubText(::agiru::BigText &Variable, ::agiru::Integer Position, ::agiru::Integer Length = {});
 
   /// \brief AL `BigText.GetSubText(Text, Integer, Integer)`. Gets part of a BigText variable.
   /// \param Variable The AL `Text`.
@@ -61,7 +61,7 @@ public:
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer
-  GetSubText(::agiru::Text<0> &Variable, ::agiru::Integer Position, ::agiru::Integer Length);
+  GetSubText(::agiru::Text<0> &Variable, ::agiru::Integer Position, ::agiru::Integer Length = {});
 
   /// \brief AL `BigText.Length()`. Retrieves the length of the text stored in this BigText
   /// instance.

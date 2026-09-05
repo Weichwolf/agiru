@@ -47,3 +47,25 @@ a temporary record passed to a `var ... temporary` parameter binds and inserts i
 and `Count()` on the caller's table afterwards is unchanged. The negative control is the second half
 -- a design that makes the parameter `T &` and keeps the store in the derived class passes the
 first and writes the temporary's rows to the database in the second.
+
+## The shape, read from the tree 2026-09-05
+
+- `Table<Derived>` already delegates every data method to `detail::Runtime*(Self(), kTable, ...)`
+  over a type-erased `RecordState` behind `StateHandle`, which costs eight bytes until the record
+  filters (board:0018). **The store goes there**: a `RecordState::temporary` that is null for a
+  database record, so the guard is one pointer test at the top of each `Runtime*` and the class
+  half of the record never changes shape.
+- **A row is the field block by image.** The layout is `constexpr` (`State_Block` at offset 0,
+  every `FieldDef::offset` beside it), so the store copies `kTable.size` bytes and compares keys
+  and filters by `FieldDef::type` -- the comparison the cursor's marks already use, not a typed
+  `ByKey<T>`.
+- `Temporary<T>` shrinks to a constructor that installs the store, plus copy/move/`Copy(from,
+  true)` sharing it; the twelve shadowing methods in `include/runtime/Table.h:1651-1800` go. A
+  `Temporary<T>` then IS a `T` whose state says so, which is what `record-istemporary-method.md`
+  says a temporary record is.
+- **The generator emits `T &` for a `var X: Record "T" temporary` parameter** and `Temporary<T>`
+  only for a declaration. The six census errors and the `Temporary<platform::Integer>` case are
+  that one emission.
+- Filters and `SetCurrentKey` over the store: sort and filter on `FindSet`, cached on the store's
+  `version` (`include/runtime/Table.h:1569`) -- which the typed store never did, so `SetRange` on a
+  temporary record was silently ignored until now. That is the activation this carries.

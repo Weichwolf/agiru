@@ -88,7 +88,7 @@ public:
   /// \param NewLength The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Length(::agiru::Integer NewLength);
+  ::agiru::Integer Length(::agiru::Integer NewLength = {});
 
   /// \brief AL `TextBuilder.MaxCapacity()`. Gets the maximum capacity of this TextBuilder instance.
   /// \return The AL `Integer`.

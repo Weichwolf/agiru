@@ -207,4 +207,22 @@ template <typename S>
   return static_cast<Char>(static_cast<unsigned char>(text[static_cast<std::size_t>(index) - 1]));
 }
 
+/// \brief AL `ArrayLen(A, Dimension)` -- the length along ONE dimension of a nested array.
+///
+/// \tparam T The element type, itself an `AlArray` for every dimension past the first.
+/// \tparam N The outermost length.
+/// \param array     The array.
+/// \param dimension Which dimension, ONE-BASED as AL counts them.
+/// \return The length along it.
+/// \throws Error when the dimension exceeds what the declaration has, which is what AL raises.
+template <typename T, std::size_t N>
+[[nodiscard]] constexpr Integer ArrayLen(const AlArray<T, N> &array, Integer dimension) {
+  if (dimension <= 1) { return array.Length(); }
+  if constexpr (requires(const T &inner) { ArrayLen(inner, dimension); }) {
+    return ArrayLen(At(array, 1), dimension - 1);
+  } else {
+    throw Error("ArrayLen: dimension " + std::to_string(dimension) + " of a one-dimensional array");
+  }
+}
+
 }

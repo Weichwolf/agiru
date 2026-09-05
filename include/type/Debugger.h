@@ -92,7 +92,8 @@ public:
   /// \param NewIsEnabled The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean EnableSqlTrace(::agiru::Integer SessionID, ::agiru::Boolean NewIsEnabled);
+  static ::agiru::Boolean EnableSqlTrace(::agiru::Integer SessionID,
+                                         ::agiru::Boolean NewIsEnabled = {});
 
   /// \brief AL `Debugger.GetLastErrorText()`. Gets the last error that occurred in the debugger.
   /// \return The AL `Text`.

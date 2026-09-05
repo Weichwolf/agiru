@@ -238,6 +238,19 @@ public:
     }
   Variant(const R &record) : held_(RecordInVariant{.record = &record, .table = R::kId}) {}
 
+  /// \brief AL `Rec := Variant` -- reads as the record the Variant refers to.
+  ///
+  /// \tparam R The generated table class the assignment target is, recognised by its `kId`.
+  /// \return The record, which the target then copies.
+  /// \throws Error when the Variant holds no record, or one of another table.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  operator const R &() const {
+    return AsRecord<R>();
+  }
+
   /// \brief The record this Variant refers to.
   ///
   /// \tparam R The generated table class expected.

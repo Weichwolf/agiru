@@ -309,6 +309,13 @@ public:
     return AsInteger() == static_cast<std::int32_t>(o);
   }
 
+  /// \brief Orders against a bare member of its own enumeration -- `Status <= Status::InProgress`.
+  /// \param value The member.
+  /// \return The ordering of the ordinals.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(E value) const {
+    return AsInteger() <=> static_cast<std::int32_t>(value);
+  }
+
   template <std::same_as<Option> O>
   [[nodiscard]] constexpr std::strong_ordering operator<=>(const O &o) const {
     return AsInteger() <=> o.AsInteger();

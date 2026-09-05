@@ -55,6 +55,11 @@ public:
     return Identifier(member.field);
   }
 
+  [[nodiscard]] virtual bool HasField(const OfVariable &member) const {
+    static_cast<void>(member);
+    return false;
+  }
+
   [[nodiscard]] virtual bool MemberIsCall(const OfVariable &member) const {
     return MembersAreCalls(member.variable);
   }

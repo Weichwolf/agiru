@@ -345,6 +345,10 @@ private:
                "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
       }
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
+        const std::string table = scope_.ObjectNamed("tables", expression.text);
+        if (table.starts_with("absent::")) {
+          return "::agiru::AbsentObjectId(\"" + expression.text + "\")";
+        }
         return "tables::" + Identifier(expression.text) + "::kId.Value()";
       }
     }
@@ -468,7 +472,10 @@ private:
       const bool isField =
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
       if (isField && expression.children[i].kind == al::ExprKind::Name &&
-          scope_.Resolve(expression.children[i].text).empty()) {
+          (scope_.Resolve(expression.children[i].text).empty() ||
+           (holder != nullptr && holder->kind == al::ExprKind::Name &&
+            scope_.HasField(
+                OfVariable{.variable = holder->text, .field = expression.children[i].text})))) {
         out += receiver + reach;
         out += holder != nullptr && holder->kind == al::ExprKind::Name
                    ? scope_.MemberSpelling(
@@ -598,6 +605,11 @@ private:
         return Parens::First;
       }
       return YieldsADoorType(base) ? Parens::First : Parens::None;
+    }
+    if (base.kind == al::ExprKind::Index && !base.children.empty() &&
+        base.children.front().kind == al::ExprKind::Name &&
+        scope_.MembersAreCalls(base.children.front().text)) {
+      return Parens::First;
     }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
     if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
@@ -902,6 +914,11 @@ public:
     if (running_ == nullptr) { return {}; }
     if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
+  }
+
+  [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    const auto *fields = FieldsOf(member.variable);
+    return fields != nullptr && fields->contains(LowerKey(std::string(member.field)));
   }
 
   [[nodiscard]] const std::map<std::string, std::string> *

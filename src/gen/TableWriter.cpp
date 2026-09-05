@@ -103,6 +103,32 @@ std::string FieldIdentifier(const al::TableObject &table, const std::string &nam
 
 namespace {
 
+std::string Trim(std::string_view text) {
+  const auto first = text.find_first_not_of(" \t");
+  if (first == std::string_view::npos) { return {}; }
+  return std::string(text.substr(first, text.find_last_not_of(" \t") - first + 1));
+}
+
+std::vector<std::string> CommaSeparatedNames(std::string_view text) {
+  std::vector<std::string> names;
+  std::string current;
+  bool quoted = false;
+  for (const char c : text) {
+    if (c == '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (c == ',' && !quoted) {
+      names.push_back(Trim(current));
+      current.clear();
+      continue;
+    }
+    current += c;
+  }
+  if (!Trim(current).empty()) { names.push_back(Trim(current)); }
+  return names;
+}
+
 std::string KeyArrayName(std::size_t position) {
   return "kKey" + std::to_string(position + 1);
 }
@@ -495,6 +521,16 @@ std::string ClassConstants(const al::TableObject &table) {
       out += "Field_No::" + FieldIdentifier(table, table.keys[i].fields[f]);
     }
     out += "}};\n";
+    const al::Property *sums = Find(table.keys[i].properties, "SumIndexFields");
+    if (sums == nullptr) { continue; }
+    const std::vector<std::string> names = CommaSeparatedNames(sums->text);
+    out += "  static constexpr std::array<" + Reach(table, "FieldNo", "FieldNo") + ", " +
+           std::to_string(names.size()) + "> " + KeyArrayName(i) + "Sums{{";
+    for (std::size_t f = 0; f < names.size(); ++f) {
+      if (f != 0) { out += ", "; }
+      out += "Field_No::" + FieldIdentifier(table, names[f]);
+    }
+    out += "}};\n";
   }
 
   if (!table.labels.empty()) { out += "\n"; }
@@ -630,7 +666,9 @@ TableHeader WriteHeader(const al::TableObject &declared,
            "::" + KeyArrayName(i) +
            ", .clustered = " + (said("Clustered", false) ? "true" : "false");
     if (!said("Enabled", true)) { out += ", .enabled = false"; }
-    if (sums != nullptr) { out += ", .sumIndexFields = " + Literal(sums->text); }
+    if (sums != nullptr) {
+      out += ", .sumIndexFields = " + tableIdentifier + "::" + KeyArrayName(i) + "Sums";
+    }
     if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
     if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
     if (said("Unique", false)) { out += ", .unique = true"; }

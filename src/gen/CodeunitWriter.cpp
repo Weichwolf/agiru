@@ -811,6 +811,16 @@ public:
     return !table->second.fields.contains(LowerKey(std::string(member.field)));
   }
 
+  [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
+                                    ? TableNoOf(unit_)
+                                    : SubtypeOfRecord(member.variable);
+    if (subtype.empty()) { return false; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    return table != objects_.tables.end() &&
+           table->second.fields.contains(LowerKey(std::string(member.field)));
+  }
+
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
     if (declared != nullptr && !NamesAnObject(*declared)) {

@@ -41,7 +41,7 @@ public:
   /// \param SetContent The AL `HttpContent`.
   /// \return The AL `HttpContent`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::HttpContent Content(const ::agiru::HttpContent &SetContent);
+  ::agiru::HttpContent Content(const ::agiru::HttpContent &SetContent = {});
 
   /// \brief AL `HttpRequestMessage.GetCookie(Text, Cookie)`. Gets the specified cookie given a
   /// name.

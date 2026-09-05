@@ -77,10 +77,10 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId,
                                   ::agiru::Integer FailureCodeunitId,
-                                  ::agiru::Boolean IsReady,
-                                  std::string_view Company,
-                                  ::agiru::DateTime NotBefore,
-                                  ::agiru::RecordId RecordID);
+                                  ::agiru::Boolean IsReady = {},
+                                  std::string_view Company = {},
+                                  ::agiru::DateTime NotBefore = {},
+                                  ::agiru::RecordId RecordID = {});
 
   /// \brief AL `TaskScheduler.SetTaskReady(Guid, DateTime)`. Sets a task that runs a codeunit to
   /// the ready state. The task will not run unless it is in the ready state.
@@ -88,7 +88,7 @@ public:
   /// \param NotBefore The AL `DateTime`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean SetTaskReady(::agiru::Guid Task, ::agiru::DateTime NotBefore);
+  static ::agiru::Boolean SetTaskReady(::agiru::Guid Task, ::agiru::DateTime NotBefore = {});
 
   /// \brief AL `TaskScheduler.TaskExists(Guid)`. Checks whether a specific task exists.
   /// \param Task The AL `Guid`.

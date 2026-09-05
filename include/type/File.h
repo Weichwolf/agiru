@@ -190,7 +190,8 @@ public:
   /// \param Time The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time);
+  static ::agiru::Boolean
+  SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time = {});
 
   /// \brief AL `File.TextMode(Boolean)`. Sets whether a file should be opened as an ASCII file or a
   /// binary file. Gets the current setting of this option for a file.
@@ -260,7 +261,8 @@ public:
   /// \param AllowDownloadAndPrint The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean View(std::string_view FromFile, ::agiru::Boolean AllowDownloadAndPrint);
+  static ::agiru::Boolean View(std::string_view FromFile,
+                               ::agiru::Boolean AllowDownloadAndPrint = {});
 
   /// \brief AL `File.ViewFromStream(InStream, Text, Boolean)`. Opens a file from the server on the
   /// client computer in preview mode. The client computer is defined as the machine running the
@@ -272,7 +274,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Boolean ViewFromStream(const ::agiru::InStream &InStream,
                                          std::string_view FileName,
-                                         ::agiru::Boolean AllowDownloadAndPrint);
+                                         ::agiru::Boolean AllowDownloadAndPrint = {});
 
   /// \brief AL `File.Write(BigInteger)`. Writes to an MS-DOS encoded file or binary file.
   /// \param Value The AL `BigInteger`.

@@ -27,6 +27,21 @@ has none. `scripts/door.py` emits a class member per documented signature and ne
 `void AddText(std::string_view String, ::agiru::Integer Position);` -- and the AL the BaseApp
 actually writes, `MyBigText.AddText('ABCDEFG')`, does not compile.
 
+## Done 2026-09-05: the class half gets its defaults from the syntax blocks
+
+A sweep over `include/type/*.h` pairs every `\brief AL \`T.M(...)\`` line with the doc page whose
+parameter types match, reads `door.parse`'s `required`, and appends ` = {}` to the optional tail.
+**97 declarations defaulted, 137 skipped** -- and the skips are the remaining finding:
+
+| skipped because | count | what settles it |
+|---|---:|---|
+| no doc page matches the brief's types | most | the brief was hand-written; the pair is by NAME and the sweep folds nothing else |
+| a SHORTER overload of the same method exists | 15 | a default beside a shorter overload is an ambiguity; `Contains(Text, DataScope)` beside `Contains(Text)` |
+| the optional parameter is `var` | 2 | a reference has no `{}`; AL's `Dialog.Error(Text, var Variant)` wants an overload without it |
+
+`= {}` is the zero of the type and NOT the documented default -- see the table below; the VALUE
+half stays open per method, and the pointer for `Round` stays as described.
+
 ## What the references say
 
 Each page states the omitted parameter's behaviour, and it is never "pass a zero":

@@ -231,8 +231,9 @@ struct KeyDef {
   /// \brief The `Enabled` property: a disabled key is declared and NOT maintained as an index.
   bool enabled = true;
 
-  /// \brief The `SumIndexFields` property, as AL wrote it: what the SIFT aggregate sums.
-  std::string_view sumIndexFields{};
+  /// \brief The `SumIndexFields` property: the fields the SIFT aggregate sums, by number and in
+  ///        declaration order. Empty on a key that declares none.
+  std::span<const FieldNo> sumIndexFields{};
 
   /// \brief The `MaintainSiftIndex` property: whether the aggregate is stored or computed.
   bool maintainSiftIndex = true;

@@ -67,7 +67,7 @@ public:
   /// \brief AL `ErrorInfo.AddNavigationAction(Text)`. Adds a navigation action for the error.
   /// \param Caption The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AddNavigationAction(std::string_view Caption);
+  void AddNavigationAction(std::string_view Caption = {});
 
   /// \brief AL `ErrorInfo.AddNavigationAction(Text, Text)`. Adds a navigation action for the error.
   /// \param Caption The AL `Text`.
@@ -246,7 +246,7 @@ public:
   /// \param RecordId The AL `RecordId`.
   /// \return The AL `RecordId`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::RecordId RecordId(::agiru::RecordId RecordId);
+  ::agiru::RecordId RecordId(::agiru::RecordId RecordId = {});
 
   /// \brief AL `ErrorInfo.SystemId(Guid)`. Specifies the system ID of the record that the error
   /// relates to.

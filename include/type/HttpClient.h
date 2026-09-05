@@ -42,13 +42,14 @@ public:
   /// \param Certificate The AL `SecretText`.
   /// \param Password The AL `SecretText`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AddCertificate(const ::agiru::SecretText &Certificate, const ::agiru::SecretText &Password);
+  void AddCertificate(const ::agiru::SecretText &Certificate,
+                      const ::agiru::SecretText &Password = {});
 
   /// \brief AL `HttpClient.AddCertificate(Text, Text)`. Adds a certificate to the HttpClient class.
   /// \param Certificate The AL `Text`.
   /// \param Password The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AddCertificate(std::string_view Certificate, std::string_view Password);
+  void AddCertificate(std::string_view Certificate, std::string_view Password = {});
 
   /// \brief AL `HttpClient.Clear()`. Sets the HttpClient variable to the default value.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -174,7 +175,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean UseWindowsAuthentication(const ::agiru::SecretText &UserName,
                                             const ::agiru::SecretText &Password,
-                                            const ::agiru::SecretText &Domain);
+                                            const ::agiru::SecretText &Domain = {});
 
   /// \brief AL `HttpClient.UseWindowsAuthentication(Text, Text, Text)`. Sets the HttpClient
   /// credentials to use the specified network credentials for Windows authentication. If this
@@ -186,7 +187,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean UseWindowsAuthentication(std::string_view UserName,
                                             std::string_view Password,
-                                            std::string_view Domain);
+                                            std::string_view Domain = {});
 };
 
 }

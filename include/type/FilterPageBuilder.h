@@ -40,7 +40,7 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean
-  AddField(std::string_view Name, const ::agiru::FieldRef &Field, std::string_view Filter);
+  AddField(std::string_view Name, const ::agiru::FieldRef &Field, std::string_view Filter = {});
 
   /// \brief AL `FilterPageBuilder.AddField(Text, Any, Text)`. Adds a table field to the filter
   /// control for a table on filter page.
@@ -50,7 +50,7 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean
-  AddField(std::string_view Name, const ::agiru::Variant &Field, std::string_view Filter);
+  AddField(std::string_view Name, const ::agiru::Variant &Field, std::string_view Filter = {});
 
   /// \brief AL `FilterPageBuilder.AddFieldNo(Text, Integer, Text)`. Adds a table field to the
   /// filter control for a table on the filter page.
@@ -60,7 +60,7 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean
-  AddFieldNo(std::string_view Name, ::agiru::Integer FieldNo, std::string_view Filter);
+  AddFieldNo(std::string_view Name, ::agiru::Integer FieldNo, std::string_view Filter = {});
 
   /// \brief AL `FilterPageBuilder.AddRecord(Text, Record)`. Adds a filter control for a table to a
   /// filter page. The table is specified by a record data type variable that is passed to the
@@ -101,7 +101,7 @@ public:
   /// \param UseNames The AL `Boolean`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetView(std::string_view Name, ::agiru::Boolean UseNames);
+  std::string GetView(std::string_view Name, ::agiru::Boolean UseNames = {});
 
   /// \brief AL `FilterPageBuilder.Name(Integer)`. Gets the name of a table filter control that is
   /// included on a filter page based on an index number that is assigned to the filter control.
