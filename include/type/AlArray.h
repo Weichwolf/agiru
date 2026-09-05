@@ -207,6 +207,23 @@ template <typename Container, typename Index>
   return container[index];
 }
 
+/// \brief AL `X[i, j, ...]` -- a multidimensional array, indexed one dimension at a time.
+/// \tparam Container The array's type.
+/// \tparam Index     The first index's type.
+/// \tparam Rest      The remaining indices' types.
+/// \param container The array.
+/// \param index     The first index, one-based.
+/// \param rest      The remaining indices, one-based.
+/// \return What sits there, as a reference, so `X[i, j] := v` assigns.
+///
+/// \note AL DECLARES `array[10, 4] of Decimal` AS ONE TYPE and indexes it with one bracket; the
+///       runtime nests one `AlArray` per dimension, so the indices peel off one at a time.
+template <typename Container, typename Index, typename... Rest>
+  requires(sizeof...(Rest) > 0)
+[[nodiscard]] decltype(auto) At(Container &container, Index index, Rest... rest) {
+  return At(container[index], rest...);
+}
+
 /// \brief AL `Text[Index]` -- one character of a string value, one-based.
 /// \tparam S A `Text` or `Code`.
 /// \param value The string.
@@ -215,6 +232,102 @@ template <typename Container, typename Index>
 /// \throws Error when the position is outside the string, which is what AL raises.
 /// \note THE GENERATOR SPELLS EVERY INDEX AS `At(...)`, because AL's `[]` reaches arrays and
 ///       strings alike; this is the string half of that one spelling.
+/// \brief One character POSITION of a text, which AL both reads and writes.
+///
+/// \note AL ASSIGNS INTO A TEXT BY POSITION -- `DateFormulaAsText[I] := '-'` is 61 call sites in
+///       the BaseApp -- so an index that returned the character BY VALUE would compile and throw
+///       the assignment away. This stands in for the position itself: it reads as a `Char` and
+///       takes a `Char`, a one-character text or a code point.
+template <typename S> class CharAt {
+public:
+  /// \brief Names a position in a text.
+  /// \param value The text. \param index The one-based position.
+  CharAt(S &value, Integer index) : value_(&value), index_(index) {}
+
+  /// \brief AL `Text[Index] := Char`.
+  /// \param character The character.
+  /// \return This position.
+  CharAt &operator=(Char character) {
+    Write(static_cast<char>(static_cast<std::int32_t>(character)));
+    return *this;
+  }
+
+  /// \brief AL `Text[Index] := 'x'` -- a one-character text.
+  /// \param text The text, whose first character is written.
+  /// \return This position.
+  /// \throws Error when the text is not exactly one character, which is what AL raises.
+  CharAt &operator=(std::string_view text) {
+    if (text.size() != 1) {
+      throw Error("A text of length " + std::to_string(text.size()) +
+                  " does not fit one character position");
+    }
+    Write(text.front());
+    return *this;
+  }
+
+  /// \brief AL `Text[Index] := Integer` -- a code point.
+  /// \param code The code point.
+  /// \return This position.
+  CharAt &operator=(std::int32_t code) {
+    Write(static_cast<char>(code));
+    return *this;
+  }
+
+  /// \brief Reads the character standing there.
+  /// \return The character.
+  [[nodiscard]] operator Char() const { return Read(); }
+
+  /// \brief Reads the character as its code point, which is what a comparison against a number
+  ///        needs.
+  /// \return The code point.
+  [[nodiscard]] operator std::int32_t() const { return static_cast<std::int32_t>(Read()); }
+
+  /// \brief Compares the character standing there.
+  /// \param other The other character.
+  /// \return Whether they are the same.
+  [[nodiscard]] bool operator==(Char other) const { return Read() == other; }
+
+  /// \brief Compares against a one-character text, which is how AL writes a character literal.
+  /// \param text The text.
+  /// \return Whether they are the same.
+  [[nodiscard]] bool operator==(std::string_view text) const { return Read() == text; }
+
+private:
+  [[nodiscard]] Char Read() const {
+    const std::string_view text = value_->Value();
+    Check(text.size());
+    return static_cast<Char>(
+        static_cast<unsigned char>(text[static_cast<std::size_t>(index_) - 1]));
+  }
+
+  void Write(char character) {
+    std::string text(value_->Value());
+    Check(text.size());
+    text[static_cast<std::size_t>(index_) - 1] = character;
+    *value_ = std::string_view(text);
+  }
+
+  void Check(std::size_t length) const {
+    if (index_ < 1 || static_cast<std::size_t>(index_) > length) {
+      throw Error("Index " + std::to_string(index_) + " is outside the text of length " +
+                  std::to_string(length));
+    }
+  }
+
+  S *value_;
+  Integer index_;
+};
+
+/// \brief AL `Text[Index]` on a text that can be WRITTEN -- the position itself.
+/// \tparam S A `Text` or `Code`.
+/// \param value The text. \param index The one-based position.
+/// \return The position, which reads as a character and takes one.
+template <typename S>
+  requires std::derived_from<S, StringValue>
+[[nodiscard]] CharAt<S> At(S &value, Integer index) {
+  return CharAt<S>(value, index);
+}
+
 template <typename S>
   requires std::derived_from<S, StringValue>
 [[nodiscard]] Char At(const S &value, Integer index) {

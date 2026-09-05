@@ -409,6 +409,43 @@ public:
     Throw();
   }
 
+  /// \brief Refuses to be compared with anything.
+  /// \tparam T The other operand's type.
+  /// \param left The refusal. \param right The other operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note WITHOUT IT THE COMPARISON WAS AMBIGUOUS RATHER THAN REFUSED. `Rec.Type = Rec.Type::X`
+  ///       over an absent enumeration had one reading per conversion the value offers, and the
+  ///       diagnostic named the operator instead of the enumeration AL could not find.
+  template <typename T>
+    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>)
+  friend bool operator==(const RefusedOptionValue &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses a comparison with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left The other operand. \param right The refusal.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>)
+  friend bool operator==(const T &left, const RefusedOptionValue &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses a comparison between two refusals.
+  /// \param left The refusal. \param right The other.
+  /// \return Never.
+  /// \throws Error always.
+  friend bool operator==(const RefusedOptionValue &left, const RefusedOptionValue &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
 private:
   [[noreturn]] void Throw() const;
 
