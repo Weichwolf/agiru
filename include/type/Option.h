@@ -389,6 +389,10 @@ public:
 ///       which expression it was.
 /// \brief What `RefusedOption` hands back: a value that refuses to become anything.
 ///
+/// \note IT DOES NOT BECOME A BARE ENUMERATOR. `Rec.Status := Rec.Status::Draft` over an absent
+///       enumeration otherwise had two readings -- the wrapper `Enum<E>` and the enumerator `E`
+///       its assignment also takes -- and an ambiguity says less than a refusal.
+///
 /// \note IT IS NOT AN `Option<>`, and that is the point. AL scopes an absent enumeration in every
 ///       position an enumeration stands in -- an argument typed `Enum`, an `Option` field, a
 ///       comparison -- and a fixed return type only fits the first of them. Refusing THE
@@ -404,7 +408,8 @@ public:
   /// \return Never.
   /// \throws Error always.
   template <typename T>
-    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
+    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view> &&
+             !std::is_enum_v<T>)
   operator T() const {
     Throw();
   }
