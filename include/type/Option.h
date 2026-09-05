@@ -419,7 +419,8 @@ public:
   ///       over an absent enumeration had one reading per conversion the value offers, and the
   ///       diagnostic named the operator instead of the enumeration AL could not find.
   template <typename T>
-    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>)
+    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>) &&
+            (!requires { typename std::remove_cvref_t<T>::IsAlRefusal; })
   friend bool operator==(const RefusedOptionValue &left, const T &right) {
     static_cast<void>(right);
     left.Throw();
@@ -431,7 +432,8 @@ public:
   /// \return Never.
   /// \throws Error always.
   template <typename T>
-    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>)
+    requires(!std::is_same_v<std::remove_cvref_t<T>, RefusedOptionValue>) &&
+            (!requires { typename std::remove_cvref_t<T>::IsAlRefusal; })
   friend bool operator==(const T &left, const RefusedOptionValue &right) {
     static_cast<void>(left);
     right.Throw();

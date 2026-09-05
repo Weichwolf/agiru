@@ -40,6 +40,14 @@ struct RefusedResult;
 
 class Refused {
 public:
+  /// \brief Marks this as a REFUSAL rather than a value, for whoever has to keep out of its way.
+  ///
+  /// \note TWO REFUSALS COMPARED TO EACH OTHER WERE AMBIGUOUS. `Absent.Status = Rec.Type::X` puts
+  ///       a refused .NET member beside an absent enumeration, and both types answer every
+  ///       operator, so neither reading was better. The other refusal looks for this marker and
+  ///       stands aside; this one then refuses, which is what both would have done.
+  using IsAlRefusal = void;
+
   /// \brief A member of a .NET type that is not rebuilt.
   /// \param named The type and the member, in one value so they cannot be swapped.
   constexpr explicit Refused(Named named) : named_(named) {}
