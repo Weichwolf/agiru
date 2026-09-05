@@ -111,3 +111,7 @@ tests/core/codeunit/LibraryRandom.cpp
 tests/core/codeunit/LibraryInventory.cpp
 base/system/io/codeunit/ConfigPackageManagement.cpp
 tests/core/codeunit/LibraryWarehouse.cpp
+tests/core/codeunit/ERMVATVIESLookupUT.cpp
+tests/core/codeunit/PaymentProposalUT.cpp
+tests/core/codeunit/PhysInvtOrderSubformUT.cpp
+tests/core/codeunit/SCMPlanningUT.cpp
