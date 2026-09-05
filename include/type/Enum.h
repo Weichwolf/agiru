@@ -191,6 +191,18 @@ public:
   /// \brief Assigns a named value.
   /// \param value The value.
   /// \return This object.
+  /// \brief Takes a refusal by its marker, so the refusal happens rather than an ambiguity.
+  /// \tparam R The refusal's type.
+  /// \param refusal The refusal.
+  /// \return Never returns.
+  /// \throws Error always.
+  template <typename R>
+    requires requires { typename std::remove_cvref_t<R>::IsAlRefusal; }
+  Enum &operator=(const R &refusal) {
+    *this = static_cast<Enum>(refusal);
+    return *this;
+  }
+
   constexpr Enum &operator=(E value) {
     SetOrdinal(static_cast<std::int32_t>(value));
     return *this;

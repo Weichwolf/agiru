@@ -279,6 +279,18 @@ public:
   ///       -- an Integer into an option field -- and the platform takes it; what AL does NOT do is
   ///       silently read an integer as a member where one is wanted, which is why the constructor
   ///       stays explicit and only the assignment is open.
+  /// \brief Takes a refusal by its marker, so the refusal happens rather than an ambiguity.
+  /// \tparam R The refusal's type.
+  /// \param refusal The refusal.
+  /// \return Never returns.
+  /// \throws Error always.
+  template <typename R>
+    requires requires { typename std::remove_cvref_t<R>::IsAlRefusal; }
+  Option &operator=(const R &refusal) {
+    *this = static_cast<Option>(refusal);
+    return *this;
+  }
+
   constexpr Option &operator=(std::int32_t ordinal) {
     SetOrdinal(ordinal);
     return *this;
@@ -389,13 +401,10 @@ public:
 ///       which expression it was.
 /// \brief What `RefusedOption` hands back: a value that refuses to become anything.
 ///
-/// \note IT BECOMES NEITHER A BARE ENUMERATOR NOR A NUMBER. Both are what an `Option` and an
-///       `Enum` also assign from, so either reading left the assignment ambiguous; refusing them
-///       leaves the wrapper, which is the one AL means.
-///
-/// \note IT DOES NOT BECOME A BARE ENUMERATOR. `Rec.Status := Rec.Status::Draft` over an absent
-///       enumeration otherwise had two readings -- the wrapper `Enum<E>` and the enumerator `E`
-///       its assignment also takes -- and an ambiguity says less than a refusal.
+/// \note AN ASSIGNMENT TAKES IT BY ITS MARKER, not by a conversion. `Option` and `Enum` declare
+///       one overload for a refusal, so the assignment picks that and the refusal happens inside
+///       it; weighing conversions instead made `Rec.Status := Rec.Status::Draft` ambiguous between
+///       the wrapper, the enumerator and the ordinal.
 ///
 /// \note IT IS NOT AN `Option<>`, and that is the point. AL scopes an absent enumeration in every
 ///       position an enumeration stands in -- an argument typed `Enum`, an `Option` field, a
@@ -403,6 +412,10 @@ public:
 ///       CONVERSION fits them all, and still refuses at the point AL would have used the ordinal.
 class RefusedOptionValue {
 public:
+  /// \brief Marks this as a REFUSAL rather than a value, which is how a wrapper knows to take it
+  ///        as one exact overload instead of weighing every conversion it offers.
+  using IsAlRefusal = void;
+
   /// \brief Carries the AL expression that named the absent enumeration.
   /// \param what The expression, spelled as AL wrote it.
   explicit RefusedOptionValue(std::string_view what) : what_(what) {}
@@ -412,8 +425,7 @@ public:
   /// \return Never.
   /// \throws Error always.
   template <typename T>
-    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view> &&
-             !std::is_enum_v<T> && !std::is_arithmetic_v<T>)
+    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
   operator T() const {
     Throw();
   }

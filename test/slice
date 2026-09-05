@@ -1681,3 +1681,9 @@ base/service/ledger/table/ServiceRegister.cpp
 base/service/ledger/table/WarrantyLedgerEntry.cpp
 base/service/ledger/table/ServiceRegister.cpp
 base/service/ledger/table/WarrantyLedgerEntry.cpp
+base/finance/dimension/page/DimensionSelectionChange.cpp
+base/finance/dimension/page/DimensionSelectionMultiple.cpp
+base/system/io/table/DataExchDef.cpp
+base/system/io/table/DataExchDef.cpp
+base/system/automation/table/Workflow.cpp
+base/system/automation/table/Workflow.cpp
