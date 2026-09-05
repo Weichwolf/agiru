@@ -669,6 +669,13 @@ private:
         scope_.MembersAreCalls(base.children.front().text)) {
       return Parens::First;
     }
+    if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
+        base.children.back().kind == al::ExprKind::Name &&
+        base.children.front().kind == al::ExprKind::Name &&
+        scope_.MemberIsCall(OfVariable{.variable = base.children.front().text,
+                                       .field = base.children.back().text})) {
+      return Parens::First;
+    }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
     if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
     if (last.kind == al::ExprKind::Name &&
@@ -1406,6 +1413,17 @@ public:
 
   [[nodiscard]] const std::map<std::string, std::string> *
   FieldsOfRecord(std::string_view variable) const {
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") {
+            continue;
+          }
+          const auto table = objects_.tables.find(LowerKey(declared.subtype));
+          return table == objects_.tables.end() ? nullptr : &table->second.fields;
+        }
+      }
+    }
     for (const al::VarDecl &declared : page_.variables) {
       if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") { continue; }
       const auto table = objects_.tables.find(LowerKey(declared.subtype));
