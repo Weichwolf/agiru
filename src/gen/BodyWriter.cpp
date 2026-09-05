@@ -1146,6 +1146,8 @@ public:
     if (kind == "tables") { index = &objects_.tables; }
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (kind == "xmlports") { index = &objects_.xmlports; }
+    if (kind == "queries") { index = &objects_.queries; }
     if (index == nullptr) { return std::string(kind) + "::" + AsTheDoorSpellsIt(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
@@ -1330,6 +1332,8 @@ public:
     if (kind == "tables") { index = &objects_.tables; }
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
+    if (kind == "xmlports") { index = &objects_.xmlports; }
+    if (kind == "queries") { index = &objects_.queries; }
     if (index == nullptr) { return std::string(kind) + "::" + AsTheDoorSpellsIt(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }

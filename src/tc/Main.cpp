@@ -178,11 +178,22 @@ std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_v
   return sources;
 }
 
-std::map<std::string, std::size_t> UntranslatedKinds(const Run &run) {
-  static constexpr std::array kWithoutAGenerator{
+std::map<std::string, std::size_t> DeclaredOnlyKinds(const Run &run) {
+  static constexpr std::array kDeclarationOnly{
       std::string_view{"report"},
       std::string_view{"query"},
       std::string_view{"xmlport"},
+  };
+  std::map<std::string, std::size_t> counted;
+  for (const std::string_view kind : kDeclarationOnly) {
+    const std::size_t found = SourcesEndingIn(run, "." + std::string(kind) + ".al").size();
+    if (found != 0) { counted[std::string(kind)] += found; }
+  }
+  return counted;
+}
+
+std::map<std::string, std::size_t> UntranslatedKinds(const Run &run) {
+  static constexpr std::array kWithoutAGenerator{
       std::string_view{"permissionset"},
       std::string_view{"permissionsetext"},
       std::string_view{"profile"},
@@ -844,6 +855,108 @@ void WriteReports(Run &run, const agiru::gen::Objects &objects) {
   }
 }
 
+void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".XmlPort.al")) {
+    const agiru::gen::ObjectDeclaration declared =
+        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::XmlPort);
+    if (!declared.found || declared.id == 0) { continue; }
+    const std::string identifier = agiru::gen::Identifier(declared.name);
+    objects.xmlports.insert_or_assign(
+        agiru::gen::LowerKey(declared.name),
+        agiru::gen::TableRef{
+            .identifier = "xmlports::" + identifier,
+            .header =
+                agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::XmlPort) +
+                "/" + identifier + ".h",
+            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
+            .procedures = {}});
+  }
+}
+
+void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (const auto &[key, ref] : objects.xmlports) {
+    const std::string identifier = ref.identifier.substr(std::string("xmlports::").size());
+    const auto number = ref.fields.find("id");
+    std::string out = "// Generated from the xmlport's declaration. Do not edit.\n\n";
+    out += "#pragma once\n\n";
+    out += "#include \"meta/Ids.h\"\n";
+    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include <string_view>\n\n";
+    out += "namespace agiru::app::xmlports {\n\n";
+    out += "class " + identifier + " {\npublic:\n";
+    out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
+    out += "  static constexpr XmlPortId Id() { return kId; }\n\n";
+    for (const std::string_view member :
+         {"Export", "Import", "Run", "SetSource", "SetDestination", "SetTableView", "GetTableView", "SetXmlDocument", "GetXmlDocument", "SetJsonDocument", "GetJsonDocument", "FilterGroup", "ObjectId", "Language", "FormatRegion"}) {
+      out += "  template <typename... Arguments> std::string ";
+      out += member;
+      out += "(Arguments &&...arguments) const {\n";
+      out += "    (static_cast<void>(arguments), ...);\n";
+      out += "    throw ::agiru::Error(\"XmlPort.";
+      out += member;
+      out += " is declared and not implemented yet (board:0065)\");\n";
+      out += "  }\n\n";
+    }
+    out += "};\n\n";
+    out += "} // namespace agiru::app::xmlports\n";
+    Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
+  }
+}
+
+void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Query.al")) {
+    const agiru::gen::ObjectDeclaration declared =
+        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Query);
+    if (!declared.found || declared.id == 0) { continue; }
+    const std::string identifier = agiru::gen::Identifier(declared.name);
+    objects.queries.insert_or_assign(
+        agiru::gen::LowerKey(declared.name),
+        agiru::gen::TableRef{
+            .identifier = "queries::" + identifier,
+            .header =
+                agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Query) +
+                "/" + identifier + ".h",
+            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
+            .procedures = {}});
+  }
+}
+
+void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
+  if (run.output.empty()) { return; }
+  for (const auto &[key, ref] : objects.queries) {
+    const std::string identifier = ref.identifier.substr(std::string("queries::").size());
+    const auto number = ref.fields.find("id");
+    std::string out = "// Generated from the query's declaration. Do not edit.\n\n";
+    out += "#pragma once\n\n";
+    out += "#include \"meta/Ids.h\"\n";
+    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include <string_view>\n\n";
+    out += "namespace agiru::app::queries {\n\n";
+    out += "class " + identifier + " {\npublic:\n";
+    out += "  static constexpr QueryId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
+    out += "  static constexpr QueryId Id() { return kId; }\n\n";
+    for (const std::string_view member :
+         {"Open", "Read", "Close", "Run", "SetRange", "SetFilter", "GetFilter", "SetCurrentKey", "TopNumberOfRows", "ObjectId", "SaveAsXml", "SaveAsCsv", "ColumnFilter"}) {
+      out += "  template <typename... Arguments> std::string ";
+      out += member;
+      out += "(Arguments &&...arguments) const {\n";
+      out += "    (static_cast<void>(arguments), ...);\n";
+      out += "    throw ::agiru::Error(\"Query.";
+      out += member;
+      out += " is declared and not implemented yet (board:0066)\");\n";
+      out += "  }\n\n";
+    }
+    out += "};\n\n";
+    out += "} // namespace agiru::app::queries\n";
+    Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
+  }
+}
+
 void ScanCodeunits(Run &run,
                    Counts &counts,
                    Gathered &gathered,
@@ -1069,6 +1182,7 @@ int Scan(const Job &job) {
   std::vector<Tables> held;
   TableByName everyTable;
   std::map<std::string, std::size_t> untranslated;
+  std::map<std::string, std::size_t> declaredOnly;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -1099,7 +1213,11 @@ int Scan(const Job &job) {
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
     IndexReports(run, objects);
+    IndexXmlPorts(run, objects);
+    IndexQueries(run, objects);
     WriteReports(run, objects);
+    WriteXmlPorts(run, objects);
+    WriteQueries(run, objects);
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
@@ -1136,6 +1254,7 @@ int Scan(const Job &job) {
                  codeunits.tests,
                  run.written != 0 ? std::format(" -- {} written", run.written) : std::string{});
     for (const auto &[kind, found] : UntranslatedKinds(run)) { untranslated[kind] += found; }
+    for (const auto &[kind, found] : DeclaredOnlyKinds(run)) { declaredOnly[kind] += found; }
     Add(allEnums, enums);
     Add(allTables, tables);
     Add(allCodeunits, codeunits);
@@ -1167,10 +1286,21 @@ int Scan(const Job &job) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
   }
+  if (!declaredOnly.empty()) {
+    std::size_t total = 0;
+    for (const auto &[kind, found] : declaredOnly) { total += found; }
+    std::println("declared  {} object(s) whose kind carries its NUMBER, NAME and a refusing "
+                 "surface, and no body (board:0034)",
+                 total);
+    std::vector<std::pair<std::string, std::size_t>> ranked(declaredOnly.begin(),
+                                                            declaredOnly.end());
+    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
+  }
   if (!untranslated.empty()) {
     std::size_t total = 0;
     for (const auto &[kind, found] : untranslated) { total += found; }
-    std::println("untranslated {} object(s) in scope whose kind has no generator (board:0034)",
+    std::println("untranslated {} object(s) in scope whose kind has no generator at all (board:0034)",
                  total);
     std::vector<std::pair<std::string, std::size_t>> ranked(untranslated.begin(),
                                                             untranslated.end());

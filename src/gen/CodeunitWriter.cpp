@@ -1003,6 +1003,8 @@ public:
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
     if (kind == "reports") { index = &objects_.reports; }
+    if (kind == "xmlports") { index = &objects_.xmlports; }
+    if (kind == "queries") { index = &objects_.queries; }
     if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
@@ -1372,6 +1374,8 @@ const HeaderIndex &HeadersOf(const Objects &objects) {
   cached = HeaderIndex{.objects = &objects, .indexed = Indexed(objects), .byIdentifier = {}};
   for (const TableIndex *index : {&objects.codeunits,
                                   &objects.pages,
+                                  &objects.xmlports,
+                                  &objects.queries,
                                   &objects.tables,
                                   &objects.interfaces,
                                   &objects.reports}) {
@@ -1413,8 +1417,14 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
-  static constexpr std::array<std::string_view, 6> kKinds{
-      "codeunits", "pages", "tables", "interfaces", "reports", "enums"};
+  static constexpr std::array<std::string_view, 8> kKinds{"codeunits",
+                                                          "pages",
+                                                          "tables",
+                                                          "interfaces",
+                                                          "reports",
+                                                          "xmlports",
+                                                          "queries",
+                                                          "enums"};
   const HeaderIndex &known = HeadersOf(objects);
   std::set<std::string> headers;
   for (std::size_t at = text.find("::"); at != std::string::npos; at = text.find("::", at + 2)) {

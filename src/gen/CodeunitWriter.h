@@ -37,6 +37,8 @@ using FieldEnums = std::map<std::string, std::map<std::string, std::string>>;
 struct Objects {
   TableIndex tables;
   TableIndex reports;
+  TableIndex xmlports;
+  TableIndex queries;
   TableIndex codeunits;
   TableIndex interfaces;
   TableIndex pages;
