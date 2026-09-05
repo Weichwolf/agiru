@@ -271,22 +271,23 @@ public:
   /// caption for the from the Enum metadata for the field that is currently selected.
   /// \param Index The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetEnumValueCaption(::agiru::Integer Index) const {
-    static_cast<void>(Index);
-    throw Error(
-        "FieldRef.GetEnumValueCaption(Integer) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.GetEnumValueCaption(Integer)` -- the caption of the value at a ONE-BASED
+  ///        position in the field's enumeration (`fieldref-getenumvaluecaption-method.md`).
+  /// \param Index The position.
+  /// \return The caption, empty outside the enumeration.
+  [[nodiscard]] std::string_view GetEnumValueCaption(::agiru::Integer Index) const;
 
   /// \brief AL `FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer)`. Gets an Enum value (or
   /// Option member) caption for the from the Enum metadata for the field that is currently
   /// selected.
   /// \param Ordinal The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetEnumValueCaptionFromOrdinalValue(::agiru::Integer Ordinal) const {
-    static_cast<void>(Ordinal);
-    throw Error("FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer) is declared and not "
-                "implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer)` -- the caption of the value
+  ///        with that ordinal.
+  /// \param Ordinal The ordinal.
+  /// \return The caption, empty when no value carries it.
+  [[nodiscard]] std::string_view
+  GetEnumValueCaptionFromOrdinalValue(::agiru::Integer Ordinal) const;
 
   /// \brief AL `FieldRef.GetFilter()`. Gets the filter that is currently applied to the field
   /// referred to by FieldRef.

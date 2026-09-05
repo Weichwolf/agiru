@@ -1008,16 +1008,17 @@ public:
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
     if (IsRecord(member.variable)) {
       if (FieldNamed(table_, member.field) != nullptr) { return true; }
-      const std::string spelled = Identifier(member.field);
+      const std::string spelled = LowerKey(Identifier(member.field));
       return std::ranges::any_of(table_.fields, [&](const al::FieldDecl &field) {
-        return Identifier(field.name) == spelled;
+        return LowerKey(Identifier(field.name)) == spelled;
       });
     }
     const auto *fields = FieldsOf(member.variable);
     if (fields == nullptr) { return false; }
     if (fields->contains(LowerKey(std::string(member.field)))) { return true; }
-    const std::string spelled = Identifier(member.field);
-    return std::ranges::any_of(*fields, [&](const auto &field) { return field.second == spelled; });
+    const std::string spelled = LowerKey(Identifier(member.field));
+    return std::ranges::any_of(
+        *fields, [&](const auto &field) { return LowerKey(Identifier(field.second)) == spelled; });
   }
 
   [[nodiscard]] bool IsVariable(std::string_view name) const override {

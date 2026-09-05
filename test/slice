@@ -491,3 +491,6 @@ base/manufacturing/routing/table/StandardTaskPersonnel.cpp
 base/manufacturing/routing/table/StandardTaskQualityMeasure.cpp
 base/manufacturing/routing/table/StandardTaskDescription.cpp
 base/manufacturing/setup/table/QualityMeasure.cpp
+base/projects/project/job/table/Job.cpp
+base/warehouse/history/table/PostedWhseReceiptHeader.cpp
+base/warehouse/activity/table/WarehouseActivityLine.cpp
