@@ -1257,9 +1257,23 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                     ">::kName")
                   : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, true, unit.name, {}, unit.procedures, body) + ") {";
+           "(" +
+           Parameters(procedure,
+                      objects,
+                      true,
+                      unit.name,
+                      Shadowing(unit.variables, unit.procedures, unit.labels),
+                      unit.procedures,
+                      body) +
+           ") {";
     const std::string locals =
-        publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures, body);
+        publisher ? std::string{}
+                  : Locals(procedure,
+                           objects,
+                           unit.name,
+                           unit.procedures,
+                           body,
+                           Shadowing(unit.variables, unit.procedures, unit.labels));
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;

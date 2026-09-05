@@ -99,8 +99,7 @@ public:
   /// \throws Error always.
   template <typename T> Refused &operator=(const T &) { Throw(); }
 
-  /// \brief Refuses to stand on either side of a `+`.
-  ///
+  /// \brief Refuses to stand on either side of `a + b`.
   /// \tparam T The other operand's type.
   /// \param left  The left operand.
   /// \param right The right operand.
@@ -112,44 +111,236 @@ public:
   ///       `Refused` -- which says nothing about the absent object, and stops a whole translation
   ///       unit over a member that would have refused at run time anyway. Friends rather than
   ///       members, so the refusal reaches the left-hand side too.
-  template <typename T> friend Refused operator+(const Refused &left, const T &right) {
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator+(const Refused &left, const T &right) {
     static_cast<void>(right);
     left.Throw();
   }
 
-  /// \brief Refuses a `+` with the refusal on the right.
+  /// \brief Refuses `a + b` with the refusal on the right.
   /// \tparam T The left operand's type.
   /// \param left  The left operand.
   /// \param right The right operand.
   /// \return Never.
   /// \throws Error always.
-  template <typename T> friend Refused operator+(const T &left, const Refused &right) {
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator+(const T &left, const Refused &right) {
     static_cast<void>(left);
     right.Throw();
   }
 
-  /// \brief Refuses to be ordered against anything.
-  /// \tparam T The other operand's type.
-  /// \param left  The refusal.
-  /// \param right The other operand.
+  /// \brief Refuses `a + b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
   /// \return Never.
   /// \throws Error always.
-  /// \note AL COMPARES WHATEVER IT HAS, and a member of an object this run does not carry stands
-  ///       in a comparison as readily as in a sum. `<=>` gives all six at once, so the refusal is
-  ///       written once rather than six times.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend Refused operator+(const Refused &left, const Refused &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to stand on either side of `a - b`.
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
   template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator-(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses `a - b` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator-(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses `a - b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend Refused operator-(const Refused &left, const Refused &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to stand on either side of `a * b`.
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator*(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses `a * b` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator*(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses `a * b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend Refused operator*(const Refused &left, const Refused &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to stand on either side of `a / b`.
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator/(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses `a / b` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend Refused operator/(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses `a / b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend Refused operator/(const Refused &left, const Refused &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to stand on either side of `a < b`.
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
   friend std::strong_ordering operator<=>(const Refused &left, const T &right) {
     static_cast<void>(right);
     left.Throw();
   }
 
-  /// \brief Refuses to be compared for equality.
-  /// \tparam T The other operand's type.
-  /// \param left  The refusal.
-  /// \param right The other operand.
+  /// \brief Refuses `a < b` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
   /// \return Never.
   /// \throws Error always.
-  template <typename T> friend bool operator==(const Refused &left, const T &right) {
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend std::strong_ordering operator<=>(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses `a < b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend std::strong_ordering operator<=>(const Refused &left, const Refused &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses to stand on either side of `a = b`.
+  /// \tparam T The other operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend bool operator==(const Refused &left, const T &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
+  /// \brief Refuses `a = b` with the refusal on the right.
+  /// \tparam T The left operand's type.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T>
+    requires(!std::is_base_of_v<Refused, std::remove_cvref_t<T>>)
+  friend bool operator==(const T &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief Refuses `a = b` between two refusals.
+  /// \param left  The left operand.
+  /// \param right The right operand.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT IS THE EXACT OVERLOAD THAT KEEPS THE PAIR ABOVE UNAMBIGUOUS. With only the two
+  ///       templates, `Refused - Refused` matched both equally well and the diagnostic named the
+  ///       operator rather than the .NET member behind it.
+  friend bool operator==(const Refused &left, const Refused &right) {
     static_cast<void>(right);
     left.Throw();
   }

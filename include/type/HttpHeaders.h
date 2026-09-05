@@ -23,6 +23,8 @@
 
 /// \file
 /// \brief AL `HttpHeaders` -- the surface the platform documentation declares.
+#include <concepts>
+#include <type_traits>
 
 namespace agiru {
 
@@ -39,7 +41,15 @@ public:
   /// \param Value The AL `SecretText`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Add(std::string_view Name, const ::agiru::SecretText &Value);
+  /// \tparam S The secret's type -- `SecretText` itself, and nothing that merely
+  ///         CONVERTS to one, so a plain text still picks the text overload.
+  template <typename S>
+    requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
+  ::agiru::Boolean Add(std::string_view Name, const S &Value) {
+    static_cast<void>(Name);
+    static_cast<void>(Value);
+    throw Error("HttpHeaders.Add(Text, SecretText) is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `HttpHeaders.Add(Text, Text)`. Adds the specified header and its value into the
   /// HttpHeaders collection. Validates the provided value.
@@ -117,7 +127,15 @@ public:
   /// \param Value The AL `SecretText`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean TryAddWithoutValidation(std::string_view Name, const ::agiru::SecretText &Value);
+  /// \tparam S The secret's type -- `SecretText` itself, and nothing that merely
+  ///         CONVERTS to one, so a plain text still picks the text overload.
+  template <typename S>
+    requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
+  ::agiru::Boolean TryAddWithoutValidation(std::string_view Name, const S &Value) {
+    static_cast<void>(Name);
+    static_cast<void>(Value);
+    throw Error("HttpHeaders.TryAddWithoutValidation(Text, SecretText) is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `HttpHeaders.TryAddWithoutValidation(Text, Text)`. Adds the specified header and its
   /// value into the HttpHeaders collection. Doesn't validate the provided value.

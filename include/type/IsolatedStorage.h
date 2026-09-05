@@ -24,6 +24,8 @@
 
 /// \file
 /// \brief AL `IsolatedStorage` -- the surface the platform documentation declares.
+#include <concepts>
+#include <type_traits>
 
 namespace agiru {
 
@@ -116,9 +118,18 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \tparam S The secret's type -- `SecretText` itself, and nothing that merely
+  ///         CONVERTS to one, so a plain text still picks the text overload.
+  template <typename S>
+    requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
   static ::agiru::Boolean Set(std::string_view Key,
-                              const ::agiru::SecretText &Value,
-                              const ::agiru::DataScope &DataScope = {});
+                              const S &Value,
+                              const ::agiru::DataScope &DataScope = {}) {
+    static_cast<void>(Key);
+    static_cast<void>(Value);
+    static_cast<void>(DataScope);
+    throw Error("IsolatedStorage.Set(Text, SecretText, DataScope) is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `IsolatedStorage.Set(Text, Text, DataScope)`. Sets the value associated with the
   /// specified key.

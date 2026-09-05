@@ -1304,8 +1304,17 @@ public:
     return DeclaredEnumMember(objects_, enumeration, member);
   }
 
-  PageNames(const al::PageObject &page, const al::TableObject *source, const Objects &objects)
-      : page_(page), source_(source), objects_(objects) {}
+  PageNames(const al::PageObject &page,
+            const al::TableObject *source,
+            const Objects &objects,
+            const al::ProcedureDecl *running = nullptr)
+      : page_(page), source_(source), objects_(objects), running_(running) {}
+
+  [[nodiscard]] std::string ExitValue() const override {
+    if (running_ == nullptr) { return {}; }
+    if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
+    return running_->returnType.empty() ? std::string{} : std::string(" {}");
+  }
 
   [[nodiscard]] std::string ObjectNamed(std::string_view kind,
                                         std::string_view name) const override {
@@ -1435,6 +1444,7 @@ private:
   const al::PageObject &page_;
   const al::TableObject *source_;
   const Objects &objects_;
+  const al::ProcedureDecl *running_ = nullptr;
 };
 
 namespace {
@@ -1547,9 +1557,16 @@ void ControlBodies(std::string &out,
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
-      const std::string body = WriteStatements(PageNames(page, source, objects), trigger.body, 2);
+      const std::string body =
+          WriteStatements(PageNames(page, source, objects, &trigger), trigger.body, 2) +
+          FallsOffEnd(trigger, PageNames(page, source, objects, &trigger));
       const std::string locals =
-          ProcedureLocals(trigger, objects, page.name, page.procedures, {}, body) +
+          ProcedureLocals(trigger,
+                          objects,
+                          page.name,
+                          page.procedures,
+                          Shadowing(page.variables, page.procedures, page.labels),
+                          body) +
           (source == nullptr ? std::string{}
                              : BindsBefore(body, "tables::" + Identifier(source->name)));
       out += "void ";
@@ -1593,8 +1610,8 @@ std::string WriteSource(const al::PageObject &page,
         IsPublisher(procedure)
             ? RaisingBody(
                   procedure, "EventObject::Page", traits + "::kId.Value()", traits + "::kName")
-            : WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
-                  FallsOffEnd(procedure, PageNames(page, source, objects));
+            : WriteStatements(PageNames(page, source, objects, &procedure), procedure.body, 2) +
+                  FallsOffEnd(procedure, PageNames(page, source, objects, &procedure));
     bodies += ProcedureSignature(procedure,
                               objects,
                               page.name,
@@ -1607,7 +1624,12 @@ std::string WriteSource(const al::PageObject &page,
     const std::string locals =
         IsPublisher(procedure)
             ? std::string{}
-            : ProcedureLocals(procedure, objects, page.name, page.procedures, {}, body) +
+            : ProcedureLocals(procedure,
+                              objects,
+                              page.name,
+                              page.procedures,
+                              Shadowing(page.variables, page.procedures, page.labels),
+                              body) +
                   (source == nullptr ? std::string{}
                                      : BindsBefore(body, "tables::" + Identifier(source->name)));
     if (locals.empty() && body.empty()) {

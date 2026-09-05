@@ -905,20 +905,9 @@ void HttpContent::WriteFrom(const ::agiru::InStream &InStream) {
   RefuseDoor("HttpContent.WriteFrom(InStream)");
 }
 
-void HttpContent::WriteFrom(const ::agiru::SecretText &SecretText) {
-  static_cast<void>(SecretText);
-  RefuseDoor("HttpContent.WriteFrom(SecretText)");
-}
-
 void HttpContent::WriteFrom(std::string_view Text) {
   static_cast<void>(Text);
   RefuseDoor("HttpContent.WriteFrom(Text)");
-}
-
-::agiru::Boolean HttpHeaders::Add(std::string_view Name, const ::agiru::SecretText &Value) {
-  static_cast<void>(Name);
-  static_cast<void>(Value);
-  RefuseDoor("HttpHeaders.Add(Text, SecretText)");
 }
 
 ::agiru::Boolean HttpHeaders::Add(std::string_view Name, std::string_view Value) {
@@ -975,13 +964,6 @@ void HttpHeaders::Clear() {
 ::agiru::Boolean HttpHeaders::Remove(std::string_view Name) {
   static_cast<void>(Name);
   RefuseDoor("HttpHeaders.Remove(Text)");
-}
-
-::agiru::Boolean HttpHeaders::TryAddWithoutValidation(std::string_view Name,
-                                                      const ::agiru::SecretText &Value) {
-  static_cast<void>(Name);
-  static_cast<void>(Value);
-  RefuseDoor("HttpHeaders.TryAddWithoutValidation(Text, SecretText)");
 }
 
 ::agiru::Boolean HttpHeaders::TryAddWithoutValidation(std::string_view Name,
@@ -1135,15 +1117,6 @@ std::string HttpResponseMessage::ReasonPhrase() {
   static_cast<void>(Key);
   static_cast<void>(Value);
   RefuseDoor("IsolatedStorage.Get(Text, Text)");
-}
-
-::agiru::Boolean IsolatedStorage::Set(std::string_view Key,
-                                      const ::agiru::SecretText &Value,
-                                      const ::agiru::DataScope &DataScope) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  static_cast<void>(DataScope);
-  RefuseDoor("IsolatedStorage.Set(Text, SecretText, DataScope)");
 }
 
 ::agiru::Boolean IsolatedStorage::Set(std::string_view Key,

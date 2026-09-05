@@ -1001,6 +1001,23 @@ public:
   /// \return True when they hold the same type and the same value.
   [[nodiscard]] bool operator==(const Variant &o) const;
 
+  /// \brief AL compares a Variant to an enumeration value by ORDINAL.
+  /// \tparam E The enumeration type -- anything carrying `AsInteger()`, which is `Enum` and
+  ///         `Option`.
+  /// \param other The value.
+  /// \return Whether the Variant holds an enumeration value with that ordinal.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD AND NOT A CONVERSION, which is the whole point: without it
+  ///       `Rec.GetRangeMax(FieldNo) = Enum::X` had two equally good readings -- the enumeration
+  ///       converted to a Variant, or the Variant compared as the enumeration -- and AL means the
+  ///       ordinal either way.
+  template <typename E>
+    requires requires(const E &value) { value.AsInteger(); }
+  [[nodiscard]] bool operator==(const E &other) const {
+    const auto *held = std::get_if<OrdinalInVariant>(&held_);
+    return held != nullptr && held->ordinal == other.AsInteger();
+  }
+
 private:
   [[noreturn]] static void Refuse();
 
