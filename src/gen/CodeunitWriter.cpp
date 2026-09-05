@@ -931,8 +931,11 @@ public:
                                     : SubtypeOfRecord(member.variable);
     if (subtype.empty()) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
-    return table != objects_.tables.end() &&
-           table->second.fields.contains(LowerKey(std::string(member.field)));
+    if (table == objects_.tables.end()) { return false; }
+    if (table->second.fields.contains(LowerKey(std::string(member.field)))) { return true; }
+    const std::string spelled = Identifier(member.field);
+    return std::ranges::any_of(table->second.fields,
+                               [&](const auto &field) { return field.second == spelled; });
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {

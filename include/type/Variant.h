@@ -263,7 +263,7 @@ public:
   /// \return The RecordRef.
   /// \throws Error when the Variant holds no RecordRef.
   template <typename T>
-    requires std::same_as<T, class RecordRef>
+    requires std::same_as<std::remove_cv_t<T>, class RecordRef>
   operator T &() const {
     const auto *held = std::get_if<RecordRefInVariant>(&held_);
     if (held == nullptr) { throw Error("this Variant holds no RecordRef"); }

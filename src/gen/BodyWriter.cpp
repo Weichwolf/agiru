@@ -437,6 +437,12 @@ private:
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
     std::string known = scope_.Resolve(callee.text);
+    if (!known.empty() && !scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
+        scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
+        HiddenByABaseMember(callee.text)) {
+      return "this->Table<" + scope_.ThisTable() +
+             ">::" + AsTheDoorSpellsIt(Identifier(callee.text));
+    }
     if (!known.empty() && !scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
         !IsAlTypeName(callee.text) && DoorCalls(callee.text)) {
@@ -964,13 +970,25 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    if (IsRecord(member.variable)) {
+      if (FieldNamed(table_, member.field) != nullptr) { return true; }
+      const std::string spelled = Identifier(member.field);
+      return std::ranges::any_of(table_.fields, [&](const al::FieldDecl &field) {
+        return Identifier(field.name) == spelled;
+      });
+    }
     const auto *fields = FieldsOf(member.variable);
-    return fields != nullptr && fields->contains(LowerKey(std::string(member.field)));
+    if (fields == nullptr) { return false; }
+    if (fields->contains(LowerKey(std::string(member.field)))) { return true; }
+    const std::string spelled = Identifier(member.field);
+    return std::ranges::any_of(*fields, [&](const auto &field) { return field.second == spelled; });
   }
 
   [[nodiscard]] bool IsVariable(std::string_view name) const override {
     return Local(name) != nullptr || Global(name) != nullptr;
   }
+
+  [[nodiscard]] std::string ThisTable() const override { return Identifier(table_.name); }
 
   [[nodiscard]] bool MembersAreCalls(std::string_view variable) const override {
     const al::VarDecl *declared = Local(variable);
@@ -1000,8 +1018,11 @@ public:
       if (const al::VarDecl *global = Global(member.variable);
           global != nullptr && TypeName(global->type) == "Record" && !global->subtype.empty()) {
         const auto found = objects_.tables.find(LowerKey(global->subtype));
-        const bool field = found != objects_.tables.end() &&
-                           found->second.fields.contains(LowerKey(std::string(member.field)));
+        const bool field =
+            found != objects_.tables.end() &&
+            (found->second.fields.contains(LowerKey(std::string(member.field))) ||
+             (found->second.fields.empty() &&
+              PlatformFieldNamed(PlatformField{.table = global->subtype, .field = member.field})));
         return !field && DoorCalls(member.field);
       }
     }

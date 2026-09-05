@@ -460,3 +460,6 @@ base/human_resources/absence/table/CauseOfAbsence.cpp
 base/human_resources/setup/table/MiscArticle.cpp
 base/human_resources/setup/table/Confidential.cpp
 foundation/foundation/no_series/table/NoSeriesRelationship.cpp
+base/inventory/ledger/table/ItemLedgerEntry.cpp
+base/manufacturing/capacity/table/CapacityLedgerEntry.cpp
+base/manufacturing/family/table/Family.cpp

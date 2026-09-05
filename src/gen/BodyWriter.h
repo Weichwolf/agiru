@@ -74,6 +74,8 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual std::string ThisTable() const { return {}; }
+
   [[nodiscard]] virtual bool IsVariable(std::string_view name) const {
     static_cast<void>(name);
     return false;
