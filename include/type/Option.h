@@ -389,6 +389,10 @@ public:
 ///       which expression it was.
 /// \brief What `RefusedOption` hands back: a value that refuses to become anything.
 ///
+/// \note IT BECOMES NEITHER A BARE ENUMERATOR NOR A NUMBER. Both are what an `Option` and an
+///       `Enum` also assign from, so either reading left the assignment ambiguous; refusing them
+///       leaves the wrapper, which is the one AL means.
+///
 /// \note IT DOES NOT BECOME A BARE ENUMERATOR. `Rec.Status := Rec.Status::Draft` over an absent
 ///       enumeration otherwise had two readings -- the wrapper `Enum<E>` and the enumerator `E`
 ///       its assignment also takes -- and an ambiguity says less than a refusal.
@@ -409,7 +413,7 @@ public:
   /// \throws Error always.
   template <typename T>
     requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view> &&
-             !std::is_enum_v<T>)
+             !std::is_enum_v<T> && !std::is_arithmetic_v<T>)
   operator T() const {
     Throw();
   }
