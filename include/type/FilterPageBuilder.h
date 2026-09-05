@@ -119,7 +119,7 @@ public:
   /// syntax block brackets: `[X := ] FilterPageBuilder.PageCaption([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string PageCaption();
+  std::string PageCaption();
 
   std::string PageCaption(std::string_view PageCaption);
 

@@ -40,7 +40,7 @@ public:
   /// block brackets: `[X := ] SessionSettings.Company([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Company();
+  std::string Company();
 
   std::string Company(std::string_view NewCompanyName);
 
@@ -59,7 +59,7 @@ public:
   /// block brackets: `[X := ] SessionSettings.LanguageId([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Integer LanguageId();
+  ::agiru::Integer LanguageId();
 
   ::agiru::Integer LanguageId(::agiru::Integer NewLanguageId);
 
@@ -72,7 +72,7 @@ public:
   /// block brackets: `[X := ] SessionSettings.LocaleId([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Integer LocaleId();
+  ::agiru::Integer LocaleId();
 
   ::agiru::Integer LocaleId(::agiru::Integer NewLocaleId);
 
@@ -85,7 +85,7 @@ public:
   /// syntax block brackets: `[X := ] SessionSettings.ProfileAppId([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Guid ProfileAppId();
+  ::agiru::Guid ProfileAppId();
 
   ::agiru::Guid ProfileAppId(::agiru::Guid NewProfileAppId);
 
@@ -98,7 +98,7 @@ public:
   /// block brackets: `[X := ] SessionSettings.ProfileId([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string ProfileId();
+  std::string ProfileId();
 
   std::string ProfileId(std::string_view NewProfileId);
 
@@ -111,7 +111,7 @@ public:
   /// documentation's syntax block brackets: `[X := ] SessionSettings.ProfileSystemScope([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean ProfileSystemScope();
+  ::agiru::Boolean ProfileSystemScope();
 
   ::agiru::Boolean ProfileSystemScope(::agiru::Boolean NewProfileScope);
 
@@ -131,7 +131,7 @@ public:
   /// block brackets: `[X := ] SessionSettings.TimeZone([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string TimeZone();
+  std::string TimeZone();
 
   std::string TimeZone(std::string_view NewTimeZone);
 };

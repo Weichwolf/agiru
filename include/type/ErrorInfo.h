@@ -83,7 +83,7 @@ public:
   /// \brief AL `ErrorInfo.Collectible()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.Collectible([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Boolean Collectible();
+  ::agiru::Boolean Collectible();
 
   ::agiru::Boolean Collectible(::agiru::Boolean Collectible);
 
@@ -93,7 +93,7 @@ public:
   /// \brief AL `ErrorInfo.ControlName()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.ControlName([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] std::string ControlName();
+  std::string ControlName();
 
   std::string ControlName(std::string_view ControlName);
 
@@ -173,7 +173,7 @@ public:
   /// \brief AL `ErrorInfo.CustomDimensions()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.CustomDimensions([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Dictionary<std::string, std::string> CustomDimensions();
+  ::agiru::Dictionary<std::string, std::string> CustomDimensions();
 
   void CustomDimensions(const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
 
@@ -186,7 +186,7 @@ public:
   /// \brief AL `ErrorInfo.DataClassification()` -- the READING form, which the documentation's
   /// syntax block brackets: `[X := ] ErrorInfo.DataClassification([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::DataClassification DataClassification();
+  ::agiru::DataClassification DataClassification();
 
   ::agiru::DataClassification DataClassification(::agiru::DataClassification NewDataClassification);
 
@@ -196,7 +196,7 @@ public:
   /// \brief AL `ErrorInfo.DetailedMessage()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.DetailedMessage([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] std::string DetailedMessage();
+  std::string DetailedMessage();
 
   std::string DetailedMessage(std::string_view DetailedMessage);
 
@@ -208,7 +208,7 @@ public:
   /// \brief AL `ErrorInfo.ErrorType()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.ErrorType([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::ErrorType ErrorType();
+  ::agiru::ErrorType ErrorType();
 
   ::agiru::ErrorType ErrorType(const ::agiru::ErrorType &ErrorType);
 
@@ -218,7 +218,7 @@ public:
   /// \brief AL `ErrorInfo.FieldNo()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.FieldNo([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Integer FieldNo();
+  ::agiru::Integer FieldNo();
 
   ::agiru::Integer FieldNo(::agiru::Integer FieldNo);
 
@@ -229,7 +229,7 @@ public:
   /// \brief AL `ErrorInfo.Message()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.Message([NewMessage])`.
   /// \return The message the error carries.
-  [[nodiscard]] std::string Message();
+  std::string Message();
 
   std::string Message(std::string_view Message);
 
@@ -239,7 +239,7 @@ public:
   /// \brief AL `ErrorInfo.PageNo()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.PageNo([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Integer PageNo();
+  ::agiru::Integer PageNo();
 
   ::agiru::Integer PageNo(::agiru::Integer PageNo);
 
@@ -256,7 +256,7 @@ public:
   /// \brief AL `ErrorInfo.SystemId()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.SystemId([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Guid SystemId();
+  ::agiru::Guid SystemId();
 
   ::agiru::Guid SystemId(::agiru::Guid SystemId);
 
@@ -266,7 +266,7 @@ public:
   /// \brief AL `ErrorInfo.TableId()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.TableId([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Integer TableId();
+  ::agiru::Integer TableId();
 
   ::agiru::Integer TableId(::agiru::Integer TableId);
 
@@ -276,7 +276,7 @@ public:
   /// \brief AL `ErrorInfo.Title()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.Title([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] std::string Title();
+  std::string Title();
 
   std::string Title(std::string_view Title);
 
@@ -288,7 +288,7 @@ public:
   /// \brief AL `ErrorInfo.Verbosity()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.Verbosity([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Verbosity Verbosity();
+  ::agiru::Verbosity Verbosity();
 
   ::agiru::Verbosity Verbosity(const ::agiru::Verbosity &Verbosity);
 

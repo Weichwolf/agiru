@@ -45,7 +45,7 @@ public:
   /// \brief AL `TextBuilder.AppendLine()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] TextBuilder.AppendLine([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Boolean AppendLine();
+  ::agiru::Boolean AppendLine();
 
   ::agiru::Boolean AppendLine(std::string_view Text);
 
@@ -56,7 +56,7 @@ public:
   /// \brief AL `TextBuilder.Capacity()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] TextBuilder.Capacity([NewX])`.
   /// \return The value it holds.
-  [[nodiscard]] ::agiru::Integer Capacity();
+  ::agiru::Integer Capacity();
 
   ::agiru::Integer Capacity(::agiru::Integer NewCapacity);
 

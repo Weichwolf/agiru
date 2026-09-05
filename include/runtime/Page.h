@@ -132,7 +132,7 @@ public:
   /// brackets: `[X := ] Page.Caption([NewCaption])`.
   /// \return The caption the page shows.
   /// \throws Error until the UI runs (board:0030).
-  [[nodiscard]] std::string Caption() const {
+  std::string Caption() const {
     throw Error("Page.Caption() needs a running UI (board:0030)");
   }
 
@@ -208,7 +208,7 @@ public:
   /// block brackets: `[X := ] Page.LookupMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error until the UI runs (board:0030).
-  [[nodiscard]] ::agiru::Boolean LookupMode() const {
+  ::agiru::Boolean LookupMode() const {
     throw Error("Page.LookupMode() needs a running UI (board:0030)");
   }
 
@@ -243,7 +243,7 @@ public:
   /// block brackets: `[X := ] Page.PromptMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error until the UI runs (board:0030).
-  [[nodiscard]] ::agiru::PromptMode PromptMode() const {
+  ::agiru::PromptMode PromptMode() const {
     throw Error("Page.PromptMode() needs a running UI (board:0030)");
   }
 
@@ -311,20 +311,12 @@ public:
     throw Error("Page.SetTableView(Record) needs a running UI (board:0030)");
   }
 
-  /// \brief AL `Page.Update()` -- the READING form, which the documentation's syntax
-  /// block brackets: `[X := ] Page.Update([NewX])`.
-  /// \return The value it holds.
-  /// \throws Error until the UI runs (board:0030).
-  [[nodiscard]] ::agiru::Boolean Update() const {
-    throw Error("Page.Update() needs a running UI (board:0030)");
-  }
-
   /// \brief AL `Page.Update(Boolean)`. Saves the current record and then updates the controls on
   /// the page. If you set the SaveRecord parameter to false, this method will not save the record
   /// before the page is updated.
   /// \param SaveRecord The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
-  void Update(::agiru::Boolean SaveRecord) {
+  void Update(::agiru::Boolean SaveRecord = true) {
     static_cast<void>(SaveRecord);
     throw Error("Page.Update(Boolean) needs a running UI (board:0030)");
   }

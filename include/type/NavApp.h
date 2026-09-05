@@ -146,7 +146,7 @@ public:
   /// block brackets: `[X := ] NavApp.IsUnlicensed([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] static ::agiru::Boolean IsUnlicensed();
+  static ::agiru::Boolean IsUnlicensed();
 
   static ::agiru::Boolean IsUnlicensed(::agiru::Guid AppId);
 

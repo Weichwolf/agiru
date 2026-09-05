@@ -76,7 +76,7 @@ public:
   /// block brackets: `[X := ] XmlDeclaration.Encoding([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Encoding();
+  std::string Encoding();
 
   std::string Encoding(std::string_view NewValue);
 
@@ -150,7 +150,7 @@ public:
   /// block brackets: `[X := ] XmlDeclaration.Standalone([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Standalone();
+  std::string Standalone();
 
   std::string Standalone(std::string_view NewValue);
 
@@ -162,7 +162,7 @@ public:
   /// block brackets: `[X := ] XmlDeclaration.Version([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Version();
+  std::string Version();
 
   std::string Version(std::string_view NewValue);
 

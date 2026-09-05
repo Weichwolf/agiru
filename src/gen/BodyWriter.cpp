@@ -1582,11 +1582,11 @@ std::string WriteSource(const al::PageObject &page,
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
   out += "\n";
-  out += SourceIncludesOf(page.variables, page.procedures, objects);
-  out += "\nnamespace agiru::app::pages {\n\n";
+  std::string bodies;
+  bodies += "\nnamespace agiru::app::pages {\n\n";
   const std::map<std::string, std::string> named = ControlIdentifiers(page);
-  ControlBodies(out, page.layout, identifier, page, source, objects, named);
-  ControlBodies(out, page.actions, identifier, page, source, objects, named);
+  ControlBodies(bodies, page.layout, identifier, page, source, objects, named);
+  ControlBodies(bodies, page.actions, identifier, page, source, objects, named);
   for (const al::ProcedureDecl &procedure : page.procedures) {
     const std::string traits = "::agiru::PageTraits<::agiru::app::pages::" + identifier + ">";
     const std::string body =
@@ -1595,7 +1595,7 @@ std::string WriteSource(const al::PageObject &page,
                   procedure, "EventObject::Page", traits + "::kId.Value()", traits + "::kName")
             : WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
                   FallsOffEnd(procedure, PageNames(page, source, objects));
-    out += ProcedureSignature(procedure,
+    bodies += ProcedureSignature(procedure,
                               objects,
                               page.name,
                               identifier,
@@ -1611,14 +1611,17 @@ std::string WriteSource(const al::PageObject &page,
                   (source == nullptr ? std::string{}
                                      : BindsBefore(body, "tables::" + Identifier(source->name)));
     if (locals.empty() && body.empty()) {
-      out += "}\n\n";
+      bodies += "}\n\n";
       continue;
     }
-    out += "\n" + locals;
-    if (!locals.empty() && !body.empty()) { out += "\n"; }
-    out += body + "}\n\n";
+    bodies += "\n" + locals;
+    if (!locals.empty() && !body.empty()) { bodies += "\n"; }
+    bodies += body + "}\n\n";
   }
-  out += "} // namespace agiru::app::pages\n";
+  bodies += "} // namespace agiru::app::pages\n";
+  out += SourceIncludesOf(page.variables, page.procedures, objects);
+  out += BodyIncludes(bodies, objects);
+  out += bodies;
   return WithDoor(out, ObjectKind::Page);
 }
 

@@ -71,7 +71,7 @@ public:
   /// syntax block brackets: `[X := ] Dialog.HideSubsequentDialogs([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean HideSubsequentDialogs();
+  ::agiru::Boolean HideSubsequentDialogs();
 
   ::agiru::Boolean HideSubsequentDialogs(::agiru::Boolean HideSubsequentDialogs);
 

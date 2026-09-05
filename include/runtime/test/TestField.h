@@ -61,7 +61,7 @@ public:
   /// \brief AL `TestField.Value()`.
   /// \return The control's value as text.
   /// \throws Error until a page can be opened.
-  [[nodiscard]] std::string Value() const;
+  std::string Value() const;
 
   /// \brief AL `TestField.AssertEquals(Expected)`.
   ///

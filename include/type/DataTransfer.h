@@ -101,7 +101,7 @@ public:
   /// syntax block brackets: `[X := ] DataTransfer.UpdateAuditFields([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean UpdateAuditFields();
+  ::agiru::Boolean UpdateAuditFields();
 
   ::agiru::Boolean UpdateAuditFields(::agiru::Boolean UpdateAuditFields);
 };

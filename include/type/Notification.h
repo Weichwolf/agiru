@@ -38,7 +38,7 @@ public:
 
   /// \brief AL `Notification.Id` -- reading it.
   /// \return The identifier; a blank GUID until one is assigned.
-  [[nodiscard]] const Guid &Id() const { return id_; }
+  const Guid &Id() const { return id_; }
 
   /// \brief AL `Notification.Id(Id)` -- setting it.
   ///
@@ -57,7 +57,7 @@ public:
 
   /// \brief AL `Notification.Message` -- reading it.
   /// \return The text the client shows.
-  [[nodiscard]] std::string_view Message() const { return message_; }
+  std::string_view Message() const { return message_; }
 
   /// \brief AL `Notification.Message(Message)` -- setting it.
   /// \param Message The text the client shows.
@@ -69,7 +69,7 @@ public:
 
   /// \brief AL `Notification.Scope` -- reading it.
   /// \return Where the notification appears.
-  [[nodiscard]] NotificationScope Scope() const { return scope_; }
+  NotificationScope Scope() const { return scope_; }
 
   /// \brief AL `Notification.Scope(Scope)` -- setting it.
   /// \param Scope Where the notification appears.

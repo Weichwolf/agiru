@@ -40,7 +40,7 @@ public:
   /// syntax block brackets: `[X := ] XmlReadOptions.PreserveWhitespace([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean PreserveWhitespace();
+  ::agiru::Boolean PreserveWhitespace();
 
   ::agiru::Boolean PreserveWhitespace(::agiru::Boolean NewValue);
 };

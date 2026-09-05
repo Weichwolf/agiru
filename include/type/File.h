@@ -77,7 +77,7 @@ public:
   /// block brackets: `[X := ] File.CreateTempFile([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean CreateTempFile();
+  ::agiru::Boolean CreateTempFile();
 
   ::agiru::Boolean CreateTempFile(const ::agiru::TextEncoding &Encoding);
 
@@ -202,7 +202,7 @@ public:
   /// block brackets: `[X := ] File.TextMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean TextMode();
+  ::agiru::Boolean TextMode();
 
   ::agiru::Boolean TextMode(::agiru::Boolean Mode);
 
@@ -370,7 +370,7 @@ public:
   /// block brackets: `[X := ] File.WriteMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Boolean WriteMode();
+  ::agiru::Boolean WriteMode();
 
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 };

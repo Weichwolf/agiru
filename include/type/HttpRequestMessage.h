@@ -82,7 +82,7 @@ public:
   /// block brackets: `[X := ] HttpRequestMessage.Method([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Method();
+  std::string Method();
 
   std::string Method(std::string_view NewMethod);
 

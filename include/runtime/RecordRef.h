@@ -91,7 +91,7 @@ public:
 
   /// \brief The record.
   /// \return It, or `nullptr`.
-  [[nodiscard]] void *Get() const { return record_; }
+  void *Get() const { return record_; }
 
 private:
   void Swap(SharedRecord &o) noexcept {

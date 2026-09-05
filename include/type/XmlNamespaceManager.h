@@ -73,7 +73,7 @@ public:
   /// syntax block brackets: `[X := ] XmlNamespaceManager.NameTable([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::XmlNameTable NameTable();
+  ::agiru::XmlNameTable NameTable();
 
   ::agiru::XmlNameTable NameTable(const ::agiru::XmlNameTable &NewValue);
 
