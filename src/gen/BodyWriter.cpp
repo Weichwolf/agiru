@@ -297,7 +297,11 @@ private:
 
   static std::string AsOption(const std::string &enumeration, std::string_view member) {
     const std::string member_ = EnumeratorName(member);
-    if (!enumeration.starts_with("::agiru::")) { return enumeration + "::" + member_; }
+    if (!enumeration.starts_with("::agiru::")) {
+      const bool isEnum = enumeration.starts_with("enums::") || enumeration.contains("::enums::");
+      return std::string(isEnum ? "::agiru::Enum<" : "::agiru::Option<") + enumeration + ">{" +
+             enumeration + "::" + member_ + "}";
+    }
     return "::agiru::Option<" + enumeration + ">{" + enumeration +
            "::" + AsTheDoorSpellsIt(member_) + "}";
   }

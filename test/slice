@@ -115,3 +115,11 @@ tests/core/codeunit/ERMVATVIESLookupUT.cpp
 tests/core/codeunit/PaymentProposalUT.cpp
 tests/core/codeunit/PhysInvtOrderSubformUT.cpp
 tests/core/codeunit/SCMPlanningUT.cpp
+system/system/utilities/codeunit/TempBlob.cpp
+system/system/utilities/table/TempBlob.cpp
+base/bank/reconciliation/codeunit/RecordMatchMgt.cpp
+base/inventory/counting/document/table/PhysInvtOrderLine.cpp
+tests/core/codeunit/LibraryResource.cpp
+system/system/environment/codeunit/EnvironmentInformation.cpp
+tests/core/codeunit/MatchGeneralJnlLinesUT.cpp
+tests/core/codeunit/PhysInvtOrderLineTABUT.cpp

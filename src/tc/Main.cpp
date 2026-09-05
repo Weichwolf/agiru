@@ -245,6 +245,16 @@ struct Gathered {
   std::map<std::string, std::size_t> attributes;
 };
 
+constexpr std::array kAcknowledgedAttributes{
+    std::pair{std::string_view{"scope"},
+              std::string_view{"reach from an extension; no run-time behaviour"}},
+    std::pair{std::string_view{"normal"}, std::string_view{"not a [Test]; the default already"}},
+    std::pair{std::string_view{"obsolete"},
+              std::string_view{"a compile-time warning in AL; the body stands"}},
+    std::pair{std::string_view{"nondebuggable"},
+              std::string_view{"debugger visibility; no debugger here"}},
+};
+
 constexpr std::array kActedOnAttributes{
     std::string_view{"businessevent"},
     std::string_view{"integrationevent"},
@@ -1120,16 +1130,24 @@ int Scan(const Job &job) {
   {
     std::size_t dropped = 0;
     std::vector<std::pair<std::string, std::size_t>> ranked;
+    std::size_t acknowledged = 0;
     for (const auto &[name, count] : gathered.attributes) {
       if (std::ranges::find(kActedOnAttributes, name) != kActedOnAttributes.end()) { continue; }
+      if (std::ranges::find_if(kAcknowledgedAttributes, [&](const auto &known) {
+            return known.first == name;
+          }) != kAcknowledgedAttributes.end()) {
+        acknowledged += count;
+        continue;
+      }
       dropped += count;
       ranked.emplace_back(name, count);
     }
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
-    std::println("attributes acted on {} of {} kind(s) declared; {} declaration(s) of {} kind(s) "
-                 "are read and dropped (board:0190)",
-                 gathered.attributes.size() - ranked.size(),
+    std::println("attributes acted on {} of {} kind(s) declared, {} declaration(s) acknowledged as "
+                 "no-ops; {} declaration(s) of {} kind(s) are read and dropped (board:0190)",
+                 gathered.attributes.size() - ranked.size() - kAcknowledgedAttributes.size(),
                  gathered.attributes.size(),
+                 acknowledged,
                  dropped,
                  ranked.size());
     for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }

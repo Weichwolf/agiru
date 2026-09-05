@@ -95,6 +95,12 @@ public:
   ///       parameter without saying anything.
   constexpr Option(const OrdinalValue &value) : OrdinalValue(value) {}
 
+  /// \brief AL `Integer := Option` -- an option is its ordinal wherever an Integer is asked for,
+  ///        `EntryStatus: Integer` taking `"Entry Status"::Printed`. The integral comparisons
+  ///        above are exact, so this conversion never competes with them.
+  /// \return The ordinal.
+  [[nodiscard]] constexpr operator std::int32_t() const { return AsInteger(); }
+
   /// \brief Compares against a member of any enumeration.
   /// \tparam E The enumeration.
   /// \param value The member.

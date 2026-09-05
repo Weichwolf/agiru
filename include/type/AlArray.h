@@ -5,7 +5,9 @@
 #include "type/Integer.h"
 #include "type/StringValue.h"
 
+#include <algorithm>
 #include <array>
+#include <concepts>
 #include <cstddef>
 #include <string>
 
@@ -107,10 +109,27 @@ public:
     this->Refer(held_.data(), static_cast<std::size_t>(other.Length()));
   }
 
+  /// \brief The same conversion one dimension down: `array[10, 100]` into `array[10, 10]`
+  ///        (`PaymentExportXMLPortUT`) differs in the ELEMENT type, and each row converts through
+  ///        the bound-changing constructor below.
+  /// \tparam U The argument's element type, itself an `AlArray` of other bounds.
+  /// \tparam M The argument's outer bound.
+  /// \param other The argument.
+  template <typename U, std::size_t M>
+    requires(!std::same_as<U, T> && M != 0 && std::constructible_from<T, const U &>)
+  AlArray(const AlArray<U, M> &other) : AlArray<T, 0>(nullptr, N) {
+    const auto taken = std::min(static_cast<std::size_t>(other.Length()), N);
+    for (std::size_t item = 0; item < taken; ++item) {
+      held_[item] = T(other[static_cast<Integer>(item) + 1]);
+    }
+    this->Refer(held_.data(), taken);
+  }
+
   /// \brief Takes another array's elements, keeping its own storage.
   /// \param other The array copied.
   /// \return This array.
   AlArray &operator=(const AlArray &other) {
+
     if (this != &other) {
       held_ = other.held_;
       this->Refer(held_.data(), static_cast<std::size_t>(other.Length()));
@@ -224,5 +243,4 @@ template <typename T, std::size_t N>
     throw Error("ArrayLen: dimension " + std::to_string(dimension) + " of a one-dimensional array");
   }
 }
-
 }
