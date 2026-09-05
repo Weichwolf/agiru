@@ -10,6 +10,7 @@
 #include "type/Integer.h"
 #include "type/IsolationLevel.h"
 #include "type/Option.h"
+#include "type/SecurityFilter.h"
 
 #include <array>
 #include <compare>
@@ -1248,9 +1249,23 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SecurityFiltering(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SecurityFiltering is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.SecurityFiltering([SecurityFilter])` -- sets how security filters apply to
+  ///        this record and answers the setting (`record-securityfiltering-method.md`).
+  /// \param filtering The setting wanted.
+  /// \return The setting in force.
+  /// \note CARRIED, NOT ENFORCED: security filtering is board:0313's (permissions), and what a
+  ///       record asks for is kept in its state until that lands.
+  SecurityFilter SecurityFiltering(SecurityFilter filtering) {
+    State().securityFiltering = filtering;
+    return filtering;
+  }
+
+  /// \brief The getter half.
+  /// \return The setting in force, `Validated` unless set.
+  [[nodiscard]] SecurityFilter SecurityFiltering() const {
+    const detail::RecordState *state =
+        reinterpret_cast<const detail::StateHandle *>(static_cast<const Derived *>(this))->Peek();
+    return state == nullptr ? SecurityFilter::Validated : state->securityFiltering;
   }
 
   /// \brief AL `Record.SetAscending(...)`. Sets the sort order for the records returned. Use this

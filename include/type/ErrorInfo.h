@@ -127,6 +127,25 @@ public:
                 ", Boolean, Record) is declared and not implemented yet (board:0035)");
   }
 
+  /// \brief AL `ErrorInfo.Create(Text, Boolean, Record, Integer)` -- with the field the error is
+  /// about.
+  /// \tparam R The record's table class.
+  /// \param Message The text. \param Collectible Whether collectible. \param Record The record.
+  /// \param FieldNo The field.
+  /// \return Never.
+  template <typename R>
+    requires requires { ::agiru::TableTraits<R>::kTable; }
+  static ::agiru::ErrorInfo Create(std::string_view Message,
+                                   ::agiru::Boolean Collectible,
+                                   const R &Record,
+                                   ::agiru::Integer FieldNo) {
+    static_cast<void>(FieldNo);
+    static_cast<void>(Collectible);
+    static_cast<void>(Record);
+    throw Error("ErrorInfo.Create(" + std::string(Message) +
+                ", Boolean, Record) is declared and not implemented yet (board:0035)");
+  }
+
   /// \brief AL `ErrorInfo.Create(String, Boolean, Record, Integer, Integer, String, Verbosity,
   /// DataClassification, Dictionary of [Text, Text])`. Creates a new ErrorInfo object.
   /// \param Message The AL `String`.

@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "type/IsolationLevel.h"
+#include "type/SecurityFilter.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -232,6 +233,8 @@ struct RecordState {
   bool positioned = false; ///< Whether a `Find` put it anywhere.
 
   IsolationLevel isolation = IsolationLevel::Default; ///< `ReadIsolation`, carried (board:0012).
+  SecurityFilter securityFiltering =
+      SecurityFilter::Validated; ///< `SecurityFiltering`, carried (board:0313).
 };
 
 /// \brief The record variable's state, owned, copied and freed with the record.

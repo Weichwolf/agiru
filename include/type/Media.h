@@ -83,7 +83,7 @@ public:
   /// \return The file that was written.
   /// \throws Error always.
   /// \warning REFUSED, for the reason ImportFile gives. The refusal names the media object.
-  [[nodiscard]] std::string_view ExportFile(std::string_view filename) const;
+  std::string_view ExportFile(std::string_view filename) const;
 
   /// \brief AL `Media.ExportStream(OutStream)`.
   /// \param Stream The stream the media object's bytes are written to.

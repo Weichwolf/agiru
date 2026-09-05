@@ -351,6 +351,19 @@ private:
         return "::agiru::" + TypeName(base.text) +
                "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
       }
+      if (scope_.Resolve(base.text).empty()) {
+        static constexpr std::array<std::pair<std::string_view, std::string_view>, 3>
+            kMethodOptions{{{"securityfiltering", "SecurityFilter"},
+                            {"readisolation", "IsolationLevel"},
+                            {"currenttransactiontype", "TransactionType"}}};
+        const std::string lowered = LowerKey(base.text);
+        for (const auto &[method, option] : kMethodOptions) {
+          if (lowered == method) {
+            return "::agiru::" + std::string(option) +
+                   "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
+          }
+        }
+      }
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
         const std::string table = scope_.ObjectNamed("tables", expression.text);
         if (table.starts_with("absent::")) {
