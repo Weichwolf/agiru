@@ -39,11 +39,11 @@ namespace agiru {
 
 class RecordRef;
 
-/// \brief AL `ErrorInfo`.
+/// \brief AL `ErrorInfo` -- an error and what it is about: its message, the record, the field,
+///        the page and whether it is collected rather than raised (`methods-auto/errorinfo/`).
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/errorinfo/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// \note COLLECTIBILITY IS CARRIED AND NOT YET ACTED ON: `Error(ErrorInfo)` raises whatever the
+///       info says, because the collecting mode itself is board:0195.
 class ErrorInfo {
 public:
   /// \brief AL `ErrorInfo.AddAction(Text, Integer, Text)`. Specifies an action for the error.

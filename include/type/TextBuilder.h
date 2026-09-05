@@ -24,11 +24,11 @@
 
 namespace agiru {
 
-/// \brief AL `TextBuilder`.
+/// \brief AL `TextBuilder` -- a text assembled in place, .NET's `StringBuilder` under AL's own
+///        one-based index (`methods-auto/textbuilder/`).
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/textbuilder/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// \note THE INDEX IS ONE-BASED, as everywhere else a text is indexed in AL. The predecessor's
+///       call site settles it: `Remove(Length, 1)` strips the trailing separator.
 class TextBuilder {
 public:
   /// \brief AL `TextBuilder.Append(Text)`. Appends a copy of the specified string to this
