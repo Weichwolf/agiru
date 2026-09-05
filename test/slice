@@ -107,3 +107,7 @@ base/pricing/price_list/table/PriceListLine.cpp
 base/pricing/worksheet/table/PriceWorksheetLine.cpp
 tests/core/codeunit/PriceListLineUT.cpp
 tests/core/codeunit/PriceWorksheetLineUT.cpp
+tests/core/codeunit/LibraryRandom.cpp
+tests/core/codeunit/LibraryInventory.cpp
+base/system/io/codeunit/ConfigPackageManagement.cpp
+tests/core/codeunit/LibraryWarehouse.cpp
