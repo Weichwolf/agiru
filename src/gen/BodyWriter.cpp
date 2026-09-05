@@ -632,7 +632,7 @@ private:
       }
       out += subject;
       out += " == ";
-      out += Expression(item, kEqualityPrecedence);
+      out += Expression(item, kEqualityPrecedence + 1);
     }
     if (out.empty()) { out = "false"; }
     if (outer > 1) { out = "(" + out + ")"; }
@@ -660,7 +660,9 @@ private:
           scope_.MembersAreCalls(base.children[1].text)) {
         return Parens::First;
       }
-      return YieldsADoorType(base) ? Parens::First : Parens::None;
+      if (YieldsADoorType(base)) { return Parens::First; }
+      if (last.kind == al::ExprKind::Name && DoorCalls(last.text)) { return Parens::Last; }
+      return Parens::None;
     }
     if (base.kind == al::ExprKind::Index && !base.children.empty() &&
         base.children.front().kind == al::ExprKind::Name &&

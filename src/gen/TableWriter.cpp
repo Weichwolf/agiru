@@ -514,6 +514,13 @@ std::string Declarations(const al::TableObject &table, const Objects &objects) {
     for (const al::VarDecl &declared : procedure.parameters) { named(declared); }
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
+    if (!procedure.returned.byReference &&
+        LowerKey(procedure.returned.subtype) != LowerKey(table.name)) {
+      const TableRef *returned = ReachObject(procedure.returned, objects);
+      if (returned != nullptr && !returned->header.empty()) {
+        memberHeaders.insert(returned->header);
+      }
+    }
   }
   for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
   if (!memberHeaders.empty()) { out += "\n"; }
