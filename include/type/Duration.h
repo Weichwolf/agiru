@@ -45,7 +45,7 @@ public:
   /// \return The milliseconds.
   /// \note `DurationAsInt := CurrentDateTime - StartTime` in `Config. Package Management`; the
   ///       duration IS a number of milliseconds in AL (`duration-data-type.md`).
-  constexpr explicit operator std::int64_t() const { return milliseconds_; }
+  constexpr explicit(false) operator std::int64_t() const { return milliseconds_; }
 
   /// \return The count of milliseconds, which is what the page says a Duration IS.
   [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }
@@ -86,7 +86,8 @@ public:
   ///
   /// \note IT IS AN EXACT OVERLOAD SO THE SUBTRACTION IS NOT AMBIGUOUS. A `Duration` converts to
   ///       `std::int64_t` and takes one, so `Duration - 1440 * 1000 * 60` had a built-in reading
-  ///       and a member one, equally good.
+  ///       and a member one, equally good. The `int` overload beside it is what an AL literal
+  ///       actually is, and an exact match beats the built-in outright.
   [[nodiscard]] constexpr Duration operator-(std::int64_t milliseconds) const {
     return Duration{milliseconds_ - milliseconds};
   }
@@ -95,6 +96,20 @@ public:
   /// \param milliseconds The milliseconds.
   /// \return The longer duration.
   [[nodiscard]] constexpr Duration operator+(std::int64_t milliseconds) const {
+    return Duration{milliseconds_ + milliseconds};
+  }
+
+  /// \brief AL `Duration - Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The shorter duration.
+  [[nodiscard]] constexpr Duration operator-(std::int32_t milliseconds) const {
+    return Duration{milliseconds_ - milliseconds};
+  }
+
+  /// \brief AL `Duration + Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The longer duration.
+  [[nodiscard]] constexpr Duration operator+(std::int32_t milliseconds) const {
     return Duration{milliseconds_ + milliseconds};
   }
 

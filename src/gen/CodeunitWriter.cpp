@@ -119,6 +119,12 @@ std::string RaisingBody(const al::ProcedureDecl &procedure,
   return out + ");\n";
 }
 
+bool IsTryFunction(const al::ProcedureDecl &procedure) {
+  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
+    return LowerKey(attribute) == "tryfunction";
+  });
+}
+
 bool IsPublisher(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "IntegrationEvent") ||
          al::HasAttribute(procedure, "BusinessEvent") ||
@@ -524,12 +530,6 @@ std::string InlineOptions(const al::CodeunitObject &unit) {
   return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
 }
 
-bool IsTryFunction(const al::ProcedureDecl &procedure) {
-  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
-    return LowerKey(attribute) == "tryfunction";
-  });
-}
-
 std::string Returns(const al::ProcedureDecl &procedure,
                     const Objects &objects,
                     const std::set<std::string> &shadowed = {}) {
@@ -860,6 +860,7 @@ public:
 
   [[nodiscard]] std::string ExitValue() const override {
     if (!procedure_.returnName.empty()) { return " " + Identifier(procedure_.returnName); }
+    if (::agiru::gen::IsTryFunction(procedure_)) { return " true"; }
     return procedure_.returnType.empty() ? std::string{} : std::string(" {}");
   }
 
@@ -895,10 +896,10 @@ public:
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
-    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
-                                        LowerKey(std::string(member.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(member.variable);
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) {
       return !NamesAControl(*held, member.field) && DoorCalls(member.field);
@@ -946,10 +947,10 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
-    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
-                                        LowerKey(std::string(member.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(member.variable);
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
     if (subtype.empty()) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end()) { return false; }
@@ -973,10 +974,10 @@ public:
       const std::string control = ControlNamed(*declared, member.field);
       return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
     }
-    const std::string subtype = SubtypeOfRecord(member.variable).empty() &&
-                                        LowerKey(std::string(member.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(member.variable);
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
     if (subtype.empty()) {
       return DoorCalls(member.field) ? AsTheDoorSpellsIt(Identifier(member.field))
                                      : Identifier(member.field);
@@ -1417,14 +1418,8 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
-  static constexpr std::array<std::string_view, 8> kKinds{"codeunits",
-                                                          "pages",
-                                                          "tables",
-                                                          "interfaces",
-                                                          "reports",
-                                                          "xmlports",
-                                                          "queries",
-                                                          "enums"};
+  static constexpr std::array<std::string_view, 8> kKinds{
+      "codeunits", "pages", "tables", "interfaces", "reports", "xmlports", "queries", "enums"};
   const HeaderIndex &known = HeadersOf(objects);
   std::set<std::string> headers;
   for (std::size_t at = text.find("::"); at != std::string::npos; at = text.find("::", at + 2)) {

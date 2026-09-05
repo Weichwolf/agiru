@@ -1020,6 +1020,7 @@ public:
   [[nodiscard]] std::string ExitValue() const override {
     if (running_ == nullptr) { return {}; }
     if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
+    if (::agiru::gen::IsTryFunction(*running_)) { return " true"; }
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 
@@ -1130,9 +1131,8 @@ public:
       }
     }
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
-    if (held != nullptr &&
-        (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
-         TypeName(held->type) == "TestRequestPage")) {
+    if (held != nullptr && (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
+                            TypeName(held->type) == "TestRequestPage")) {
       const auto page = objects_.pages.find(LowerKey(held->subtype));
       const bool control = page != objects_.pages.end() &&
                            page->second.fields.contains(LowerKey(std::string(member.field)));
@@ -1332,6 +1332,7 @@ public:
   [[nodiscard]] std::string ExitValue() const override {
     if (running_ == nullptr) { return {}; }
     if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
+    if (::agiru::gen::IsTryFunction(*running_)) { return " true"; }
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 
@@ -1643,14 +1644,14 @@ std::string WriteSource(const al::PageObject &page,
             : WriteStatements(PageNames(page, source, objects, &procedure), procedure.body, 2) +
                   FallsOffEnd(procedure, PageNames(page, source, objects, &procedure));
     bodies += ProcedureSignature(procedure,
-                              objects,
-                              page.name,
-                              identifier,
-                              true,
-                              {},
-                              page.procedures,
-                              Spelling{.spelled = Identifier(procedure.name), .body = body}) +
-           " {";
+                                 objects,
+                                 page.name,
+                                 identifier,
+                                 true,
+                                 {},
+                                 page.procedures,
+                                 Spelling{.spelled = Identifier(procedure.name), .body = body}) +
+              " {";
     const std::string locals =
         IsPublisher(procedure)
             ? std::string{}
