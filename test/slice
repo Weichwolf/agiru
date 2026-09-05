@@ -1751,3 +1751,15 @@ base/system/visualization/table/BusinessChartMap.cpp
 base/fixed_assets/journal/table/FAGLPostingBuffer.cpp
 base/system/visualization/table/BusinessChartMap.cpp
 system/system/integration/table/DocumentSharing.cpp
+system/system/visualization/codeunit/BusinessChartImpl.cpp
+base/fixed_assets/ledger/codeunit/FAInsertGLAccount.cpp
+base/finance/general_ledger/posting/codeunit/GenJnlPostLine.cpp
+base/inventory/document/codeunit/InvtDocLineReserve.cpp
+base/inventory/tracking/codeunit/ItemTrackingManagement.cpp
+base/service/contract/codeunit/ServContractManagement.cpp
+base/fixed_assets/ledger/codeunit/FAGetGLAccountNo.cpp
+base/inventory/document/page/AvailableInvtDocLines.cpp
+base/finance/deferral/table/DeferralPostingBuffer.cpp
+base/finance/deferral/table/DeferralPostingBuffer.cpp
+base/finance/dimension/table/DimensionPostingBuffer.cpp
+base/finance/vat/calculation/table/VATPostingParameters.cpp
