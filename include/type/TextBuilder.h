@@ -35,7 +35,6 @@ public:
   /// TextBuilder instance.
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Append(std::string_view Text);
 
   /// \brief AL `TextBuilder.AppendLine(Text)`. Appends a copy of the specified string followed by
@@ -43,11 +42,9 @@ public:
   /// omitted, only the line terminator will be appended.
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   /// \brief AL `TextBuilder.AppendLine()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] TextBuilder.AppendLine([NewX])`.
   /// \return The value it holds.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   [[nodiscard]] ::agiru::Boolean AppendLine();
 
   ::agiru::Boolean AppendLine(std::string_view Text);
@@ -56,24 +53,20 @@ public:
   /// can be contained in the memory allocated by the current instance.
   /// \param NewCapacity The AL `Integer`.
   /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   /// \brief AL `TextBuilder.Capacity()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] TextBuilder.Capacity([NewX])`.
   /// \return The value it holds.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   [[nodiscard]] ::agiru::Integer Capacity();
 
   ::agiru::Integer Capacity(::agiru::Integer NewCapacity);
 
   /// \brief AL `TextBuilder.Clear()`. Removes all characters from the current TextBuilder instance.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void Clear();
 
   /// \brief AL `TextBuilder.EnsureCapacity(Integer)`. Ensures that the capacity of this TextBuilder
   /// instance is at least the specified value.
   /// \param NewCapacity The AL `Integer`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean EnsureCapacity(::agiru::Integer NewCapacity);
 
   /// \brief AL `TextBuilder.Insert(Integer, Text)`. Inserts a string into this TextBuilder instance
@@ -81,18 +74,15 @@ public:
   /// \param Position The AL `Integer`.
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Insert(::agiru::Integer Position, std::string_view Text);
 
   /// \brief AL `TextBuilder.Length(Integer)`. Gets or sets the length of this TextBuilder instance.
   /// \param NewLength The AL `Integer`.
   /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer Length(::agiru::Integer NewLength = {});
 
   /// \brief AL `TextBuilder.MaxCapacity()`. Gets the maximum capacity of this TextBuilder instance.
   /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer MaxCapacity();
 
   /// \brief AL `TextBuilder.Remove(Integer, Integer)`. Removes the specified range of characters
@@ -100,7 +90,6 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \param Count The AL `Integer`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Remove(::agiru::Integer StartIndex, ::agiru::Integer Count);
 
   /// \brief AL `TextBuilder.Replace(Text, Text, Integer, Integer)`. Replaces, within a substring of
@@ -111,7 +100,6 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \param Count The AL `Integer`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Replace(std::string_view OldText,
                            std::string_view NewText,
                            ::agiru::Integer StartIndex,
@@ -122,12 +110,10 @@ public:
   /// \param OldText The AL `Text`.
   /// \param NewText The AL `Text`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Replace(std::string_view OldText, std::string_view NewText);
 
   /// \brief AL `TextBuilder.ToText()`. Converts the value of this TextBuilder instance to a Text.
   /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   std::string ToText();
 
   /// \brief AL `TextBuilder.ToText(Integer, Integer)`. Converts the value of a substring of this
@@ -135,8 +121,10 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \param Count The AL `Integer`.
   /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   std::string ToText(::agiru::Integer StartIndex, ::agiru::Integer Count);
+
+private:
+  std::string text_;
 };
 
 }

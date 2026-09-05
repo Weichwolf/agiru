@@ -529,3 +529,4 @@ base/finance/financial_reports/table/FinancialReportUserFilters.cpp
 base/finance/general_ledger/account/table/MyAccount.cpp
 base/cost_accounting/account/table/CostType.cpp
 base/sales/customer/table/CustomerPostingGroup.cpp
+base/finance/general_ledger/setup/table/GeneralPostingSetup.cpp

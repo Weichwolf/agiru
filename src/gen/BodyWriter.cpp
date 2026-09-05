@@ -1250,7 +1250,11 @@ public:
     }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       const auto field = fields->find(LowerKey(std::string(member.field)));
-      return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
+      if (field != fields->end()) { return field->second; }
+      if (const std::string declaredThere = ProcedureOf(member); !declaredThere.empty()) {
+        return declaredThere;
+      }
+      return AsTheDoorSpellsIt(Identifier(member.field));
     }
     if (IsRecord(member.variable) && FieldNamed(table_, member.field) != nullptr) {
       return Identifier(member.field);
@@ -1260,6 +1264,9 @@ public:
       const std::string platform =
           PlatformFieldSpelling(PlatformField{.table = where->subtype, .field = member.field});
       if (!platform.empty()) { return platform; }
+    }
+    if (const std::string declaredThere = ProcedureOf(member); !declaredThere.empty()) {
+      return declaredThere;
     }
     return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
                                 : Identifier(member.field);

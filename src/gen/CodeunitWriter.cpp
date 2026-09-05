@@ -985,6 +985,8 @@ public:
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }
+    const auto declaredThere = table->second.procedures.find(LowerKey(std::string(member.field)));
+    if (declaredThere != table->second.procedures.end()) { return declaredThere->second; }
     return AsTheDoorSpellsIt(Identifier(member.field));
   }
 
