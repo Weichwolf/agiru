@@ -684,6 +684,12 @@ private:
       return AsTheDoorSpellsIt(Identifier(target.text)) + "(" +
              Expression(expression.children.back(), 0) + ")";
     }
+    if (target.kind == al::ExprKind::Name && !scope_.Resolve(target.text).empty() &&
+        !scope_.IsVariable(target.text) &&
+        !scope_.HasField(OfVariable{.variable = "Rec", .field = target.text}) &&
+        !scope_.ProcedureOf(OfVariable{.variable = "Rec", .field = target.text}).empty()) {
+      return scope_.Resolve(target.text) + "(" + Expression(expression.children.back(), 0) + ")";
+    }
     if (target.kind != al::ExprKind::Binary || target.text != "." || target.children.size() != 2 ||
         target.children[0].kind != al::ExprKind::Name ||
         target.children[1].kind != al::ExprKind::Name) {

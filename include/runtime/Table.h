@@ -7,6 +7,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Boolean.h"
+#include "type/ErrorInfo.h"
 #include "type/Integer.h"
 #include "type/IsolationLevel.h"
 #include "type/Option.h"
@@ -509,6 +510,25 @@ public:
     } else {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
     }
+  }
+
+  /// \brief AL `Record.TestField(Field, Value, ErrorInfo)` -- the same check, raising the
+  ///        caller's own error when the field does not hold the value
+  ///        (`record-testfield-*-errorinfo-method.md`).
+  /// \tparam FieldType The field's type. \tparam Value The value's type.
+  /// \param member   The field. \param expected The value it must hold.
+  /// \param info     The error to raise.
+  template <typename FieldType, typename Value>
+  void TestField(const FieldType &member, const Value &expected, const ErrorInfo &info) const {
+    bool same = false;
+    if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
+      same = member == FieldType{expected};
+    } else if constexpr (std::is_enum_v<Value>) {
+      same = member == Option<Value>{expected};
+    } else {
+      same = member == expected;
+    }
+    if (!same) { throw Error(info); }
   }
 
   /// \brief AL `Record.FieldCaption(Field)`, naming the field itself.
