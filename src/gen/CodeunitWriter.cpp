@@ -344,6 +344,9 @@ std::string Signature(const al::VarDecl &declared,
                       const std::set<std::string> &names,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
+  if (type.starts_with("Temporary<") && type.ends_with(">")) {
+    type = type.substr(10, type.size() - 11);
+  }
   if (Hidden(type, names)) { type = Qualified(type, names); }
   if (declared.byReference) { type = Unsized(type); }
   return type + (declared.byReference ? " &" : " ");

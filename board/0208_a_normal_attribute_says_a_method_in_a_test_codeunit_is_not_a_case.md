@@ -52,3 +52,10 @@ A `[TryFunction]` on a `[Normal]` method inside a test codeunit translates; the 
 
 **The negative control is the second case.** Today both translate, so the gate goes red before the
 change and green after -- which is the only way to see the check exists.
+
+## 2026-09-05: acknowledged by the attribute census
+
+`[Normal]` is on `kAcknowledgedAttributes` in `src/tc/Main.cpp` with its reason, so the transpiler
+counts it as a documented no-op rather than a dropped declaration (board:0190). The metadata half
+this item asks for is still open.
+

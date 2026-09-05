@@ -9,6 +9,7 @@
 #include "Cursor.h"
 #include "Rows.h"
 #include "Selection.h"
+#include "Temporary.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -121,6 +122,8 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
 }
 
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
+  if (TempOf(record) != nullptr) { return TempFind(record, table, which); }
+
   RecordState *state = StateOf(record);
   if (which.empty()) { which = "="; }
   for (const char step : which) {
@@ -148,6 +151,8 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
 }
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempFindSet(record, table); }
+
   RecordState *state = StateOf(record);
   state->open.Forget();
   state->stepped = 0;
@@ -167,6 +172,8 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
 }
 
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
+  if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
+
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();
   if (open == nullptr || !state->positioned) { return 0; }
@@ -187,6 +194,8 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
 }
 
 std::int32_t RuntimeCount(const void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempCount(const_cast<void *>(record), table); }
+
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT count(*) FROM " + Name(table);
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
@@ -197,6 +206,8 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
 }
 
 bool RuntimeIsEmpty(const void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempIsEmpty(const_cast<void *>(record), table); }
+
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "SELECT 1 FROM " + Name(table);
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
@@ -205,6 +216,8 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table) {
 }
 
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempDeleteAll(const_cast<void *>(record), table); }
+
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "DELETE FROM " + Name(table);
   if (!made.where.empty()) { sql += " WHERE " + made.where; }

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 /// \file
@@ -265,6 +266,22 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table);
 /// \param table  Its declaration.
 /// \return How many rows went.
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
+
+/// \brief Gives a record its own empty set of temporary rows (board:0583).
+/// \param record The record.
+/// \param ops    How the runtime reaches rows of its type -- `kTempOps<T>`.
+void RuntimeMakeTemporary(void *record, const TempOps *ops);
+
+/// \brief AL `Record.IsTemporary()`.
+/// \param record The record.
+/// \return Whether its state carries temporary rows.
+[[nodiscard]] bool RuntimeIsTemporary(const void *record);
+
+/// \brief AL `Record.Copy(From, true)`: the record shares `from`'s temporary rows from now on.
+/// \param record The record.
+/// \param from   The temporary record whose rows it joins.
+/// \throws Error when either is not temporary, which is what the platform refuses too.
+void RuntimeShareTemporary(void *record, const void *from);
 
 /// \brief Writes one field from the text a column returned.
 /// \param record The record.
@@ -672,9 +689,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void Copy(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Copy is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.Copy(From [, ShareTable])` -- the fields, the filters and the position
+  ///        come across; with `ShareTable`, two temporary records share ONE set of rows from
+  ///        then on (`record-copy-method.md`).
+  /// \param from       The record copied from.
+  /// \param ShareTable Whether to share the temporary rows rather than keep this record's own.
+  void Copy(const Derived &from, Boolean ShareTable = false) {
+    static_cast<Derived &>(*this) = from;
+    if (ShareTable) { detail::RuntimeShareTemporary(Self(), &from); }
   }
 
   /// \brief AL `Record.CopyFilter(...)`. Copies the filter that has been set for one field and
@@ -1024,10 +1046,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean IsTemporary(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.IsTemporary is declared and not implemented yet (board:0035)");
-  }
+  Boolean IsTemporary() const { return detail::RuntimeIsTemporary(Self()); }
 
   /// \brief AL `Record.LoadFields(...)`. Accesses the table's corresponding data source and loads
   /// the values of the specified fields on the record.
@@ -1566,298 +1585,89 @@ inline void CurrFieldNo(::agiru::Integer no) {
               " needs the validating-field machinery (board:0042)");
 }
 
-/// \brief The rows a temporary record holds, and how often they changed.
+/// \brief How the runtime reaches temporary rows of one table: a `std::vector` of the generated
+///        class, and a row is the record with its state left behind.
+/// \tparam T The generated table class.
+template <typename T> struct TempRows {
+  std::vector<T> rows; ///< In primary-key order, which is what AL walks.
+};
+
+/// \brief The `TempOps` for one table, one instance per type in `.rodata`.
 ///
 /// \tparam T The generated table class.
 ///
-/// \note THE VERSION IS NOT BOOKKEEPING, IT IS THE HOT PATH. A `repeat ... until Next() = 0` loop
-///       over a temporary buffer re-filters and re-sorts the whole store on every step unless a
-///       cached view can tell it is still valid. The predecessor measured that as its O(n^2) case
-///       and put the counter on the STORE for a second reason: AL `Copy(src, true)` makes two
-///       record variables share one store, and each must see the other's mutations.
-template <typename T> struct TempStore {
-  std::vector<T> rows;      ///< In primary-key order, which is what AL walks.
-  std::uint64_t version{0}; ///< Rises on every structural change.
-  std::size_t held{0};      ///< How many records share it.
+/// \note A ROW CARRIES NO STATE. What goes into the store is the record's fields; its filters,
+///       its cursor and its own store pointer stay with the variable, and `load` copies the
+///       fields back out around the variable's state -- so a walk never inherits a row's filters.
+template <typename T>
+constexpr detail::TempOps kTempOps{
+    .make = []() -> void * { return new TempRows<T>{}; },
+    .destroy = [](void *rows) { delete static_cast<TempRows<T> *>(rows); },
+    .count = [](const void *rows) { return static_cast<const TempRows<T> *>(rows)->rows.size(); },
+    .at = [](const void *rows, std::size_t index) -> const void * {
+      return &static_cast<const TempRows<T> *>(rows)->rows[index];
+    },
+    .insert =
+        [](void *rows, std::size_t at, const void *record) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
+        },
+    .replace =
+        [](void *rows, std::size_t at, const void *record) {
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
+        },
+    .erase =
+        [](void *rows, std::size_t at) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          held.erase(held.begin() + static_cast<std::ptrdiff_t>(at));
+        },
+    .clear = [](void *rows) { static_cast<TempRows<T> *>(rows)->rows.clear(); },
+    .load =
+        [](void *record, const void *row) {
+          auto *state = reinterpret_cast<detail::StateHandle *>(record);
+          detail::StateHandle keep = std::move(*state);
+          *static_cast<T *>(record) = *static_cast<const T *>(row);
+          *state = std::move(keep);
+        },
 };
 
 /// \brief AL `Record "X" temporary` -- the same table with no database behind it.
 ///
-/// \tparam T The generated table class.
-///
 /// From `SetTemporary` and the `temporary` keyword: the record keeps its fields, its keys and its
-/// filters, and its rows live in memory for the length of the session. AL code cannot tell the
-/// difference, which is the point -- a buffer table and a real one are written the same way.
+/// triggers, and its rows live in the variable rather than in a table. **Temporariness is state,
+/// not type** (board:0583): the constructor installs the rows into the record's state, and from
+/// then on every `Insert`, `Find` and `SetRange` of the base class reads that state -- so a
+/// `T &` parameter bound to a temporary record keeps it temporary, which is what a `var X: Record
+/// T temporary` parameter is in AL.
 ///
-/// \note The rows are held SORTED BY PRIMARY KEY, because that is the order AL walks a record in
-///       and the order `Get` searches. Inserting into the middle of a vector is what a buffer table
-///       does rarely and reads often.
+/// \tparam T The generated table class.
 template <typename T> class Temporary : public T {
 public:
   /// \brief A temporary record with a store of its own.
-  Temporary() : store_(new TempStore<T>{.rows = {}, .version = 0, .held = 1}) {}
+  Temporary() { detail::RuntimeMakeTemporary(this, &kTempOps<T>); }
 
-  /// \brief Copies a record, and with it whichever store that record was on.
-  /// \param o The record to copy.
-  Temporary(const Temporary &o) : T(o), store_(o.store_), position_(o.position_) { ++store_->held; }
-
-  /// \brief Takes over a record's store.
-  /// \param o The record to move from.
-  Temporary(Temporary &&o) noexcept
-      : T(std::move(static_cast<T &>(o))), store_(o.store_), position_(o.position_) {
-    o.store_ = nullptr;
-  }
-
-  /// \brief Takes a plain record's FIELDS, the way AL's `TempRec := Rec` does.
-  /// \param o The record to copy the fields of.
-  /// \return This record.
-  ///
-  /// \note THE STORE IS NOT PART OF THE ASSIGNMENT. AL copies a record's fields and nothing else;
-  ///       where the rows live belongs to the VARIABLE, so a temporary that is assigned from a
-  ///       database record keeps its own store and gains that record's values.
+  /// \brief AL `Temp := Other` -- the fields and filters come across, the rows stay this
+  ///        variable's own (`detail::StateHandle::operator=`).
   Temporary &operator=(const T &o) {
     T::operator=(o);
     return *this;
   }
 
-  /// \brief Assigns a record, and with it whichever store that record is on.
-  /// \param o The record to copy.
-  /// \return This record.
-  Temporary &operator=(const Temporary &o) {
-    if (this == &o) { return *this; }
-    T::operator=(o);
-    Release();
-    store_ = o.store_;
-    position_ = o.position_;
-    ++store_->held;
-    return *this;
-  }
-
-  /// \brief Takes over a record's store.
-  /// \param o The record to move from.
-  /// \return This record.
-  Temporary &operator=(Temporary &&o) noexcept {
-    if (this == &o) { return *this; }
-    T::operator=(std::move(static_cast<T &>(o)));
-    Release();
-    store_ = o.store_;
-    position_ = o.position_;
-    o.store_ = nullptr;
-    return *this;
-  }
-
-  ~Temporary() { Release(); }
-
-  /// \brief AL `Record.Insert()` on a temporary record.
-  /// \return True, which is what `if TempRec.Insert() then` reads on success.
-  /// \throws Error when a row already carries this primary key, as AL does.
-  Boolean Insert() {
-    const auto at = LowerBound();
-    if (at != store_->rows.end() && detail::SameKey<T>(*at, *this)) {
-      throw Error("the record already exists");
-    }
-    store_->rows.insert(at, static_cast<const T &>(*this));
-    ++store_->version;
-    return true;
-  }
-
-  /// \brief AL `Record.Get(...)` on a temporary record.
-  /// \tparam Keys The key field types, in key order.
-  /// \param  keys The primary key values.
-  /// \return True when a row carried that key; the record is then that row.
-  template <typename... Keys> bool Get(const Keys &...keys) {
-    this->AssignPrimaryKey(keys...);
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    static_cast<T &>(*this) = *at;
-    return true;
-  }
-
-  /// \brief AL `Record.Modify()` on a temporary record.
-  /// \return True when a row carried this primary key.
-  bool Modify() {
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    *at = static_cast<const T &>(*this);
-    ++store_->version;
-    return true;
-  }
-
-  /// \brief AL `Record.Delete()` on a temporary record.
-  /// \return True when a row carried this primary key.
-  bool Delete() {
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    store_->rows.erase(at);
-    ++store_->version;
-    return true;
-  }
-
-  /// \brief AL `Record.DeleteAll()` on a temporary record.
-  void DeleteAll() {
-    store_->rows.clear();
-    ++store_->version;
-  }
-
-  /// \brief AL `Record.Insert(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnInsert` runs.
-  /// \throws Error when a row already carries this primary key.
-  ///
-  /// \note A TEMPORARY RECORD RUNS ITS TRIGGERS. The platform page says a temporary table behaves
-  ///       like a real one except that it lives in memory and its triggers are the table's own --
-  ///       so `TempRec.Insert(true)` fires `OnInsert`, and 102 call sites in the 58 UT codeunits
-  ///       alone write it.
-  void Insert(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnInsert(); }) {
-        static_cast<T *>(this)->OnInsert();
-      }
-    }
-    Insert();
-  }
-
-  /// \brief AL `Record.Modify(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnModify` runs.
-  /// \return True when a row carried this primary key.
-  bool Modify(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnModify(); }) {
-        static_cast<T *>(this)->OnModify();
-      }
-    }
-    return Modify();
-  }
-
-  /// \brief AL `Record.Delete(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnDelete` runs.
-  /// \return True when a row carried this primary key.
-  bool Delete(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnDelete(); }) {
-        static_cast<T *>(this)->OnDelete();
-      }
-    }
-    return Delete();
-  }
-
-  /// \brief AL `Record.DeleteAll(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether each row's `OnDelete` runs.
-  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
-  ///         do yet (board:0044).
-  void DeleteAll(Boolean RunTrigger) {
-    if (RunTrigger) {
-      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
-                  "(board:0044)");
-    }
-    DeleteAll();
-  }
-
-  /// \brief AL `Record.Count()`.
-  /// \return How many rows the store holds.
-  [[nodiscard]] Integer Count() const { return static_cast<Integer>(store_->rows.size()); }
-
-  /// \brief AL `Record.IsEmpty()`.
-  /// \return True when the store holds no rows.
-  [[nodiscard]] bool IsEmpty() const { return store_->rows.empty(); }
-
-  /// \brief AL `Record.FindSet()` -- positions on the first row.
-  /// \return True when there is one, which is then this record.
-  bool FindSet() {
-    position_ = 0;
-    return Fetch();
-  }
-
-  /// \brief AL `Record.Next()` -- steps to the row after this one.
-  /// \return True when there was one, which is then this record.
-  bool Next() {
-    ++position_;
-    return Fetch();
-  }
-
-  /// \brief AL `Record.Next(Steps)` on a temporary record.
-  /// \param Steps How far to step; AL takes a negative number to go back.
-  /// \return How many steps were taken, 0 at the end.
-  Integer Next(Integer Steps) {
-    if (Steps == 0) { return Next() ? 1 : 0; }
-    const Integer way = Steps > 0 ? 1 : -1;
-    Integer taken = 0;
-    for (Integer step = 0; step < (Steps > 0 ? Steps : -Steps); ++step) {
-      if (way < 0 && position_ == 0) { break; }
-      position_ += way;
-      if (!Fetch()) { break; }
-      taken += way;
-    }
-    return taken;
-  }
-
-  /// \brief AL `Record.Copy(From, true)` -- shares another temporary record's store.
-  ///
-  /// \param from  The record to share with.
-  /// \param share True to share the STORE; false copies the current row only.
-  ///
-  /// \note Sharing is why the version rides on the store rather than on the record: after this,
-  ///       two variables mutate one set of rows and each must see the other's changes.
-  /// \brief AL `Record.Copy(Record)` from a record that is NOT temporary: the fields come over and
-  ///        the store stays this one's, because there is no store on the other side to share.
-  /// \param from  The record.
-  /// \param share Ignored -- a database record has no store to share.
-  void Copy(const T &from, bool share = false) {
-    static_cast<void>(share);
-    T::operator=(from);
-  }
-
-  void Copy(const Temporary &from, bool share = false) {
-    static_cast<T &>(*this) = static_cast<const T &>(from);
-    if (!share || store_ == from.store_) { return; }
-    Release();
-    store_ = from.store_;
-    ++store_->held;
-  }
-
-private:
-  [[nodiscard]] auto LowerBound() {
-    auto first = store_->rows.begin();
-    auto last = store_->rows.end();
-    while (first != last) {
-      const auto middle = first + ((last - first) / 2);
-      if (detail::ByKey<T>(*middle, static_cast<const T &>(*this))) {
-        first = middle + 1;
-      } else {
-        last = middle;
-      }
-    }
-    return first;
-  }
-
-  bool Fetch() {
-    if (position_ >= store_->rows.size()) { return false; }
-    static_cast<T &>(*this) = store_->rows[position_];
-    return true;
-  }
-
-  /// A COUNT RATHER THAN A `shared_ptr`, AND THE REASON IS THE DOOR'S SIZE. `<memory>` pulls
-  /// `<format>` with it in libstdc++-14 -- 143 000 preprocessed lines together -- and the door is
-  /// included by all 6 398 generated files. Measured 2026-09-02: dropping the runtime half of the
-  /// door takes an empty translation unit from 306 ms to 53 ms. Twenty lines of counting buy that
-  /// back, and the temporary-record gate's checks on sharing are what stand behind them.
-  void Release() {
-    if (store_ != nullptr && --store_->held == 0) { delete store_; }
-    store_ = nullptr;
-  }
-
-  TempStore<T> *store_;
-  std::size_t position_{0};
+  Temporary(const Temporary &) = default;
+  Temporary(Temporary &&) noexcept = default;
+  Temporary &operator=(const Temporary &) = default;
+  Temporary &operator=(Temporary &&) noexcept = default;
+  ~Temporary() = default;
 };
 
 /// \brief A temporary record's declaration is its table's declaration.
 ///
-/// \tparam T The generated table class.
-///
-/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the table:
-/// the same table is read from the database through one variable and held in memory through
-/// another, and both have the same fields, keys and captions. So the traits forward rather than
-/// being specialised again -- and `RecordRef.GetTable(TempRec)` finds the same metadata it would
-/// find for the row on disk.
+/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the
+/// table, so the field table, the keys and the `OnValidate` map are the same.
 template <typename T> struct TableTraits<Temporary<T>> : TableTraits<T> {};
 
 }

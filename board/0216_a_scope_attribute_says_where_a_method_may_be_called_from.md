@@ -55,3 +55,10 @@ translates, is callable, and produces the deprecation warning naming `OnPrem`.
 
 **The negative control is the warning** -- remove it and the second case must go silent, which is
 how you tell "known and inert" from "dropped".
+
+## 2026-09-05: acknowledged by the attribute census
+
+`[Scope]` is on `kAcknowledgedAttributes` in `src/tc/Main.cpp` with its reason, so the transpiler
+counts it as a documented no-op rather than a dropped declaration (board:0190). The metadata half
+this item asks for is still open.
+

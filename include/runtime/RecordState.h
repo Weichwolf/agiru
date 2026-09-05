@@ -4,6 +4,8 @@
 #include "meta/TableDef.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -108,7 +110,53 @@ private:
   OpenCursor *open_ = nullptr;
 };
 
+/// \brief What the runtime can do with a temporary record's rows without knowing their type.
+///
+/// The rows are the generated table class, held in a `std::vector` the door instantiates per
+/// table (`kTempOps<T>` in `runtime/Table.h`); the runtime sorts, filters and positions over
+/// `const void *` rows through `CompareField` and `FieldText`, the way it already compares two
+/// records of one table (board:0583).
+struct TempOps {
+  void *(*make)();                                                 ///< A new, empty row set.
+  void (*destroy)(void *rows);                                     ///< Frees one.
+  std::size_t (*count)(const void *rows);                          ///< How many rows.
+  const void *(*at)(const void *rows, std::size_t index);          ///< The row at a position.
+  void (*insert)(void *rows, std::size_t at, const void *record);  ///< Copies the record in.
+  void (*replace)(void *rows, std::size_t at, const void *record); ///< Overwrites a row.
+  void (*erase)(void *rows, std::size_t at);                       ///< Removes a row.
+  void (*clear)(void *rows);                                       ///< Removes every row.
+  void (*load)(void *record, const void *row);                     ///< Copies a row's FIELDS out.
+};
+
+/// \brief The rows a temporary record holds, shared by every variable that `Copy(From, true)`d
+///        them, and how often they changed.
+struct TempTable {
+  const TempOps *ops;    ///< How to reach the rows.
+  void *rows;            ///< The rows, owned here.
+  std::uint64_t version; ///< Rises on every structural change, so a walk can notice.
+
+  TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_), version(0) {}
+
+  TempTable(const TempTable &) = delete;
+  TempTable(TempTable &&) = delete;
+  TempTable &operator=(const TempTable &) = delete;
+  TempTable &operator=(TempTable &&) = delete;
+
+  ~TempTable() { ops->destroy(rows); }
+};
+
 struct RecordState {
+  /// \brief The temporary rows, when the record is `temporary`; null for a database record.
+  ///        Temporariness is STATE and never type: a `Temporary<T>` installs it, and a `T &`
+  ///        parameter bound to one keeps behaving as one (board:0583).
+  std::shared_ptr<TempTable> temporary;
+  std::vector<std::size_t> view;        ///< The rows a `Find` selected, sorted, by index.
+  std::size_t at = 0;                   ///< Where in `view` the record stands.
+  std::uint64_t viewVersion = 0;        ///< The `TempTable::version` the view was built at.
+  std::vector<FieldFilter> viewFilters; ///< The filters that built it -- a walk keeps its own.
+  std::vector<SortField> viewKey;       ///< And the key.
+  bool viewAscending = true;            ///< And the direction.
+
   std::vector<FieldFilter> filters; ///< AND across fields and groups.
   std::vector<SortField> key;       ///< `SetCurrentKey`; empty means the primary key.
   bool ascending = true;            ///< `Ascending()`, over the whole key.
@@ -153,10 +201,21 @@ public:
   /// \brief Copies the state, letting go of this one's.
   /// \param o The other.
   /// \return This handle.
+  /// \brief AL `Rec := Other`: the filters and the position come across, the ROWS do not. A
+  ///        temporary record assigned from another keeps its own rows, and a database record
+  ///        assigned from a temporary one stays a database record; only `Copy(From, true)`
+  ///        shares (`record-copy-method.md`).
   StateHandle &operator=(const StateHandle &o) {
     if (this != &o) {
+      std::shared_ptr<TempTable> keep = state_ == nullptr ? nullptr : state_->temporary;
       StateHandle copy(o);
       Swap(copy);
+      if (state_ != nullptr || keep != nullptr) {
+        RecordState &mine = Ensure();
+        mine.temporary = std::move(keep);
+        mine.view.clear();
+        mine.positioned = false;
+      }
     }
     return *this;
   }

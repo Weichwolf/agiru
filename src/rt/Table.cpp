@@ -18,6 +18,7 @@
 #include "type/Time.h"
 
 #include "Rows.h"
+#include "Temporary.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -322,23 +323,34 @@ void RuntimeClear(void *record, const TableDef &table) {
 }
 
 void RuntimeInsert(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) {
+    TempInsert(record, table);
+    return;
+  }
+
   StampInserted(record, table);
   const FieldValues values = ValuesOf(record, table);
   InsertRow(Session::Current().Database(), table, values);
 }
 
 bool RuntimeModify(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempModify(record, table); }
+
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   return ModifyRow(Session::Current().Database(), table, values);
 }
 
 bool RuntimeDelete(const void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempDelete(const_cast<void *>(record), table); }
+
   const FieldValues key = KeyOf(record, table);
   return DeleteRow(Session::Current().Database(), table, key);
 }
 
 bool RuntimeGet(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempGet(record, table); }
+
   const FieldValues key = KeyOf(record, table);
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
   if (!row.has_value()) { return false; }

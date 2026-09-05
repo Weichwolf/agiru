@@ -63,7 +63,17 @@ public:
   /// own
   ///       `operator==(const Option &)` reached the other side through a conversion and the two
   ///       were ambiguous.
-  friend constexpr bool operator==(const Option<void> &a, const Option<void> &b) {
+  /// \brief Two options of any two enumerations compare by ordinal -- `Option<>` against
+  ///        `Option<E>` included. Templated over the derived types so the match is EXACT and the
+  ///        Integer conversion below cannot make `int == int` a rival.
+  /// \tparam A One option type.
+  /// \tparam B The other.
+  /// \param a One.
+  /// \param b The other.
+  /// \return Whether the ordinals agree.
+  template <typename A, typename B>
+    requires std::derived_from<A, Option<void>> && std::derived_from<B, Option<void>>
+  friend constexpr bool operator==(const A &a, const B &b) {
     return a.AsInteger() == b.AsInteger();
   }
 
