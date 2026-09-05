@@ -268,3 +268,17 @@ seventy-three takes a parameter with that name, and every one is a `var` the gen
   publisher passes itself as a leading `Sender`), `GlobalVarAccess` (4 declarations), the two
   skip flags, isolated events.
 
+## Done 2026-09-06: phases 1 and 2
+
+- Custom events on codeunits, tables and pages raise; `[EventSubscriber]` procedures bind by
+  name; Manual and automatic instances; `BindSubscription`/`UnbindSubscription` (282 refusals
+  left the run). `EventGate` proves the dispatch, the var write-back, the refusal by name.
+- The platform table events `OnBefore/OnAfter{Insert,Modify,Delete}Event` raise from the
+  door's `Insert`, `Modify` and `Delete` with `Rec`, `xRec` and `RunTrigger`;
+  `OnBefore/OnAfterValidateEvent` from `Validate` with the field as the element and
+  `CurrFieldNo`. `xRec` on Insert/Modify/Delete is the record itself until the before image is
+  read from the row -- a subscriber reading `xRec` there sees `Rec`, which is the open half.
+- **Open**: `OnBefore/OnAfterRenameEvent` (Rename is board:0231's), `IncludeSender`,
+  `GlobalVarAccess`, the skip flags, isolated events, page trigger events (400 subscriptions),
+  and the before image for `xRec`.
+

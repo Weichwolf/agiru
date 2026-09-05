@@ -36,7 +36,8 @@ struct Subscription {
   std::string_view event;                       ///< The published method's name.
   std::string_view element;                     ///< The field, for a table trigger event.
   std::span<const std::string_view> parameters; ///< The subscriber's parameter names, in order.
-  /// \brief Calls the subscriber on an instance with each parameter bound to `args.values[bound[i]]`.
+  /// \brief Calls the subscriber on an instance with each parameter bound to
+  /// `args.values[bound[i]]`.
   void (*invoke)(void *instance, const EventArgs &args, std::span<const std::size_t> bound);
 };
 
@@ -68,14 +69,19 @@ public:
 
   /// \return The subscriber codeunit.
   [[nodiscard]] CodeunitId Id() const { return id_; }
+
   /// \return Its AL name.
   [[nodiscard]] std::string_view Name() const { return name_; }
+
   /// \return Its subscriptions.
   [[nodiscard]] std::span<const Subscription> Subscriptions() const { return subscriptions_; }
+
   /// \return Whether its instance is `Manual`.
   [[nodiscard]] bool Manual() const { return manual_; }
+
   /// \return A new instance of the codeunit.
   [[nodiscard]] void *Make() const { return make_(); }
+
   /// \param instance One `Make` made.
   void Free(void *instance) const { free_(instance); }
 
@@ -123,8 +129,7 @@ void CallBound(T &unit,
                std::span<const std::size_t> bound,
                void (T::*)(P...)) {
   [&]<std::size_t... I>(std::index_sequence<I...>) {
-    (unit.*Method)(
-        *static_cast<std::remove_cvref_t<P> *>(args.values[bound[I]])...); // NOLINT
+    (unit.*Method)(*static_cast<std::remove_cvref_t<P> *>(args.values[bound[I]])...); // NOLINT
   }(std::index_sequence_for<P...>{});
 }
 
@@ -138,6 +143,27 @@ void InvokeSubscriber(void *instance, const EventArgs &args, std::span<const std
 }
 
 /// \brief What a publisher's emitted body calls: the arguments by address, the names beside.
+/// \param kind       The publisher's object kind.
+/// \param objectId   Its number.
+/// \param objectName Its AL name.
+/// \param event      The published method.
+/// \param element    The field, for a table trigger event; empty otherwise.
+/// \param names      The publisher's parameter names.
+/// \param values     The arguments, one per name.
+template <typename... Values>
+void RaiseEventOn(EventObject kind,
+                  std::int32_t objectId,
+                  std::string_view objectName,
+                  std::string_view event,
+                  std::string_view element,
+                  std::span<const std::string_view> names,
+                  Values &...values) {
+  std::array<void *, sizeof...(Values)> addresses{
+      const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
+  Raise(kind, objectId, objectName, event, element, EventArgs{.names = names, .values = addresses});
+}
+
+/// \brief `RaiseEventOn` with no element -- what a codeunit's publisher emits.
 template <typename... Values>
 void RaiseEvent(EventObject kind,
                 std::int32_t objectId,
@@ -145,9 +171,7 @@ void RaiseEvent(EventObject kind,
                 std::string_view event,
                 std::span<const std::string_view> names,
                 Values &...values) {
-  std::array<void *, sizeof...(Values)> addresses{
-      const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
-  Raise(kind, objectId, objectName, event, {}, EventArgs{.names = names, .values = addresses});
+  RaiseEventOn(kind, objectId, objectName, event, {}, names, values...);
 }
 
 }

@@ -1,4 +1,3 @@
-#include "BuiltinsWritten.h"
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Error.h"
@@ -7,7 +6,9 @@
 #include "type/Integer.h"
 #include "type/Text.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
+#include "LineNumberBuffer.h"
 
 #include <array>
 #include <string>
@@ -28,6 +29,7 @@ namespace {
 class Publisher_Codeunit;
 class Listener_Codeunit;
 class Misnamed_Codeunit;
+class Watcher_Codeunit;
 } // namespace
 
 template <> struct agiru::CodeunitTraits<Publisher_Codeunit> {
@@ -38,6 +40,11 @@ template <> struct agiru::CodeunitTraits<Publisher_Codeunit> {
 template <> struct agiru::CodeunitTraits<Listener_Codeunit> {
   static constexpr CodeunitId kId{50101};
   static constexpr std::string_view kName{"Event Gate Listener"};
+};
+
+template <> struct agiru::CodeunitTraits<Watcher_Codeunit> {
+  static constexpr CodeunitId kId{50103};
+  static constexpr std::string_view kName{"Event Gate Watcher"};
 };
 
 template <> struct agiru::CodeunitTraits<Misnamed_Codeunit> {
@@ -76,6 +83,21 @@ public:
   int calls = 0;
 };
 
+/// AL: `[EventSubscriber(ObjectType::Table, Database::"Line Number Buffer", 'OnBeforeInsertEvent',
+/// '', false, false)] local procedure Seen(var Rec: Record "Line Number Buffer"; RunTrigger:
+/// Boolean)`.
+class Watcher_Codeunit : public Codeunit<Watcher_Codeunit> {
+public:
+  void Seen(agiru::app::tables::LineNumberBuffer &Rec, Boolean RunTrigger) {
+    Rec.NewLineNumber = Rec.OldLineNumber + 1;
+    sawRunTrigger = RunTrigger;
+    ++seen;
+  }
+
+  int seen = 0;
+  Boolean sawRunTrigger = false;
+};
+
 class Misnamed_Codeunit : public Codeunit<Misnamed_Codeunit> {
 public:
   void Wrong(Integer &Total) { Total = 0; }
@@ -87,7 +109,12 @@ namespace {
 
 constexpr std::array<std::string_view, 2> kDoublesNames{"IsHandled", "Amount"};
 constexpr std::array<Subscription, 1> kListenerSubscriptions{{
-    {EventObject::Codeunit, 0, "Event Gate Publisher", "OnBeforePost", "", kDoublesNames,
+    {EventObject::Codeunit,
+     0,
+     "Event Gate Publisher",
+     "OnBeforePost",
+     "",
+     kDoublesNames,
      &agiru::detail::InvokeSubscriber<Listener_Codeunit, &Listener_Codeunit::Doubles>},
 }};
 const SubscriptionCatalogue kListenerCatalogue{
@@ -100,7 +127,12 @@ const SubscriptionCatalogue kListenerCatalogue{
 
 constexpr std::array<std::string_view, 1> kWrongNames{"Total"};
 constexpr std::array<Subscription, 1> kMisnamedSubscriptions{{
-    {EventObject::Codeunit, 0, "Event Gate Publisher", "OnBeforePost", "", kWrongNames,
+    {EventObject::Codeunit,
+     0,
+     "Event Gate Publisher",
+     "OnBeforePost",
+     "",
+     kWrongNames,
      &agiru::detail::InvokeSubscriber<Misnamed_Codeunit, &Misnamed_Codeunit::Wrong>},
 }};
 const SubscriptionCatalogue kMisnamedCatalogue{
@@ -110,6 +142,39 @@ const SubscriptionCatalogue kMisnamedCatalogue{
     true,
     []() -> void * { return new Misnamed_Codeunit(); },
     [](void *instance) { delete static_cast<Misnamed_Codeunit *>(instance); }};
+
+constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
+constexpr std::array<Subscription, 1> kWatcherSubscriptions{{
+    {EventObject::Table,
+     0,
+     "Line Number Buffer",
+     "OnBeforeInsertEvent",
+     "",
+     kSeenNames,
+     &agiru::detail::InvokeSubscriber<Watcher_Codeunit, &Watcher_Codeunit::Seen>},
+}};
+const SubscriptionCatalogue kWatcherCatalogue{
+    CodeunitTraits<Watcher_Codeunit>::kId,
+    CodeunitTraits<Watcher_Codeunit>::kName,
+    kWatcherSubscriptions,
+    true,
+    []() -> void * { return new Watcher_Codeunit(); },
+    [](void *instance) { delete static_cast<Watcher_Codeunit *>(instance); }};
+
+/// The platform raises `OnBeforeInsertEvent` from `Insert`, with `Rec` the record itself, so a
+/// subscriber writing a field writes what gets inserted (`devenv-event-types.md:109`).
+void ATableTriggerEventReachesASubscriber() {
+  Watcher_Codeunit watcher;
+  static_cast<void>(agiru::BindSubscription(watcher));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  buffer.OldLineNumber = 7;
+  buffer.Insert(true);
+  CHECK_TRUE("Insert raised OnBeforeInsertEvent once", watcher.seen == 1);
+  CHECK_TRUE("with RunTrigger as given", watcher.sawRunTrigger);
+  CHECK_TRUE("and the subscriber's write to Rec is what was inserted",
+             buffer.Get(7) && buffer.NewLineNumber == 8);
+  static_cast<void>(agiru::UnbindSubscription(watcher));
+}
 
 void AManualSubscriberHearsOnlyWhileBound() {
   Publisher_Codeunit publisher;
@@ -150,5 +215,6 @@ int main() {
   return gate::Run("Event", [] {
     AManualSubscriberHearsOnlyWhileBound();
     ASubscriberNamingAnUnpublishedParameterIsRefused();
+    ATableTriggerEventReachesASubscriber();
   });
 }

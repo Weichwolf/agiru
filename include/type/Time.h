@@ -72,6 +72,22 @@ public:
   ///         its own CompareTime example writes `Abs(TimeA - TimeB) = 86399999`.
   [[nodiscard]] constexpr std::int32_t AsMilliseconds() const { return milliseconds_; }
 
+  /// \brief AL `Time + Integer` -- a number of milliseconds later, wrapping at midnight the way
+  ///        the platform does (`LibraryService`: `Time + RandInt(ConvertHoursToMilliSec(12))`).
+  /// \param milliseconds How many.
+  /// \return The later time.
+  [[nodiscard]] constexpr Time operator+(std::int32_t milliseconds) const {
+    const std::int32_t sum = (milliseconds_ + milliseconds) % kMillisecondsPerDay;
+    return FromMilliseconds(sum < 0 ? sum + kMillisecondsPerDay : sum);
+  }
+
+  /// \brief AL `Time - Integer` -- a number of milliseconds earlier.
+  /// \param milliseconds How many.
+  /// \return The earlier time.
+  [[nodiscard]] constexpr Time operator-(std::int32_t milliseconds) const {
+    return *this + (-milliseconds);
+  }
+
   /// \return True for `0T`, which is midnight.
   [[nodiscard]] constexpr bool IsUndefined() const { return milliseconds_ == 0; }
 

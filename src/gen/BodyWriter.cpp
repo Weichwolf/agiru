@@ -1242,12 +1242,21 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     }
   }
   for (const al::ProcedureDecl &procedure : table.procedures) {
+    const std::string traits = "::agiru::TableTraits<::agiru::app::tables::" + identifier + ">";
     const std::string body =
-        WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2) +
-        FallsOffEnd(procedure, TableNames(table, objects, &procedure));
+        IsPublisher(procedure)
+            ? RaisingBody(procedure,
+                          "EventObject::Table",
+                          traits + "::kTable.id.Value()",
+                          traits + "::kTable.name")
+            : WriteStatements(TableNames(table, objects, &procedure), procedure.body, 2) +
+                  FallsOffEnd(procedure, TableNames(table, objects, &procedure));
     const std::string locals =
-        ProcedureLocals(procedure, objects, table.name, table.procedures, Shadowed(table), body) +
-        BindsBefore(body, identifier);
+        IsPublisher(procedure)
+            ? std::string{}
+            : ProcedureLocals(
+                  procedure, objects, table.name, table.procedures, Shadowed(table), body) +
+                  BindsBefore(body, identifier);
     out += ProcedureSignature(
                procedure,
                objects,
@@ -1330,8 +1339,13 @@ std::string WriteSource(const al::PageObject &page,
   ControlBodies(out, page.layout, identifier, page, source, objects, named);
   ControlBodies(out, page.actions, identifier, page, source, objects, named);
   for (const al::ProcedureDecl &procedure : page.procedures) {
-    const std::string body = WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
-                             FallsOffEnd(procedure, PageNames(page, source, objects));
+    const std::string traits = "::agiru::PageTraits<::agiru::app::pages::" + identifier + ">";
+    const std::string body =
+        IsPublisher(procedure)
+            ? RaisingBody(
+                  procedure, "EventObject::Page", traits + "::kId.Value()", traits + "::kName")
+            : WriteStatements(PageNames(page, source, objects), procedure.body, 2) +
+                  FallsOffEnd(procedure, PageNames(page, source, objects));
     out += ProcedureSignature(procedure,
                               objects,
                               page.name,
@@ -1342,9 +1356,11 @@ std::string WriteSource(const al::PageObject &page,
                               Spelling{.spelled = Identifier(procedure.name), .body = body}) +
            " {";
     const std::string locals =
-        ProcedureLocals(procedure, objects, page.name, page.procedures, {}, body) +
-        (source == nullptr ? std::string{}
-                           : BindsBefore(body, "tables::" + Identifier(source->name)));
+        IsPublisher(procedure)
+            ? std::string{}
+            : ProcedureLocals(procedure, objects, page.name, page.procedures, {}, body) +
+                  (source == nullptr ? std::string{}
+                                     : BindsBefore(body, "tables::" + Identifier(source->name)));
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;

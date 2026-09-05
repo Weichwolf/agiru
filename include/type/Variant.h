@@ -4,6 +4,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
@@ -177,6 +178,7 @@ public:
                             Guid,
                             RecordId,
                             DateFormula,
+                            Blob,
                             OrdinalInVariant,
                             RecordInVariant>;
 

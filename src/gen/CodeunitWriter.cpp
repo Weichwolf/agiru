@@ -26,12 +26,6 @@ namespace agiru::gen {
 
 namespace {
 
-bool IsPublisher(const al::ProcedureDecl &procedure) {
-  return al::HasAttribute(procedure, "IntegrationEvent") ||
-         al::HasAttribute(procedure, "BusinessEvent") ||
-         al::HasAttribute(procedure, "InternalEvent");
-}
-
 std::string TableNoOf(const al::CodeunitObject &unit) {
   const al::Property *source = al::Find(unit.properties, "TableNo");
   if (source == nullptr || source->value.empty()) { return {}; }
@@ -93,23 +87,33 @@ bool DeclaresOnRun(const al::CodeunitObject &unit) {
   });
 }
 
+}
+
 std::string RaisingBody(const al::ProcedureDecl &procedure,
-                        const std::string &identifier,
-                        std::string_view kind) {
+                        std::string_view kind,
+                        const std::string &objectId,
+                        const std::string &objectName) {
   std::string out = "  static constexpr std::array<std::string_view, " +
                     std::to_string(procedure.parameters.size()) + "> kNames{";
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
     out += Literal(procedure.parameters[i].name);
   }
-  const std::string traits = "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier + ">";
-  out += "};\n  ::agiru::detail::RaiseEvent(::agiru::" + std::string(kind) + ", " + traits +
-         "::kId.Value(), " + traits + "::kName, " + Literal(procedure.name) + ", kNames";
+  out += "};\n  ::agiru::detail::RaiseEvent(::agiru::" + std::string(kind) + ", " + objectId +
+         ", " + objectName + ", " + Literal(procedure.name) + ", kNames";
   for (const al::VarDecl &parameter : procedure.parameters) {
     out += ", " + Identifier(parameter.name);
   }
   return out + ");\n";
 }
+
+bool IsPublisher(const al::ProcedureDecl &procedure) {
+  return al::HasAttribute(procedure, "IntegrationEvent") ||
+         al::HasAttribute(procedure, "BusinessEvent") ||
+         al::HasAttribute(procedure, "InternalEvent");
+}
+
+namespace {
 
 std::string EventObjectOf(std::string_view objectType) {
   const std::string kind = LowerKey(std::string(objectType.substr(objectType.find("::") + 2)));
@@ -1185,7 +1189,12 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
     const std::string body =
-        publisher ? RaisingBody(procedure, identifier, "EventObject::Codeunit")
+        publisher ? RaisingBody(procedure,
+                                "EventObject::Codeunit",
+                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
+                                    ">::kId.Value()",
+                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
+                                    ">::kName")
                   : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
                         FallsOff(procedure, CodeunitNames(unit, procedure, objects));
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +

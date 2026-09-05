@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/Events.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Boolean.h"
@@ -10,6 +11,7 @@
 #include "type/IsolationLevel.h"
 #include "type/Option.h"
 
+#include <array>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -364,10 +366,7 @@ public:
   ///       `record-modify-method.md` and `record-delete-method.md` all read
   ///       `[Ok := ] Record.X(...)`, and AL writes `exit(Modify())` -- 226 sites under Layers/W1.
   ///       A `void` here made every one of them a compile error.
-  Boolean Insert() {
-    detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
-    return true;
-  }
+  Boolean Insert() { return Insert(false); }
 
   /// \brief AL `Record.Insert(RunTrigger)`.
   ///
@@ -381,12 +380,14 @@ public:
   ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
   ///       it and a table without the trigger compiles to the same code `Insert()` does.
   Boolean Insert(Boolean RunTrigger) {
+    TableEvent("OnBeforeInsertEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnInsert(); }) {
         static_cast<Derived *>(this)->OnInsert();
       }
     }
     detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    TableEvent("OnAfterInsertEvent", RunTrigger);
     return true;
   }
 
@@ -409,12 +410,15 @@ public:
   /// \throws Error when no row carries this primary key, and whatever the trigger raises.
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   Boolean Modify(Boolean RunTrigger) {
+    TableEvent("OnBeforeModifyEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnModify(); }) {
         static_cast<Derived *>(this)->OnModify();
       }
     }
-    return Modify();
+    const Boolean done = Modify();
+    TableEvent("OnAfterModifyEvent", RunTrigger);
+    return done;
   }
 
   /// \brief AL `Record.Delete()`.
@@ -434,12 +438,15 @@ public:
   /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
   ///       record it is about to remove, and a great many of them do.
   Boolean Delete(Boolean RunTrigger) {
+    TableEvent("OnBeforeDeleteEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnDelete(); }) {
         static_cast<Derived *>(this)->OnDelete();
       }
     }
-    return Delete();
+    const Boolean done = Delete();
+    TableEvent("OnAfterDeleteEvent", RunTrigger);
+    return done;
   }
 
   /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.
@@ -596,9 +603,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AddLoadFields(...)` -- partial records (`record-addloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean AddLoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.AddLoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.AreFieldsLoaded(...)`. Checks whether the specified fields are all initially
@@ -607,9 +619,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AreFieldsLoaded(...)` -- partial records
+  /// (`record-arefieldsloaded-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean AreFieldsLoaded(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.AreFieldsLoaded is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.Ascending(...)`. Gets or sets the order in which the system searches through
@@ -1055,9 +1072,13 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.LoadFields(...)` -- partial records (`record-loadfields-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean LoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.LoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.LockTable(...)`. Starts locking on a table to protect it from write
@@ -1297,9 +1318,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.SetLoadFields(...)` -- partial records (`record-setloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean SetLoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.SetLoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.SetPermissionFilter(...)`. Applies the user's security filter.
@@ -1447,7 +1473,9 @@ public:
     }
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      ValidateEvent("OnBeforeValidateEvent", no, before);
       RunOnValidate(no);
+      ValidateEvent("OnAfterValidateEvent", no, before);
     } catch (...) {
       static_cast<Derived &>(*this) = before;
       throw;
@@ -1571,6 +1599,45 @@ private:
   /// state handle first and asserts the offset is zero beside every table. So the base reaches it
   /// without the generated file declaring an accessor -- the language guarantees the cast, and the
   /// assertion holds the layout it depends on (board:0018).
+  /// \brief Raises one of the database trigger events (`devenv-event-types.md:109`) with the
+  ///        parameters the page names: `Rec` is this record, `xRec` this record too until the
+  ///        before image is read from the row (board:0057, phase 2), `RunTrigger` the flag.
+  /// \brief Raises `OnBeforeValidateEvent` or `OnAfterValidateEvent` for one field, the field's
+  ///        AL name as the element, with `Rec`, `xRec` (the record before the assignment) and
+  ///        `CurrFieldNo` (`devenv-event-types.md:151`).
+  void ValidateEvent(std::string_view event, ::agiru::FieldNo no, const Derived &before) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "CurrFieldNo"};
+    std::string_view element;
+    for (const FieldDef &def : TableTraits<Derived>::kTable.fields) {
+      if (def.no == no) { element = def.name; }
+    }
+    Derived &rec = static_cast<Derived &>(*this);
+    Derived xRec = before;
+    ::agiru::Integer currFieldNo = no.Value();
+    detail::RaiseEventOn(EventObject::Table,
+                         TableTraits<Derived>::kTable.id.Value(),
+                         TableTraits<Derived>::kTable.name,
+                         event,
+                         element,
+                         kNames,
+                         rec,
+                         xRec,
+                         currFieldNo);
+  }
+
+  void TableEvent(std::string_view event, Boolean RunTrigger) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
+    Derived &rec = static_cast<Derived &>(*this);
+    detail::RaiseEvent(EventObject::Table,
+                       TableTraits<Derived>::kTable.id.Value(),
+                       TableTraits<Derived>::kTable.name,
+                       event,
+                       kNames,
+                       rec,
+                       rec,
+                       RunTrigger);
+  }
+
   [[nodiscard]] detail::RecordState &State() {
     return reinterpret_cast<detail::StateHandle *>(Self())->Ensure();
   }

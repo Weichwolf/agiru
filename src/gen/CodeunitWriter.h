@@ -73,6 +73,13 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
 
+bool IsPublisher(const al::ProcedureDecl &procedure);
+
+std::string RaisingBody(const al::ProcedureDecl &procedure,
+                        std::string_view kind,
+                        const std::string &objectId,
+                        const std::string &objectName);
+
 std::string InlineOptionsOf(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
