@@ -1,10 +1,10 @@
 #pragma once
 
 #include <compare>
-#include <type_traits>
 #include <concepts>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 
 /// \file
 /// \brief AL `Duration` -- how long, in milliseconds, and possibly negative.
@@ -48,6 +48,7 @@ public:
   /// \param milliseconds The milliseconds, rounded to whole ones.
   template <typename D>
     requires(!std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
+             !requires { typename D::IsAlRefusal; } &&
              std::is_convertible_v<const D &, std::int32_t>)
   constexpr Duration(const D &milliseconds)
       : milliseconds_(static_cast<std::int64_t>(static_cast<std::int32_t>(milliseconds))) {}
@@ -205,6 +206,5 @@ private:
 [[nodiscard]] constexpr Duration operator*(std::int32_t factor, const Duration &d) {
   return d * static_cast<std::int64_t>(factor);
 }
-
 
 }
