@@ -921,12 +921,6 @@ void LogInternalError(std::string_view Message,
                       const ::agiru::DataClassification &DataClassificationInstance,
                       const ::agiru::Verbosity &VerbosityInstance);
 
-/// \brief AL `Dialog.Message(Text, Any)`. Displays a text string in a message window.
-/// \param String The AL `Text`.
-/// \param Value The AL `Any`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Message(std::string_view String, const ::agiru::Variant &Value = {});
-
 /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series of
 /// options.
 /// \param OptionMembers The AL `Text`.

@@ -706,12 +706,6 @@ void LogInternalError(std::string_view Message,
   RefuseDoor("Dialog.LogInternalError(Text, Text, DataClassification, Verbosity)");
 }
 
-void Message(std::string_view String, const ::agiru::Variant &Value) {
-  static_cast<void>(String);
-  static_cast<void>(Value);
-  RefuseDoor("Dialog.Message(Text, Any)");
-}
-
 ::agiru::Integer StrMenu(std::string_view OptionMembers,
                          ::agiru::Integer DefaultNumber,
                          std::string_view Instruction) {

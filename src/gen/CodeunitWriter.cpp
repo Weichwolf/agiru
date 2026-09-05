@@ -1474,4 +1474,11 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                         .absent = std::move(absent)};
 }
 
+std::string OptionTypeName(const std::string &owner,
+                           const std::string &within,
+                           const al::VarDecl &declared,
+                           const std::vector<al::ProcedureDecl> &procedures) {
+  return OptionNameOf(owner, within, declared, procedures);
+}
+
 }

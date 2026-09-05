@@ -113,14 +113,16 @@ public:
   /// \return The ordering of the ordinal against it.
   /// \note WITHOUT THIS, `Option > 0` WAS AMBIGUOUS between converting the option to an integer
   ///       and converting the integer to an option; naming the number's comparison settles it.
-  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::int32_t o) const {
-    return AsInteger() <=> o;
+  template <std::integral I> [[nodiscard]] constexpr std::strong_ordering operator<=>(I o) const {
+    return AsInteger() <=> static_cast<std::int32_t>(o);
   }
 
   /// \brief Compares against a number by ordinal.
   /// \param o The number.
   /// \return True when the ordinal is that number.
-  [[nodiscard]] constexpr bool operator==(std::int32_t o) const { return AsInteger() == o; }
+  template <std::integral I> [[nodiscard]] constexpr bool operator==(I o) const {
+    return AsInteger() == static_cast<std::int32_t>(o);
+  }
 
   [[nodiscard]] constexpr std::strong_ordering operator<=>(const Option &o) const {
     return AsInteger() <=> o.AsInteger();
@@ -296,14 +298,16 @@ public:
   /// \return The ordering of the ordinal against it.
   /// \note WITHOUT THIS, `Option > 0` WAS AMBIGUOUS between converting the option to an integer
   ///       and converting the integer to an option; naming the number's comparison settles it.
-  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::int32_t o) const {
-    return AsInteger() <=> o;
+  template <std::integral I> [[nodiscard]] constexpr std::strong_ordering operator<=>(I o) const {
+    return AsInteger() <=> static_cast<std::int32_t>(o);
   }
 
   /// \brief Compares against a number by ordinal.
   /// \param o The number.
   /// \return True when the ordinal is that number.
-  [[nodiscard]] constexpr bool operator==(std::int32_t o) const { return AsInteger() == o; }
+  template <std::integral I> [[nodiscard]] constexpr bool operator==(I o) const {
+    return AsInteger() == static_cast<std::int32_t>(o);
+  }
 
   template <std::same_as<Option> O>
   [[nodiscard]] constexpr std::strong_ordering operator<=>(const O &o) const {

@@ -43,6 +43,11 @@ struct Objects {
   FieldEnums fieldEnums;
 };
 
+std::string OptionTypeName(const std::string &owner,
+                           const std::string &within,
+                           const al::VarDecl &declared,
+                           const std::vector<al::ProcedureDecl> &procedures);
+
 [[nodiscard]] TableIndex PlatformTables();
 
 [[nodiscard]] FieldEnums PlatformFieldEnums();

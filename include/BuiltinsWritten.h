@@ -406,6 +406,28 @@ IsNull(const T &Variable) {
 ///       Permissions`.
 ::agiru::Guid UserSecurityId();
 
+/// \brief AL `Dialog.Message(Text [, Any, ...])` -- a message with substitution values.
+/// \tparam Values The values' types.
+/// \param String The message, with `%1`-style placeholders.
+/// \param values What the placeholders are replaced with.
+/// \throws Error always -- a message needs a running UI (board:0030).
+/// \note VARIADIC, BECAUSE AL'S IS: the BaseApp passes up to five values.
+/// \brief AL `Dialog.Message(Text)` -- the message alone.
+/// \param String The message.
+/// \throws Error always -- a message needs a running UI (board:0030).
+inline void Message(std::string_view String) {
+  throw ::agiru::Error(std::string("Message(") + std::string(String) +
+                       ") needs a running UI (board:0030)");
+}
+
+template <typename First, typename... Values>
+void Message(std::string_view String, const First &first, const Values &...values) {
+  static_cast<void>(first);
+  (static_cast<void>(values), ...);
+  throw ::agiru::Error(std::string("Message(") + std::string(String) +
+                       ") needs a running UI (board:0030)");
+}
+
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
 ///        Dictionary of [Text, Text])` -- the dictionary form of the custom dimensions.
 /// \param EventId            The event id.

@@ -1017,8 +1017,15 @@ public:
     const al::FieldDecl *field = FieldNamed(table_, name);
     if (field == nullptr) {
       for (const al::VarDecl *where : {Local(name), Global(name)}) {
-        if (where != nullptr && TypeName(where->type) == "Enum" && !where->subtype.empty()) {
+        if (where == nullptr) { continue; }
+        if (TypeName(where->type) == "Enum" && !where->subtype.empty()) {
           return "enums::" + Identifier(where->subtype);
+        }
+        if (TypeName(where->type) == "Option" && !where->members.empty()) {
+          return OptionTypeName(table_.name,
+                                running_ != nullptr ? running_->name : std::string{},
+                                *where,
+                                table_.procedures);
         }
       }
       return {};
