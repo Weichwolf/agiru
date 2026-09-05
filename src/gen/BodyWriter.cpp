@@ -313,6 +313,9 @@ private:
       return "RefusedOption(\"" + name + "\")";
     }
     const std::string named = scope_.ObjectNamed(kind, name);
+    if (named.starts_with("absent::") && !NumberedKind(kind).empty()) {
+      return "::agiru::AbsentObjectId(\"" + name + "\")";
+    }
     return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
   }
 
@@ -588,6 +591,12 @@ private:
   Parens Calls(std::string_view spelling, const al::Expr &base, const al::Expr &last) {
     if (spelling != ".") { return Parens::None; }
     if (base.kind == al::ExprKind::Call) {
+      const al::Expr &callee = base.children.front();
+      if (callee.kind == al::ExprKind::Name && SameName(callee.text, "At") &&
+          base.children.size() > 1 && base.children[1].kind == al::ExprKind::Name &&
+          scope_.MembersAreCalls(base.children[1].text)) {
+        return Parens::First;
+      }
       return YieldsADoorType(base) ? Parens::First : Parens::None;
     }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
@@ -899,6 +908,7 @@ public:
   FieldsOf(std::string_view variable) const {
     if (IsRecord(variable)) { return nullptr; }
     const al::VarDecl *local = Local(variable);
+    if (local == nullptr) { local = Global(variable); }
     if (local == nullptr || TypeName(local->type) != "Record" || local->subtype.empty()) {
       return nullptr;
     }

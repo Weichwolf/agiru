@@ -1203,6 +1203,16 @@ std::string BodyIncludes(const std::string &text, const Objects &objects) {
       }
     }
   }
+  static const std::regex enumerated(R"(\benums::([A-Za-z0-9_]+))");
+  for (std::sregex_iterator it(text.begin(), text.end(), enumerated), end; it != end; ++it) {
+    const std::string identifier = (*it)[1].str();
+    for (const auto &[key, ref] : objects.enums) {
+      if (ref.identifier == identifier && !ref.header.empty()) {
+        headers.insert(ref.header);
+        break;
+      }
+    }
+  }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   return out;

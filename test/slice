@@ -97,3 +97,8 @@ tests/core/codeunit/WFBufferTablePageUT.cpp
 tests/core/codeunit/LibraryPriceCalculation.cpp
 base/pricing/source/table/PriceSource.cpp
 base/inventory/counting/comment/table/PhysInvtCommentLine.cpp
+system/system/utilities/codeunit/RegexImpl.cpp
+base/pricing/source/enum/PriceSourceType.cpp
+base/inventory/counting/document/table/PhysInvtOrderHeader.cpp
+tests/core/codeunit/PriceSourceUT.cpp
+tests/core/codeunit/PhysInvtOrderTABUT.cpp
