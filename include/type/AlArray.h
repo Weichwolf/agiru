@@ -116,6 +116,20 @@ public:
   /// \tparam U The argument's element type, itself an `AlArray` of other bounds.
   /// \tparam M The argument's outer bound.
   /// \param other The argument.
+  /// \brief Takes the elements of an array whose SIZE the caller does not carry.
+  /// \param other The array, as AL hands one on from a `var array` parameter.
+  ///
+  /// \note AL DECLARES A SIZE AND PASSES ONE ON WITHOUT IT. A `var array of Integer` parameter is
+  ///       the unsized view here, and the procedure it is handed to declares `array[10]`; the
+  ///       elements are copied, which is what passing by value means in AL too.
+  AlArray(const AlArray<T, 0> &other) : AlArray<T, 0>(nullptr, N) {
+    const auto taken = std::min(static_cast<std::size_t>(other.Length()), N);
+    for (std::size_t item = 0; item < taken; ++item) {
+      held_[item] = other[static_cast<Integer>(item) + 1];
+    }
+    this->Refer(held_.data(), taken);
+  }
+
   template <typename U, std::size_t M>
     requires(!std::same_as<U, T> && M != 0 && std::constructible_from<T, const U &>)
   AlArray(const AlArray<U, M> &other) : AlArray<T, 0>(nullptr, N) {

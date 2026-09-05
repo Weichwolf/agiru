@@ -414,6 +414,13 @@ struct RefusedResult : Refused {
   Refused GetType{{.type = "<result>", .member = "GetType"}};           ///< The chained member.
   Refused Equals{{.type = "<result>", .member = "Equals"}};             ///< The chained member.
   Refused Dispose{{.type = "<result>", .member = "Dispose"}};           ///< The chained member.
+  Refused DataType{{.type = "<result>", .member = "DataType"}}; ///< The chained member.
+  Refused Clear{{.type = "<result>", .member = "Clear"}}; ///< The chained member.
+  Refused Add{{.type = "<result>", .member = "Add"}}; ///< The chained member.
+  Refused Remove{{.type = "<result>", .member = "Remove"}}; ///< The chained member.
+  Refused Contains{{.type = "<result>", .member = "Contains"}}; ///< The chained member.
+  Refused Rows{{.type = "<result>", .member = "Rows"}}; ///< The chained member.
+  Refused Columns{{.type = "<result>", .member = "Columns"}}; ///< The chained member.
 };
 
 template <typename... Arguments> RefusedResult Refused::operator()(Arguments &&...arguments) const {
