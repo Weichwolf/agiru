@@ -1,6 +1,7 @@
 #pragma once
 
 #include <compare>
+#include <type_traits>
 #include <concepts>
 #include <cstdint>
 #include <string>
@@ -40,6 +41,16 @@ public:
   /// \brief A number of milliseconds.
   /// \param milliseconds How long, negative for a duration that runs backwards.
   constexpr Duration(std::int64_t milliseconds) : milliseconds_(milliseconds) {}
+
+  /// \brief AL assigns a `Decimal` to a `Duration` -- `Duration := Round(...)` is 40-odd call
+  ///        sites -- and a duration IS a number of milliseconds.
+  /// \tparam D The number's type, which must convert to one.
+  /// \param milliseconds The milliseconds, rounded to whole ones.
+  template <typename D>
+    requires(!std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
+             std::is_convertible_v<const D &, std::int32_t>)
+  constexpr Duration(const D &milliseconds)
+      : milliseconds_(static_cast<std::int64_t>(static_cast<std::int32_t>(milliseconds))) {}
 
   /// \brief Reads as its milliseconds, which is how AL assigns a Duration to a BigInteger.
   /// \return The milliseconds.
@@ -182,5 +193,18 @@ private:
 [[nodiscard]] constexpr Duration operator*(std::int64_t factor, const Duration &d) {
   return d * factor;
 }
+
+/// \brief Repeats a duration, with an `Integer` written first.
+/// \param factor How many times.
+/// \param d      The duration.
+/// \return The product.
+///
+/// \note IT IS THE `int` OVERLOAD AND IT EARNS ITS PLACE. AL's literal and its `Integer` are
+///       `int`, and only an exact match on both operands beats the built-in arithmetic the
+///       duration's own conversion to a number offers.
+[[nodiscard]] constexpr Duration operator*(std::int32_t factor, const Duration &d) {
+  return d * static_cast<std::int64_t>(factor);
+}
+
 
 }

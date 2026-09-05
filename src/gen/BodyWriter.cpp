@@ -1599,7 +1599,7 @@ void ControlBodies(std::string &out,
                           Shadowing(page.variables, page.procedures, page.labels),
                           body) +
           (source == nullptr ? std::string{}
-                             : BindsBefore(body, "tables::" + Identifier(source->name)));
+                             : BindsBefore(body, Identifier(source->name)));
       out += "void ";
       out += identifier;
       out += "::";
@@ -1662,7 +1662,7 @@ std::string WriteSource(const al::PageObject &page,
                               Shadowing(page.variables, page.procedures, page.labels),
                               body) +
                   (source == nullptr ? std::string{}
-                                     : BindsBefore(body, "tables::" + Identifier(source->name)));
+                                     : BindsBefore(body, Identifier(source->name)));
     if (locals.empty() && body.empty()) {
       bodies += "}\n\n";
       continue;

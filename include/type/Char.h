@@ -39,6 +39,20 @@ public:
   ///
   /// \note AL ASSIGNS AN INTEGER TO A CHAR, which is the other half of the conversion its own page
   ///       describes: `CRLF[1] := 13` is how a body builds a line break.
+  /// \brief AL `Char := Text[Index]` -- the character standing at a position.
+  /// \tparam P The position's type.
+  /// \param position The position, which reads as a character.
+  /// \return This character.
+  ///
+  /// \note IT TAKES THE POSITION BY ITS MARKER, so the assignment is one overload rather than an
+  ///       ambiguity between the position's conversion to a `Char` and to a code point.
+  template <typename P>
+    requires requires(const P &at) { typename P::IsATextPosition; }
+  constexpr Char &operator=(const P &position) {
+    *this = static_cast<Char>(position);
+    return *this;
+  }
+
   constexpr Char &operator=(std::int32_t code) {
     code_ = code;
     return *this;

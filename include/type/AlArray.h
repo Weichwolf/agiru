@@ -255,6 +255,9 @@ template <typename Container, typename Index, typename... Rest>
 ///       takes a `Char`, a one-character text or a code point.
 template <typename S> class CharAt {
 public:
+  /// \brief Marks this as a text POSITION, so a `Char` can take it as one overload.
+  using IsATextPosition = void;
+
   /// \brief Names a position in a text.
   /// \param value The text. \param index The one-based position.
   CharAt(S &value, Integer index) : value_(&value), index_(index) {}
@@ -312,6 +315,17 @@ public:
   /// \param other The other character.
   /// \return Whether they are the same.
   [[nodiscard]] bool operator==(Char other) const { return Read() == other; }
+
+  /// \brief Compares one text position with another.
+  /// \tparam O The other text's type.
+  /// \param other The other position.
+  /// \return Whether the two characters are the same.
+  ///
+  /// \note WITHOUT IT `Text[I] = Other[J]` WAS AMBIGUOUS WITH ITSELF: each side converts to a
+  ///       `Char`, so the comparison and its reversed form were equally good.
+  template <typename O> [[nodiscard]] bool operator==(const CharAt<O> &other) const {
+    return Read() == static_cast<Char>(other);
+  }
 
   /// \brief Compares against a one-character text, which is how AL writes a character literal.
   /// \param text The text.

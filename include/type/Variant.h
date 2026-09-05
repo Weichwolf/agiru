@@ -1040,6 +1040,20 @@ public:
   ///       `Rec.GetRangeMax(FieldNo) = Enum::X` had two equally good readings -- the enumeration
   ///       converted to a Variant, or the Variant compared as the enumeration -- and AL means the
   ///       ordinal either way.
+  /// \brief AL compares a Variant to a VALUE of one of its alternatives.
+  /// \tparam T The value's type -- exactly one of the alternatives.
+  /// \param other The value.
+  /// \return Whether the Variant holds that type and that value.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD, so `Rec.GetRangeMax(FieldNo) = 0` and `WorkDate() <> Variant`
+  ///       read as comparisons rather than as an ambiguity between converting either side.
+  template <typename T>
+    requires detail::InVariant<T, Held>::value
+  [[nodiscard]] bool operator==(const T &other) const {
+    const auto *held = std::get_if<T>(&held_);
+    return held != nullptr && *held == other;
+  }
+
   template <typename E>
     requires requires(const E &value) { value.AsInteger(); }
   [[nodiscard]] bool operator==(const E &other) const {
