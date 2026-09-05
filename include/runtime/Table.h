@@ -493,8 +493,27 @@ public:
   /// \param member   The field.
   /// \param expected The value it must hold, or the option member it must hold.
   /// \throws Error when the values differ.
-  template <typename FieldType, typename Value>
+  /// \brief AL `Record.TestField(Field, ErrorInfo)` -- the field must not hold its blank, and the
+  ///        refusal is the one the caller wrote (`record-testfield-joker-errorinfo-method.md`).
+  /// \tparam FieldType The field member's type.
+  /// \param member The field.
+  /// \param info   The error to raise.
+  /// \throws Error when the field holds its type's blank.
+  ///
+  /// \note THE SECOND ARGUMENT IS NOT AN EXPECTED VALUE. Without this overload an `ErrorInfo`
+  ///       landed in the value form and was COMPARED against the field, which is a compile error
+  ///       where the field cannot be compared to one and a wrong answer where it can.
+  template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  void TestField(const FieldType &member, const ::agiru::ErrorInfo &info) const {
+    if (member != FieldType{}) { return; }
+    ::agiru::ErrorInfo raised = info;
+    throw Error(raised.Message());
+  }
+
+  template <typename FieldType, typename Value>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo> &&
+             !std::is_same_v<std::remove_cvref_t<Value>, ::agiru::ErrorInfo>)
   /// \note THE FIELD'S OWN TYPE IS THE WRAPPER, and guessing `Option` was wrong for half of them.
   ///       AL writes `TestField(Status, "Price Status"::Active)` -- a bare member -- and the
   ///       holder it belongs in is whatever the field is declared as: `Option<E>` for a field with

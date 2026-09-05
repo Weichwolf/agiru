@@ -437,13 +437,13 @@ private:
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
     std::string known = scope_.Resolve(callee.text);
-    if (!known.empty() && !scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
+    if (!scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
-        HiddenByABaseMember(callee.text)) {
+        HiddenByABaseMember(callee.text) && BareBuiltin(callee.text).empty()) {
       return "this->::agiru::Table<::agiru::app::tables::" + scope_.ThisTable() +
              ">::" + AsTheDoorSpellsIt(Identifier(callee.text));
     }
-    if (!known.empty() && !scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
+    if (!scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
         !IsAlTypeName(callee.text) && DoorCalls(callee.text)) {
       return "::agiru::" + AsTheDoorSpellsIt(Identifier(callee.text));
@@ -454,7 +454,10 @@ private:
     }
     if (!known.empty()) { return known; }
     const std::string_view builtin = BareBuiltin(callee.text);
-    return builtin.empty() ? AsTheDoorSpellsIt(Identifier(callee.text)) : std::string(builtin);
+    if (builtin.empty()) { return AsTheDoorSpellsIt(Identifier(callee.text)); }
+    return scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text})
+               ? "::agiru::" + std::string(builtin)
+               : std::string(builtin);
   }
 
   std::string Tried(const al::Expr &expression) {
@@ -597,10 +600,16 @@ private:
     const std::string known = scope_.Resolve(expression.text);
     if (known.empty()) {
       const std::string_view builtin = BareBuiltin(expression.text);
-      if (!builtin.empty()) { return std::string(builtin) + "()"; }
+      if (!builtin.empty()) {
+        const bool hidden =
+            scope_.HasField(OfVariable{.variable = "Rec", .field = expression.text}) ||
+            !scope_.Resolve(expression.text).empty();
+        return (hidden ? "::agiru::" : "") + std::string(builtin) + "()";
+      }
       if (IsSystemFieldName(expression.text)) { return Identifier(expression.text); }
       if (scope_.MemberIsCall(OfVariable{.variable = "Rec", .field = expression.text})) {
         if (!scope_.ThisTable().empty() && HiddenByABaseMember(expression.text) &&
+            BareBuiltin(expression.text).empty() &&
             scope_.HasField(OfVariable{.variable = "Rec", .field = expression.text})) {
           return "this->::agiru::Table<::agiru::app::tables::" + scope_.ThisTable() +
                  ">::" + AsTheDoorSpellsIt(Identifier(expression.text)) + "()";
