@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <array>
+#include <compare>
 #include <concepts>
 #include <cstddef>
 #include <string>
@@ -277,11 +278,6 @@ public:
   /// \return The character.
   [[nodiscard]] operator Char() const { return Read(); }
 
-  /// \brief Reads the character as its code point, which is what a comparison against a number
-  ///        needs.
-  /// \return The code point.
-  [[nodiscard]] operator std::int32_t() const { return static_cast<std::int32_t>(Read()); }
-
   /// \brief Compares the character standing there.
   /// \param other The other character.
   /// \return Whether they are the same.
@@ -291,6 +287,18 @@ public:
   /// \param text The text.
   /// \return Whether they are the same.
   [[nodiscard]] bool operator==(std::string_view text) const { return Read() == text; }
+
+  /// \brief Orders the character against a one-character text -- AL's `>= '0'`.
+  /// \param text The text.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(std::string_view text) const {
+    return Read() <=> text;
+  }
+
+  /// \brief Orders the character against another.
+  /// \param other The other character.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(Char other) const { return Read() <=> other; }
 
 private:
   [[nodiscard]] Char Read() const {
