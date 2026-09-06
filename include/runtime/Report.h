@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
+#include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 
@@ -95,7 +96,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> SaveAs(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean SaveAs(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.SaveAs(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -108,7 +109,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> SaveAsExcel(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean SaveAsExcel(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.SaveAsExcel(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -121,7 +122,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> SaveAsWord(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean SaveAsWord(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.SaveAsWord(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -134,7 +135,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> SaveAsHtml(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean SaveAsHtml(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.SaveAsHtml(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -147,7 +148,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> SaveAsXml(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean SaveAsXml(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.SaveAsXml(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -160,7 +161,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> Print(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean Print(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.Print(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
@@ -212,7 +213,7 @@ public:
   /// \return Never.
   /// \throws Error always -- a report has no translated body yet (board:0034).
   template <typename... Arguments>
-  static ::agiru::Text<0> GetSubstituteReportId(::agiru::Integer Number, Arguments &&...arguments) {
+  static ::agiru::Boolean GetSubstituteReportId(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.GetSubstituteReportId(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
