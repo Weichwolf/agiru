@@ -2036,3 +2036,5 @@ system/system/globalization/codeunit/LanguageImpl.cpp
 base/system/text/codeunit/DotNet_NormalizationForm.cpp
 base/system/threading/codeunit/JobQueueStartReportBase.cpp
 system/system/globalization/table/AllowedLanguage.cpp
+base/foundation/reporting/table/DocumentSendingProfile.cpp
+base/foundation/reporting/table/DocumentSendingProfile.cpp
