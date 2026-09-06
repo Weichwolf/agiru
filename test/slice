@@ -1564,7 +1564,6 @@ base/warehouse/activity/codeunit/CreateInventoryPutAway.cpp
 base/foundation/period/codeunit/DateFilterCalc.cpp
 base/finance/dimension/codeunit/DimensionBufferManagement.cpp
 base/utilities/codeunit/DocumentErrorsMgt.cpp
-base/system/date_time/codeunit/DotNetDateTimeOffset.cpp
 base/fixed_assets/posting/codeunit/FAJnlPostBatch.cpp
 base/finance/consolidation/codeunit/ImportConsolidationFromAPI.cpp
 base/inventory/posting/codeunit/ItemJnlPostBatch.cpp
@@ -2015,8 +2014,6 @@ base/intercompany/data_exchange/codeunit/ICDataExchangeAPI.cpp
 base/service/archive/codeunit/ServiceDocumentArchiveMgmt.cpp
 base/system/io/codeunit/TransformRuleFormatting.cpp
 base/finance/vat/calculation/codeunit/VATReportingDateMgt.cpp
-base/system/globalization/codeunit/DotNetCultureInfo.cpp
-base/system/date_time/codeunit/DotNetDateTimeStyles.cpp
 base/intercompany/data_exchange/table/ICIncomingNotification.cpp
 base/intercompany/data_exchange/table/BufferICCommentLine.cpp
 base/intercompany/data_exchange/table/BufferICDocumentDimension.cpp

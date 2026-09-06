@@ -30,6 +30,10 @@ std::vector<std::string> Words(std::string_view name) {
       current += c;
       continue;
     }
+    if (c == '_' && !current.empty()) {
+      current += c;
+      continue;
+    }
     if (c == '%') {
       if (!current.empty()) {
         words.push_back(current);
