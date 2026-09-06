@@ -4608,11 +4608,6 @@ std::string TestHttpResponseMessage::ReasonPhrase() {
   RefuseDoor("File.GetStamp()");
 }
 
-::agiru::BigInteger NumberSequence::Range(std::string_view Name, ::agiru::Integer Count) {
-  static_cast<void>(Name);
-  static_cast<void>(Count);
-  RefuseDoor("NumberSequence.Range()");
-}
 
 }
 

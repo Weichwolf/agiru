@@ -82,16 +82,6 @@ public:
   /// \param CompanySpecific The AL `Boolean`.
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  /// \brief AL `NumberSequence.Range` without its optional argument(s), which the
-  ///        documentation brackets.
-  /// \return The value.
-  /// \throws Error always -- the surface is declared, the behaviour is not.
-  /// \brief AL `NumberSequence.Range` without its optional argument(s), which the
-  ///        documentation brackets.
-  /// \return The value.
-  /// \throws Error always -- the surface is declared, the behaviour is not.
-  static ::agiru::BigInteger Range(std::string_view Name, ::agiru::Integer Count);
-
   static ::agiru::BigInteger Range(std::string_view Name, ::agiru::Integer Count, ::agiru::BigInteger &Increment);
 
   static ::agiru::BigInteger Range(std::string_view Name,

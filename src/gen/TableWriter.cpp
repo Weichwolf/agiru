@@ -312,6 +312,35 @@ DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumI
   flag("autoIncrement", PropertyIs(field, "AutoIncrement", false), false);
   flag("editable", PropertyIs(field, "Editable", true), true);
   flag("validateTableRelation", PropertyIs(field, "ValidateTableRelation", true), true);
+  {
+    const std::string relation = PropertyText(field, "TableRelation");
+    const std::string lowered = LowerKey(relation);
+    const bool simple = !relation.empty() && lowered.find("where") == std::string::npos &&
+                        lowered.find("if") == std::string::npos &&
+                        lowered.find("else") == std::string::npos;
+    if (simple) {
+      const auto unquote = [](std::string one) {
+        while (!one.empty() && (one.front() == '"' || one.front() == ' ')) { one.erase(0, 1); }
+        while (!one.empty() && (one.back() == '"' || one.back() == ' ' || one.back() == ';')) {
+          one.pop_back();
+        }
+        return one;
+      };
+      std::string target = relation;
+      std::string named;
+      const std::size_t dot = target.find("\".\"");
+      if (dot != std::string::npos) {
+        named = target.substr(dot + 2);
+        target = target.substr(0, dot + 1);
+      } else if (const std::size_t bare = target.find('.');
+                 bare != std::string::npos && target.front() != '"') {
+        named = target.substr(bare + 1);
+        target = target.substr(0, bare);
+      }
+      text("relationTable", unquote(target));
+      text("relationField", unquote(named));
+    }
+  }
   flag("blankZero", PropertyIs(field, "BlankZero", false), false);
   text("minValue", PropertyText(field, "MinValue"));
   text("maxValue", PropertyText(field, "MaxValue"));

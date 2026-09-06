@@ -200,7 +200,20 @@ struct FieldDef {
   /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.
   std::string_view access{};
 
+  /// \brief The `TableRelation`'s target table, empty where the declaration is conditional or
+  ///        filtered.
+  ///
+  /// \note THE SIMPLE FORM IS THE MAJORITY AND THE WHOLE GRAMMAR IS NOT. `TableRelation` is a small
+  ///       language -- `if (...) T.F where(...) else ...` -- and 72 % of the BaseApp's declarations
+  ///       are the bare `Table[.Field]` (measured over 400 declarations, 2026-09-06). What is here
+  ///       is that majority; the rest is board:0043, and an empty target says so.
+  std::string_view relationTable{};
+
+  /// \brief The `TableRelation`'s target field, empty where it names the table's own primary key.
+  std::string_view relationField{};
+
   /// \brief The `ObsoleteState` property, as AL wrote it -- `Pending` or `Removed`, else empty.
+
   std::string_view obsoleteState{};
 
   /// \brief The `ObsoleteReason` property: the text a diagnostic prints.

@@ -275,9 +275,6 @@ constexpr std::array kAcknowledgedAttributes{
               std::string_view{"debugger visibility; no debugger here"}},
 };
 
-// THE LIST IS DERIVED FROM THE WRITERS, not written beside them: every `Find(properties, "X")`
-// and every `PropertyIs(field, "X", ...)` in `src/gen` names a property the generator READS, and
-// this array is that grep, checked into the tree so the census can subtract it (board:0067).
 constexpr std::array kTranslatedProperties{
     std::string_view{"access"},
     std::string_view{"allowincustomizations"},
@@ -323,24 +320,31 @@ constexpr std::array kTranslatedProperties{
     std::string_view{"width"},
 };
 
-// A PROPERTY DROPPED BY DECISION CARRIES THE REASON, so the census's remainder is what nobody has
-// looked at rather than what nobody has written yet (board:0067).
 constexpr std::array kDroppedProperties{
-    std::pair{std::string_view{"applicationarea"}, std::string_view{"the UI decides visibility (board:0030)"}},
+    std::pair{std::string_view{"applicationarea"},
+              std::string_view{"the UI decides visibility (board:0030)"}},
     std::pair{std::string_view{"tooltip"}, std::string_view{"the UI shows it (board:0030)"}},
-    std::pair{std::string_view{"visible"}, std::string_view{"the UI decides visibility (board:0030)"}},
+    std::pair{std::string_view{"visible"},
+              std::string_view{"the UI decides visibility (board:0030)"}},
     std::pair{std::string_view{"image"}, std::string_view{"the UI draws it (board:0030)"}},
     std::pair{std::string_view{"promoted"}, std::string_view{"the UI's action bar (board:0030)"}},
-    std::pair{std::string_view{"promotedcategory"}, std::string_view{"the UI's action bar (board:0030)"}},
-    std::pair{std::string_view{"promotedisbig"}, std::string_view{"the UI's action bar (board:0030)"}},
-    std::pair{std::string_view{"promotedonly"}, std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedcategory"},
+              std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedisbig"},
+              std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedonly"},
+              std::string_view{"the UI's action bar (board:0030)"}},
     std::pair{std::string_view{"style"}, std::string_view{"the UI renders it (board:0030)"}},
     std::pair{std::string_view{"styleexpr"}, std::string_view{"the UI renders it (board:0030)"}},
     std::pair{std::string_view{"showcaption"}, std::string_view{"the UI renders it (board:0030)"}},
-    std::pair{std::string_view{"multiplenewlines"}, std::string_view{"the UI's list behaviour (board:0030)"}},
-    std::pair{std::string_view{"dataclassification"}, std::string_view{"telemetry classification, no run-time behaviour"}},
-    std::pair{std::string_view{"obsoletereason"}, std::string_view{"a diagnostic's text (board:0069)"}},
-    std::pair{std::string_view{"obsoletetag"}, std::string_view{"a diagnostic's text (board:0069)"}},
+    std::pair{std::string_view{"multiplenewlines"},
+              std::string_view{"the UI's list behaviour (board:0030)"}},
+    std::pair{std::string_view{"dataclassification"},
+              std::string_view{"telemetry classification, no run-time behaviour"}},
+    std::pair{std::string_view{"obsoletereason"},
+              std::string_view{"a diagnostic's text (board:0069)"}},
+    std::pair{std::string_view{"obsoletetag"},
+              std::string_view{"a diagnostic's text (board:0069)"}},
 };
 
 constexpr std::array kActedOnAttributes{
@@ -393,7 +397,8 @@ void NotePropertiesOf(const agiru::al::TableObject &table,
 
 void NotePropertiesOf(const agiru::al::PageObject &page, std::map<std::string, std::size_t> &into) {
   NoteProperties(page.properties, into);
-  const auto walk = [&into](auto &&self, const std::vector<agiru::al::PageControl> &controls) -> void {
+  const auto walk = [&into](auto &&self,
+                            const std::vector<agiru::al::PageControl> &controls) -> void {
     for (const agiru::al::PageControl &control : controls) {
       NoteProperties(control.properties, into);
       self(self, control.children);
@@ -769,8 +774,8 @@ void WriteTable(Run &run,
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   Absorb(gathered.refused, agiru::gen::Refused(table));
   CountAttributes(table, gathered.attributes, gathered.deprecatedScopes);
-    NotePropertiesOf(table, gathered.properties);
-    CheckNormal(table, "table", false, gathered.refused);
+  NotePropertiesOf(table, gathered.properties);
+  CheckNormal(table, "table", false, gathered.refused);
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
@@ -812,8 +817,7 @@ void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums 
                               "enums::" + agiru::gen::Identifier(field.subtype));
       continue;
     }
-    if (const agiru::al::Property *members =
-            agiru::al::Find(field.properties, "OptionMembers");
+    if (const agiru::al::Property *members = agiru::al::Find(field.properties, "OptionMembers");
         members != nullptr) {
       const std::string named =
           agiru::gen::OptionEnumName(table.name, field.name, agiru::al::ListValue(*members));
@@ -1075,8 +1079,21 @@ void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
     out += "  static constexpr XmlPortId Id() { return kId; }\n\n";
-    for (const std::string_view member :
-         {"Export", "Import", "Run", "SetSource", "SetDestination", "SetTableView", "GetTableView", "SetXmlDocument", "GetXmlDocument", "SetJsonDocument", "GetJsonDocument", "FilterGroup", "ObjectId", "Language", "FormatRegion"}) {
+    for (const std::string_view member : {"Export",
+                                          "Import",
+                                          "Run",
+                                          "SetSource",
+                                          "SetDestination",
+                                          "SetTableView",
+                                          "GetTableView",
+                                          "SetXmlDocument",
+                                          "GetXmlDocument",
+                                          "SetJsonDocument",
+                                          "GetJsonDocument",
+                                          "FilterGroup",
+                                          "ObjectId",
+                                          "Language",
+                                          "FormatRegion"}) {
       out += "  template <typename... Arguments> std::string ";
       out += member;
       out += "(Arguments &&...arguments) const {\n";
@@ -1126,8 +1143,19 @@ void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
     out += "  static constexpr QueryId Id() { return kId; }\n\n";
-    for (const std::string_view member :
-         {"Open", "Read", "Close", "Run", "SetRange", "SetFilter", "GetFilter", "SetCurrentKey", "TopNumberOfRows", "ObjectId", "SaveAsXml", "SaveAsCsv", "ColumnFilter"}) {
+    for (const std::string_view member : {"Open",
+                                          "Read",
+                                          "Close",
+                                          "Run",
+                                          "SetRange",
+                                          "SetFilter",
+                                          "GetFilter",
+                                          "SetCurrentKey",
+                                          "TopNumberOfRows",
+                                          "ObjectId",
+                                          "SaveAsXml",
+                                          "SaveAsCsv",
+                                          "ColumnFilter"}) {
       out += "  template <typename... Arguments> std::string ";
       out += member;
       out += "(Arguments &&...arguments) const {\n";
@@ -1267,9 +1295,9 @@ void WriteOptions(const std::filesystem::path &out, const OptionsInScope &option
     text += "  static constexpr std::array<EnumValueDef, " + std::to_string(members.size()) +
             "> kValues{{\n";
     for (std::size_t i = 0; i < members.size(); ++i) {
-      text += "      EnumValueDef{.ordinal = " + std::to_string(i) + ", .name = " +
-              agiru::gen::Literal(names[i]) + ", .caption = " + agiru::gen::Literal(members[i]) +
-              "},\n";
+      text += "      EnumValueDef{.ordinal = " + std::to_string(i) +
+              ", .name = " + agiru::gen::Literal(names[i]) +
+              ", .caption = " + agiru::gen::Literal(members[i]) + "},\n";
     }
     text += "  }};\n};\n\n";
   }
@@ -1563,8 +1591,9 @@ int Scan(const Job &job) {
   if (!untranslated.empty()) {
     std::size_t total = 0;
     for (const auto &[kind, found] : untranslated) { total += found; }
-    std::println("untranslated {} object(s) in scope whose kind has no generator at all (board:0034)",
-                 total);
+    std::println(
+        "untranslated {} object(s) in scope whose kind has no generator at all (board:0034)",
+        total);
     std::vector<std::pair<std::string, std::size_t>> ranked(untranslated.begin(),
                                                             untranslated.end());
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
@@ -1606,9 +1635,8 @@ int Scan(const Job &job) {
                  dropped,
                  ranked.size());
     for (const auto &[dead, found] : gathered.deprecatedScopes) {
-      std::println("          {:>5} x [Scope] {} -- deprecated in runtime 4.0 (board:0216)",
-                   found,
-                   dead);
+      std::println(
+          "          {:>5} x [Scope] {} -- deprecated in runtime 4.0 (board:0216)", found, dead);
     }
     for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
   }
