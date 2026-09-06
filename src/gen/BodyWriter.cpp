@@ -431,6 +431,7 @@ private:
     if (SameName(base, "Page")) { return "::agiru::Page<>"; }
     if (SameName(base, "Report")) { return "::agiru::Report<>"; }
     if (SameName(base, "XmlPort")) { return "::agiru::XmlPort<>"; }
+    if (SameName(base, "Codeunit")) { return "::agiru::Codeunit<>"; }
     return {};
   }
 
@@ -1153,6 +1154,9 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where != nullptr && TypeName(where->type) == "DotNet") { return false; }
+    }
     const al::VarDecl *local = Local(member.variable);
     if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
     if (local == nullptr) {

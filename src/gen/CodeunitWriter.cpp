@@ -1026,6 +1026,10 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    if (const al::VarDecl *dotnet = Declaration(member.variable);
+        dotnet != nullptr && TypeName(dotnet->type) == "DotNet") {
+      return false;
+    }
     if (MembersAreCalls(member.variable)) { return true; }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
@@ -1093,6 +1097,9 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
+    if (declared != nullptr && TypeName(declared->type) == "DotNet") {
+      return Identifier(member.field);
+    }
     if (declared != nullptr && TypeName(declared->type) == "Codeunit" &&
         !declared->subtype.empty()) {
       const auto unit = objects_.codeunits.find(LowerKey(declared->subtype));

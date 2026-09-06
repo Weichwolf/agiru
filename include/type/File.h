@@ -61,11 +61,24 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CreateInStream(const ::agiru::InStream &InStream);
 
+  /// \brief AL `File.CreateInStream(InStream, TextEncoding)` -- the encoding the file is read in.
+  /// \param InStream The stream.
+  /// \param Encoding The encoding.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void CreateInStream(const ::agiru::InStream &InStream, const ::agiru::TextEncoding &Encoding);
+
   /// \brief AL `File.CreateOutStream(OutStream)`. Creates an OutStream object for a file. This
   /// enables you to export or write data to the file.
   /// \param OutStream The AL `OutStream`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CreateOutStream(const ::agiru::OutStream &OutStream);
+
+  /// \brief AL `File.CreateOutStream(OutStream, TextEncoding)` -- the encoding the file is written
+  ///        in.
+  /// \param OutStream The stream.
+  /// \param Encoding  The encoding.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void CreateOutStream(const ::agiru::OutStream &OutStream, const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.CreateTempFile(TextEncoding)`. Creates a temporary file. This enables you to
   /// save data of any format to a temporary file. This file has a unique name and will be stored in

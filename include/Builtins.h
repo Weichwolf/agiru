@@ -850,11 +850,28 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              ::agiru::Duration Timeout,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record);
+/// \brief AL `StartSession(Timeout, Company, Record)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             ::agiru::Duration Timeout,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Timeout);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record, Duration)`. Starts a session
 /// without a UI and runs the specified codeunit.
@@ -865,11 +882,28 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Timeout The AL `Duration`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record,
-                              ::agiru::Duration Timeout);
+/// \brief AL `StartSession(Company, Record, Timeout)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record,
+             ::agiru::Duration Timeout) {
+  static_cast<void>(Timeout);
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record)`. Starts a session without a UI
 /// and runs the specified codeunit.
@@ -879,10 +913,26 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record);
+/// \brief AL `StartSession(Company, Record)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StopSession(Integer, Text)`. Stops a session.
 /// \param SessionId The AL `Integer`.

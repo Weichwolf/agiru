@@ -416,6 +416,20 @@ void File::Close() {
   RefuseDoor("File.Create(Text, TextEncoding)");
 }
 
+void File::CreateInStream(const ::agiru::InStream &InStream,
+                          const ::agiru::TextEncoding &Encoding) {
+  static_cast<void>(InStream);
+  static_cast<void>(Encoding);
+  RefuseDoor("File.CreateInStream(InStream, TextEncoding)");
+}
+
+void File::CreateOutStream(const ::agiru::OutStream &OutStream,
+                           const ::agiru::TextEncoding &Encoding) {
+  static_cast<void>(OutStream);
+  static_cast<void>(Encoding);
+  RefuseDoor("File.CreateOutStream(OutStream, TextEncoding)");
+}
+
 void File::CreateInStream(const ::agiru::InStream &InStream) {
   static_cast<void>(InStream);
   RefuseDoor("File.CreateInStream(InStream)");

@@ -1,10 +1,9 @@
 #include "Builtins.h"
 
-#include "runtime/Scopes.h"
-#include "runtime/test/Handlers.h"
-
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Scopes.h"
+#include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -653,43 +652,6 @@ void SendTraceTag(std::string_view Tag,
 void SetDocumentServiceToken(std::string_view Token) {
   static_cast<void>(Token);
   RefuseDoor("Session.SetDocumentServiceToken(Text)");
-}
-
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              ::agiru::Duration Timeout,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Timeout);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  RefuseDoor("Session.StartSession(Integer, Integer, Duration, Text, Record)");
-}
-
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record,
-                              ::agiru::Duration Timeout) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  static_cast<void>(Timeout);
-  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record, Duration)");
-}
-
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record)");
 }
 
 ::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment) {
