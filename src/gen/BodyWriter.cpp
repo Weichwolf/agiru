@@ -1154,9 +1154,6 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
-      if (where != nullptr && TypeName(where->type) == "DotNet") { return false; }
-    }
     const al::VarDecl *local = Local(member.variable);
     if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
     if (local == nullptr) {
@@ -1308,6 +1305,11 @@ public:
       const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
       if (found != unit->second.procedures.end()) { return found->second; }
       break;
+    }
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where != nullptr && TypeName(where->type) == "DotNet") {
+        return Identifier(member.field);
+      }
     }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
       const auto field = fields->find(LowerKey(std::string(member.field)));

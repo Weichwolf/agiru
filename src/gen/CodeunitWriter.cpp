@@ -1026,10 +1026,6 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
-    if (const al::VarDecl *dotnet = Declaration(member.variable);
-        dotnet != nullptr && TypeName(dotnet->type) == "DotNet") {
-      return false;
-    }
     if (MembersAreCalls(member.variable)) { return true; }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
