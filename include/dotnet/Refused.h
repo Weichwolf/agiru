@@ -384,6 +384,84 @@ private:
 ///       call it has already refused. So the result carries the members BCApps reaches that way
 ///       (measured 2026-09-05 over the UT census), each a refusal of its own, and a name outside
 ///       this list is a compile error naming the member -- which is the census's next entry.
+/// \brief What an AL OBJECT this run does not have still has to answer: the record and
+///        codeunit surface a body reaches on it.
+///
+/// \note A STUB IS NOT ONLY A BAG OF NAMED MEMBERS. A page over an absent table calls
+///       `Rec.Find`, a codeunit variable calls `Run`, and neither name appears in the
+///       gathered member list because the gatherer only sees `.X` in a BODY. The surface
+///       is inherited once rather than emitted 843 times (board:0032, board:0035).
+struct AbsentObject {
+  Refused Find{{.type = "<absent object>", .member = "Find"}}; ///< The AL member.
+  Refused FindFirst{{.type = "<absent object>", .member = "FindFirst"}}; ///< The AL member.
+  Refused FindLast{{.type = "<absent object>", .member = "FindLast"}}; ///< The AL member.
+  Refused FindSet{{.type = "<absent object>", .member = "FindSet"}}; ///< The AL member.
+  Refused Next{{.type = "<absent object>", .member = "Next"}}; ///< The AL member.
+  Refused Get{{.type = "<absent object>", .member = "Get"}}; ///< The AL member.
+  Refused GetBySystemId{{.type = "<absent object>", .member = "GetBySystemId"}}; ///< The AL member.
+  Refused Insert{{.type = "<absent object>", .member = "Insert"}}; ///< The AL member.
+  Refused Modify{{.type = "<absent object>", .member = "Modify"}}; ///< The AL member.
+  Refused Delete{{.type = "<absent object>", .member = "Delete"}}; ///< The AL member.
+  Refused DeleteAll{{.type = "<absent object>", .member = "DeleteAll"}}; ///< The AL member.
+  Refused ModifyAll{{.type = "<absent object>", .member = "ModifyAll"}}; ///< The AL member.
+  Refused Rename{{.type = "<absent object>", .member = "Rename"}}; ///< The AL member.
+  Refused Init{{.type = "<absent object>", .member = "Init"}}; ///< The AL member.
+  Refused Reset{{.type = "<absent object>", .member = "Reset"}}; ///< The AL member.
+  Refused SetRange{{.type = "<absent object>", .member = "SetRange"}}; ///< The AL member.
+  Refused SetFilter{{.type = "<absent object>", .member = "SetFilter"}}; ///< The AL member.
+  Refused GetFilter{{.type = "<absent object>", .member = "GetFilter"}}; ///< The AL member.
+  Refused GetFilters{{.type = "<absent object>", .member = "GetFilters"}}; ///< The AL member.
+  Refused SetCurrentKey{{.type = "<absent object>", .member = "SetCurrentKey"}}; ///< The AL member.
+  Refused SetView{{.type = "<absent object>", .member = "SetView"}}; ///< The AL member.
+  Refused GetView{{.type = "<absent object>", .member = "GetView"}}; ///< The AL member.
+  Refused SetAscending{{.type = "<absent object>", .member = "SetAscending"}}; ///< The AL member.
+  Refused IsEmpty{{.type = "<absent object>", .member = "IsEmpty"}}; ///< The AL member.
+  Refused Count{{.type = "<absent object>", .member = "Count"}}; ///< The AL member.
+  Refused CountApprox{{.type = "<absent object>", .member = "CountApprox"}}; ///< The AL member.
+  Refused CalcFields{{.type = "<absent object>", .member = "CalcFields"}}; ///< The AL member.
+  Refused CalcSums{{.type = "<absent object>", .member = "CalcSums"}}; ///< The AL member.
+  Refused TestField{{.type = "<absent object>", .member = "TestField"}}; ///< The AL member.
+  Refused FieldError{{.type = "<absent object>", .member = "FieldError"}}; ///< The AL member.
+  Refused FieldCaption{{.type = "<absent object>", .member = "FieldCaption"}}; ///< The AL member.
+  Refused TableCaption{{.type = "<absent object>", .member = "TableCaption"}}; ///< The AL member.
+  Refused FieldName{{.type = "<absent object>", .member = "FieldName"}}; ///< The AL member.
+  Refused FieldNo{{.type = "<absent object>", .member = "FieldNo"}}; ///< The AL member.
+  Refused Validate{{.type = "<absent object>", .member = "Validate"}}; ///< The AL member.
+  Refused TransferFields{{.type = "<absent object>", .member = "TransferFields"}}; ///< The AL member.
+  Refused CopyFilters{{.type = "<absent object>", .member = "CopyFilters"}}; ///< The AL member.
+  Refused CopyFilter{{.type = "<absent object>", .member = "CopyFilter"}}; ///< The AL member.
+  Refused SetRecFilter{{.type = "<absent object>", .member = "SetRecFilter"}}; ///< The AL member.
+  Refused Mark{{.type = "<absent object>", .member = "Mark"}}; ///< The AL member.
+  Refused MarkedOnly{{.type = "<absent object>", .member = "MarkedOnly"}}; ///< The AL member.
+  Refused ClearMarks{{.type = "<absent object>", .member = "ClearMarks"}}; ///< The AL member.
+  Refused LockTable{{.type = "<absent object>", .member = "LockTable"}}; ///< The AL member.
+  Refused Run{{.type = "<absent object>", .member = "Run"}}; ///< The AL member.
+  Refused RunModal{{.type = "<absent object>", .member = "RunModal"}}; ///< The AL member.
+  Refused SetTableView{{.type = "<absent object>", .member = "SetTableView"}}; ///< The AL member.
+  Refused SetTempTableView{{.type = "<absent object>", .member = "SetTempTableView"}}; ///< The AL member.
+  Refused Ascending{{.type = "<absent object>", .member = "Ascending"}}; ///< The AL member.
+  Refused RecordId{{.type = "<absent object>", .member = "RecordId"}}; ///< The AL member.
+  Refused SystemId{{.type = "<absent object>", .member = "SystemId"}}; ///< The AL member.
+  Refused CurrentKeyIndex{{.type = "<absent object>", .member = "CurrentKeyIndex"}}; ///< The AL member.
+  Refused ChangeCompany{{.type = "<absent object>", .member = "ChangeCompany"}}; ///< The AL member.
+  Refused AddLoadFields{{.type = "<absent object>", .member = "AddLoadFields"}}; ///< The AL member.
+  Refused SetLoadFields{{.type = "<absent object>", .member = "SetLoadFields"}}; ///< The AL member.
+  Refused LoadFields{{.type = "<absent object>", .member = "LoadFields"}}; ///< The AL member.
+  Refused AreFieldsLoaded{{.type = "<absent object>", .member = "AreFieldsLoaded"}}; ///< The AL member.
+  Refused SetAutoCalcFields{{.type = "<absent object>", .member = "SetAutoCalcFields"}}; ///< The AL member.
+  Refused HasFilter{{.type = "<absent object>", .member = "HasFilter"}}; ///< The AL member.
+  Refused FilterGroup{{.type = "<absent object>", .member = "FilterGroup"}}; ///< The AL member.
+  Refused ReadPermission{{.type = "<absent object>", .member = "ReadPermission"}}; ///< The AL member.
+  Refused WritePermission{{.type = "<absent object>", .member = "WritePermission"}}; ///< The AL member.
+  Refused ReadIsolation{{.type = "<absent object>", .member = "ReadIsolation"}}; ///< The AL member.
+  Refused SecurityFiltering{{.type = "<absent object>", .member = "SecurityFiltering"}}; ///< The AL member.
+  Refused IsTemporary{{.type = "<absent object>", .member = "IsTemporary"}}; ///< The AL member.
+  Refused Copy{{.type = "<absent object>", .member = "Copy"}}; ///< The AL member.
+  Refused Number{{.type = "<absent object>", .member = "Number"}}; ///< The AL member.
+  Refused Open{{.type = "<absent object>", .member = "Open"}}; ///< The AL member.
+  Refused Close{{.type = "<absent object>", .member = "Close"}}; ///< The AL member.
+};
+
 struct RefusedResult : Refused {
   using Refused::Refused;
   Refused Groups{{.type = "<result>", .member = "Groups"}};             ///< The chained member.

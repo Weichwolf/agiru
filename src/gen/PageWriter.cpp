@@ -261,7 +261,8 @@ std::string SourceTable(const al::PageObject &object, const Objects &objects) {
   std::string name;
   for (const al::Token &token : source->value) { name += token.text; }
   const auto found = objects.tables.find(LowerKey(name));
-  return found == objects.tables.end() ? std::string{} : found->second.identifier;
+  if (found != objects.tables.end()) { return found->second.identifier; }
+  return "absent::" + Identifier(name);
 }
 
 }
@@ -324,7 +325,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
   out += kDoorMarker;
-  if (NamesAbsentIn(object.variables, object.procedures, objects)) {
+  if (NamesAbsentIn(object.variables, object.procedures, objects) ||
+      SourceTable(object, objects).starts_with("absent::")) {
     out += "#include \"absent/Types.h\"\n";
   }
   const std::string includes = Includes(object, objects);

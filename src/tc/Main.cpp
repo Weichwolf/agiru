@@ -1261,14 +1261,17 @@ struct Counted {
   std::size_t members = 0;
 };
 
-Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebuilt) {
+Counted Stubs(std::string &text,
+              const agiru::gen::DotNetUse &use,
+              bool skipRebuilt,
+              bool alObjects = false) {
   Counted counted;
   for (const auto &[type, named] : use) {
     if (skipRebuilt && Rebuilt().contains(type)) { continue; }
     ++counted.types;
     text += "\nstruct ";
     text += type;
-    text += " {\n";
+    text += alObjects ? " : ::agiru::dotnet::AbsentObject {\n" : " {\n";
     for (const std::string &member : named) {
       ++counted.members;
       text += "  ::agiru::dotnet::Refused ";
@@ -1332,7 +1335,7 @@ void WriteAbsent(const std::filesystem::path &out,
   text += "\nnamespace agiru::dotnet {\n";
   const Counted net = Stubs(text, dotnet, true);
   text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::app::absent {\n";
-  const Counted objects = Stubs(text, absent, false);
+  const Counted objects = Stubs(text, absent, false, true);
   text += "\n} // namespace agiru::app::absent\n";
 
   const std::filesystem::path path = out / "absent" / "absent" / "Types.h";

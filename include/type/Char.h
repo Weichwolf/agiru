@@ -32,6 +32,20 @@ public:
   /// \param code The code point.
   constexpr explicit Char(std::int32_t code) : code_(code) {}
 
+  /// \brief AL passes `'+'` where a `Char` is declared -- a one-character text IS a character.
+  /// \param text The text, whose single character is taken.
+  /// \throws Error when the text is not exactly one character.
+  constexpr explicit(false) Char(std::string_view text)
+      : code_(text.size() == 1 ? static_cast<std::int32_t>(static_cast<unsigned char>(text.front()))
+                               : throw Error("A text of length " + std::to_string(text.size()) +
+                                             " is not one character")) {}
+
+  /// \brief AL passes a one-character literal where a `Char` is declared.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  template <std::size_t N>
+  constexpr explicit(false) Char(const char (&text)[N]) : Char(std::string_view(text, N - 1)) {}
+
   /// \brief Assigns a code point.
   ///
   /// \param code The code point.
