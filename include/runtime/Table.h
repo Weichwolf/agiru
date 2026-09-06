@@ -91,7 +91,6 @@ private:
   bool read_ = false;
 };
 
-
 /// \brief Makes a record the `xRec` of the trigger about to run.
 ///
 /// \param record The record as it was BEFORE the change, which the caller owns and must outlive

@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/Integer.h"
+#include "type/Text.h"
 
 #include <string>
 
@@ -71,6 +72,149 @@ public:
   static void Execute(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.Execute(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.RunRequestPage(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> RunRequestPage(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.RunRequestPage(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.SaveAs(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> SaveAs(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.SaveAs(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.SaveAsExcel(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> SaveAsExcel(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.SaveAsExcel(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.SaveAsWord(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> SaveAsWord(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.SaveAsWord(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.SaveAsHtml(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> SaveAsHtml(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.SaveAsHtml(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.SaveAsXml(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> SaveAsXml(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.SaveAsXml(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.Print(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> Print(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.Print(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.ObjectId(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> ObjectId(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.ObjectId(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.Language(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> Language(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.Language(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.FormatRegion(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> FormatRegion(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.FormatRegion(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.GetSubstituteReportId(Number, ...)`.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> GetSubstituteReportId(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.GetSubstituteReportId(" + std::to_string(Number) +
                 ") has no translated report body yet (board:0034)");
   }
 

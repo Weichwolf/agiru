@@ -1,7 +1,5 @@
 #include "runtime/Table.h"
 
-#include <exception>
-
 #include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
@@ -29,6 +27,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <format>
 #include <optional>
 #include <span>
@@ -43,7 +42,6 @@ Found::~Found() noexcept(false) {
   if (read_ || found_ || std::uncaught_exceptions() != 0) { return; }
   throw Error("There is no " + std::string(table_) + " within the filter.");
 }
-
 
 class ValueAccess {
 public:

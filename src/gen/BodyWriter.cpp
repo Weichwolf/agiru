@@ -236,6 +236,17 @@ private:
         const std::string counter = Expression(statement.expression.children.front(), 0);
         const std::string first = Expression(statement.expression.children.back(), 0);
         const std::string last = Expression(statement.labels.front(), 0);
+        const bool overBooleans = (first == "true" || first == "false") &&
+                                  (last == "true" || last == "false");
+        if (overBooleans) {
+          const std::string step = "Step_Block";
+          out = Pad(indent) + "for (::agiru::Integer " + step + " = " + (first == "true" ? "1" : "0") +
+                "; " + step + (statement.descending ? " >= " : " <= ") +
+                (last == "true" ? "1" : "0") + "; " + (statement.descending ? "--" : "++") + step +
+                ") {\n" + Pad(indent + 2) + counter + " = " + step + " != 0;\n" +
+                Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+          break;
+        }
         out = Pad(indent) + "for (" + counter + " = " + first + "; " + counter +
               (statement.descending ? " >= " : " <= ") + last + "; " +
               (statement.descending ? "--" : "++") + counter + ") {\n" +
@@ -416,19 +427,36 @@ private:
     return "::agiru::RaiseOrCollect(" + message + ")";
   }
 
+  static std::string_view PlatformObject(std::string_view base) {
+    if (SameName(base, "Page")) { return "::agiru::Page<>"; }
+    if (SameName(base, "Report")) { return "::agiru::Report<>"; }
+    if (SameName(base, "XmlPort")) { return "::agiru::XmlPort<>"; }
+    return {};
+  }
+
   std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
     const al::Expr &named = expression.children[1];
+    const std::string member = Identifier(callee.children[1].text);
     std::string subject = Expression(named, kPrimaryPrecedence);
+    std::size_t first = 2;
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
         named.children.front().kind == al::ExprKind::Name) {
       const std::string_view kind = KindNamespace(named.children.front().text);
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
+    } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
+               !platform.empty()) {
+      std::string out = std::string(platform) + "::" +
+                        (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
+      for (std::size_t i = 1; i < expression.children.size(); ++i) {
+        if (i != 1) { out += ", "; }
+        out += Expression(expression.children[i], 0);
+      }
+      return out + ")";
     }
-    const std::string member = Identifier(callee.children[1].text);
     std::string out =
         subject + "." + (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
-    for (std::size_t i = 2; i < expression.children.size(); ++i) {
-      if (i != 2) { out += ", "; }
+    for (std::size_t i = first; i < expression.children.size(); ++i) {
+      if (i != first) { out += ", "; }
       out += Expression(expression.children[i], 0);
     }
     return out + ")";
@@ -483,7 +511,7 @@ private:
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[0].kind == al::ExprKind::Name &&
         !KindNamespace(callee.children[0].text).empty() && expression.children.size() > 1 &&
-        expression.children[1].kind == al::ExprKind::Scope) {
+        !scope_.IsVariable(callee.children[0].text)) {
       return RunObject(expression, callee);
     }
     const std::string spelled = Callee(callee);
