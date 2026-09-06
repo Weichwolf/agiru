@@ -64,11 +64,6 @@ std::string ApplicationPath() {
   RefuseDoor("System.CalcDate(Text, Date)");
 }
 
-::agiru::Boolean CanLoadType(const ::agiru::Variant &DotNet) {
-  static_cast<void>(DotNet);
-  RefuseDoor("System.CanLoadType(DotNet)");
-}
-
 std::string CaptionClassTranslate(std::string_view CaptionClassText) {
   static_cast<void>(CaptionClassText);
   RefuseDoor("System.CaptionClassTranslate(Text)");
@@ -104,22 +99,6 @@ void CodeCoverageLoad() {
 
 void CodeCoverageRefresh() {
   RefuseDoor("System.CodeCoverageRefresh()");
-}
-
-::agiru::Integer CompressArray(const ::agiru::Variant &StringArray) {
-  static_cast<void>(StringArray);
-  RefuseDoor("System.CompressArray(Array of [Text])");
-}
-
-void CopyArray(const ::agiru::Variant &NewArray,
-               const ::agiru::Variant &Array,
-               ::agiru::Integer Position,
-               ::agiru::Integer Length) {
-  static_cast<void>(NewArray);
-  static_cast<void>(Array);
-  static_cast<void>(Position);
-  static_cast<void>(Length);
-  RefuseDoor("System.CopyArray(Array of [Any], Array of [Any], Integer, Integer)");
 }
 
 ::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,

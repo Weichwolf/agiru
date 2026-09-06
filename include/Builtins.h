@@ -84,7 +84,11 @@ std::string ApplicationPath();
 /// \param DotNet The AL `DotNet`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean CanLoadType(const ::agiru::Variant &DotNet);
+template <typename T> ::agiru::Boolean CanLoadType(const T &DotNet) {
+  static_cast<void>(DotNet);
+  throw ::agiru::Error("System.CanLoadType(DotNet) is declared and not implemented yet "
+                       "(board:0035)");
+}
 
 /// \brief AL `System.CaptionClassTranslate(Text)`. Returns a translated version of the caption
 /// string. The string is translated to the current local language.
@@ -138,7 +142,13 @@ void CodeCoverageRefresh();
 /// \param StringArray The AL `Array of [Text]`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer CompressArray(const ::agiru::Variant &StringArray);
+template <typename A>
+  requires requires(const A &array) { array.Length(); }
+::agiru::Integer CompressArray(A &StringArray) {
+  static_cast<void>(StringArray);
+  throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
+                       "(board:0035)");
+}
 
 /// \brief AL `System.CopyArray(Array of [Any], Array of [Any], Integer, Integer)`. Copies one or
 /// more elements in an array to a new array.
@@ -147,10 +157,16 @@ void CodeCoverageRefresh();
 /// \param Position The AL `Integer`.
 /// \param Length The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void CopyArray(const ::agiru::Variant &NewArray,
-               const ::agiru::Variant &Array,
-               ::agiru::Integer Position,
-               ::agiru::Integer Length = {});
+template <typename A, typename B>
+  requires requires(const B &array) { array.Length(); }
+void CopyArray(A &NewArray, const B &Array, ::agiru::Integer Position,
+               ::agiru::Integer Length = {}) {
+  static_cast<void>(NewArray);
+  static_cast<void>(Array);
+  static_cast<void>(Position);
+  static_cast<void>(Length);
+  throw ::agiru::Error("System.CopyArray is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `System.CopyStream(OutStream, InStream, Integer)`. Copies the information that is
 /// contained in an InStream to an OutStream.
