@@ -686,6 +686,12 @@ private:
                                        .field = base.children.back().text})) {
       return Parens::First;
     }
+    if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
+        base.children.back().kind == al::ExprKind::Name &&
+        base.children.front().kind == al::ExprKind::Name && last.kind == al::ExprKind::Name &&
+        DoorCalls(last.text)) {
+      return Parens::Last;
+    }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
     if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
     if (last.kind == al::ExprKind::Name &&
@@ -916,10 +922,12 @@ private:
       out = "(" + out + ")";
     }
     for (std::size_t i = chain.size(); i > 0; --i) {
+      const al::Expr &base = i == chain.size() ? *walk : *chain[i];
+      const bool here = i > 1 && Calls(spelling, base, *chain[i - 1]) == Parens::Last;
       Link(out,
            {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
            {.arrow = handle && i == chain.size(),
-            .parens = calls != Parens::None && (calls == Parens::First || i == 1) &&
+            .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
                       !(asCallee && i == 1),
             .precedence = precedence,
             .callee = asCallee && i == 1});
@@ -1429,7 +1437,9 @@ public:
       return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
     }
     const al::VarDecl *declared = DeclarationOf(member.variable);
-    if (declared == nullptr) { return false; }
+    if (declared == nullptr) {
+      return !ControlOf(member.variable).empty() && DoorCalls(member.field);
+    }
     const std::string type = TypeName(declared->type);
     if (type == "Page" || type == "TestPage" || type == "TestRequestPage") {
       const auto page = objects_.pages.find(LowerKey(declared->subtype));

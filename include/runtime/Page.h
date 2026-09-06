@@ -72,6 +72,42 @@ public:
 ///       the generator spells the static form `Page<>::RunModal`. `Id()` and `Name()` are the two
 ///       that need a Derived, and asking for them on `Page<>` is a compile error rather than a
 ///       wrong number.
+/// \brief A PART control on a page: AL reaches the sub-page through it -- `CurrPage.Matrix.PAGE`.
+///
+/// \tparam P The sub-page's generated class.
+///
+/// \note THE PART IS A CONTROL AND THE SUB-PAGE IS AN OBJECT, and AL keeps them apart with
+///       `.PAGE`. The part itself carries what the platform offers on a control (`Visible`,
+///       `Editable`); everything on the other side of `.PAGE` is the sub-page's own surface, and
+///       reaching it needs a running UI (board:0030).
+template <typename P> class PartRef {
+public:
+  /// \brief AL `CurrPage.<Part>.PAGE` -- the sub-page behind the part.
+  /// \return Never.
+  /// \throws Error always -- a part's page needs a running UI (board:0030).
+  [[nodiscard]] P &Page() const {
+    throw Error("A part's PAGE needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `CurrPage.<Part>.Visible(Boolean)`.
+  /// \param NewVisible Whether it shows.
+  /// \return Never.
+  /// \throws Error always -- a part needs a running UI (board:0030).
+  ::agiru::Boolean Visible(::agiru::Boolean NewVisible) const {
+    static_cast<void>(NewVisible);
+    throw Error("A part's Visible needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `CurrPage.<Part>.Editable(Boolean)`.
+  /// \param NewEditable Whether it takes input.
+  /// \return Never.
+  /// \throws Error always -- a part needs a running UI (board:0030).
+  ::agiru::Boolean Editable(::agiru::Boolean NewEditable) const {
+    static_cast<void>(NewEditable);
+    throw Error("A part's Editable needs a running UI (board:0030)");
+  }
+};
+
 template <typename Derived = void> class Page {
 public:
   /// \brief The page's AL number.

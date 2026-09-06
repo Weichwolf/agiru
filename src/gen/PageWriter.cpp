@@ -360,6 +360,22 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   const std::string table = SourceTable(object, objects);
   if (!table.empty()) { out += "  " + table + " Rec;\n\n"; }
 
+  {
+    Controls all;
+    Flatten(object.layout, all);
+    Flatten(object.actions, all);
+    std::set<std::string> written;
+    for (const al::PageControl *control : all.parts) {
+      const std::string member = ControlIdentifier(named, control->name);
+      if (member.empty() || !written.insert(member).second) { continue; }
+      const auto found = objects.pages.find(LowerKey(PartSource(*control)));
+      const std::string sub =
+          found == objects.pages.end() ? std::string{"::agiru::Page<>"} : found->second.identifier;
+      out += "  ::agiru::PartRef<" + sub + "> " + member + ";\n";
+    }
+    if (!written.empty()) { out += "\n"; }
+  }
+
   const std::set<std::string> shadowed =
       Shadowing(object.variables, object.procedures, object.labels);
   const std::string members =
