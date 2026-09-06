@@ -438,15 +438,16 @@ IsNull(const T &Variable) {
 /// \param String The message.
 /// \throws Error always -- a message needs a running UI (board:0030).
 inline void Message(std::string_view String) {
+  if (::agiru::AnsweredByHandler(1, String, nullptr)) { return; }
   throw ::agiru::Error(std::string("Message(") + std::string(String) +
                        ") needs a running UI (board:0030)");
 }
 
 template <typename First, typename... Values>
 void Message(std::string_view String, const First &first, const Values &...values) {
-  static_cast<void>(first);
-  (static_cast<void>(values), ...);
-  throw ::agiru::Error(std::string("Message(") + std::string(String) +
+  const std::string shown = ::agiru::StrSubstNo(String, first, values...);
+  if (::agiru::AnsweredByHandler(1, shown, nullptr)) { return; }
+  throw ::agiru::Error(std::string("Message(") + shown +
                        ") needs a running UI (board:0030)");
 }
 
@@ -489,10 +490,11 @@ void LogMessage(std::string_view EventId,
 template <typename... Values>
 ::agiru::Boolean
 Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...values) {
-  static_cast<void>(Default);
-  (static_cast<void>(values), ...);
-  throw ::agiru::Error(std::string("Confirm(") + std::string(String) +
-                       ") needs a running UI (board:0030)");
+  const std::string asked =
+      sizeof...(values) == 0 ? std::string(String) : ::agiru::StrSubstNo(String, values...);
+  ::agiru::Boolean reply = Default;
+  if (::agiru::AnsweredByHandler(0, asked, &reply)) { return reply; }
+  throw ::agiru::Error(std::string("Confirm(") + asked + ") needs a running UI (board:0030)");
 }
 
 /// \brief AL `Dialog.Confirm(Text)` -- the one-argument form.

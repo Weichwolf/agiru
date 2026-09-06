@@ -1,5 +1,7 @@
 #include "Builtins.h"
 
+#include "runtime/test/Handlers.h"
+
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
@@ -258,7 +260,16 @@ std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
   RefuseDoor("System.GlobalLanguage(Integer)");
 }
 
+bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
+  const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
+  if (handler == nullptr) { return false; }
+  HandlerTable::Ran(*handler);
+  handler->invoke(text, reply);
+  return true;
+}
+
 ::agiru::Boolean GuiAllowed() {
+  if (HandlerTable::Installed()) { return true; }
   RefuseDoor("System.GuiAllowed()");
 }
 

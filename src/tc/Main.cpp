@@ -261,6 +261,7 @@ struct Gathered {
   std::vector<agiru::gen::RefusedProperty> refused;
   std::map<std::string, std::size_t> attributes;
   std::map<std::string, std::vector<std::string>> options;
+  std::map<std::string, std::size_t> deprecatedScopes;
 };
 
 constexpr std::array kAcknowledgedAttributes{
@@ -278,13 +279,54 @@ constexpr std::array kActedOnAttributes{
     std::string_view{"integrationevent"},
     std::string_view{"internalevent"},
     std::string_view{"test"},
+    std::string_view{"securityfiltering"},
+    std::string_view{"testpermissions"},
     std::string_view{"transactionmodel"},
 };
 
+constexpr std::array kDeprecatedScopes{
+    std::pair{std::string_view{"internal"}, std::string_view{"OnPrem"}},
+    std::pair{std::string_view{"solution"}, std::string_view{"OnPrem"}},
+    std::pair{std::string_view{"personalization"}, std::string_view{"Cloud"}},
+    std::pair{std::string_view{"extension"}, std::string_view{"Cloud"}},
+};
+
 template <typename Object>
-void CountAttributes(const Object &unit, std::map<std::string, std::size_t> &into) {
+void CheckNormal(const Object &unit,
+                 std::string_view kind,
+                 bool isTestCodeunit,
+                 std::vector<agiru::gen::RefusedProperty> &into) {
+  for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
+    const bool normal = agiru::al::HasAttribute(procedure, "Normal");
+    if (normal && kind != "codeunit") {
+      into.push_back({.property = "[Normal] on " + procedure.name,
+                      .where = std::string(kind) + " \"" + unit.name +
+                               "\" -- the attribute is only legal inside a codeunit "
+                               "(attributes/devenv-normal-attribute.md)"});
+    }
+    if (isTestCodeunit && !normal && agiru::al::HasAttribute(procedure, "TryFunction")) {
+      into.push_back({.property = "[TryFunction] on " + procedure.name,
+                      .where = "test codeunit \"" + unit.name +
+                               "\" -- in a test codeunit [TryFunction] applies to [Normal] "
+                               "methods only (attributes/devenv-tryfunction-attribute.md)"});
+    }
+  }
+}
+
+template <typename Object>
+void CountAttributes(const Object &unit,
+                     std::map<std::string, std::size_t> &into,
+                     std::map<std::string, std::size_t> &deprecated) {
   for (const agiru::al::ProcedureDecl &procedure : unit.procedures) {
     for (const std::string &attribute : procedure.attributes) {
+      const std::string lowered = agiru::gen::LowerKey(attribute);
+      if (lowered.starts_with("scope")) {
+        for (const auto &[dead, replacement] : kDeprecatedScopes) {
+          if (lowered.find(dead) != std::string::npos) {
+            ++deprecated[std::string(dead) + " -> " + std::string(replacement)];
+          }
+        }
+      }
       ++into[agiru::gen::LowerKey(attribute.substr(0, attribute.find('(')))];
     }
   }
@@ -507,7 +549,8 @@ void WritePages(Run &run,
     const agiru::gen::PageHeader written =
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
     Absorb(gathered.refused, agiru::gen::Refused(pages.objects[i]));
-    CountAttributes(pages.objects[i], gathered.attributes);
+    CountAttributes(pages.objects[i], gathered.attributes, gathered.deprecatedScopes);
+    CheckNormal(pages.objects[i], "page", false, gathered.refused);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
     const std::filesystem::path header = agiru::gen::PageHeaderPath(pages.objects[i]);
@@ -607,7 +650,8 @@ void WriteTable(Run &run,
       agiru::gen::Identifier(table.name);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   Absorb(gathered.refused, agiru::gen::Refused(table));
-  CountAttributes(table, gathered.attributes);
+  CountAttributes(table, gathered.attributes, gathered.deprecatedScopes);
+    CheckNormal(table, "table", false, gathered.refused);
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
@@ -1011,7 +1055,8 @@ void ScanCodeunits(Run &run,
     }
     counts.tests += tests;
     if (population.files != 0) { counts.unitParsed += tests; }
-    CountAttributes(*unit, gathered.attributes);
+    CountAttributes(*unit, gathered.attributes, gathered.deprecatedScopes);
+    CheckNormal(*unit, "codeunit", agiru::gen::IsTestCodeunit(*unit), gathered.refused);
     NoteOptions(unit->variables, unit->procedures, gathered.options);
     if (run.output.empty()) { continue; }
     try {
@@ -1408,6 +1453,11 @@ int Scan(const Job &job) {
                  acknowledged,
                  dropped,
                  ranked.size());
+    for (const auto &[dead, found] : gathered.deprecatedScopes) {
+      std::println("          {:>5} x [Scope] {} -- deprecated in runtime 4.0 (board:0216)",
+                   found,
+                   dead);
+    }
     for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
   }
   ReportUnresolved("extension(s)", "object(s) no app declares", orphans);

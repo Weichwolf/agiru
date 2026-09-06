@@ -596,12 +596,13 @@ private:
   }
 
   void ParseVarsInto(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
+    std::vector<std::string> pending;
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("begin") &&
            !AtKeyword("trigger") && !AtKeyword("procedure") && !AtKeyword("local") &&
            !AtKeyword("internal") && !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
         if (!VariableFollowsAttribute()) { return; }
-        (void)ReadAttribute();
+        pending.push_back(ReadAttribute());
         continue;
       }
       std::vector<std::string> names{ExpectName()};
@@ -624,9 +625,11 @@ private:
         for (const std::string &name : names) {
           VarDecl one = declared;
           one.name = name;
+          one.attributes = pending;
           variables.push_back(std::move(one));
         }
       }
+      pending.clear();
       while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
       Expect(";");
     }

@@ -19,19 +19,38 @@ std::vector<const TestCatalogue *> &Registered() {
   return registered;
 }
 
+std::string Missed(const std::vector<std::string_view> &names) {
+  std::string out;
+  for (const std::string_view name : names) {
+    if (!out.empty()) { out += ", "; }
+    out += name;
+  }
+  return out;
+}
+
 TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
   detail::Scope scope;
+  HandlerTable::Install(codeunit.Handlers(), method.handlers);
   try {
     method.invoke();
   } catch (const Error &e) {
+    static_cast<void>(HandlerTable::Uninstall());
     scope.Discard(e.what());
     return TestResult{
         .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
   }
+  const std::vector<std::string_view> missed = HandlerTable::Uninstall();
   if (method.model.has_value() && *method.model == TransactionModel::AutoRollback) {
     scope.Discard("");
   } else {
     scope.Keep();
+  }
+  if (!missed.empty()) {
+    return TestResult{.codeunit = codeunit.Name(),
+                      .method = method.name,
+                      .passed = false,
+                      .error = "The handler(s) " + Missed(missed) +
+                               " were named and never ran (board:0054)"};
   }
   return TestResult{
       .codeunit = codeunit.Name(), .method = method.name, .passed = true, .error = {}};
@@ -42,8 +61,9 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
 TestCatalogue::TestCatalogue(CodeunitId id,
                              std::string_view name,
                              void (*onRun)(),
-                             std::span<const TestMethod> methods)
-    : id_(id), name_(name), onRun_(onRun), methods_(methods) {
+                             std::span<const TestMethod> methods,
+                             std::span<const TestHandler> handlers)
+    : id_(id), name_(name), onRun_(onRun), methods_(methods), handlers_(handlers) {
   Registered().push_back(this);
 }
 

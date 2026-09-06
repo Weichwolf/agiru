@@ -64,9 +64,19 @@ std::string SubtypeOf(const al::CodeunitObject &unit) {
   return "Normal";
 }
 
-bool IsTestCodeunit(const al::CodeunitObject &unit) {
-  const al::Property *subtype = al::Find(unit.properties, "Subtype");
-  return subtype != nullptr && LowerKey(subtype->text) == "test";
+std::string SecurityFilteringOf(const al::VarDecl &declared) {
+  if (TypeName(declared.type) != "Record") { return {}; }
+  for (const std::string &attribute : declared.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("securityfiltering") == std::string::npos) { continue; }
+    for (const std::string_view member : {"ignored", "validated", "filtered", "disallowed"}) {
+      if (lowered.find(member) == std::string::npos) { continue; }
+      std::string named(member);
+      named[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(named[0])));
+      return "::agiru::SecurityFilter::" + named;
+    }
+  }
+  return {};
 }
 
 std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
@@ -78,6 +88,31 @@ std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
     return "TransactionModel::AutoRollback";
   }
   return "{}";
+}
+
+std::string PermissionsOf(const al::CodeunitObject &unit, const al::ProcedureDecl &procedure) {
+  const auto named = [](const std::string &lowered) -> std::string {
+    if (lowered.find("nonrestrictive") != std::string::npos) {
+      return "TestPermissions::NonRestrictive";
+    }
+    if (lowered.find("disabled") != std::string::npos) { return "TestPermissions::Disabled"; }
+    if (lowered.find("restrictive") != std::string::npos) {
+      return "TestPermissions::Restrictive";
+    }
+    return {};
+  };
+  const al::Property *declared = al::Find(unit.properties, "TestPermissions");
+  const std::string unitValue =
+      declared == nullptr ? std::string{} : named(LowerKey(declared->text));
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("testpermissions") == std::string::npos) { continue; }
+    if (lowered.find("inheritfromtestcodeunit") != std::string::npos) { break; }
+    const std::string method = named(lowered);
+    if (!method.empty()) { return method; }
+    break;
+  }
+  return unitValue.empty() ? "TestPermissions::Restrictive" : unitValue;
 }
 
 bool IsTest(const al::ProcedureDecl &procedure) {
@@ -129,6 +164,11 @@ bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
     return std::ranges::any_of(procedure.parameters, option) ||
            std::ranges::any_of(procedure.variables, option) || option(procedure.returned);
   });
+}
+
+bool IsTestCodeunit(const al::CodeunitObject &unit) {
+  const al::Property *subtype = al::Find(unit.properties, "Subtype");
+  return subtype != nullptr && LowerKey(subtype->text) == "test";
 }
 
 bool IsTryFunction(const al::ProcedureDecl &procedure) {
@@ -204,11 +244,91 @@ std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::s
   return out;
 }
 
+std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
+  static constexpr std::array kKinds{
+      std::pair{std::string_view{"confirmhandler"}, std::string_view{"HandlerKind::Confirm"}},
+      std::pair{std::string_view{"messagehandler"}, std::string_view{"HandlerKind::Message"}},
+      std::pair{std::string_view{"strmenuhandler"}, std::string_view{"HandlerKind::StrMenu"}},
+      std::pair{std::string_view{"hyperlinkhandler"}, std::string_view{"HandlerKind::HyperLink"}},
+      std::pair{std::string_view{"modalpagehandler"}, std::string_view{"HandlerKind::ModalPage"}},
+      std::pair{std::string_view{"pagehandler"}, std::string_view{"HandlerKind::Page"}},
+      std::pair{std::string_view{"requestpagehandler"},
+                std::string_view{"HandlerKind::RequestPage"}},
+      std::pair{std::string_view{"reporthandler"}, std::string_view{"HandlerKind::Report"}},
+      std::pair{std::string_view{"filterpagehandler"}, std::string_view{"HandlerKind::FilterPage"}},
+      std::pair{std::string_view{"sendnotificationhandler"},
+                std::string_view{"HandlerKind::SendNotification"}},
+      std::pair{std::string_view{"recallnotificationhandler"},
+                std::string_view{"HandlerKind::RecallNotification"}},
+      std::pair{std::string_view{"sessionsettingshandler"}, std::string_view{"HandlerKind::Session"}},
+      std::pair{std::string_view{"httpclienthandler"}, std::string_view{"HandlerKind::HttpClient"}},
+  };
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string name = LowerKey(attribute.substr(0, attribute.find('(')));
+    for (const auto &[declared, kind] : kKinds) {
+      if (name == declared) { return std::string(kind); }
+    }
+  }
+  return {};
+}
+
+std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
+  std::vector<std::string> named;
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (!lowered.starts_with("handlerfunctions")) { continue; }
+    const std::size_t open = attribute.find('\'');
+    const std::size_t close = attribute.rfind('\'');
+    if (open == std::string::npos || close <= open) { continue; }
+    std::string listed = attribute.substr(open + 1, close - open - 1);
+    std::string one;
+    for (const char c : listed + ",") {
+      if (c == ',') {
+        const std::size_t first = one.find_first_not_of(" \t");
+        const std::size_t last = one.find_last_not_of(" \t");
+        if (first != std::string::npos) { named.push_back(one.substr(first, last - first + 1)); }
+        one.clear();
+        continue;
+      }
+      one += c;
+    }
+  }
+  return named;
+}
+
+std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &identifier) {
+  std::vector<const al::ProcedureDecl *> handlers;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (!HandlerKindOf(procedure).empty()) { handlers.push_back(&procedure); }
+  }
+  if (handlers.empty()) { return {}; }
+  std::string out = "constexpr std::array<TestHandler, " + std::to_string(handlers.size()) +
+                    "> kHandlers{{\n";
+  for (const al::ProcedureDecl *handler : handlers) {
+    out += "    {\"" + handler->name + "\", " + HandlerKindOf(*handler) + ", 0, &InvokeHandler<" +
+           identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">},\n";
+  }
+  out += "}};\n\n";
+  return out;
+}
+
 std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
-  std::string out =
-      "\nnamespace {\nnamespace " + identifier + "_tests {\n\nconstexpr std::array<TestMethod, ";
+  std::string out = "\nnamespace {\nnamespace " + identifier + "_tests {\n\n";
+  out += HandlerTableOf(unit, identifier);
+  for (const al::ProcedureDecl *test : tests) {
+    const std::vector<std::string> named = HandlersNamedBy(*test);
+    if (named.empty()) { continue; }
+    out += "constexpr std::array<std::string_view, " + std::to_string(named.size()) + "> k" +
+           Identifier(test->name) + "Handlers{{";
+    for (std::size_t i = 0; i < named.size(); ++i) {
+      out += (i == 0 ? "" : ", ");
+      out += Literal(named[i]);
+    }
+    out += "}};\n";
+  }
+  out += "\nconstexpr std::array<TestMethod, ";
   out += std::to_string(tests.size());
   out += "> kTestMethods{{\n";
   for (const al::ProcedureDecl *test : tests) {
@@ -222,6 +342,11 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
     out += Identifier(test->name);
     out += ">, ";
     out += TransactionModelOf(*test);
+    out += ", ";
+    const std::vector<std::string> named = HandlersNamedBy(*test);
+    out += named.empty() ? std::string("{}") : "k" + Identifier(test->name) + "Handlers";
+    out += ", ";
+    out += PermissionsOf(unit, *test);
     out += "},\n";
   }
   out += "}};\n\nconst TestCatalogue kTestCatalogue{CodeunitTraits<";
@@ -232,8 +357,11 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
   out += DeclaresOnRun(unit) ? "                                  &InvokeTest<" + identifier +
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
-  out += "                                  kTestMethods};\n\n} // namespace " + identifier +
-         "_tests\n} // namespace\n";
+  out += "                                  kTestMethods";
+  out += HandlerTableOf(unit, identifier).empty() ? std::string{} : std::string(",\n") +
+                                                                        "                          "
+                                                                        "        kHandlers";
+  out += "};\n\n} // namespace " + identifier + "_tests\n} // namespace\n";
   return out;
 }
 
@@ -1207,6 +1335,11 @@ std::string Locals(const al::ProcedureDecl &procedure,
   for (const al::LabelDecl &label : procedure.labels) {
     out += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
            Literal(label.text) + "};\n";
+  }
+  for (const al::VarDecl &declared : procedure.variables) {
+    const std::string filtering = SecurityFilteringOf(declared);
+    if (filtering.empty()) { continue; }
+    out += "  " + Identifier(declared.name) + ".SecurityFiltering(" + filtering + ");\n";
   }
   return out;
 }

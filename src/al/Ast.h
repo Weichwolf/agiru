@@ -36,6 +36,7 @@ struct VarDecl {
   std::vector<std::string> members;
   std::vector<VarDecl> arguments;
   std::vector<int> dimensions;
+  std::vector<std::string> attributes;
 };
 
 using Parameter = VarDecl;

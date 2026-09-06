@@ -96,6 +96,8 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const std::vector<al::ProcedureDecl> &all = {},
                                  const std::string &spelled = {});
 
+bool IsTestCodeunit(const al::CodeunitObject &unit);
+
 bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
                       const std::vector<al::ProcedureDecl> &procedures);
 
