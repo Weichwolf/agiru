@@ -4571,6 +4571,49 @@ std::string XmlText::Value() {
   RefuseDoor("TestHttpResponseMessage.IsSuccessfulRequest()");
 }
 
+::agiru::Integer TestHttpResponseMessage::HttpStatusCode() {
+  RefuseDoor("TestHttpResponseMessage.HttpStatusCode()");
+}
+
+::agiru::Boolean TestHttpResponseMessage::IsBlockedByEnvironment() {
+  RefuseDoor("TestHttpResponseMessage.IsBlockedByEnvironment()");
+}
+
+std::string TestHttpResponseMessage::ReasonPhrase() {
+  RefuseDoor("TestHttpResponseMessage.ReasonPhrase()");
+}
+
+::agiru::Boolean File::GetStamp(std::string_view Name, ::agiru::Date &Date) {
+  static_cast<void>(Name);
+  static_cast<void>(Date);
+  RefuseDoor("File.GetStamp()");
+}
+
+::agiru::BigInteger NumberSequence::Range(std::string_view Name, ::agiru::Integer Count, ::agiru::BigInteger &Increment) {
+  static_cast<void>(Name);
+  static_cast<void>(Count);
+  static_cast<void>(Increment);
+  RefuseDoor("NumberSequence.Range()");
+}
+
+::agiru::Guid TaskScheduler::CreateTask(::agiru::Integer CodeunitId, ::agiru::Integer FailureCodeunitId, ::agiru::Boolean IsReady) {
+  static_cast<void>(CodeunitId);
+  static_cast<void>(FailureCodeunitId);
+  static_cast<void>(IsReady);
+  RefuseDoor("TaskScheduler.CreateTask()");
+}
+
+::agiru::Boolean File::GetStamp(std::string_view Name) {
+  static_cast<void>(Name);
+  RefuseDoor("File.GetStamp()");
+}
+
+::agiru::BigInteger NumberSequence::Range(std::string_view Name, ::agiru::Integer Count) {
+  static_cast<void>(Name);
+  static_cast<void>(Count);
+  RefuseDoor("NumberSequence.Range()");
+}
+
 }
 
 // NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)

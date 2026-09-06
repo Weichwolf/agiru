@@ -1,5 +1,6 @@
 #include "Builtins.h"
 
+#include "runtime/Scopes.h"
 #include "runtime/test/Handlers.h"
 
 #include "runtime/Error.h"
@@ -79,7 +80,7 @@ void ClearAll() {
 }
 
 void ClearCollectedErrors() {
-  RefuseDoor("System.ClearCollectedErrors()");
+  ErrorScope::Clear();
 }
 
 ::agiru::Date ClosingDate(::agiru::Date Date) {
@@ -224,8 +225,12 @@ void ExportObjects(std::string_view FileName,
 }
 
 ::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear) {
-  static_cast<void>(Clear);
-  RefuseDoor("System.GetCollectedErrors(Boolean)");
+  ::agiru::List<::agiru::ErrorInfo> collected;
+  for (const std::string &message : ErrorScope::Collected()) {
+    collected.Add(::agiru::ErrorInfo::Create(message, true));
+  }
+  if (Clear) { ErrorScope::Clear(); }
+  return collected;
 }
 
 std::string GetDocumentUrl(::agiru::Guid ID) {
@@ -274,10 +279,11 @@ bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
 }
 
 ::agiru::Boolean HasCollectedErrors() {
-  RefuseDoor("System.HasCollectedErrors()");
+  return !ErrorScope::Collected().empty();
 }
 
 void Hyperlink(std::string_view URL) {
+  if (AnsweredByHandler(3, URL, nullptr)) { return; }
   static_cast<void>(URL);
   RefuseDoor("System.Hyperlink(Text)");
 }

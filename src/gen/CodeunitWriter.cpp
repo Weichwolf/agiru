@@ -64,6 +64,23 @@ std::string SubtypeOf(const al::CodeunitObject &unit) {
   return "Normal";
 }
 
+std::string ScopeGuardsOf(const al::ProcedureDecl &procedure) {
+  std::string out;
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.starts_with("commitbehavior")) {
+      const bool error = lowered.find("error") != std::string::npos;
+      out += "  const ::agiru::CommitScope Commit_Block{::agiru::CommitBehavior::";
+      out += error ? "Error" : "Ignore";
+      out += "};\n";
+    }
+    if (lowered.starts_with("errorbehavior")) {
+      out += "  const ::agiru::ErrorScope Error_Block{::agiru::ErrorBehavior::Collect};\n";
+    }
+  }
+  return out;
+}
+
 std::string SecurityFilteringOf(const al::VarDecl &declared) {
   if (TypeName(declared.type) != "Record") { return {}; }
   for (const std::string &attribute : declared.attributes) {
@@ -1300,7 +1317,7 @@ std::string Locals(const al::ProcedureDecl &procedure,
     shadowed.insert(Identifier(parameter.name));
   }
   if (!procedure.returnName.empty()) { shadowed.insert(Identifier(procedure.returnName)); }
-  std::string out;
+  std::string out = ScopeGuardsOf(procedure);
   const std::string code = WithoutLiterals(body);
   const auto shadows = [&code](const std::string &name) {
     return code.find("for ([[maybe_unused]] auto &" + name + " :") != std::string::npos;

@@ -413,7 +413,7 @@ private:
       message += Expression(expression.children[i], 0);
     }
     if (expression.children.size() > 2) { message += ")"; }
-    return "throw Error(" + message + ")";
+    return "::agiru::RaiseOrCollect(" + message + ")";
   }
 
   std::string RunObject(const al::Expr &expression, const al::Expr &callee) {

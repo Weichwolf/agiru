@@ -56,6 +56,12 @@ public:
   /// \param Timeout The AL `Duration`.
   /// \return The AL `Guid`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TaskScheduler.CreateTask` without its optional argument(s), which the
+  ///        documentation brackets.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId, ::agiru::Integer FailureCodeunitId, ::agiru::Boolean IsReady);
+
   static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId,
                                   ::agiru::Integer FailureCodeunitId,
                                   ::agiru::Boolean IsReady,

@@ -276,12 +276,29 @@ constexpr std::array kAcknowledgedAttributes{
 
 constexpr std::array kActedOnAttributes{
     std::string_view{"businessevent"},
+    std::string_view{"commitbehavior"},
+    std::string_view{"confirmhandler"},
+    std::string_view{"errorbehavior"},
+    std::string_view{"eventsubscriber"},
+    std::string_view{"filterpagehandler"},
+    std::string_view{"handlerfunctions"},
+    std::string_view{"hyperlinkhandler"},
     std::string_view{"integrationevent"},
     std::string_view{"internalevent"},
-    std::string_view{"test"},
+    std::string_view{"messagehandler"},
+    std::string_view{"modalpagehandler"},
+    std::string_view{"pagehandler"},
+    std::string_view{"recallnotificationhandler"},
+    std::string_view{"reporthandler"},
+    std::string_view{"requestpagehandler"},
     std::string_view{"securityfiltering"},
+    std::string_view{"sendnotificationhandler"},
+    std::string_view{"sessionsettingshandler"},
+    std::string_view{"strmenuhandler"},
+    std::string_view{"test"},
     std::string_view{"testpermissions"},
     std::string_view{"transactionmodel"},
+    std::string_view{"tryfunction"},
 };
 
 constexpr std::array kDeprecatedScopes{

@@ -357,17 +357,6 @@ std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean GuiAllowed();
 
-/// \brief Whether a dialog kind has a handler standing in for the user right now.
-/// \param kind The dialog kind, as `HandlerKind` numbers it.
-/// \param text What the dialog would show.
-/// \param reply Where a `Confirm` or a `StrMenu` puts the answer.
-/// \return True when a handler answered, false when none is installed.
-///
-/// \note IT IS THE DOOR'S HALF OF THE HANDLER TABLE. The builtins that show something call it
-///       before refusing, so a test with `[HandlerFunctions]` gets its answer and one without gets
-///       the platform's refusal (board:0054).
-[[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
-
 /// \brief AL `System.HasCollectedErrors()`. Gets a value indicating whether errors have been
 /// collected in the current error collection scope.
 /// \return The AL `Boolean`.

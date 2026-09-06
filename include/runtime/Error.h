@@ -143,4 +143,24 @@ void Commit();
               " names a table this run does not carry (board:0034)");
 }
 
+
+/// \brief AL `Error(...)` -- raises, unless a `[ErrorBehavior(ErrorBehavior::Collect)]` scope is
+///        standing, in which case the error is COLLECTED and the call returns.
+/// \param message The text AL wrote.
+/// \throws Error unless a collecting scope took it.
+///
+/// \note IT IS WHY THE GENERATOR NO LONGER WRITES `throw`. AL's `Error` ends the path in the
+///       ordinary case and does NOT end it inside a collecting scope, so the decision belongs to
+///       the runtime rather than to the emitted statement (board:0195).
+void RaiseOrCollect(std::string_view message);
+
+/// \brief AL `Error(ErrorInfo)` -- the same, with the info's own message.
+/// \tparam Info Anything carrying a `Message()`, which is what `ErrorInfo` is here.
+/// \param info The error's description.
+/// \throws Error unless a collecting scope took it.
+template <typename Info>
+  requires requires(Info info) { info.Message(); }
+void RaiseOrCollect(Info info) {
+  RaiseOrCollect(std::string_view(info.Message()));
+}
 }

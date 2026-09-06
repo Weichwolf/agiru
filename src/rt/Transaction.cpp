@@ -1,9 +1,11 @@
 #include "runtime/Transaction.h"
 
 #include "runtime/Database.h"
+#include "runtime/Scopes.h"
 #include "runtime/Session.h"
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -94,6 +96,10 @@ void ClearLastError() {
 }
 
 void Commit() {
+  if (const std::optional<CommitBehavior> standing = CommitScope::Standing()) {
+    if (*standing == CommitBehavior::Ignore) { return; }
+    throw Error("A Commit inside a [CommitBehavior(CommitBehavior::Error)] scope is refused");
+  }
   Session::Current().Transaction().Commit(Session::Current().Database());
 }
 
