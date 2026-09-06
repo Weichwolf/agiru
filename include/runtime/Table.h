@@ -1459,6 +1459,21 @@ public:
     detail::Narrow(State(), NumberOf(&member), StrSubstNo(expression, arguments...));
   }
 
+  /// \brief AL `Record.SetFilter(Field, Value)` where the VALUE is the expression.
+  /// \tparam Field      The field member's type.
+  /// \tparam Expression The value's type -- anything AL renders into a filter.
+  /// \param member     The field.
+  /// \param expression The value, rendered the way `Format` renders it.
+  ///
+  /// \note AL DOES NOT REQUIRE A PLACEHOLDER. `SetFilter(Field, '%1', Value)` is one form and
+  ///       `SetFilter(Field, Value)` is another, and the second is what the BaseApp writes for a
+  ///       Guid or a Date it wants matched exactly.
+  template <typename Field, typename Expression>
+    requires(!std::convertible_to<const Expression &, std::string_view>)
+  void SetFilter(const Field &member, const Expression &expression) {
+    detail::Narrow(State(), NumberOf(&member), StrSubstNo("%1", expression));
+  }
+
   /// \brief AL `Record.SetLoadFields(...)`. Sets the fields to be initially loaded when the record
   /// is retrieved from its data source. This will overwrite fields previously selected for initial
   /// load.

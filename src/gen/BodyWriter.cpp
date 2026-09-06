@@ -1400,6 +1400,13 @@ public:
   }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (SameName(declared.name, name)) { return false; }
+        }
+      }
+    }
     for (const al::VarDecl &declared : page_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
         return DeclaresAnObject(declared) || TypeName(declared.type) == "Interface";

@@ -3,6 +3,8 @@
 #include "meta/Ids.h"
 #include "type/Integer.h"
 
+#include "runtime/Error.h"
+
 #include <compare>
 #include <string>
 #include <vector>
@@ -25,6 +27,24 @@ namespace agiru {
 ///
 /// \note `GetRecord()` IS ABSENT. It returns a RecordRef, and there is no RecordRef in this runtime
 ///       yet; writing it would mean inventing a return the platform documents as something else.
+namespace detail {
+
+/// \brief What `RecordId.GetRecord()` hands back: a value that refuses to become a row.
+///
+/// \note IT IS A REFUSAL AND NOT A `RecordRef`, because the id has no way to READ the row until
+///       the catalogue can find a table by number (board:0025).
+struct RefusedRow {
+  /// \brief Refuses to become a value of any type.
+  /// \tparam T The type the caller wants.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T> operator T() const {
+    throw Error("RecordId.GetRecord() needs the table catalogue (board:0025)");
+  }
+};
+
+}
+
 class RecordId {
 public:
   /// \brief A blank RecordId, which is what an unset field holds.
@@ -46,6 +66,15 @@ public:
   /// \throws Error when the RecordId is blank, which the page says it must: "This function returns
   ///         an error if the record is blank."
   [[nodiscard]] Integer TableNo() const;
+
+  /// \brief AL `RecordId.GetRecord()` -- the row this id names
+  ///        (`recordid-getrecord-method.md`).
+  /// \return A value that refuses to become anything, because reading a row by its id needs the
+  ///         catalogue (board:0025).
+  ///
+  /// \note IT REFUSES THE CONVERSION rather than naming `RecordRef`, which is built ON the record
+  ///       base this header sits under: a return type here would turn the door's direction around.
+  [[nodiscard]] detail::RefusedRow GetRecord() const { return detail::RefusedRow{}; }
 
   /// \brief AL `Format(RecordId)`.
   /// \return `Caption: key,key`, or the empty string when blank.
