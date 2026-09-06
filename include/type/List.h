@@ -179,6 +179,19 @@ public:
 
   /// \brief The elements, for a `foreach`.
   /// \return An iterator to the first.
+  /// \brief The first element, for AL's `foreach`.
+  /// \return The iterator.
+  ///
+  /// \note AL'S `foreach` HANDS THE ELEMENT AND NOT A CONST VIEW OF IT: a body that calls a
+  ///       member on the loop variable -- `CurrentFile.CreateInStream(...)` -- needs one it can
+  ///       call a non-const method on, and AL's own rule that writing it does not write the list
+  ///       back is about the LIST, not about constness.
+  [[nodiscard]] auto begin() { return values_.begin(); }
+
+  /// \brief The last element, for AL's `foreach`.
+  /// \return The iterator.
+  [[nodiscard]] auto end() { return values_.end(); }
+
   [[nodiscard]] auto begin() const { return values_.begin(); }
 
   /// \brief The end of the elements, for a `foreach`.
