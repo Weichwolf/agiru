@@ -482,6 +482,18 @@ public:
   /// \return True when this RecordRef points at a record.
   [[nodiscard]] bool IsOpen() const { return record_ != nullptr; }
 
+  /// \brief The record this reference stands for, when it is the type the caller expects.
+  /// \tparam T The record's class.
+  /// \return The record, or nothing when the reference is closed or names another table.
+  ///
+  /// \note IT IS HOW `Rec := RecordRef` COPIES. AL assigns a `RecordRef` to a `Record` in a
+  ///       lookup trigger -- `OnAfterLookup(Selected: RecordRef)` is 30-odd call sites -- and what
+  ///       AL copies is the ROW, which is this record's fields.
+  template <typename T> [[nodiscard]] const T *As() const {
+    if (record_ == nullptr || table_ != &TableTraits<T>::kTable) { return nullptr; }
+    return static_cast<const T *>(record_);
+  }
+
   /// \brief AL `RecordRef.Number()`.
   /// \return The AL table number.
   /// \throws Error when the RecordRef points at nothing.

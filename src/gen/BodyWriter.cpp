@@ -1244,8 +1244,9 @@ public:
       }
       return {};
     }
-    if (Find(field->properties, "OptionMembers") != nullptr) {
-      return OptionEnumName(table_.name, field->name);
+    if (const al::Property *members = Find(field->properties, "OptionMembers");
+        members != nullptr) {
+      return OptionEnumName(table_.name, field->name, al::ListValue(*members));
     }
     if (TypeName(field->type) == "Enum" && !field->subtype.empty()) {
       return "enums::" + Identifier(field->subtype);
@@ -1424,12 +1425,40 @@ public:
     if (SameName("CurrPage", member.variable)) {
       return DoorCalls(member.field) && ControlOf(member.field).empty();
     }
-    const auto *fields = FieldsOfRecord(member.variable);
-    return fields != nullptr && DoorCalls(member.field) &&
-           !fields->contains(LowerKey(std::string(member.field)));
+    if (const auto *fields = FieldsOfRecord(member.variable); fields != nullptr) {
+      return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
+    }
+    const al::VarDecl *declared = DeclarationOf(member.variable);
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    if (type == "Page" || type == "TestPage" || type == "TestRequestPage") {
+      const auto page = objects_.pages.find(LowerKey(declared->subtype));
+      const bool control = page != objects_.pages.end() &&
+                           page->second.fields.contains(LowerKey(std::string(member.field)));
+      return !control && DoorCalls(member.field);
+    }
+    return !DeclaresAnObject(*declared) && DoorCalls(member.field);
+  }
+
+  [[nodiscard]] const al::VarDecl *DeclarationOf(std::string_view variable) const {
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (SameName(declared.name, variable)) { return &declared; }
+        }
+      }
+    }
+    for (const al::VarDecl &declared : page_.variables) {
+      if (SameName(declared.name, variable)) { return &declared; }
+    }
+    return nullptr;
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (MemberIsCall(member) && !IsRecord(member.variable) &&
+        !SameName("CurrPage", member.variable) && FieldsOfRecord(member.variable) == nullptr) {
+      return AsTheDoorSpellsIt(Identifier(member.field));
+    }
     if (SameName("CurrPage", member.variable)) {
       const std::string control = ControlOf(member.field);
       return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
@@ -1489,8 +1518,9 @@ public:
     if (source_ == nullptr) { return {}; }
     const al::FieldDecl *field = FieldNamed(*source_, name);
     if (field == nullptr) { return {}; }
-    if (Find(field->properties, "OptionMembers") != nullptr) {
-      return OptionEnumName(source_->name, field->name);
+    if (const al::Property *members = Find(field->properties, "OptionMembers");
+        members != nullptr) {
+      return OptionEnumName(source_->name, field->name, al::ListValue(*members));
     }
     if (TypeName(field->type) == "Enum" && !field->subtype.empty()) {
       return "enums::" + Identifier(field->subtype);

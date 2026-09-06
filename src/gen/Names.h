@@ -18,7 +18,14 @@ std::string EnumeratorName(std::string_view optionMember);
 
 std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members);
 
-std::string OptionEnumName(std::string_view tableName, std::string_view fieldName);
+/// The name an option enumeration carries: its CONTENT, in the one namespace every object shares.
+/// Two options with one member list are ONE type wherever they are declared, which is what AL
+/// means by an option and what lets a field bind to a `var Option` parameter (board:0586).
+std::string OptionContentName(const std::vector<std::string> &members);
+
+std::string OptionEnumName(std::string_view tableName,
+                           std::string_view fieldName,
+                           const std::vector<std::string> &members = {});
 
 std::string TypeName(std::string_view alType);
 

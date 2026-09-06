@@ -155,7 +155,8 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})
     target_include_directories(agiru_slice PRIVATE
-      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent")
+      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/shared")
     file(READ "${CMAKE_SOURCE_DIR}/apps.json" slice_apps_json)
     string(JSON slice_app_count LENGTH "${slice_apps_json}" apps)
     math(EXPR slice_app_last "${slice_app_count} - 1")
@@ -198,6 +199,7 @@ if(AGIRU_BUILD_APPS)
     add_library(agiru_app_${app} SHARED ${app_sources})
     target_include_directories(agiru_app_${app} PRIVATE
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/shared"
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")

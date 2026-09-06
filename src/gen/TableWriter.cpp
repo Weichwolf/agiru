@@ -69,8 +69,8 @@ std::vector<OptionField> OptionFields(const al::TableObject &table) {
     if (members == nullptr) { continue; }
     OptionField option;
     option.field = &field;
-    option.enumName = OptionEnumName(table.name, field.name);
     option.members = ListValue(*members);
+    option.enumName = OptionEnumName(table.name, field.name, option.members);
     option.captions = Captions(field, option.members);
     options.push_back(std::move(option));
   }
@@ -201,19 +201,6 @@ std::vector<const al::FieldDecl *> ByNumber(const al::TableObject &table) {
   std::ranges::sort(
       fields, [](const al::FieldDecl *a, const al::FieldDecl *b) { return a->number < b->number; });
   return fields;
-}
-
-void WriteOptionTraits(std::string &out, const OptionField &option) {
-  out += "template <> struct agiru::OptionTraits<agiru::app::tables::" + option.enumName + "> {\n";
-  out += "  static constexpr std::array<EnumValueDef, " + std::to_string(option.members.size()) +
-         "> kValues{{\n";
-  for (std::size_t i = 0; i < option.members.size(); ++i) {
-    out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
-           ", .name = " + Literal(option.members[i]) +
-           ", .caption = " + Literal(option.captions[i]) + "},\n";
-  }
-  out += "  }};\n";
-  out += "};\n";
 }
 
 std::string Includes(const al::TableObject &table,
@@ -596,6 +583,7 @@ std::string ClassBody(const al::TableObject &table,
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
   out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
   out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
+  out += "  using Table<" + tableClass + ">::operator=;\n\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(table.name) + "};\n\n";
@@ -800,22 +788,12 @@ TableHeader WriteHeader(const al::TableObject &declared,
   }
   out += Declarations(table, objects);
 
-  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures);
+  std::map<std::string, std::vector<std::string>> fieldOptions;
+  for (const OptionField &option : options) { fieldOptions.emplace(option.enumName, option.members); }
+  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures, fieldOptions);
 
-  out += "namespace agiru::app::tables {\n\n";
-  for (const OptionField &option : options) {
-    const std::vector<std::string> names = EnumeratorNames(option.members);
-    out += "enum class " + option.enumName + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
-    }
-    out += "};\n\n";
-  }
-  out += "} // namespace agiru::app::tables\n\n";
-
-  for (const OptionField &option : options) {
-    WriteOptionTraits(out, option);
-    out += "\n";
+  if (!options.empty() || DeclaresAnOption(table.variables, table.procedures)) {
+    out += "#include \"options/Types.h\"\n\n";
   }
 
   out += ClassBody(table, tableIdentifier, options, enums, objects);

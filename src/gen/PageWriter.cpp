@@ -186,6 +186,22 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
     Controls all;
     Flatten(object.layout, all);
     Flatten(object.actions, all);
+    std::vector<const al::PageControl *> everywhere = all.parts;
+    everywhere.insert(everywhere.end(), all.fields.begin(), all.fields.end());
+    everywhere.insert(everywhere.end(), all.actions.begin(), all.actions.end());
+    for (const al::PageControl *control : everywhere) {
+      for (const al::ProcedureDecl &trigger : control->triggers) {
+        for (const al::VarDecl &declared : trigger.parameters) {
+          Named(reached, declared, objects, false);
+        }
+        Named(reached, trigger.returned, objects, false);
+      }
+    }
+  }
+  {
+    Controls all;
+    Flatten(object.layout, all);
+    Flatten(object.actions, all);
     for (const al::PageControl *control : all.parts) {
       const auto found = objects.pages.find(LowerKey(PartSource(*control)));
       if (found != objects.pages.end() && !found->second.header.empty()) {
@@ -203,6 +219,9 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
     }
   }
   std::string out;
+  if (DeclaresAnOption(object.variables, object.procedures)) {
+    out += "#include \"options/Types.h\"\n";
+  }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   if (!reached.forward.empty()) { out += "\n"; }
   for (const auto &[space, named] : reached.forward) {

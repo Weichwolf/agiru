@@ -1104,6 +1104,27 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record := RecordRef` -- the row the reference stands for.
+  /// \tparam R The reference's type, taken as a template because `RecordRef` is only declared
+  ///         here: the door's record base is what `RecordRef` itself is built on.
+  /// \param from The reference.
+  /// \return This record.
+  /// \throws Error when the reference is closed or names another table, which AL raises too.
+  ///
+  /// \note AL ASSIGNS A REFERENCE TO A RECORD in a lookup trigger -- `OnAfterLookup(Selected:
+  ///       RecordRef)` -- and what it copies is the ROW.
+  template <typename R>
+    requires requires(const R &ref) { ref.IsOpen(); }
+  Derived &operator=(const R &from) {
+    const Derived *row = from.template As<Derived>();
+    if (row == nullptr) {
+      throw Error("A RecordRef of another table cannot be assigned to " +
+                  std::string(TableTraits<Derived>::kTable.name));
+    }
+    if (row != static_cast<const Derived *>(Self())) { *static_cast<Derived *>(Self()) = *row; }
+    return *static_cast<Derived *>(Self());
+  }
+
   Boolean IsTemporary() const { return detail::RuntimeIsTemporary(Self()); }
 
   /// \brief AL `Record.LoadFields(...)`. Accesses the table's corresponding data source and loads

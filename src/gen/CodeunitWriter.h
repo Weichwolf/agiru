@@ -86,7 +86,8 @@ std::string RaisingBody(const al::ProcedureDecl &procedure,
 std::string InlineOptionsOf(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures);
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already = {});
 
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
@@ -94,6 +95,9 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const std::set<std::string> &shadowed = {},
                                  const std::vector<al::ProcedureDecl> &all = {},
                                  const std::string &spelled = {});
+
+bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
+                      const std::vector<al::ProcedureDecl> &procedures);
 
 bool IsTryFunction(const al::ProcedureDecl &procedure);
 

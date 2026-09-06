@@ -119,6 +119,18 @@ std::string RaisingBody(const al::ProcedureDecl &procedure,
   return out + ");\n";
 }
 
+bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
+                      const std::vector<al::ProcedureDecl> &procedures) {
+  const auto option = [](const al::VarDecl &declared) {
+    return TypeName(declared.type) == "Option" && !declared.members.empty();
+  };
+  if (std::ranges::any_of(variables, option)) { return true; }
+  return std::ranges::any_of(procedures, [&option](const al::ProcedureDecl &procedure) {
+    return std::ranges::any_of(procedure.parameters, option) ||
+           std::ranges::any_of(procedure.variables, option) || option(procedure.returned);
+  });
+}
+
 bool IsTryFunction(const al::ProcedureDecl &procedure) {
   return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
     return LowerKey(attribute) == "tryfunction";
@@ -376,17 +388,7 @@ std::string OptionNameOf(const std::string &owner,
                          const std::vector<al::ProcedureDecl> &procedures) {
   static_cast<void>(procedures);
   if (declared.members.empty()) { return OptionName(owner, within, declared.name); }
-  std::string joined;
-  for (const std::string &member : EnumeratorNames(declared.members)) { joined += member; }
-  constexpr std::size_t kReadable = 48;
-  if (joined.size() > kReadable) {
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (const char c : joined) {
-      hash = (hash ^ static_cast<unsigned char>(c)) * 1099511628211ULL;
-    }
-    joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % 1000000007ULL);
-  }
-  return Identifier(owner) + "Option" + joined;
+  return OptionContentName(declared.members);
 }
 
 bool Hidden(const std::string &type, const std::set<std::string> &names) {
@@ -487,47 +489,18 @@ std::string Parameters(const al::ProcedureDecl &procedure,
 std::string InlineOptionsIn(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures) {
-  std::string out;
-  std::map<std::string, std::vector<std::string>> emitted;
-  const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
-    if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
-    const std::string name = OptionNameOf(owner, within, declared, procedures);
-    const auto seen = emitted.find(name);
-    if (seen != emitted.end()) {
-      if (EnumeratorNames(seen->second) != EnumeratorNames(declared.members)) {
-        throw std::runtime_error("\"" + owner +
-                                 "\" declares two different options under the name " + name);
-      }
-      return;
-    }
-    emitted.insert_or_assign(name, declared.members);
-    const std::vector<std::string> names = EnumeratorNames(declared.members);
-    out += "namespace agiru::app::" + space + " {\n\nenum class " + name + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
-    }
-    out += "};\n\n} // namespace agiru::app::" + space + "\n\n";
-    out += "template <> struct agiru::OptionTraits<agiru::app::" + space + "::" + name + "> {\n";
-    out += "  static constexpr std::array<EnumValueDef, " +
-           std::to_string(declared.members.size()) + "> kValues{{\n";
-    for (std::size_t i = 0; i < declared.members.size(); ++i) {
-      out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
-             ", .name = " + Literal(declared.members[i]) +
-             ", .caption = " + Literal(declared.members[i]) + "},\n";
-    }
-    out += "  }};\n};\n\n";
-  };
-  for (const al::VarDecl &declared : variables) { declare(std::string{}, declared); }
-  for (const al::ProcedureDecl &procedure : procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) { declare(procedure.name, declared); }
-    for (const al::VarDecl &declared : procedure.variables) { declare(procedure.name, declared); }
-  }
-  return out;
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already) {
+  static_cast<void>(owner);
+  static_cast<void>(space);
+  static_cast<void>(variables);
+  static_cast<void>(procedures);
+  static_cast<void>(already);
+  return {};
 }
 
 std::string InlineOptions(const al::CodeunitObject &unit) {
-  return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
+  return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures, {});
 }
 
 std::string Returns(const al::ProcedureDecl &procedure,
@@ -719,6 +692,9 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   }
   std::string out = std::string(kDoorMarker);
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
+  if (DeclaresAnOption(unit.variables, unit.procedures)) {
+    out += "#include \"options/Types.h\"\n";
+  }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
 
   if (!forward.empty()) { out += "\n"; }
@@ -1423,6 +1399,8 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
 }
 
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
+  std::string named;
+  if (text.find("options::") != std::string::npos) { named = "#include \"options/Types.h\"\n"; }
   static constexpr std::array<std::string_view, 8> kKinds{
       "codeunits", "pages", "tables", "interfaces", "reports", "xmlports", "queries", "enums"};
   const HeaderIndex &known = HeadersOf(objects);
@@ -1441,7 +1419,7 @@ std::string BodyIncludes(const std::string &text, const Objects &objects) {
   }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
-  return out;
+  return named + out;
 }
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
@@ -1506,8 +1484,9 @@ const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects)
 std::string InlineOptionsOf(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures) {
-  return InlineOptionsIn(owner, space, variables, procedures);
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already) {
+  return InlineOptionsIn(owner, space, variables, procedures, already);
 }
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {

@@ -260,6 +260,7 @@ struct Gathered {
   agiru::gen::DotNetUse absent;
   std::vector<agiru::gen::RefusedProperty> refused;
   std::map<std::string, std::size_t> attributes;
+  std::map<std::string, std::vector<std::string>> options;
 };
 
 constexpr std::array kAcknowledgedAttributes{
@@ -622,6 +623,24 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
+using OptionsInScope = std::map<std::string, std::vector<std::string>>;
+
+void NoteOption(const agiru::al::VarDecl &declared, OptionsInScope &into) {
+  if (agiru::gen::TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
+  into.insert_or_assign(agiru::gen::OptionContentName(declared.members), declared.members);
+}
+
+void NoteOptions(const std::vector<agiru::al::VarDecl> &variables,
+                 const std::vector<agiru::al::ProcedureDecl> &procedures,
+                 OptionsInScope &into) {
+  for (const agiru::al::VarDecl &declared : variables) { NoteOption(declared, into); }
+  for (const agiru::al::ProcedureDecl &procedure : procedures) {
+    for (const agiru::al::VarDecl &declared : procedure.parameters) { NoteOption(declared, into); }
+    for (const agiru::al::VarDecl &declared : procedure.variables) { NoteOption(declared, into); }
+    NoteOption(procedure.returned, into);
+  }
+}
+
 void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums &into) {
   auto &fields = into[agiru::gen::LowerKey(table.name)];
   for (const agiru::al::FieldDecl &field : table.fields) {
@@ -630,9 +649,13 @@ void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums 
                               "enums::" + agiru::gen::Identifier(field.subtype));
       continue;
     }
-    if (agiru::al::Find(field.properties, "OptionMembers") != nullptr) {
+    if (const agiru::al::Property *members =
+            agiru::al::Find(field.properties, "OptionMembers");
+        members != nullptr) {
+      const std::string named =
+          agiru::gen::OptionEnumName(table.name, field.name, agiru::al::ListValue(*members));
       fields.insert_or_assign(agiru::gen::LowerKey(field.name),
-                              "tables::" + agiru::gen::OptionEnumName(table.name, field.name));
+                              named.find("::") == std::string::npos ? "tables::" + named : named);
     }
   }
 }
@@ -989,6 +1012,7 @@ void ScanCodeunits(Run &run,
     counts.tests += tests;
     if (population.files != 0) { counts.unitParsed += tests; }
     CountAttributes(*unit, gathered.attributes);
+    NoteOptions(unit->variables, unit->procedures, gathered.options);
     if (run.output.empty()) { continue; }
     try {
       const std::string relative = std::filesystem::relative(path, run.root).string();
@@ -1059,6 +1083,36 @@ Counted Stubs(std::string &text, const agiru::gen::DotNetUse &use, bool skipRebu
     text += "};\n";
   }
   return counted;
+}
+
+void WriteOptions(const std::filesystem::path &out, const OptionsInScope &options) {
+  if (out.empty()) { return; }
+  std::string text = "// Generated from every option AL declares by its members. Do not edit.\n";
+  text += "// Do not edit.\n\n#pragma once\n\n#include \"meta/EnumDef.h\"\n";
+  text += "#include \"type/Option.h\"\n\n#include <array>\n#include <cstdint>\n\n";
+  for (const auto &[qualified, members] : options) {
+    const std::string name = qualified.substr(qualified.rfind(':') + 1);
+    const std::vector<std::string> names = agiru::gen::EnumeratorNames(members);
+    text += "namespace agiru::app::options {\n\nenum class " + name + " : std::int32_t {\n";
+    for (std::size_t i = 0; i < names.size(); ++i) {
+      text += "  " + names[i] + " = " + std::to_string(i) + ",\n";
+    }
+    text += "};\n\n} // namespace agiru::app::options\n\n";
+    text += "template <> struct agiru::OptionTraits<agiru::app::options::" + name + "> {\n";
+    text += "  static constexpr std::array<EnumValueDef, " + std::to_string(members.size()) +
+            "> kValues{{\n";
+    for (std::size_t i = 0; i < members.size(); ++i) {
+      text += "      EnumValueDef{.ordinal = " + std::to_string(i) + ", .name = " +
+              agiru::gen::Literal(names[i]) + ", .caption = " + agiru::gen::Literal(members[i]) +
+              "},\n";
+    }
+    text += "  }};\n};\n\n";
+  }
+  const std::filesystem::path path = out / "shared" / "options" / "Types.h";
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream file(path, std::ios::binary);
+  file << text;
+  std::println("options   {} enumeration(s) named by their members", options.size());
 }
 
 void WriteAbsent(const std::filesystem::path &out,
@@ -1239,6 +1293,18 @@ int Scan(const Job &job) {
       }
     }
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
+    for (const agiru::al::TableObject &table : parsedTables.objects) {
+      NoteOptions(table.variables, table.procedures, gathered.options);
+      for (const agiru::al::FieldDecl &field : table.fields) {
+        const agiru::al::Property *members = agiru::al::Find(field.properties, "OptionMembers");
+        if (members == nullptr) { continue; }
+        const std::vector<std::string> listed = agiru::al::ListValue(*members);
+        gathered.options.insert_or_assign(agiru::gen::OptionContentName(listed), listed);
+      }
+    }
+    for (const agiru::al::PageObject &page : parsed.objects) {
+      NoteOptions(page.variables, page.procedures, gathered.options);
+    }
     WriteEnums(run, heldEnums, objects);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
@@ -1355,6 +1421,7 @@ int Scan(const Job &job) {
   }
   ReportUnresolved("enum(s)", "field(s)", unresolvedEnums);
   WriteAbsent(job.output, gathered.dotnet, gathered.absent);
+  WriteOptions(job.output, gathered.options);
   ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
   Cluster(failures);
   if (!refusals.empty()) {

@@ -205,6 +205,16 @@ template <typename T, std::size_t N>
   return array.Length();
 }
 
+/// \brief AL `ArrayLen(X)` where the array is held by a HANDLE, which is how a page keeps one.
+/// \tparam H The handle's type.
+/// \param handle The handle.
+/// \return The number of elements.
+template <typename H>
+  requires requires(const H &held) { ArrayLen(*held.operator->()); }
+[[nodiscard]] Integer ArrayLen(const H &handle) {
+  return ArrayLen(*handle.operator->());
+}
+
 /// \brief AL `X[i]` -- the element at a ONE-BASED index.
 ///
 /// \tparam Container What is being indexed.

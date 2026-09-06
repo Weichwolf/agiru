@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <set>
 #include <sstream>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -131,8 +132,25 @@ std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members
   return names;
 }
 
-std::string OptionEnumName(std::string_view tableName, std::string_view fieldName) {
-  return Identifier(tableName) + Identifier(fieldName);
+std::string OptionContentName(const std::vector<std::string> &members) {
+  std::string joined;
+  for (const std::string &member : EnumeratorNames(members)) { joined += member; }
+  constexpr std::size_t kReadable = 48;
+  if (joined.size() > kReadable) {
+    std::uint64_t hash = 14695981039346656037ULL;
+    for (const char c : joined) {
+      hash = (hash ^ static_cast<unsigned char>(c)) * 1099511628211ULL;
+    }
+    joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % 1000000007ULL);
+  }
+  return "options::Option" + joined;
+}
+
+std::string OptionEnumName(std::string_view tableName,
+                           std::string_view fieldName,
+                           const std::vector<std::string> &members) {
+  if (members.empty()) { return Identifier(tableName) + Identifier(fieldName); }
+  return OptionContentName(members);
 }
 
 std::string Literal(std::string_view text) {
