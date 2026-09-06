@@ -53,6 +53,26 @@ public:
     return *this;
   }
 
+  /// \brief AL `Char := 'x'` -- a one-character text.
+  /// \param text The text, whose single character is taken.
+  /// \return This character.
+  /// \throws Error when the text is not exactly one character, which is what AL raises.
+  constexpr Char &operator=(std::string_view text) {
+    if (text.size() != 1) {
+      throw Error("A text of length " + std::to_string(text.size()) + " is not one character");
+    }
+    code_ = static_cast<std::int32_t>(static_cast<unsigned char>(text.front()));
+    return *this;
+  }
+
+  /// \brief AL `Char := "x"` where the literal is a character array.
+  /// \tparam N The array's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return This character.
+  template <std::size_t N> constexpr Char &operator=(const char (&text)[N]) {
+    return *this = std::string_view(text, N - 1);
+  }
+
   constexpr Char &operator=(std::int32_t code) {
     code_ = code;
     return *this;
@@ -98,4 +118,36 @@ private:
   std::int32_t code_ = 0;
 };
 
+
+/// \brief AL `Text + Char` -- the character is appended.
+/// \param text The text.
+/// \param character The character.
+/// \return The text with the character on the end.
+///
+/// \note WITHOUT IT THE `+` WAS POINTER ARITHMETIC. A `Char` converts to its code point, so
+///       `std::string + Char` read as "advance a pointer" and the diagnostic named the operands
+///       rather than the AL line that concatenated them.
+[[nodiscard]] inline std::string operator+(std::string_view text, Char character) {
+  std::string out(text);
+  out += static_cast<char>(static_cast<std::int32_t>(character));
+  return out;
+}
+
+/// \brief AL `Char + Text` -- the character comes first.
+/// \param character The character.
+/// \param text The text.
+/// \return The character with the text after it.
+[[nodiscard]] inline std::string operator+(Char character, std::string_view text) {
+  std::string out(1, static_cast<char>(static_cast<std::int32_t>(character)));
+  out += text;
+  return out;
+}
+
+/// \brief AL `Text + Char` where the left side is already a `std::string`.
+/// \param text The text.
+/// \param character The character.
+/// \return The text with the character on the end.
+[[nodiscard]] inline std::string operator+(const std::string &text, Char character) {
+  return std::string_view(text) + character;
+}
 }

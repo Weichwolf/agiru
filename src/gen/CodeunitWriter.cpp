@@ -1812,6 +1812,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += ", public " + found->second.identifier;
   }
   out += " {\npublic:\n";
+  out += "  using Codeunit<" + unitClass + ">::operator=;\n\n";
 
   const std::string source = SourceTableOf(unit, objects);
   if (!source.empty()) { out += "  " + source + " Rec;\n\n"; }

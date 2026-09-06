@@ -221,6 +221,21 @@ template <typename C, typename Index>
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
 template <typename Derived = void> class Codeunit {
 public:
+  /// \brief AL assigns a `Variant` holding a codeunit to a codeunit variable -- the platform's
+  ///        `OnRunPreview` hands the subscriber that way.
+  /// \tparam V The Variant's type, taken as a template because `Variant` is a door type this base
+  ///         does not include.
+  /// \param held The Variant.
+  /// \return This codeunit.
+  /// \throws Error always -- a codeunit instance does not travel in a Variant here (board:0035).
+  template <typename V>
+    requires requires(const V &value) { value.IsCodeunit(); }
+  Codeunit &operator=(const V &held) {
+    static_cast<void>(held);
+    throw Error("A Variant holding a codeunit cannot be assigned yet (board:0035)");
+  }
+
+public:
   /// \brief The codeunit's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr CodeunitId Id() { return CodeunitTraits<Derived>::kId; }
