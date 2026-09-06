@@ -118,7 +118,6 @@ private:
   std::int32_t code_ = 0;
 };
 
-
 /// \brief AL `Text + Char` -- the character is appended.
 /// \param text The text.
 /// \param character The character.

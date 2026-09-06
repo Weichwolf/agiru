@@ -100,7 +100,6 @@ template <typename T> Integer MaxStrLen(const T &value) {
   return static_cast<Integer>(detail::Utf16Length(value));
 }
 
-
 /// \brief AL `Text.TrimEnd(Char)` -- a character is one character of text.
 /// \tparam C The character's type.
 /// \param Chars The character.

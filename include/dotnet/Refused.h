@@ -414,6 +414,20 @@ struct RefusedResult : Refused {
   Refused GetType{{.type = "<result>", .member = "GetType"}};           ///< The chained member.
   Refused Equals{{.type = "<result>", .member = "Equals"}};             ///< The chained member.
   Refused Dispose{{.type = "<result>", .member = "Dispose"}};           ///< The chained member.
+  Refused Parent{{.type = "<result>", .member = "Parent"}};   ///< The chained member.
+  Refused ToTitleCase{{.type = "<result>", .member = "ToTitleCase"}}; ///< The chained member.
+  Refused SelectSingleNode{{.type = "<result>", .member = "SelectSingleNode"}}; ///< The chained member.
+  Refused InnerXml{{.type = "<result>", .member = "InnerXml"}}; ///< The chained member.
+  Refused ImportStream{{.type = "<result>", .member = "ImportStream"}}; ///< The chained member.
+  Refused ImportNode{{.type = "<result>", .member = "ImportNode"}}; ///< The chained member.
+  Refused HasValue{{.type = "<result>", .member = "HasValue"}}; ///< The chained member.
+  Refused GetEnumerator{{.type = "<result>", .member = "GetEnumerator"}}; ///< The chained member.
+  Refused ExportStream{{.type = "<result>", .member = "ExportStream"}}; ///< The chained member.
+  Refused CreateOutStream{{.type = "<result>", .member = "CreateOutStream"}}; ///< The chained member.
+  Refused CreateNode{{.type = "<result>", .member = "CreateNode"}}; ///< The chained member.
+  Refused CreateInStream{{.type = "<result>", .member = "CreateInStream"}}; ///< The chained member.
+  Refused CopyTo{{.type = "<result>", .member = "CopyTo"}}; ///< The chained member.
+  Refused AbsoluteUri{{.type = "<result>", .member = "AbsoluteUri"}}; ///< The chained member.
   Refused DataType{{.type = "<result>", .member = "DataType"}}; ///< The chained member.
   Refused Clear{{.type = "<result>", .member = "Clear"}}; ///< The chained member.
   Refused Add{{.type = "<result>", .member = "Add"}}; ///< The chained member.
