@@ -2027,3 +2027,12 @@ base/intercompany/data_exchange/table/BufferICInOutJnlLineDim.cpp
 base/system/automation/table/FlowServiceConfiguration.cpp
 base/system/automation/table/FlowUserEnvironmentConfig.cpp
 base/intercompany/data_exchange/table/ICOutgoingNotification.cpp
+base/system/globalization/codeunit/DotNet_CultureInfo.cpp
+base/system/date_time/codeunit/DotNet_DateTimeOffset.cpp
+base/system/date_time/codeunit/DotNet_DateTimeStyles.cpp
+base/system/text/codeunit/DotNet_String.cpp
+base/system/threading/codeunit/JobQueueStartCodeunit.cpp
+system/system/globalization/codeunit/LanguageImpl.cpp
+base/system/text/codeunit/DotNet_NormalizationForm.cpp
+base/system/threading/codeunit/JobQueueStartReportBase.cpp
+system/system/globalization/table/AllowedLanguage.cpp
