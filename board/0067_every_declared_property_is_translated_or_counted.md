@@ -104,6 +104,22 @@ discarded there.
 - **The counter is the denominator the property items are measured against**, so board:0043,
   board:0047, board:0066, board:0068 and board:0069 each close a row of it and the number falls.
 
+## What the counter says now, measured 2026-09-06
+
+`agirutc` prints it on every run:
+
+| | |
+|---|---:|
+| property declarations in scope | **287 017** of 150 kinds |
+| dropped by DECISION, each with a reason | 128 078 |
+| read and dropped in SILENCE | **46 203** of 96 kinds |
+
+The biggest silent ones are `TableRelation` (8 388, board:0043), `RunObject` (5 678),
+`Importance` (2 802), `PageType` (2 689), `AccessByPermission` (2 140, board:0062) and `Enabled`
+(2 052). **The census counts a property BY NAME**, so one read on a field and dropped on a control
+counts as read; that is coarse and it is the ranking's own limit, said here rather than left for a
+reader to find.
+
 ## Gate
 
 The run summary lists dropped properties by count. A property added to the AL corpus that neither

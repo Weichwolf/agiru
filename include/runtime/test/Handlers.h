@@ -23,7 +23,7 @@ enum class HandlerKind : std::uint8_t {
   Confirm,          ///< `[ConfirmHandler]` -- `Confirm(Question, var Reply)`.
   Message,          ///< `[MessageHandler]` -- `Message(Text)`.
   StrMenu,          ///< `[StrMenuHandler]` -- `StrMenu(Options, var Choice, Instruction)`.
-  HyperLink,        ///< `[HyperlinkHandler]` -- `Hyperlink(Url)`.
+  Hyperlink,        ///< `[HyperlinkHandler]` -- `Hyperlink(Url)`.
   Page,             ///< `[PageHandler]` -- a page run non-modally.
   ModalPage,        ///< `[ModalPageHandler]` -- a page run modally.
   RequestPage,      ///< `[RequestPageHandler]` -- a report's request page.

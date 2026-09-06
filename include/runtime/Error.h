@@ -143,7 +143,6 @@ void Commit();
               " names a table this run does not carry (board:0034)");
 }
 
-
 /// \brief AL `Error(...)` -- raises, unless a `[ErrorBehavior(ErrorBehavior::Collect)]` scope is
 ///        standing, in which case the error is COLLECTED and the call returns.
 /// \param message The text AL wrote.

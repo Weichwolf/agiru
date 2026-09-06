@@ -59,6 +59,10 @@ constexpr std::array kRefusedValue{
 
 }
 
+bool RefusedByName(std::string_view name) {
+  return std::ranges::find(kRefused, name) != kRefused.end();
+}
+
 void CollectRefused(const std::vector<al::Property> &properties,
                     std::string_view where,
                     std::vector<RefusedProperty> &into) {

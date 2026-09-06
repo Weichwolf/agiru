@@ -266,7 +266,7 @@ std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
       std::pair{std::string_view{"confirmhandler"}, std::string_view{"HandlerKind::Confirm"}},
       std::pair{std::string_view{"messagehandler"}, std::string_view{"HandlerKind::Message"}},
       std::pair{std::string_view{"strmenuhandler"}, std::string_view{"HandlerKind::StrMenu"}},
-      std::pair{std::string_view{"hyperlinkhandler"}, std::string_view{"HandlerKind::HyperLink"}},
+      std::pair{std::string_view{"hyperlinkhandler"}, std::string_view{"HandlerKind::Hyperlink"}},
       std::pair{std::string_view{"modalpagehandler"}, std::string_view{"HandlerKind::ModalPage"}},
       std::pair{std::string_view{"pagehandler"}, std::string_view{"HandlerKind::Page"}},
       std::pair{std::string_view{"requestpagehandler"},

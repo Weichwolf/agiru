@@ -262,6 +262,7 @@ struct Gathered {
   std::map<std::string, std::size_t> attributes;
   std::map<std::string, std::vector<std::string>> options;
   std::map<std::string, std::size_t> deprecatedScopes;
+  std::map<std::string, std::size_t> properties;
 };
 
 constexpr std::array kAcknowledgedAttributes{
@@ -272,6 +273,74 @@ constexpr std::array kAcknowledgedAttributes{
               std::string_view{"a compile-time warning in AL; the body stands"}},
     std::pair{std::string_view{"nondebuggable"},
               std::string_view{"debugger visibility; no debugger here"}},
+};
+
+// THE LIST IS DERIVED FROM THE WRITERS, not written beside them: every `Find(properties, "X")`
+// and every `PropertyIs(field, "X", ...)` in `src/gen` names a property the generator READS, and
+// this array is that grep, checked into the tree so the census can subtract it (board:0067).
+constexpr std::array kTranslatedProperties{
+    std::string_view{"access"},
+    std::string_view{"allowincustomizations"},
+    std::string_view{"autoformatexpression"},
+    std::string_view{"autoformattype"},
+    std::string_view{"autoincrement"},
+    std::string_view{"blanknumbers"},
+    std::string_view{"blankzero"},
+    std::string_view{"calcformula"},
+    std::string_view{"caption"},
+    std::string_view{"captionclass"},
+    std::string_view{"charallowed"},
+    std::string_view{"closingdates"},
+    std::string_view{"compressed"},
+    std::string_view{"datacaptionfields"},
+    std::string_view{"decimalplaces"},
+    std::string_view{"defaultimplementation"},
+    std::string_view{"drilldownpageid"},
+    std::string_view{"editable"},
+    std::string_view{"eventsubscriberinstance"},
+    std::string_view{"extendeddatatype"},
+    std::string_view{"fieldclass"},
+    std::string_view{"implementation"},
+    std::string_view{"initvalue"},
+    std::string_view{"lookuppageid"},
+    std::string_view{"masktype"},
+    std::string_view{"maxvalue"},
+    std::string_view{"minvalue"},
+    std::string_view{"notblank"},
+    std::string_view{"numeric"},
+    std::string_view{"obsoletereason"},
+    std::string_view{"obsoletestate"},
+    std::string_view{"obsoletetag"},
+    std::string_view{"optimizefortextsearch"},
+    std::string_view{"optioncaption"},
+    std::string_view{"optionmembers"},
+    std::string_view{"sourcetable"},
+    std::string_view{"subtype"},
+    std::string_view{"tableno"},
+    std::string_view{"testpermissions"},
+    std::string_view{"validatetablerelation"},
+    std::string_view{"valuesallowed"},
+    std::string_view{"width"},
+};
+
+// A PROPERTY DROPPED BY DECISION CARRIES THE REASON, so the census's remainder is what nobody has
+// looked at rather than what nobody has written yet (board:0067).
+constexpr std::array kDroppedProperties{
+    std::pair{std::string_view{"applicationarea"}, std::string_view{"the UI decides visibility (board:0030)"}},
+    std::pair{std::string_view{"tooltip"}, std::string_view{"the UI shows it (board:0030)"}},
+    std::pair{std::string_view{"visible"}, std::string_view{"the UI decides visibility (board:0030)"}},
+    std::pair{std::string_view{"image"}, std::string_view{"the UI draws it (board:0030)"}},
+    std::pair{std::string_view{"promoted"}, std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedcategory"}, std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedisbig"}, std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"promotedonly"}, std::string_view{"the UI's action bar (board:0030)"}},
+    std::pair{std::string_view{"style"}, std::string_view{"the UI renders it (board:0030)"}},
+    std::pair{std::string_view{"styleexpr"}, std::string_view{"the UI renders it (board:0030)"}},
+    std::pair{std::string_view{"showcaption"}, std::string_view{"the UI renders it (board:0030)"}},
+    std::pair{std::string_view{"multiplenewlines"}, std::string_view{"the UI's list behaviour (board:0030)"}},
+    std::pair{std::string_view{"dataclassification"}, std::string_view{"telemetry classification, no run-time behaviour"}},
+    std::pair{std::string_view{"obsoletereason"}, std::string_view{"a diagnostic's text (board:0069)"}},
+    std::pair{std::string_view{"obsoletetag"}, std::string_view{"a diagnostic's text (board:0069)"}},
 };
 
 constexpr std::array kActedOnAttributes{
@@ -307,6 +376,37 @@ constexpr std::array kDeprecatedScopes{
     std::pair{std::string_view{"personalization"}, std::string_view{"Cloud"}},
     std::pair{std::string_view{"extension"}, std::string_view{"Cloud"}},
 };
+
+void NoteProperties(const std::vector<agiru::al::Property> &properties,
+                    std::map<std::string, std::size_t> &into) {
+  for (const agiru::al::Property &property : properties) {
+    ++into[agiru::gen::LowerKey(property.name)];
+  }
+}
+
+void NotePropertiesOf(const agiru::al::TableObject &table,
+                      std::map<std::string, std::size_t> &into) {
+  NoteProperties(table.properties, into);
+  for (const agiru::al::FieldDecl &field : table.fields) { NoteProperties(field.properties, into); }
+  for (const agiru::al::KeyDecl &key : table.keys) { NoteProperties(key.properties, into); }
+}
+
+void NotePropertiesOf(const agiru::al::PageObject &page, std::map<std::string, std::size_t> &into) {
+  NoteProperties(page.properties, into);
+  const auto walk = [&into](auto &&self, const std::vector<agiru::al::PageControl> &controls) -> void {
+    for (const agiru::al::PageControl &control : controls) {
+      NoteProperties(control.properties, into);
+      self(self, control.children);
+    }
+  };
+  walk(walk, page.layout);
+  walk(walk, page.actions);
+}
+
+void NotePropertiesOf(const agiru::al::CodeunitObject &unit,
+                      std::map<std::string, std::size_t> &into) {
+  NoteProperties(unit.properties, into);
+}
 
 template <typename Object>
 void CheckNormal(const Object &unit,
@@ -567,6 +667,7 @@ void WritePages(Run &run,
         agiru::gen::WritePage(pages.objects[i], pages.paths[i], objects);
     Absorb(gathered.refused, agiru::gen::Refused(pages.objects[i]));
     CountAttributes(pages.objects[i], gathered.attributes, gathered.deprecatedScopes);
+    NotePropertiesOf(pages.objects[i], gathered.properties);
     CheckNormal(pages.objects[i], "page", false, gathered.refused);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
@@ -668,6 +769,7 @@ void WriteTable(Run &run,
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   Absorb(gathered.refused, agiru::gen::Refused(table));
   CountAttributes(table, gathered.attributes, gathered.deprecatedScopes);
+    NotePropertiesOf(table, gathered.properties);
     CheckNormal(table, "table", false, gathered.refused);
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
@@ -1073,6 +1175,7 @@ void ScanCodeunits(Run &run,
     counts.tests += tests;
     if (population.files != 0) { counts.unitParsed += tests; }
     CountAttributes(*unit, gathered.attributes, gathered.deprecatedScopes);
+    NotePropertiesOf(*unit, gathered.properties);
     CheckNormal(*unit, "codeunit", agiru::gen::IsTestCodeunit(*unit), gathered.refused);
     NoteOptions(unit->variables, unit->procedures, gathered.options);
     if (run.output.empty()) { continue; }
@@ -1413,6 +1516,38 @@ int Scan(const Job &job) {
   for (const auto &[name, total] : store.held) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
+  }
+  {
+    std::size_t counted = 0;
+    std::size_t decided = 0;
+    std::vector<std::pair<std::string, std::size_t>> silent;
+    for (const auto &[name, found] : gathered.properties) {
+      counted += found;
+      if (std::ranges::find(kTranslatedProperties, name) != kTranslatedProperties.end()) {
+        continue;
+      }
+      if (agiru::gen::RefusedByName(name)) { continue; }
+      if (std::ranges::find_if(kDroppedProperties, [&name](const auto &known) {
+            return known.first == name;
+          }) != kDroppedProperties.end()) {
+        decided += found;
+        continue;
+      }
+      silent.emplace_back(name, found);
+    }
+    std::ranges::sort(silent, [](const auto &a, const auto &b) { return a.second > b.second; });
+    std::size_t dropped = 0;
+    for (const auto &[name, found] : silent) { dropped += found; }
+    std::println("properties {} declaration(s) of {} kind(s); {} dropped by decision, {} of {} "
+                 "kind(s) read and dropped in silence (board:0067)",
+                 counted,
+                 gathered.properties.size(),
+                 decided,
+                 dropped,
+                 silent.size());
+    for (std::size_t i = 0; i < silent.size() && i < 12; ++i) {
+      std::println("          {:>7} x {}", silent[i].second, silent[i].first);
+    }
   }
   if (!declaredOnly.empty()) {
     std::size_t total = 0;

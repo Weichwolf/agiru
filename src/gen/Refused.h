@@ -13,6 +13,10 @@ struct RefusedProperty {
   std::string where;
 };
 
+/// Whether the transpiler refuses this property by DECISION rather than by omission -- the list
+/// the run summary counts against (board:0067).
+bool RefusedByName(std::string_view name);
+
 void CollectRefused(const std::vector<al::Property> &properties,
                     std::string_view where,
                     std::vector<RefusedProperty> &into);

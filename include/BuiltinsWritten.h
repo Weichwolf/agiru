@@ -52,7 +52,6 @@ namespace agiru {
 ///       the platform's refusal (board:0054).
 [[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
 
-
 /// \brief AL `Text.ConvertStr(Text, Text, Text)`. Replaces all chars in source found in
 /// FromCharacters with the corresponding char in ToCharacters and returns the converted string. If
 /// the length of the FromCharacters parameter and the ToChars parameter are different, an exception
@@ -459,8 +458,7 @@ template <typename First, typename... Values>
 void Message(std::string_view String, const First &first, const Values &...values) {
   const std::string shown = ::agiru::StrSubstNo(String, first, values...);
   if (::agiru::AnsweredByHandler(1, shown, nullptr)) { return; }
-  throw ::agiru::Error(std::string("Message(") + shown +
-                       ") needs a running UI (board:0030)");
+  throw ::agiru::Error(std::string("Message(") + shown + ") needs a running UI (board:0030)");
 }
 
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
