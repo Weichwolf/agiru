@@ -1853,3 +1853,11 @@ base/fixed_assets/depreciation/codeunit/TableDeprCalculation.cpp
 base/finance/dimension/page/DimensionSelection.cpp
 base/fixed_assets/insurance/table/InsuranceRegister.cpp
 base/fixed_assets/depreciation/table/DepreciationTableBuffer.cpp
+base/inventory/costing/codeunit/CalcInventoryAdjmtOrder.cpp
+base/system/io/table/DataExchLineDef.cpp
+base/system/io/table/DataExchLineDef.cpp
+base/foundation/reporting/table/ReportSelections.cpp
+base/system/automation/table/WorkflowEvent.cpp
+base/foundation/reporting/table/ReportSelections.cpp
+base/system/automation/table/WorkflowEvent.cpp
+base/inventory/costing/table/InventoryAdjustmentBuffer.cpp
