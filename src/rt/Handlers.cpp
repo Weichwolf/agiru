@@ -50,7 +50,7 @@ std::vector<std::string_view> HandlerTable::Uninstall() {
       missed.push_back(name);
       continue;
     }
-    if (!held.ran.contains(&*found)) { missed.push_back(name); }
+    if (!found->optional && !held.ran.contains(&*found)) { missed.push_back(name); }
   }
   held = Standing{};
   return missed;

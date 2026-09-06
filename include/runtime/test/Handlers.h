@@ -53,6 +53,10 @@ struct TestHandler {
   HandlerKind kind;      ///< Which dialog it answers.
   std::int32_t object;   ///< The page or report number it answers, 0 where the kind has none.
   HandlerThunk invoke;   ///< Calls it on a fresh codeunit with the dialog's own arguments.
+  bool optional;         ///< `HandlerIsOptional` -- a notification handler AL lets a case declare
+                         ///< and not reach (`attributes/devenv-sendnotificationhandler-attribute.md`);
+                         ///< it is excluded from the "named and never ran" failure (openerp
+                         ///< WI-1305, board:0054).
 };
 
 /// \brief The handlers of ONE test codeunit, installed while one of its cases runs.

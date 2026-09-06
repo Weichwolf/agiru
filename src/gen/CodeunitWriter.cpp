@@ -289,6 +289,15 @@ std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
   return {};
 }
 
+bool HandlerIsOptional(const al::ProcedureDecl &procedure) {
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("handler(") == std::string::npos) { continue; }
+    if (lowered.find("true") != std::string::npos) { return true; }
+  }
+  return false;
+}
+
 std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
   std::vector<std::string> named;
   for (const std::string &attribute : procedure.attributes) {
@@ -323,7 +332,8 @@ std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &id
                     "> kHandlers{{\n";
   for (const al::ProcedureDecl *handler : handlers) {
     out += "    {\"" + handler->name + "\", " + HandlerKindOf(*handler) + ", 0, &InvokeHandler<" +
-           identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">},\n";
+           identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">, " +
+           (HandlerIsOptional(*handler) ? "true" : "false") + "},\n";
   }
   out += "}};\n\n";
   return out;

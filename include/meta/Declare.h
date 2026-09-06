@@ -270,6 +270,10 @@ struct Declared {
   bool autoIncrement = false;                                   ///< `AutoIncrement`.
   bool editable = true;                                         ///< `Editable`.
   bool validateTableRelation = true;                            ///< `ValidateTableRelation`.
+  std::string_view relationTable{}; ///< `TableRelation`'s target table, empty when the declaration
+                                    ///< is conditional or filtered (board:0043).
+  std::string_view relationField{}; ///< Its target field, empty when the relation names the table's
+                                    ///< own primary key.
   bool blankZero = false;                                       ///< `BlankZero`.
   std::string_view minValue{};                                  ///< `MinValue`, as AL wrote it.
   std::string_view maxValue{};                                  ///< `MaxValue`, as AL wrote it.
@@ -291,10 +295,6 @@ struct Declared {
   std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
   std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
   std::string_view access{};                ///< `Access`, as AL wrote it.
-  std::string_view relationTable{}; ///< `TableRelation`'s target table, empty when the declaration
-                                    ///< is conditional or filtered (board:0043).
-  std::string_view relationField{}; ///< Its target field, empty when the relation names the table's
-                                    ///< own primary key.
   std::string_view obsoleteState{};         ///< `ObsoleteState`.
   std::string_view obsoleteReason{};        ///< `ObsoleteReason`.
   std::string_view obsoleteTag{};           ///< `ObsoleteTag`.
@@ -322,6 +322,8 @@ constexpr FieldDef Declare(FieldNo no,
       .autoIncrement = declared.autoIncrement,
       .editable = declared.editable,
       .validateTableRelation = declared.validateTableRelation,
+      .relationTable = declared.relationTable,
+      .relationField = declared.relationField,
       .blankZero = declared.blankZero,
       .minValue = declared.minValue,
       .maxValue = declared.maxValue,
@@ -343,8 +345,6 @@ constexpr FieldDef Declare(FieldNo no,
       .autoFormatExpression = declared.autoFormatExpression,
       .allowInCustomizations = declared.allowInCustomizations,
       .access = declared.access,
-      .relationTable = declared.relationTable,
-      .relationField = declared.relationField,
       .obsoleteState = declared.obsoleteState,
       .obsoleteReason = declared.obsoleteReason,
       .obsoleteTag = declared.obsoleteTag,
