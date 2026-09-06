@@ -1763,3 +1763,16 @@ base/finance/deferral/table/DeferralPostingBuffer.cpp
 base/finance/deferral/table/DeferralPostingBuffer.cpp
 base/finance/dimension/table/DimensionPostingBuffer.cpp
 base/finance/vat/calculation/table/VATPostingParameters.cpp
+base/finance/financial_reports/codeunit/AccSchedManagement.cpp
+base/inventory/analysis/codeunit/AnalysisReportManagement.cpp
+base/e_services/e_document/codeunit/ImportAttachmentIncDoc.cpp
+base/e_services/e_document/codeunit/ServDocExchangeMgt.cpp
+base/crm/profiling/page/ContactProfileAnswers.cpp
+base/system/environment/configuration/page/MyNotifications.cpp
+base/finance/dimension/table/ChangeGlobalDimLogEntry.cpp
+base/finance/dimension/table/ChangeGlobalDimLogEntry.cpp
+base/system/threading/table/JobQueueLogEntry.cpp
+base/finance/financial_reports/table/AccSchedCellValue.cpp
+base/inventory/analysis/table/AnalysisFieldValue.cpp
+base/finance/financial_reports/table/DimensionPerspectiveLine.cpp
+base/finance/general_ledger/account/table/GLAccCatBuffer.cpp
