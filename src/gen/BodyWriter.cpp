@@ -1629,8 +1629,14 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   return WithDoor(out, ObjectKind::Table);
 }
 
-std::string ControlTrigger(std::string_view trigger, std::string_view controlIdentifier) {
-  return Identifier(trigger) + std::string(controlIdentifier);
+std::string ControlTrigger(std::string_view trigger,
+                           std::string_view controlIdentifier,
+                           const std::vector<al::ProcedureDecl> &procedures) {
+  const std::string composed = Identifier(trigger) + std::string(controlIdentifier);
+  const bool taken = std::ranges::any_of(procedures, [&composed](const al::ProcedureDecl &other) {
+    return LowerKey(Identifier(other.name)) == LowerKey(composed);
+  });
+  return taken ? composed + "_Control" : composed;
 }
 
 namespace {
@@ -1644,7 +1650,7 @@ void ControlBodies(std::string &out,
                    const std::map<std::string, std::string> &named) {
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
+      const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures);
       const std::string body =
           WriteStatements(PageNames(page, source, objects, &trigger), trigger.body, 2) +
           FallsOffEnd(trigger, PageNames(page, source, objects, &trigger));

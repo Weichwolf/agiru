@@ -130,6 +130,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                                       const Objects &objects,
                                       const al::TableObject *source);
 
-[[nodiscard]] std::string ControlTrigger(std::string_view trigger, std::string_view control);
+[[nodiscard]] std::string ControlTrigger(std::string_view trigger,
+                                         std::string_view control,
+                                         const std::vector<al::ProcedureDecl> &procedures = {});
 
 }

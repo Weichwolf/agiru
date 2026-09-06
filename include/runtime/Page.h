@@ -114,6 +114,14 @@ public:
   /// \param Refresh The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
+  /// \brief AL `Page.Activate()` -- the READING form, which the documentation brackets:
+  ///        `[X := ] Page.Activate([NewX])`.
+  /// \return Never.
+  /// \throws Error always -- a page property needs a running UI (board:0030).
+  [[nodiscard]] ::agiru::Boolean Activate() const {
+    throw Error("Page.Activate() needs a running UI (board:0030)");
+  }
+
   ::agiru::Boolean Activate(::agiru::Boolean Refresh) {
     static_cast<void>(Refresh);
     throw Error("Page.Activate(Boolean) needs a running UI (board:0030)");
@@ -154,6 +162,14 @@ public:
   /// \param NewEditable The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
+  /// \brief AL `Page.Editable()` -- the READING form, which the documentation brackets:
+  ///        `[X := ] Page.Editable([NewX])`.
+  /// \return Never.
+  /// \throws Error always -- a page property needs a running UI (board:0030).
+  [[nodiscard]] ::agiru::Boolean Editable() const {
+    throw Error("Page.Editable() needs a running UI (board:0030)");
+  }
+
   ::agiru::Boolean Editable(::agiru::Boolean NewEditable) {
     static_cast<void>(NewEditable);
     throw Error("Page.Editable(Boolean) needs a running UI (board:0030)");

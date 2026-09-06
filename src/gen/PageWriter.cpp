@@ -248,7 +248,8 @@ void ControlTriggerDeclarations(std::string &out,
                                   Shadowing(page.variables, page.procedures, page.labels),
                                   page.procedures,
                                   ControlTrigger(trigger.name,
-                                                 ControlIdentifier(named, control.name)));
+                                                 ControlIdentifier(named, control.name),
+                                                 page.procedures));
     }
     ControlTriggerDeclarations(out, control.children, named, page, objects);
   }

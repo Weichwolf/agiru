@@ -148,7 +148,8 @@ private:
       }
       return leave;
     }
-    if (AtKeyword("continue")) {
+    if (AtKeyword("continue") && !IsPunctuation(Peek(1), ":=") && !IsPunctuation(Peek(1), ".") &&
+        !IsPunctuation(Peek(1), "(") && !IsPunctuation(Peek(1), "[")) {
       Advance();
       return Stmt{.kind = StmtKind::Continue,
                   .expression = {},
@@ -157,7 +158,8 @@ private:
                   .otherwise = {},
                   .descending = false};
     }
-    if (AtKeyword("break")) {
+    if (AtKeyword("break") && !IsPunctuation(Peek(1), ":=") && !IsPunctuation(Peek(1), ".") &&
+        !IsPunctuation(Peek(1), "(") && !IsPunctuation(Peek(1), "[")) {
       Advance();
       return Stmt{.kind = StmtKind::Break,
                   .expression = {},
