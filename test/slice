@@ -1999,3 +1999,14 @@ system/system/email/codeunit/EmailAccount.cpp
 system/system/email/table/EmailAccountScenario.cpp
 system/system/email/table/EmailScenario.cpp
 system/system/email/enum/EmailConnector.cpp
+base/sales/receivables/codeunit/CustEntryApplyPostedEntries.cpp
+base/human_resources/payables/codeunit/EmplEntryApplyPostedEntries.cpp
+base/purchases/payables/codeunit/VendEntryApplyPostedEntries.cpp
+base/finance/currency/codeunit/ExchRateAdjmtRunHandler.cpp
+base/sales/receivables/page/UnapplyCustomerEntries.cpp
+base/human_resources/payables/page/UnapplyEmployeeEntries.cpp
+base/purchases/payables/page/UnapplyVendorEntries.cpp
+base/finance/currency/codeunit/ExchRateAdjmtProcess.cpp
+base/finance/currency/table/ExchRateAdjmtBuffer.cpp
+base/finance/currency/table/ExchRateAdjmtBuffer.cpp
+base/finance/currency/table/ExchRateAdjmtReg.cpp
