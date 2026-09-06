@@ -32,7 +32,10 @@ children carry the work; this item carries the RULE and the counter.
 
 ## The counter this epic owns
 
-**Attributes the generator acts on: 4 of 41.** It may only rise. Nothing the generator emits today
+**Attributes the generator acts on: 22 of the 28 kinds BCApps declares (measured 2026-09-06;
+28 of 41 documented kinds appear in this source at all).** It may only rise. What is left is
+`[InherentPermissions]` (108 declarations, waiting on board:0062's permission layer) and
+`[ServiceEnabled]` (1). Nothing the generator emits today
 would let a reader see the other 37 being ignored, which is why the count lives here rather than in
 the tree.
 
