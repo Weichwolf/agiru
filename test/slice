@@ -1861,3 +1861,15 @@ base/system/automation/table/WorkflowEvent.cpp
 base/foundation/reporting/table/ReportSelections.cpp
 base/system/automation/table/WorkflowEvent.cpp
 base/inventory/costing/table/InventoryAdjustmentBuffer.cpp
+base/foundation/batch_processing/codeunit/BatchProcessingMgt.cpp
+base/system/reflection/codeunit/DataTypeManagement.cpp
+base/finance/general_ledger/journal/codeunit/GenJnlCheckLine.cpp
+base/finance/general_ledger/posting/codeunit/GenJnlPostBatch.cpp
+base/inventory/journal/codeunit/ItemJnlCheckLine.cpp
+base/projects/project/posting/codeunit/JobJnlCheckLine.cpp
+base/sales/peppol/codeunit/PEPPOLManagement.cpp
+base/projects/resources/journal/codeunit/ResJnlCheckLine.cpp
+base/service/posting/codeunit/ServicePost.cpp
+system/system/utilities/codeunit/TempBlobListImpl.cpp
+system/system/upgrade/codeunit/UpgradeTagImpl.cpp
+base/system/automation/codeunit/WorkflowEventHandling.cpp
