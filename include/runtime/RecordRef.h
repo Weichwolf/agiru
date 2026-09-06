@@ -1137,6 +1137,14 @@ public:
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.
   /// \param String The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `RecordRef.SetTable(Variant)` -- the record a Variant carries.
+  /// \param Rec The Variant.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void SetTable(const ::agiru::Variant &Rec) {
+    static_cast<void>(Rec);
+    throw Error("RecordRef.SetTable(Variant) is declared and not implemented yet (board:0035)");
+  }
+
   void SetView(std::string_view String) {
     static_cast<void>(String);
     throw Error("RecordRef.SetView(Text) is declared and not implemented yet (board:0035)");

@@ -421,6 +421,20 @@ public:
   /// \note WHETHER THE TABLE HAS ONE IS A COMPILE-TIME QUESTION, not a registry lookup: the
   ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
   ///       it and a table without the trigger compiles to the same code `Insert()` does.
+  /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` -- the row keeps the `SystemId`
+  ///        the caller put in it (`record-insert-boolean-boolean-method.md`).
+  /// \param RunTrigger         Whether `OnInsert` runs.
+  /// \param InsertWithSystemId Whether the record's own `SystemId` is written rather than a new one.
+  /// \return Whether the row was written.
+  /// \throws Error when the row is already there.
+  ///
+  /// \note THE RULE LIVES IN THE TWO-ARGUMENT PAGE and not beside it, which is what the overload
+  ///       filenames are for: the predecessor paid three reverts for reading the wrong file.
+  Boolean Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    static_cast<void>(InsertWithSystemId);
+    return Insert(RunTrigger);
+  }
+
   Boolean Insert(Boolean RunTrigger) {
     TableEvent("OnBeforeInsertEvent", RunTrigger);
     if (RunTrigger) {
@@ -513,6 +527,19 @@ public:
   ///
   /// The address of the member is enough to find its declaration, so the generated line reads like
   /// the AL line instead of naming a field number.
+  /// \brief AL `Record.FieldError(Field, ErrorInfo)` -- the field's own refusal, with the caller's
+  ///        error (`record-fielderror-joker-errorinfo-method.md`).
+  /// \tparam Field The field member's type.
+  /// \param member The field.
+  /// \param info   The error, whose message is raised.
+  /// \throws Error always.
+  template <typename Field>
+    requires(!std::is_same_v<Field, ::agiru::FieldNo>)
+  [[noreturn]] void FieldError(const Field &member, const ::agiru::ErrorInfo &info) const {
+    ::agiru::ErrorInfo raised = info;
+    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), raised.Message());
+  }
+
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[noreturn]] void FieldError(const FieldType &member, std::string_view text = {}) const {
