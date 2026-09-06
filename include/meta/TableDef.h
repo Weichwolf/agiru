@@ -141,7 +141,6 @@ struct FieldDef {
   /// \brief The `TableRelation`'s target field, empty where it names the table's own primary key.
   std::string_view relationField{};
 
-
   /// \brief The `BlankZero` property: a zero renders as nothing.
   bool blankZero = false;
 

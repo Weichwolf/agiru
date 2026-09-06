@@ -51,6 +51,47 @@ template <typename T> struct OnValidateOf {
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
 
+/// \brief What a `Find` hands back: the answer, and the REFUSAL when nobody reads it.
+///
+/// \note AL DECIDES AT CONSUMPTION. `record-findset--method.md`: "[Ok :=] ... If you omit this
+///       optional return value and the operation does not execute successfully, a runtime error
+///       will occur." So the same call is a question in `if Rec.FindSet() then` and an assertion
+///       as a bare statement, and only the CONSUMPTION tells the two apart -- which is what this
+///       wrapper carries (openerp WI-1385, board:0056).
+class Found {
+public:
+  /// \brief Holds the answer and the table it is about.
+  /// \param found Whether the row was there. \param table The table's AL name.
+  Found(bool found, std::string_view table) : found_(found), table_(table) {}
+
+  Found(const Found &) = delete;
+  Found &operator=(const Found &) = delete;
+  Found &operator=(Found &&) = delete;
+
+  /// \brief Moves, and the moved-from copy stops being an assertion.
+  /// \param other The one being moved.
+  Found(Found &&other) noexcept : found_(other.found_), table_(other.table_), read_(other.read_) {
+    other.read_ = true;
+  }
+
+  /// \brief Reading the answer makes it a QUESTION rather than an assertion.
+  /// \return Whether the row was there.
+  operator ::agiru::Boolean() {
+    read_ = true;
+    return found_;
+  }
+
+  /// \brief Raises when nobody read it and nothing was found.
+  /// \throws Error `DB:NothingInsideFilter` -- "There is no <Table> within the filter."
+  ~Found() noexcept(false);
+
+private:
+  bool found_;
+  std::string_view table_;
+  bool read_ = false;
+};
+
+
 /// \brief Makes a record the `xRec` of the trigger about to run.
 ///
 /// \param record The record as it was BEFORE the change, which the caller owns and must outlive
@@ -402,7 +443,8 @@ public:
   ///       written by the platform on every modify.
   Boolean Modify() {
     if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("the record does not exist");
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
     return true;
   }
@@ -428,7 +470,8 @@ public:
   /// \see Insert() for why the statement form raises.
   Boolean Delete() {
     if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("the record does not exist");
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
     return true;
   }
@@ -890,19 +933,20 @@ public:
   ///        values already in the record, combinable and tried in the written order.
   /// \return True when a row matched.
   /// \see `record-find-method.md`, which tabulates the five characters.
-  Boolean Find(std::string_view which = "=") {
-    return detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which);
+  detail::Found Find(std::string_view which = "=") {
+    return detail::Found{detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which),
+                         TableTraits<Derived>::kTable.name};
   }
 
   /// \brief AL `Record.FindFirst()` -- the first row of the set.
   /// \return True when a row matched.
   /// \note The page says to use this rather than `Find('-')` when only the first row is wanted,
   ///       and not to combine it with `repeat..until`. It is the same read either way.
-  Boolean FindFirst() { return Find("-"); }
+  detail::Found FindFirst() { return Find("-"); }
 
   /// \brief AL `Record.FindLast()` -- the last row of the set.
   /// \return True when a row matched.
-  Boolean FindLast() { return Find("+"); }
+  detail::Found FindLast() { return Find("+"); }
 
   /// \brief AL `Record.FindSet()`. Opens the set the filters and the key select and positions on
   ///        its first row.
@@ -912,7 +956,10 @@ public:
   ///       request for the matching rows, and a table with a hundred million of them would put all
   ///       of them in the session. SQL Server declares a cursor for this and BC is written against
   ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
-  Boolean FindSet() { return detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable); }
+  detail::Found FindSet() {
+    return detail::Found{detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable),
+                         TableTraits<Derived>::kTable.name};
+  }
 
   /// \brief AL `Record.FindSet(ForUpdate)`.
   /// \param ForUpdate Whether the rows are read for modification.
@@ -920,7 +967,7 @@ public:
   /// \warning `ForUpdate` DOES NOT RAISE THE LOCK YET. The tri-state locking a read owes AL is
   ///          board:0012, and the argument is accepted rather than refused so the call site keeps
   ///          its shape until it is.
-  Boolean FindSet(Boolean ForUpdate) {
+  detail::Found FindSet(Boolean ForUpdate) {
     static_cast<void>(ForUpdate);
     return FindSet();
   }
@@ -1650,6 +1697,20 @@ protected:
   ///
   /// \note Shared with the temporary store, which assigns the key the same way and then searches
   ///       its own rows rather than the database. Doing it twice was the alternative.
+  [[nodiscard]] std::string PrimaryKeyText() const {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (table.keys.empty()) { return {}; }
+    std::string out;
+    for (const ::agiru::FieldNo no : table.keys[0].fields) {
+      const auto found = std::ranges::find_if(
+          table.fields, [no](const FieldDef &field) { return field.no == no; });
+      if (found == table.fields.end()) { continue; }
+      if (!out.empty()) { out += ", "; }
+      out += ::agiru::FieldText(Self(), *found);
+    }
+    return out;
+  }
+
   template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
     const TableDef &table = TableTraits<Derived>::kTable;
     if (table.keys.empty() || table.keys[0].fields.size() < sizeof...(Keys)) {
