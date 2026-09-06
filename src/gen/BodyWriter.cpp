@@ -118,14 +118,18 @@ std::string Temporal(const std::string &literal) {
     return zero ? "::agiru::DateTime{}"
                 : "::agiru::RefusedTemporal<::agiru::DateTime>(\"" + literal + "\")";
   }
+  const auto decimal = [](std::string part) {
+    while (part.size() > 1 && part.front() == '0') { part.erase(0, 1); }
+    return part;
+  };
   if (suffix == "D") {
     if (zero) { return "::agiru::Date{}"; }
     if (digits.size() != kDateDigits) {
       return "::agiru::RefusedTemporal<::agiru::Date>(\"" + literal + "\")";
     }
-    return "Date::FromYmd(" + digits.substr(0, kYearDigits) + ", " +
-           digits.substr(kYearDigits, kPairDigits) + ", " +
-           digits.substr(kYearDigits + kPairDigits, kPairDigits) + ")";
+    return "Date::FromYmd(" + decimal(digits.substr(0, kYearDigits)) + ", " +
+           decimal(digits.substr(kYearDigits, kPairDigits)) + ", " +
+           decimal(digits.substr(kYearDigits + kPairDigits, kPairDigits)) + ")";
   }
   if (suffix == "T") {
     if (zero) { return "Time{}"; }
@@ -134,9 +138,9 @@ std::string Temporal(const std::string &literal) {
     if (clock.size() != kClockDigits) { return "RefusedTemporal<Time>(\"" + literal + "\")"; }
     std::string milli = point == std::string::npos ? "0" : digits.substr(point + 1);
     while (milli.size() < kMilliDigits) { milli += '0'; }
-    return "Time::FromHms(" + clock.substr(0, kPairDigits) + ", " +
-           clock.substr(kPairDigits, kPairDigits) + ", " +
-           clock.substr(2 * kPairDigits, kPairDigits) + ", " + milli.substr(0, kMilliDigits) + ")";
+    return "Time::FromHms(" + decimal(clock.substr(0, kPairDigits)) + ", " +
+           decimal(clock.substr(kPairDigits, kPairDigits)) + ", " +
+           decimal(clock.substr(2 * kPairDigits, kPairDigits)) + ", " + decimal(milli.substr(0, kMilliDigits)) + ")";
   }
   return "RefusedTemporal<Date>(\"" + literal + "\")";
 }
@@ -587,6 +591,7 @@ private:
         std::string_view{"CurrFieldNo"},
         std::string_view{"CurrentClientType"},
         std::string_view{"CurrentDateTime"},
+        std::string_view{"CurrentTransactionType"},
         std::string_view{"CurrentExecutionMode"},
         std::string_view{"DefaultClientType"},
         std::string_view{"DeleteEncryptionKey"},

@@ -263,6 +263,7 @@ struct Gathered {
   std::map<std::string, std::vector<std::string>> options;
   std::map<std::string, std::size_t> deprecatedScopes;
   std::map<std::string, std::size_t> properties;
+  std::map<std::string, std::size_t> contradictions;
 };
 
 constexpr std::array kAcknowledgedAttributes{
@@ -385,6 +386,19 @@ void NoteProperties(const std::vector<agiru::al::Property> &properties,
                     std::map<std::string, std::size_t> &into) {
   for (const agiru::al::Property &property : properties) {
     ++into[agiru::gen::LowerKey(property.name)];
+  }
+}
+
+void NoteFieldClasses(const agiru::al::TableObject &table,
+                      std::map<std::string, std::size_t> &into) {
+  for (const agiru::al::FieldDecl &field : table.fields) {
+    const agiru::al::Property *kind = agiru::al::Find(field.properties, "FieldClass");
+    const bool formula = agiru::al::Find(field.properties, "CalcFormula") != nullptr;
+    const std::string named = kind == nullptr ? std::string{} : agiru::gen::LowerKey(kind->text);
+    if (named == "flowfield" && !formula) { ++into["a FlowField with no CalcFormula"]; }
+    if ((named.empty() || named == "normal") && formula) {
+      ++into["a CalcFormula on a Normal field"];
+    }
   }
 }
 
@@ -775,6 +789,7 @@ void WriteTable(Run &run,
   Absorb(gathered.refused, agiru::gen::Refused(table));
   CountAttributes(table, gathered.attributes, gathered.deprecatedScopes);
   NotePropertiesOf(table, gathered.properties);
+  NoteFieldClasses(table, gathered.contradictions);
   CheckNormal(table, "table", false, gathered.refused);
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
@@ -1576,6 +1591,12 @@ int Scan(const Job &job) {
     for (std::size_t i = 0; i < silent.size() && i < 12; ++i) {
       std::println("          {:>7} x {}", silent[i].second, silent[i].first);
     }
+  }
+  for (const auto &[what, found] : gathered.contradictions) {
+    std::println("declared  {:>5} x {} -- carried as declared, and it cannot mean what it says "
+                 "(board:0339)",
+                 found,
+                 what);
   }
   if (!declaredOnly.empty()) {
     std::size_t total = 0;
