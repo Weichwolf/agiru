@@ -100,4 +100,27 @@ template <typename T> Integer MaxStrLen(const T &value) {
   return static_cast<Integer>(detail::Utf16Length(value));
 }
 
+
+/// \brief AL `Text.TrimEnd(Char)` -- a character is one character of text.
+/// \tparam C The character's type.
+/// \param Chars The character.
+/// \return The trimmed text.
+template <typename C>
+  requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+Text<0> StringValue::TrimEnd(const C &Chars) const {
+  const char one = static_cast<char>(static_cast<std::int32_t>(Chars.AsInteger()));
+  return TrimEnd(std::string_view(&one, 1));
+}
+
+/// \brief AL `Text.TrimStart(Char)` -- a character is one character of text.
+/// \tparam C The character's type.
+/// \param Chars The character.
+/// \return The trimmed text.
+template <typename C>
+  requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+Text<0> StringValue::TrimStart(const C &Chars) const {
+  const char one = static_cast<char>(static_cast<std::int32_t>(Chars.AsInteger()));
+  return TrimStart(std::string_view(&one, 1));
+}
+
 }

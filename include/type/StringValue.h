@@ -15,6 +15,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -476,6 +477,18 @@ public:
   /// \see `text-trimstart-method.md`
   [[nodiscard]] Text<0> TrimStart(std::string_view Chars) const;
 
+  /// \brief AL `Text.TrimStart(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimStart(const C &Chars) const;
+
   /// \brief AL `Text.TrimEnd()` -- white space off the back.
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
@@ -486,6 +499,18 @@ public:
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
   [[nodiscard]] Text<0> TrimEnd(std::string_view Chars) const;
+
+  /// \brief AL `Text.TrimEnd(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimEnd(const C &Chars) const;
 
   /// \brief AL `+=` on text -- appends.
   ///
