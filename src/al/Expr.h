@@ -39,6 +39,7 @@ enum class StmtKind : std::uint8_t {
   With,
   Exit,
   Break,
+  Continue,
   AssertError,
 };
 

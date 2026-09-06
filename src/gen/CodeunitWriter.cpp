@@ -1190,7 +1190,12 @@ std::string Locals(const al::ProcedureDecl &procedure,
                    const std::string &unit,
                    const std::vector<al::ProcedureDecl> &all = {},
                    const std::string &body = {},
-                   const std::set<std::string> &shadowed = {}) {
+                   const std::set<std::string> &shadowedByOwner = {}) {
+  std::set<std::string> shadowed = shadowedByOwner;
+  for (const al::VarDecl &parameter : procedure.parameters) {
+    shadowed.insert(Identifier(parameter.name));
+  }
+  if (!procedure.returnName.empty()) { shadowed.insert(Identifier(procedure.returnName)); }
   std::string out;
   const std::string code = WithoutLiterals(body);
   const auto shadows = [&code](const std::string &name) {

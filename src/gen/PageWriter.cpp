@@ -218,13 +218,20 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
 
 void ControlTriggerDeclarations(std::string &out,
                                 const std::vector<al::PageControl> &controls,
-                                const std::map<std::string, std::string> &named) {
+                                const std::map<std::string, std::string> &named,
+                                const al::PageObject &page,
+                                const Objects &objects) {
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      out += "  void " + ControlTrigger(trigger.name, ControlIdentifier(named, control.name)) +
-             "();\n";
+      out += ProcedureDeclaration(trigger,
+                                  objects,
+                                  page.name,
+                                  Shadowing(page.variables, page.procedures, page.labels),
+                                  page.procedures,
+                                  ControlTrigger(trigger.name,
+                                                 ControlIdentifier(named, control.name)));
     }
-    ControlTriggerDeclarations(out, control.children, named);
+    ControlTriggerDeclarations(out, control.children, named, page, objects);
   }
 }
 
@@ -340,8 +347,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   if (!members.empty()) { out += members + "\n"; }
 
   std::string triggers;
-  ControlTriggerDeclarations(triggers, object.layout, named);
-  ControlTriggerDeclarations(triggers, object.actions, named);
+  ControlTriggerDeclarations(triggers, object.layout, named, object, objects);
+  ControlTriggerDeclarations(triggers, object.actions, named, object, objects);
   if (!triggers.empty()) { out += "\n" + triggers; }
 
   std::string publics;

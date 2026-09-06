@@ -148,6 +148,15 @@ private:
       }
       return leave;
     }
+    if (AtKeyword("continue")) {
+      Advance();
+      return Stmt{.kind = StmtKind::Continue,
+                  .expression = {},
+                  .labels = {},
+                  .body = {},
+                  .otherwise = {},
+                  .descending = false};
+    }
     if (AtKeyword("break")) {
       Advance();
       return Stmt{.kind = StmtKind::Break,

@@ -264,6 +264,7 @@ private:
               ";\n";
         break;
       case al::StmtKind::Break: out = Pad(indent) + "break;\n"; break;
+      case al::StmtKind::Continue: out = Pad(indent) + "continue;\n"; break;
       case al::StmtKind::Expression: {
         const bool was = discarded_;
         discarded_ = true;
@@ -1370,6 +1371,16 @@ public:
   }
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (SameName(declared.name, name)) { return Identifier(declared.name); }
+        }
+      }
+      if (!running_->returnName.empty() && SameName(running_->returnName, name)) {
+        return Identifier(running_->returnName);
+      }
+    }
     for (const al::VarDecl &declared : page_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
     }
@@ -1390,6 +1401,20 @@ public:
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
     return source_ != nullptr && (SameName("Rec", variable) || SameName("xRec", variable));
+  }
+
+  [[nodiscard]] bool IsVariable(std::string_view name) const override {
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (SameName(declared.name, name)) { return true; }
+        }
+      }
+      if (SameName(running_->returnName, name)) { return true; }
+    }
+    return std::ranges::any_of(page_.variables, [name](const al::VarDecl &declared) {
+      return SameName(declared.name, name);
+    });
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
@@ -1590,7 +1615,9 @@ void ControlBodies(std::string &out,
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name));
-      const std::string body = WriteStatements(PageNames(page, source, objects), trigger.body, 2);
+      const std::string body =
+          WriteStatements(PageNames(page, source, objects, &trigger), trigger.body, 2) +
+          FallsOffEnd(trigger, PageNames(page, source, objects, &trigger));
       const std::string locals =
           ProcedureLocals(trigger,
                           objects,
@@ -1600,11 +1627,15 @@ void ControlBodies(std::string &out,
                           body) +
           (source == nullptr ? std::string{}
                              : BindsBefore(body, Identifier(source->name)));
-      out += "void ";
-      out += identifier;
-      out += "::";
-      out += name;
-      out += "() {";
+      out += ProcedureSignature(trigger,
+                                objects,
+                                page.name,
+                                identifier,
+                                true,
+                                Shadowing(page.variables, page.procedures, page.labels),
+                                page.procedures,
+                                Spelling{.spelled = name, .body = body});
+      out += " {";
       if (locals.empty() && body.empty()) {
         out += "}\n\n";
         continue;
