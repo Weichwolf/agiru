@@ -4,6 +4,7 @@
 
 #include <array>
 #include <compare>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -84,6 +85,30 @@ public:
   ///       only one of those in an implicit conversion sequence.
   Guid(const char *text) : Guid(std::string_view(text)) {}
 
+  /// \brief AL assigns a Text, a Code or a `std::string` to a Guid.
+  ///
+  /// \tparam T The text side -- a `Text[N]`, a `Code[N]`, a `std::string` or a literal.
+  /// \param text The GUID in its text form, with or without braces.
+  /// \return This Guid.
+  /// \throws Error when the text is not a GUID.
+  ///
+  /// \note `guid-data-type.md` states this outright -- "You can assign and compare the Text data
+  ///       type and the GUID data type", with `MyTableRec.MyGuid := MyTableRec.MyText` as its own
+  ///       example. `ImportConsolidationFromAPI` writes `TempCompany.Id := JsonValue.AsText()`,
+  ///       which is the same assignment one builtin further out.
+  ///
+  /// \note IT IS AN ASSIGNMENT AND NOT A CONSTRUCTOR, and that is the whole point. AL converts
+  ///       text to a Guid where a Guid is ASSIGNED; it does not offer the conversion when it picks
+  ///       an overload. A constructor would, and `PriceSourceList.Add(Type, Code[20])` beside
+  ///       `Add(Type, Guid)` then has no answer -- 7 call sites, measured 2026-09-07. An
+  ///       `operator=` converts exactly where AL converts.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Guid &operator=(const T &text) {
+    *this = FromText(std::string_view(text));
+    return *this;
+  }
+
   /// \return True when every byte is zero, which is AL's empty Guid.
   [[nodiscard]] constexpr bool IsNull() const {
     std::uint8_t any = 0;
@@ -116,6 +141,33 @@ private:
   std::array<std::uint8_t, kSize> bytes_{};
 };
 
+/// \brief AL compares a Text against a Guid, and compares them AS GUIDS.
+///
+/// \tparam T The text side -- a `Text[N]`, a `Code[N]`, a literal or a `std::string`.
+/// \param left  The text.
+/// \param right The Guid.
+/// \return True when the text spells that GUID.
+///
+/// \note `guid-data-type.md`: "You can assign and compare the Text data type and the GUID data
+///       type", and it lists BOTH spellings as supported -- braced and bare. So the comparison is
+///       between two GUIDs and not between two strings, and
+///       `'aaaaaaaa-…' = '{aaaaaaaa-…}'` is true where a text comparison would say false.
+///       `AADApplicationCard` depends on exactly that: it strips the brackets and lower-cases
+///       before comparing against a Guid.
+///
+/// \note IT IS SPELLED OUT RATHER THAN LEFT TO THE CONSTRUCTOR, because a Guid that can be built
+///       from text makes `Text == Guid` ambiguous -- the text comparison and the Guid comparison
+///       are then one conversion apiece.
+///
+/// \note THE GUID SIDE IS A CONSTRAINED TEMPLATE for the reason the `+` operators give: a plain
+///       `const Guid &` lets every `Code == ''` in the tree reach this comparison by building a
+///       Guid out of the literal, which is 2 000 ambiguous call sites (measured 2026-09-07).
+template <typename T, typename G>
+  requires std::convertible_to<const T &, std::string_view> && std::same_as<G, Guid>
+[[nodiscard]] inline bool operator==(const T &left, const G &right) {
+  return Guid::FromText(std::string_view(left)) == right;
+}
+
 /// \brief AL `+` on text and a Guid.
 ///
 /// \param left  The text.
@@ -127,7 +179,14 @@ private:
 ///       gain one: a Guid is 16 bytes and its text is 38, so a conversion operator would need
 ///       storage on every Guid, and a Guid sits in every record as `SystemId`. The operator carries
 ///       it instead, where the text is actually wanted.
-[[nodiscard]] inline std::string operator+(const ::agiru::Text<0> &left, const Guid &right) {
+/// \note THE GUID SIDE TAKES NO CONVERSION, and that is why it is a constrained template rather
+///       than a plain `const Guid &`. A Guid is assignable from AL text, so a plain parameter would
+///       let `Text + std::string` reach this operator by converting the string to a Guid -- against
+///       the text operator it belongs to and at the same rank, which is 50 ambiguous call sites
+///       (measured 2026-09-07). `std::same_as` keeps the operator to the type it is written for.
+template <typename G>
+  requires std::same_as<G, Guid>
+[[nodiscard]] inline std::string operator+(const ::agiru::Text<0> &left, const G &right) {
   return left + right.ToText();
 }
 
@@ -135,7 +194,10 @@ private:
 /// \param left  The Guid.
 /// \param right The text.
 /// \return The two joined.
-[[nodiscard]] inline std::string operator+(const Guid &left, std::string_view right) {
+/// \note Constrained for the reason above, from the other side.
+template <typename G>
+  requires std::same_as<G, Guid>
+[[nodiscard]] inline std::string operator+(const G &left, std::string_view right) {
   return left.ToText() + std::string(right);
 }
 

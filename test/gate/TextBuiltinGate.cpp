@@ -1,6 +1,9 @@
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
+#include <string>
+#include <string_view>
+
 using agiru::ConvertStr;
 using agiru::CopyStr;
 using agiru::DelChr;
@@ -86,10 +89,34 @@ void TheRestOfTheStringBuiltins() {
 
 } // namespace
 
+namespace agiru::caption_gate {
+
+/// A CAPTION JOINED TO A CAPTION IS THE TWO CAPTIONS, and it took a board item to make that
+/// true. `Record.TableCaption()` hands back a `std::string` and `Record.FieldCaption()` a
+/// `std::string_view`; the standard library joins neither pair, so the join found
+/// `operator+(Text<0>, Guid)` -- one user-defined conversion on each side -- and wrote
+/// `Family {00000000-0000-0000-0000-000000000000}` where AL writes `Family No.` (board:0608).
+///
+/// IT IS WRITTEN INSIDE `namespace agiru` ON PURPOSE. Both operands are `std::` types, so argument-
+/// dependent lookup searches `std` and nothing else; the door's operator is found by ORDINARY
+/// lookup from an enclosing namespace, which is where every generated body sits and where the
+/// defect lived.
+static void ACaptionJoinedToACaptionIsTheTwoCaptions() {
+  const std::string table{"Family"};
+  const std::string_view field{"No."};
+
+  CHECK_TEXT("a std::string joins a std::string_view", table + " " + field, "Family No.");
+  CHECK_TEXT("and the other way round", field + std::string{" of "} + table, "No. of Family");
+  CHECK_TEXT("and two views join", std::string_view{"No"} + std::string_view{"."}, "No.");
+}
+
+}
+
 int main() {
   return gate::Run("TextBuiltin", [] {
     DelChrTakesAWhereAndAWhich();
     APositionIsOneBased();
     TheRestOfTheStringBuiltins();
+    agiru::caption_gate::ACaptionJoinedToACaptionIsTheTwoCaptions();
   });
 }

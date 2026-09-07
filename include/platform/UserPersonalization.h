@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Declare.h"
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/RecordState.h"
@@ -13,6 +14,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 /// \file
@@ -20,17 +22,39 @@
 
 namespace agiru::platform {
 
+/// \brief The vocabulary of AL `User Personalization.Scope` -- whose personalisation a row is.
+///
+/// From the declaration: `OptionMembers = System,Tenant`.
+enum class PersonalizationScope : std::int32_t {
+  System = 0, ///< Shipped with the object.
+  Tenant = 1, ///< The tenant's own.
+};
+
+}
+
+/// \brief The vocabulary of AL `User Personalization.Scope`.
+template <> struct agiru::OptionTraits<agiru::platform::PersonalizationScope> {
+  /// \brief The two scopes.
+  static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
+      {.ordinal = 0, .name = "System", .caption = "System"},
+      {.ordinal = 1, .name = "Tenant", .caption = "Tenant"},
+  }};
+};
+
+namespace agiru::platform {
+
 /// \brief AL `User Personalization` -- the platform's own table, which no `.al` file declares.
 ///
-/// \note THE FIELD NUMBERS ARE THE PREDECESSOR'S, MEASURED RATHER THAN DOCUMENTED, exactly as
-///       `platform/User.h` records for the user table: `~/Git/openerp/openerp/runtime/base/
-///       system_tables.py` carries them and is 97 % green on the suite that reads them. Numbers 2,
-///       4 and 5 are absent there and absent here -- inventing one would put a number in the
-///       metadata that nothing can check.
+/// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
+///       `work/symbols/src/Tenant Database Tables/UserPersonalization.Table.al` (`make symbols`)
+///       carries it. The predecessor's measured layout, which this file carried until 2026-09-07,
+///       had every number wrong but one: this table starts at 3 and runs to 34 with eleven gaps,
+///       and a column order sees none of them (board:0607).
 ///
-/// \note `Scope` CARRIES NO VOCABULARY, for the reason `User.State` gives: the AL source names the
-///       members and nowhere states their ORDER, so an ordinal here would be a guess wearing a
-///       number. `Option<>` holds the ordinal without claiming a vocabulary (board:0032).
+/// \note NINE OF THE TWENTY DECLARED FIELDS ARE HERE. The debugger flags, `Full Name`,
+///       `Language Name`, `Region`, `License Type`, `Customization Status`, `Role` and
+///       `Emit Version` are not, and their absence is a hole with a number rather than a decision
+///       -- board:0607 replaces this file with the transpiled declaration.
 class UserPersonalization_Table : public Table<UserPersonalization_Table> {
 public:
   /// \brief The AL table number.
@@ -59,7 +83,7 @@ public:
   /// \brief AL `User Personalization.Company`.
   Text<kCompanyLength> Company;
   /// \brief AL `User Personalization.Scope`.
-  Option<void> Scope;
+  Option<PersonalizationScope> Scope;
   /// \brief AL `User Personalization."App ID"`.
   Guid AppID;
   /// \brief AL `User Personalization."Locale ID"`.
@@ -69,30 +93,34 @@ public:
   /// \brief AL `User Personalization."User ID"`.
   Code<kUserIdLength> UserID;
 
-  /// \brief The field numbers, from the predecessor's measured layout.
+  /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No {
     /// \brief The AL field number of `User SID`.
-    static constexpr ::agiru::FieldNo UserSID{1};
+    static constexpr ::agiru::FieldNo UserSID{3};
     /// \brief The AL field number of `Profile ID`.
-    static constexpr ::agiru::FieldNo ProfileID{3};
+    static constexpr ::agiru::FieldNo ProfileID{9};
     /// \brief The AL field number of `Language ID`.
-    static constexpr ::agiru::FieldNo LanguageID{6};
+    static constexpr ::agiru::FieldNo LanguageID{12};
     /// \brief The AL field number of `Company`.
-    static constexpr ::agiru::FieldNo Company{7};
+    static constexpr ::agiru::FieldNo Company{15};
     /// \brief The AL field number of `Scope`.
-    static constexpr ::agiru::FieldNo Scope{8};
+    static constexpr ::agiru::FieldNo Scope{11};
     /// \brief The AL field number of `App ID`.
-    static constexpr ::agiru::FieldNo AppID{9};
+    static constexpr ::agiru::FieldNo AppID{10};
     /// \brief The AL field number of `Locale ID`.
-    static constexpr ::agiru::FieldNo LocaleID{10};
+    static constexpr ::agiru::FieldNo LocaleID{27};
     /// \brief The AL field number of `Time Zone`.
-    static constexpr ::agiru::FieldNo TimeZone{11};
+    static constexpr ::agiru::FieldNo TimeZone{30};
     /// \brief The AL field number of `User ID`.
-    static constexpr ::agiru::FieldNo UserID{12};
+    static constexpr ::agiru::FieldNo UserID{6};
   };
 
   /// \brief The primary key.
   static constexpr std::array<::agiru::FieldNo, 1> kKey1{{Field_No::UserSID}};
+  /// \brief The key on the profile.
+  static constexpr std::array<::agiru::FieldNo, 1> kKey2{{Field_No::ProfileID}};
+  /// \brief The key on the company.
+  static constexpr std::array<::agiru::FieldNo, 1> kKey3{{Field_No::Company}};
 };
 
 /// \brief AL `User Personalization`, under the name AL gives it.
@@ -104,10 +132,22 @@ inline constexpr std::array<FieldDef, 9> kUserPersonalizationFields{{
                                            "User SID",
                                            "User SID",
                                            offsetof(UserPersonalization, UserSID)),
+    Declare<&UserPersonalization::UserID>(UserPersonalization::Field_No::UserID,
+                                          "User ID",
+                                          "User ID",
+                                          offsetof(UserPersonalization, UserID)),
     Declare<&UserPersonalization::ProfileID>(UserPersonalization::Field_No::ProfileID,
                                              "Profile ID",
                                              "Profile ID",
                                              offsetof(UserPersonalization, ProfileID)),
+    Declare<&UserPersonalization::AppID>(UserPersonalization::Field_No::AppID,
+                                         "App ID",
+                                         "App ID",
+                                         offsetof(UserPersonalization, AppID)),
+    Declare<&UserPersonalization::Scope>(UserPersonalization::Field_No::Scope,
+                                         "Scope",
+                                         "Scope",
+                                         offsetof(UserPersonalization, Scope)),
     Declare<&UserPersonalization::LanguageID>(UserPersonalization::Field_No::LanguageID,
                                               "Language ID",
                                               "Language ID",
@@ -116,14 +156,6 @@ inline constexpr std::array<FieldDef, 9> kUserPersonalizationFields{{
                                            "Company",
                                            "Company",
                                            offsetof(UserPersonalization, Company)),
-    Declare<&UserPersonalization::Scope>(UserPersonalization::Field_No::Scope,
-                                         "Scope",
-                                         "Scope",
-                                         offsetof(UserPersonalization, Scope)),
-    Declare<&UserPersonalization::AppID>(UserPersonalization::Field_No::AppID,
-                                         "App ID",
-                                         "App ID",
-                                         offsetof(UserPersonalization, AppID)),
     Declare<&UserPersonalization::LocaleID>(UserPersonalization::Field_No::LocaleID,
                                             "Locale ID",
                                             "Locale ID",
@@ -132,15 +164,13 @@ inline constexpr std::array<FieldDef, 9> kUserPersonalizationFields{{
                                             "Time Zone",
                                             "Time Zone",
                                             offsetof(UserPersonalization, TimeZone)),
-    Declare<&UserPersonalization::UserID>(UserPersonalization::Field_No::UserID,
-                                          "User ID",
-                                          "User ID",
-                                          offsetof(UserPersonalization, UserID)),
 }};
 
 /// \brief The keys of the system `User Personalization` table.
-inline constexpr std::array<KeyDef, 1> kUserPersonalizationKeys{{
-    KeyDef{.name = "PK", .fields = UserPersonalization::kKey1, .clustered = true},
+inline constexpr std::array<KeyDef, 3> kUserPersonalizationKeys{{
+    KeyDef{.name = "Key1", .fields = UserPersonalization::kKey1, .clustered = true},
+    KeyDef{.name = "Key2", .fields = UserPersonalization::kKey2, .clustered = false},
+    KeyDef{.name = "Key3", .fields = UserPersonalization::kKey3, .clustered = false},
 }};
 
 /// \brief The declaration of the system `User Personalization` table.
@@ -151,6 +181,8 @@ inline constexpr TableDef kUserPersonalizationTable{
     .fields = kUserPersonalizationFields,
     .keys = kUserPersonalizationKeys,
 };
+
+static_assert(FieldsAreSorted(kUserPersonalizationTable), "the field table is searched by number");
 
 }
 

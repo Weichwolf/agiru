@@ -4,20 +4,21 @@ Area:     rt, gen, net
 Source:   the first start of `agiru run-tests` after the namespace round, 2026-09-07
 Class:    activation
 
-**STANDING: 12 of the 13 tables link (2026-09-07). One is left and it is not a missing declaration:**
+**STANDING: 12 of the 13 are closed and ONE data symbol is left (2026-09-07):**
+`agiru::System::IO::kConfigSetupTable`, which is board:0609 -- `dotnet::XmlElement` does not derive
+from `dotnet::XmlNode` here and does in .NET.
 
-```cpp
-void ICPartner_Table::AutosetICPartnerName(absent::Company Company) {
-  ICDataExchange->GetICPartnerICSetup(Company.Name(), TempPartnerICSetup);   // ambiguous
-```
+`Company` is not an absent AL object at all -- it is PLATFORM table 2000000006, and the system
+symbols declare it field for field (board:0607). With `include/platform/Company.h` registered,
+`Company.Name` is a `Text<30>` and the overload that had no ground to choose has one.
+`PermissionSetBuffer` is board:0599 and out of the slice.
 
-`Company` is an ABSENT AL object, so `Company.Name()` is a `dotnet::Refused`, and a refusal converts
-to EVERY type -- both `GetICPartnerICSetup(ICPartner_Table, ...)` and
-`GetICPartnerICSetup(Text<0>, ...)` are equally viable and C++ has no ground to choose. AL chooses by
-the DECLARED return type of `Name()`, which this tree cannot know while the object it belongs to is
-absent. So the fix is not a signature: it is either the absent object carrying its methods' types
-(board:0035's family) or a refusal that refuses to participate in overload resolution at all.
-`PermissionSetBuffer` is board:0599 and out of the slice.**
+**AND THE SLICE HAD TO RE-TRIGGER CONFIGURE BEFORE ANY OF IT COUNTED.** `test/slice` is read by
+`file(STRINGS ...)` at CONFIGURE time and nothing depended on it, so a source added to the file
+never entered the build graph: `make` stayed green, the object was never compiled, and the runner
+died at load on the very symbol the addition was for. `CMAKE_CONFIGURE_DEPENDS` now names it. This
+is CLAUDE.md's blind gate in its cheapest form -- the step that was supposed to do the work never
+ran, and everything downstream reported success.
 
 # `agiru run-tests` starts, because every table the slice names is linked
 
@@ -52,7 +53,8 @@ slice. A data symbol is bound at load, so one of them is the whole program.
 
 **Six of the thirteen are closed (2026-09-07), and the data symbols stand at 7:**
 `RetentionPolicySetup` by folding a record field's spelling to the table's own declaration;
-`AADApplication` by `User."Application ID"`, field 13, measured in the restored demo database;
+`AADApplication` by `User."Application ID"` -- measured in the demo database as field 13, which
+the system symbols later corrected to 16 (board:0607);
 `ADCSUser` by the 73rd entry in `Refused`'s hand-kept member list; `MergeDuplicatesBuffer` and
 `AttachmentEntityBuffer` by two door signatures the documentation carries and the door did not --
 `RecordRef.Rename(Value1 [, Value2,...])` was capped at two of a primary key's sixteen, and

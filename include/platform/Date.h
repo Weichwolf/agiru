@@ -22,12 +22,9 @@ namespace agiru::platform {
 
 /// \brief The vocabulary of the `Period Type` field: which kind of period a row describes.
 ///
-/// \note THE ORDER IS THE PREDECESSOR'S, MEASURED RATHER THAN DOCUMENTED. The page
-///       `devenv-date-virtual-table.md` names the five -- days, weeks, months, quarters and years
-///       -- and gives no
-///       ordinals; `~/Git/openerp/openerp/runtime/base/system_tables.py` records `Date=0` and the
-///       rest in that order, and it is 97 % green on the suite that reads them. The AL source
-///       writes the NAMES and never a number, so nothing there contradicts it.
+/// \note THE ORDER IS THE DECLARATION'S. `work/symbols/src/Virtual Tables/Date.Table.al`
+///       (`make symbols`) says `OptionMembers = "Date",Week,Month,Quarter,Year`, which is what the
+///       predecessor had measured and the one platform table it got right (board:0607).
 enum class PeriodType : std::int32_t {
   Date = 0,    ///< One row per day.
   Week = 1,    ///< One row per week.
@@ -70,8 +67,9 @@ public:
 
   detail::StateHandle State_Block;
 
-  /// \brief The declared length of `Period Name`, which is AL's and not this file's.
-  static constexpr std::size_t kNameLength = 30;
+  /// \brief The declared length of `Period Name` and `Period Invariant Name`, which is AL's
+  ///        and not this file's.
+  static constexpr std::size_t kNameLength = 31;
 
   /// \brief AL `Date."Period Type"`.
   Option<PeriodType> PeriodType_;
@@ -81,10 +79,12 @@ public:
   ::agiru::Date PeriodEnd;
   /// \brief AL `Date."Period No."`.
   ::agiru::Integer PeriodNo;
-  /// \brief AL `Date."Period Name"`.
+  /// \brief AL `Date."Period Name"`, in the user's language.
   Text<kNameLength> PeriodName;
+  /// \brief AL `Date."Period Invariant Name"`, which does not follow the language.
+  Text<kNameLength> PeriodInvariantName;
 
-  /// \brief The field numbers, from the predecessor's measured layout.
+  /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No {
     /// \brief The AL field number of `Period Type`.
     static constexpr ::agiru::FieldNo PeriodType{1};
@@ -96,6 +96,8 @@ public:
     static constexpr ::agiru::FieldNo PeriodNo{4};
     /// \brief The AL field number of `Period Name`.
     static constexpr ::agiru::FieldNo PeriodName{5};
+    /// \brief The AL field number of `Period Invariant Name`.
+    static constexpr ::agiru::FieldNo PeriodInvariantName{6};
   };
 
   /// \brief The primary key: which kind of period, and which one.
@@ -107,7 +109,7 @@ public:
 using Date = Date_Table;
 
 /// \brief The field table of the virtual `Date` table.
-inline constexpr std::array<FieldDef, 5> kDateFields{{
+inline constexpr std::array<FieldDef, 6> kDateFields{{
     Declare<&Date::PeriodType_>(
         Date::Field_No::PeriodType, "Period Type", "Period Type", offsetof(Date, PeriodType_)),
     Declare<&Date::PeriodStart>(
@@ -118,11 +120,15 @@ inline constexpr std::array<FieldDef, 5> kDateFields{{
         Date::Field_No::PeriodNo, "Period No.", "Period No.", offsetof(Date, PeriodNo)),
     Declare<&Date::PeriodName>(
         Date::Field_No::PeriodName, "Period Name", "Period Name", offsetof(Date, PeriodName)),
+    Declare<&Date::PeriodInvariantName>(Date::Field_No::PeriodInvariantName,
+                                        "Period Invariant Name",
+                                        "Period Invariant Name",
+                                        offsetof(Date, PeriodInvariantName)),
 }};
 
 /// \brief The keys of the virtual `Date` table.
 inline constexpr std::array<KeyDef, 1> kDateKeys{{
-    KeyDef{.name = "PK", .fields = Date::kKey1, .clustered = true},
+    KeyDef{.name = "pk", .fields = Date::kKey1, .clustered = true},
 }};
 
 /// \brief The declaration of the virtual `Date` table.
@@ -133,6 +139,8 @@ inline constexpr TableDef kDateTable{
     .fields = kDateFields,
     .keys = kDateKeys,
 };
+
+static_assert(FieldsAreSorted(kDateTable), "the field table is searched by number");
 
 }
 

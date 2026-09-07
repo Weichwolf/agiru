@@ -1722,6 +1722,7 @@ TableIndex PlatformTables() {
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
+  add("Company", "2000000006");
   add("Field", "2000000041");
   add("Integer", "2000000026");
   add("Date", "2000000007");
@@ -1736,6 +1737,11 @@ FieldEnums PlatformFieldEnums() {
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
   enums["2000000041"] = enums["field"];
+  enums["user"]["state"] = "::agiru::platform::UserState";
+  enums["user"]["license type"] = "::agiru::platform::UserLicenseType";
+  enums["2000000120"] = enums["user"];
+  enums["user personalization"]["scope"] = "::agiru::platform::PersonalizationScope";
+  enums["2000000073"] = enums["user personalization"];
   return enums;
 }
 

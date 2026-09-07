@@ -1,4 +1,6 @@
+#include "type/Code.h"
 #include "type/Guid.h"
+#include "type/Text.h"
 
 #include "Check.h"
 
@@ -8,7 +10,9 @@
 #include <set>
 #include <string>
 
+using agiru::Code;
 using agiru::Guid;
+using agiru::Text;
 
 namespace {
 
@@ -18,6 +22,11 @@ namespace {
 constexpr std::array<std::uint8_t, Guid::kSize> kBytes{
     0xAA, 0xAA, 0xAA, 0xAA, 0x00, 0x00, 0x11, 0x11, 0x22, 0x22, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB};
 constexpr Guid kNamed{kBytes};
+
+// AL's own lengths: `User."Full Name"` is Text[80] and `User."User Name"` Code[50],
+// which is the pair a GUID is written into and read back from in the BaseApp.
+constexpr std::size_t kFieldLength = 80;
+constexpr std::size_t kCodeLength = 50;
 
 static_assert(Guid{}.IsNull(), "the default GUID is the empty one AL calls null");
 static_assert(!kNamed.IsNull());
@@ -97,12 +106,45 @@ void SequentialGuidsRiseWithTime() {
              Guid::CreateSequentialGuid() != Guid::Create());
 }
 
+/// AL ASSIGNS A TEXT TO A GUID WITHOUT A CAST, and the page says so outright:
+/// `guid-data-type.md`, "You can assign and compare the Text data type and the GUID data type",
+/// with `MyTableRec.MyGuid := MyTableRec.MyText` as its own example and the two accepted spellings
+/// beside it. `ImportConsolidationFromAPI` writes `TempCompany.Id := JsonToken.AsValue().AsText()`,
+/// which is the same assignment one builtin further out.
+void ATextAssignsToAGuidTheWayALAssignsIt() {
+  const std::string braced{"{aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb}"};
+  Guid held;
+
+  held = braced;
+  CHECK_TRUE("a std::string assigns, which is what a builtin returning Text hands back",
+             held == kNamed);
+
+  Text<kFieldLength> field;
+  field = "aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb";
+  held = Guid{};
+  held = field;
+  CHECK_TRUE("and so does a Text[N] field, unbraced -- both spellings are documented",
+             held == kNamed);
+
+  Code<kCodeLength> code;
+  code = braced;
+  held = Guid{};
+  held = code;
+  CHECK_TRUE("and a Code[N] field, braced", held == kNamed);
+
+  // AL COMPARES A TEXT AGAINST A GUID AS GUIDS, which is why the two spellings compare equal.
+  CHECK_TRUE("a braced text equals the GUID", braced == kNamed);
+  CHECK_TRUE("and so does the unbraced field", field == kNamed);
+  CHECK_TRUE("text that is not a GUID does not", std::string{"Family No."} != kNamed);
+}
+
 } // namespace
 
 int main() {
   return gate::Run("Guid", [] {
     TheTextIsTheDocumentedOneBracesIncluded();
     TheTextGoesBothWays();
+    ATextAssignsToAGuidTheWayALAssignsIt();
     CreatedGuidsAreUniqueAndWellFormed();
     SequentialGuidsRiseWithTime();
   });

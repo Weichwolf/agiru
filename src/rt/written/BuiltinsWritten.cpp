@@ -1,9 +1,12 @@
 #include "BuiltinsWritten.h"
 
+#include "Builtins.h"
 #include "meta/EnumDef.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Scopes.h"
 #include "runtime/Session.h"
+#include "runtime/test/Handlers.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/ClientType.h"
@@ -13,8 +16,10 @@
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
+#include "type/ErrorInfo.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
@@ -465,6 +470,41 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
 
 ::agiru::Guid UserSecurityId() {
   return Session::Current().UserSecurityId();
+}
+
+bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
+  const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
+  if (handler == nullptr) { return false; }
+  HandlerTable::Ran(*handler);
+  handler->invoke(text, reply);
+  return true;
+}
+
+void ClearCollectedErrors() {
+  ErrorScope::Clear();
+}
+
+::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear) {
+  ::agiru::List<::agiru::ErrorInfo> collected;
+  for (const std::string &message : ErrorScope::Collected()) {
+    collected.Add(::agiru::ErrorInfo::Create(message, true));
+  }
+  if (Clear) { ErrorScope::Clear(); }
+  return collected;
+}
+
+::agiru::Boolean HasCollectedErrors() {
+  return !ErrorScope::Collected().empty();
+}
+
+::agiru::Boolean GuiAllowed() {
+  if (HandlerTable::Installed()) { return true; }
+  RefuseDoor("System.GuiAllowed()");
+}
+
+void Hyperlink(std::string_view URL) {
+  if (AnsweredByHandler(3, URL, nullptr)) { return; }
+  RefuseDoor("System.Hyperlink(Text)");
 }
 
 }

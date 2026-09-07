@@ -9,6 +9,8 @@
 #include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/Dictionary.h"
+#include "type/Duration.h"
+#include "type/ErrorInfo.h"
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
@@ -51,6 +53,169 @@ namespace agiru {
 ///       before refusing, so a test with `[HandlerFunctions]` gets its answer and one without gets
 ///       the platform's refusal (board:0054).
 [[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
+
+/// \brief AL `System.CanLoadType(DotNet)`. Whether a .NET type can be loaded.
+/// \tparam T Whatever AL handed it -- a `DotNet` variable is a refusal in this tree.
+/// \param DotNet The AL `DotNet`.
+/// \return Never.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note IT IS A TEMPLATE AND IT LIVES HERE FOR THAT REASON. The generator writes a `Variant`
+///       parameter, and a `DotNet` variable is a `dotnet::Refused` that does not convert to one --
+///       65 call sites (measured 2026-09-07). A written declaration is how the door keeps a shape
+///       the generator cannot know (board:0607).
+template <typename T>::agiru::Boolean CanLoadType(const T &DotNet) {
+  static_cast<void>(DotNet);
+  throw ::agiru::Error("System.CanLoadType(DotNet) is declared and not implemented yet "
+                       "(board:0035)");
+}
+
+/// \brief AL `System.CompressArray(Array of [Text])`. Moves every non-empty string to the front.
+/// \tparam A The array's class, which AL knows and the door does not.
+/// \param StringArray The AL `Array of [Text]`.
+/// \return Never.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+template <typename A>
+  requires requires(const A &array) { array.Length(); } ::agiru::Integer
+CompressArray(A &StringArray) {
+  static_cast<void>(StringArray);
+  throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
+                       "(board:0035)");
+}
+
+/// \brief AL `System.CopyArray(Array of [Any], Array of [Any], Integer [, Integer])`.
+/// \tparam A The target array's class.
+/// \tparam B The source array's class.
+/// \param NewArray Where the elements go.
+/// \param Array    Where they come from.
+/// \param Position Where the copy starts, one-based.
+/// \param Length   How many; the rest when omitted.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+template <typename A, typename B>
+  requires requires(const B &array) { array.Length(); }
+void CopyArray(A &NewArray,
+               const B &Array,
+               ::agiru::Integer Position,
+               ::agiru::Integer Length = {}) {
+  static_cast<void>(NewArray);
+  static_cast<void>(Array);
+  static_cast<void>(Position);
+  static_cast<void>(Length);
+  throw ::agiru::Error("System.CopyArray is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `Evaluate(Variable, String [, Number])` where the STRING is a refusal.
+/// \tparam Any1 What AL is evaluating into.
+/// \tparam T    The refusal's type.
+/// \param Variable The AL `Any`.
+/// \param refusal  The refusal standing in for the text.
+/// \param Number   The AL `Integer`.
+/// \return Whatever the refusal answers -- which is to raise.
+///
+/// \note IT HANDS THE REFUSAL ITS OWN JOB. A refusal converts to anything, so without this
+///       overload it would convert to `std::string_view` and the door would refuse in the name of
+///       `Evaluate` rather than in the name of the absent thing that produced the text.
+template <typename Any1, typename T>
+  requires requires { typename T::IsAlRefusal; } ::agiru::Boolean
+Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
+  static_cast<void>(Variable);
+  static_cast<void>(Number);
+  return static_cast<::agiru::Boolean>(refusal);
+}
+
+/// \brief AL `StartSession(SessionId, CodeunitId, Timeout, Company, Record)` -- the record travels
+///        as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Timeout    How long it may take.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             ::agiru::Duration Timeout,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Timeout);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `StartSession(SessionId, CodeunitId, Company, Record, Timeout)`.
+/// \tparam R The record's class.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \param Timeout    How long it may take.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record,
+             ::agiru::Duration Timeout) {
+  static_cast<void>(Timeout);
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `StartSession(SessionId, CodeunitId, Company, Record)`.
+/// \tparam R The record's class.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `System.ClearCollectedErrors()`. Clears the errors collected so far.
+///
+/// \note IT DOES NOT TOUCH THE TRANSACTION -- `runtime/Scopes.h` says why.
+void ClearCollectedErrors();
+
+/// \brief AL `System.GetCollectedErrors(Boolean)`. The errors collected so far.
+/// \param Clear Whether to empty the collection after reading it.
+/// \return One `ErrorInfo` per collected error, in the order they were collected.
+[[nodiscard]] ::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear = {});
+
+/// \brief AL `System.HasCollectedErrors()`. Whether anything has been collected.
+/// \return True when the collection is not empty.
+[[nodiscard]] ::agiru::Boolean HasCollectedErrors();
+
+/// \brief AL `System.GuiAllowed()`. Whether a UI is there to answer a dialog.
+/// \return True when a test has installed handlers; otherwise it refuses.
+/// \throws Error when no handler table is installed -- there is no UI to allow (board:0030).
+[[nodiscard]] ::agiru::Boolean GuiAllowed();
+
+/// \brief AL `System.Hyperlink(Text)`. Opens a URL on the client.
+/// \param URL The address.
+/// \throws Error when no handler answers -- opening one needs a running client (board:0030).
+void Hyperlink(std::string_view URL);
 
 /// \brief AL `Text.ConvertStr(Text, Text, Text)`. Replaces all chars in source found in
 /// FromCharacters with the corresponding char in ToCharacters and returns the converted string. If

@@ -1905,6 +1905,7 @@ base/intercompany/outbox/table/ICOutboxTransaction.cpp
 base/intercompany/page/IntercompanyActivities.cpp
 base/intercompany/partner/page/ICPartnerList.cpp
 base/intercompany/partner/page/ICPartnersListPart.cpp
+base/intercompany/partner/table/ICPartner.cpp
 base/intercompany/setup/codeunit/ICSetupDiagnostics.cpp
 base/intercompany/setup/page/ICSetupDiagnosticsList.cpp
 base/intercompany/setup/page/IntercompanySetup.cpp

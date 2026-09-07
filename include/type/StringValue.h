@@ -972,6 +972,35 @@ template <typename Left, typename Right>
   return std::string(std::string_view(left)) + std::string(right.Value());
 }
 
+/// \brief AL `+` where NEITHER side is a `Text[N]` or `Code[N]` field.
+///
+/// \tparam Left  The left side, which must read as a `std::string_view`.
+/// \tparam Right The right side, same.
+/// \param left  The left side.
+/// \param right The right side.
+/// \return The two joined.
+///
+/// \note IT CLOSES A HOLE THAT PRODUCED A NULL GUID. `Record.TableCaption()` returns a
+///       `std::string` and `Record.FieldCaption()` a `std::string_view`, and the standard library
+///       joins neither pair -- so `TableCaption() + ' ' + FieldCaption(No)` found
+///       `operator+(const Text<0> &, const Guid &)` instead, one user-defined conversion on each
+///       side, and wrote `Family {00000000-0000-0000-0000-000000000000}` where AL writes
+///       `Family No.` (measured 2026-09-07, 33 call sites). The operator AL means has to exist, or
+///       overload resolution finds one AL does not mean.
+///
+/// \note BOTH SIDES MUST BE CLASS TYPES, and neither may be a `std::string` when the other is one:
+///       the standard library already joins `string + string`, `string + const char *` and their
+///       mirrors, and a template that is exact on both sides would take those over.
+template <typename Left, typename Right>
+  requires std::convertible_to<const Left &, std::string_view> &&
+           std::convertible_to<const Right &, std::string_view> &&
+           (!std::derived_from<Left, StringValue>) && (!std::derived_from<Right, StringValue>) &&
+           std::is_class_v<Left> && std::is_class_v<Right> &&
+           (!std::same_as<Left, std::string> || !std::same_as<Right, std::string>)
+[[nodiscard]] std::string operator+(const Left &left, const Right &right) {
+  return std::string(std::string_view(left)) + std::string(std::string_view(right));
+}
+
 /// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a
 ///        `Text<0>` -- by their stored text.
 /// \param a One.

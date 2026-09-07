@@ -168,6 +168,12 @@ option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
 # skipped; every other line is a path under `apps/`. A named file that does not compile makes `make`
 # red, which is the difference between a slice and a glob.
 if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
+  # THE SLICE IS READ AT CONFIGURE TIME, SO IT HAS TO RE-TRIGGER CONFIGURE. Without this a source
+  # added to the file never enters the build graph: `make` is green, the object is never compiled,
+  # and the runner dies at load on the very data symbol the addition was for -- which is how one
+  # round was spent adding `ICPartner` twice (2026-09-07).
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/test/slice")
   file(STRINGS "${CMAKE_SOURCE_DIR}/test/slice" slice_lines)
   set(slice_sources "")
   foreach(line IN LISTS slice_lines)

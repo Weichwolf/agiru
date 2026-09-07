@@ -23,11 +23,19 @@ if [ "$before" != "$after" ]; then
   exit 1
 fi
 
-# AND NOTHING WRITTEN REFUSES. A written function that ends in `RefuseDoor` is one the generator
-# took back, which is the failure this whole split exists to stop -- and it would leave the digest
-# above unchanged, because by then the refusal IS what is on disk.
-if grep -q RefuseDoor src/rt/written/BuiltinsWritten.cpp; then
-  printf 'door: a written builtin refuses. It was overwritten by the generator.\n' >&2
+# AND NOTHING WRITTEN REFUSES OUTRIGHT. A written function whose FIRST statement is `RefuseDoor` is
+# one the generator took back, which is the failure this whole split exists to stop -- and it would
+# leave the digest above unchanged, because by then the refusal IS what is on disk.
+#
+# A CONDITIONAL REFUSAL IS NOT THAT. `GuiAllowed` answers true when a test has installed handlers
+# and refuses otherwise; `Hyperlink` hands the URL to a handler and refuses when none takes it.
+# Both compute first, and both are written precisely so the generator cannot take the computation
+# away. So the test is on the FIRST statement of the body, not on the presence of the word.
+outright=$(awk '/\{$/ { open = 1; next } open && /^  RefuseDoor\(/ { count++ } { open = 0 } \
+  END { print count + 0 }' src/rt/written/BuiltinsWritten.cpp)
+if [ "$outright" -gt 0 ]; then
+  printf 'door: %s written builtin(s) refuse outright. Overwritten by the generator.\n' \
+    "$outright" >&2
   exit 1
 fi
 

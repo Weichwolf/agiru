@@ -74,6 +74,9 @@ builtins:          ## which AL builtins the UT milestone calls, ranked
 schema:            ## how much of the CRONUS dataset the transpiled schema can hold
 	@python3 $(SELF)/scripts/schema_gap.py
 
+symbols:           ## the AL source of every platform object, out of the system symbols
+	@python3 $(SELF)/scripts/fetch_symbols.py
+
 cronus:            ## the demo database from the CDN into PostgreSQL, one to one
 	@sh $(SELF)/scripts/fetch_artifact.sh
 	@sh $(SELF)/scripts/mssql_restore.sh

@@ -1,3 +1,4 @@
+#include "platform/Company.h"
 #include "platform/Date.h"
 #include "platform/Field.h"
 #include "platform/Integer.h"
@@ -8,6 +9,7 @@
 namespace agiru {
 namespace {
 
+const RegisterTable<platform::Company> kCompany;
 const RegisterTable<platform::Date> kDate;
 const RegisterTable<platform::Field> kField;
 const RegisterTable<platform::Integer> kInteger;

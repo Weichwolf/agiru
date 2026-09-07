@@ -12,13 +12,11 @@
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
-#include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
-#include "type/List.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -79,17 +77,6 @@ std::string ApplicationPath();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date = {});
 
-/// \brief AL `System.CanLoadType(DotNet)`. Tests if the specified .NET Framework type can be
-/// loaded.
-/// \param DotNet The AL `DotNet`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename T>::agiru::Boolean CanLoadType(const T &DotNet) {
-  static_cast<void>(DotNet);
-  throw ::agiru::Error("System.CanLoadType(DotNet) is declared and not implemented yet "
-                       "(board:0035)");
-}
-
 /// \brief AL `System.CaptionClassTranslate(Text)`. Returns a translated version of the caption
 /// string. The string is translated to the current local language.
 /// \param CaptionClassText The AL `Text`.
@@ -102,11 +89,6 @@ std::string CaptionClassTranslate(std::string_view CaptionClassText);
 /// on that contain AL code.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void ClearAll();
-
-/// \brief AL `System.ClearCollectedErrors()`. Clears all collected errors from the current
-/// collection scope.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void ClearCollectedErrors();
 
 /// \brief AL `System.ClosingDate(Date)`. Gets the closing date for a Date Data Type.
 /// \param Date The AL `Date`.
@@ -142,33 +124,7 @@ void CodeCoverageRefresh();
 /// \param StringArray The AL `Array of [Text]`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename A>
-  requires requires(const A &array) { array.Length(); } ::agiru::Integer
-CompressArray(A &StringArray) {
-  static_cast<void>(StringArray);
-  throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
-                       "(board:0035)");
-}
-
-/// \brief AL `System.CopyArray(Array of [Any], Array of [Any], Integer, Integer)`. Copies one or
-/// more elements in an array to a new array.
-/// \param NewArray The AL `Array of [Any]`.
-/// \param Array The AL `Array of [Any]`.
-/// \param Position The AL `Integer`.
-/// \param Length The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename A, typename B>
-  requires requires(const B &array) { array.Length(); }
-void CopyArray(A &NewArray,
-               const B &Array,
-               ::agiru::Integer Position,
-               ::agiru::Integer Length = {}) {
-  static_cast<void>(NewArray);
-  static_cast<void>(Array);
-  static_cast<void>(Position);
-  static_cast<void>(Length);
-  throw ::agiru::Error("System.CopyArray is declared and not implemented yet (board:0035)");
-}
+::agiru::Integer CompressArray(const ::agiru::Variant &StringArray);
 
 /// \brief AL `System.CopyStream(OutStream, InStream, Integer)`. Copies the information that is
 /// contained in an InStream to an OutStream.
@@ -292,21 +248,6 @@ std::string Encrypt(std::string_view PlainTextString);
 /// \param Number The AL `Integer`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename Any1, typename T>
-  requires requires { typename T::IsAlRefusal; } ::agiru::Boolean
-Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
-  static_cast<void>(Variable);
-  static_cast<void>(Number);
-  return static_cast<::agiru::Boolean>(refusal);
-}
-
-/// \brief AL `Evaluate(Variable, String [, Number])`. Reads a value from its text form.
-/// \tparam Any1 The AL `Any`.
-/// \param Variable The AL `Any`.
-/// \param String The AL `Text`.
-/// \param Number The AL `Integer`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename Any1>
 ::agiru::Boolean Evaluate(Any1 &Variable, std::string_view String, ::agiru::Integer Number = {}) {
   static_cast<void>(Variable);
@@ -335,13 +276,6 @@ std::string ExportEncryptionKey(std::string_view Password);
 void ExportObjects(std::string_view FileName,
                    ::agiru::RecordRef &ObjectRecord,
                    ::agiru::Integer Format = {});
-
-/// \brief AL `System.GetCollectedErrors(Boolean)`. Gets all collected errors in the current
-/// collection scope.
-/// \param Clear The AL `Boolean`.
-/// \return The AL `List of [ErrorInfo]`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear = {});
 
 /// \brief AL `System.GetDocumentUrl(Guid)`. Gets the URL for the specified temporary media object
 /// ID.
@@ -383,24 +317,6 @@ std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent);
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID = {});
-
-/// \brief AL `System.GuiAllowed()`. Checks whether the AL code can show any information on the
-/// screen.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean GuiAllowed();
-
-/// \brief AL `System.HasCollectedErrors()`. Gets a value indicating whether errors have been
-/// collected in the current error collection scope.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean HasCollectedErrors();
-
-/// \brief AL `System.Hyperlink(Text)`. Passes a URL as an argument to an Internet browser, such as
-/// Microsoft Edge.
-/// \param URL The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Hyperlink(std::string_view URL);
 
 /// \brief AL `System.ImportEncryptionKey(Text, Text)`. Points to a password protected file that
 /// contains the key on the current server. When encrypting or decrypting data in Dynamics 365
@@ -883,28 +799,11 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-/// \brief AL `StartSession(Timeout, Company, Record)` -- the record travels as its OWN table.
-/// \tparam R The record's class, because AL hands a `var Record` of any table.
-/// \param SessionId  Where the new session's id goes.
-/// \param CodeunitId Which codeunit runs.
-/// \param Company    Which company it runs in.
-/// \param Record     The record it starts on.
-/// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
-template <typename R>
-  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
-StartSession(::agiru::Integer &SessionId,
-             ::agiru::Integer CodeunitId,
-             ::agiru::Duration Timeout,
-             std::string_view Company,
-             R &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Timeout);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
-}
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              ::agiru::Duration Timeout,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record);
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record, Duration)`. Starts a session
 /// without a UI and runs the specified codeunit.
@@ -915,28 +814,11 @@ StartSession(::agiru::Integer &SessionId,
 /// \param Timeout The AL `Duration`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-/// \brief AL `StartSession(Company, Record, Timeout)` -- the record travels as its OWN table.
-/// \tparam R The record's class, because AL hands a `var Record` of any table.
-/// \param SessionId  Where the new session's id goes.
-/// \param CodeunitId Which codeunit runs.
-/// \param Company    Which company it runs in.
-/// \param Record     The record it starts on.
-/// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
-template <typename R>
-  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
-StartSession(::agiru::Integer &SessionId,
-             ::agiru::Integer CodeunitId,
-             std::string_view Company,
-             R &Record,
-             ::agiru::Duration Timeout) {
-  static_cast<void>(Timeout);
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
-}
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record,
+                              ::agiru::Duration Timeout);
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record)`. Starts a session without a UI
 /// and runs the specified codeunit.
@@ -946,26 +828,10 @@ StartSession(::agiru::Integer &SessionId,
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-/// \brief AL `StartSession(Company, Record)` -- the record travels as its OWN table.
-/// \tparam R The record's class, because AL hands a `var Record` of any table.
-/// \param SessionId  Where the new session's id goes.
-/// \param CodeunitId Which codeunit runs.
-/// \param Company    Which company it runs in.
-/// \param Record     The record it starts on.
-/// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
-template <typename R>
-  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
-StartSession(::agiru::Integer &SessionId,
-             ::agiru::Integer CodeunitId,
-             std::string_view Company,
-             R &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
-}
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record);
 
 /// \brief AL `Session.StopSession(Integer, Text)`. Stops a session.
 /// \param SessionId The AL `Integer`.

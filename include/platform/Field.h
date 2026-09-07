@@ -147,12 +147,22 @@ namespace agiru::platform {
 ///       declarations, of which 282 carry `temporary`. A temporary one needs nothing but this
 ///       declaration, because `Temporary<T>` keeps its own store and touches no database.
 ///
-/// \note THE FIELD NUMBERS 1 TO 13 ARE MEASURED, the three after them are [SET].
-///       `~/Git/openerp/openerp/runtime/base/system_tables.py` carries the first thirteen with
-///       their numbers; it carries `Field Caption`, `Enabled` and `Is Part of Primary Key` without
-///       any, and says why -- the BaseApp reaches them BY NAME, which the generator turns into a
-///       member access, so the number is not part of that contract. They are numbered here so the
-///       field table can exist at all, and the origin is written down rather than implied.
+/// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
+///       `work/symbols/src/Virtual Tables/Field.Table.al` (`make symbols`) carries it. The
+///       predecessor's measured layout, which this file carried until 2026-09-07, had `Enabled`
+///       sitting on `RelationTableNo`'s number and four more one place too low -- a `FieldRef` by
+///       number would have read the wrong column and thrown nothing (board:0607).
+///
+/// \note FIFTEEN OF THE TWENTY-FOUR DECLARED FIELDS ARE HERE. `Type Name`, `ExternalName`,
+///       `SQLDataType`, `DataClassification`, `App Package ID`, `App Runtime Package ID`,
+///       `OptimizeForTextSearch`, `Access` and `IsAllowedInCustomizations` are not, and their
+///       absence is a hole with a number rather than a decision (board:0607).
+///
+/// \warning `Field.Type` IS NOT `FieldType`. The declaration gives the virtual table's own option
+///          `OptionOrdinalValues` running 4912 to 37375, so `Field.Type::Code` is 31489 where
+///          `FieldRef.Type()` answers 33. This file stores one option for both; the BaseApp
+///          compares by MEMBER and never by number, so nothing has failed yet, and board:0607
+///          carries the separation.
 class Field : public Table<Field> {
 public:
   /// \brief The AL table number of the virtual `Field` table.
@@ -169,7 +179,7 @@ public:
   /// \brief The declared length of `ObsoleteReason`.
   static constexpr std::size_t kReasonLength = 248;
   /// \brief The declared length of `OptionString`.
-  static constexpr std::size_t kOptionStringLength = 250;
+  static constexpr std::size_t kOptionStringLength = 2047;
 
   /// \brief AL `Field."TableNo"`.
   ::agiru::Integer TableNo{};
@@ -199,7 +209,7 @@ public:
   Text<kCaptionLength> FieldCaption;
   /// \brief AL `Field."Enabled"`.
   Boolean Enabled{};
-  /// \brief AL `Field."Is Part of Primary Key"`.
+  /// \brief AL `Field.IsPartOfPrimaryKey`, which the declaration spells without spaces.
   Boolean IsPartOfPrimaryKey{};
 
   /// \brief AL `Field.SystemId` -- blank, because a virtual table has no row to carry one.
@@ -235,21 +245,21 @@ public:
     /// \brief The AL field number of `Class`.
     static constexpr ::agiru::FieldNo Class{7};
     /// \brief The AL field number of `RelationTableNo`.
-    static constexpr ::agiru::FieldNo RelationTableNo{8};
+    static constexpr ::agiru::FieldNo RelationTableNo{21};
     /// \brief The AL field number of `RelationFieldNo`.
-    static constexpr ::agiru::FieldNo RelationFieldNo{9};
+    static constexpr ::agiru::FieldNo RelationFieldNo{22};
     /// \brief The AL field number of `OptionString`.
-    static constexpr ::agiru::FieldNo OptionString{10};
+    static constexpr ::agiru::FieldNo OptionString{24};
     /// \brief The AL field number of `ObsoleteState`.
-    static constexpr ::agiru::FieldNo ObsoleteState{11};
+    static constexpr ::agiru::FieldNo ObsoleteState{25};
     /// \brief The AL field number of `ObsoleteReason`.
-    static constexpr ::agiru::FieldNo ObsoleteReason{12};
+    static constexpr ::agiru::FieldNo ObsoleteReason{26};
     /// \brief The AL field number of `Field Caption`.
     static constexpr ::agiru::FieldNo FieldCaption{20};
     /// \brief The AL field number of `Enabled`.
-    static constexpr ::agiru::FieldNo Enabled{21};
-    /// \brief The AL field number of `Is Part of Primary Key`.
-    static constexpr ::agiru::FieldNo IsPartOfPrimaryKey{22};
+    static constexpr ::agiru::FieldNo Enabled{8};
+    /// \brief The AL field number of `IsPartOfPrimaryKey`.
+    static constexpr ::agiru::FieldNo IsPartOfPrimaryKey{28};
   };
 
   /// \brief The primary key: the table and the field within it.
@@ -285,6 +295,12 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
     Declare<&Field::Type>(Field::Field_No::Type, "Type", "Type", offsetof(Field, Type)),
     Declare<&Field::Len>(Field::Field_No::Len, "Len", "Len", offsetof(Field, Len)),
     Declare<&Field::Class>(Field::Field_No::Class, "Class", "Class", offsetof(Field, Class)),
+    Declare<&Field::Enabled>(
+        Field::Field_No::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
+    Declare<&Field::FieldCaption>(Field::Field_No::FieldCaption,
+                                  "Field Caption",
+                                  "Field Caption",
+                                  offsetof(Field, FieldCaption)),
     Declare<&Field::RelationTableNo>(Field::Field_No::RelationTableNo,
                                      "RelationTableNo",
                                      "RelationTableNo",
@@ -305,21 +321,15 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
                                     "ObsoleteReason",
                                     "ObsoleteReason",
                                     offsetof(Field, ObsoleteReason)),
-    Declare<&Field::FieldCaption>(Field::Field_No::FieldCaption,
-                                  "Field Caption",
-                                  "Field Caption",
-                                  offsetof(Field, FieldCaption)),
-    Declare<&Field::Enabled>(
-        Field::Field_No::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
     Declare<&Field::IsPartOfPrimaryKey>(Field::Field_No::IsPartOfPrimaryKey,
-                                        "Is Part of Primary Key",
-                                        "Is Part of Primary Key",
+                                        "IsPartOfPrimaryKey",
+                                        "IsPartOfPrimaryKey",
                                         offsetof(Field, IsPartOfPrimaryKey)),
 }});
 
 /// \brief The keys of the virtual `Field` table.
 inline constexpr std::array<KeyDef, 1> kFieldKeys{{
-    KeyDef{.name = "Key1", .fields = Field::kKey1, .clustered = true},
+    KeyDef{.name = "pk", .fields = Field::kKey1, .clustered = true},
 }};
 
 /// \brief The declaration of the virtual `Field` table.

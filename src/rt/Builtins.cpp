@@ -1,9 +1,8 @@
 #include "Builtins.h"
 
+#include "platform/Company.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
-#include "runtime/Scopes.h"
-#include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -15,13 +14,11 @@
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
-#include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
-#include "type/List.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -73,10 +70,6 @@ void ClearAll() {
   RefuseDoor("System.ClearAll()");
 }
 
-void ClearCollectedErrors() {
-  ErrorScope::Clear();
-}
-
 ::agiru::Date ClosingDate(::agiru::Date Date) {
   static_cast<void>(Date);
   RefuseDoor("System.ClosingDate(Date)");
@@ -99,6 +92,11 @@ void CodeCoverageLoad() {
 
 void CodeCoverageRefresh() {
   RefuseDoor("System.CodeCoverageRefresh()");
+}
+
+::agiru::Integer CompressArray(const ::agiru::Variant &StringArray) {
+  static_cast<void>(StringArray);
+  RefuseDoor("System.CompressArray(Array of [Text])");
 }
 
 ::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,
@@ -202,15 +200,6 @@ void ExportObjects(std::string_view FileName,
   RefuseDoor("System.ExportObjects(Text, Record, Integer)");
 }
 
-::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear) {
-  ::agiru::List<::agiru::ErrorInfo> collected;
-  for (const std::string &message : ErrorScope::Collected()) {
-    collected.Add(::agiru::ErrorInfo::Create(message, true));
-  }
-  if (Clear) { ErrorScope::Clear(); }
-  return collected;
-}
-
 std::string GetDocumentUrl(::agiru::Guid ID) {
   static_cast<void>(ID);
   RefuseDoor("System.GetDocumentUrl(Guid)");
@@ -241,29 +230,6 @@ std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
 ::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID) {
   static_cast<void>(NewLanguageID);
   RefuseDoor("System.GlobalLanguage(Integer)");
-}
-
-bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
-  const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
-  if (handler == nullptr) { return false; }
-  HandlerTable::Ran(*handler);
-  handler->invoke(text, reply);
-  return true;
-}
-
-::agiru::Boolean GuiAllowed() {
-  if (HandlerTable::Installed()) { return true; }
-  RefuseDoor("System.GuiAllowed()");
-}
-
-::agiru::Boolean HasCollectedErrors() {
-  return !ErrorScope::Collected().empty();
-}
-
-void Hyperlink(std::string_view URL) {
-  if (AnsweredByHandler(3, URL, nullptr)) { return; }
-  static_cast<void>(URL);
-  RefuseDoor("System.Hyperlink(Text)");
 }
 
 ::agiru::Boolean ImportEncryptionKey(std::string_view Path, std::string_view Password) {
@@ -631,6 +597,43 @@ void SendTraceTag(std::string_view Tag,
 void SetDocumentServiceToken(std::string_view Token) {
   static_cast<void>(Token);
   RefuseDoor("Session.SetDocumentServiceToken(Text)");
+}
+
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              ::agiru::Duration Timeout,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Timeout);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  RefuseDoor("Session.StartSession(Integer, Integer, Duration, Text, Record)");
+}
+
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record,
+                              ::agiru::Duration Timeout) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  static_cast<void>(Timeout);
+  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record, Duration)");
+}
+
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              std::string_view Company,
+                              ::agiru::RecordRef &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record)");
 }
 
 ::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment) {

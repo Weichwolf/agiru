@@ -1581,6 +1581,10 @@ public:
                            page->second.fields.contains(LowerKey(std::string(member.field)));
       return !control && DoorCalls(member.field);
     }
+    if (type == "Record" && !declared->subtype.empty()) {
+      return DoorCalls(member.field) &&
+             !PlatformFieldNamed(PlatformField{.table = declared->subtype, .field = member.field});
+    }
     return !DeclaresAnObject(*declared) && DoorCalls(member.field);
   }
 
@@ -1642,14 +1646,16 @@ public:
             continue;
           }
           const auto table = objects_.tables.find(LowerKey(declared.subtype));
-          return table == objects_.tables.end() ? nullptr : &table->second.fields;
+          return table == objects_.tables.end() || table->second.fields.empty()
+                     ? nullptr
+                     : &table->second.fields;
         }
       }
     }
     for (const al::VarDecl &declared : page_.variables) {
       if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") { continue; }
       const auto table = objects_.tables.find(LowerKey(declared.subtype));
-      if (table == objects_.tables.end()) { return nullptr; }
+      if (table == objects_.tables.end() || table->second.fields.empty()) { return nullptr; }
       return &table->second.fields;
     }
     return nullptr;
