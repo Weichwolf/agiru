@@ -4,6 +4,9 @@ Area:     gen, build
 Source:   the first full build over the grown slice, 2026-09-07
 Class:    silent-wrong-data
 
+**STANDING: not started. 846 paths are shared, 2 differ in content, and one of those is what
+keeps `PermissionSetBuffer` unbuildable.**
+
 # An include names the app it reaches into, and no file gets another app's header by accident
 
 **A generated file included another app's header and the compiler could not have said so.**

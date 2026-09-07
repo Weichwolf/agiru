@@ -4,6 +4,9 @@ Area:     gen
 Source:   the first full build over the grown slice, 2026-09-07
 Class:    silent-wrong-data
 
+**STANDING: nothing is fixed; both halves of the `PermissionSetBuffer` pair are out of
+`test/slice` (2026-09-07), which is why the tree is green. The fold is still not injective.**
+
 # A generated class name is unique across every app, and a name that folds onto another is refused
 
 **Four C++ class names are declared twice in `agiru::app::tables` and `agiru::app::codeunits`**, and

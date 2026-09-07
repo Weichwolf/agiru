@@ -4,6 +4,8 @@ Area:     gen
 Source:   nine sources refused by -Werror while the slice grew, 2026-09-07
 Class:    silent-wrong-data
 
+**STANDING: nothing is emitted differently yet; the nine sources are out of `test/slice`.**
+
 # A faithful translation of AL is one the C++ compiler accepts
 
 **AL permits three things that clang refuses under `-Werror`, and all three are FAITHFUL

@@ -4,6 +4,11 @@ Area:     gen, rt
 Source:   an A/B over the three object kinds, 2026-09-07
 Class:    activation
 
+**STANDING: the cheap half is done (2026-09-07).** `Reach` returns nothing for `Report`, `Query`
+and `XmlPort`, so such a variable reaches the ABSENT surface, which refuses every member --
+never a table that happens to share the name. What remains is the expensive half: the stub
+itself refusing, so it can carry the object's id and name instead of the absent placeholder.
+
 # A report, query and xmlport stub refuses every member, and only then does a variable find it
 
 **`Reach` resolves a variable in the index of the kind AL declares -- except for three kinds, where

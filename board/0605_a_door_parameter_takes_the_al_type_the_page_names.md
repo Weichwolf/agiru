@@ -4,6 +4,8 @@ Area:     net, rt
 Source:   three of the four tables that still stop the runner, 2026-09-07
 Class:    silent-wrong-data
 
+**STANDING: measured, not started. 433 parameters; it closes 2 of the 4 tables in board:0601.**
+
 # A door parameter takes the AL type its page names, not the standard spelling underneath it
 
 **433 door parameters are spelled `std::string_view` where the documentation says `Text`**, and that

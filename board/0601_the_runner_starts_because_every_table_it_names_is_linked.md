@@ -4,6 +4,11 @@ Area:     rt, gen, net
 Source:   the first start of `agiru run-tests` after the namespace round, 2026-09-07
 Class:    activation
 
+**STANDING: 9 of the 13 tables link (2026-09-07). What is left is 4 -- `ICPartner`,
+`WorkflowWebhookSubscription`, `ConfigSetup`, `OAuth20Setup` -- and two of them are board:0605's
+`std::string_view` parameter, one is an ambiguous interface overload, one a `dotnet::XmlNode`
+that will not bind to a reference. `PermissionSetBuffer` is board:0599 and out of the slice.**
+
 # `agiru run-tests` starts, because every table the slice names is linked
 
 **The tree compiles and links, and the runner still does not start.**
