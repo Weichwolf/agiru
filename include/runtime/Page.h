@@ -52,6 +52,12 @@ public:
   /// \throws Error until a report can be run (board:0034).
   TestAction Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
 
+  /// \brief AL `TestRequestPage.Schedule()` -- queues the report on the job queue.
+  /// \return The AL `TestAction` the page's own documentation names as the return
+  ///         (`testrequestpage-schedule-method.md`).
+  /// \throws Error until a report can be run (board:0034).
+  TestAction Schedule() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+
   /// \brief AL `TestRequestPage.GoToRecord(Record)` -- positions the request page on a record.
   /// \tparam Source The record's type.
   /// \param Record The record to stand on.
