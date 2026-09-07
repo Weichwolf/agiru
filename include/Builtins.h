@@ -84,7 +84,7 @@ std::string ApplicationPath();
 /// \param DotNet The AL `DotNet`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-template <typename T> ::agiru::Boolean CanLoadType(const T &DotNet) {
+template <typename T>::agiru::Boolean CanLoadType(const T &DotNet) {
   static_cast<void>(DotNet);
   throw ::agiru::Error("System.CanLoadType(DotNet) is declared and not implemented yet "
                        "(board:0035)");
@@ -143,8 +143,8 @@ void CodeCoverageRefresh();
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename A>
-  requires requires(const A &array) { array.Length(); }
-::agiru::Integer CompressArray(A &StringArray) {
+  requires requires(const A &array) { array.Length(); } ::agiru::Integer
+CompressArray(A &StringArray) {
   static_cast<void>(StringArray);
   throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
                        "(board:0035)");
@@ -159,7 +159,9 @@ template <typename A>
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename A, typename B>
   requires requires(const B &array) { array.Length(); }
-void CopyArray(A &NewArray, const B &Array, ::agiru::Integer Position,
+void CopyArray(A &NewArray,
+               const B &Array,
+               ::agiru::Integer Position,
                ::agiru::Integer Length = {}) {
   static_cast<void>(NewArray);
   static_cast<void>(Array);
@@ -285,6 +287,21 @@ std::string Encrypt(std::string_view PlainTextString);
 /// \brief AL `System.Evaluate(Any, Text, Integer)`. Evaluates a string representation of a value
 /// into its typical representation. The result is assigned to a variable.
 /// \tparam Any1 What AL handed it.
+/// \param Variable The AL `Any`.
+/// \param String The AL `Text`.
+/// \param Number The AL `Integer`.
+/// \return The AL `Boolean`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+template <typename Any1, typename T>
+  requires requires { typename T::IsAlRefusal; } ::agiru::Boolean
+Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
+  static_cast<void>(Variable);
+  static_cast<void>(Number);
+  return static_cast<::agiru::Boolean>(refusal);
+}
+
+/// \brief AL `Evaluate(Variable, String [, Number])`. Reads a value from its text form.
+/// \tparam Any1 The AL `Any`.
 /// \param Variable The AL `Any`.
 /// \param String The AL `Text`.
 /// \param Number The AL `Integer`.

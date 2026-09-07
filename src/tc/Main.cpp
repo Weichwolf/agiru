@@ -1573,7 +1573,8 @@ Counted Stubs(std::string &text,
     ++counted.types;
     text += "\nstruct ";
     text += type;
-    text += alObjects ? " : ::agiru::dotnet::AbsentObject {\n" : " {\n";
+    text +=
+        alObjects ? " : ::agiru::dotnet::AbsentObject {\n" : " : ::agiru::dotnet::AbsentType {\n";
     for (const std::string &member : named) {
       ++counted.members;
       text += "  ::agiru::dotnet::Refused ";
@@ -2025,8 +2026,9 @@ int Scan(const Job &job) {
                  silentProperties);
     std::println("          Every one belongs in `kTranslatedProperties` with a member behind it, "
                  "in");
-    std::println("          `kDroppedProperties` with a reason, or in `kPartlyTranslatedProperties` "
-                 "with what");
+    std::println(
+        "          `kDroppedProperties` with a reason, or in `kPartlyTranslatedProperties` "
+        "with what");
     std::println("          reaches the metadata and what does not.");
     return 1;
   }

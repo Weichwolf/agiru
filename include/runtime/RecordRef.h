@@ -354,6 +354,22 @@ public:
     throw Error("FieldRef.Relation() is declared and not implemented yet (board:0035)");
   }
 
+  /// \brief AL `FieldRef.SetFilter(...)` where the filter text is a member the runtime has not
+  ///        rebuilt.
+  /// \tparam T The refusal's type, which marks itself with `IsAlRefusal`.
+  /// \param refusal The refused member.
+  /// \throws Error always, naming the member -- which is what reading it does anywhere else.
+  ///
+  /// \warning IT IS AN OVERLOAD AND NOT A CONVERSION. A refusal deliberately does not become a
+  ///          `std::string_view`, because a `Code<N>` assignment then had two equally good
+  ///          conversions; so every door method that takes text takes a refusal beside it, one at
+  ///          a time as the tree asks for it (board:0035).
+  template <typename T>
+    requires requires { typename T::IsAlRefusal; }
+  void SetFilter(const T &refusal) const {
+    static_cast<void>(static_cast<std::int32_t>(refusal));
+  }
+
   /// \brief AL `FieldRef.SetFilter(Text, Any)`. Assigns a filter to a field that you specify.
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.

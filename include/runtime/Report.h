@@ -608,6 +608,87 @@ public:
                 ") has no translated report body yet (board:0034)");
   }
 
+  /// \brief AL `REPORT.DefaultLayout(Number, ...)` -- the built-in layout a report is rendered
+  /// with.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::DefaultLayout DefaultLayout(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.DefaultLayout(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.ExcelLayout(Number, ...)` -- a report's Excel layout.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Boolean ExcelLayout(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.ExcelLayout(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.RDLCLayout(Number, ...)` -- a report's RDLC layout.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Boolean RDLCLayout(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.RDLCLayout(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.WordLayout(Number, ...)` -- a report's Word layout.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Boolean WordLayout(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.WordLayout(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.WordXmlPart(Number, ...)` -- a report's Word XML part.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Text<0> WordXmlPart(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.WordXmlPart(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
+  /// \brief AL `REPORT.ValidateAndPrepareLayout(Number, ...)` -- a layout checked before it is
+  /// used.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param Number    The report's number.
+  /// \param arguments The rest, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- a report has no translated body yet (board:0034).
+  template <typename... Arguments>
+  static ::agiru::Boolean ValidateAndPrepareLayout(::agiru::Integer Number,
+                                                   Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Report.ValidateAndPrepareLayout(" + std::to_string(Number) +
+                ") has no translated report body yet (board:0034)");
+  }
+
   /// \brief AL `REPORT.SaveAsPdf(Number, ...)` and its siblings.
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param Number    The report's number.

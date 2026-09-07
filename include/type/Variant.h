@@ -223,6 +223,23 @@ public:
   /// \brief Copies. OUT OF LINE, with the destructor and the comparison: the `std::variant`
   ///        machinery behind them is instantiated once in `src/net/Variant.cpp` rather than in
   ///        every generated translation unit (measured 2026-09-06: ~1.1 s per file, board:0589).
+  /// \brief AL hands a record of a table this run does not have to a `Variant` parameter.
+  ///
+  /// \tparam T The stub's type, which marks itself with `IsAnAbsentType`.
+  /// \param absent The stub, read only to be discarded.
+  /// \throws Error always, the way every other path through a stub does.
+  ///
+  /// \warning IT REFUSES RATHER THAN CARRYING NOTHING. Without it the call was a hard compile
+  ///          error in a body that is otherwise translated, and a `Variant` holding an empty value
+  ///          would be the predecessor's silent nil (board:0032, board:0035).
+  template <typename T>
+    requires requires { typename T::IsAnAbsentType; }
+  explicit(false) Variant(const T &absent) {
+    static_cast<void>(absent);
+    throw Error("a record of a table this run does not have cannot travel in a Variant "
+                "(board:0032)");
+  }
+
   Variant(const Variant &o);
   /// \brief Moves.
   Variant(Variant &&o) noexcept;
@@ -320,7 +337,8 @@ public:
       { ::agiru::CodeunitTraits<C>::kId } -> std::convertible_to<CodeunitId>;
     }
   Variant(const C &unit)
-      : held_(CodeunitInVariant{.id = ::agiru::CodeunitTraits<C>::kId.Value(), .instance = &unit}) {}
+      : held_(CodeunitInVariant{.id = ::agiru::CodeunitTraits<C>::kId.Value(), .instance = &unit}) {
+  }
 
   /// \brief AL `Rec := Variant` -- reads as the record the Variant refers to.
   ///
@@ -444,9 +462,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsAction() const {
-    return false;
-  }
+  ::agiru::Boolean IsAction() const { return false; }
 
   /// \brief AL `Variant.IsAutomation()`. Indicates whether an AL variant contains an Automation
   /// variable.
@@ -454,15 +470,11 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsAutomation() const {
-    return false;
-  }
+  ::agiru::Boolean IsAutomation() const { return false; }
 
   /// \brief AL `Variant.IsBinary()`. Indicates whether an AL variant contains a Binary variable.
   /// \return The AL `Boolean`.
-  ::agiru::Boolean IsBinary() const {
-    return Is<Blob>();
-  }
+  ::agiru::Boolean IsBinary() const { return Is<Blob>(); }
 
   /// \brief AL `Variant.IsByte()`. Indicates whether an AL variant contains a Byte data type
   /// variable.
@@ -470,18 +482,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsByte() const {
-    return false;
-  }
+  ::agiru::Boolean IsByte() const { return false; }
 
   /// \brief AL `Variant.IsChar()`. Indicates whether an AL variant contains a Char variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsChar() const {
-    return false;
-  }
+  ::agiru::Boolean IsChar() const { return false; }
 
   /// \brief AL `Variant.IsClientType()`. Indicates whether an AL variant contains a ClientType
   /// variable.
@@ -489,25 +497,20 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsClientType() const {
-    return false;
-  }
+  ::agiru::Boolean IsClientType() const { return false; }
 
   /// \brief AL `Variant.IsCodeunit()`. Indicates whether an AL variant contains a Codeunit
   /// variable.
   /// \return The AL `Boolean`.
-  ::agiru::Boolean IsCodeunit() const {
-    return std::holds_alternative<CodeunitInVariant>(held_);
-  }
+  ::agiru::Boolean IsCodeunit() const { return std::holds_alternative<CodeunitInVariant>(held_); }
+
   /// \brief AL `Variant.IsDataClassification()`. Indicates whether an AL variant contains a
   /// DataClassification variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsDataClassification() const {
-    return false;
-  }
+  ::agiru::Boolean IsDataClassification() const { return false; }
 
   /// \brief AL `Variant.IsDataClassificationType()`. Indicates whether an AL variant contains a
   /// DataClassification variable.
@@ -515,9 +518,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsDataClassificationType() const {
-    return false;
-  }
+  ::agiru::Boolean IsDataClassificationType() const { return false; }
 
   /// \brief AL `Variant.IsDefaultLayout()`. Indicates whether an AL variant contains a
   /// DefaultLayout variable.
@@ -525,9 +526,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsDefaultLayout() const {
-    return false;
-  }
+  ::agiru::Boolean IsDefaultLayout() const { return false; }
 
   /// \brief AL `Variant.IsDictionary()`. Indicates whether an AL variant contains a Dictionary
   /// variable.
@@ -535,18 +534,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsDictionary() const {
-    return false;
-  }
+  ::agiru::Boolean IsDictionary() const { return false; }
 
   /// \brief AL `Variant.IsDotNet()`. Indicates whether an AL variant contains a DotNet variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsDotNet() const {
-    return false;
-  }
+  ::agiru::Boolean IsDotNet() const { return false; }
 
   /// \brief AL `Variant.IsExecutionMode()`. Indicates whether an AL variant contains an
   /// ExecutionMode variable.
@@ -554,9 +549,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsExecutionMode() const {
-    return false;
-  }
+  ::agiru::Boolean IsExecutionMode() const { return false; }
 
   /// \brief AL `Variant.IsFieldRef()`. Indicates whether an AL variant contains a FieldRef
   /// variable.
@@ -564,18 +557,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsFieldRef() const {
-    return false;
-  }
+  ::agiru::Boolean IsFieldRef() const { return false; }
 
   /// \brief AL `Variant.IsFile()`. Indicates whether an AL variant contains a File variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsFile() const {
-    return false;
-  }
+  ::agiru::Boolean IsFile() const { return false; }
 
   /// \brief AL `Variant.IsFilterPageBuilder()`. Indicates whether an AL variant contains a
   /// FilterPageBuilder variable.
@@ -583,9 +572,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsFilterPageBuilder() const {
-    return false;
-  }
+  ::agiru::Boolean IsFilterPageBuilder() const { return false; }
 
   /// \brief AL `Variant.IsInStream()`. Indicates whether an AL variant contains an InStream
   /// variable.
@@ -593,9 +580,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsInStream() const {
-    return false;
-  }
+  ::agiru::Boolean IsInStream() const { return false; }
 
   /// \brief AL `Variant.IsJsonArray()`. Indicates whether an AL variant contains a JsonArray
   /// variable.
@@ -603,9 +588,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsJsonArray() const {
-    return false;
-  }
+  ::agiru::Boolean IsJsonArray() const { return false; }
 
   /// \brief AL `Variant.IsJsonObject()`. Indicates whether an AL variant contains a JsonObject
   /// variable.
@@ -613,9 +596,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsJsonObject() const {
-    return false;
-  }
+  ::agiru::Boolean IsJsonObject() const { return false; }
 
   /// \brief AL `Variant.IsJsonToken()`. Indicates whether an AL variant contains a JsonToken
   /// variable.
@@ -623,9 +604,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsJsonToken() const {
-    return false;
-  }
+  ::agiru::Boolean IsJsonToken() const { return false; }
 
   /// \brief AL `Variant.IsJsonValue()`. Indicates whether an AL variant contains a JsonValue
   /// variable.
@@ -633,18 +612,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsJsonValue() const {
-    return false;
-  }
+  ::agiru::Boolean IsJsonValue() const { return false; }
 
   /// \brief AL `Variant.IsList()`. Indicates whether an AL variant contains a List variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsList() const {
-    return false;
-  }
+  ::agiru::Boolean IsList() const { return false; }
 
   /// \brief AL `Variant.IsNotification()`. Indicates whether an AL variant contains a Notification
   /// variable.
@@ -652,9 +627,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsNotification() const {
-    return false;
-  }
+  ::agiru::Boolean IsNotification() const { return false; }
 
   /// \brief AL `Variant.IsObjectType()`. Indicates whether an AL variant contains an ObjectType
   /// variable.
@@ -662,9 +635,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsObjectType() const {
-    return false;
-  }
+  ::agiru::Boolean IsObjectType() const { return false; }
 
   /// \brief AL `Variant.IsOutStream()`. Indicates whether an AL variant contains an OutStream
   /// variable.
@@ -672,9 +643,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsOutStream() const {
-    return false;
-  }
+  ::agiru::Boolean IsOutStream() const { return false; }
 
   /// \brief AL `Variant.IsPromptMode()`. Indicates whether an AL variant contains a PromptMode
   /// variable.
@@ -682,9 +651,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsPromptMode() const {
-    return false;
-  }
+  ::agiru::Boolean IsPromptMode() const { return false; }
 
   /// \brief AL `Variant.IsRecord()`. Indicates whether an AL variant contains a Record variable.
   /// \return The AL `Boolean`.
@@ -693,9 +660,7 @@ public:
   /// \brief AL `Variant.IsRecordRef()`. Indicates whether an AL variant contains a RecordRef
   /// variable.
   /// \return The AL `Boolean`.
-  ::agiru::Boolean IsRecordRef() const {
-    return Is<RecordRefInVariant>();
-  }
+  ::agiru::Boolean IsRecordRef() const { return Is<RecordRefInVariant>(); }
 
   /// \brief AL `Variant.IsReportFormat()`. Indicates whether an AL variant contains a ReportFormat
   /// variable.
@@ -703,9 +668,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsReportFormat() const {
-    return false;
-  }
+  ::agiru::Boolean IsReportFormat() const { return false; }
 
   /// \brief AL `Variant.IsSecurityFiltering()`. Indicates whether an AL variant contains a
   /// SecurityFiltering variable.
@@ -713,9 +676,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsSecurityFiltering() const {
-    return false;
-  }
+  ::agiru::Boolean IsSecurityFiltering() const { return false; }
 
   /// \brief AL `Variant.IsTableConnectionType()`. Indicates whether an AL variant contains a
   /// TableConnectionType variable.
@@ -723,9 +684,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTableConnectionType() const {
-    return false;
-  }
+  ::agiru::Boolean IsTableConnectionType() const { return false; }
 
   /// \brief AL `Variant.IsTestPermissions()`. Indicates whether an AL variant contains a
   /// TestPermissions variable.
@@ -733,9 +692,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTestPermissions() const {
-    return false;
-  }
+  ::agiru::Boolean IsTestPermissions() const { return false; }
 
   /// \brief AL `Variant.IsTextBuilder()`. Indicates whether an AL variant contains a TextBuilder
   /// variable.
@@ -743,9 +700,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTextBuilder() const {
-    return false;
-  }
+  ::agiru::Boolean IsTextBuilder() const { return false; }
 
   /// \brief AL `Variant.IsTextConstant()`. Indicates whether an AL variant contains a Text
   /// constant.
@@ -753,9 +708,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTextConstant() const {
-    return false;
-  }
+  ::agiru::Boolean IsTextConstant() const { return false; }
 
   /// \brief AL `Variant.IsTextEncoding()`. Indicates whether an AL variant contains a TextEncoding
   /// variable.
@@ -763,9 +716,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTextEncoding() const {
-    return false;
-  }
+  ::agiru::Boolean IsTextEncoding() const { return false; }
 
   /// \brief AL `Variant.IsTransactionType()`. Indicates whether an AL variant contains a
   /// TransactionType variable.
@@ -773,9 +724,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsTransactionType() const {
-    return false;
-  }
+  ::agiru::Boolean IsTransactionType() const { return false; }
 
   /// \brief AL `Variant.IsWideChar()`. Indicates whether an AL variant contains a WideChar
   /// variable.
@@ -783,9 +732,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsWideChar() const {
-    return false;
-  }
+  ::agiru::Boolean IsWideChar() const { return false; }
 
   /// \brief AL `Variant.IsXmlAttribute()`. Indicates whether an AL variant contains an XmlAttribute
   /// variable.
@@ -793,9 +740,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlAttribute() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlAttribute() const { return false; }
 
   /// \brief AL `Variant.IsXmlAttributeCollection()`. Indicates whether an AL variant contains an
   /// XmlAttributeCollection variable.
@@ -803,9 +748,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlAttributeCollection() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlAttributeCollection() const { return false; }
 
   /// \brief AL `Variant.IsXmlCData()`. Indicates whether an AL variant contains an XmlCData
   /// variable.
@@ -813,9 +756,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlCData() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlCData() const { return false; }
 
   /// \brief AL `Variant.IsXmlComment()`. Indicates whether an AL variant contains an XmlComment
   /// variable.
@@ -823,9 +764,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlComment() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlComment() const { return false; }
 
   /// \brief AL `Variant.IsXmlDeclaration()`. Indicates whether an AL variant contains an
   /// XmlDeclaration variable.
@@ -833,9 +772,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDeclaration() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlDeclaration() const { return false; }
 
   /// \brief AL `Variant.IsXmlDocument()`. Indicates whether an AL variant contains an XmlDocument
   /// variable.
@@ -843,9 +780,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDocument() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlDocument() const { return false; }
 
   /// \brief AL `Variant.IsXmlDocumentType()`. Indicates whether an AL variant contains an
   /// XmlDocumentType variable.
@@ -853,9 +788,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDocumentType() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlDocumentType() const { return false; }
 
   /// \brief AL `Variant.IsXmlElement()`. Indicates whether an AL variant contains an XmlElement
   /// variable.
@@ -863,9 +796,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlElement() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlElement() const { return false; }
 
   /// \brief AL `Variant.IsXmlNamespaceManager()`. Indicates whether an AL variant contains an
   /// XmlNamespaceManager variable.
@@ -873,9 +804,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNamespaceManager() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlNamespaceManager() const { return false; }
 
   /// \brief AL `Variant.IsXmlNameTable()`. Indicates whether an AL variant contains an XmlNameTable
   /// variable.
@@ -883,18 +812,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNameTable() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlNameTable() const { return false; }
 
   /// \brief AL `Variant.IsXmlNode()`. Indicates whether an AL variant contains an XmlNode variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNode() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlNode() const { return false; }
 
   /// \brief AL `Variant.IsXmlNodeList()`. Indicates whether an AL variant contains an XmlNodeList
   /// variable.
@@ -902,9 +827,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNodeList() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlNodeList() const { return false; }
 
   /// \brief AL `Variant.IsXmlProcessingInstruction()`. Indicates whether an AL variant contains an
   /// XmlProcessingInstruction variable.
@@ -912,9 +835,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlProcessingInstruction() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlProcessingInstruction() const { return false; }
 
   /// \brief AL `Variant.IsXmlReadOptions()`. Indicates whether an AL variant contains an
   /// XmlReadOptions variable.
@@ -922,18 +843,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlReadOptions() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlReadOptions() const { return false; }
 
   /// \brief AL `Variant.IsXmlText()`. Indicates whether an AL variant contains an XmlText variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlText() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlText() const { return false; }
 
   /// \brief AL `Variant.IsXmlWriteOptions()`. Indicates whether an AL variant contains an
   /// XmlWriteOptions variable.
@@ -941,9 +858,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlWriteOptions() const {
-    return false;
-  }
+  ::agiru::Boolean IsXmlWriteOptions() const { return false; }
 
   /// \brief The value, if the Variant holds that type.
   ///
