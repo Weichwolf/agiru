@@ -9,6 +9,7 @@
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
+#include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
@@ -223,6 +224,36 @@ CopyStream(Out &OutStream, In &InStream, ::agiru::Integer BytesToRead = {}) {
   static_cast<void>(BytesToRead);
   throw ::agiru::Error("System.CopyStream reached a .NET stream this run does not have "
                        "(board:0609)");
+}
+
+/// \brief AL `System.Abs(Number)`. The absolute value of a number.
+/// \param Number The input value.
+/// \return Never.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note IT MOVED HERE WITH ITS DURATION SIBLING AND NOT BEFORE. `gen_builtins.py` skips a
+///       builtin whose name another door header declares, so declaring only the Duration form
+///       took the documented `Abs(Decimal)` out of the generated door entirely. A name is
+///       written WHOLE or not at all.
+::agiru::Decimal Abs(::agiru::Decimal Number);
+
+/// \brief AL `System.Abs(Number)` where the number is a `Duration`.
+/// \param Number The duration.
+/// \return Its magnitude, as a duration.
+///
+/// \note AL HANDS A DURATION TO A DECIMAL PARAMETER, because a Duration IS a number of
+///       milliseconds there: `BackupManagement` writes `if Abs(Time - WindowsUpdateTime) > 1000`.
+///       The implicit conversion that would carry it was taken back once, measured -- it made
+///       every mixed arithmetic ambiguous -- so the ONE builtin that needs it says so by name and
+///       answers in the type it was handed.
+///
+/// \warning IT TAKES THE EXACT TYPE. A plain `Abs(Duration)` beside the documented
+///          `Abs(Decimal)` makes `Abs(SomeInteger)` ambiguous -- an `Integer` reaches both in one
+///          user-defined conversion -- which is 31 call sites in the slice (measured 2026-09-07).
+template <typename T>
+  requires std::same_as<T, ::agiru::Duration>
+[[nodiscard]] constexpr ::agiru::Duration Abs(T Number) {
+  return Number.Milliseconds() < 0 ? -Number : Number;
 }
 
 /// \brief AL `System.Time()` -- the time of day, from the session's clock.

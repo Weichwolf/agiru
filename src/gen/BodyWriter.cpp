@@ -259,11 +259,21 @@ private:
               Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
         break;
       }
-      case al::StmtKind::ForEach:
-        out = Pad(indent) + "for ([[maybe_unused]] auto &" + Expression(statement.expression, 0) +
-              " : " + Expression(statement.labels.front(), 0) + ") {\n" +
-              Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+      case al::StmtKind::ForEach: {
+        const std::string element = Expression(statement.expression, 0);
+        const std::string over = Expression(statement.labels.front(), 0);
+        const std::string enumeration = scope_.DeclaredEnum(statement.expression.text);
+        if (enumeration.empty()) {
+          out = Pad(indent) + "for ([[maybe_unused]] auto &" + element + " : " + over + ") {\n" +
+                Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+          break;
+        }
+        const std::string held = "Element_Block";
+        out = Pad(indent) + "for (auto &&" + held + " : " + over + ") {\n" + Pad(indent + 2) +
+              "[[maybe_unused]] ::agiru::Enum<" + enumeration + "> " + element + "{" + held +
+              "};\n" + Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
         break;
+      }
       case al::StmtKind::Case: out = CaseChain(statement, indent); break;
       case al::StmtKind::CaseBranch:
         throw std::runtime_error("a case branch stands only inside a case");
@@ -1335,6 +1345,16 @@ public:
            });
   }
 
+  [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
+    for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
+      if (where == nullptr || TypeName(where->type) != "Enum" || where->subtype.empty()) {
+        continue;
+      }
+      return NamedEnum(objects_, where->subtype);
+    }
+    return {};
+  }
+
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
     const al::FieldDecl *field = FieldNamed(table_, name);
     if (field == nullptr) {
@@ -1674,6 +1694,14 @@ public:
       if (found != table->second.end()) { return found->second; }
     }
     return {};
+  }
+
+  [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
+    const al::VarDecl *where = DeclarationOf(variable);
+    if (where == nullptr || TypeName(where->type) != "Enum" || where->subtype.empty()) {
+      return {};
+    }
+    return NamedEnum(objects_, where->subtype);
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {

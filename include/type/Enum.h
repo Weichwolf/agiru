@@ -106,6 +106,32 @@ public:
   /// \brief The zero ordinal.
   constexpr Enum() = default;
 
+  /// \brief Holds an ordinal, where AL converts an Integer into a declared enum.
+  ///
+  /// \tparam T The ordinal's type, which must BE `Integer` and not merely reach it.
+  /// \param ordinal The ordinal.
+  ///
+  /// \note AL CONVERTS AN INTEGER INTO AN ENUM WHERE AN ENUM IS DECLARED, because an AL enum IS
+  ///       its ordinal. `IDAutomation1DProvider` walks `Enum::"Barcode Symbology".Ordinals()` --
+  ///       documented as `List of [Integer]` -- into a variable declared
+  ///       `Enum "Barcode Symbology"`, with no cast, because AL needs none.
+  ///
+  /// \warning IT IS `explicit`, AND THE GENERATOR SPELLS THE CONVERSION AT THE ONE PLACE AL
+  ///          PERFORMS IT -- the `foreach` whose variable is declared as an enum. An implicit one
+  ///          would be a catch-all: `::agiru::Integer` is `std::int32_t`, so every integer
+  ///          expression in the tree would reach every enum parameter in ONE user-defined
+  ///          conversion (board:0611).
+  ///
+  /// \warning IT TAKES THE EXACT TYPE, which is what keeps it out of the way of the option
+  ///          constructor above. `OrdinalValue` converts to `std::int32_t` on purpose
+  ///          (`option-data-type.md`: "You can convert option data types to integers"), so a plain
+  ///          `explicit Enum(std::int32_t)` would make `Enum<E>{SomeOption}` ambiguous against the
+  ///          `derived_from<OrdinalValue>` constructor. Deducing the type and requiring it to BE
+  ///          `Integer` takes the ordinal and nothing that merely reads as one.
+  template <typename T>
+    requires std::same_as<T, ::agiru::Integer>
+  constexpr explicit Enum(T ordinal) : OrdinalValue(ordinal) {}
+
   /// \brief AL `for Value := A to B do` over an enumeration steps by ordinal.
   /// \return This, one ordinal further.
   constexpr Enum &operator++() {

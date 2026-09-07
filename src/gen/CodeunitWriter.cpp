@@ -1051,6 +1051,15 @@ public:
     return Declaration(name) != nullptr;
   }
 
+  [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
+    const al::VarDecl *where = Declaration(variable);
+    if (where == nullptr || TypeName(where->type) != "Enum" || where->subtype.empty()) {
+      return {};
+    }
+    const auto found = objects_.enums.find(LowerKey(where->subtype));
+    return found == objects_.enums.end() ? std::string{} : found->second.identifier;
+  }
+
   [[nodiscard]] std::string EnumMember(std::string_view enumeration,
                                        std::string_view member) const override {
     return DeclaredEnumMember(objects_, enumeration, member);

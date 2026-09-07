@@ -40,11 +40,6 @@ namespace agiru {
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 
-::agiru::Decimal Abs(::agiru::Decimal Number) {
-  static_cast<void>(Number);
-  RefuseDoor("System.Abs(Decimal)");
-}
-
 std::string ApplicationPath() {
   RefuseDoor("System.ApplicationPath()");
 }

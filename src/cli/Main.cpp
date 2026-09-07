@@ -110,11 +110,12 @@ int RunTests(const Options &options) {
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
   const agiru::Session session(runner.Dsn());
   agiru::ProvisionInstalled(session.Database());
-  const agiru::TestRun run = agiru::RunRegisteredTests(options.codeunit);
-  for (const agiru::TestResult &result : run.results) {
-    if (result.passed) { continue; }
-    std::println("FAIL  {}  {}\n      {}", result.codeunit, result.method, result.error);
-  }
+  const agiru::TestRun run =
+      agiru::RunRegisteredTests(options.codeunit, [](const agiru::TestResult &result) {
+        if (result.passed) { return; }
+        std::println("FAIL  {}  {}\n      {}", result.codeunit, result.method, result.error);
+        std::fflush(stdout);
+      });
   std::println("{} of {} passed", run.passed, run.passed + run.failed);
   return run.failed == 0 ? 0 : 1;
 }

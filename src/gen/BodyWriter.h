@@ -116,6 +116,11 @@ public:
     static_cast<void>(name);
     return false;
   }
+
+  [[nodiscard]] virtual std::string DeclaredEnum(std::string_view variable) const {
+    static_cast<void>(variable);
+    return {};
+  }
 };
 
 std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &body, int indent);

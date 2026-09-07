@@ -225,6 +225,29 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
                                                  UNITY_BUILD_BATCH_SIZE 32)
     target_compile_options(agiru_slice PRIVATE ${AGIRU_GENERATED_FLAGS})
     target_link_libraries(agiru PRIVATE agiru_slice)
+
+    # AN AL PROCEDURE THE SLICE CALLS AND NO LINKED SOURCE DEFINES RAISES, rather than killing the
+    # process. Those calls leave undefined FUNCTION symbols, which the loader binds lazily -- and a
+    # lazy binding failure is not an exception: the loader writes `symbol lookup error` and calls
+    # `_exit`, so `agiru run-tests` used to end at the FIRST test that reached one. This writes a
+    # definition for each of them that throws, naming the procedure, so the test fails and the next
+    # one runs (board:0612).
+    #
+    # IT IS A SECOND PASS BY CONSTRUCTION: the symbols are only known once the slice has linked, so
+    # the file is generated FROM `libagiru_slice.so` and compiled into `agiru` afterwards.
+    # `ENABLE_EXPORTS` is what puts the definitions where the shared object's lazy lookup finds
+    # them.
+    add_custom_command(
+      OUTPUT "${CMAKE_BINARY_DIR}/unlinked.cpp"
+      COMMAND "${CMAKE_COMMAND}" -E env python3 "${CMAKE_SOURCE_DIR}/scripts/unlinked.py"
+              "${CMAKE_BINARY_DIR}/unlinked.cpp" "$<TARGET_FILE:agiru_slice>"
+              "$<TARGET_FILE:agiru_rt>" "$<TARGET_FILE:agiru_net>" "$<TARGET_FILE:agiru_db>"
+      DEPENDS agiru_slice agiru_rt agiru_net agiru_db "${CMAKE_SOURCE_DIR}/scripts/unlinked.py"
+      COMMENT "the AL procedures the slice calls and no linked source defines")
+    target_sources(agiru PRIVATE "${CMAKE_BINARY_DIR}/unlinked.cpp")
+    set_source_files_properties("${CMAKE_BINARY_DIR}/unlinked.cpp" PROPERTIES
+      COMPILE_OPTIONS "${AGIRU_GENERATED_FLAGS}" SKIP_PRECOMPILE_HEADERS ON)
+    set_target_properties(agiru PROPERTIES ENABLE_EXPORTS ON)
   endif()
 endif()
 

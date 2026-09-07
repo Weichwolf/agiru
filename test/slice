@@ -287,6 +287,7 @@ base/cash_flow/forecast/codeunit/CashFlowForecastHandler.cpp
 base/cash_flow/forecast/codeunit/CashFlowForecastUpdate.cpp
 base/cash_flow/forecast/codeunit/CashFlowManagement.cpp
 base/cash_flow/forecast/codeunit/ServCashFlowManagement.cpp
+base/cash_flow/forecast/codeunit/CashFlowChartMgt.cpp
 base/cash_flow/forecast/page/CashFlowAvailabilityLines.cpp
 base/cash_flow/forecast/page/CashFlowForecastCard.cpp
 base/cash_flow/forecast/page/CashFlowForecastEntries.cpp
@@ -330,6 +331,8 @@ base/core/codeunit/O365SalesInvoicePayment.cpp
 base/core/codeunit/O365SetupEmail.cpp
 base/core/codeunit/OfficeAddInSampleEmails.cpp
 base/core/codeunit/OppBarChartDrillDown.cpp
+base/core/codeunit/DataGeoNotification.cpp
+base/core/codeunit/O365HTMLTemplMgt.cpp
 base/core/page/AdditionalCustomerTerms.cpp
 base/core/page/AdditionalCustTermsSetup.cpp
 base/core/page/ExcelTemplateCompanyInfo.cpp
@@ -1759,6 +1762,7 @@ base/integration/entity/table/SalesQuoteEntityBuffer.cpp
 base/integration/entity/table/TaxAreaBuffer.cpp
 base/integration/entity/table/TaxGroupBuffer.cpp
 base/integration/entity/table/TaxRateBuffer.cpp
+base/integration/entity/table/PictureEntity.cpp
 base/integration/graph/codeunit/DisableAggregateTableUpdate.cpp
 base/integration/graph/codeunit/GraphCollectionMgtItem.cpp
 base/integration/graph/codeunit/GraphConnectionSetup.cpp
@@ -3115,6 +3119,8 @@ base/projects/time_sheet/page/TimeSheetSetupResources.cpp
 base/projects/time_sheet/page/TimeSheetStatusFactBox.cpp
 base/projects/time_sheet/page/TimeSheetUserSetupSubform.cpp
 base/projects/time_sheet/page/UserTimeRegisters.cpp
+base/projects/time_sheet/page/TimeSheetArchiveSubform.cpp
+base/projects/time_sheet/page/TimeSheetLinesSubform.cpp
 base/projects/time_sheet/table/MyTimeSheets.cpp
 base/projects/time_sheet/table/TimeSheetChartSetup.cpp
 base/projects/time_sheet/table/TimeSheetCmtLineArchive.cpp
@@ -3709,6 +3715,7 @@ base/sales/reminder/codeunit/ReminderSend.cpp
 base/sales/reminder/codeunit/SendReminderAction.cpp
 base/sales/reminder/codeunit/SendReminder.cpp
 base/sales/reminder/codeunit/SendReminderEventHandler.cpp
+base/sales/reminder/codeunit/SendReminderActionJob.cpp
 base/sales/reminder/enum/ReminderAction.cpp
 base/sales/reminder/page/AdditionalFeeSetup.cpp
 base/sales/reminder/page/CreateRemindersSetup.cpp
@@ -4286,6 +4293,7 @@ base/system/environment/configuration/codeunit/NotificationLifecycleMgt.cpp
 base/system/environment/configuration/codeunit/NotificationManagement.cpp
 base/system/environment/configuration/codeunit/ServNotificationMgt.cpp
 base/system/environment/configuration/codeunit/WebserviceNotificationMgt.cpp
+base/system/environment/configuration/codeunit/AADApplicationSetup.cpp
 base/system/environment/configuration/page/ApplicationArea.cpp
 base/system/environment/configuration/page/CopyProfile.cpp
 base/system/environment/configuration/page/CreditLimitNotification.cpp
@@ -4523,6 +4531,7 @@ base/system/security/access_control/codeunit/IdentityManagement.cpp
 base/system/security/access_control/codeunit/PermissionPagesMgt.cpp
 base/system/security/access_control/codeunit/PermissionsOverviewHandler.cpp
 base/system/security/access_control/codeunit/UpgradeUserGroups.cpp
+base/system/security/access_control/codeunit/PermissionManager.cpp
 base/system/security/access_control/page/ChangedPermissionSetList.cpp
 base/system/security/access_control/page/EffectivePermissionsBySet.cpp
 base/system/security/access_control/page/EffectivePermissions.cpp
@@ -4560,6 +4569,7 @@ base/system/security/encryption/table/IsolatedCertificate.cpp
 base/system/security/user/codeunit/UserAccessUpdate.cpp
 base/system/security/user/codeunit/UsersCreateSuperUser.cpp
 base/system/security/user/codeunit/UserSetupManagement.cpp
+base/system/security/user/codeunit/UserManagement.cpp
 base/system/security/user/page/UserACSSetup.cpp
 base/system/security/user/page/UserPermissionSets.cpp
 base/system/security/user/page/UserSecurityStatusList.cpp
@@ -5212,6 +5222,8 @@ system/system/email/codeunit/ViewAllEmailsPolicy.cpp
 system/system/email/codeunit/ViewOnlyOwnEmailsPolicy.cpp
 system/system/email/codeunit/ViewIfAllRelatedRecords.cpp
 system/system/email/codeunit/ViewIfAnyRelatedRecords.cpp
+system/system/email/codeunit/EmailAccountImpl.cpp
+system/system/email/codeunit/EmailViewPolicy.cpp
 system/system/email/enum/EmailConnector.cpp
 system/system/email/enum/EmailViewPolicy.cpp
 system/system/email/page/EmailAccountFolders.cpp
@@ -5258,6 +5270,7 @@ system/system/environment/codeunit/EnvironmentInformationImpl.cpp
 system/system/environment/codeunit/TenantInformation.cpp
 system/system/environment/codeunit/TenantLicenseState.cpp
 system/system/environment/codeunit/TenantLicenseStateImpl.cpp
+system/system/environment/codeunit/EnvInfNotificationImpl.cpp
 system/system/environment/configuration/codeunit/AdvancedSettings.cpp
 system/system/environment/configuration/codeunit/AdvancedSettingsImpl.cpp
 system/system/environment/configuration/codeunit/AssistedSetupInstallation.cpp
@@ -5350,6 +5363,7 @@ system/system/integration/sharepoint/codeunit/SharePointClientCredentials.cpp
 system/system/integration/sharepoint/codeunit/SharePointDiagnostics.cpp
 system/system/integration/sharepoint/codeunit/SharePointGraphParser.cpp
 system/system/integration/sharepoint/codeunit/SharePointRequestHelper.cpp
+system/system/integration/sharepoint/codeunit/SharePointHttpContent.cpp
 system/system/integration/sharepoint/table/SharePointFile.cpp
 system/system/integration/sharepoint/table/SharePointFolder.cpp
 system/system/integration/sharepoint/table/SharePointGraphDrive.cpp
@@ -5380,6 +5394,7 @@ system/system/integration/word/page/WordTemplatesRelatedPart.cpp
 system/system/integration/word/page/WordTemplatesTableLookup.cpp
 system/system/integration/word/page/WordTemplatesTablesPart.cpp
 system/system/integration/word/page/WordTemplateToTextWizard.cpp
+system/system/integration/word/page/WordTemplatesFieldSelection.cpp
 system/system/integration/word/table/WordTemplate.cpp
 system/system/integration/word/table/WordTemplateCustomField.cpp
 system/system/integration/word/table/WordTemplateField.cpp
@@ -5419,6 +5434,7 @@ system/system/security/access_control/codeunit/PermissionSetCopyImpl.cpp
 system/system/security/access_control/codeunit/PermissionsOverview.cpp
 system/system/security/access_control/codeunit/SecurityGroup.cpp
 system/system/security/access_control/codeunit/SecurityGroupUpgrade.cpp
+system/system/security/access_control/codeunit/PermissionSetRelation.cpp
 system/system/security/access_control/page/CopySecurityGroup.cpp
 system/system/security/access_control/page/ExpandedPermissions.cpp
 system/system/security/access_control/page/ExpandedPermissionsFactbox.cpp
@@ -5471,6 +5487,8 @@ system/system/security/encryption/codeunit/X509Certificate2.cpp
 system/system/security/encryption/codeunit/RSACryptoServiceProviderImpl.cpp
 system/system/security/encryption/codeunit/DSACryptoServiceProviderImpl.cpp
 system/system/security/encryption/codeunit/RSAImpl.cpp
+system/system/security/encryption/codeunit/CertificateRequestImpl.cpp
+system/system/security/encryption/codeunit/DESCryptoServiceProviderImpl.cpp
 system/system/security/encryption/enum/SignatureAlgorithm.cpp
 system/system/security/encryption/enum/SymmetricAlgorithm.cpp
 system/system/security/encryption/page/DataEncryptionManagement.cpp
@@ -5524,6 +5542,7 @@ system/system/text/codeunit/IDA2DMaxiCodeEncoder.cpp
 system/system/text/codeunit/IDA2DPDF417Encoder.cpp
 system/system/text/codeunit/IDA2DQRCodeEncoder.cpp
 system/system/text/codeunit/MagicFunction.cpp
+system/system/text/codeunit/IDAutomation1DProvider.cpp
 system/system/text/enum/BarcodeFontProvider.cpp
 system/system/text/json/codeunit/Json.cpp
 system/system/text/json/codeunit/JsonImpl.cpp
@@ -5659,12 +5678,15 @@ system_test_library/system/test_libraries/visualization/codeunit/CuesAndKPIsTest
 system_test_library/system/test_libraries/visualization/table/CuesAndKPIsTest1Cue.cpp
 system_test_library/system/test_libraries/visualization/table/CuesAndKPIsTest2Cue.cpp
 test_runner/system/test_tools/code_coverage/codeunit/ALCodeCoverageMgt.cpp
+test_runner/system/test_tools/code_coverage/codeunit/ALCodeCoverageSubscribers.cpp
 test_runner/system/test_tools/code_coverage/table/ALCodeCoverageMap.cpp
 test_runner/system/test_tools/code_coverage/table/TestCodeCoverageResult.cpp
 test_runner/system/test_tools/test_runner/codeunit/ExpandDataDrivenTests.cpp
 test_runner/system/test_tools/test_runner/codeunit/TestInputsManagement.cpp
 test_runner/system/test_tools/test_runner/codeunit/TestOutputJson.cpp
 test_runner/system/test_tools/test_runner/codeunit/TestProfileManagement.cpp
+test_runner/system/test_tools/test_runner/codeunit/TestOutput.cpp
+test_runner/system/test_tools/test_runner/codeunit/TestRunnerMgt.cpp
 test_runner/system/test_tools/test_runner/page/ALTestSuites.cpp
 test_runner/system/test_tools/test_runner/page/CommandLineTestTool.cpp
 test_runner/system/test_tools/test_runner/page/SelectTestRunner.cpp
@@ -6872,6 +6894,8 @@ base/system/environment/configuration/page/AADApplicationList.cpp
 base/system/environment/configuration/page/ReportResGovernSettings.cpp
 base/system/io/codeunit/ImportXMLFileToDataExch.cpp
 base/system/io/codeunit/XMLBufferReader.cpp
+base/system/io/codeunit/JsonTextReaderWriter.cpp
+base/system/io/codeunit/MemoryMappedFile.cpp
 base/system/io/table/ConfigSetup.cpp
 base/system/security/encryption/codeunit/CertificateManagement.cpp
 base/system/tooling/page/NewPage.cpp
@@ -6879,6 +6903,7 @@ base/system/tooling/page/PageFieldsSelectionList.cpp
 base/system/utilities/codeunit/MediaResourcesMgt.cpp
 base/upgrade/codeunit/UpgradeCompositeReportParts.cpp
 base/utilities/codeunit/PageManagement.cpp
+base/utilities/codeunit/DataClassNotificationMgt.cpp
 base/warehouse/activity/history/page/RegisteredWhseMovements.cpp
 base/warehouse/activity/history/page/RegisteredWhsePicks.cpp
 base/warehouse/activity/history/page/RegisteredWhsePutAways.cpp
@@ -6908,6 +6933,7 @@ tests/core/codeunit/ERMCostAccountingCodeunit.cpp
 tests/core/codeunit/LibraryDocumentApprovals.cpp
 tests/core/codeunit/ProfileImportExportTest.cpp
 tests/core/codeunit/WFPartnerExtensionTests.cpp
+tests/core/codeunit/BackupManagement.cpp
 tests/service/test/codeunit/ServicePriceManagement.cpp
 base/system/environment/configuration/table/AADApplication.cpp
 base/warehouse/adcs/table/ADCSUser.cpp
@@ -6918,3 +6944,4 @@ test_runner/system/test_tools/test_runner/table/ALTestSuite.cpp
 tests/core/table/AsmAvailabilityTestBuffer.cpp
 base/system/automation/table/WorkflowWebhookSubscription.cpp
 base/system/security/authentication/table/OAuth20Setup.cpp
+base/system/text/page/TableFilter.cpp

@@ -48,13 +48,6 @@ namespace agiru {
 
 [[noreturn]] void RefuseDoor(std::string_view what);
 
-/// \brief AL `System.Abs(Decimal)`. Calculates the absolute value of a number (Decimal, Integer or
-/// BigInteger). ABS always returns a positive numeric value or zero.
-/// \param Number The AL `Decimal`.
-/// \return The AL `Decimal`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Decimal Abs(::agiru::Decimal Number);
-
 /// \brief AL `System.ApplicationPath()`. Returns the path of the directory where the executable
 /// file for the product is installed.
 /// \return The AL `Text`.

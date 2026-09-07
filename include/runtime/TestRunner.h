@@ -175,6 +175,22 @@ struct TestRun {
 ///          separates a test codeunit from a normal one on exactly this.
 [[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit);
 
+/// \brief What a run reports about one procedure the moment it finishes.
+using TestReport = void (*)(const TestResult &);
+
+/// \brief Runs the registered `[Test]` procedures, reporting each one as it finishes.
+///
+/// \param codeunit The AL name of one test codeunit, or empty for all of them.
+/// \param report   Called after every procedure, before the next one starts.
+/// \return What each procedure did.
+///
+/// \note A RUN THAT PRINTS ONLY AT THE END LOSES EVERYTHING IT DID when it does not reach the
+///       end. A run over the whole population is minutes and 855 codeunits, and a hard failure
+///       inside one of them -- a segmentation fault, which no `catch` sees -- took the entire
+///       report with it: 0 lines of output for a run that had done most of its work. Reporting as
+///       it goes is what makes such a run say where it stopped.
+[[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit, TestReport report);
+
 /// \brief Every registered test codeunit.
 /// \return Them, by codeunit number.
 [[nodiscard]] std::vector<const TestCatalogue *> RegisteredTestCodeunits();

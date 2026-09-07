@@ -460,6 +460,11 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
   return std::string(Session::Current().CompanyName());
 }
 
+::agiru::Decimal Abs(::agiru::Decimal Number) {
+  static_cast<void>(Number);
+  RefuseDoor("System.Abs(Decimal)");
+}
+
 ::agiru::Time CurrentTime() {
   return ::agiru::CurrentDateTime().Time();
 }

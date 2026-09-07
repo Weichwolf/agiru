@@ -78,6 +78,10 @@ std::vector<const TestCatalogue *> RegisteredTestCodeunits() {
 }
 
 TestRun RunRegisteredTests(std::string_view codeunit) {
+  return RunRegisteredTests(codeunit, nullptr);
+}
+
+TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
   TestRun run;
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
@@ -90,6 +94,7 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
         run.results.push_back(TestResult{
             .codeunit = catalogue->Name(), .method = "OnRun", .passed = false, .error = e.what()});
         ++run.failed;
+        if (report != nullptr) { report(run.results.back()); }
         continue;
       }
     }
@@ -100,6 +105,7 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
       } else {
         ++run.failed;
       }
+      if (report != nullptr) { report(run.results.back()); }
     }
     isolation.Discard("");
   }
