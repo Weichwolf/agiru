@@ -3,6 +3,7 @@
 #include "Ast.h"
 #include "EnumWriter.h"
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -14,6 +15,8 @@ namespace agiru::gen {
 struct TableRef {
   std::string identifier;
   std::string header;
+
+  std::int32_t id = 0;
 
   std::map<std::string, std::string> fields;
   std::map<std::string, std::string> procedures;

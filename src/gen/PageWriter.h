@@ -19,6 +19,9 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
 std::string PageHeaderPath(const al::PageObject &object);
 
+std::string
+PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source);
+
 [[nodiscard]] std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object);
 
 [[nodiscard]] std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object,

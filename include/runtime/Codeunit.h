@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "meta/Subtype.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
@@ -32,19 +33,6 @@ namespace agiru {
 /// The generator specialises this beside the class, so that the class itself carries nothing but
 /// what AL wrote: its procedures and its variables. The number and the name live here, the same way
 /// a table's field and key tables do.
-/// \brief AL `Subtype` on a codeunit -- what the object is FOR.
-///
-/// `devenv-subtype-codeunit-property.md` gives five values and two of them decide how the object is
-/// run: a `Test` codeunit HOLDS test methods, a `TestRunner` codeunit RUNS test codeunits and
-/// carries `OnBeforeTestRun`/`OnAfterTestRun` instead.
-enum class Subtype : std::uint8_t {
-  Normal,     ///< The default: a general-purpose codeunit.
-  Test,       ///< Holds `[Test]` methods.
-  TestRunner, ///< Runs test codeunits.
-  Upgrade,    ///< Holds data-upgrade triggers.
-  Install,    ///< Holds extension-installation triggers.
-};
-
 template <typename T> struct CodeunitTraits;
 
 /// \brief One codeunit held by another, created the first time it is used.
@@ -117,7 +105,9 @@ public:
   ///          undefined whenever that record's header is not in this translation unit. The
   ///          record's own `kId` is the one thing every table declares and nothing chases.
   template <typename U>
-    requires(!std::same_as<U, T>) && requires { { U::kId } -> std::convertible_to<TableId>; }
+    requires(!std::same_as<U, T>) && requires {
+      { U::kId } -> std::convertible_to<TableId>;
+    }
   Instance &operator=(const U &value) {
     static_cast<U &>(*operator->()) = value;
     return *this;

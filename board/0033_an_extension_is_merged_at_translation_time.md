@@ -106,3 +106,39 @@ is declared in. Four entries matter here:
 
 `apps.json` in this tree is the analogue of `dependencies` plus `application`, and the `id`-binds-table-names
 rule is the one to carry into board:0013's system fields rather than into the build.
+
+## A PAGE EXTENSION'S OPERATIONS WERE APPENDED AND NOT APPLIED, found 2026-09-07
+
+`MergePageExtensions` appended `extension.layout` to `page.layout` verbatim, and an extension's
+layout is not controls -- it is OPERATIONS over the base page's controls:
+
+```al
+pageextension 50100 X extends "Customer Card"
+{
+    layout { addafter("No.") { field(Mine; Rec.Mine) { } } }
+}
+```
+
+so the merged page carried a top-level control of kind `addafter` whose children were the added
+fields, and the base layout was untouched. The renderer would have shown the base page and the added
+fields would have hung off nothing.
+
+**It was invisible until the layout became metadata.** The flat three-vector writer visited every
+control for its children, so the added fields DID reach the TestPage surface and nothing looked
+wrong; board:0553's `ControlDef` tree made the operation nodes appear as `ControlKind::Unknown` with
+the AL word beside them, and the count was 296.
+
+| operation | declarations | placed |
+|---|---:|---:|
+| `addafter` | 224 | all but the anchors below |
+| `modify` | 24 | property-by-property onto the named control |
+| `addlast` | 19 | appended inside the named container |
+| `addfirst` | 19 | inserted at the front of the named container |
+| `addbefore` | 10 | inserted before the named control |
+| **placed** | **296** | **275** |
+
+**The 21 that stay put name an anchor the base page does not declare**, and they are printed as
+`unplaced` on every run rather than dropped: most name a promoted CATEGORY (`Category_Process`),
+which is board:0477's legacy syntax and not a control at all. The merge retries an unplaced
+operation after every other extension has been applied, so an anchor added by a LATER extension is
+found -- what remains is anchors that do not exist.

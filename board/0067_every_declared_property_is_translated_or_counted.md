@@ -126,3 +126,49 @@ The run summary lists dropped properties by count. A property added to the AL co
 list knows produces a warning naming it. **Negative control**: remove `Caption` from the seven the
 generator reads and require the count of dropped `Caption` declarations to appear at the top of the
 ranking -- a counter that only sees what it already handles is the blind gate CLAUDE.md names.
+
+## The counter keyed the property by NAME and that made two false claims, 2026-09-07
+
+A property means different things on different owners, and the census key did not say which owner it
+came from. Two consequences, both found by qualifying the key as `<owner>.<property>`:
+
+- **`Enabled` on a KEY is translated and on a page CONTROL it is not**, and the one entry in the
+  translated list claimed both. 2 052 `enabled` declarations were counted as carried when the key
+  half is some 40 of them.
+- **`Caption` on a FIELD was translated and on a TABLE was not** -- `TableDef::caption` was emitted
+  as the table's NAME, so `Record.TableCaption()` returned the name for every table that declares a
+  caption. Now the property lands and the name stands in only where AL declares none.
+
+The census now counts `table.`, `field.`, `key.`, `page.`, `control.`, `action.` and `codeunit.`
+separately, the translated list is qualified entry for entry, and the two lists that still match by
+NAME -- the dropped-by-decision list and the refusal list -- strip the owner first, because those
+decisions are about the property and not about where it sits.
+
+**And the two page-id properties were counted translated while carrying nothing**: see board:0334.
+
+## THE NUMBER, 2026-09-07: 46 203 SILENT BECAME 813
+
+Over the same 287 008 declarations, with the census keyed by owner:
+
+| | before | after |
+|---|---:|---:|
+| translated | -- | 279 099 |
+| dropped by decision, with a reason | 128 078 | 7 096 |
+| **read and dropped in silence** | **46 203** | **813** |
+| translated only in part | -- | 7 578 (`field.tablerelation`) |
+| kinds still silent | 96 | 53 |
+
+What closed it was three structs rather than three hundred decisions: `ControlDef` and `PageDef`
+(board:0553), `CodeunitDef` beside them, and four members each on `FieldDef` and `TableDef`. The
+UI properties left the dropped-by-decision list on the way -- `ToolTip`, `ApplicationArea`,
+`Visible`, `Image`, `Style`, `StyleExpr` and `ShowCaption` were "the UI decides" while there was
+nothing for the UI to read, and they are metadata now.
+
+**The 813 that remain are a list a person can read**, the largest being `control.notblank` 76,
+`control.provider` 53, `table.extensible` 51 and `page.populateallfields` 51. None is a decision
+waiting to be made; each is a member nobody has needed yet.
+
+**`field.tablerelation` is counted APART and not as either.** The bare `Table[.Field]` form reaches
+`relationTable`/`relationField` and the conditional grammar does not, so calling it translated would
+be a claim about 7 578 declarations of which the majority is true -- and the census now prints a
+`partly` line with the reason and board:0043's number instead of rounding either way.

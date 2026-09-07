@@ -79,3 +79,11 @@ restriction expressed as `RunPageView` is not shown and cannot be cleared.
 
 **The negative control is clearing the filter** -- an implementation that merges the two lets the user
 clear a `RunPageView` restriction, which every "the right rows appear" gate passes.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

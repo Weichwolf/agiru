@@ -88,3 +88,11 @@ SAME user cannot read that table directly after the procedure returns.
 **The negative control is the read after the return** -- an implementation that pushes and never pops
 passes the positive half and grants every user every permission any procedure ever declared, which is
 board:0376's negative control arriving through the attribute.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

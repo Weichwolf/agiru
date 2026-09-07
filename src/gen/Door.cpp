@@ -292,8 +292,14 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
       headers.insert("meta/TableDef.h");
       headers.insert("runtime/Table.h");
       break;
-    case ObjectKind::Codeunit: headers.insert("runtime/Codeunit.h"); break;
-    case ObjectKind::Page: headers.insert("runtime/Page.h"); break;
+    case ObjectKind::Codeunit:
+      headers.insert("meta/CodeunitDef.h");
+      headers.insert("runtime/Codeunit.h");
+      break;
+    case ObjectKind::Page:
+      headers.insert("meta/PageDef.h");
+      headers.insert("runtime/Page.h");
+      break;
     case ObjectKind::Enum: headers.insert("meta/EnumDef.h"); break;
     default: break;
   }

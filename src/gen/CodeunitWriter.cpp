@@ -113,9 +113,7 @@ std::string PermissionsOf(const al::CodeunitObject &unit, const al::ProcedureDec
       return "TestPermissions::NonRestrictive";
     }
     if (lowered.find("disabled") != std::string::npos) { return "TestPermissions::Disabled"; }
-    if (lowered.find("restrictive") != std::string::npos) {
-      return "TestPermissions::Restrictive";
-    }
+    if (lowered.find("restrictive") != std::string::npos) { return "TestPermissions::Restrictive"; }
     return {};
   };
   const al::Property *declared = al::Find(unit.properties, "TestPermissions");
@@ -277,7 +275,8 @@ std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
                 std::string_view{"HandlerKind::SendNotification"}},
       std::pair{std::string_view{"recallnotificationhandler"},
                 std::string_view{"HandlerKind::RecallNotification"}},
-      std::pair{std::string_view{"sessionsettingshandler"}, std::string_view{"HandlerKind::Session"}},
+      std::pair{std::string_view{"sessionsettingshandler"},
+                std::string_view{"HandlerKind::Session"}},
       std::pair{std::string_view{"httpclienthandler"}, std::string_view{"HandlerKind::HttpClient"}},
   };
   for (const std::string &attribute : procedure.attributes) {
@@ -328,8 +327,8 @@ std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &id
     if (!HandlerKindOf(procedure).empty()) { handlers.push_back(&procedure); }
   }
   if (handlers.empty()) { return {}; }
-  std::string out = "constexpr std::array<TestHandler, " + std::to_string(handlers.size()) +
-                    "> kHandlers{{\n";
+  std::string out =
+      "constexpr std::array<TestHandler, " + std::to_string(handlers.size()) + "> kHandlers{{\n";
   for (const al::ProcedureDecl *handler : handlers) {
     out += "    {\"" + handler->name + "\", " + HandlerKindOf(*handler) + ", 0, &InvokeHandler<" +
            identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">, " +
@@ -385,9 +384,10 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
   out += "                                  kTestMethods";
-  out += HandlerTableOf(unit, identifier).empty() ? std::string{} : std::string(",\n") +
-                                                                        "                          "
-                                                                        "        kHandlers";
+  out += HandlerTableOf(unit, identifier).empty()
+             ? std::string{}
+             : std::string(",\n") + "                          "
+                                    "        kHandlers";
   out += "};\n\n} // namespace " + identifier + "_tests\n} // namespace\n";
   return out;
 }
@@ -1376,6 +1376,37 @@ std::string Locals(const al::ProcedureDecl &procedure,
 
 }
 
+std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string &identifier) {
+  const auto said = [&unit](std::string_view name) {
+    const al::Property *found = Find(unit.properties, name);
+    return found == nullptr ? std::string{} : found->text;
+  };
+  const std::string traits = "::agiru::CodeunitTraits<" + identifier + ">";
+  std::string out = "constexpr CodeunitDef k" + identifier + "Codeunit{\n";
+  out += "    .id = " + traits + "::kId,\n";
+  out += "    .name = " + traits + "::kName,\n";
+  out += "    .subtype = " + traits + "::kSubtype,\n";
+  const std::string table = said("TableNo");
+  if (!table.empty() && table.find_first_not_of("0123456789") == std::string::npos) {
+    out += "    .tableNo = ::agiru::TableId{" + table + "},\n";
+  }
+  const auto text = [&out, &said](std::string_view member, std::string_view property) {
+    const std::string value = said(property);
+    if (value.empty()) { return; }
+    out += "    ." + std::string(member) + " = " + Literal(value) + ",\n";
+  };
+  text("permissions", "Permissions");
+  text("inherentPermissions", "InherentPermissions");
+  text("inherentEntitlements", "InherentEntitlements");
+  if (LowerKey(said("SingleInstance")) == "true") { out += "    .singleInstance = true,\n"; }
+  text("eventSubscriberInstance", "EventSubscriberInstance");
+  text("testPermissions", "TestPermissions");
+  text("access", "Access");
+  text("obsoleteState", "ObsoleteState");
+  out += "};\n\n";
+  return out;
+}
+
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
                                 const std::string &sourcePath,
                                 const Objects &objects) {
@@ -1433,6 +1464,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   }
 
   out += catalogue;
+  out += CodeunitDefinition(unit, identifier);
   out += "} // namespace agiru::app::codeunits\n";
   out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Codeunit);
@@ -1843,12 +1875,15 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += locals;
   }
   out += "};\n\n";
+  out += "extern const CodeunitDef k" + identifier + "Codeunit;\n\n";
   out += "} // namespace agiru::app::codeunits\n\n";
 
   out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "  static constexpr Subtype kSubtype{Subtype::" + SubtypeOf(unit) + "};\n";
+  out += "  static constexpr const CodeunitDef &kCodeunit = agiru::app::codeunits::k" + identifier +
+         "Codeunit;\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;

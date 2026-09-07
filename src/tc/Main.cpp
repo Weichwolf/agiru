@@ -277,57 +277,219 @@ constexpr std::array kAcknowledgedAttributes{
 };
 
 constexpr std::array kTranslatedProperties{
-    std::string_view{"access"},
-    std::string_view{"allowincustomizations"},
-    std::string_view{"autoformatexpression"},
-    std::string_view{"autoformattype"},
-    std::string_view{"autoincrement"},
-    std::string_view{"blanknumbers"},
-    std::string_view{"blankzero"},
-    std::string_view{"calcformula"},
-    std::string_view{"caption"},
-    std::string_view{"captionclass"},
-    std::string_view{"charallowed"},
-    std::string_view{"closingdates"},
-    std::string_view{"compressed"},
-    std::string_view{"datacaptionfields"},
-    std::string_view{"decimalplaces"},
-    std::string_view{"defaultimplementation"},
-    std::string_view{"drilldownpageid"},
-    std::string_view{"editable"},
-    std::string_view{"eventsubscriberinstance"},
-    std::string_view{"extendeddatatype"},
-    std::string_view{"fieldclass"},
-    std::string_view{"implementation"},
-    std::string_view{"initvalue"},
-    std::string_view{"lookuppageid"},
-    std::string_view{"masktype"},
-    std::string_view{"maxvalue"},
-    std::string_view{"minvalue"},
-    std::string_view{"notblank"},
-    std::string_view{"numeric"},
-    std::string_view{"obsoletereason"},
-    std::string_view{"obsoletestate"},
-    std::string_view{"obsoletetag"},
-    std::string_view{"optimizefortextsearch"},
-    std::string_view{"optioncaption"},
-    std::string_view{"optionmembers"},
-    std::string_view{"sourcetable"},
-    std::string_view{"subtype"},
-    std::string_view{"tableno"},
-    std::string_view{"testpermissions"},
-    std::string_view{"validatetablerelation"},
-    std::string_view{"valuesallowed"},
-    std::string_view{"width"},
+    std::string_view{"codeunit.eventsubscriberinstance"},
+    std::string_view{"codeunit.subtype"},
+    std::string_view{"codeunit.tableno"},
+    std::string_view{"codeunit.testpermissions"},
+    std::string_view{"field.access"},
+    std::string_view{"field.allowincustomizations"},
+    std::string_view{"field.autoformatexpression"},
+    std::string_view{"field.autoformattype"},
+    std::string_view{"field.autoincrement"},
+    std::string_view{"field.blanknumbers"},
+    std::string_view{"field.blankzero"},
+    std::string_view{"field.calcformula"},
+    std::string_view{"field.caption"},
+    std::string_view{"field.captionclass"},
+    std::string_view{"field.charallowed"},
+    std::string_view{"field.closingdates"},
+    std::string_view{"field.compressed"},
+    std::string_view{"field.decimalplaces"},
+    std::string_view{"field.drilldownpageid"},
+    std::string_view{"field.editable"},
+    std::string_view{"field.extendeddatatype"},
+    std::string_view{"field.fieldclass"},
+    std::string_view{"field.initvalue"},
+    std::string_view{"field.lookuppageid"},
+    std::string_view{"field.masktype"},
+    std::string_view{"field.maxvalue"},
+    std::string_view{"field.minvalue"},
+    std::string_view{"field.notblank"},
+    std::string_view{"field.numeric"},
+    std::string_view{"field.obsoletereason"},
+    std::string_view{"field.obsoletestate"},
+    std::string_view{"field.obsoletetag"},
+    std::string_view{"field.optimizefortextsearch"},
+    std::string_view{"field.optioncaption"},
+    std::string_view{"field.optionmembers"},
+    std::string_view{"field.validatetablerelation"},
+    std::string_view{"field.valuesallowed"},
+    std::string_view{"field.width"},
+    std::string_view{"key.clustered"},
+    std::string_view{"key.enabled"},
+    std::string_view{"key.includedfields"},
+    std::string_view{"key.maintainsiftindex"},
+    std::string_view{"key.maintainsqlindex"},
+    std::string_view{"key.sumindexfields"},
+    std::string_view{"key.unique"},
+    std::string_view{"page.sourcetable"},
+    std::string_view{"codeunit.permissions"},
+    std::string_view{"codeunit.inherentpermissions"},
+    std::string_view{"codeunit.inherententitlements"},
+    std::string_view{"codeunit.access"},
+    std::string_view{"codeunit.singleinstance"},
+    std::string_view{"codeunit.obsoletestate"},
+    std::string_view{"action.abouttext"},
+    std::string_view{"action.abouttitle"},
+    std::string_view{"action.drilldownpageid"},
+    std::string_view{"action.extendeddatatype"},
+    std::string_view{"action.indentationcolumn"},
+    std::string_view{"action.indentationcontrols"},
+    std::string_view{"action.infooterbar"},
+    std::string_view{"action.instructionaltext"},
+    std::string_view{"action.lookuppageid"},
+    std::string_view{"action.optioncaption"},
+    std::string_view{"action.runpageonrec"},
+    std::string_view{"action.showas"},
+    std::string_view{"action.showfilter"},
+    std::string_view{"action.updatepropagation"},
+    std::string_view{"control.abouttext"},
+    std::string_view{"control.abouttitle"},
+    std::string_view{"control.drilldownpageid"},
+    std::string_view{"control.extendeddatatype"},
+    std::string_view{"control.indentationcolumn"},
+    std::string_view{"control.indentationcontrols"},
+    std::string_view{"control.infooterbar"},
+    std::string_view{"control.instructionaltext"},
+    std::string_view{"control.lookuppageid"},
+    std::string_view{"control.optioncaption"},
+    std::string_view{"control.runpageonrec"},
+    std::string_view{"control.showas"},
+    std::string_view{"control.showfilter"},
+    std::string_view{"control.updatepropagation"},
+    std::string_view{"field.description"},
+    std::string_view{"field.movedto"},
+    std::string_view{"page.abouttext"},
+    std::string_view{"page.abouttitle"},
+    std::string_view{"page.autosplitkey"},
+    std::string_view{"page.extensible"},
+    std::string_view{"page.sourcetabletemporary"},
+    std::string_view{"table.access"},
+    std::string_view{"table.inherententitlements"},
+    std::string_view{"table.inherentpermissions"},
+    std::string_view{"table.permissions"},
+    std::string_view{"field.tooltip"},
+    std::string_view{"field.accessbypermission"},
+    std::string_view{"table.lookuppageid"},
+    std::string_view{"table.drilldownpageid"},
+    std::string_view{"control.autoformattype"},
+    std::string_view{"control.autoformatexpression"},
+    std::string_view{"control.captionclass"},
+    std::string_view{"control.decimalplaces"},
+    std::string_view{"control.tablerelation"},
+    std::string_view{"control.blankzero"},
+    std::string_view{"action.autoformattype"},
+    std::string_view{"action.autoformatexpression"},
+    std::string_view{"action.captionclass"},
+    std::string_view{"action.decimalplaces"},
+    std::string_view{"action.tablerelation"},
+    std::string_view{"action.blankzero"},
+    std::string_view{"action.accessbypermission"},
+    std::string_view{"action.applicationarea"},
+    std::string_view{"action.assistedit"},
+    std::string_view{"action.caption"},
+    std::string_view{"action.drilldown"},
+    std::string_view{"action.editable"},
+    std::string_view{"action.ellipsis"},
+    std::string_view{"action.enabled"},
+    std::string_view{"action.freezecolumn"},
+    std::string_view{"action.hidevalue"},
+    std::string_view{"action.image"},
+    std::string_view{"action.importance"},
+    std::string_view{"action.lookup"},
+    std::string_view{"action.multiline"},
+    std::string_view{"action.obsoletestate"},
+    std::string_view{"action.quickentry"},
+    std::string_view{"action.runobject"},
+    std::string_view{"action.runpagelink"},
+    std::string_view{"action.runpagemode"},
+    std::string_view{"action.runpageview"},
+    std::string_view{"action.scope"},
+    std::string_view{"action.shortcutkey"},
+    std::string_view{"action.showcaption"},
+    std::string_view{"action.showmandatory"},
+    std::string_view{"action.style"},
+    std::string_view{"action.styleexpr"},
+    std::string_view{"action.subpagelink"},
+    std::string_view{"action.subpageview"},
+    std::string_view{"action.tooltip"},
+    std::string_view{"action.visible"},
+    std::string_view{"action.width"},
+    std::string_view{"control.accessbypermission"},
+    std::string_view{"control.applicationarea"},
+    std::string_view{"control.assistedit"},
+    std::string_view{"control.caption"},
+    std::string_view{"control.drilldown"},
+    std::string_view{"control.editable"},
+    std::string_view{"control.ellipsis"},
+    std::string_view{"control.enabled"},
+    std::string_view{"control.freezecolumn"},
+    std::string_view{"control.hidevalue"},
+    std::string_view{"control.image"},
+    std::string_view{"control.importance"},
+    std::string_view{"control.lookup"},
+    std::string_view{"control.multiline"},
+    std::string_view{"control.obsoletestate"},
+    std::string_view{"control.quickentry"},
+    std::string_view{"control.runobject"},
+    std::string_view{"control.runpagelink"},
+    std::string_view{"control.runpagemode"},
+    std::string_view{"control.runpageview"},
+    std::string_view{"control.scope"},
+    std::string_view{"control.shortcutkey"},
+    std::string_view{"control.showcaption"},
+    std::string_view{"control.showmandatory"},
+    std::string_view{"control.style"},
+    std::string_view{"control.styleexpr"},
+    std::string_view{"control.subpagelink"},
+    std::string_view{"control.subpageview"},
+    std::string_view{"control.tooltip"},
+    std::string_view{"control.visible"},
+    std::string_view{"control.width"},
+    std::string_view{"page.access"},
+    std::string_view{"page.additionalsearchterms"},
+    std::string_view{"page.analysismodeenabled"},
+    std::string_view{"page.applicationarea"},
+    std::string_view{"page.caption"},
+    std::string_view{"page.cardpageid"},
+    std::string_view{"page.datacaptionexpression"},
+    std::string_view{"page.datacaptionfields"},
+    std::string_view{"page.delayedinsert"},
+    std::string_view{"page.deleteallowed"},
+    std::string_view{"page.editable"},
+    std::string_view{"page.insertallowed"},
+    std::string_view{"page.instructionaltext"},
+    std::string_view{"page.linksallowed"},
+    std::string_view{"page.modifyallowed"},
+    std::string_view{"page.obsoletestate"},
+    std::string_view{"page.pagetype"},
+    std::string_view{"page.permissions"},
+    std::string_view{"page.promotedactioncategories"},
+    std::string_view{"page.refreshonactivate"},
+    std::string_view{"page.savevalues"},
+    std::string_view{"page.showfilter"},
+    std::string_view{"page.sourcetableview"},
+    std::string_view{"page.usagecategory"},
+    std::string_view{"table.allowincustomizations"},
+    std::string_view{"table.caption"},
+    std::string_view{"table.compressiontype"},
+    std::string_view{"table.datacaptionfields"},
+    std::string_view{"table.dataaccessintent"},
+    std::string_view{"table.datapercompany"},
+    std::string_view{"table.movedfrom"},
+    std::string_view{"table.movedto"},
+    std::string_view{"table.obsoletestate"},
+    std::string_view{"table.replicatedata"},
+    std::string_view{"table.tabletype"},
+};
+
+constexpr std::array kPartlyTranslatedProperties{
+    std::pair{std::string_view{"field.tablerelation"},
+              std::string_view{"the bare Table[.Field] form reaches the metadata and the "
+                               "conditional grammar does not (board:0043)"}},
 };
 
 constexpr std::array kDroppedProperties{
-    std::pair{std::string_view{"applicationarea"},
-              std::string_view{"the UI decides visibility (board:0030)"}},
-    std::pair{std::string_view{"tooltip"}, std::string_view{"the UI shows it (board:0030)"}},
-    std::pair{std::string_view{"visible"},
-              std::string_view{"the UI decides visibility (board:0030)"}},
-    std::pair{std::string_view{"image"}, std::string_view{"the UI draws it (board:0030)"}},
     std::pair{std::string_view{"promoted"}, std::string_view{"the UI's action bar (board:0030)"}},
     std::pair{std::string_view{"promotedcategory"},
               std::string_view{"the UI's action bar (board:0030)"}},
@@ -335,9 +497,6 @@ constexpr std::array kDroppedProperties{
               std::string_view{"the UI's action bar (board:0030)"}},
     std::pair{std::string_view{"promotedonly"},
               std::string_view{"the UI's action bar (board:0030)"}},
-    std::pair{std::string_view{"style"}, std::string_view{"the UI renders it (board:0030)"}},
-    std::pair{std::string_view{"styleexpr"}, std::string_view{"the UI renders it (board:0030)"}},
-    std::pair{std::string_view{"showcaption"}, std::string_view{"the UI renders it (board:0030)"}},
     std::pair{std::string_view{"multiplenewlines"},
               std::string_view{"the UI's list behaviour (board:0030)"}},
     std::pair{std::string_view{"dataclassification"},
@@ -383,10 +542,16 @@ constexpr std::array kDeprecatedScopes{
 };
 
 void NoteProperties(const std::vector<agiru::al::Property> &properties,
+                    std::string_view owner,
                     std::map<std::string, std::size_t> &into) {
   for (const agiru::al::Property &property : properties) {
-    ++into[agiru::gen::LowerKey(property.name)];
+    ++into[std::string(owner) + "." + agiru::gen::LowerKey(property.name)];
   }
+}
+
+std::string_view PropertyName(std::string_view qualified) {
+  const std::size_t dot = qualified.find('.');
+  return dot == std::string_view::npos ? qualified : qualified.substr(dot + 1);
 }
 
 void NoteFieldClasses(const agiru::al::TableObject &table,
@@ -404,27 +569,30 @@ void NoteFieldClasses(const agiru::al::TableObject &table,
 
 void NotePropertiesOf(const agiru::al::TableObject &table,
                       std::map<std::string, std::size_t> &into) {
-  NoteProperties(table.properties, into);
-  for (const agiru::al::FieldDecl &field : table.fields) { NoteProperties(field.properties, into); }
-  for (const agiru::al::KeyDecl &key : table.keys) { NoteProperties(key.properties, into); }
+  NoteProperties(table.properties, "table", into);
+  for (const agiru::al::FieldDecl &field : table.fields) {
+    NoteProperties(field.properties, "field", into);
+  }
+  for (const agiru::al::KeyDecl &key : table.keys) { NoteProperties(key.properties, "key", into); }
 }
 
 void NotePropertiesOf(const agiru::al::PageObject &page, std::map<std::string, std::size_t> &into) {
-  NoteProperties(page.properties, into);
+  NoteProperties(page.properties, "page", into);
   const auto walk = [&into](auto &&self,
+                            std::string_view owner,
                             const std::vector<agiru::al::PageControl> &controls) -> void {
     for (const agiru::al::PageControl &control : controls) {
-      NoteProperties(control.properties, into);
-      self(self, control.children);
+      NoteProperties(control.properties, owner, into);
+      self(self, owner, control.children);
     }
   };
-  walk(walk, page.layout);
-  walk(walk, page.actions);
+  walk(walk, "control", page.layout);
+  walk(walk, "action", page.actions);
 }
 
 void NotePropertiesOf(const agiru::al::CodeunitObject &unit,
                       std::map<std::string, std::size_t> &into) {
-  NoteProperties(unit.properties, into);
+  NoteProperties(unit.properties, "codeunit", into);
 }
 
 template <typename Object>
@@ -535,6 +703,7 @@ struct Extensions {
   std::map<std::string, std::vector<agiru::al::PageExtensionObject>> pages;
   mutable std::map<std::string, std::size_t> held;
   mutable std::map<std::string, std::size_t> consumed;
+  mutable std::size_t unplaced = 0;
 };
 
 std::string Overload(const agiru::al::ProcedureDecl &procedure) {
@@ -633,6 +802,7 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           agiru::gen::LowerKey(object.name),
           agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
                                .header = agiru::gen::PageHeaderPath(object),
+                               .id = object.id,
                                .fields = std::move(controlNames),
                                .procedures = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
@@ -644,6 +814,83 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   return pages;
 }
 
+agiru::al::PageControl *NamedControl(std::vector<agiru::al::PageControl> &controls,
+                                     const std::string &name,
+                                     std::vector<agiru::al::PageControl> **holder) {
+  for (agiru::al::PageControl &control : controls) {
+    if (agiru::gen::LowerKey(control.name) == name) {
+      *holder = &controls;
+      return &control;
+    }
+    if (agiru::al::PageControl *found = NamedControl(control.children, name, holder);
+        found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+bool Splice(std::vector<agiru::al::PageControl> &into, const agiru::al::PageControl &operation) {
+  const std::string where = agiru::gen::LowerKey(operation.kind);
+  const std::string anchor = agiru::gen::LowerKey(operation.name);
+  std::vector<agiru::al::PageControl> *holder = nullptr;
+  agiru::al::PageControl *at = NamedControl(into, anchor, &holder);
+  if (at == nullptr || holder == nullptr) { return false; }
+  if (where == "modify") {
+    for (const agiru::al::Property &property : operation.properties) {
+      const auto standing =
+          std::ranges::find_if(at->properties, [&property](const agiru::al::Property &one) {
+            return agiru::gen::LowerKey(one.name) == agiru::gen::LowerKey(property.name);
+          });
+      if (standing == at->properties.end()) {
+        at->properties.push_back(property);
+      } else {
+        *standing = property;
+      }
+    }
+    return true;
+  }
+  if (where == "addfirst") {
+    at->children.insert(at->children.begin(), operation.children.begin(), operation.children.end());
+    return true;
+  }
+  if (where == "addlast") {
+    at->children.insert(at->children.end(), operation.children.begin(), operation.children.end());
+    return true;
+  }
+  const auto seat =
+      std::ranges::find_if(*holder, [at](const agiru::al::PageControl &one) { return &one == at; });
+  if (seat == holder->end()) { return false; }
+  const auto put = where == "addbefore" ? seat : seat + 1;
+  holder->insert(put, operation.children.begin(), operation.children.end());
+  return true;
+}
+
+bool IsAnOperation(const std::string &kind) {
+  const std::string lowered = agiru::gen::LowerKey(kind);
+  return lowered == "addfirst" || lowered == "addlast" || lowered == "addafter" ||
+         lowered == "addbefore" || lowered == "modify";
+}
+
+std::size_t TakeControls(std::vector<agiru::al::PageControl> &into,
+                         const std::vector<agiru::al::PageControl> &from,
+                         std::size_t &unplaced) {
+  std::size_t placed = 0;
+  for (const agiru::al::PageControl &control : from) {
+    if (!IsAnOperation(control.kind)) {
+      into.push_back(control);
+      continue;
+    }
+    if (Splice(into, control)) {
+      ++placed;
+    } else {
+      ++unplaced;
+      into.push_back(control);
+    }
+  }
+  return placed;
+}
+
 std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
   std::size_t merged = 0;
   const auto take = [](auto &into, auto &from) {
@@ -653,13 +900,38 @@ std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
     const auto found = store.pages.find(agiru::gen::LowerKey(page.name));
     if (found == store.pages.end()) { continue; }
     for (const agiru::al::PageExtensionObject &extension : found->second) {
-      take(page.layout, extension.layout);
-      take(page.actions, extension.actions);
+      std::size_t ignored = 0;
+      TakeControls(page.layout, extension.layout, ignored);
+      TakeControls(page.actions, extension.actions, ignored);
       TakeProcedures(page.procedures, extension.procedures);
       TakeVariables(page.variables, extension.variables);
       take(page.labels, extension.labels);
       ++merged;
       ++store.consumed["page " + found->first];
+    }
+    for (std::vector<agiru::al::PageControl> *section : {&page.layout, &page.actions}) {
+      std::vector<agiru::al::PageControl> waiting;
+      for (const agiru::al::PageControl &control : *section) {
+        if (IsAnOperation(control.kind)) { waiting.push_back(control); }
+      }
+      if (waiting.empty()) { continue; }
+      std::erase_if(*section, [](const agiru::al::PageControl &control) {
+        return IsAnOperation(control.kind);
+      });
+      for (bool moved = true; moved && !waiting.empty();) {
+        moved = false;
+        std::vector<agiru::al::PageControl> again;
+        for (const agiru::al::PageControl &operation : waiting) {
+          if (Splice(*section, operation)) {
+            moved = true;
+          } else {
+            again.push_back(operation);
+          }
+        }
+        waiting = std::move(again);
+      }
+      store.unplaced += waiting.size();
+      section->insert(section->end(), waiting.begin(), waiting.end());
     }
   }
   return merged;
@@ -1028,34 +1300,22 @@ void WriteReports(Run &run, const agiru::gen::Objects &objects) {
   for (const auto &[key, ref] : objects.reports) {
     const std::string identifier = ref.identifier.substr(std::string("reports::").size());
     const auto number = ref.fields.find("id");
-    std::string out = "// Generated from the report's declaration. Do not edit.\n\n";
+    std::string out = "// Generated from the report\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
-    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
     out += "namespace agiru::app::reports {\n\n";
-    out += "class " + identifier + " {\npublic:\n";
+    out += "class " + identifier + " : public ::agiru::Report<" + identifier + "> {\npublic:\n";
     out += "  static constexpr ReportId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
-    out += "  static constexpr ReportId Id() { return kId; }\n\n";
-    for (const std::string_view member :
-         {"Run",          "RunModal",       "RunRequestPage",       "Print",       "Execute",
-          "SaveAs",       "SaveAsPdf",      "SaveAsExcel",          "SaveAsWord",  "SaveAsHtml",
-          "SaveAsXml",    "RdlcLayout",     "WordLayout",           "ExcelLayout", "DefaultLayout",
-          "SetTableView", "UseRequestPage", "TargetFormat",         "ObjectId",    "Language",
-          "FormatRegion", "Preview",        "GetSubstituteReportId"}) {
-      out += "  template <typename... Arguments> std::string ";
-      out += member;
-      out += "(Arguments &&...arguments) const {\n";
-      out += "    (static_cast<void>(arguments), ...);\n";
-      out += "    throw ::agiru::Error(\"Report.";
-      out += member;
-      out += " is declared and not implemented yet (board:0034)\");\n";
-      out += "  }\n\n";
-    }
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::reports\n";
+    out += "} // namespace agiru::app::reports\n\n";
+    out += "template <> struct agiru::ReportTraits<agiru::app::reports::" + identifier + "> {\n";
+    out += "  static constexpr ReportId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1083,43 +1343,22 @@ void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
   for (const auto &[key, ref] : objects.xmlports) {
     const std::string identifier = ref.identifier.substr(std::string("xmlports::").size());
     const auto number = ref.fields.find("id");
-    std::string out = "// Generated from the xmlport's declaration. Do not edit.\n\n";
+    std::string out = "// Generated from the xmlport\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
-    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
     out += "namespace agiru::app::xmlports {\n\n";
-    out += "class " + identifier + " {\npublic:\n";
+    out += "class " + identifier + " : public ::agiru::XmlPort<" + identifier + "> {\npublic:\n";
     out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
-    out += "  static constexpr XmlPortId Id() { return kId; }\n\n";
-    for (const std::string_view member : {"Export",
-                                          "Import",
-                                          "Run",
-                                          "SetSource",
-                                          "SetDestination",
-                                          "SetTableView",
-                                          "GetTableView",
-                                          "SetXmlDocument",
-                                          "GetXmlDocument",
-                                          "SetJsonDocument",
-                                          "GetJsonDocument",
-                                          "FilterGroup",
-                                          "ObjectId",
-                                          "Language",
-                                          "FormatRegion"}) {
-      out += "  template <typename... Arguments> std::string ";
-      out += member;
-      out += "(Arguments &&...arguments) const {\n";
-      out += "    (static_cast<void>(arguments), ...);\n";
-      out += "    throw ::agiru::Error(\"XmlPort.";
-      out += member;
-      out += " is declared and not implemented yet (board:0065)\");\n";
-      out += "  }\n\n";
-    }
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::xmlports\n";
+    out += "} // namespace agiru::app::xmlports\n\n";
+    out += "template <> struct agiru::XmlPortTraits<agiru::app::xmlports::" + identifier + "> {\n";
+    out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1147,41 +1386,22 @@ void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
   for (const auto &[key, ref] : objects.queries) {
     const std::string identifier = ref.identifier.substr(std::string("queries::").size());
     const auto number = ref.fields.find("id");
-    std::string out = "// Generated from the query's declaration. Do not edit.\n\n";
+    std::string out = "// Generated from the query\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
-    out += "#include \"runtime/Error.h\"\n\n";
+    out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
     out += "namespace agiru::app::queries {\n\n";
-    out += "class " + identifier + " {\npublic:\n";
+    out += "class " + identifier + " : public ::agiru::Query<" + identifier + "> {\npublic:\n";
     out += "  static constexpr QueryId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n\n";
-    out += "  static constexpr QueryId Id() { return kId; }\n\n";
-    for (const std::string_view member : {"Open",
-                                          "Read",
-                                          "Close",
-                                          "Run",
-                                          "SetRange",
-                                          "SetFilter",
-                                          "GetFilter",
-                                          "SetCurrentKey",
-                                          "TopNumberOfRows",
-                                          "ObjectId",
-                                          "SaveAsXml",
-                                          "SaveAsCsv",
-                                          "ColumnFilter"}) {
-      out += "  template <typename... Arguments> std::string ";
-      out += member;
-      out += "(Arguments &&...arguments) const {\n";
-      out += "    (static_cast<void>(arguments), ...);\n";
-      out += "    throw ::agiru::Error(\"Query.";
-      out += member;
-      out += " is declared and not implemented yet (board:0066)\");\n";
-      out += "  }\n\n";
-    }
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::queries\n";
+    out += "} // namespace agiru::app::queries\n\n";
+    out += "template <> struct agiru::QueryTraits<agiru::app::queries::" + identifier + "> {\n";
+    out += "  static constexpr QueryId kId{" + number->second + "};\n";
+    out += "  static constexpr std::string_view kName{" +
+           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1558,6 +1778,11 @@ int Scan(const Job &job) {
   Report("pages", allPages);
   Report("extensions", allExtensionsRead);
   std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
+  if (store.unplaced != 0) {
+    std::println("unplaced   {} page-extension operation(s) name a control the base page does not "
+                 "declare, and stay where they were written (board:0033)",
+                 store.unplaced);
+  }
   std::map<std::string, std::size_t> orphans;
   for (const auto &[name, total] : store.held) {
     const auto taken = store.consumed.find(name);
@@ -1567,14 +1792,22 @@ int Scan(const Job &job) {
     std::size_t counted = 0;
     std::size_t decided = 0;
     std::vector<std::pair<std::string, std::size_t>> silent;
+    std::vector<std::pair<std::string, std::size_t>> partial;
     for (const auto &[name, found] : gathered.properties) {
       counted += found;
       if (std::ranges::find(kTranslatedProperties, name) != kTranslatedProperties.end()) {
         continue;
       }
-      if (agiru::gen::RefusedByName(name)) { continue; }
-      if (std::ranges::find_if(kDroppedProperties, [&name](const auto &known) {
+      const std::string_view bare = PropertyName(name);
+      if (std::ranges::find_if(kPartlyTranslatedProperties, [&name](const auto &known) {
             return known.first == name;
+          }) != kPartlyTranslatedProperties.end()) {
+        partial.emplace_back(name, found);
+        continue;
+      }
+      if (agiru::gen::RefusedByName(bare)) { continue; }
+      if (std::ranges::find_if(kDroppedProperties, [bare](const auto &known) {
+            return known.first == bare;
           }) != kDroppedProperties.end()) {
         decided += found;
         continue;
@@ -1591,8 +1824,13 @@ int Scan(const Job &job) {
                  decided,
                  dropped,
                  silent.size());
-    for (std::size_t i = 0; i < silent.size() && i < 12; ++i) {
+    for (std::size_t i = 0; i < silent.size() && i < 30; ++i) {
       std::println("          {:>7} x {}", silent[i].second, silent[i].first);
+    }
+    for (const auto &[name, found] : partial) {
+      const auto known = std::ranges::find_if(
+          kPartlyTranslatedProperties, [&name](const auto &one) { return one.first == name; });
+      std::println("partly    {:>7} x {} -- {}", found, name, known->second);
     }
   }
   for (const auto &[what, found] : gathered.contradictions) {

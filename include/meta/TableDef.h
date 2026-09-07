@@ -186,6 +186,17 @@ struct FieldDef {
   /// \brief The `MaskType` property, as AL wrote it.
   std::string_view maskType{};
 
+  /// \brief The `ToolTip` property, which a TABLE FIELD may declare and 12 660 of them do.
+  ///
+  /// \note IT IS NOT ONLY A PAGE PROPERTY. `devenv-tooltip-property.md` applies to a table field
+  ///       as well as to a page control, and a page that shows the field without declaring its own
+  ///       shows this one (board:0385).
+  std::string_view toolTip{};
+
+  /// \brief The `AccessByPermission` property: the field is gone for a user without it
+  ///        (board:0377).
+  std::string_view accessByPermission{};
+
   /// \brief The `LookupPageId` property: the list the dropdown opens (board:0334).
   PageId lookupPageId{};
 
@@ -212,8 +223,13 @@ struct FieldDef {
   /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.
   std::string_view access{};
 
-  /// \brief The `ObsoleteState` property, as AL wrote it -- `Pending` or `Removed`, else empty.
+  /// \brief The `MovedTo` property on the FIELD: the app the field went to (board:0357).
+  std::string_view movedTo{};
 
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
+
+  /// \brief The `ObsoleteState` property, as AL wrote it -- `Pending` or `Removed`, else empty.
   std::string_view obsoleteState{};
 
   /// \brief The `ObsoleteReason` property: the text a diagnostic prints.
@@ -326,10 +342,28 @@ struct TableDef {
   ///        number and in declaration order; empty where the primary key stands in (board:0374).
   std::span<const FieldNo> dataCaptionFields{};
 
+  /// \brief The `Permissions` property: what the table's own code may reach beyond its caller
+  ///        (board:0376).
+  std::string_view permissions{};
+
+  /// \brief The `InherentPermissions` and `InherentEntitlements` properties, as AL wrote them: an
+  ///        object granted its own access (board:0378).
+  std::string_view inherentPermissions{};
+  std::string_view inherentEntitlements{}; ///< \see inherentPermissions
+
+  /// \brief The `Access` property, as AL wrote it: what the generated name is visible to
+  ///        (board:0359).
+  std::string_view access{};
+
   /// \brief The `MovedFrom` and `MovedTo` properties, as AL wrote them: the app id an object came
   ///        from or went to (board:0357).
   std::string_view movedFrom{};
   std::string_view movedTo{}; ///< \see movedFrom
+
+  /// \brief The `LookupPageId` and `DrillDownPageId` properties on the TABLE, which every field
+  ///        of it falls back to (board:0334, board:0335).
+  PageId lookupPageId{};
+  PageId drillDownPageId{}; ///< \see lookupPageId
 
   /// \brief The `AllowInCustomizations` property on the TABLE (board:0480).
   std::string_view allowInCustomizations{};

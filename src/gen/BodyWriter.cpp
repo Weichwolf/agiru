@@ -140,7 +140,8 @@ std::string Temporal(const std::string &literal) {
     while (milli.size() < kMilliDigits) { milli += '0'; }
     return "Time::FromHms(" + decimal(clock.substr(0, kPairDigits)) + ", " +
            decimal(clock.substr(kPairDigits, kPairDigits)) + ", " +
-           decimal(clock.substr(2 * kPairDigits, kPairDigits)) + ", " + decimal(milli.substr(0, kMilliDigits)) + ")";
+           decimal(clock.substr(2 * kPairDigits, kPairDigits)) + ", " +
+           decimal(milli.substr(0, kMilliDigits)) + ")";
   }
   return "RefusedTemporal<Date>(\"" + literal + "\")";
 }
@@ -240,15 +241,16 @@ private:
         const std::string counter = Expression(statement.expression.children.front(), 0);
         const std::string first = Expression(statement.expression.children.back(), 0);
         const std::string last = Expression(statement.labels.front(), 0);
-        const bool overBooleans = (first == "true" || first == "false") &&
-                                  (last == "true" || last == "false");
+        const bool overBooleans =
+            (first == "true" || first == "false") && (last == "true" || last == "false");
         if (overBooleans) {
           const std::string step = "Step_Block";
-          out = Pad(indent) + "for (::agiru::Integer " + step + " = " + (first == "true" ? "1" : "0") +
-                "; " + step + (statement.descending ? " >= " : " <= ") +
-                (last == "true" ? "1" : "0") + "; " + (statement.descending ? "--" : "++") + step +
-                ") {\n" + Pad(indent + 2) + counter + " = " + step + " != 0;\n" +
-                Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
+          out = Pad(indent) + "for (::agiru::Integer " + step + " = " +
+                (first == "true" ? "1" : "0") + "; " + step +
+                (statement.descending ? " >= " : " <= ") + (last == "true" ? "1" : "0") + "; " +
+                (statement.descending ? "--" : "++") + step + ") {\n" + Pad(indent + 2) + counter +
+                " = " + step + " != 0;\n" + Statements(statement.body, indent + 2) + Pad(indent) +
+                "}\n";
           break;
         }
         out = Pad(indent) + "for (" + counter + " = " + first + "; " + counter +
@@ -400,20 +402,33 @@ private:
   static std::size_t FieldArguments(std::string_view method) {
     static constexpr auto kAll = static_cast<std::size_t>(-1);
     static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
-        {"SetRange", 1},           {"SetFilter", 1},
-        {"FindFirstField", 1},     {"FindNextField", 1},
-        {"FindPreviousField", 1},  {"TestField", 1},
-        {"FieldError", 1},         {"FieldCaption", 1},
-        {"FieldName", 1},          {"FieldNo", 1},
-        {"Validate", 1},           {"SetAscending", 1},
-        {"CalcFields", kAll},      {"CalcSums", kAll},
-        {"SetCurrentKey", kAll},   {"SetLoadFields", kAll},
-        {"AddLoadFields", kAll},   {"LoadFields", kAll},
+        {"SetRange", 1},
+        {"SetFilter", 1},
+        {"FindFirstField", 1},
+        {"FindNextField", 1},
+        {"FindPreviousField", 1},
+        {"TestField", 1},
+        {"FieldError", 1},
+        {"FieldCaption", 1},
+        {"FieldName", 1},
+        {"FieldNo", 1},
+        {"Validate", 1},
+        {"SetAscending", 1},
+        {"CalcFields", kAll},
+        {"CalcSums", kAll},
+        {"SetCurrentKey", kAll},
+        {"SetLoadFields", kAll},
+        {"AddLoadFields", kAll},
+        {"LoadFields", kAll},
         {"GetRangeMin", 1},
-        {"GetRangeMax", 1},        {"GetFilter", 1},
-        {"GetAscending", 1},       {"CopyFilter", kAll},
-        {"FieldActive", 1},        {"ModifyAll", 1},
-        {"Relation", 1},           {"SetAutoCalcFields", kAll},
+        {"GetRangeMax", 1},
+        {"GetFilter", 1},
+        {"GetAscending", 1},
+        {"CopyFilter", kAll},
+        {"FieldActive", 1},
+        {"ModifyAll", 1},
+        {"Relation", 1},
+        {"SetAutoCalcFields", kAll},
         {"AreFieldsLoaded", kAll},
     };
     for (const auto &[name, count] : kTakers) {
@@ -451,8 +466,8 @@ private:
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
                !platform.empty()) {
-      std::string out = std::string(platform) + "::" +
-                        (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
+      std::string out = std::string(platform) +
+                        "::" + (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
       for (std::size_t i = 1; i < expression.children.size(); ++i) {
         if (i != 1) { out += ", "; }
         out += Expression(expression.children[i], 0);
@@ -1628,7 +1643,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::ProcedureDecl &trigger : field.triggers) { reaching.push_back(trigger); }
   }
   out += SourceIncludesOf(table.variables, reaching, objects);
-  out += "\n" + TableDefinitions(table, objects.enums);
+  out += "\n" + TableDefinitions(table, objects);
   const std::size_t bodyAt = out.size();
   const std::set<std::string> shadowedByFields = Shadowed(table);
   out += "\nnamespace agiru::app::tables {\n\n";
@@ -1707,7 +1722,8 @@ void ControlBodies(std::string &out,
                    const std::map<std::string, std::string> &named) {
   for (const al::PageControl &control : controls) {
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      const std::string name = ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures);
+      const std::string name =
+          ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures);
       const std::string body =
           WriteStatements(PageNames(page, source, objects, &trigger), trigger.body, 2) +
           FallsOffEnd(trigger, PageNames(page, source, objects, &trigger));
@@ -1718,8 +1734,7 @@ void ControlBodies(std::string &out,
                           page.procedures,
                           Shadowing(page.variables, page.procedures, page.labels),
                           body) +
-          (source == nullptr ? std::string{}
-                             : BindsBefore(body, Identifier(source->name)));
+          (source == nullptr ? std::string{} : BindsBefore(body, Identifier(source->name)));
       out += ProcedureSignature(trigger,
                                 objects,
                                 page.name,
@@ -1785,8 +1800,7 @@ std::string WriteSource(const al::PageObject &page,
                               page.procedures,
                               Shadowing(page.variables, page.procedures, page.labels),
                               body) +
-                  (source == nullptr ? std::string{}
-                                     : BindsBefore(body, Identifier(source->name)));
+                  (source == nullptr ? std::string{} : BindsBefore(body, Identifier(source->name)));
     if (locals.empty() && body.empty()) {
       bodies += "}\n\n";
       continue;
@@ -1795,7 +1809,8 @@ std::string WriteSource(const al::PageObject &page,
     if (!locals.empty() && !body.empty()) { bodies += "\n"; }
     bodies += body + "}\n\n";
   }
-  bodies += "} // namespace agiru::app::pages\n";
+  bodies += "} // namespace agiru::app::pages\n\n";
+  bodies += PageDefinition(page, objects, source);
   out += SourceIncludesOf(page.variables, page.procedures, objects);
   out += BodyIncludes(bodies, objects);
   out += bodies;

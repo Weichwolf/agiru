@@ -274,18 +274,20 @@ struct Declared {
                                     ///< is conditional or filtered (board:0043).
   std::string_view relationField{}; ///< Its target field, empty when the relation names the table's
                                     ///< own primary key.
-  bool blankZero = false;                                       ///< `BlankZero`.
-  std::string_view minValue{};                                  ///< `MinValue`, as AL wrote it.
-  std::string_view maxValue{};                                  ///< `MaxValue`, as AL wrote it.
-  std::string_view decimalPlaces{};                             ///< `DecimalPlaces`.
-  std::string_view blankNumbers{};                              ///< `BlankNumbers`.
-  bool compressed = true;                                       ///< `Compressed`, BLOB only.
-  bool numeric = false;                                         ///< `Numeric`.
-  std::string_view charAllowed{};                               ///< `CharAllowed`, as AL wrote it.
-  std::string_view valuesAllowed{};         ///< `ValuesAllowed`, as AL wrote it.
-  bool closingDates = false;                ///< `ClosingDates`.
+  bool blankZero = false;           ///< `BlankZero`.
+  std::string_view minValue{};      ///< `MinValue`, as AL wrote it.
+  std::string_view maxValue{};      ///< `MaxValue`, as AL wrote it.
+  std::string_view decimalPlaces{}; ///< `DecimalPlaces`.
+  std::string_view blankNumbers{};  ///< `BlankNumbers`.
+  bool compressed = true;           ///< `Compressed`, BLOB only.
+  bool numeric = false;             ///< `Numeric`.
+  std::string_view charAllowed{};   ///< `CharAllowed`, as AL wrote it.
+  std::string_view valuesAllowed{}; ///< `ValuesAllowed`, as AL wrote it.
+  bool closingDates = false;        ///< `ClosingDates`.
   std::string_view extendedDataType{};      ///< `ExtendedDataType`, as AL wrote it.
   std::string_view maskType{};              ///< `MaskType`, as AL wrote it.
+  std::string_view toolTip{};               ///< `ToolTip`, which a table field may declare.
+  std::string_view accessByPermission{};    ///< `AccessByPermission`.
   PageId lookupPageId{};                    ///< `LookupPageId`.
   PageId drillDownPageId{};                 ///< `DrillDownPageId`.
   bool optimizeForTextSearch = false;       ///< `OptimizeForTextSearch`.
@@ -295,6 +297,8 @@ struct Declared {
   std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
   std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
   std::string_view access{};                ///< `Access`, as AL wrote it.
+  std::string_view movedTo{};               ///< `MovedTo`, the app the field went to.
+  std::string_view description{};           ///< `Description`, which nothing reads.
   std::string_view obsoleteState{};         ///< `ObsoleteState`.
   std::string_view obsoleteReason{};        ///< `ObsoleteReason`.
   std::string_view obsoleteTag{};           ///< `ObsoleteTag`.
@@ -336,6 +340,8 @@ constexpr FieldDef Declare(FieldNo no,
       .closingDates = declared.closingDates,
       .extendedDataType = declared.extendedDataType,
       .maskType = declared.maskType,
+      .toolTip = declared.toolTip,
+      .accessByPermission = declared.accessByPermission,
       .lookupPageId = declared.lookupPageId,
       .drillDownPageId = declared.drillDownPageId,
       .optimizeForTextSearch = declared.optimizeForTextSearch,
@@ -345,6 +351,8 @@ constexpr FieldDef Declare(FieldNo no,
       .autoFormatExpression = declared.autoFormatExpression,
       .allowInCustomizations = declared.allowInCustomizations,
       .access = declared.access,
+      .movedTo = declared.movedTo,
+      .description = declared.description,
       .obsoleteState = declared.obsoleteState,
       .obsoleteReason = declared.obsoleteReason,
       .obsoleteTag = declared.obsoleteTag,

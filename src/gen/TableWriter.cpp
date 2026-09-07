@@ -277,8 +277,22 @@ bool PropertyIs(const al::FieldDecl &field, std::string_view name, bool absent) 
   return LowerKey(text) == "true";
 }
 
-std::string
-DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumIndex &enums) {
+std::string PageNumber(const TableIndex &pages, std::string text) {
+  while (!text.empty() && (text.back() == ';' || text.back() == ' ' || text.back() == '"')) {
+    text.pop_back();
+  }
+  while (!text.empty() && (text.front() == ' ' || text.front() == '"')) { text.erase(0, 1); }
+  if (text.empty()) { return {}; }
+  if (text.find_first_not_of("0123456789") == std::string::npos) { return text; }
+  const auto found = pages.find(LowerKey(text));
+  if (found == pages.end() || found->second.id == 0) { return {}; }
+  return std::to_string(found->second.id);
+}
+
+std::string DeclaredBlock(const al::FieldDecl &field,
+                          const OptionField *option,
+                          const EnumIndex &enums,
+                          const TableIndex &pages) {
   std::string out;
   const auto text = [&out](std::string_view member, const std::string &value) {
     if (value.empty()) { return; }
@@ -353,8 +367,12 @@ DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumI
   flag("closingDates", PropertyIs(field, "ClosingDates", false), false);
   text("extendedDataType", PropertyText(field, "ExtendedDataType"));
   text("maskType", PropertyText(field, "MaskType"));
-  number("lookupPageId", PropertyText(field, "LookupPageId"), "::agiru::PageId");
-  number("drillDownPageId", PropertyText(field, "DrillDownPageId"), "::agiru::PageId");
+  text("toolTip", PropertyText(field, "ToolTip"));
+  text("accessByPermission", PropertyText(field, "AccessByPermission"));
+  number("lookupPageId", PageNumber(pages, PropertyText(field, "LookupPageId")), "::agiru::PageId");
+  number("drillDownPageId",
+         PageNumber(pages, PropertyText(field, "DrillDownPageId")),
+         "::agiru::PageId");
   flag("optimizeForTextSearch", PropertyIs(field, "OptimizeForTextSearch", false), false);
   text("captionClass", PropertyText(field, "CaptionClass"));
   number("width", PropertyText(field, "Width"), "");
@@ -362,6 +380,8 @@ DeclaredBlock(const al::FieldDecl &field, const OptionField *option, const EnumI
   text("autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
   text("allowInCustomizations", PropertyText(field, "AllowInCustomizations"));
   text("access", PropertyText(field, "Access"));
+  text("movedTo", PropertyText(field, "MovedTo"));
+  text("description", PropertyText(field, "Description"));
   text("obsoleteState", PropertyText(field, "ObsoleteState"));
   text("obsoleteReason", PropertyText(field, "ObsoleteReason"));
   text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
@@ -372,7 +392,8 @@ std::string FieldTable(const al::TableObject &table,
                        const std::vector<const al::FieldDecl *> &sorted,
                        const std::string &tableIdentifier,
                        const std::vector<OptionField> &options,
-                       const EnumIndex &enums) {
+                       const EnumIndex &enums,
+                       const TableIndex &pages) {
   const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
   std::string out = "constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
                     tableIdentifier + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
@@ -397,7 +418,7 @@ std::string FieldTable(const al::TableObject &table,
     out += ", ";
     out += identifier;
     out += ")";
-    const std::string declared = DeclaredBlock(*field, OptionOf(options, *field), enums);
+    const std::string declared = DeclaredBlock(*field, OptionOf(options, *field), enums, pages);
     if (!declared.empty()) { out += ", Declared{" + declared + "}"; }
     out += "),\n";
   }
@@ -674,13 +695,14 @@ std::set<std::string> Shadowed(const al::TableObject &table) {
   return hidden;
 }
 
-std::string TableDefinitions(const al::TableObject &declared, const EnumIndex &enums) {
+std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
+  const EnumIndex &enums = objects.enums;
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
   std::string out = "namespace agiru::app::tables {\n\n";
-  out += FieldTable(table, sorted, tableIdentifier, options, enums);
+  out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
 
   out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
@@ -709,7 +731,10 @@ std::string TableDefinitions(const al::TableObject &declared, const EnumIndex &e
   out += "constexpr TableDef k" + tableIdentifier + "Table{\n";
   out += "    .id = " + tableIdentifier + "::kId,\n";
   out += "    .name = " + tableIdentifier + "::kName,\n";
-  out += "    .caption = " + tableIdentifier + "::kName,\n";
+  const al::Property *named = Find(table.properties, "Caption");
+  out += "    .caption = ";
+  out += named == nullptr ? tableIdentifier + "::kName" : Literal(named->text);
+  out += ",\n";
   out += "    .fields = k" + tableIdentifier + "Fields,\n";
   out += "    .keys = k" + tableIdentifier + "Keys,\n";
   const auto property = [&table](std::string_view name) {
@@ -739,12 +764,27 @@ std::string TableDefinitions(const al::TableObject &declared, const EnumIndex &e
     out += "    .dataCaptionFields = " + tableIdentifier + "::kDataCaptionFields,\n";
   }
   for (const auto &[name, member] :
-       {std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
-        std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"},
-        std::pair<std::string_view, std::string_view>{"AllowInCustomizations",
-                                                      "allowInCustomizations"}}) {
+       {std::pair<std::string_view, std::string_view>{"Permissions", "permissions"},
+        std::pair<std::string_view, std::string_view>{"InherentPermissions", "inherentPermissions"},
+        std::pair<std::string_view, std::string_view>{"InherentEntitlements",
+                                                      "inherentEntitlements"},
+        std::pair<std::string_view, std::string_view>{"Access", "access"},
+        std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
+        std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"}}) {
     const std::string said = property(name);
     if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
+  }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"LookupPageId", "lookupPageId"},
+        std::pair<std::string_view, std::string_view>{"DrillDownPageId", "drillDownPageId"}}) {
+    const std::string said = PageNumber(objects.pages, property(name));
+    if (!said.empty()) {
+      out += "    ." + std::string(member) + " = ::agiru::PageId{" + said + "},\n";
+    }
+  }
+  {
+    const std::string said = property("AllowInCustomizations");
+    if (!said.empty()) { out += "    .allowInCustomizations = " + Literal(said) + ",\n"; }
   }
   const std::string obsolete = property("ObsoleteState");
   if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
@@ -812,16 +852,20 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += Includes(table, options, enums);
   out += "#include <array>\n#include <cstddef>\n#include <cstdint>\n";
   out += "#include <string_view>\n#include <type_traits>\n\n";
-  if (NamesAbsentIn(table.variables, table.procedures, objects)) {
-    out += "#include \"absent/Types.h\"\n\n";
+  std::vector<al::ProcedureDecl> bodies = table.procedures;
+  for (const al::FieldDecl &field : table.fields) {
+    bodies.insert(bodies.end(), field.triggers.begin(), field.triggers.end());
   }
+  if (NamesAbsentIn(table.variables, bodies, objects)) { out += "#include \"absent/Types.h\"\n\n"; }
   out += Declarations(table, objects);
 
   std::map<std::string, std::vector<std::string>> fieldOptions;
-  for (const OptionField &option : options) { fieldOptions.emplace(option.enumName, option.members); }
-  out += InlineOptionsOf(table.name, "tables", table.variables, table.procedures, fieldOptions);
+  for (const OptionField &option : options) {
+    fieldOptions.emplace(option.enumName, option.members);
+  }
+  out += InlineOptionsOf(table.name, "tables", table.variables, bodies, fieldOptions);
 
-  if (!options.empty() || DeclaresAnOption(table.variables, table.procedures)) {
+  if (!options.empty() || DeclaresAnOption(table.variables, bodies)) {
     out += "#include \"options/Types.h\"\n\n";
   }
 
@@ -859,10 +903,6 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
-  std::vector<al::ProcedureDecl> bodies = table.procedures;
-  for (const al::FieldDecl &field : table.fields) {
-    bodies.insert(bodies.end(), field.triggers.begin(), field.triggers.end());
-  }
   GatherAbsentIn(table.variables, bodies, objects, dotnet, absent);
   return TableHeader{.text = WithDoor(out, ObjectKind::Table),
                      .unresolvedEnums = Unresolved(table, enums),

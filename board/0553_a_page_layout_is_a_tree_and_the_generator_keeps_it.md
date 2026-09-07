@@ -3,7 +3,7 @@ Status:   open
 Parent:   0030
 Area:     gen, rt
 Source:   developer/devenv-page-types-and-layouts.md
-Verdict:  teilweise
+Verdict:  teilweise -- the tree stands, the checks and two sections do not
 Class:    activation
 
 # A page layout is a tree, and the generator keeps it
@@ -311,3 +311,58 @@ that the client renders**, and nothing about it is a new storage mechanism.
 **One limitation is stated and is worth carrying**: *"Business Central doesn't currently offer any way
 for you to restrict user input to simple formatting only."* There is no sanitisation surface, so
 whatever the client produces is what is stored.
+
+## WHAT LANDED, 2026-09-07
+
+`include/meta/PageDef.h` is beside `TableDef.h`, and every page's `.cpp` carries its tree the way a
+table's carries its field table: `extern const PageDef k<Page>Page;` in the header, the `constexpr`
+arrays in the source, so a page's consumer parses a declaration and not 60 controls.
+
+```cpp
+constexpr std::array<ControlDef, 2> kGenerateTestData_C1{{
+    ControlDef{.kind = ControlKind::Group, .name = "Options", .caption = "Options",
+               .children = kGenerateTestData_C2},
+    ControlDef{.kind = ControlKind::Repeater, .name = "Group", .editable = "false",
+               .children = kGenerateTestData_C4},
+}};
+constexpr std::array<ControlDef, 1> kGenerateTestDataLayout{{
+    ControlDef{.kind = ControlKind::Area, .area = AreaKind::Content,
+               .children = kGenerateTestData_C1},
+}};
+```
+
+The children array is emitted BEFORE its parent, which is what lets a `constexpr std::span` name it;
+`PageTraits<Page>::kPage` is the reference the runtime reaches it through.
+
+**What the tree carries per control**: kind, area, name, caption, the source EXPRESSION and the
+field number when the expression is a field of the source table, the embedded page's number,
+tooltip, application area, visible/enabled/editable as AL wrote them, importance, style, image,
+shortcut key, the four `Run...` properties, the two `SubPage...` properties, showCaption, ellipsis,
+multiLine, quickEntry, showMandatory, hideValue, width, freezeColumn, lookup, drillDown, assistEdit,
+scope, accessByPermission, obsoleteState, the two page-id overrides, `AboutTitle`/`AboutText`,
+the two indentation properties, `ShowAs`, `InFooterBar`, `RunPageOnRec`, and the format group.
+**What the PAGE carries**: type, source table, source table view, the four permission flags, and
+twenty more.
+
+**Visible, Enabled and Editable are TEXT and not `bool`, and that is the finding of the round.**
+2 052 `Enabled` declarations name a page variable far oftener than they say `false`, so a flag would
+have been a lie for most of them and the renderer would have had nothing to evaluate.
+
+**The census is what proves it**: 46 203 declarations were read and dropped in silence before the
+round and 2 885 after it, over the same 287 017 -- and the remainder is a NAMED list, of which
+2 047 are codeunit properties with no `CodeunitDef` to reach.
+
+**An unknown control word is a counted hole**, `ControlKind::Unknown` with the AL word in `.source`,
+which is how board:0033's 296 unapplied page-extension operations were found. 42 remain: 21
+`customaction` (already refused as a property) and 21 operations whose anchor does not exist.
+
+## WHAT IS STILL OPEN
+
+- **The `static_assert`s the item argues for are not emitted** -- depth, kind, the three the platform
+  refuses. The `Depth()` and `Control()` walks they need are in the door and constant-evaluable.
+- **`views` and `analysisviews` have a span and no source**: the parser reads neither section.
+- **`systempart` is a `ControlKind::SystemPart` in the TREE and still a field in the flat
+  `_Controls` list**, which is board:0540's surface and untouched by design.
+- **The three flat lists are still built by `Flatten` rather than derived from the tree**, so the
+  duplication the item wanted removed is still there -- both are generated from the same AST, which
+  is enough for correctness and not for the item's own argument.

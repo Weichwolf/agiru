@@ -528,6 +528,24 @@ public:
     return *this;
   }
 
+  /// \brief AL `+=` where the other side is a member the runtime has not rebuilt.
+  ///
+  /// \tparam T The refusal's type, which marks itself with `IsAlRefusal`.
+  /// \param refusal The refused member.
+  /// \return Never.
+  /// \throws Error always, naming the member -- which is what reading it does anywhere else.
+  ///
+  /// \warning IT READS THE REFUSAL AS A NUMBER TO MAKE IT THROW, and that is not an accident: a
+  ///          refusal deliberately does NOT convert to `std::string_view`, because a `Code<N>`
+  ///          assignment then had two equally good conversions. So the append cannot go through
+  ///          text, and any conversion the refusal offers raises the same error.
+  template <typename T>
+    requires requires { typename T::IsAlRefusal; }
+  StringValue &operator+=(const T &refusal) {
+    static_cast<void>(static_cast<std::int32_t>(refusal));
+    return *this;
+  }
+
   /// \brief Reads as text wherever text is wanted.
   ///
   /// \return The stored text.
