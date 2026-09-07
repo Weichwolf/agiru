@@ -297,6 +297,9 @@ struct Declared {
   std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
   std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
   std::string_view access{};                ///< `Access`, as AL wrote it.
+  std::string_view subtype{};               ///< `Subtype`, on a Blob or Media field.
+  bool enabled = true;                      ///< `Enabled`, on a field.
+  std::string_view movedFrom{};             ///< `MovedFrom`, the app the field came from.
   std::string_view movedTo{};               ///< `MovedTo`, the app the field went to.
   std::string_view description{};           ///< `Description`, which nothing reads.
   std::string_view obsoleteState{};         ///< `ObsoleteState`.
@@ -351,6 +354,9 @@ constexpr FieldDef Declare(FieldNo no,
       .autoFormatExpression = declared.autoFormatExpression,
       .allowInCustomizations = declared.allowInCustomizations,
       .access = declared.access,
+      .subtype = declared.subtype,
+      .enabled = declared.enabled,
+      .movedFrom = declared.movedFrom,
       .movedTo = declared.movedTo,
       .description = declared.description,
       .obsoleteState = declared.obsoleteState,

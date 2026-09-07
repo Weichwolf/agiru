@@ -380,6 +380,9 @@ std::string DeclaredBlock(const al::FieldDecl &field,
   text("autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
   text("allowInCustomizations", PropertyText(field, "AllowInCustomizations"));
   text("access", PropertyText(field, "Access"));
+  text("subtype", PropertyText(field, "Subtype"));
+  flag("enabled", PropertyIs(field, "Enabled", true), true);
+  text("movedFrom", PropertyText(field, "MovedFrom"));
   text("movedTo", PropertyText(field, "MovedTo"));
   text("description", PropertyText(field, "Description"));
   text("obsoleteState", PropertyText(field, "ObsoleteState"));
@@ -724,6 +727,12 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     if (said("Unique", false)) { out += ", .unique = true"; }
     const al::Property *included = Find(table.keys[i].properties, "IncludedFields");
     if (included != nullptr) { out += ", .includedFields = " + Literal(included->text); }
+    for (const auto &[name, member] :
+         {std::pair<std::string_view, std::string_view>{"Description", "description"},
+          std::pair<std::string_view, std::string_view>{"ObsoleteState", "obsoleteState"}}) {
+      const al::Property *found = Find(table.keys[i].properties, name);
+      if (found != nullptr) { out += ", ." + std::string(member) + " = " + Literal(found->text); }
+    }
     out += "},\n";
   }
   out += "}};\n\n";
@@ -768,6 +777,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
         std::pair<std::string_view, std::string_view>{"InherentPermissions", "inherentPermissions"},
         std::pair<std::string_view, std::string_view>{"InherentEntitlements",
                                                       "inherentEntitlements"},
+        std::pair<std::string_view, std::string_view>{"Extensible", "extensible"},
         std::pair<std::string_view, std::string_view>{"Access", "access"},
         std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
         std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"}}) {
@@ -783,6 +793,9 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     }
   }
   {
+    if (LowerKey(property("PasteIsValid")) == "false") { out += "    .pasteIsValid = false,\n"; }
+    const std::string describe = property("Description");
+    if (!describe.empty()) { out += "    .description = " + Literal(describe) + ",\n"; }
     const std::string said = property("AllowInCustomizations");
     if (!said.empty()) { out += "    .allowInCustomizations = " + Literal(said) + ",\n"; }
   }

@@ -276,7 +276,7 @@ constexpr std::array kAcknowledgedAttributes{
               std::string_view{"debugger visibility; no debugger here"}},
 };
 
-constexpr std::array kTranslatedProperties{
+constexpr std::string_view kTranslatedProperties[] = {
     std::string_view{"codeunit.eventsubscriberinstance"},
     std::string_view{"codeunit.subtype"},
     std::string_view{"codeunit.tableno"},
@@ -323,6 +323,82 @@ constexpr std::array kTranslatedProperties{
     std::string_view{"key.sumindexfields"},
     std::string_view{"key.unique"},
     std::string_view{"page.sourcetable"},
+    std::string_view{"action.allowedfileextensions"},
+    std::string_view{"action.allowmultiplefiles"},
+    std::string_view{"action.closingdates"},
+    std::string_view{"action.columnspan"},
+    std::string_view{"action.cuegrouplayout"},
+    std::string_view{"action.description"},
+    std::string_view{"action.entityname"},
+    std::string_view{"action.entitysetname"},
+    std::string_view{"action.numeric"},
+    std::string_view{"action.rowspan"},
+    std::string_view{"action.treeinitialstate"},
+    std::string_view{"action.valuesallowed"},
+    std::string_view{"codeunit.description"},
+    std::string_view{"codeunit.testisolation"},
+    std::string_view{"codeunit.testtype"},
+    std::string_view{"control.allowedfileextensions"},
+    std::string_view{"control.allowmultiplefiles"},
+    std::string_view{"control.closingdates"},
+    std::string_view{"control.columnspan"},
+    std::string_view{"control.cuegrouplayout"},
+    std::string_view{"control.description"},
+    std::string_view{"control.entityname"},
+    std::string_view{"control.entitysetname"},
+    std::string_view{"control.numeric"},
+    std::string_view{"control.rowspan"},
+    std::string_view{"control.treeinitialstate"},
+    std::string_view{"control.valuesallowed"},
+    std::string_view{"field.enabled"},
+    std::string_view{"field.movedfrom"},
+    std::string_view{"field.subtype"},
+    std::string_view{"key.description"},
+    std::string_view{"key.obsoletestate"},
+    std::string_view{"page.apigroup"},
+    std::string_view{"page.apipublisher"},
+    std::string_view{"page.apiversion"},
+    std::string_view{"page.changetrackingallowed"},
+    std::string_view{"page.dataaccessintent"},
+    std::string_view{"page.description"},
+    std::string_view{"page.entitycaption"},
+    std::string_view{"page.entityname"},
+    std::string_view{"page.entitysetcaption"},
+    std::string_view{"page.entitysetname"},
+    std::string_view{"page.helplink"},
+    std::string_view{"page.ispreview"},
+    std::string_view{"table.description"},
+    std::string_view{"table.pasteisvalid"},
+    std::string_view{"action.blanknumbers"},
+    std::string_view{"action.flowtemplatecategoryname"},
+    std::string_view{"action.gesture"},
+    std::string_view{"action.gridlayout"},
+    std::string_view{"action.isheader"},
+    std::string_view{"action.masktype"},
+    std::string_view{"action.maxvalue"},
+    std::string_view{"action.minvalue"},
+    std::string_view{"action.notblank"},
+    std::string_view{"action.provider"},
+    std::string_view{"action.showastree"},
+    std::string_view{"control.blanknumbers"},
+    std::string_view{"control.flowtemplatecategoryname"},
+    std::string_view{"control.gesture"},
+    std::string_view{"control.gridlayout"},
+    std::string_view{"control.isheader"},
+    std::string_view{"control.masktype"},
+    std::string_view{"control.maxvalue"},
+    std::string_view{"control.minvalue"},
+    std::string_view{"control.notblank"},
+    std::string_view{"control.provider"},
+    std::string_view{"control.showastree"},
+    std::string_view{"page.accessbypermission"},
+    std::string_view{"page.contextsensitivehelppage"},
+    std::string_view{"page.inherententitlements"},
+    std::string_view{"page.inherentpermissions"},
+    std::string_view{"page.odatakeyfields"},
+    std::string_view{"page.populateallfields"},
+    std::string_view{"page.querycategory"},
+    std::string_view{"table.extensible"},
     std::string_view{"codeunit.permissions"},
     std::string_view{"codeunit.inherentpermissions"},
     std::string_view{"codeunit.inherententitlements"},
@@ -1795,7 +1871,8 @@ int Scan(const Job &job) {
     std::vector<std::pair<std::string, std::size_t>> partial;
     for (const auto &[name, found] : gathered.properties) {
       counted += found;
-      if (std::ranges::find(kTranslatedProperties, name) != kTranslatedProperties.end()) {
+      if (std::ranges::find(kTranslatedProperties, name) !=
+          std::ranges::end(kTranslatedProperties)) {
         continue;
       }
       const std::string_view bare = PropertyName(name);
@@ -1824,7 +1901,7 @@ int Scan(const Job &job) {
                  decided,
                  dropped,
                  silent.size());
-    for (std::size_t i = 0; i < silent.size() && i < 30; ++i) {
+    for (std::size_t i = 0; i < silent.size() && i < 60; ++i) {
       std::println("          {:>7} x {}", silent[i].second, silent[i].first);
     }
     for (const auto &[name, found] : partial) {

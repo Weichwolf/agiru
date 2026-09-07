@@ -100,9 +100,8 @@ enum class ControlKind : std::uint8_t {
 /// \param kind The control's kind.
 /// \return True when the control's children are its layout.
 [[nodiscard]] constexpr bool Container(ControlKind kind) {
-  return kind == ControlKind::Area || kind == ControlKind::Group ||
-         kind == ControlKind::Repeater || kind == ControlKind::CueGroup ||
-         kind == ControlKind::Grid || kind == ControlKind::Fixed ||
+  return kind == ControlKind::Area || kind == ControlKind::Group || kind == ControlKind::Repeater ||
+         kind == ControlKind::CueGroup || kind == ControlKind::Grid || kind == ControlKind::Fixed ||
          kind == ControlKind::Actions;
 }
 
@@ -275,6 +274,71 @@ struct ControlDef {
   /// \brief The `ShowFilter` property on a part, which a part cannot get back (board:0421).
   bool showFilter = true;
 
+  /// \brief The `NotBlank` property on the CONTROL: the client refuses an empty entry
+  ///        (board:0319).
+  bool notBlank = false;
+
+  /// \brief The `ShowAsTree` property: a repeater renders as an expandable tree (board:0560).
+  bool showAsTree = false;
+
+  /// \brief The `IsHeader` property of a separator, which makes it a heading (board:0478).
+  bool isHeader = false;
+
+  /// \brief The `Provider` property, as AL wrote it: the part an action's data comes from.
+  std::string_view provider{};
+
+  /// \brief The `MinValue`, `MaxValue`, `BlankNumbers` and `MaskType` properties, as AL wrote
+  ///        them: a control may override what its field declares (board:0317, board:0318,
+  ///        board:0323, board:0330).
+  std::string_view minValue{};
+  std::string_view maxValue{};     ///< \see minValue
+  std::string_view blankNumbers{}; ///< \see minValue
+  std::string_view maskType{};     ///< \see minValue
+
+  /// \brief The `ColumnSpan` and `RowSpan` properties: how many grid cells a control fills; the
+  ///        web client ignores `RowSpan` (board:0422). 0 when none is declared.
+  std::uint16_t columnSpan = 0;
+  std::uint16_t rowSpan = 0; ///< \see columnSpan
+
+  /// \brief The `ClosingDates` and `Numeric` properties on the CONTROL (board:0326, board:0320).
+  bool closingDates = false;
+  bool numeric = false; ///< \see closingDates
+
+  /// \brief The `ValuesAllowed` property, as AL wrote it (board:0322).
+  std::string_view valuesAllowed{};
+
+  /// \brief The `TreeInitialState` property, as AL wrote it: how an expandable list opens
+  ///        (board:0560).
+  std::string_view treeInitialState{};
+
+  /// \brief The `CueGroupLayout` property, as AL wrote it: whether a cue group is wide
+  ///        (board:0428).
+  std::string_view cueGroupLayout{};
+
+  /// \brief The `AllowMultipleFiles` and `AllowedFileExtensions` properties of a file-upload
+  ///        action, as AL wrote them (board:0300).
+  bool allowMultipleFiles = false;
+  std::string_view allowedFileExtensions{}; ///< \see allowMultipleFiles
+
+  /// \brief The `EntityName` and `EntitySetName` properties on a CONTROL, which an API page's
+  ///        parts carry (board:0567).
+  std::string_view entityName{};
+  std::string_view entitySetName{}; ///< \see entityName
+
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
+
+  /// \brief The `GridLayout` property, as AL wrote it: rows or columns (board:0422).
+  std::string_view gridLayout{};
+
+  /// \brief The `Gesture` property, as AL wrote it: the touch gesture that runs the action
+  ///        (board:0426).
+  std::string_view gesture{};
+
+  /// \brief The `FlowTemplateCategoryName` property, as AL wrote it: the Power Automate category
+  ///        a template action belongs to.
+  std::string_view flowTemplateCategoryName{};
+
   /// \brief The `AutoFormatType` and `AutoFormatExpression` properties, as AL wrote them: a
   ///        control may override what its field says (board:0437).
   std::string_view autoFormatType{};
@@ -390,9 +454,58 @@ struct PageDef {
   std::string_view aboutTitle{};
   std::string_view aboutText{}; ///< \see aboutTitle
 
+  /// \brief The `PopulateAllFields` property: the page reads every field of its source rather
+  ///        than the ones its controls name.
+  bool populateAllFields = false;
+
+  /// \brief The `InherentPermissions` and `InherentEntitlements` properties on the PAGE
+  ///        (board:0378).
+  std::string_view inherentPermissions{};
+  std::string_view inherentEntitlements{}; ///< \see inherentPermissions
+
+  /// \brief The `AccessByPermission` property on the PAGE (board:0377).
+  std::string_view accessByPermission{};
+
+  /// \brief The `QueryCategory` property, as AL wrote it: where an API page is listed
+  ///        (board:0464).
+  std::string_view queryCategory{};
+
+  /// \brief The `ODataKeyFields` property, as AL wrote it: the fields an OData key is built from
+  ///        (board:0390).
+  std::string_view odataKeyFields{};
+
+  /// \brief The `ContextSensitiveHelpPage` property, as AL wrote it (board:0393).
+  std::string_view contextSensitiveHelpPage{};
+
+  /// \brief The API identity: `APIPublisher`, `APIGroup`, `APIVersion`, `EntityName`,
+  ///        `EntitySetName`, `EntityCaption` and `EntitySetCaption`, as AL wrote them. An API
+  ///        object is addressed by publisher, group and version (board:0465, board:0390).
+  std::string_view apiPublisher{};
+  std::string_view apiGroup{};         ///< \see apiPublisher
+  std::string_view apiVersion{};       ///< \see apiPublisher
+  std::string_view entityName{};       ///< \see apiPublisher
+  std::string_view entitySetName{};    ///< \see apiPublisher
+  std::string_view entityCaption{};    ///< \see apiPublisher
+  std::string_view entitySetCaption{}; ///< \see apiPublisher
+
+  /// \brief The `ChangeTrackingAllowed` property: whether the API exposes a delta link.
+  bool changeTrackingAllowed = false;
+
+  /// \brief The `IsPreview` property: the object is not yet supported for production.
+  bool isPreview = false;
+
+  /// \brief The `DataAccessIntent` property on the PAGE, as AL wrote it.
+  std::string_view dataAccessIntent{};
+
+  /// \brief The `HelpLink` property, as AL wrote it (board:0393).
+  std::string_view helpLink{};
+
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
+
   /// \brief The `Extensible`, `Access` and `ObsoleteState` properties, as AL wrote them.
   std::string_view extensible{};
-  std::string_view access{}; ///< \see extensible
+  std::string_view access{};        ///< \see extensible
   std::string_view obsoleteState{}; ///< \see extensible
 };
 
@@ -406,7 +519,7 @@ struct PageDef {
 ///       test and from a client action rather than from a posting loop, and a map would cost a
 ///       relocation per page in every process.
 [[nodiscard]] constexpr const ControlDef *Control(std::span<const ControlDef> controls,
-                                                 std::string_view name) {
+                                                  std::string_view name) {
   for (const ControlDef &control : controls) {
     if (control.name == name) { return &control; }
     if (const ControlDef *found = Control(control.children, name); found != nullptr) {

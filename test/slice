@@ -2047,3 +2047,6 @@ base/cash_flow/setup/table/CashFlowSetup.cpp
 system/system/security/encryption/codeunit/CryptographyManagement.cpp
 system/system/environment/configuration/table/SignupContextValues.cpp
 system/system/security/encryption/codeunit/SignatureKey.cpp
+base/system/environment/configuration/codeunit/NotificationEntryDispatcher.cpp
+base/pricing/calculation/table/PriceCalculationSetup.cpp
+base/pricing/calculation/table/PriceCalculationSetup.cpp

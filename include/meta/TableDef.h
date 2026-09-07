@@ -223,8 +223,16 @@ struct FieldDef {
   /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.
   std::string_view access{};
 
-  /// \brief The `MovedTo` property on the FIELD: the app the field went to (board:0357).
-  std::string_view movedTo{};
+  /// \brief The `Subtype` property on a BLOB or Media field, as AL wrote it: `Bitmap`, `Memo`,
+  ///        `Json`, `Xml` or `UserDefined`.
+  std::string_view subtype{};
+
+  /// \brief The `Enabled` property on a FIELD: a disabled field is declared and not maintained.
+  bool enabled = true;
+
+  /// \brief The `MovedFrom` and `MovedTo` properties on the FIELD (board:0357).
+  std::string_view movedFrom{};
+  std::string_view movedTo{}; ///< \see movedFrom
 
   /// \brief The `Description` property, which the compiler carries and nothing reads.
   std::string_view description{};
@@ -288,6 +296,12 @@ struct KeyDef {
   /// \brief The `IncludedFields` property, as AL wrote it -- kept SEPARATE from the key's own
   ///        fields, because `SetCurrentKey` never selects a key by them (board:0351).
   std::string_view includedFields{};
+
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
+
+  /// \brief The `ObsoleteState` property on the KEY, as AL wrote it.
+  std::string_view obsoleteState{};
 };
 
 /// \brief How many system fields the platform adds to every table.
@@ -351,6 +365,10 @@ struct TableDef {
   std::string_view inherentPermissions{};
   std::string_view inherentEntitlements{}; ///< \see inherentPermissions
 
+  /// \brief The `Extensible` property, as AL wrote it: whether an extension may reach the object
+  ///        (board:0360).
+  std::string_view extensible{};
+
   /// \brief The `Access` property, as AL wrote it: what the generated name is visible to
   ///        (board:0359).
   std::string_view access{};
@@ -364,6 +382,12 @@ struct TableDef {
   ///        of it falls back to (board:0334, board:0335).
   PageId lookupPageId{};
   PageId drillDownPageId{}; ///< \see lookupPageId
+
+  /// \brief The `PasteIsValid` property: whether the client may paste rows into the table.
+  bool pasteIsValid = true;
+
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
 
   /// \brief The `AllowInCustomizations` property on the TABLE (board:0480).
   std::string_view allowInCustomizations{};

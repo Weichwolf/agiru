@@ -1401,6 +1401,9 @@ std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string
   if (LowerKey(said("SingleInstance")) == "true") { out += "    .singleInstance = true,\n"; }
   text("eventSubscriberInstance", "EventSubscriberInstance");
   text("testPermissions", "TestPermissions");
+  text("testType", "TestType");
+  text("testIsolation", "TestIsolation");
+  text("description", "Description");
   text("access", "Access");
   text("obsoleteState", "ObsoleteState");
   out += "};\n\n";

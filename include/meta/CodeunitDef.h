@@ -43,6 +43,17 @@ struct CodeunitDef {
   /// \brief The `TestPermissions` property, as AL wrote it (board:0473).
   std::string_view testPermissions{};
 
+  /// \brief The `TestType` property, as AL wrote it: `Uncategorized`, `IntegrationTest` and the
+  ///        rest of the categories a test codeunit declares.
+  std::string_view testType{};
+
+  /// \brief The `TestIsolation` property, as AL wrote it: what the runner rolls back after a case
+  ///        (board:0470).
+  std::string_view testIsolation{};
+
+  /// \brief The `Description` property, which the compiler carries and nothing reads.
+  std::string_view description{};
+
   /// \brief The `Access` property, as AL wrote it (board:0359).
   std::string_view access{};
 

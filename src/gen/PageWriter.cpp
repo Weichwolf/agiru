@@ -497,6 +497,39 @@ std::string DeclaredControl(const al::PageControl &control,
   flag("inFooterBar", "InFooterBar", false);
   flag("runPageOnRec", "RunPageOnRec", false);
   flag("showFilter", "ShowFilter", true);
+  flag("notBlank", "NotBlank", false);
+  flag("showAsTree", "ShowAsTree", false);
+  flag("isHeader", "IsHeader", false);
+  text("provider", "Provider");
+  text("minValue", "MinValue");
+  text("maxValue", "MaxValue");
+  text("blankNumbers", "BlankNumbers");
+  text("maskType", "MaskType");
+  {
+    const auto span = [&out, &control](std::string_view member, std::string_view property) {
+      const std::string said = ControlText(control, property);
+      if (said.empty() || said.find_first_not_of("0123456789") != std::string::npos ||
+          said == "0") {
+        return;
+      }
+      out += ", ." + std::string(member) + " = " + said;
+    };
+    span("columnSpan", "ColumnSpan");
+    span("rowSpan", "RowSpan");
+  }
+  flag("closingDates", "ClosingDates", false);
+  flag("numeric", "Numeric", false);
+  text("valuesAllowed", "ValuesAllowed");
+  text("treeInitialState", "TreeInitialState");
+  text("cueGroupLayout", "CueGroupLayout");
+  flag("allowMultipleFiles", "AllowMultipleFiles", false);
+  text("allowedFileExtensions", "AllowedFileExtensions");
+  text("entityName", "EntityName");
+  text("entitySetName", "EntitySetName");
+  text("description", "Description");
+  text("gridLayout", "GridLayout");
+  text("gesture", "Gesture");
+  text("flowTemplateCategoryName", "FlowTemplateCategoryName");
   text("autoFormatType", "AutoFormatType");
   text("autoFormatExpression", "AutoFormatExpression");
   text("captionClass", "CaptionClass");
@@ -531,6 +564,15 @@ std::string ControlArrays(const std::vector<al::PageControl> &controls,
   }
   out += "}};\n\n";
   return name;
+}
+
+std::size_t DepthOf(const std::vector<al::PageControl> &controls) {
+  std::size_t deepest = 0;
+  for (const al::PageControl &control : controls) {
+    const std::size_t below = DepthOf(control.children) + 1;
+    if (below > deepest) { deepest = below; }
+  }
+  return deepest;
 }
 
 std::string PageTypeOf(const al::PageObject &page) {
@@ -633,11 +675,37 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   flag("autoSplitKey", "AutoSplitKey", false);
   text("aboutTitle", "AboutTitle");
   text("aboutText", "AboutText");
+  flag("populateAllFields", "PopulateAllFields", false);
+  text("inherentPermissions", "InherentPermissions");
+  text("inherentEntitlements", "InherentEntitlements");
+  text("accessByPermission", "AccessByPermission");
+  text("queryCategory", "QueryCategory");
+  text("odataKeyFields", "ODataKeyFields");
+  text("contextSensitiveHelpPage", "ContextSensitiveHelpPage");
+  text("apiPublisher", "APIPublisher");
+  text("apiGroup", "APIGroup");
+  text("apiVersion", "APIVersion");
+  text("entityName", "EntityName");
+  text("entitySetName", "EntitySetName");
+  text("entityCaption", "EntityCaption");
+  text("entitySetCaption", "EntitySetCaption");
+  flag("changeTrackingAllowed", "ChangeTrackingAllowed", false);
+  flag("isPreview", "IsPreview", false);
+  text("dataAccessIntent", "DataAccessIntent");
+  text("helpLink", "HelpLink");
+  text("description", "Description");
   text("extensible", "Extensible");
   text("access", "Access");
   text("obsoleteState", "ObsoleteState");
   out += "};\n\n";
-  out += "} // namespace agiru::app::pages\n";
+  for (const auto &[named, controls] :
+       {std::pair{layout, &page.layout}, std::pair{actions, &page.actions}}) {
+    if (named.empty()) { continue; }
+    out += "static_assert(Depth(" + named + ") == " + std::to_string(DepthOf(*controls)) +
+           ",\n              \"a page's layout is a TREE and the generator keeps it -- a "
+           "flattened one is one level deep (board:0553)\");\n";
+  }
+  out += "\n} // namespace agiru::app::pages\n";
   return out;
 }
 
