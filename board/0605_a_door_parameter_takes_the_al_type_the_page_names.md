@@ -34,7 +34,14 @@ refusing it is the door being wrong.
 
 ## The choice
 
-**The parameter takes `const StringValue &`**, which is what `Text` and `Code` already are and what
+**MEASURED 2026-09-07, and it moves the choice**: `StringValue` carries no constructor from a
+literal or a `std::string_view` -- it has `explicit StringValue(std::size_t max)` and the defaulted
+ones, because it is the BASE of `Text<N>` and `Code<N>` and a length is part of it. A parameter
+typed `const StringValue &` would therefore take `Text` and `Code` and refuse `"Name"`, which is
+what a great many call sites pass. So this is not a 433-site type swap; it needs a parameter type
+that accepts a literal, an AL string, a `Guid` and a refusal, and that type does not exist yet.
+
+**~~The parameter takes `const StringValue &`~~**, which is what `Text` and `Code` already are and what
 a temporary can bind to. Then `Guid` gains the conversion the page above describes, and `Refused`
 keeps its deliberate exclusion of the STANDARD spellings while still converting to the AL type --
 which is what its own `\warning` says it wants (`Code<50> = Obj.Member` had two viable conversions
