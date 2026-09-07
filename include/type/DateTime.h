@@ -117,6 +117,22 @@ public:
   /// \brief AL `DateTime - Duration`.
   /// \param d How long to move back.
   /// \return The earlier instant, or the undefined one when this is undefined.
+  /// \brief AL `DateTime += Duration` -- in place.
+  /// \param d The duration, which AL also spells as a number of milliseconds.
+  /// \return This moment.
+  constexpr DateTime &operator+=(const Duration &d) {
+    *this = *this + d;
+    return *this;
+  }
+
+  /// \brief AL `DateTime -= Duration` -- in place.
+  /// \param d The duration.
+  /// \return This moment.
+  constexpr DateTime &operator-=(const Duration &d) {
+    *this = *this - d;
+    return *this;
+  }
+
   [[nodiscard]] constexpr DateTime operator-(const Duration &d) const {
     return IsUndefined() ? *this : FromMilliseconds(milliseconds_ - d.Milliseconds());
   }

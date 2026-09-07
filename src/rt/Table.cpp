@@ -8,20 +8,26 @@
 #include "runtime/Record.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Media.h"
+#include "type/MediaSet.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 
 #include "Rows.h"
+#include "Temporary.h"
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <format>
 #include <optional>
 #include <span>
@@ -31,6 +37,11 @@
 #include <vector>
 
 namespace agiru::detail {
+
+Found::~Found() noexcept(false) {
+  if (read_ || found_ || std::uncaught_exceptions() != 0) { return; }
+  throw Error("There is no " + std::string(table_) + " within the filter.");
+}
 
 class ValueAccess {
 public:
@@ -145,7 +156,10 @@ namespace {
 FieldValues ValuesOf(const void *record, const TableDef &table) {
   FieldValues values;
   values.reserve(table.fields.size());
-  for (const FieldDef &def : table.fields) { values.emplace_back(StorageText(record, def)); }
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    values.emplace_back(StorageText(record, def));
+  }
   return values;
 }
 
@@ -228,6 +242,12 @@ void ClearField(void *record, const FieldDef &def) {
     case FieldType::DateTime: *reinterpret_cast<DateTime *>(At(record, def)) = DateTime{}; return;
     case FieldType::Duration: *reinterpret_cast<Duration *>(At(record, def)) = Duration{}; return;
     case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid{}; return;
+    case FieldType::DateFormula:
+      *reinterpret_cast<DateFormula *>(At(record, def)) = DateFormula{};
+      return;
+    case FieldType::Blob: *reinterpret_cast<Blob *>(At(record, def)) = Blob{}; return;
+    case FieldType::Media: *reinterpret_cast<Media *>(At(record, def)) = Media{}; return;
+    case FieldType::MediaSet: *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{}; return;
     default:
       throw Error("Init: field " + std::string(def.name) +
                   " has a type this runtime cannot return to its default yet");
@@ -319,28 +339,42 @@ void RuntimeClear(void *record, const TableDef &table) {
 }
 
 void RuntimeInsert(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) {
+    TempInsert(record, table);
+    return;
+  }
+
   StampInserted(record, table);
   const FieldValues values = ValuesOf(record, table);
   InsertRow(Session::Current().Database(), table, values);
 }
 
 bool RuntimeModify(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempModify(record, table); }
+
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   return ModifyRow(Session::Current().Database(), table, values);
 }
 
 bool RuntimeDelete(const void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempDelete(const_cast<void *>(record), table); }
+
   const FieldValues key = KeyOf(record, table);
   return DeleteRow(Session::Current().Database(), table, key);
 }
 
 bool RuntimeGet(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempGet(record, table); }
+
   const FieldValues key = KeyOf(record, table);
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
   if (!row.has_value()) { return false; }
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    SetFieldText(record, table.fields[i], Required((*row)[i], table.fields[i]));
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    SetFieldText(record, def, Required((*row)[column], def));
+    ++column;
   }
   return true;
 }

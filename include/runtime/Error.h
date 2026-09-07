@@ -2,6 +2,7 @@
 
 #include "runtime/Transaction.h"
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -32,6 +33,18 @@ public:
   ///       `std::runtime_error` does not take. Without this, `Error(GetLastErrorText())` -- the
   ///       shape a test writes to re-raise -- does not compile.
   explicit Error(std::string_view text) : std::runtime_error(std::string(text)) {}
+
+  /// \brief AL `Error(ErrorInfo)` -- the error an `ErrorInfo` describes.
+  ///
+  /// \tparam Info Anything that carries a `Message()`, which is what `ErrorInfo` is here.
+  /// \param  info The described error.
+  ///
+  /// \note IT IS A TEMPLATE SO THAT THE DOOR STAYS CHEAP. `runtime/Error.h` is included by every
+  ///       generated translation unit and `type/ErrorInfo.h` is not; naming the type here would
+  ///       put the second behind the first for all 7 885 of them.
+  template <typename Info>
+    requires requires(Info &info) { std::string_view{info.Message()}; }
+  explicit Error(Info info) : std::runtime_error(std::string(info.Message())) {}
 };
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.
@@ -120,4 +133,33 @@ template <typename T> [[noreturn]] T RefusedTemporal(std::string_view what) {
 ///       says why, and the predecessor paid for the difference.
 void Commit();
 
+/// \brief AL `Database::"X"` for a table this run does not carry -- refused where it is read.
+/// \param name The AL name of the table.
+/// \return Never.
+/// \throws Error always, naming the table: an object number for a table that is not translated
+///         would be a number nothing can check (board:0034).
+[[noreturn]] inline std::int32_t AbsentObjectId(std::string_view name) {
+  throw Error("Database::" + std::string(name) +
+              " names a table this run does not carry (board:0034)");
+}
+
+/// \brief AL `Error(...)` -- raises, unless a `[ErrorBehavior(ErrorBehavior::Collect)]` scope is
+///        standing, in which case the error is COLLECTED and the call returns.
+/// \param message The text AL wrote.
+/// \throws Error unless a collecting scope took it.
+///
+/// \note IT IS WHY THE GENERATOR NO LONGER WRITES `throw`. AL's `Error` ends the path in the
+///       ordinary case and does NOT end it inside a collecting scope, so the decision belongs to
+///       the runtime rather than to the emitted statement (board:0195).
+void RaiseOrCollect(std::string_view message);
+
+/// \brief AL `Error(ErrorInfo)` -- the same, with the info's own message.
+/// \tparam Info Anything carrying a `Message()`, which is what `ErrorInfo` is here.
+/// \param info The error's description.
+/// \throws Error unless a collecting scope took it.
+template <typename Info>
+  requires requires(Info info) { info.Message(); }
+void RaiseOrCollect(Info info) {
+  RaiseOrCollect(std::string_view(info.Message()));
+}
 }

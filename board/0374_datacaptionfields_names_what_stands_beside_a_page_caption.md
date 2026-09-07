@@ -8,6 +8,9 @@ Class:    activation
 
 # `DataCaptionFields` names what stands beside a page caption
 
+**The metadata half is done:** carried as `TableDef::dataCaptionFields`, a `std::span<const FieldNo>` resolved by the generator (2026-09-05); the caption rule per page type remains.
+
+
 > Sets the fields that appear **to the left of the caption** on pages that display the contents of
 > this table. Applies to: **Table, Page, Request Page.**
 
@@ -69,3 +72,11 @@ declaring none shows its primary key.
 **The negative control is the page's own declaration on a card page** -- it must have NO effect, and
 an implementation that honours the more specific declaration passes every gate that does not set the
 two differently.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

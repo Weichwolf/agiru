@@ -132,8 +132,44 @@ void ATemporaryRecordNeedsNoSession() {
 
 } // namespace
 
+/// AL `var Buffer: Record "Line Number Buffer" temporary` is a `LineNumberBuffer &` here, and the
+/// rows must follow the ARGUMENT: temporariness is state, not type (board:0583).
+void ThroughBaseReference(LineNumberBuffer &rec, agiru::Integer n) {
+  rec.OldLineNumber = n;
+  rec.NewLineNumber = n * kTens;
+  rec.Insert();
+}
+
+void ABaseReferenceKeepsATemporaryTemporary() {
+  Temporary<LineNumberBuffer> buffer = With({1, 2});
+  LineNumberBuffer &asBase = buffer;
+  CHECK_TRUE("the base reference says it is temporary", asBase.IsTemporary());
+  ThroughBaseReference(buffer, 3);
+  CHECK_TRUE("and an Insert through it lands in the variable's rows", buffer.Count() == 3);
+  CHECK_TRUE("while a plain record is not temporary", !LineNumberBuffer{}.IsTemporary());
+}
+
+/// `SetRange` on a temporary record narrows the walk and the count, which the typed store never
+/// did (board:0583 names that as the activation this carries).
+void AFilterNarrowsATemporaryWalk() {
+  constexpr agiru::Integer kFive = 5;
+  Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
+  buffer.SetRange(buffer.OldLineNumber, 2, 4);
+  CHECK_TRUE("Count sees the filter", buffer.Count() == 3);
+  std::string walked;
+  for (bool more = buffer.FindSet(); more; more = buffer.Next()) {
+    walked += std::to_string(buffer.OldLineNumber) + " ";
+  }
+  CHECK_TEXT("and so does the walk", walked, "2 3 4 ");
+  CHECK_TRUE("FindLast lands on the last in range", buffer.FindLast() && buffer.OldLineNumber == 4);
+  buffer.Reset();
+  CHECK_TRUE("Reset widens it again", buffer.Count() == kFive);
+}
+
 int main() {
   return gate::Run("Temporary", [] {
+    ABaseReferenceKeepsATemporaryTemporary();
+    AFilterNarrowsATemporaryWalk();
     RowsWalkInPrimaryKeyOrder();
     ADuplicateKeyIsRefused();
     GetsRowFinds();

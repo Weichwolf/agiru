@@ -36,6 +36,12 @@ public:
   /// \param NewCompanyName The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.Company()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] SessionSettings.Company([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string Company();
+
   std::string Company(std::string_view NewCompanyName);
 
   /// \brief AL `SessionSettings.Init()`. Populates the instance of a SessionsSettings with the
@@ -49,6 +55,12 @@ public:
   /// \param NewLanguageId The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.LanguageId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] SessionSettings.LanguageId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer LanguageId();
+
   ::agiru::Integer LanguageId(::agiru::Integer NewLanguageId);
 
   /// \brief AL `SessionSettings.LocaleId(Integer)`. Gets or sets the locale ID property in a
@@ -56,6 +68,12 @@ public:
   /// \param NewLocaleId The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.LocaleId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] SessionSettings.LocaleId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer LocaleId();
+
   ::agiru::Integer LocaleId(::agiru::Integer NewLocaleId);
 
   /// \brief AL `SessionSettings.ProfileAppId(Guid)`. Gets or sets the ID of an extension, which
@@ -63,6 +81,12 @@ public:
   /// \param NewProfileAppId The AL `Guid`.
   /// \return The AL `Guid`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.ProfileAppId()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] SessionSettings.ProfileAppId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Guid ProfileAppId();
+
   ::agiru::Guid ProfileAppId(::agiru::Guid NewProfileAppId);
 
   /// \brief AL `SessionSettings.ProfileId(Text)`. Gets or sets the profile ID property in a
@@ -70,6 +94,12 @@ public:
   /// \param NewProfileId The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.ProfileId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] SessionSettings.ProfileId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string ProfileId();
+
   std::string ProfileId(std::string_view NewProfileId);
 
   /// \brief AL `SessionSettings.ProfileSystemScope(Boolean)`. Gets or sets the profile scope
@@ -77,6 +107,12 @@ public:
   /// \param NewProfileScope The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.ProfileSystemScope()` -- the READING form, which the
+  /// documentation's syntax block brackets: `[X := ] SessionSettings.ProfileSystemScope([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean ProfileSystemScope();
+
   ::agiru::Boolean ProfileSystemScope(::agiru::Boolean NewProfileScope);
 
   /// \brief AL `SessionSettings.RequestSessionUpdate(Boolean)`. Passes a SessionSettings object to
@@ -91,6 +127,12 @@ public:
   /// \param NewTimeZone The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `SessionSettings.TimeZone()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] SessionSettings.TimeZone([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string TimeZone();
+
   std::string TimeZone(std::string_view NewTimeZone);
 };
 

@@ -3,6 +3,7 @@
 #include "Ast.h"
 #include "EnumWriter.h"
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -15,7 +16,10 @@ struct TableRef {
   std::string identifier;
   std::string header;
 
+  std::int32_t id = 0;
+
   std::map<std::string, std::string> fields;
+  std::map<std::string, std::string> procedures;
 };
 
 using TableIndex = std::map<std::string, TableRef>;
@@ -36,12 +40,19 @@ using FieldEnums = std::map<std::string, std::map<std::string, std::string>>;
 struct Objects {
   TableIndex tables;
   TableIndex reports;
+  TableIndex xmlports;
+  TableIndex queries;
   TableIndex codeunits;
   TableIndex interfaces;
   TableIndex pages;
   EnumIndex enums;
   FieldEnums fieldEnums;
 };
+
+std::string OptionTypeName(const std::string &owner,
+                           const std::string &within,
+                           const al::VarDecl &declared,
+                           const std::vector<al::ProcedureDecl> &procedures);
 
 [[nodiscard]] TableIndex PlatformTables();
 
@@ -68,10 +79,18 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
 
+bool IsPublisher(const al::ProcedureDecl &procedure);
+
+std::string RaisingBody(const al::ProcedureDecl &procedure,
+                        std::string_view kind,
+                        const std::string &objectId,
+                        const std::string &objectName);
+
 std::string InlineOptionsOf(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures);
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already = {});
 
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const Objects &objects,
@@ -79,6 +98,13 @@ std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
                                  const std::set<std::string> &shadowed = {},
                                  const std::vector<al::ProcedureDecl> &all = {},
                                  const std::string &spelled = {});
+
+bool IsTestCodeunit(const al::CodeunitObject &unit);
+
+bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
+                      const std::vector<al::ProcedureDecl> &procedures);
+
+bool IsTryFunction(const al::ProcedureDecl &procedure);
 
 std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
                                 const std::vector<al::ProcedureDecl> &procedures,
@@ -113,6 +139,9 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
                             const std::string &body = {});
 
 [[nodiscard]] std::string BodyIncludes(const std::string &text, const Objects &objects);
+
+[[nodiscard]] std::string
+DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::string_view member);
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
                              const std::vector<al::ProcedureDecl> &procedures,

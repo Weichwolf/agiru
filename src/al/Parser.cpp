@@ -575,7 +575,16 @@ private:
     while (!AtEnd() && depth > 0) {
       if (AtPunctuation("[")) { ++depth; }
       if (AtPunctuation("]")) { --depth; }
-      if (depth > 0) { written += Peek().text; }
+      if (depth > 0) {
+        const Token &token = Peek();
+        if (token.kind == TokenKind::String) {
+          written += "'" + token.text + "'";
+        } else if (token.kind == TokenKind::QuotedIdentifier) {
+          written += "\"" + token.text + "\"";
+        } else {
+          written += token.text;
+        }
+      }
       Advance();
     }
     return written;
@@ -587,12 +596,13 @@ private:
   }
 
   void ParseVarsInto(std::vector<LabelDecl> &labels, std::vector<VarDecl> &variables) {
+    std::vector<std::string> pending;
     while (!AtEnd() && !AtPunctuation("}") && !AtKeyword("var") && !AtKeyword("begin") &&
            !AtKeyword("trigger") && !AtKeyword("procedure") && !AtKeyword("local") &&
            !AtKeyword("internal") && !AtKeyword("protected")) {
       if (AtPunctuation("[")) {
         if (!VariableFollowsAttribute()) { return; }
-        (void)ReadAttribute();
+        pending.push_back(ReadAttribute());
         continue;
       }
       std::vector<std::string> names{ExpectName()};
@@ -609,14 +619,17 @@ private:
           }
           Advance();
         }
+        while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
       } else {
         const VarDecl declared = ReadType();
         for (const std::string &name : names) {
           VarDecl one = declared;
           one.name = name;
+          one.attributes = pending;
           variables.push_back(std::move(one));
         }
       }
+      pending.clear();
       while (!AtEnd() && !AtPunctuation(";")) { Advance(); }
       Expect(";");
     }
@@ -845,8 +858,7 @@ private:
         Expect(")");
         if (AtKeyword("var")) {
           Advance();
-          std::vector<LabelDecl> labels;
-          ParseVarsInto(labels, trigger.variables);
+          ParseVarsInto(trigger.labels, trigger.variables);
         }
         trigger.tokens = SkipBeginEnd();
         trigger.body = ParseStatements(trigger.tokens);
@@ -947,6 +959,43 @@ EnumExtensionObject ParseEnumExtension(std::string_view source) {
 
 PageExtensionObject ParsePageExtension(std::string_view source) {
   return Parser(Tokenize(source)).ParsePageExtension();
+}
+
+std::vector<std::string> AttributeArguments(const ProcedureDecl &procedure, std::string_view name) {
+  for (const std::string &attribute : procedure.attributes) {
+    const std::size_t open = attribute.find('(');
+    if (!SameName(open == std::string::npos ? attribute : attribute.substr(0, open), name)) {
+      continue;
+    }
+    std::vector<std::string> arguments;
+    if (open == std::string::npos) { return arguments; }
+    std::string current;
+    char quote = 0;
+    for (std::size_t i = open + 1; i < attribute.size(); ++i) {
+      const char c = attribute[i];
+      if (quote != 0) {
+        if (c == quote) {
+          quote = 0;
+        } else {
+          current += c;
+        }
+        continue;
+      }
+      if (c == '\'' || c == '"') {
+        quote = c;
+        continue;
+      }
+      if (c == ',' || (c == ')' && i + 1 == attribute.size())) {
+        arguments.push_back(current);
+        current.clear();
+        continue;
+      }
+      current += c;
+    }
+    if (!current.empty()) { arguments.push_back(current); }
+    return arguments;
+  }
+  return {};
 }
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name) {

@@ -1,10 +1,14 @@
 #pragma once
 
 #include "meta/EnumDef.h"
+#include "type/Integer.h"
+#include "type/List.h"
 
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -27,6 +31,18 @@ template <typename E> struct EnumTraits;
 /// \tparam E The generated enumeration, or `void` when this run never saw its declaration.
 template <typename E = void> class Enum;
 
+namespace detail {
+
+/// \brief Whether a type IS an `Enum<...>`, which decides what may convert into one.
+/// \tparam T The type.
+template <typename T> struct IsEnumHolder : std::false_type {};
+
+/// \brief The specialisation that says yes.
+/// \tparam E The enumeration.
+template <typename E> struct IsEnumHolder<Enum<E>> : std::true_type {};
+
+}
+
 /// \brief AL `Enum`.
 ///
 /// \tparam E The generated enumeration naming the values.
@@ -42,13 +58,40 @@ template <typename E = void> class Enum;
 /// \note The default is ordinal 0 whether or not the enumeration declares it, which is what an
 ///       integer column stores for an unset field. IsDeclared() says which of the two it is.
 ///
-/// \note `Names()` and `Ordinals()` are NOT here yet. Both return a `List of [...]` and there is no
-///       List type in the runtime, so writing them would mean inventing a return the platform does
-///       not document. The AL surface baseline counts what is reachable, and it counts them absent.
 template <typename E> class Enum : public OrdinalValue {
 public:
   /// \brief The generated enumeration.
   using Enumeration = E;
+
+  /// \brief Takes an ORDINAL from an option of the same shape, which is what AL assigns.
+  ///
+  /// \tparam T The option's type.
+  /// \param value The option.
+  ///
+  /// \note AL ASSIGNS AN OPTION TO AN ENUM FIELD and the platform takes the ordinal across --
+  ///       `ReservationStatus` in `Item.Table.al` is assigned from a bare option field. What it
+  ///       must NOT accept is another ENUM: two enumerations that happen to share an ordinal are
+  ///       two different vocabularies, and a silent conversion between them is the wrong value
+  ///       wearing the right type. `IsEnumHolder` is what keeps that out.
+  template <typename T>
+    requires std::derived_from<T, OrdinalValue> && (!detail::IsEnumHolder<T>::value)
+  constexpr explicit Enum(const T &value) : OrdinalValue(value.AsInteger()) {}
+
+  /// \brief Takes an option's ordinal, which is the shape AL writes as an assignment.
+  /// \tparam T The option's type.
+  /// \param value The option.
+  /// \return This enum.
+  ///
+  /// \note THE CONSTRUCTOR IS EXPLICIT AND THIS IS NOT, and that split is what keeps `==`
+  ///       unambiguous: an implicit constructor gave `Enum == Option` two ways to resolve -- the
+  ///       ordinal conversion both types already carry, and the new one -- while an assignment
+  ///       operator takes part in neither.
+  template <typename T>
+    requires std::derived_from<T, OrdinalValue> && (!detail::IsEnumHolder<T>::value)
+  constexpr Enum &operator=(const T &value) {
+    SetOrdinal(value.AsInteger());
+    return *this;
+  }
 
   /// \brief The value table for that enumeration.
   using Traits = EnumTraits<E>;
@@ -62,6 +105,20 @@ public:
 
   /// \brief The zero ordinal.
   constexpr Enum() = default;
+
+  /// \brief AL `for Value := A to B do` over an enumeration steps by ordinal.
+  /// \return This, one ordinal further.
+  constexpr Enum &operator++() {
+    *this = FromInteger(AsInteger() + 1);
+    return *this;
+  }
+
+  /// \brief The step down.
+  /// \return This, one ordinal back.
+  constexpr Enum &operator--() {
+    *this = FromInteger(AsInteger() - 1);
+    return *this;
+  }
 
   /// \brief Holds a named value.
   ///
@@ -134,6 +191,18 @@ public:
   /// \brief Assigns a named value.
   /// \param value The value.
   /// \return This object.
+  /// \brief Takes a refusal by its marker, so the refusal happens rather than an ambiguity.
+  /// \tparam R The refusal's type.
+  /// \param refusal The refusal.
+  /// \return Never returns.
+  /// \throws Error always.
+  template <typename R>
+    requires requires { typename std::remove_cvref_t<R>::IsAlRefusal; }
+  Enum &operator=(const R &refusal) {
+    *this = static_cast<Enum>(refusal);
+    return *this;
+  }
+
   constexpr Enum &operator=(E value) {
     SetOrdinal(static_cast<std::int32_t>(value));
     return *this;
@@ -159,6 +228,24 @@ public:
     return value != nullptr ? value->caption : std::string_view{};
   }
 
+  /// \brief AL `Enum.Names()`.
+  /// \return The value names, in the order the enumeration declares them.
+  [[nodiscard]] static ::agiru::List<std::string> Names() {
+    ::agiru::List<std::string> names;
+    for (const EnumValueDef &value : Traits::kValues) { names.Add(std::string(value.name)); }
+    return names;
+  }
+
+  /// \brief AL `Enum.Ordinals()`.
+  /// \return The declared ordinals, in the order the enumeration declares them.
+  /// \note THE ORDINAL IS DECLARED AND NOT COUNTED, so this is not `0..n-1`: `value(10; No)`
+  ///       contributes 10, and 103 of the BaseApp's 576 enumerations have gaps.
+  [[nodiscard]] static ::agiru::List<::agiru::Integer> Ordinals() {
+    ::agiru::List<::agiru::Integer> ordinals;
+    for (const EnumValueDef &value : Traits::kValues) { ordinals.Add(value.ordinal); }
+    return ordinals;
+  }
+
   /// \brief Compares against a named value, the way AL writes `Type = Type::Service`.
   /// \param value The value.
   /// \return True when this enum holds that value.
@@ -176,6 +263,17 @@ public:
   /// \brief Compares two enums by ordinal.
   /// \param o The other enum.
   /// \return True when the ordinals are equal.
+  /// \brief Two DIFFERENT enumerations compare by ordinal -- what AL does for a
+  ///        `"Purchase Applies-to Document Type"` against `"Purchase Document Type"` (board:0084).
+  /// \tparam F The other enumeration.
+  /// \param o The other value.
+  /// \return Whether the ordinals agree.
+  template <typename F>
+    requires(!std::same_as<F, E>)
+  [[nodiscard]] constexpr bool operator==(const Enum<F> &o) const {
+    return AsInteger() == o.AsInteger();
+  }
+
   [[nodiscard]] constexpr bool operator==(const Enum &o) const {
     return AsInteger() == o.AsInteger();
   }

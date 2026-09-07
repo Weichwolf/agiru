@@ -91,7 +91,7 @@ public:
 
   /// \brief The record.
   /// \return It, or `nullptr`.
-  [[nodiscard]] void *Get() const { return record_; }
+  void *Get() const { return record_; }
 
 private:
   void Swap(SharedRecord &o) noexcept {
@@ -197,7 +197,7 @@ public:
 
   /// \brief AL `FieldRef.OptionMembers()`.
   /// \return The member names, in declaration order.
-  [[nodiscard]] List<std::string> OptionMembers() const;
+  [[nodiscard]] std::string OptionMembers() const;
 
   /// \brief AL `FieldRef.Value()`.
   /// \return The field's value, carrying its type.
@@ -245,12 +245,9 @@ public:
   }
 
   /// \brief AL `FieldRef.Class()`. Gets the value of the FieldClass Property of the field that is
-  /// currently selected. This method returns an error if no field is selected.
-  /// \return The AL `FieldClass`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::FieldClass Class() const {
-    throw Error("FieldRef.Class() is declared and not implemented yet (board:0035)");
-  }
+  /// currently selected.
+  /// \return The AL `FieldClass` the table declared for this field.
+  [[nodiscard]] ::agiru::FieldClass Class() const { return def_->fieldClass; }
 
   /// \brief AL `FieldRef.FieldError(ErrorInfo)`. Stops the execution of the code, causing a
   /// run-time error, and creates an error message for a field.
@@ -274,22 +271,23 @@ public:
   /// caption for the from the Enum metadata for the field that is currently selected.
   /// \param Index The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetEnumValueCaption(::agiru::Integer Index) const {
-    static_cast<void>(Index);
-    throw Error(
-        "FieldRef.GetEnumValueCaption(Integer) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.GetEnumValueCaption(Integer)` -- the caption of the value at a ONE-BASED
+  ///        position in the field's enumeration (`fieldref-getenumvaluecaption-method.md`).
+  /// \param Index The position.
+  /// \return The caption, empty outside the enumeration.
+  [[nodiscard]] std::string_view GetEnumValueCaption(::agiru::Integer Index) const;
 
   /// \brief AL `FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer)`. Gets an Enum value (or
   /// Option member) caption for the from the Enum metadata for the field that is currently
   /// selected.
   /// \param Ordinal The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetEnumValueCaptionFromOrdinalValue(::agiru::Integer Ordinal) const {
-    static_cast<void>(Ordinal);
-    throw Error("FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer) is declared and not "
-                "implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.GetEnumValueCaptionFromOrdinalValue(Integer)` -- the caption of the value
+  ///        with that ordinal.
+  /// \param Ordinal The ordinal.
+  /// \return The caption, empty when no value carries it.
+  [[nodiscard]] std::string_view
+  GetEnumValueCaptionFromOrdinalValue(::agiru::Integer Ordinal) const;
 
   /// \brief AL `FieldRef.GetFilter()`. Gets the filter that is currently applied to the field
   /// referred to by FieldRef.
@@ -356,6 +354,22 @@ public:
     throw Error("FieldRef.Relation() is declared and not implemented yet (board:0035)");
   }
 
+  /// \brief AL `FieldRef.SetFilter(...)` where the filter text is a member the runtime has not
+  ///        rebuilt.
+  /// \tparam T The refusal's type, which marks itself with `IsAlRefusal`.
+  /// \param refusal The refused member.
+  /// \throws Error always, naming the member -- which is what reading it does anywhere else.
+  ///
+  /// \warning IT IS AN OVERLOAD AND NOT A CONVERSION. A refusal deliberately does not become a
+  ///          `std::string_view`, because a `Code<N>` assignment then had two equally good
+  ///          conversions; so every door method that takes text takes a refusal beside it, one at
+  ///          a time as the tree asks for it (board:0035).
+  template <typename T>
+    requires requires { typename T::IsAlRefusal; }
+  void SetFilter(const T &refusal) const {
+    static_cast<void>(static_cast<std::int32_t>(refusal));
+  }
+
   /// \brief AL `FieldRef.SetFilter(Text, Any)`. Assigns a filter to a field that you specify.
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.
@@ -364,6 +378,26 @@ public:
     static_cast<void>(String);
     static_cast<void>(Value);
     throw Error("FieldRef.SetFilter(Text, Any) is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `FieldRef.SetFilter(Text, Any, Any, ...)` -- the filter text with its `%1`
+  ///        substitutions, any number of them.
+  /// \tparam Values The substituted values.
+  /// \param String The filter, with placeholders.
+  /// \param Value1 The first value.
+  /// \param Value2 The second.
+  /// \param rest   Any more.
+  template <typename... Values>
+  void SetFilter(std::string_view String,
+                 const ::agiru::Variant &Value1,
+                 const ::agiru::Variant &Value2,
+                 const Values &...rest) const {
+    static_cast<void>(Value1);
+    static_cast<void>(Value2);
+    (static_cast<void>(rest), ...);
+    throw Error("FieldRef.SetFilter(Text, Any, Any, ...) is declared and not implemented yet "
+                "(board:0035): " +
+                std::string(String));
   }
 
   /// \brief AL `FieldRef.SetRange(Any, Any)`. Sets a simple filter on a field, such as a single
@@ -390,6 +424,17 @@ public:
   /// \brief AL `FieldRef.TestField()` -- raises when the field is blank.
   /// \throws Error with the platform's own wording when the field holds its zero.
   void TestField() const;
+
+  /// \brief AL `FieldRef.TestField(Any)` -- `fieldref-testfield-*-method.md`, one page per type:
+  ///        raises unless the field holds exactly the expected value.
+  /// \tparam V Any value type a Variant can hold.
+  /// \param Expected The value the field must hold.
+  /// \throws Error naming the field, the way `Record.TestField(Field, Value)` does.
+  template <typename V> void TestField(const V &Expected) const {
+    if (!(Value() == ::agiru::Variant(Expected))) {
+      throw Error(std::string(Name()) + " must be equal to '" + ::agiru::AsText(Expected) + "'");
+    }
+  }
 
 private:
   void *record_ = nullptr;
@@ -452,6 +497,18 @@ public:
 
   /// \return True when this RecordRef points at a record.
   [[nodiscard]] bool IsOpen() const { return record_ != nullptr; }
+
+  /// \brief The record this reference stands for, when it is the type the caller expects.
+  /// \tparam T The record's class.
+  /// \return The record, or nothing when the reference is closed or names another table.
+  ///
+  /// \note IT IS HOW `Rec := RecordRef` COPIES. AL assigns a `RecordRef` to a `Record` in a
+  ///       lookup trigger -- `OnAfterLookup(Selected: RecordRef)` is 30-odd call sites -- and what
+  ///       AL copies is the ROW, which is this record's fields.
+  template <typename T> [[nodiscard]] const T *As() const {
+    if (record_ == nullptr || table_ != &TableTraits<T>::kTable) { return nullptr; }
+    return static_cast<const T *>(record_);
+  }
 
   /// \brief AL `RecordRef.Number()`.
   /// \return The AL table number.
@@ -1096,6 +1153,14 @@ public:
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.
   /// \param String The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `RecordRef.SetTable(Variant)` -- the record a Variant carries.
+  /// \param Rec The Variant.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void SetTable(const ::agiru::Variant &Rec) {
+    static_cast<void>(Rec);
+    throw Error("RecordRef.SetTable(Variant) is declared and not implemented yet (board:0035)");
+  }
+
   void SetView(std::string_view String) {
     static_cast<void>(String);
     throw Error("RecordRef.SetView(Text) is declared and not implemented yet (board:0035)");

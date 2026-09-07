@@ -49,17 +49,17 @@ Integer InStream::Length() const {
   return static_cast<Integer>(blob_->Length());
 }
 
-Integer InStream::ReadText(std::string &text, Integer length) {
+Integer InStream::ReadText(::agiru::Text<0> &text, Integer length) {
   const std::size_t left =
       blob_->Length() - (position_ < blob_->Length() ? position_ : blob_->Length());
   const std::size_t want = length < 0 ? 0 : static_cast<std::size_t>(length);
   const std::size_t take = want < left ? want : left;
-  text.assign(reinterpret_cast<const char *>(blob_->Bytes().data()) + position_, take);
+  text = std::string_view(reinterpret_cast<const char *>(blob_->Bytes().data()) + position_, take);
   position_ += take;
   return static_cast<Integer>(take);
 }
 
-Integer InStream::ReadText(std::string &text) {
+Integer InStream::ReadText(::agiru::Text<0> &text) {
   return ReadText(text, static_cast<Integer>(blob_->Length() - position_));
 }
 
@@ -71,8 +71,26 @@ OutStream Blob::CreateOutStream() {
   return OutStream{*this};
 }
 
+void Blob::CreateOutStream(OutStream &into, const TextEncoding &Encoding) {
+  static_cast<void>(Encoding);
+  into = OutStream(*this);
+}
+
+void Blob::CreateInStream(InStream &from, const TextEncoding &Encoding) const {
+  static_cast<void>(Encoding);
+  from = InStream(*this);
+}
+
 InStream Blob::CreateInStream() const {
   return InStream{*this};
+}
+
+std::string Blob::Export(std::string_view Name) {
+  throw Error("Blob.Export(" + std::string(Name) + ") needs a client (board:0030)");
+}
+
+std::string Blob::Import(std::string_view Name) {
+  throw Error("Blob.Import(" + std::string(Name) + ") needs a client (board:0030)");
 }
 
 }

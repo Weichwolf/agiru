@@ -9,6 +9,12 @@ than nowhere, because the commits that made this item still say the old one.
 
 # AL's `Text` is a TYPE WITH METHODS, and the door hands back a `std::string`
 
+**Step three is done for the door.** 96 `var Text` parameters over 24 door headers and
+`Door.cpp` take `::agiru::Text<0> &` now, and `scripts/door.py` emits that shape; a `Guid` reaches
+`Text` through `ToText()` (assignment and the text builtins). What remains is the generated
+procedure's OWN `var Text` parameters, which `CodeunitWriter` still spells `std::string &`.
+
+
 `LowerCase(Guid).Replace("{", "").Replace("}", "")` is one AL line from
 `Import Consolidation from API`, and neither half of it compiles:
 `LowerCase` returns a `std::string`, which has no `Replace`, and its argument is

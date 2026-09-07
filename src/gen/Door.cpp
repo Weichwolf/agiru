@@ -12,6 +12,7 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -62,8 +63,7 @@ std::vector<std::string> &DoorTypes() {
     for (const auto &entry : std::filesystem::directory_iterator(door)) {
       if (entry.path().extension() != ".h") { continue; }
       const std::string name = entry.path().stem().string();
-      if (BaseMembers().contains(name)) { continue; }
-      found.push_back(name);
+      found.push_back(BaseMembers().contains(name) ? "agiru::" + name : name);
     }
     if (found.empty()) { throw std::runtime_error("the door declares no types"); }
     return found;
@@ -148,7 +148,55 @@ const std::map<std::string, std::string> &DoorSpellings() {
   return spellings;
 }
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhere{{
+constexpr std::array kJson{std::string_view{"JsonToken"},
+                           std::string_view{"JsonValue"},
+                           std::string_view{"JsonObject"},
+                           std::string_view{"JsonArray"}};
+constexpr std::array kHttp{std::string_view{"HttpClient"},
+                           std::string_view{"HttpContent"},
+                           std::string_view{"HttpHeaders"},
+                           std::string_view{"HttpRequestMessage"},
+                           std::string_view{"HttpResponseMessage"}};
+constexpr std::array kXml{std::string_view{"XmlDocument"},
+                          std::string_view{"XmlElement"},
+                          std::string_view{"XmlNode"},
+                          std::string_view{"XmlNodeList"},
+                          std::string_view{"XmlAttribute"},
+                          std::string_view{"XmlAttributeCollection"},
+                          std::string_view{"XmlText"},
+                          std::string_view{"XmlNameTable"},
+                          std::string_view{"XmlNamespaceManager"}};
+
+std::span<const std::string_view> DoorFamily(char which) {
+  switch (which) {
+    case 'j': return kJson;
+    case 'h': return kHttp;
+    default: return kXml;
+  }
+}
+
+constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
+    {"JsonToken", 'j'},
+    {"JsonValue", 'j'},
+    {"JsonObject", 'j'},
+    {"JsonArray", 'j'},
+    {"HttpClient", 'h'},
+    {"HttpContent", 'h'},
+    {"HttpHeaders", 'h'},
+    {"HttpRequestMessage", 'h'},
+    {"HttpResponseMessage", 'h'},
+    {"XmlDocument", 'x'},
+    {"XmlElement", 'x'},
+    {"XmlNode", 'x'},
+    {"XmlNodeList", 'x'},
+    {"XmlAttribute", 'x'},
+    {"XmlAttributeCollection", 'x'},
+    {"XmlText", 'x'},
+    {"XmlNameTable", 'x'},
+    {"XmlNamespaceManager", 'x'},
+}};
+
+constexpr std::array<std::pair<std::string_view, std::string_view>, 51> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -162,6 +210,21 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhe
     {"Commit", "runtime/Transaction.h"},
     {"RecordRef", "runtime/RecordRef.h"},
     {"FieldRef", "runtime/RecordRef.h"},
+    {"Page", "runtime/Page.h"},
+    {"CommitScope", "runtime/Scopes.h"},
+    {"ErrorScope", "runtime/Scopes.h"},
+    {"InStream", "type/Stream.h"},
+    {"OutStream", "type/Stream.h"},
+    {"Report", "runtime/Report.h"},
+    {"XmlPort", "runtime/Report.h"},
+    {"GenericList1", "dotnet/Generic.h"},
+    {"GenericDictionary2", "dotnet/Generic.h"},
+    {"Materialised", "runtime/Events.h"},
+    {"Subscription", "runtime/Events.h"},
+    {"SubscriptionCatalogue", "runtime/Events.h"},
+    {"InvokeSubscriber", "runtime/Events.h"},
+    {"RaiseEvent", "runtime/Events.h"},
+    {"EventObject", "runtime/Events.h"},
     {"TestCatalogue", "runtime/TestRunner.h"},
     {"InvokeTest", "runtime/TestRunner.h"},
     {"TestMethod", "runtime/TestRunner.h"},
@@ -174,6 +237,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhe
     {"platform::Integer", "platform/Integer.h"},
     {"platform::Tenant", "platform/Tenant.h"},
     {"platform::User", "platform/User.h"},
+    {"platform::UserPersonalization", "platform/UserPersonalization.h"},
     {"absent::", "dotnet/Refused.h"},
     {"DotNetGeneric", "dotnet/Generic.h"},
     {"ALConfigSettings", "dotnet/ALConfigSettings.h"},
@@ -183,6 +247,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 34> kElsewhe
     {"Format", "runtime/Record.h"},
     {"AsText", "runtime/Record.h"},
     {"FieldNo", "meta/Ids.h"},
+    {"At", "type/AlArray.h"},
 }};
 
 bool Mentions(std::string_view text, std::string_view name) {
@@ -227,13 +292,27 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
       headers.insert("meta/TableDef.h");
       headers.insert("runtime/Table.h");
       break;
-    case ObjectKind::Codeunit: headers.insert("runtime/Codeunit.h"); break;
-    case ObjectKind::Page: headers.insert("runtime/Page.h"); break;
+    case ObjectKind::Codeunit:
+      headers.insert("meta/CodeunitDef.h");
+      headers.insert("runtime/Codeunit.h");
+      break;
+    case ObjectKind::Page:
+      headers.insert("meta/PageDef.h");
+      headers.insert("runtime/Page.h");
+      break;
     case ObjectKind::Enum: headers.insert("meta/EnumDef.h"); break;
     default: break;
   }
   for (const std::string &type : DoorTypes()) {
-    if (Mentions(text, type)) { headers.insert("type/" + type + ".h"); }
+    if (!Mentions(text, type)) { continue; }
+    const std::size_t bare = type.starts_with("agiru::") ? std::string_view{"agiru::"}.size() : 0;
+    headers.insert("type/" + type.substr(bare) + ".h");
+  }
+  for (const auto &[member, family] : kFamilies) {
+    if (!headers.contains("type/" + std::string(member) + ".h")) { continue; }
+    for (const std::string_view &beside : DoorFamily(family)) {
+      headers.insert("type/" + std::string(beside) + ".h");
+    }
   }
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
@@ -290,12 +369,12 @@ const std::map<std::string, std::string> &PlatformMembers(std::string_view table
 }
 
 bool PlatformFieldNamed(const PlatformField &wanted) {
-  return PlatformMembers(wanted.table).contains(LowerKey(std::string(wanted.field)));
+  return PlatformMembers(wanted.table).contains(LowerKey(Identifier(wanted.field)));
 }
 
 std::string PlatformFieldSpelling(const PlatformField &wanted) {
   const auto &declared = PlatformMembers(wanted.table);
-  const auto found = declared.find(LowerKey(std::string(wanted.field)));
+  const auto found = declared.find(LowerKey(Identifier(wanted.field)));
   return found == declared.end() ? std::string{} : found->second;
 }
 

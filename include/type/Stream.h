@@ -4,6 +4,7 @@
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <cstddef>
 #include <string>
@@ -21,6 +22,15 @@ namespace agiru {
 ///       would leave the caller's BLOB empty and every test of it green for the wrong reason.
 class OutStream {
 public:
+  /// \brief A stream bound to nothing yet.
+  ///
+  /// \note AL DECLARES THE VARIABLE BEFORE IT HAS A SOURCE. `ProfileConfigurationOutStream:
+  ///       OutStream;` is a `var` line and the source arrives later, through
+  ///       `File.CreateOutStream(...)` or `Blob.CreateOutStream()`. So the type has to be default
+  ///       constructible; what it writes to until then is nothing, and every operation on it
+  ///       refuses.
+  OutStream() = default;
+
   /// \brief A stream that writes into a BLOB.
   /// \param into The BLOB.
   explicit OutStream(Blob &into) : blob_(&into) {}
@@ -54,12 +64,21 @@ public:
 private:
   [[noreturn]] static void RefuseTyped();
 
-  Blob *blob_;
+  Blob *blob_ = nullptr;
 };
 
 /// \brief AL `InStream` -- what a BLOB is read through.
 class InStream {
 public:
+  /// \brief A stream bound to nothing yet.
+  ///
+  /// \note AL DECLARES THE VARIABLE BEFORE IT HAS A SOURCE. `ProfileConfigurationOutStream:
+  ///       OutStream;` is a `var` line and the source arrives later, through
+  ///       `File.CreateInStream(...)` or `Blob.CreateInStream()`. So the type has to be default
+  ///       constructible; what it reads to until then is nothing, and every operation on it
+  ///       refuses.
+  InStream() = default;
+
   /// \brief A stream that reads from a BLOB.
   /// \param from The BLOB.
   explicit InStream(const Blob &from) : blob_(&from) {}
@@ -77,19 +96,22 @@ public:
   [[nodiscard]] Integer Position() const { return static_cast<Integer>(position_) + 1; }
 
   /// \brief AL `InStream.ResetPosition()` -- starts again from the beginning.
-  void ResetPosition() { position_ = 0; }
+  ::agiru::Boolean ResetPosition() {
+    position_ = 0;
+    return true;
+  }
 
   /// \brief AL `InStream.ReadText(var Text [, Length])`.
   ///
   /// \param text   Receives what was read.
   /// \param length How many characters at most; the whole rest when omitted.
   /// \return How many characters were read.
-  Integer ReadText(std::string &text, Integer length);
+  Integer ReadText(::agiru::Text<0> &text, Integer length);
 
   /// \brief AL `InStream.ReadText(var Text)` -- the whole rest of the stream.
   /// \param text Receives what was read.
   /// \return How many characters were read.
-  Integer ReadText(std::string &text);
+  Integer ReadText(::agiru::Text<0> &text);
 
   /// \brief AL `InStream.Read(var Value)` for a typed value.
   /// \tparam T The value's type.
@@ -104,7 +126,7 @@ public:
 private:
   [[noreturn]] static void RefuseTyped();
 
-  const Blob *blob_;
+  const Blob *blob_ = nullptr;
   std::size_t position_ = 0;
 };
 

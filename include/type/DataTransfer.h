@@ -46,7 +46,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void AddDestinationFilter(::agiru::Integer DestinationField,
                             std::string_view String,
-                            const ::agiru::Variant &Value);
+                            const ::agiru::Variant &Value = {});
 
   /// \brief AL `DataTransfer.AddFieldValue(Integer, Integer)`. Specifies a source and destination
   /// field, where the values from the source field are to be copied to the destination field. The
@@ -71,7 +71,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void AddSourceFilter(::agiru::Integer SourceField,
                        std::string_view String,
-                       const ::agiru::Variant &Value);
+                       const ::agiru::Variant &Value = {});
 
   /// \brief AL `DataTransfer.CopyFields()`. Copies the fields specified in AddFields with filters
   /// from AddSourceFilter, and the join conditions from AddJoins in one bulk operation in SQL.
@@ -97,6 +97,12 @@ public:
   /// \param UpdateAuditFields The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `DataTransfer.UpdateAuditFields()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] DataTransfer.UpdateAuditFields([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean UpdateAuditFields();
+
   ::agiru::Boolean UpdateAuditFields(::agiru::Boolean UpdateAuditFields);
 };
 

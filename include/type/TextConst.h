@@ -52,7 +52,7 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOf(std::string_view Value, ::agiru::Integer StartIndex);
+  ::agiru::Integer IndexOf(std::string_view Value, ::agiru::Integer StartIndex = {});
 
   /// \brief AL `TextConst.IndexOfAny(List of [Char], Integer)`. Reports the one-based index of the
   /// first occurrence in this instance of any character in a specified array of Unicode characters.
@@ -62,7 +62,7 @@ public:
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer IndexOfAny(const ::agiru::List<::agiru::Char> &Values,
-                              ::agiru::Integer StartIndex);
+                              ::agiru::Integer StartIndex = {});
 
   /// \brief AL `TextConst.IndexOfAny(Text, Integer)`. Reports the one-based index of the first
   /// occurrence of the specified string in this instance. The search starts at a specified
@@ -71,7 +71,7 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer IndexOfAny(std::string_view Values, ::agiru::Integer StartIndex);
+  ::agiru::Integer IndexOfAny(std::string_view Values, ::agiru::Integer StartIndex = {});
 
   /// \brief AL `TextConst.LastIndexOf(Text, Integer)`. Reports the one-based index position of the
   /// last occurrence of a specified string in this instance.
@@ -79,7 +79,7 @@ public:
   /// \param StartIndex The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer LastIndexOf(std::string_view Value, ::agiru::Integer StartIndex);
+  ::agiru::Integer LastIndexOf(std::string_view Value, ::agiru::Integer StartIndex = {});
 
   /// \brief AL `TextConst.PadLeft(Integer, Char)`. Returns a new Text that right-aligns the
   /// characters in this instance by padding them on the left, for a specified total length.
@@ -87,7 +87,7 @@ public:
   /// \param Char The AL `Char`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string PadLeft(::agiru::Integer Count, ::agiru::Char Char);
+  std::string PadLeft(::agiru::Integer Count, ::agiru::Char Char = {});
 
   /// \brief AL `TextConst.PadRight(Integer, Char)`. Returns a new string that left-aligns the
   /// characters in this string by padding them with spaces on the right, for a specified total
@@ -96,7 +96,7 @@ public:
   /// \param Char The AL `Char`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string PadRight(::agiru::Integer Count, ::agiru::Char Char);
+  std::string PadRight(::agiru::Integer Count, ::agiru::Char Char = {});
 
   /// \brief AL `TextConst.Remove(Integer, Integer)`. Returns a new Text in which a specified number
   /// of characters from the current string are deleted.
@@ -104,7 +104,7 @@ public:
   /// \param Count The AL `Integer`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Remove(::agiru::Integer StartIndex, ::agiru::Integer Count);
+  std::string Remove(::agiru::Integer StartIndex, ::agiru::Integer Count = {});
 
   /// \brief AL `TextConst.Replace(Text, Text)`. Returns a new Text in which all occurrences of a
   /// specified string in the current instance are replaced with another specified string.
@@ -130,7 +130,7 @@ public:
   /// on a collection of separators.
   /// \param Separators The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Split(std::string_view Separators);
+  void Split(std::string_view Separators = {});
 
   /// \brief AL `TextConst.StartsWith(Text)`. Determines whether the beginning of this instance
   /// matches a specified string.
@@ -144,7 +144,7 @@ public:
   /// \param Count The AL `Integer`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Substring(::agiru::Integer StartIndex, ::agiru::Integer Count);
+  std::string Substring(::agiru::Integer StartIndex, ::agiru::Integer Count = {});
 
   /// \brief AL `TextConst.ToLower()`. Returns a copy of this string converted to lowercase.
   /// \return The AL `Text`.
@@ -167,14 +167,14 @@ public:
   /// \param Chars The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string TrimEnd(std::string_view Chars);
+  std::string TrimEnd(std::string_view Chars = {});
 
   /// \brief AL `TextConst.TrimStart(Text)`. Removes all leading occurrences of a set of characters
   /// specified in an array from the current Text object.
   /// \param Chars The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string TrimStart(std::string_view Chars);
+  std::string TrimStart(std::string_view Chars = {});
 };
 
 }

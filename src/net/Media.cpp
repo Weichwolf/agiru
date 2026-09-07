@@ -51,12 +51,42 @@ Guid MediaSet::Item(Integer index) const {
   RefuseWithoutStore("reaching item " + std::to_string(index) + " of media set " + id_.ToText());
 }
 
-void MediaSet::Insert(const Guid &mediaId) {
+::agiru::Boolean MediaSet::Insert(const Guid &mediaId) {
   RefuseWithoutStore("adding media " + mediaId.ToText() + " to set " + id_.ToText());
 }
 
 Guid MediaSet::ImportFile(std::string_view filename, std::string_view description) {
   RefuseWithoutStore(Importing(filename, description) + " into set " + id_.ToText());
+}
+
+Boolean Media::ExportStream(class OutStream &Stream) {
+  static_cast<void>(Stream);
+  RefuseWithoutStore("exporting media " + id_.ToText() + " to a stream");
+}
+
+Guid Media::ImportStream(class InStream &Stream,
+                         std::string_view Description,
+                         std::string_view MimeType,
+                         std::string_view FileName) {
+  static_cast<void>(Stream);
+  static_cast<void>(MimeType);
+  RefuseWithoutStore(Importing(FileName, Description) + " from a stream");
+}
+
+List<Guid> Media::FindOrphans() {
+  RefuseWithoutStore("sweeping the tenant media table for orphans");
+}
+
+Guid MediaSet::ImportStream(class InStream &Stream,
+                            std::string_view Description,
+                            std::string_view MimeType) {
+  static_cast<void>(Stream);
+  static_cast<void>(MimeType);
+  RefuseWithoutStore(Importing("", Description) + " from a stream");
+}
+
+List<Guid> MediaSet::FindOrphans() {
+  RefuseWithoutStore("sweeping the tenant media table for orphan sets");
 }
 
 }

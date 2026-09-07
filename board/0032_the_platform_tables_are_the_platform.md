@@ -255,3 +255,24 @@ part of the `Date` value rather than a rendering.
 
 `devenv-virtual-tables.md` and `devenv-integer-virtual-table.md` are this item's other two rows and
 are already read.
+
+## `Company` IS THE NEXT ONE AND ITS FIELD NUMBERS CANNOT BE MEASURED TODAY, 2026-09-07
+
+`Record Company` is declared 257 times in the read roots and the stub costs a real compile error
+rather than a refusal: `ICDataExchange.GetICPartnerICSetup(Company.Name(), ...)` is AMBIGUOUS,
+because the interface declares the method twice -- once taking `Record ICPartner`, once taking
+`Text` -- and a refusal converts to both equally well. That is not a defect in `Refused`: an
+argument that converts to everything cannot pick an overload, and the fix is for `Company` to stop
+being absent.
+
+**The field NAMES are in the AL source** -- `APIV2AutCompanies.Page.al` shows all five: `Id`,
+`Name`, `"Evaluation Company"`, `"Display Name"`, `"Business Profile Id"`.
+
+**The field NUMBERS are in neither source.** `dev-itpro` has no page for table 2000000006, the
+BaseApp declares fields and never numbers them, and the predecessor's `system_tables.py` -- which is
+where `platform/User.h` got ITS numbers, measured rather than documented -- does not carry `Company`
+either. The demo database would settle it in one query and `make provision` is not run in this
+loop.
+
+**So the numbers wait for a measurement rather than being invented.** `platform/User.h` says the
+same thing about its own field 2: an ordinal nothing can check is a number wearing a guess.

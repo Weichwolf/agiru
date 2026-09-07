@@ -8,6 +8,10 @@ Class:    silent-wrong-data
 
 # `OptionOrdinalValues` maps a member onto a foreign number
 
+**The refusal is in place.** `OptionOrdinalValues` is on `src/gen/Refused.cpp`'s list, which
+follows board:0364's decision about `CRM` tables. What remains is the second ordinal on
+`EnumValueDef` -- and only if those tables are ever translated.
+
 > Specifies the list of option values. **Can be set if the property `ExternalType` is set to
 > `Picklist`.** Applies to: **Table field.**
 >

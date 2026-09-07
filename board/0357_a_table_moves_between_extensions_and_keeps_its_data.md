@@ -8,6 +8,9 @@ Class:    activation
 
 # A table moves between extensions and keeps its data
 
+**The metadata half is done:** carried as `TableDef::movedFrom` and `movedTo`; refusing to translate a moved object remains.
+
+
 **Two pages, one item, because they are the two ends of one move**: `MovedTo` on the source names
 where the table went, `MovedFrom` on the destination names where it came from, and neither is
 meaningful alone.

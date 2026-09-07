@@ -244,7 +244,7 @@ template <typename Class, typename Value> struct MemberOwnerOf<Value Class::*> {
 /// \param name    The AL name, spaces and all.
 /// \param caption The `Caption` property.
 /// \param offset  `offsetof` the member within the record.
-/// \param initValue The `InitValue` property in the column's own spelling, or nothing.
+/// \param declared What the `.al` file's `properties` block said about the field.
 /// \return The field's declaration.
 ///
 /// The type tag, the declared length and an enumeration's values are DERIVED from the member's
@@ -257,12 +257,62 @@ template <typename Class, typename Value> struct MemberOwnerOf<Value Class::*> {
 ///       compiler checks the pair -- a repetition a machine emits and a compiler verifies is a
 ///       checksum rather than a duplication. With C++26 reflection (P2996) it would go; measured
 ///       2026-09-01, neither clang-19 nor gcc-14 has it (board:0015).
+/// \brief What a field's `properties` block declares, beyond what its type carries.
+///
+/// \note IT IS ONE VALUE AND NOT FOURTEEN PARAMETERS. AL writes these as a block of named
+///       assignments and the generator emits them the same way, so a reader compares the two side
+///       by side -- and a field that declares none costs one defaulted argument.
+struct Declared {
+  std::optional<std::string_view> initValue{};                  ///< `InitValue`, column spelling.
+  ::agiru::FieldClass fieldClass = ::agiru::FieldClass::Normal; ///< `FieldClass`.
+  std::string_view calcFormula{};                               ///< `CalcFormula`, as AL wrote it.
+  bool notBlank = false;                                        ///< `NotBlank`.
+  bool autoIncrement = false;                                   ///< `AutoIncrement`.
+  bool editable = true;                                         ///< `Editable`.
+  bool validateTableRelation = true;                            ///< `ValidateTableRelation`.
+  std::string_view relationTable{}; ///< `TableRelation`'s target table, empty when the declaration
+                                    ///< is conditional or filtered (board:0043).
+  std::string_view relationField{}; ///< Its target field, empty when the relation names the table's
+                                    ///< own primary key.
+  bool blankZero = false;           ///< `BlankZero`.
+  std::string_view minValue{};      ///< `MinValue`, as AL wrote it.
+  std::string_view maxValue{};      ///< `MaxValue`, as AL wrote it.
+  std::string_view decimalPlaces{}; ///< `DecimalPlaces`.
+  std::string_view blankNumbers{};  ///< `BlankNumbers`.
+  bool compressed = true;           ///< `Compressed`, BLOB only.
+  bool numeric = false;             ///< `Numeric`.
+  std::string_view charAllowed{};   ///< `CharAllowed`, as AL wrote it.
+  std::string_view valuesAllowed{}; ///< `ValuesAllowed`, as AL wrote it.
+  bool closingDates = false;        ///< `ClosingDates`.
+  std::string_view extendedDataType{};      ///< `ExtendedDataType`, as AL wrote it.
+  std::string_view maskType{};              ///< `MaskType`, as AL wrote it.
+  std::string_view toolTip{};               ///< `ToolTip`, which a table field may declare.
+  std::string_view accessByPermission{};    ///< `AccessByPermission`.
+  PageId lookupPageId{};                    ///< `LookupPageId`.
+  PageId drillDownPageId{};                 ///< `DrillDownPageId`.
+  bool optimizeForTextSearch = false;       ///< `OptimizeForTextSearch`.
+  std::string_view captionClass{};          ///< `CaptionClass`.
+  std::uint16_t width = 0;                  ///< `Width`, 0 when none is declared.
+  std::string_view autoFormatType{};        ///< `AutoFormatType`.
+  std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
+  std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
+  std::string_view access{};                ///< `Access`, as AL wrote it.
+  std::string_view subtype{};               ///< `Subtype`, on a Blob or Media field.
+  bool enabled = true;                      ///< `Enabled`, on a field.
+  std::string_view movedFrom{};             ///< `MovedFrom`, the app the field came from.
+  std::string_view movedTo{};               ///< `MovedTo`, the app the field went to.
+  std::string_view description{};           ///< `Description`, which nothing reads.
+  std::string_view obsoleteState{};         ///< `ObsoleteState`.
+  std::string_view obsoleteReason{};        ///< `ObsoleteReason`.
+  std::string_view obsoleteTag{};           ///< `ObsoleteTag`.
+};
+
 template <auto Member>
 constexpr FieldDef Declare(FieldNo no,
                            std::string_view name,
                            std::string_view caption,
                            std::size_t offset,
-                           std::optional<std::string_view> initValue = std::nullopt) {
+                           const Declared &declared = {}) {
   using Value = typename MemberOwnerOf<decltype(Member)>::Field;
   return FieldDef{
       .no = no,
@@ -272,7 +322,46 @@ constexpr FieldDef Declare(FieldNo no,
       .length = FieldTypeOf<Value>::kLength,
       .offset = offset,
       .values = FieldTypeOf<Value>::kValues,
-      .initValue = initValue,
+      .initValue = declared.initValue,
+      .fieldClass = declared.fieldClass,
+      .calcFormula = declared.calcFormula,
+      .notBlank = declared.notBlank,
+      .autoIncrement = declared.autoIncrement,
+      .editable = declared.editable,
+      .validateTableRelation = declared.validateTableRelation,
+      .relationTable = declared.relationTable,
+      .relationField = declared.relationField,
+      .blankZero = declared.blankZero,
+      .minValue = declared.minValue,
+      .maxValue = declared.maxValue,
+      .decimalPlaces = declared.decimalPlaces,
+      .blankNumbers = declared.blankNumbers,
+      .compressed = declared.compressed,
+      .numeric = declared.numeric,
+      .charAllowed = declared.charAllowed,
+      .valuesAllowed = declared.valuesAllowed,
+      .closingDates = declared.closingDates,
+      .extendedDataType = declared.extendedDataType,
+      .maskType = declared.maskType,
+      .toolTip = declared.toolTip,
+      .accessByPermission = declared.accessByPermission,
+      .lookupPageId = declared.lookupPageId,
+      .drillDownPageId = declared.drillDownPageId,
+      .optimizeForTextSearch = declared.optimizeForTextSearch,
+      .captionClass = declared.captionClass,
+      .width = declared.width,
+      .autoFormatType = declared.autoFormatType,
+      .autoFormatExpression = declared.autoFormatExpression,
+      .allowInCustomizations = declared.allowInCustomizations,
+      .access = declared.access,
+      .subtype = declared.subtype,
+      .enabled = declared.enabled,
+      .movedFrom = declared.movedFrom,
+      .movedTo = declared.movedTo,
+      .description = declared.description,
+      .obsoleteState = declared.obsoleteState,
+      .obsoleteReason = declared.obsoleteReason,
+      .obsoleteTag = declared.obsoleteTag,
   };
 }
 

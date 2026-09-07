@@ -8,6 +8,9 @@ Class:    activation
 
 # `AllowInCustomizations` says which fields a user may add to a page
 
+**The metadata half is done:** carried as `FieldDef::allowInCustomizations` and `TableDef::allowInCustomizations`, the text AL wrote; the customisation half remains.
+
+
 > **Version**: runtime 16.0. Applies to: **Table, Table field.**
 >
 > `ToBeClassified` (**the default**) -- **"the fields can be used as source expressions for new page
@@ -68,3 +71,11 @@ can be added and made editable.
 
 **The negative control is the default field** -- it must be addable and NOT editable, which is neither
 of the two declared cases and is what every undeclared field in 1 609 tables does.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

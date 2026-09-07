@@ -72,6 +72,22 @@ public:
   ///         its own CompareTime example writes `Abs(TimeA - TimeB) = 86399999`.
   [[nodiscard]] constexpr std::int32_t AsMilliseconds() const { return milliseconds_; }
 
+  /// \brief AL `Time + Integer` -- a number of milliseconds later, wrapping at midnight the way
+  ///        the platform does (`LibraryService`: `Time + RandInt(ConvertHoursToMilliSec(12))`).
+  /// \param milliseconds How many.
+  /// \return The later time.
+  [[nodiscard]] constexpr Time operator+(std::int32_t milliseconds) const {
+    const std::int32_t sum = (milliseconds_ + milliseconds) % kMillisecondsPerDay;
+    return FromMilliseconds(sum < 0 ? sum + kMillisecondsPerDay : sum);
+  }
+
+  /// \brief AL `Time - Integer` -- a number of milliseconds earlier.
+  /// \param milliseconds How many.
+  /// \return The earlier time.
+  [[nodiscard]] constexpr Time operator-(std::int32_t milliseconds) const {
+    return *this + (-milliseconds);
+  }
+
   /// \return True for `0T`, which is midnight.
   [[nodiscard]] constexpr bool IsUndefined() const { return milliseconds_ == 0; }
 
@@ -107,6 +123,22 @@ public:
   /// \brief AL `Time - Time` -- how long lies between them.
   /// \param o The earlier time.
   /// \return The difference, which the page's own CompareTime example compares against 86 399 999.
+  /// \brief AL `Time += Integer` -- milliseconds, in place.
+  /// \param milliseconds The milliseconds.
+  /// \return This time.
+  constexpr Time &operator+=(std::int32_t milliseconds) {
+    *this = *this + milliseconds;
+    return *this;
+  }
+
+  /// \brief AL `Time -= Integer` -- milliseconds, in place.
+  /// \param milliseconds The milliseconds.
+  /// \return This time.
+  constexpr Time &operator-=(std::int32_t milliseconds) {
+    *this = *this - milliseconds;
+    return *this;
+  }
+
   [[nodiscard]] constexpr Duration operator-(const Time &o) const {
     return Duration{static_cast<std::int64_t>(milliseconds_) -
                     static_cast<std::int64_t>(o.milliseconds_)};

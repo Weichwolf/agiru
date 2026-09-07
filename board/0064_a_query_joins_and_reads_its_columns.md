@@ -127,3 +127,11 @@ gate.
 `devenv-query-retrieve-date-data.md` adds one more column-level transform: a **date method** on a
 column returns only the Year, Month or Day of a date field, which is a `date_part` in the emitted
 SQL and another reason the column list is a projection rather than a field list.
+
+## Measured 2026-09-06 on the 893-case run
+
+`ConfPersonalizationMgt` declares `RoleCenterFromPlans: Query "Role Center from Plans"`, the
+transpiler stubs the absent kind as a .NET type, and 44 cases fail on `RoleCenterFromPlans.SetRange`
+-- every test that opens a role centre goes through it. The first query a generator has to carry
+is that one.
+

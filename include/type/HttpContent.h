@@ -15,6 +15,7 @@
 #include "type/RecordId.h"
 #include "type/SecretText.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -23,6 +24,8 @@
 
 /// \file
 /// \brief AL `HttpContent` -- the surface the platform documentation declares.
+#include <concepts>
+#include <type_traits>
 
 namespace agiru {
 
@@ -69,7 +72,7 @@ public:
   /// \param OutputString The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean ReadAs(std::string &OutputString);
+  ::agiru::Boolean ReadAs(::agiru::Text<0> &OutputString);
 
   /// \brief AL `HttpContent.WriteFrom(InStream)`. Sets HttpContent content to the provided text or
   /// stream.
@@ -81,7 +84,14 @@ public:
   /// SecretText.
   /// \param SecretText The AL `SecretText`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void WriteFrom(const ::agiru::SecretText &SecretText);
+  /// \tparam S The secret's type -- `SecretText` itself, and nothing that merely
+  ///         CONVERTS to one, so a plain text still picks the text overload.
+  template <typename S>
+    requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
+  void WriteFrom(const S &SecretText) {
+    static_cast<void>(SecretText);
+    throw Error("HttpContent.WriteFrom(SecretText) is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `HttpContent.WriteFrom(Text)`. Sets HttpContent content to the provided text or
   /// stream.

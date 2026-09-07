@@ -15,6 +15,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/TextEncoding.h"
 #include "type/Time.h"
 #include "type/Variant.h"
@@ -52,7 +53,7 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Create(std::string_view Name, const ::agiru::TextEncoding &Encoding);
+  ::agiru::Boolean Create(std::string_view Name, const ::agiru::TextEncoding &Encoding = {});
 
   /// \brief AL `File.CreateInStream(InStream)`. Creates an InStream object for a file. This enables
   /// you to import or read data from the file.
@@ -60,11 +61,24 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CreateInStream(const ::agiru::InStream &InStream);
 
+  /// \brief AL `File.CreateInStream(InStream, TextEncoding)` -- the encoding the file is read in.
+  /// \param InStream The stream.
+  /// \param Encoding The encoding.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void CreateInStream(const ::agiru::InStream &InStream, const ::agiru::TextEncoding &Encoding);
+
   /// \brief AL `File.CreateOutStream(OutStream)`. Creates an OutStream object for a file. This
   /// enables you to export or write data to the file.
   /// \param OutStream The AL `OutStream`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CreateOutStream(const ::agiru::OutStream &OutStream);
+
+  /// \brief AL `File.CreateOutStream(OutStream, TextEncoding)` -- the encoding the file is written
+  ///        in.
+  /// \param OutStream The stream.
+  /// \param Encoding  The encoding.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void CreateOutStream(const ::agiru::OutStream &OutStream, const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.CreateTempFile(TextEncoding)`. Creates a temporary file. This enables you to
   /// save data of any format to a temporary file. This file has a unique name and will be stored in
@@ -72,6 +86,12 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.CreateTempFile()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.CreateTempFile([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean CreateTempFile();
+
   ::agiru::Boolean CreateTempFile(const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.Download(Text, Text, Text, Text, Text)`. Sends a file from a server computer
@@ -88,7 +108,7 @@ public:
                                    std::string_view DialogTitle,
                                    std::string_view ToFolder,
                                    std::string_view ToFilter,
-                                   std::string &ToFile);
+                                   ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from
   /// server computer to the client computer. The client computer is the computer that is running
@@ -104,7 +124,7 @@ public:
                                              std::string_view DialogTitle,
                                              std::string_view ToFolder,
                                              std::string_view ToFilter,
-                                             std::string &ToFile);
+                                             ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.Erase(Text)`. Deletes a file.
   /// \param Name The AL `Text`.
@@ -125,6 +145,18 @@ public:
   /// \param Time The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.GetStamp` without its optional argument(s), which the
+  ///        documentation brackets.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  /// \brief AL `File.GetStamp` without its optional argument(s), which the
+  ///        documentation brackets.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  static ::agiru::Boolean GetStamp(std::string_view Name);
+
+  static ::agiru::Boolean GetStamp(std::string_view Name, ::agiru::Date &Date);
+
   static ::agiru::Boolean GetStamp(std::string_view Name, ::agiru::Date &Date, ::agiru::Time &Time);
 
   /// \brief AL `File.IsPathTemporary(Text)`. Validates whether the given path is located in the
@@ -150,7 +182,7 @@ public:
   /// \param Encoding The AL `TextEncoding`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Open(std::string_view Name, const ::agiru::TextEncoding &Encoding);
+  ::agiru::Boolean Open(std::string_view Name, const ::agiru::TextEncoding &Encoding = {});
 
   /// \brief AL `File.Pos()`. Gets the current position of the file pointer in an ASCII or binary
   /// file.
@@ -183,13 +215,20 @@ public:
   /// \param Time The AL `Time`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time);
+  static ::agiru::Boolean
+  SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time = {});
 
   /// \brief AL `File.TextMode(Boolean)`. Sets whether a file should be opened as an ASCII file or a
   /// binary file. Gets the current setting of this option for a file.
   /// \param Mode The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.TextMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.TextMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean TextMode();
+
   ::agiru::Boolean TextMode(::agiru::Boolean Mode);
 
   /// \brief AL `File.Trunc()`. Truncate an ASCII or binary file to the current position of the file
@@ -211,7 +250,7 @@ public:
                                  std::string_view FromFolder,
                                  std::string_view FromFilter,
                                  std::string_view FromFile,
-                                 std::string &ToFile);
+                                 ::agiru::Text<0> &ToFile);
 
   /// \brief AL `File.UploadIntoStream(Text, InStream)`. Sends a file from the client computer to
   /// the corresponding server. The client computer is the computer that is running a browser that
@@ -237,7 +276,7 @@ public:
   static ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                            std::string_view FromFolder,
                                            std::string_view FromFilter,
-                                           std::string &FromFile,
+                                           ::agiru::Text<0> &FromFile,
                                            ::agiru::InStream &InStream);
 
   /// \brief AL `File.View(Text, Boolean)`. Opens a file from server computer on the client computer
@@ -247,7 +286,8 @@ public:
   /// \param AllowDownloadAndPrint The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean View(std::string_view FromFile, ::agiru::Boolean AllowDownloadAndPrint);
+  static ::agiru::Boolean View(std::string_view FromFile,
+                               ::agiru::Boolean AllowDownloadAndPrint = {});
 
   /// \brief AL `File.ViewFromStream(InStream, Text, Boolean)`. Opens a file from the server on the
   /// client computer in preview mode. The client computer is defined as the machine running the
@@ -259,7 +299,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Boolean ViewFromStream(const ::agiru::InStream &InStream,
                                          std::string_view FileName,
-                                         ::agiru::Boolean AllowDownloadAndPrint);
+                                         ::agiru::Boolean AllowDownloadAndPrint = {});
 
   /// \brief AL `File.Write(BigInteger)`. Writes to an MS-DOS encoded file or binary file.
   /// \param Value The AL `BigInteger`.
@@ -351,6 +391,12 @@ public:
   /// \param Mode The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `File.WriteMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] File.WriteMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean WriteMode();
+
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 };
 

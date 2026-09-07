@@ -1,7 +1,10 @@
 #pragma once
 
+#include "type/TextEncoding.h"
+
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -53,6 +56,31 @@ public:
   /// \brief AL `Blob.CreateInStream(InStream)` -- points a stream at this BLOB to read from.
   /// \return The stream.
   [[nodiscard]] class InStream CreateInStream() const;
+
+  /// \brief AL `Blob.CreateOutStream(var OutStream [, TextEncoding])` -- the `var` form.
+  /// \param into     The stream to bind to this BLOB.
+  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  void CreateOutStream(class OutStream &into, const TextEncoding &Encoding = {});
+
+  /// \brief AL `Blob.CreateInStream(var InStream [, TextEncoding])` -- the `var` form.
+  /// \param from     The stream to bind to this BLOB.
+  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  void CreateInStream(class InStream &from, const TextEncoding &Encoding = {}) const;
+
+  /// \brief AL `Blob.Export(Text)`.
+  /// \param Name The full path and name of the file the bytes are written to.
+  /// \return The name of the file that was written.
+  /// \throws Error always.
+  /// \warning REFUSED. Writing a client file needs a client (board:0030); the refusal names the
+  ///          file, so a caller learns WHICH export it lost.
+  std::string Export(std::string_view Name);
+
+  /// \brief AL `Blob.Import(Text)`.
+  /// \param Name The full path and name of the file the bytes are read from.
+  /// \return The name of the file that was read.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason Export gives.
+  std::string Import(std::string_view Name);
 
   /// \brief Compares two BLOBs.
   /// \param o The other BLOB.

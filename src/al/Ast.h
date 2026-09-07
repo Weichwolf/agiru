@@ -36,6 +36,7 @@ struct VarDecl {
   std::vector<std::string> members;
   std::vector<VarDecl> arguments;
   std::vector<int> dimensions;
+  std::vector<std::string> attributes;
 };
 
 using Parameter = VarDecl;
@@ -174,6 +175,8 @@ const Property *Find(const std::vector<Property> &properties, std::string_view n
 const Trigger *Find(const std::vector<Trigger> &triggers, std::string_view name);
 
 bool HasAttribute(const ProcedureDecl &procedure, std::string_view name);
+
+std::vector<std::string> AttributeArguments(const ProcedureDecl &procedure, std::string_view name);
 
 std::vector<std::string> ListValue(const Property &property);
 

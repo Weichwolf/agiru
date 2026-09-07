@@ -36,6 +36,12 @@ public:
   /// \param NewValue The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlWriteOptions.PreserveWhitespace()` -- the READING form, which the
+  /// documentation's syntax block brackets: `[X := ] XmlWriteOptions.PreserveWhitespace([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean PreserveWhitespace();
+
   ::agiru::Boolean PreserveWhitespace(::agiru::Boolean NewValue);
 };
 

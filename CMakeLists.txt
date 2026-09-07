@@ -9,6 +9,9 @@ cmake_minimum_required(VERSION 3.28)
 project(agiru CXX)
 
 set(CMAKE_CXX_STANDARD 23)
+# NO MODULE SCANNING: nothing here is a C++20 module, the scan is a second preprocessor pass over
+# every translation unit, and CMake refuses to unity-batch a scanned source (board:0589).
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -20,8 +23,36 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # fall out of the compiler, and that is the hold which replaces it.
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
+# A TEMPLATE'S INLINE FUNCTIONS ARE NOT AN EXPORTED SYMBOL. The door is templates all the way down --
+# `Table<Derived>`, `Text<N>`, `Declare<&Member>` -- and every instantiation lands in the dynamic
+# symbol table of the library that made it, which the linker then has to merge and the loader to
+# resolve. Hiding them is what `-fvisibility-inlines-hidden` is for, and it changes no observable
+# behaviour: an inline function's ADDRESS is not something AL can take.
+add_compile_options(-fvisibility-inlines-hidden)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+# THE GENERATED TREE IS COMPILED FOR THE LOOP AND NOT FOR THE CLOCK, and the measurement is the
+# whole argument. One 1 022-line table source, clang++-19, 2026-09-07, same machine and same load:
+#
+#   -O2 -g    67.9 s   18.2 MB object   <- what the build did
+#   -O2 -g0   44.3 s    3.0 MB
+#   -O0 -g0   12.8 s    5.3 MB          <- 5.3x faster
+#
+# and the library it lands in was 1 001 MB of which 864 MB was DWARF, which the linker merges and
+# relocates on every build. NOBODY STEPS THROUGH A GENERATED BODY: its defect is a defect in
+# `src/gen`, and `src/` keeps the build type's own flags, debugger and all.
+#
+# `AGIRU_FAST_LOOP=OFF` gives the generated tree the build type's flags back, and ANY statement
+# about run time has to be measured that way -- CLAUDE.md's benchmark is the same operation in
+# plain SQL, and an -O0 build cannot answer it.
+option(AGIRU_FAST_LOOP "Compile the generated tree for compile time rather than for run time" ON)
+if(AGIRU_FAST_LOOP)
+  set(AGIRU_GENERATED_FLAGS -O0 -g0)
+else()
+  set(AGIRU_GENERATED_FLAGS "")
 endif()
 
 find_program(LLD ld.lld-19 ld.lld)
@@ -80,6 +111,18 @@ foreach(tier IN LISTS TIERS)
     set(target agiru_${tier})
   endif()
 
+  # THE TRANSPILER KEEPS ITS OPTIMISER AND EVERYTHING ELSE LOSES IT. `agirutc` runs on EVERY round
+  # -- 95 s over 9 300 objects -- so its run time IS build time and `-O0` would cost more than the
+  # compile saves; `al` and `gen` are its libraries. The runtime and the CLI are compiled for the
+  # loop like the generated tree, because nothing measures their run time yet.
+  if(AGIRU_FAST_LOOP)
+    if(tier STREQUAL tc OR tier STREQUAL gen OR tier STREQUAL al)
+      target_compile_options(${target} PRIVATE -g0)
+    else()
+      target_compile_options(${target} PRIVATE ${AGIRU_GENERATED_FLAGS})
+    endif()
+  endif()
+
   # Its own tier, the door, and exactly what `reaches` names.
   target_include_directories(${target} PRIVATE
     "${CMAKE_SOURCE_DIR}/src/${tier}" "${CMAKE_SOURCE_DIR}/include")
@@ -133,11 +176,27 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
       continue()
     endif()
     list(APPEND slice_sources "${CMAKE_SOURCE_DIR}/apps/${line}")
+    # A UNITY GROUP IS A DIRECTORY, IN BUCKETS OF 16 IN SLICE ORDER. Batches numbered over the
+    # whole list shift whenever a source enters the middle, and every batch after it recompiles;
+    # a group keyed by directory and rank keeps a new source's cost to its own bucket
+    # (board:0589).
+    # The group key is the source's app and module (`base/sales`), not its leaf directory: a leaf
+    # holds two or three slice sources on average and amortises the door parse over as few.
+    string(REGEX REPLACE "^([^/]+/[^/]+).*$" "\\1" slice_dir "${line}")
+    string(MAKE_C_IDENTIFIER "${slice_dir}" slice_dir_id)
+    if(NOT DEFINED slice_rank_${slice_dir_id})
+      set(slice_rank_${slice_dir_id} 0)
+    endif()
+    math(EXPR slice_bucket "${slice_rank_${slice_dir_id}} / 16")
+    math(EXPR slice_rank_${slice_dir_id} "${slice_rank_${slice_dir_id}} + 1")
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/apps/${line}" PROPERTIES
+      UNITY_GROUP "${slice_dir}/${slice_bucket}")
   endforeach()
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})
     target_include_directories(agiru_slice PRIVATE
-      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent")
+      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/shared")
     file(READ "${CMAKE_SOURCE_DIR}/apps.json" slice_apps_json)
     string(JSON slice_app_count LENGTH "${slice_apps_json}" apps)
     math(EXPR slice_app_last "${slice_app_count} - 1")
@@ -152,6 +211,13 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
     # including what it uses -- that stands as its own rule -- it is what makes the loop bearable
     # while the tree is still repaired file by file.
     target_precompile_headers(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    # THE DOOR IS PARSED ONCE PER BATCH, NOT ONCE PER FILE. Measured 2026-09-06 on a 1 022-line
+    # table source: 8.2 s, of which 6.6 s parse the door and 0.5 s are the back end. A unity batch
+    # of 16 pays that parse once for 16 sources; every generated file keeps its file-scope names in
+    # a namespace of its own so the batch has nothing to collide on (board:0589).
+    set_target_properties(agiru_slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP
+                                                 UNITY_BUILD_BATCH_SIZE 32)
+    target_compile_options(agiru_slice PRIVATE ${AGIRU_GENERATED_FLAGS})
     target_link_libraries(agiru PRIVATE agiru_slice)
   endif()
 endif()
@@ -175,9 +241,11 @@ if(AGIRU_BUILD_APPS)
     add_library(agiru_app_${app} SHARED ${app_sources})
     target_include_directories(agiru_app_${app} PRIVATE
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/shared"
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    target_compile_options(agiru_app_${app} PRIVATE ${AGIRU_GENERATED_FLAGS})
 
     string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)
     if(depends)

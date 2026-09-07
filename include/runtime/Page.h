@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/test/TestAction.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
@@ -44,12 +45,22 @@ public:
   /// \brief AL `TestRequestPage.OK()` -- closes the request page and runs the report.
   /// \return Whether it ran.
   /// \throws Error until a report can be run (board:0034).
-  Boolean OK() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestAction OK() { throw Error("a TestRequestPage needs a report (board:0034)"); }
 
   /// \brief AL `TestRequestPage.Cancel()` -- closes the request page without running.
   /// \return Whether it closed.
   /// \throws Error until a report can be run (board:0034).
-  Boolean Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestAction Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+
+  /// \brief AL `TestRequestPage.GoToRecord(Record)` -- positions the request page on a record.
+  /// \tparam Source The record's type.
+  /// \param Record The record to stand on.
+  /// \return Whether the request page could.
+  /// \throws Error until a report runs (board:0034).
+  template <typename Source> Boolean GoToRecord(const Source &Record) {
+    static_cast<void>(Record);
+    throw Error("a TestRequestPage needs a report (board:0034)");
+  }
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.
@@ -61,6 +72,40 @@ public:
 ///       the generator spells the static form `Page<>::RunModal`. `Id()` and `Name()` are the two
 ///       that need a Derived, and asking for them on `Page<>` is a compile error rather than a
 ///       wrong number.
+/// \brief A PART control on a page: AL reaches the sub-page through it -- `CurrPage.Matrix.PAGE`.
+///
+/// \tparam P The sub-page's generated class.
+///
+/// \note THE PART IS A CONTROL AND THE SUB-PAGE IS AN OBJECT, and AL keeps them apart with
+///       `.PAGE`. The part itself carries what the platform offers on a control (`Visible`,
+///       `Editable`); everything on the other side of `.PAGE` is the sub-page's own surface, and
+///       reaching it needs a running UI (board:0030).
+template <typename P> class PartRef {
+public:
+  /// \brief AL `CurrPage.<Part>.PAGE` -- the sub-page behind the part.
+  /// \return Never.
+  /// \throws Error always -- a part's page needs a running UI (board:0030).
+  [[nodiscard]] P &Page() const { throw Error("A part's PAGE needs a running UI (board:0030)"); }
+
+  /// \brief AL `CurrPage.<Part>.Visible(Boolean)`.
+  /// \param NewVisible Whether it shows.
+  /// \return Never.
+  /// \throws Error always -- a part needs a running UI (board:0030).
+  ::agiru::Boolean Visible(::agiru::Boolean NewVisible) const {
+    static_cast<void>(NewVisible);
+    throw Error("A part's Visible needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `CurrPage.<Part>.Editable(Boolean)`.
+  /// \param NewEditable Whether it takes input.
+  /// \return Never.
+  /// \throws Error always -- a part needs a running UI (board:0030).
+  ::agiru::Boolean Editable(::agiru::Boolean NewEditable) const {
+    static_cast<void>(NewEditable);
+    throw Error("A part's Editable needs a running UI (board:0030)");
+  }
+};
+
 template <typename Derived = void> class Page {
 public:
   /// \brief The page's AL number.
@@ -103,6 +148,14 @@ public:
   /// \param Refresh The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
+  /// \brief AL `Page.Activate()` -- the READING form, which the documentation brackets:
+  ///        `[X := ] Page.Activate([NewX])`.
+  /// \return Never.
+  /// \throws Error always -- a page property needs a running UI (board:0030).
+  [[nodiscard]] ::agiru::Boolean Activate() const {
+    throw Error("Page.Activate() needs a running UI (board:0030)");
+  }
+
   ::agiru::Boolean Activate(::agiru::Boolean Refresh) {
     static_cast<void>(Refresh);
     throw Error("Page.Activate(Boolean) needs a running UI (board:0030)");
@@ -116,6 +169,12 @@ public:
     static_cast<void>(TaskId);
     throw Error("Page.CancelBackgroundTask(Integer) needs a running UI (board:0030)");
   }
+
+  /// \brief AL `Page.Caption()` -- the READING form, which the documentation's syntax block
+  /// brackets: `[X := ] Page.Caption([NewCaption])`.
+  /// \return The caption the page shows.
+  /// \throws Error until the UI runs (board:0030).
+  std::string Caption() const { throw Error("Page.Caption() needs a running UI (board:0030)"); }
 
   /// \brief AL `Page.Caption(Text)`. The caption shown in the title bar. For example, the default
   /// value in English (United States) is the same as the name of the page.
@@ -135,6 +194,14 @@ public:
   /// \param NewEditable The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
+  /// \brief AL `Page.Editable()` -- the READING form, which the documentation brackets:
+  ///        `[X := ] Page.Editable([NewX])`.
+  /// \return Never.
+  /// \throws Error always -- a page property needs a running UI (board:0030).
+  [[nodiscard]] ::agiru::Boolean Editable() const {
+    throw Error("Page.Editable() needs a running UI (board:0030)");
+  }
+
   ::agiru::Boolean Editable(::agiru::Boolean NewEditable) {
     static_cast<void>(NewEditable);
     throw Error("Page.Editable(Boolean) needs a running UI (board:0030)");
@@ -169,7 +236,7 @@ public:
 
   /// \brief AL `Page.GetBackgroundParameters()`. Gets the page background task input parameters.
   /// \throws Error until the UI runs (board:0030).
-  void GetBackgroundParameters() {
+  ::agiru::Dictionary<std::string, std::string> GetBackgroundParameters() {
     throw Error("Page.GetBackgroundParameters() needs a running UI (board:0030)");
   }
 
@@ -185,6 +252,14 @@ public:
     throw Error("Page.GetRecord(Record) needs a running UI (board:0030)");
   }
 
+  /// \brief AL `Page.LookupMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.LookupMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  ::agiru::Boolean LookupMode() const {
+    throw Error("Page.LookupMode() needs a running UI (board:0030)");
+  }
+
   /// \brief AL `Page.LookupMode(Boolean)`. Gets or sets the default lookup mode for the page.
   /// \param NewLookupMode The AL `Boolean`.
   /// \return The AL `Boolean`.
@@ -192,6 +267,14 @@ public:
   ::agiru::Boolean LookupMode(::agiru::Boolean NewLookupMode) {
     static_cast<void>(NewLookupMode);
     throw Error("Page.LookupMode(Boolean) needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `Page.ObjectId()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.ObjectId([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  [[nodiscard]] std::string ObjectId() const {
+    throw Error("Page.ObjectId() needs a running UI (board:0030)");
   }
 
   /// \brief AL `Page.ObjectId(Boolean)`. Returns a string in the "Page xxx" format, where xxx is
@@ -202,6 +285,14 @@ public:
   std::string ObjectId(::agiru::Boolean UseNames) {
     static_cast<void>(UseNames);
     throw Error("Page.ObjectId(Boolean) needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `Page.PromptMode()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] Page.PromptMode([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error until the UI runs (board:0030).
+  ::agiru::PromptMode PromptMode() const {
+    throw Error("Page.PromptMode() needs a running UI (board:0030)");
   }
 
   /// \brief AL `Page.PromptMode(PromptMode)`. The mode of a PromptDialog page that prompts the user
@@ -273,7 +364,7 @@ public:
   /// before the page is updated.
   /// \param SaveRecord The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
-  void Update(::agiru::Boolean SaveRecord) {
+  void Update(::agiru::Boolean SaveRecord = true) {
     static_cast<void>(SaveRecord);
     throw Error("Page.Update(Boolean) needs a running UI (board:0030)");
   }
@@ -281,6 +372,47 @@ public:
   /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
   ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate
   ///       initialisation and both of those make it fail from the caller's context.
+};
+
+/// \brief AL `Page.Run(Number, ...)` and `Page.RunModal(Number, ...)` by object NUMBER, the way
+///        `Codeunit<void>` carries `Codeunit.Run(Number)`: refused until the page catalogue exists
+///        (board:0038).
+template <> class Page<void> {
+public:
+  /// \brief AL `PAGE.GetBackgroundParameters(...)` -- the parameters a page background task was
+  /// started with.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- there is no running page yet (board:0030).
+  template <typename... Arguments>
+  static ::agiru::Text<0> GetBackgroundParameters(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.GetBackgroundParameters is declared and needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `PAGE.SetFilterToMultipleValues(...)` -- a filter naming several values at once.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \throws Error always -- there is no running page yet (board:0030).
+  template <typename... Arguments> static void SetFilterToMultipleValues(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.SetFilterToMultipleValues is declared and needs a running UI (board:0030)");
+  }
+
+  template <typename... Arguments>
+  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.Run(" + std::to_string(Number) +
+                ") by number needs the page catalogue (board:0038)");
+  }
+
+  template <typename... Arguments>
+  static ::agiru::Action RunModal(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.RunModal(" + std::to_string(Number) +
+                ") by number needs the page catalogue (board:0038)");
+  }
 };
 
 }

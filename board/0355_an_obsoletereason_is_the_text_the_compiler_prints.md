@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # An `ObsoleteReason` is the text the diagnostic prints
 
+**The metadata half is done.** `ObsoleteReason` reaches `FieldDef::obsoleteReason`; what is missing is the diagnostic.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Specifies **why** the object has been marked as Pending in the `ObsoleteState` property.
 >
 > Applies to: 37 element kinds -- table, table field, table key, codeunit, enum type, enum value,

@@ -3,17 +3,23 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/Events.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Boolean.h"
+#include "type/ErrorInfo.h"
 #include "type/Integer.h"
+#include "type/IsolationLevel.h"
 #include "type/Option.h"
+#include "type/SecurityFilter.h"
 
+#include <array>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 /// \file
@@ -44,6 +50,46 @@ template <typename T> struct OnValidateOf {
 
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
+
+/// \brief What a `Find` hands back: the answer, and the REFUSAL when nobody reads it.
+///
+/// \note AL DECIDES AT CONSUMPTION. `record-findset--method.md`: "[Ok :=] ... If you omit this
+///       optional return value and the operation does not execute successfully, a runtime error
+///       will occur." So the same call is a question in `if Rec.FindSet() then` and an assertion
+///       as a bare statement, and only the CONSUMPTION tells the two apart -- which is what this
+///       wrapper carries (openerp WI-1385, board:0056).
+class Found {
+public:
+  /// \brief Holds the answer and the table it is about.
+  /// \param found Whether the row was there. \param table The table's AL name.
+  Found(bool found, std::string_view table) : found_(found), table_(table) {}
+
+  Found(const Found &) = delete;
+  Found &operator=(const Found &) = delete;
+  Found &operator=(Found &&) = delete;
+
+  /// \brief Moves, and the moved-from copy stops being an assertion.
+  /// \param other The one being moved.
+  Found(Found &&other) noexcept : found_(other.found_), table_(other.table_), read_(other.read_) {
+    other.read_ = true;
+  }
+
+  /// \brief Reading the answer makes it a QUESTION rather than an assertion.
+  /// \return Whether the row was there.
+  operator ::agiru::Boolean() {
+    read_ = true;
+    return found_;
+  }
+
+  /// \brief Raises when nobody read it and nothing was found.
+  /// \throws Error `DB:NothingInsideFilter` -- "There is no <Table> within the filter."
+  ~Found() noexcept(false);
+
+private:
+  bool found_;
+  std::string_view table_;
+  bool read_ = false;
+};
 
 /// \brief Makes a record the `xRec` of the trigger about to run.
 ///
@@ -266,6 +312,22 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table);
 /// \return How many rows went.
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
 
+/// \brief Gives a record its own empty set of temporary rows (board:0583).
+/// \param record The record.
+/// \param ops    How the runtime reaches rows of its type -- `kTempOps<T>`.
+void RuntimeMakeTemporary(void *record, const TempOps *ops);
+
+/// \brief AL `Record.IsTemporary()`.
+/// \param record The record.
+/// \return Whether its state carries temporary rows.
+[[nodiscard]] bool RuntimeIsTemporary(const void *record);
+
+/// \brief AL `Record.Copy(From, true)`: the record shares `from`'s temporary rows from now on.
+/// \param record The record.
+/// \param from   The temporary record whose rows it joins.
+/// \throws Error when either is not temporary, which is what the platform refuses too.
+void RuntimeShareTemporary(void *record, const void *from);
+
 /// \brief Writes one field from the text a column returned.
 /// \param record The record.
 /// \param def    The field.
@@ -346,10 +408,7 @@ public:
   ///       `record-modify-method.md` and `record-delete-method.md` all read
   ///       `[Ok := ] Record.X(...)`, and AL writes `exit(Modify())` -- 226 sites under Layers/W1.
   ///       A `void` here made every one of them a compile error.
-  Boolean Insert() {
-    detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
-    return true;
-  }
+  Boolean Insert() { return Insert(false); }
 
   /// \brief AL `Record.Insert(RunTrigger)`.
   ///
@@ -362,13 +421,29 @@ public:
   /// \note WHETHER THE TABLE HAS ONE IS A COMPILE-TIME QUESTION, not a registry lookup: the
   ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
   ///       it and a table without the trigger compiles to the same code `Insert()` does.
+  /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` -- the row keeps the `SystemId`
+  ///        the caller put in it (`record-insert-boolean-boolean-method.md`).
+  /// \param RunTrigger         Whether `OnInsert` runs.
+  /// \param InsertWithSystemId Whether the record's own `SystemId` is written rather than a new one.
+  /// \return Whether the row was written.
+  /// \throws Error when the row is already there.
+  ///
+  /// \note THE RULE LIVES IN THE TWO-ARGUMENT PAGE and not beside it, which is what the overload
+  ///       filenames are for: the predecessor paid three reverts for reading the wrong file.
+  Boolean Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    static_cast<void>(InsertWithSystemId);
+    return Insert(RunTrigger);
+  }
+
   Boolean Insert(Boolean RunTrigger) {
+    TableEvent("OnBeforeInsertEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnInsert(); }) {
         static_cast<Derived *>(this)->OnInsert();
       }
     }
     detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    TableEvent("OnAfterInsertEvent", RunTrigger);
     return true;
   }
 
@@ -381,7 +456,8 @@ public:
   ///       written by the platform on every modify.
   Boolean Modify() {
     if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("the record does not exist");
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
     return true;
   }
@@ -391,12 +467,15 @@ public:
   /// \throws Error when no row carries this primary key, and whatever the trigger raises.
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   Boolean Modify(Boolean RunTrigger) {
+    TableEvent("OnBeforeModifyEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnModify(); }) {
         static_cast<Derived *>(this)->OnModify();
       }
     }
-    return Modify();
+    const Boolean done = Modify();
+    TableEvent("OnAfterModifyEvent", RunTrigger);
+    return done;
   }
 
   /// \brief AL `Record.Delete()`.
@@ -404,7 +483,8 @@ public:
   /// \see Insert() for why the statement form raises.
   Boolean Delete() {
     if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("the record does not exist");
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
     return true;
   }
@@ -416,12 +496,15 @@ public:
   /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
   ///       record it is about to remove, and a great many of them do.
   Boolean Delete(Boolean RunTrigger) {
+    TableEvent("OnBeforeDeleteEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnDelete(); }) {
         static_cast<Derived *>(this)->OnDelete();
       }
     }
-    return Delete();
+    const Boolean done = Delete();
+    TableEvent("OnAfterDeleteEvent", RunTrigger);
+    return done;
   }
 
   /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.
@@ -444,6 +527,19 @@ public:
   ///
   /// The address of the member is enough to find its declaration, so the generated line reads like
   /// the AL line instead of naming a field number.
+  /// \brief AL `Record.FieldError(Field, ErrorInfo)` -- the field's own refusal, with the caller's
+  ///        error (`record-fielderror-joker-errorinfo-method.md`).
+  /// \tparam Field The field member's type.
+  /// \param member The field.
+  /// \param info   The error, whose message is raised.
+  /// \throws Error always.
+  template <typename Field>
+    requires(!std::is_same_v<Field, ::agiru::FieldNo>)
+  [[noreturn]] void FieldError(const Field &member, const ::agiru::ErrorInfo &info) const {
+    ::agiru::ErrorInfo raised = info;
+    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), raised.Message());
+  }
+
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[noreturn]] void FieldError(const FieldType &member, std::string_view text = {}) const {
@@ -466,8 +562,27 @@ public:
   /// \param member   The field.
   /// \param expected The value it must hold, or the option member it must hold.
   /// \throws Error when the values differ.
-  template <typename FieldType, typename Value>
+  /// \brief AL `Record.TestField(Field, ErrorInfo)` -- the field must not hold its blank, and the
+  ///        refusal is the one the caller wrote (`record-testfield-joker-errorinfo-method.md`).
+  /// \tparam FieldType The field member's type.
+  /// \param member The field.
+  /// \param info   The error to raise.
+  /// \throws Error when the field holds its type's blank.
+  ///
+  /// \note THE SECOND ARGUMENT IS NOT AN EXPECTED VALUE. Without this overload an `ErrorInfo`
+  ///       landed in the value form and was COMPARED against the field, which is a compile error
+  ///       where the field cannot be compared to one and a wrong answer where it can.
+  template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  void TestField(const FieldType &member, const ::agiru::ErrorInfo &info) const {
+    if (member != FieldType{}) { return; }
+    ::agiru::ErrorInfo raised = info;
+    throw Error(raised.Message());
+  }
+
+  template <typename FieldType, typename Value>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo> &&
+             !std::is_same_v<std::remove_cvref_t<Value>, ::agiru::ErrorInfo>)
   /// \note THE FIELD'S OWN TYPE IS THE WRAPPER, and guessing `Option` was wrong for half of them.
   ///       AL writes `TestField(Status, "Price Status"::Active)` -- a bare member -- and the
   ///       holder it belongs in is whatever the field is declared as: `Option<E>` for a field with
@@ -483,6 +598,25 @@ public:
     } else {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
     }
+  }
+
+  /// \brief AL `Record.TestField(Field, Value, ErrorInfo)` -- the same check, raising the
+  ///        caller's own error when the field does not hold the value
+  ///        (`record-testfield-*-errorinfo-method.md`).
+  /// \tparam FieldType The field's type. \tparam Value The value's type.
+  /// \param member   The field. \param expected The value it must hold.
+  /// \param info     The error to raise.
+  template <typename FieldType, typename Value>
+  void TestField(const FieldType &member, const Value &expected, const ErrorInfo &info) const {
+    bool same = false;
+    if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
+      same = member == FieldType{expected};
+    } else if constexpr (std::is_enum_v<Value>) {
+      same = member == Option<Value>{expected};
+    } else {
+      same = member == expected;
+    }
+    if (!same) { throw Error(info); }
   }
 
   /// \brief AL `Record.FieldCaption(Field)`, naming the field itself.
@@ -566,7 +700,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean AddLink(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer AddLink(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.AddLink is declared and not implemented yet (board:0035)");
   }
@@ -578,9 +712,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AddLoadFields(...)` -- partial records (`record-addloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean AddLoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.AddLoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.AreFieldsLoaded(...)`. Checks whether the specified fields are all initially
@@ -589,9 +728,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AreFieldsLoaded(...)` -- partial records
+  /// (`record-arefieldsloaded-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean AreFieldsLoaded(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.AreFieldsLoaded is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.Ascending(...)`. Gets or sets the order in which the system searches through
@@ -651,7 +795,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ClearMarks(Arguments &&...arguments) const {
+  template <typename... Arguments> void ClearMarks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.ClearMarks is declared and not implemented yet (board:0035)");
   }
@@ -661,7 +805,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Consistent(Arguments &&...arguments) const {
+  template <typename... Arguments> void Consistent(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.Consistent is declared and not implemented yet (board:0035)");
   }
@@ -672,9 +816,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Copy(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Copy is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.Copy(From [, ShareTable])` -- the fields, the filters and the position
+  ///        come across; with `ShareTable`, two temporary records share ONE set of rows from
+  ///        then on (`record-copy-method.md`).
+  /// \param from       The record copied from.
+  /// \param ShareTable Whether to share the temporary rows rather than keep this record's own.
+  void Copy(const Derived &from, Boolean ShareTable = false) {
+    static_cast<Derived &>(*this) = from;
+    if (ShareTable) { detail::RuntimeShareTemporary(Self(), &from); }
   }
 
   /// \brief AL `Record.CopyFilter(...)`. Copies the filter that has been set for one field and
@@ -683,7 +832,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CopyFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void CopyFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CopyFilter is declared and not implemented yet (board:0035)");
   }
@@ -705,7 +854,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CopyLinks(Arguments &&...arguments) const {
+  template <typename... Arguments> void CopyLinks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CopyLinks is declared and not implemented yet (board:0035)");
   }
@@ -716,7 +865,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CountApprox(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer CountApprox(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CountApprox is declared and not implemented yet (board:0035)");
   }
@@ -726,7 +875,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CurrentCompany(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string CurrentCompany(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CurrentCompany is declared and not implemented yet (board:0035)");
   }
@@ -736,7 +885,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CurrentKey(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string CurrentKey(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.CurrentKey is declared and not implemented yet (board:0035)");
   }
@@ -746,7 +895,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean DeleteLink(Arguments &&...arguments) const {
+  template <typename... Arguments> void DeleteLink(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.DeleteLink is declared and not implemented yet (board:0035)");
   }
@@ -757,7 +906,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean DeleteLinks(Arguments &&...arguments) const {
+  template <typename... Arguments> void DeleteLinks(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.DeleteLinks is declared and not implemented yet (board:0035)");
   }
@@ -799,7 +948,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FilterGroup(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer FilterGroup(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.FilterGroup is declared and not implemented yet (board:0035)");
   }
@@ -810,19 +959,20 @@ public:
   ///        values already in the record, combinable and tried in the written order.
   /// \return True when a row matched.
   /// \see `record-find-method.md`, which tabulates the five characters.
-  Boolean Find(std::string_view which = "=") {
-    return detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which);
+  detail::Found Find(std::string_view which = "=") {
+    return detail::Found{detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which),
+                         TableTraits<Derived>::kTable.name};
   }
 
   /// \brief AL `Record.FindFirst()` -- the first row of the set.
   /// \return True when a row matched.
   /// \note The page says to use this rather than `Find('-')` when only the first row is wanted,
   ///       and not to combine it with `repeat..until`. It is the same read either way.
-  Boolean FindFirst() { return Find("-"); }
+  detail::Found FindFirst() { return Find("-"); }
 
   /// \brief AL `Record.FindLast()` -- the last row of the set.
   /// \return True when a row matched.
-  Boolean FindLast() { return Find("+"); }
+  detail::Found FindLast() { return Find("+"); }
 
   /// \brief AL `Record.FindSet()`. Opens the set the filters and the key select and positions on
   ///        its first row.
@@ -832,7 +982,10 @@ public:
   ///       request for the matching rows, and a table with a hundred million of them would put all
   ///       of them in the session. SQL Server declares a cursor for this and BC is written against
   ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
-  Boolean FindSet() { return detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable); }
+  detail::Found FindSet() {
+    return detail::Found{detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable),
+                         TableTraits<Derived>::kTable.name};
+  }
 
   /// \brief AL `Record.FindSet(ForUpdate)`.
   /// \param ForUpdate Whether the rows are read for modification.
@@ -840,7 +993,7 @@ public:
   /// \warning `ForUpdate` DOES NOT RAISE THE LOCK YET. The tri-state locking a read owes AL is
   ///          board:0012, and the argument is accepted rather than refused so the call site keeps
   ///          its shape until it is.
-  Boolean FindSet(Boolean ForUpdate) {
+  detail::Found FindSet(Boolean ForUpdate) {
     static_cast<void>(ForUpdate);
     return FindSet();
   }
@@ -884,11 +1037,11 @@ public:
   /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
   ///         do yet (board:0044).
   void DeleteAll(Boolean RunTrigger) {
-    if (RunTrigger) {
-      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
-                  "(board:0044)");
+    if (!RunTrigger) {
+      DeleteAll();
+      return;
     }
-    DeleteAll();
+    while (FindFirst()) { Delete(true); }
   }
 
   /// \brief AL `Record.FullyQualifiedName(...)`. Gets the fully qualified name of a table.
@@ -896,7 +1049,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FullyQualifiedName(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string FullyQualifiedName(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.FullyQualifiedName is declared and not implemented yet (board:0035)");
   }
@@ -931,7 +1084,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetFilter is declared and not implemented yet (board:0035)");
   }
@@ -943,7 +1096,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetFilters(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetFilters(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetFilters is declared and not implemented yet (board:0035)");
   }
@@ -954,7 +1107,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetPosition(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetPosition(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetPosition is declared and not implemented yet (board:0035)");
   }
@@ -964,7 +1117,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetRangeMax(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Variant GetRangeMax(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetRangeMax is declared and not implemented yet (board:0035)");
   }
@@ -974,7 +1127,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetRangeMin(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Variant GetRangeMin(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetRangeMin is declared and not implemented yet (board:0035)");
   }
@@ -985,7 +1138,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetView(Arguments &&...arguments) const {
+  template <typename... Arguments> std::string GetView(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.GetView is declared and not implemented yet (board:0035)");
   }
@@ -1024,10 +1177,28 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean IsTemporary(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.IsTemporary is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record := RecordRef` -- the row the reference stands for.
+  /// \tparam R The reference's type, taken as a template because `RecordRef` is only declared
+  ///         here: the door's record base is what `RecordRef` itself is built on.
+  /// \param from The reference.
+  /// \return This record.
+  /// \throws Error when the reference is closed or names another table, which AL raises too.
+  ///
+  /// \note AL ASSIGNS A REFERENCE TO A RECORD in a lookup trigger -- `OnAfterLookup(Selected:
+  ///       RecordRef)` -- and what it copies is the ROW.
+  template <typename R>
+    requires requires(const R &ref) { ref.IsOpen(); }
+  Derived &operator=(const R &from) {
+    const Derived *row = from.template As<Derived>();
+    if (row == nullptr) {
+      throw Error("A RecordRef of another table cannot be assigned to " +
+                  std::string(TableTraits<Derived>::kTable.name));
+    }
+    if (row != static_cast<const Derived *>(Self())) { *static_cast<Derived *>(Self()) = *row; }
+    return *static_cast<Derived *>(Self());
   }
+
+  Boolean IsTemporary() const { return detail::RuntimeIsTemporary(Self()); }
 
   /// \brief AL `Record.LoadFields(...)`. Accesses the table's corresponding data source and loads
   /// the values of the specified fields on the record.
@@ -1035,9 +1206,13 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.LoadFields(...)` -- partial records (`record-loadfields-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean LoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.LoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.LockTable(...)`. Starts locking on a table to protect it from write
@@ -1046,7 +1221,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean LockTable(Arguments &&...arguments) const {
+  template <typename... Arguments> void LockTable(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.LockTable is declared and not implemented yet (board:0035)");
   }
@@ -1087,9 +1262,26 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ModifyAll(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ModifyAll is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.ModifyAll(Field, NewValue [, RunTrigger])` -- sets one field on every
+  ///        record the filters select (`record-modifyall-method.md`).
+  /// \tparam Field The field's type.
+  /// \tparam Value The value's type.
+  /// \param member     The field itself, the way AL names it: `Rec.ModifyAll(Status, X)`.
+  /// \param value      The new value.
+  /// \param RunTrigger Whether `OnValidate` and `OnModify` run per record.
+  /// \note A WALK AND NOT ONE `UPDATE`, so the triggers and the rowversion are the ordinary
+  ///       ones; the single statement is the measured optimisation this can take later.
+  template <typename Field, typename Value>
+  void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
+    if (!FindSet()) { return; }
+    do {
+      if (RunTrigger) {
+        Validate(member, value);
+      } else {
+        member = value;
+      }
+      Modify(RunTrigger);
+    } while (Next() != 0);
   }
 
   /// \brief AL `Record.ReadConsistency(...)`. Determines if the table supports read consistency.
@@ -1107,9 +1299,16 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ReadIsolation(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ReadIsolation is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.ReadIsolation([IsolationLevel])` -- sets the isolation the record's
+  ///        reads ask for, and answers the level in force (`record-readisolation-method.md`).
+  /// \param level The level wanted; `Default` follows the table's tri-state (board:0012).
+  /// \return The level now set.
+  /// \note CARRIED, NOT ENFORCED YET: PostgreSQL has no dirty read and the tri-state per table is
+  ///       board:0012's; what a record asks for is kept in its state so the reads can honour it
+  ///       when that lands. The name is AL's exactly, getter and setter in one.
+  IsolationLevel ReadIsolation(IsolationLevel level = IsolationLevel::Default) {
+    if (level != IsolationLevel::Default) { State().isolation = level; }
+    return State().isolation;
   }
 
   /// \brief AL `Record.ReadPermission(...)`. Determines whether a user is granted read permission
@@ -1155,7 +1354,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Relation(Arguments &&...arguments) const {
+  template <typename... Arguments> Integer Relation(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.Relation is declared and not implemented yet (board:0035)");
   }
@@ -1183,9 +1382,23 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SecurityFiltering(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SecurityFiltering is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.SecurityFiltering([SecurityFilter])` -- sets how security filters apply to
+  ///        this record and answers the setting (`record-securityfiltering-method.md`).
+  /// \param filtering The setting wanted.
+  /// \return The setting in force.
+  /// \note CARRIED, NOT ENFORCED: security filtering is board:0313's (permissions), and what a
+  ///       record asks for is kept in its state until that lands.
+  SecurityFilter SecurityFiltering(SecurityFilter filtering) {
+    State().securityFiltering = filtering;
+    return filtering;
+  }
+
+  /// \brief The getter half.
+  /// \return The setting in force, `Validated` unless set.
+  [[nodiscard]] SecurityFilter SecurityFiltering() const {
+    const detail::RecordState *state =
+        reinterpret_cast<const detail::StateHandle *>(static_cast<const Derived *>(this))->Peek();
+    return state == nullptr ? SecurityFilter::Validated : state->securityFiltering;
   }
 
   /// \brief AL `Record.SetAscending(...)`. Sets the sort order for the records returned. Use this
@@ -1196,7 +1409,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetAscending(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetAscending(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetAscending is declared and not implemented yet (board:0035)");
   }
@@ -1246,6 +1459,21 @@ public:
     detail::Narrow(State(), NumberOf(&member), StrSubstNo(expression, arguments...));
   }
 
+  /// \brief AL `Record.SetFilter(Field, Value)` where the VALUE is the expression.
+  /// \tparam Field      The field member's type.
+  /// \tparam Expression The value's type -- anything AL renders into a filter.
+  /// \param member     The field.
+  /// \param expression The value, rendered the way `Format` renders it.
+  ///
+  /// \note AL DOES NOT REQUIRE A PLACEHOLDER. `SetFilter(Field, '%1', Value)` is one form and
+  ///       `SetFilter(Field, Value)` is another, and the second is what the BaseApp writes for a
+  ///       Guid or a Date it wants matched exactly.
+  template <typename Field, typename Expression>
+    requires(!std::convertible_to<const Expression &, std::string_view>)
+  void SetFilter(const Field &member, const Expression &expression) {
+    detail::Narrow(State(), NumberOf(&member), StrSubstNo("%1", expression));
+  }
+
   /// \brief AL `Record.SetLoadFields(...)`. Sets the fields to be initially loaded when the record
   /// is retrieved from its data source. This will overwrite fields previously selected for initial
   /// load.
@@ -1253,9 +1481,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.SetLoadFields(...)` -- partial records (`record-setloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
   template <typename... Arguments> Boolean SetLoadFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.SetLoadFields is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `Record.SetPermissionFilter(...)`. Applies the user's security filter.
@@ -1263,7 +1496,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetPermissionFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetPermissionFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetPermissionFilter is declared and not implemented yet (board:0035)");
   }
@@ -1274,7 +1507,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetPosition(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetPosition(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetPosition is declared and not implemented yet (board:0035)");
   }
@@ -1304,8 +1537,8 @@ public:
   /// \param member The field.
   /// \param from   The lower bound.
   /// \param to     The upper bound.
-  template <typename Field, typename Value>
-  void SetRange(const Field &member, const Value &from, const Value &to) {
+  template <typename Field, typename From, typename To>
+  void SetRange(const Field &member, const From &from, const To &to) {
     detail::Narrow(State(),
                    NumberOf(&member),
                    detail::Literally(FilterText(from)) + ".." + detail::Literally(FilterText(to)));
@@ -1317,7 +1550,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetRecFilter(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetRecFilter(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetRecFilter is declared and not implemented yet (board:0035)");
   }
@@ -1327,29 +1560,21 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetView(Arguments &&...arguments) const {
+  template <typename... Arguments> void SetView(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.SetView is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.TableCaption(...)`. Gets the current caption of a table as a string.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TableCaption(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.TableCaption is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.
+  /// \return The `Caption` the table declares, which is its name when it declares none.
+  [[nodiscard]] std::string TableCaption() const {
+    return std::string(TableTraits<Derived>::kTable.caption);
   }
 
-  /// \brief AL `Record.TableName(...)`. Gets the name of a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TableName(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.TableName is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.TableName()`. Gets the name of a table.
+  /// \return The AL name, spaces and all.
+  [[nodiscard]] std::string TableName() const {
+    return std::string(TableTraits<Derived>::kTable.name);
   }
 
   /// \brief AL `Record.TransferFields(...)`. Copies all matching fields in one record to another
@@ -1358,7 +1583,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean TransferFields(Arguments &&...arguments) const {
+  template <typename... Arguments> void TransferFields(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("Record.TransferFields is declared and not implemented yet (board:0035)");
   }
@@ -1402,10 +1627,20 @@ public:
     const Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before);
     const detail::ValidatingField current(no);
-    member = value;
+    if constexpr (requires { member = value; }) {
+      member = value;
+    } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
+      member = Field::FromInteger(value.AsInteger());
+    } else if constexpr (std::integral<Value> && requires { member = Field::FromInteger(value); }) {
+      member = Field::FromInteger(value);
+    } else {
+      member = static_cast<Field>(value);
+    }
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      ValidateEvent("OnBeforeValidateEvent", no, before);
       RunOnValidate(no);
+      ValidateEvent("OnAfterValidateEvent", no, before);
     } catch (...) {
       static_cast<Derived &>(*this) = before;
       throw;
@@ -1503,6 +1738,20 @@ protected:
   ///
   /// \note Shared with the temporary store, which assigns the key the same way and then searches
   ///       its own rows rather than the database. Doing it twice was the alternative.
+  [[nodiscard]] std::string PrimaryKeyText() const {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (table.keys.empty()) { return {}; }
+    std::string out;
+    for (const ::agiru::FieldNo no : table.keys[0].fields) {
+      const auto found = std::ranges::find_if(
+          table.fields, [no](const FieldDef &field) { return field.no == no; });
+      if (found == table.fields.end()) { continue; }
+      if (!out.empty()) { out += ", "; }
+      out += ::agiru::FieldText(Self(), *found);
+    }
+    return out;
+  }
+
   template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
     const TableDef &table = TableTraits<Derived>::kTable;
     if (table.keys.empty() || table.keys[0].fields.size() < sizeof...(Keys)) {
@@ -1516,7 +1765,12 @@ protected:
   }
 
 private:
-  [[nodiscard]] void *Self() { return static_cast<Derived *>(this); }
+  [[nodiscard]] void *Self() {
+    static_assert(offsetof(Derived, State_Block) == 0,
+                  "a record's State_Block is its first member: the runtime reaches the state at "
+                  "offset 0 of whatever record it is handed, generated or platform");
+    return static_cast<Derived *>(this);
+  }
 
   /// The record variable's own state, made on the first call.
   ///
@@ -1524,6 +1778,45 @@ private:
   /// state handle first and asserts the offset is zero beside every table. So the base reaches it
   /// without the generated file declaring an accessor -- the language guarantees the cast, and the
   /// assertion holds the layout it depends on (board:0018).
+  /// \brief Raises one of the database trigger events (`devenv-event-types.md:109`) with the
+  ///        parameters the page names: `Rec` is this record, `xRec` this record too until the
+  ///        before image is read from the row (board:0057, phase 2), `RunTrigger` the flag.
+  /// \brief Raises `OnBeforeValidateEvent` or `OnAfterValidateEvent` for one field, the field's
+  ///        AL name as the element, with `Rec`, `xRec` (the record before the assignment) and
+  ///        `CurrFieldNo` (`devenv-event-types.md:151`).
+  void ValidateEvent(std::string_view event, ::agiru::FieldNo no, const Derived &before) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "CurrFieldNo"};
+    std::string_view element;
+    for (const FieldDef &def : TableTraits<Derived>::kTable.fields) {
+      if (def.no == no) { element = def.name; }
+    }
+    Derived &rec = static_cast<Derived &>(*this);
+    Derived xRec = before;
+    ::agiru::Integer currFieldNo = no.Value();
+    detail::RaiseEventOn(EventObject::Table,
+                         TableTraits<Derived>::kTable.id.Value(),
+                         TableTraits<Derived>::kTable.name,
+                         event,
+                         element,
+                         kNames,
+                         rec,
+                         xRec,
+                         currFieldNo);
+  }
+
+  void TableEvent(std::string_view event, Boolean RunTrigger) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
+    Derived &rec = static_cast<Derived &>(*this);
+    detail::RaiseEvent(EventObject::Table,
+                       TableTraits<Derived>::kTable.id.Value(),
+                       TableTraits<Derived>::kTable.name,
+                       event,
+                       kNames,
+                       rec,
+                       rec,
+                       RunTrigger);
+  }
+
   [[nodiscard]] detail::RecordState &State() {
     return reinterpret_cast<detail::StateHandle *>(Self())->Ensure();
   }
@@ -1559,275 +1852,106 @@ private:
 ///       which is a visible and uniform deviation rather than a clever one.
 [[nodiscard]] ::agiru::Integer CurrFieldNo();
 
-/// \brief The rows a temporary record holds, and how often they changed.
+/// \brief AL `CurrFieldNo := FieldNo(...)` -- the BaseApp ASSIGNS the system variable to make a
+///        later `Validate` behave as if the user had entered that field.
+/// \param no The field number the running trigger should report.
+/// \throws Error always -- setting the current field outside the trigger machinery is board:0042.
+inline void CurrFieldNo(::agiru::Integer no) {
+  throw Error("CurrFieldNo := " + std::to_string(no) +
+              " needs the validating-field machinery (board:0042)");
+}
+
+/// \brief How the runtime reaches temporary rows of one table: a `std::vector` of the generated
+///        class, and a row is the record with its state left behind.
+/// \tparam T The generated table class.
+template <typename T> struct TempRows {
+  std::vector<T> rows; ///< In primary-key order, which is what AL walks.
+};
+
+/// \brief The `TempOps` for one table, one instance per type in `.rodata`.
 ///
 /// \tparam T The generated table class.
 ///
-/// \note THE VERSION IS NOT BOOKKEEPING, IT IS THE HOT PATH. A `repeat ... until Next() = 0` loop
-///       over a temporary buffer re-filters and re-sorts the whole store on every step unless a
-///       cached view can tell it is still valid. The predecessor measured that as its O(n^2) case
-///       and put the counter on the STORE for a second reason: AL `Copy(src, true)` makes two
-///       record variables share one store, and each must see the other's mutations.
-template <typename T> struct TempStore {
-  std::vector<T> rows;      ///< In primary-key order, which is what AL walks.
-  std::uint64_t version{0}; ///< Rises on every structural change.
-  std::size_t held{0};      ///< How many records share it.
+/// \note A ROW CARRIES NO STATE. What goes into the store is the record's fields; its filters,
+///       its cursor and its own store pointer stay with the variable, and `load` copies the
+///       fields back out around the variable's state -- so a walk never inherits a row's filters.
+template <typename T>
+constexpr detail::TempOps kTempOps{
+    .make = []() -> void * { return new TempRows<T>{}; },
+    .destroy = [](void *rows) { delete static_cast<TempRows<T> *>(rows); },
+    .count = [](const void *rows) { return static_cast<const TempRows<T> *>(rows)->rows.size(); },
+    .at = [](const void *rows, std::size_t index) -> const void * {
+      return &static_cast<const TempRows<T> *>(rows)->rows[index];
+    },
+    .insert =
+        [](void *rows, std::size_t at, const void *record) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
+        },
+    .replace =
+        [](void *rows, std::size_t at, const void *record) {
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
+        },
+    .erase =
+        [](void *rows, std::size_t at) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          held.erase(held.begin() + static_cast<std::ptrdiff_t>(at));
+        },
+    .clear = [](void *rows) { static_cast<TempRows<T> *>(rows)->rows.clear(); },
+    .load =
+        [](void *record, const void *row) {
+          auto *state = reinterpret_cast<detail::StateHandle *>(record);
+          detail::StateHandle keep = std::move(*state);
+          *static_cast<T *>(record) = *static_cast<const T *>(row);
+          *state = std::move(keep);
+        },
 };
 
 /// \brief AL `Record "X" temporary` -- the same table with no database behind it.
 ///
-/// \tparam T The generated table class.
-///
 /// From `SetTemporary` and the `temporary` keyword: the record keeps its fields, its keys and its
-/// filters, and its rows live in memory for the length of the session. AL code cannot tell the
-/// difference, which is the point -- a buffer table and a real one are written the same way.
+/// triggers, and its rows live in the variable rather than in a table. **Temporariness is state,
+/// not type** (board:0583): the constructor installs the rows into the record's state, and from
+/// then on every `Insert`, `Find` and `SetRange` of the base class reads that state -- so a
+/// `T &` parameter bound to a temporary record keeps it temporary, which is what a `var X: Record
+/// T temporary` parameter is in AL.
 ///
-/// \note The rows are held SORTED BY PRIMARY KEY, because that is the order AL walks a record in
-///       and the order `Get` searches. Inserting into the middle of a vector is what a buffer table
-///       does rarely and reads often.
+/// \tparam T The generated table class.
 template <typename T> class Temporary : public T {
 public:
   /// \brief A temporary record with a store of its own.
-  Temporary() : store_(new TempStore<T>{.rows = {}, .version = 0, .held = 1}) {}
+  Temporary() { detail::RuntimeMakeTemporary(this, &kTempOps<T>); }
 
-  /// \brief Copies a record, and with it whichever store that record was on.
-  /// \param o The record to copy.
-  Temporary(const Temporary &o) : T(o), store_(o.store_), position_(o.position_) { ++store_->held; }
-
-  /// \brief Takes over a record's store.
-  /// \param o The record to move from.
-  Temporary(Temporary &&o) noexcept
-      : T(std::move(static_cast<T &>(o))), store_(o.store_), position_(o.position_) {
-    o.store_ = nullptr;
-  }
-
-  /// \brief Assigns a record, and with it whichever store that record is on.
-  /// \param o The record to copy.
-  /// \return This record.
-  Temporary &operator=(const Temporary &o) {
-    if (this == &o) { return *this; }
+  /// \brief AL `Temp := Other` -- the fields and filters come across, the rows stay this
+  ///        variable's own (`detail::StateHandle::operator=`).
+  Temporary &operator=(const T &o) {
     T::operator=(o);
-    Release();
-    store_ = o.store_;
-    position_ = o.position_;
-    ++store_->held;
     return *this;
   }
 
-  /// \brief Takes over a record's store.
-  /// \param o The record to move from.
-  /// \return This record.
-  Temporary &operator=(Temporary &&o) noexcept {
-    if (this == &o) { return *this; }
-    T::operator=(std::move(static_cast<T &>(o)));
-    Release();
-    store_ = o.store_;
-    position_ = o.position_;
-    o.store_ = nullptr;
-    return *this;
-  }
-
-  ~Temporary() { Release(); }
-
-  /// \brief AL `Record.Insert()` on a temporary record.
-  /// \throws Error when a row already carries this primary key, as AL does.
-  void Insert() {
-    const auto at = LowerBound();
-    if (at != store_->rows.end() && detail::SameKey<T>(*at, *this)) {
-      throw Error("the record already exists");
-    }
-    store_->rows.insert(at, static_cast<const T &>(*this));
-    ++store_->version;
-  }
-
-  /// \brief AL `Record.Get(...)` on a temporary record.
-  /// \tparam Keys The key field types, in key order.
-  /// \param  keys The primary key values.
-  /// \return True when a row carried that key; the record is then that row.
-  template <typename... Keys> bool Get(const Keys &...keys) {
-    this->AssignPrimaryKey(keys...);
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    static_cast<T &>(*this) = *at;
-    return true;
-  }
-
-  /// \brief AL `Record.Modify()` on a temporary record.
-  /// \return True when a row carried this primary key.
-  bool Modify() {
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    *at = static_cast<const T &>(*this);
-    ++store_->version;
-    return true;
-  }
-
-  /// \brief AL `Record.Delete()` on a temporary record.
-  /// \return True when a row carried this primary key.
-  bool Delete() {
-    const auto at = LowerBound();
-    if (at == store_->rows.end() || !detail::SameKey<T>(*at, *this)) { return false; }
-    store_->rows.erase(at);
-    ++store_->version;
-    return true;
-  }
-
-  /// \brief AL `Record.DeleteAll()` on a temporary record.
-  void DeleteAll() {
-    store_->rows.clear();
-    ++store_->version;
-  }
-
-  /// \brief AL `Record.Insert(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnInsert` runs.
-  /// \throws Error when a row already carries this primary key.
-  ///
-  /// \note A TEMPORARY RECORD RUNS ITS TRIGGERS. The platform page says a temporary table behaves
-  ///       like a real one except that it lives in memory and its triggers are the table's own --
-  ///       so `TempRec.Insert(true)` fires `OnInsert`, and 102 call sites in the 58 UT codeunits
-  ///       alone write it.
-  void Insert(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnInsert(); }) {
-        static_cast<T *>(this)->OnInsert();
-      }
-    }
-    Insert();
-  }
-
-  /// \brief AL `Record.Modify(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnModify` runs.
-  /// \return True when a row carried this primary key.
-  bool Modify(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnModify(); }) {
-        static_cast<T *>(this)->OnModify();
-      }
-    }
-    return Modify();
-  }
-
-  /// \brief AL `Record.Delete(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether the table's `OnDelete` runs.
-  /// \return True when a row carried this primary key.
-  bool Delete(Boolean RunTrigger) {
-    if (RunTrigger) {
-      if constexpr (requires(T &record) { record.OnDelete(); }) {
-        static_cast<T *>(this)->OnDelete();
-      }
-    }
-    return Delete();
-  }
-
-  /// \brief AL `Record.DeleteAll(RunTrigger)` on a temporary record.
-  /// \param RunTrigger Whether each row's `OnDelete` runs.
-  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
-  ///         do yet (board:0044).
-  void DeleteAll(Boolean RunTrigger) {
-    if (RunTrigger) {
-      throw Error("Record.DeleteAll(true) has to run OnDelete per row and does not yet "
-                  "(board:0044)");
-    }
-    DeleteAll();
-  }
-
-  /// \brief AL `Record.Count()`.
-  /// \return How many rows the store holds.
-  [[nodiscard]] Integer Count() const { return static_cast<Integer>(store_->rows.size()); }
-
-  /// \brief AL `Record.IsEmpty()`.
-  /// \return True when the store holds no rows.
-  [[nodiscard]] bool IsEmpty() const { return store_->rows.empty(); }
-
-  /// \brief AL `Record.FindSet()` -- positions on the first row.
-  /// \return True when there is one, which is then this record.
-  bool FindSet() {
-    position_ = 0;
-    return Fetch();
-  }
-
-  /// \brief AL `Record.Next()` -- steps to the row after this one.
-  /// \return True when there was one, which is then this record.
-  bool Next() {
-    ++position_;
-    return Fetch();
-  }
-
-  /// \brief AL `Record.Next(Steps)` on a temporary record.
-  /// \param Steps How far to step; AL takes a negative number to go back.
-  /// \return How many steps were taken, 0 at the end.
-  Integer Next(Integer Steps) {
-    if (Steps == 0) { return Next() ? 1 : 0; }
-    const Integer way = Steps > 0 ? 1 : -1;
-    Integer taken = 0;
-    for (Integer step = 0; step < (Steps > 0 ? Steps : -Steps); ++step) {
-      if (way < 0 && position_ == 0) { break; }
-      position_ += way;
-      if (!Fetch()) { break; }
-      taken += way;
-    }
-    return taken;
-  }
-
-  /// \brief AL `Record.Copy(From, true)` -- shares another temporary record's store.
-  ///
-  /// \param from  The record to share with.
-  /// \param share True to share the STORE; false copies the current row only.
-  ///
-  /// \note Sharing is why the version rides on the store rather than on the record: after this,
-  ///       two variables mutate one set of rows and each must see the other's changes.
-  void Copy(const Temporary &from, bool share) {
-    static_cast<T &>(*this) = static_cast<const T &>(from);
-    if (!share || store_ == from.store_) { return; }
-    Release();
-    store_ = from.store_;
-    ++store_->held;
-  }
-
-private:
-  [[nodiscard]] auto LowerBound() {
-    auto first = store_->rows.begin();
-    auto last = store_->rows.end();
-    while (first != last) {
-      const auto middle = first + ((last - first) / 2);
-      if (detail::ByKey<T>(*middle, static_cast<const T &>(*this))) {
-        first = middle + 1;
-      } else {
-        last = middle;
-      }
-    }
-    return first;
-  }
-
-  bool Fetch() {
-    if (position_ >= store_->rows.size()) { return false; }
-    static_cast<T &>(*this) = store_->rows[position_];
-    return true;
-  }
-
-  /// A COUNT RATHER THAN A `shared_ptr`, AND THE REASON IS THE DOOR'S SIZE. `<memory>` pulls
-  /// `<format>` with it in libstdc++-14 -- 143 000 preprocessed lines together -- and the door is
-  /// included by all 6 398 generated files. Measured 2026-09-02: dropping the runtime half of the
-  /// door takes an empty translation unit from 306 ms to 53 ms. Twenty lines of counting buy that
-  /// back, and the temporary-record gate's checks on sharing are what stand behind them.
-  void Release() {
-    if (store_ != nullptr && --store_->held == 0) { delete store_; }
-    store_ = nullptr;
-  }
-
-  TempStore<T> *store_;
-  std::size_t position_{0};
+  Temporary(const Temporary &) = default;
+  Temporary(Temporary &&) noexcept = default;
+  Temporary &operator=(const Temporary &) = default;
+  Temporary &operator=(Temporary &&) noexcept = default;
+  ~Temporary() = default;
 };
 
 /// \brief A temporary record's declaration is its table's declaration.
 ///
-/// \tparam T The generated table class.
-///
-/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the table:
-/// the same table is read from the database through one variable and held in memory through
-/// another, and both have the same fields, keys and captions. So the traits forward rather than
-/// being specialised again -- and `RecordRef.GetTable(TempRec)` finds the same metadata it would
-/// find for the row on disk.
+/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the
+/// table, so the field table, the keys and the `OnValidate` map are the same.
 template <typename T> struct TableTraits<Temporary<T>> : TableTraits<T> {};
+
+template <typename T> class Instance;
+
+/// \brief A record a codeunit holds by handle (`Instance<T>`, board:0018) declares what its
+///        table declares, so `Rec.Copy(GlobalRec)` and `Variant(GlobalRec)` see the table.
+template <typename T>
+  requires requires { TableTraits<T>::kTable; }
+struct TableTraits<Instance<T>> : TableTraits<T> {};
 
 }

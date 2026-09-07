@@ -15,6 +15,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -476,6 +477,18 @@ public:
   /// \see `text-trimstart-method.md`
   [[nodiscard]] Text<0> TrimStart(std::string_view Chars) const;
 
+  /// \brief AL `Text.TrimStart(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimStart(const C &Chars) const;
+
   /// \brief AL `Text.TrimEnd()` -- white space off the back.
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
@@ -486,6 +499,18 @@ public:
   /// \return The trimmed text.
   /// \see `text-trimend-method.md`
   [[nodiscard]] Text<0> TrimEnd(std::string_view Chars) const;
+
+  /// \brief AL `Text.TrimEnd(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimEnd(const C &Chars) const;
 
   /// \brief AL `+=` on text -- appends.
   ///
@@ -500,6 +525,24 @@ public:
     requires std::convertible_to<const T &, std::string_view>
   StringValue &operator+=(const T &value) {
     value_ += std::string_view(value);
+    return *this;
+  }
+
+  /// \brief AL `+=` where the other side is a member the runtime has not rebuilt.
+  ///
+  /// \tparam T The refusal's type, which marks itself with `IsAlRefusal`.
+  /// \param refusal The refused member.
+  /// \return Never.
+  /// \throws Error always, naming the member -- which is what reading it does anywhere else.
+  ///
+  /// \warning IT READS THE REFUSAL AS A NUMBER TO MAKE IT THROW, and that is not an accident: a
+  ///          refusal deliberately does NOT convert to `std::string_view`, because a `Code<N>`
+  ///          assignment then had two equally good conversions. So the append cannot go through
+  ///          text, and any conversion the refusal offers raises the same error.
+  template <typename T>
+    requires requires { typename T::IsAlRefusal; }
+  StringValue &operator+=(const T &refusal) {
+    static_cast<void>(static_cast<std::int32_t>(refusal));
     return *this;
   }
 
@@ -627,6 +670,38 @@ public:
     requires std::convertible_to<const T &, std::string_view>
   Text &operator=(const T &value) {
     Assign(std::string_view(value));
+    return *this;
+  }
+
+  /// \brief Makes a text from anything that RENDERS as text -- a `Guid` handed to a `Text`
+  ///        parameter, which `guid-data-type.md` allows.
+  /// \tparam T The source, which must carry a `ToText()` and must not already read as text.
+  /// \param value The value.
+  /// \throws StringError when the rendering does not fit the declared length.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  explicit(false) Text(const T &value) : Text() {
+    Assign(std::string_view(value.ToText()));
+  }
+
+  /// \brief Assigns anything that RENDERS as text, which is how AL assigns a GUID to a Text.
+  ///
+  /// \tparam T The source, which must carry a `ToText()`.
+  /// \param value The value.
+  /// \return This object.
+  /// \throws StringError when the rendering does not fit the declared length.
+  ///
+  /// \note `guid-data-type.md`: "You can assign and compare the Text data type and the GUID data
+  ///       type." A `Guid` is not convertible to `std::string_view` -- it holds sixteen bytes --
+  ///       so the conversion is its documented TEXT and never its storage.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
     return *this;
   }
 
@@ -835,6 +910,26 @@ template <typename Left, typename Right>
            (!std::derived_from<Left, StringValue>) && std::derived_from<Right, StringValue>
 [[nodiscard]] std::string operator+(const Left &left, const Right &right) {
   return std::string(std::string_view(left)) + std::string(right.Value());
+}
+
+/// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a
+///        `Text<0>` -- by their stored text.
+/// \param a One.
+/// \param b The other.
+/// \return True when the stored text is identical.
+///
+/// \note A FREE TEMPLATE ON THE EXACT TYPES, and that is the whole trick: each class's own
+///       `operator==` takes its own type, so `Code == Text` needs a user-defined conversion on one
+///       side whichever member is chosen -- and a free function on the BASE was no better, since
+///       the member is exact on its own side. Deduced to the two exact types it is exact on both,
+///       which beats every candidate that converts anything.
+/// \tparam A One string value's type.
+/// \tparam B The other's, which must differ -- the class's own `operator==` takes the same type.
+template <typename A, typename B>
+  requires std::derived_from<A, StringValue> && std::derived_from<B, StringValue> &&
+           (!std::same_as<A, B>)
+[[nodiscard]] bool operator==(const A &a, const B &b) {
+  return a.Value() == b.Value();
 }
 
 }

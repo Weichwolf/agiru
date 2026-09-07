@@ -459,4 +459,12 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
   return ::agiru::CurrentDateTime().Date();
 }
 
+::agiru::Text<0> UserId() {
+  return ::agiru::Text<0>{Session::Current().UserId()};
+}
+
+::agiru::Guid UserSecurityId() {
+  return Session::Current().UserSecurityId();
+}
+
 }

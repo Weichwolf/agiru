@@ -4,6 +4,7 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
@@ -47,6 +48,10 @@ struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T,
 // NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
 
+/// \brief The runtime's codeunit traits, declared here so a Variant can constrain on them.
+/// \tparam T The codeunit's class.
+template <typename T> struct CodeunitTraits;
+
 /// \brief What a Variant holding a RECORD holds.
 ///
 /// \note A HANDLE AND NOT A COPY, which is what AL does. A Variant alternative that stored the
@@ -69,6 +74,17 @@ struct RecordInVariant {
 /// \param b The other.
 /// \return Whether they refer to the same record.
 ///
+/// \brief A `RecordRef` a Variant refers to -- AL `Variant := RecRef` keeps the reference.
+struct RecordRefInVariant {
+  const class RecordRef *ref; ///< The RecordRef, which lives in the caller's variable.
+};
+
+/// \brief Compares two held RecordRefs by identity.
+/// \param a One. \param b The other. \return Whether they are the same RecordRef.
+[[nodiscard]] inline bool operator==(const RecordRefInVariant &a, const RecordRefInVariant &b) {
+  return a.ref == b.ref;
+}
+
 /// \note FREE AND NOT A MEMBER, so `RecordInVariant` stays an aggregate. A member `operator==`
 ///       makes it a class with behaviour, and its two data members then have to be private -- which
 ///       would buy accessors for a pair that IS the value.
@@ -90,6 +106,24 @@ struct RecordInVariant {
 ///
 /// \note THE NAME TABLE TRAVELS AS A SPAN OVER `.rodata`. It is the same `constexpr` array the
 ///       enumeration already emits, so holding one costs a pointer and a length and no copy.
+/// \brief A codeunit a Variant holds: WHICH codeunit, and the instance it stands for.
+///
+/// \note AL PASSES A CODEUNIT VARIABLE INTO A VARIANT PARAMETER -- `GenJnlPostPreview.Preview` is
+///       one of 30-odd call sites that hand a codeunit to a runner. What the runner needs is the
+///       object's IDENTITY, so that is what travels; the instance is carried opaquely beside it
+///       for whoever can already run one.
+struct CodeunitInVariant {
+  std::int32_t id;      ///< The AL object number.
+  const void *instance; ///< The instance, for a runner that knows the type.
+};
+
+/// \brief Two codeunit values are equal when they name the same object and instance.
+/// \param a One value. \param b The other.
+/// \return Whether they are the same.
+[[nodiscard]] inline bool operator==(const CodeunitInVariant &a, const CodeunitInVariant &b) {
+  return a.id == b.id && a.instance == b.instance;
+}
+
 struct OrdinalInVariant {
   std::int32_t ordinal;                 ///< The declared number.
   std::span<const EnumValueDef> values; ///< The declared members, for the rendering.
@@ -177,11 +211,43 @@ public:
                             Guid,
                             RecordId,
                             DateFormula,
+                            Blob,
                             OrdinalInVariant,
-                            RecordInVariant>;
+                            RecordInVariant,
+                            RecordRefInVariant,
+                            CodeunitInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
+
+  /// \brief Copies. OUT OF LINE, with the destructor and the comparison: the `std::variant`
+  ///        machinery behind them is instantiated once in `src/net/Variant.cpp` rather than in
+  ///        every generated translation unit (measured 2026-09-06: ~1.1 s per file, board:0589).
+  /// \brief AL hands a record of a table this run does not have to a `Variant` parameter.
+  ///
+  /// \tparam T The stub's type, which marks itself with `IsAnAbsentType`.
+  /// \param absent The stub, read only to be discarded.
+  /// \throws Error always, the way every other path through a stub does.
+  ///
+  /// \warning IT REFUSES RATHER THAN CARRYING NOTHING. Without it the call was a hard compile
+  ///          error in a body that is otherwise translated, and a `Variant` holding an empty value
+  ///          would be the predecessor's silent nil (board:0032, board:0035).
+  template <typename T>
+    requires requires { typename T::IsAnAbsentType; }
+  explicit(false) Variant(const T &absent) {
+    static_cast<void>(absent);
+    throw Error("a record of a table this run does not have cannot travel in a Variant "
+                "(board:0032)");
+  }
+
+  Variant(const Variant &o);
+  /// \brief Moves.
+  Variant(Variant &&o) noexcept;
+  /// \brief Assigns a copy.
+  Variant &operator=(const Variant &o);
+  /// \brief Assigns a move.
+  Variant &operator=(Variant &&o) noexcept;
+  ~Variant();
 
   /// \brief Holds a value.
   /// \tparam T The AL type, which must be one of the alternatives EXACTLY.
@@ -202,6 +268,20 @@ public:
   Variant(const T &value)
       : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = T::Traits::kValues}) {}
 
+  /// \brief Holds a door enumeration that has no value table -- `TransactionType`,
+  ///        `TextEncoding` -- by its ordinal alone, which is what AL hands `Any`.
+  /// \tparam F The enumeration.
+  /// \param value The member.
+  template <typename F>
+    requires std::is_enum_v<F> && (!Enumeration<F>)
+  Variant(F value)
+      : held_(OrdinalInVariant{.ordinal = static_cast<std::int32_t>(value), .values = {}}) {}
+
+  /// \brief Holds an option that carries no vocabulary -- `Option<>` -- by its ordinal alone.
+  /// \param value The option.
+  Variant(const Option<> &value)
+      : held_(OrdinalInVariant{.ordinal = value.AsInteger(), .values = {}}) {}
+
   /// \brief Holds a bare enumeration member, which is how AL writes one.
   ///
   /// \tparam E The generated enumeration.
@@ -214,6 +294,31 @@ public:
       : held_(OrdinalInVariant{.ordinal = static_cast<std::int32_t>(value),
                                .values = MembersOf<E>()}) {}
 
+  /// \brief Holds a RecordRef by reference (`Variant := RecRef`).
+  /// \param ref The RecordRef.
+  Variant(const class RecordRef &ref) : held_(RecordRefInVariant{.ref = &ref}) {}
+
+  /// \brief AL `RecRef := Variant`: the RecordRef the Variant refers to.
+  /// \tparam T `RecordRef`, deduced at the assignment.
+  /// \return The RecordRef.
+  /// \throws Error when the Variant holds no RecordRef.
+  template <typename T>
+    requires std::same_as<std::remove_cv_t<T>, class RecordRef>
+  operator T &() const {
+    const auto *held = std::get_if<RecordRefInVariant>(&held_);
+    if (held == nullptr) { throw Error("this Variant holds no RecordRef"); }
+    return const_cast<T &>(*held->ref); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  }
+
+  /// \brief Holds a record a codeunit keeps by handle (`Instance<T>`): the record behind it.
+  /// \tparam H The handle type.
+  /// \param handle The handle.
+  template <typename H>
+    requires requires(H &h) {
+      { *h } -> std::convertible_to<const Variant &>;
+    } && (!std::same_as<std::remove_cvref_t<H>, Variant>)
+  Variant(H &handle) : Variant(*handle) {}
+
   /// \brief Holds a record.
   ///
   /// \tparam R The generated table class, recognised by the `kId` every one of them declares.
@@ -223,6 +328,46 @@ public:
       { R::kId } -> std::convertible_to<TableId>;
     }
   Variant(const R &record) : held_(RecordInVariant{.record = &record, .table = R::kId}) {}
+
+  /// \brief AL puts a CODEUNIT into a Variant, and this is that.
+  /// \tparam C The codeunit's class -- anything the runtime knows an object number for.
+  /// \param unit The instance, kept as an address beside its number.
+  template <typename C>
+    requires requires {
+      { ::agiru::CodeunitTraits<C>::kId } -> std::convertible_to<CodeunitId>;
+    }
+  Variant(const C &unit)
+      : held_(CodeunitInVariant{.id = ::agiru::CodeunitTraits<C>::kId.Value(), .instance = &unit}) {
+  }
+
+  /// \brief AL `Rec := Variant` -- reads as the record the Variant refers to.
+  ///
+  /// \tparam R The generated table class the assignment target is, recognised by its `kId`.
+  /// \return The record, which the target then copies.
+  /// \throws Error when the Variant holds no record, or one of another table.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  operator const R &() const {
+    return AsRecord<R>();
+  }
+
+  /// \brief AL `Proc(var Rec: Record X)` given a Variant that holds one: the Variant refers to
+  ///        the caller's record, so the var parameter IS that record and writes reach it.
+  /// \tparam R The generated table class the parameter is.
+  /// \return The record referred to.
+  /// \throws Error when the Variant holds no record, or one of another table.
+  /// \note THE CONST IS CAST AWAY, because a Variant stores the address of a record it was
+  ///       handed by reference and AL's `var` semantics are exactly "that variable" -- a Variant
+  ///       built from a temporary would dangle, which is the same defect as in AL.
+  template <typename R>
+    requires requires {
+      { R::kId } -> std::convertible_to<TableId>;
+    }
+  operator R &() {
+    return const_cast<R &>(AsRecord<R>()); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  }
 
   /// \brief The record this Variant refers to.
   ///
@@ -314,419 +459,406 @@ public:
 
   /// \brief AL `Variant.IsAction()`. Indicates whether an AL variant contains an Action variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsAction() const {
-    throw Error("Variant.IsAction() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsAction() const { return false; }
 
   /// \brief AL `Variant.IsAutomation()`. Indicates whether an AL variant contains an Automation
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsAutomation() const {
-    throw Error("Variant.IsAutomation() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsAutomation() const { return false; }
 
   /// \brief AL `Variant.IsBinary()`. Indicates whether an AL variant contains a Binary variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsBinary() const {
-    throw Error("Variant.IsBinary() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsBinary() const { return Is<Blob>(); }
 
   /// \brief AL `Variant.IsByte()`. Indicates whether an AL variant contains a Byte data type
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsByte() const {
-    throw Error("Variant.IsByte() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsByte() const { return false; }
 
   /// \brief AL `Variant.IsChar()`. Indicates whether an AL variant contains a Char variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsChar() const {
-    throw Error("Variant.IsChar() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsChar() const { return false; }
 
   /// \brief AL `Variant.IsClientType()`. Indicates whether an AL variant contains a ClientType
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsClientType() const {
-    throw Error("Variant.IsClientType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsClientType() const { return false; }
 
   /// \brief AL `Variant.IsCodeunit()`. Indicates whether an AL variant contains a Codeunit
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsCodeunit() const {
-    throw Error("Variant.IsCodeunit() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsCodeunit() const { return std::holds_alternative<CodeunitInVariant>(held_); }
 
   /// \brief AL `Variant.IsDataClassification()`. Indicates whether an AL variant contains a
   /// DataClassification variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsDataClassification() const {
-    throw Error("Variant.IsDataClassification() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsDataClassification() const { return false; }
 
   /// \brief AL `Variant.IsDataClassificationType()`. Indicates whether an AL variant contains a
   /// DataClassification variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsDataClassificationType() const {
-    throw Error(
-        "Variant.IsDataClassificationType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsDataClassificationType() const { return false; }
 
   /// \brief AL `Variant.IsDefaultLayout()`. Indicates whether an AL variant contains a
   /// DefaultLayout variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsDefaultLayout() const {
-    throw Error("Variant.IsDefaultLayout() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsDefaultLayout() const { return false; }
 
   /// \brief AL `Variant.IsDictionary()`. Indicates whether an AL variant contains a Dictionary
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsDictionary() const {
-    throw Error("Variant.IsDictionary() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsDictionary() const { return false; }
 
   /// \brief AL `Variant.IsDotNet()`. Indicates whether an AL variant contains a DotNet variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsDotNet() const {
-    throw Error("Variant.IsDotNet() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsDotNet() const { return false; }
 
   /// \brief AL `Variant.IsExecutionMode()`. Indicates whether an AL variant contains an
   /// ExecutionMode variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsExecutionMode() const {
-    throw Error("Variant.IsExecutionMode() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsExecutionMode() const { return false; }
 
   /// \brief AL `Variant.IsFieldRef()`. Indicates whether an AL variant contains a FieldRef
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsFieldRef() const {
-    throw Error("Variant.IsFieldRef() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsFieldRef() const { return false; }
 
   /// \brief AL `Variant.IsFile()`. Indicates whether an AL variant contains a File variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsFile() const {
-    throw Error("Variant.IsFile() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsFile() const { return false; }
 
   /// \brief AL `Variant.IsFilterPageBuilder()`. Indicates whether an AL variant contains a
   /// FilterPageBuilder variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsFilterPageBuilder() const {
-    throw Error("Variant.IsFilterPageBuilder() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsFilterPageBuilder() const { return false; }
 
   /// \brief AL `Variant.IsInStream()`. Indicates whether an AL variant contains an InStream
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsInStream() const {
-    throw Error("Variant.IsInStream() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsInStream() const { return false; }
 
   /// \brief AL `Variant.IsJsonArray()`. Indicates whether an AL variant contains a JsonArray
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsJsonArray() const {
-    throw Error("Variant.IsJsonArray() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsJsonArray() const { return false; }
 
   /// \brief AL `Variant.IsJsonObject()`. Indicates whether an AL variant contains a JsonObject
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsJsonObject() const {
-    throw Error("Variant.IsJsonObject() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsJsonObject() const { return false; }
 
   /// \brief AL `Variant.IsJsonToken()`. Indicates whether an AL variant contains a JsonToken
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsJsonToken() const {
-    throw Error("Variant.IsJsonToken() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsJsonToken() const { return false; }
 
   /// \brief AL `Variant.IsJsonValue()`. Indicates whether an AL variant contains a JsonValue
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsJsonValue() const {
-    throw Error("Variant.IsJsonValue() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsJsonValue() const { return false; }
 
   /// \brief AL `Variant.IsList()`. Indicates whether an AL variant contains a List variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsList() const {
-    throw Error("Variant.IsList() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsList() const { return false; }
 
   /// \brief AL `Variant.IsNotification()`. Indicates whether an AL variant contains a Notification
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsNotification() const {
-    throw Error("Variant.IsNotification() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsNotification() const { return false; }
 
   /// \brief AL `Variant.IsObjectType()`. Indicates whether an AL variant contains an ObjectType
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsObjectType() const {
-    throw Error("Variant.IsObjectType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsObjectType() const { return false; }
 
   /// \brief AL `Variant.IsOutStream()`. Indicates whether an AL variant contains an OutStream
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsOutStream() const {
-    throw Error("Variant.IsOutStream() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsOutStream() const { return false; }
 
   /// \brief AL `Variant.IsPromptMode()`. Indicates whether an AL variant contains a PromptMode
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsPromptMode() const {
-    throw Error("Variant.IsPromptMode() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsPromptMode() const { return false; }
 
   /// \brief AL `Variant.IsRecord()`. Indicates whether an AL variant contains a Record variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean IsRecord() const { return std::holds_alternative<RecordInVariant>(held_); }
 
   /// \brief AL `Variant.IsRecordRef()`. Indicates whether an AL variant contains a RecordRef
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsRecordRef() const {
-    throw Error("Variant.IsRecordRef() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsRecordRef() const { return Is<RecordRefInVariant>(); }
 
   /// \brief AL `Variant.IsReportFormat()`. Indicates whether an AL variant contains a ReportFormat
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsReportFormat() const {
-    throw Error("Variant.IsReportFormat() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsReportFormat() const { return false; }
 
   /// \brief AL `Variant.IsSecurityFiltering()`. Indicates whether an AL variant contains a
   /// SecurityFiltering variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsSecurityFiltering() const {
-    throw Error("Variant.IsSecurityFiltering() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsSecurityFiltering() const { return false; }
 
   /// \brief AL `Variant.IsTableConnectionType()`. Indicates whether an AL variant contains a
   /// TableConnectionType variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTableConnectionType() const {
-    throw Error("Variant.IsTableConnectionType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTableConnectionType() const { return false; }
 
   /// \brief AL `Variant.IsTestPermissions()`. Indicates whether an AL variant contains a
   /// TestPermissions variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTestPermissions() const {
-    throw Error("Variant.IsTestPermissions() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTestPermissions() const { return false; }
 
   /// \brief AL `Variant.IsTextBuilder()`. Indicates whether an AL variant contains a TextBuilder
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTextBuilder() const {
-    throw Error("Variant.IsTextBuilder() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTextBuilder() const { return false; }
 
   /// \brief AL `Variant.IsTextConstant()`. Indicates whether an AL variant contains a Text
   /// constant.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTextConstant() const {
-    throw Error("Variant.IsTextConstant() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTextConstant() const { return false; }
 
   /// \brief AL `Variant.IsTextEncoding()`. Indicates whether an AL variant contains a TextEncoding
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTextEncoding() const {
-    throw Error("Variant.IsTextEncoding() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTextEncoding() const { return false; }
 
   /// \brief AL `Variant.IsTransactionType()`. Indicates whether an AL variant contains a
   /// TransactionType variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTransactionType() const {
-    throw Error("Variant.IsTransactionType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsTransactionType() const { return false; }
 
   /// \brief AL `Variant.IsWideChar()`. Indicates whether an AL variant contains a WideChar
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsWideChar() const {
-    throw Error("Variant.IsWideChar() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsWideChar() const { return false; }
 
   /// \brief AL `Variant.IsXmlAttribute()`. Indicates whether an AL variant contains an XmlAttribute
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlAttribute() const {
-    throw Error("Variant.IsXmlAttribute() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlAttribute() const { return false; }
 
   /// \brief AL `Variant.IsXmlAttributeCollection()`. Indicates whether an AL variant contains an
   /// XmlAttributeCollection variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlAttributeCollection() const {
-    throw Error(
-        "Variant.IsXmlAttributeCollection() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlAttributeCollection() const { return false; }
 
   /// \brief AL `Variant.IsXmlCData()`. Indicates whether an AL variant contains an XmlCData
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlCData() const {
-    throw Error("Variant.IsXmlCData() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlCData() const { return false; }
 
   /// \brief AL `Variant.IsXmlComment()`. Indicates whether an AL variant contains an XmlComment
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlComment() const {
-    throw Error("Variant.IsXmlComment() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlComment() const { return false; }
 
   /// \brief AL `Variant.IsXmlDeclaration()`. Indicates whether an AL variant contains an
   /// XmlDeclaration variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlDeclaration() const {
-    throw Error("Variant.IsXmlDeclaration() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlDeclaration() const { return false; }
 
   /// \brief AL `Variant.IsXmlDocument()`. Indicates whether an AL variant contains an XmlDocument
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlDocument() const {
-    throw Error("Variant.IsXmlDocument() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlDocument() const { return false; }
 
   /// \brief AL `Variant.IsXmlDocumentType()`. Indicates whether an AL variant contains an
   /// XmlDocumentType variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlDocumentType() const {
-    throw Error("Variant.IsXmlDocumentType() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlDocumentType() const { return false; }
 
   /// \brief AL `Variant.IsXmlElement()`. Indicates whether an AL variant contains an XmlElement
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlElement() const {
-    throw Error("Variant.IsXmlElement() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlElement() const { return false; }
 
   /// \brief AL `Variant.IsXmlNamespaceManager()`. Indicates whether an AL variant contains an
   /// XmlNamespaceManager variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlNamespaceManager() const {
-    throw Error("Variant.IsXmlNamespaceManager() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlNamespaceManager() const { return false; }
 
   /// \brief AL `Variant.IsXmlNameTable()`. Indicates whether an AL variant contains an XmlNameTable
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlNameTable() const {
-    throw Error("Variant.IsXmlNameTable() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlNameTable() const { return false; }
 
   /// \brief AL `Variant.IsXmlNode()`. Indicates whether an AL variant contains an XmlNode variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlNode() const {
-    throw Error("Variant.IsXmlNode() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlNode() const { return false; }
 
   /// \brief AL `Variant.IsXmlNodeList()`. Indicates whether an AL variant contains an XmlNodeList
   /// variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlNodeList() const {
-    throw Error("Variant.IsXmlNodeList() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlNodeList() const { return false; }
 
   /// \brief AL `Variant.IsXmlProcessingInstruction()`. Indicates whether an AL variant contains an
   /// XmlProcessingInstruction variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlProcessingInstruction() const {
-    throw Error(
-        "Variant.IsXmlProcessingInstruction() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlProcessingInstruction() const { return false; }
 
   /// \brief AL `Variant.IsXmlReadOptions()`. Indicates whether an AL variant contains an
   /// XmlReadOptions variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlReadOptions() const {
-    throw Error("Variant.IsXmlReadOptions() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlReadOptions() const { return false; }
 
   /// \brief AL `Variant.IsXmlText()`. Indicates whether an AL variant contains an XmlText variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlText() const {
-    throw Error("Variant.IsXmlText() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlText() const { return false; }
 
   /// \brief AL `Variant.IsXmlWriteOptions()`. Indicates whether an AL variant contains an
   /// XmlWriteOptions variable.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsXmlWriteOptions() const {
-    throw Error("Variant.IsXmlWriteOptions() is declared and not implemented yet (board:0035)");
-  }
+  /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
+  ///       that type, so the assignment refuses at COMPILE time and no such value
+  ///       can be inside one (board:0035).
+  ::agiru::Boolean IsXmlWriteOptions() const { return false; }
 
   /// \brief The value, if the Variant holds that type.
   ///
@@ -789,10 +921,60 @@ public:
     Refuse();
   }
 
+  /// \brief Reads as an enumeration or an option, which a Variant holds by ORDINAL.
+  ///
+  /// \tparam T The `Enum<E>` or `Option<E>` wanted.
+  /// \return That enumeration standing on the ordinal the Variant carries.
+  /// \throws Error when the Variant holds something that is not an ordinal.
+  ///
+  /// \note AN ENUM IS NOT ONE OF THE ALTERNATIVES. What a Variant stores for one is its
+  ///       `OrdinalInVariant` -- the number plus the value table -- because the enumeration is a
+  ///       generated type the Variant cannot name. So the way back is `FromInteger`, and
+  ///       `Validate(Type, GetRangeMin(Type))` in `Library - ERM` is what needs it.
+  template <typename T>
+    requires(!detail::InVariant<T, Held>::value) &&
+            requires(std::int32_t ordinal) { T::FromInteger(ordinal); }
+  operator T() const {
+    const OrdinalInVariant *held = std::get_if<OrdinalInVariant>(&held_);
+    if (held == nullptr) { Refuse(); }
+    return T::FromInteger(held->ordinal);
+  }
+
   /// \brief Compares two Variants.
   /// \param o The other.
   /// \return True when they hold the same type and the same value.
-  [[nodiscard]] bool operator==(const Variant &o) const = default;
+  [[nodiscard]] bool operator==(const Variant &o) const;
+
+  /// \brief AL compares a Variant to an enumeration value by ORDINAL.
+  /// \tparam E The enumeration type -- anything carrying `AsInteger()`, which is `Enum` and
+  ///         `Option`.
+  /// \param other The value.
+  /// \return Whether the Variant holds an enumeration value with that ordinal.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD AND NOT A CONVERSION, which is the whole point: without it
+  ///       `Rec.GetRangeMax(FieldNo) = Enum::X` had two equally good readings -- the enumeration
+  ///       converted to a Variant, or the Variant compared as the enumeration -- and AL means the
+  ///       ordinal either way.
+  /// \brief AL compares a Variant to a VALUE of one of its alternatives.
+  /// \tparam T The value's type -- exactly one of the alternatives.
+  /// \param other The value.
+  /// \return Whether the Variant holds that type and that value.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD, so `Rec.GetRangeMax(FieldNo) = 0` and `WorkDate() <> Variant`
+  ///       read as comparisons rather than as an ambiguity between converting either side.
+  template <typename T>
+    requires detail::InVariant<T, Held>::value
+  [[nodiscard]] bool operator==(const T &other) const {
+    const auto *held = std::get_if<T>(&held_);
+    return held != nullptr && *held == other;
+  }
+
+  template <typename E>
+    requires requires(const E &value) { value.AsInteger(); }
+  [[nodiscard]] bool operator==(const E &other) const {
+    const auto *held = std::get_if<OrdinalInVariant>(&held_);
+    return held != nullptr && held->ordinal == other.AsInteger();
+  }
 
 private:
   [[noreturn]] static void Refuse();

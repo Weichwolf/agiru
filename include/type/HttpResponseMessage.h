@@ -50,7 +50,7 @@ public:
 
   /// \brief AL `HttpResponseMessage.GetCookieNames()`. Gets the list of cookie names.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void GetCookieNames();
+  [[nodiscard]] ::agiru::List<std::string> GetCookieNames();
 
   /// \brief AL `HttpResponseMessage.Headers()`. Gets the HTTP response's HTTP headers.
   /// \return The AL `HttpHeaders`.

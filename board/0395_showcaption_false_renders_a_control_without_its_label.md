@@ -47,3 +47,11 @@ and to a `FieldCaption` call.
 **The negative control is `FieldCaption`** -- an implementation that clears the caption instead of
 hiding the label renders correctly and returns an empty string to AL code, which is a silently wrong
 error message on 8 636 controls.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

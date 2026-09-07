@@ -70,6 +70,11 @@ std::string FieldText(const void *record, const FieldDef &def) {
     case FieldType::Enum:
       return detail::MemberText(
           def, reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger());
+    case FieldType::Blob: return {};
+    case FieldType::Media:
+      return reinterpret_cast<const Media *>(At(record, def))->MediaId().ToText();
+    case FieldType::MediaSet:
+      return reinterpret_cast<const MediaSet *>(At(record, def))->MediaId().ToText();
     default: throw Error("FieldText: no rendering for this field type yet");
   }
 }

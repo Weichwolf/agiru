@@ -52,10 +52,16 @@ public:
   /// \throws Error until a page can be opened.
   void SetValue(std::string_view value) { SetValueText(value); }
 
+  /// \brief AL `TestField.Value(Text)` -- the setter half of `[Value := ]
+  /// TestField.Value([Value])`,
+  ///        `testfield-value-method.md`: "Gets or sets the value of this field."
+  /// \param value The text to set, the way `SetValue` sets it.
+  void Value(std::string_view value) { SetValueText(value); }
+
   /// \brief AL `TestField.Value()`.
   /// \return The control's value as text.
   /// \throws Error until a page can be opened.
-  [[nodiscard]] std::string Value() const;
+  std::string Value() const;
 
   /// \brief AL `TestField.AssertEquals(Expected)`.
   ///

@@ -8,6 +8,9 @@ Class:    activation
 
 # `ExtendedDatatype` gives a field its client behaviour
 
+**The metadata half is done:** carried as `FieldDef::extendedDataType`, the text AL wrote; the control half remains.
+
+
 > Sets the extended data type of a control. By applying special meaning or semantics to a field, the
 > value of the table field is converted to a text field of the new data type that may apply special
 > validation, a different way of displaying the value or interacting with the field.
@@ -71,3 +74,11 @@ control declaring `URL` over a field declaring `EMail` renders the page's.
 
 **The negative control is the override** -- a renderer reading only the field passes the first half
 and gets the second backwards.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

@@ -144,8 +144,8 @@ void TheEnumAccessorsAnswerByPositionAndByOrdinal() {
              type.GetEnumValueName(0).empty() && type.GetEnumValueName(4).empty());
   CHECK_TRUE("and an ordinal the enumeration does not declare answers nothing",
              type.GetEnumValueNameFromOrdinalValue(9).empty());
-  CHECK_TRUE("the members come out in declaration order", type.OptionMembers().Count() == 3);
-  CHECK_TEXT("first", type.OptionMembers().Get(1), "Resource");
+  CHECK_TRUE("the members come out in declaration order, comma-joined as the page says",
+             type.OptionMembers().starts_with("Resource,"));
 
   // An OPTION is not an ENUM, and the platform asks that separately.
   CHECK_TRUE("an option field is not an enum field", !type.IsEnum());
@@ -183,20 +183,37 @@ struct Painted : agiru::Table<Painted> {
 
   agiru::Enum<Kind> Kind;
   agiru::Option<Shade> Shade;
+  agiru::Integer Painted_Count;
+  agiru::Date Painted_On;
 
   struct Field_No {
     static constexpr agiru::FieldNo Kind{1};
     static constexpr agiru::FieldNo Shade{2};
+    static constexpr agiru::FieldNo Painted_Count{3};
+    static constexpr agiru::FieldNo Painted_On{4};
   };
 
   static constexpr std::array<agiru::FieldNo, 1> kKey1{{Field_No::Kind}};
 };
 
-inline constexpr std::array<agiru::FieldDef, 2> kPaintedFields{{
+inline constexpr std::array<agiru::FieldDef, 4> kPaintedFields{{
     agiru::Declare<&Painted::Kind>(
         Painted::Field_No::Kind, "Kind", "Kind", offsetof(Painted, Kind)),
     agiru::Declare<&Painted::Shade>(
         Painted::Field_No::Shade, "Shade", "Shade", offsetof(Painted, Shade)),
+    agiru::Declare<&Painted::Painted_Count>(
+        Painted::Field_No::Painted_Count,
+        "Painted Count",
+        "Painted Count",
+        offsetof(Painted, Painted_Count),
+        agiru::Declared{.fieldClass = agiru::FieldClass::FlowField,
+                        .calcFormula = "Count(\"Painted\")"}),
+    agiru::Declare<&Painted::Painted_On>(
+        Painted::Field_No::Painted_On,
+        "Painted On",
+        "Painted On",
+        offsetof(Painted, Painted_On),
+        agiru::Declared{.fieldClass = agiru::FieldClass::FlowFilter}),
 }};
 
 inline constexpr std::array<agiru::KeyDef, 1> kPaintedKeys{{
@@ -241,9 +258,24 @@ void AnEnumFieldReportsOption() {
 
   // AND BOTH HAND OUT THEIR MEMBERS, which is the half `BankPmtApplRuleUT` reaches after the type
   // check: `OptionMembers` on an enum field must not be empty.
-  CHECK_TRUE("the enum names its values", declared.OptionMembers().Count() == 2);
-  CHECK_TRUE("and so does the option", option.OptionMembers().Count() == 2);
+  CHECK_TRUE("the enum names its values", declared.OptionMembers().find(',') != std::string::npos);
+  CHECK_TRUE("and so does the option", option.OptionMembers().find(',') != std::string::npos);
   CHECK_TRUE("the enum keeps its declared ordinal", declared.GetEnumValueOrdinal(2) == 10);
+}
+
+void AFieldAnswersTheClassItsTableDeclared() {
+  Painted rec;
+  RecordRef ref;
+  ref.GetTable(rec);
+
+  CHECK_TRUE("a FlowField says so", ref.Field(3).Class() == agiru::FieldClass::FlowField);
+  CHECK_TRUE("a FlowFilter says so", ref.Field(4).Class() == agiru::FieldClass::FlowFilter);
+
+  // THE NEGATIVE CONTROL IS THE ORDINARY FIELD. `devenv-fieldclass-property.md` makes Normal the
+  // default, so a Class() that returned a hardcoded Normal passes on field 1 and fails on the two
+  // above -- which is why the ordinary field is checked LAST and never alone.
+  CHECK_TRUE("and a field that declares none is Normal",
+             ref.Field(1).Class() == agiru::FieldClass::Normal);
 }
 
 /// THE FIELD TYPE'S NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. AL compares the result of
@@ -290,5 +322,6 @@ int main() {
     AnEnumFieldReportsOption();
     TheFieldTypeCarriesThePlatformsOwnNumbers();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
+    AFieldAnswersTheClassItsTableDeclared();
   });
 }

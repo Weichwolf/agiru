@@ -23,6 +23,8 @@ std::string FieldIdentifier(const al::TableObject &table, const std::string &nam
 
 std::string ProcedureIdentifier(const al::TableObject &table, const std::string &name);
 
+std::string TableDefinitions(const al::TableObject &declared, const Objects &objects);
+
 TableHeader WriteHeader(const al::TableObject &declared,
                         const std::string &sourcePath,
                         const EnumIndex &enums,

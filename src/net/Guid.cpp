@@ -79,7 +79,7 @@ Guid Guid::Create() {
   return Guid{bytes};
 }
 
-Guid Guid::CreateSequential() {
+Guid Guid::CreateSequentialGuid() {
   std::array<std::uint8_t, kSize> bytes{};
   const auto now =
       static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(

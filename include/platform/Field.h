@@ -4,8 +4,11 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
@@ -157,6 +160,8 @@ public:
   /// \brief The AL name.
   static constexpr std::string_view kName{"Field"};
 
+  detail::StateHandle State_Block;
+
   /// \brief The declared lengths, which are AL's and not this file's.
   static constexpr std::size_t kNameLength = 30;
   /// \brief The declared length of `FieldCaption`.
@@ -197,10 +202,23 @@ public:
   /// \brief AL `Field."Is Part of Primary Key"`.
   Boolean IsPartOfPrimaryKey{};
 
-  /// \note NO SYSTEM FIELDS. A virtual table is not stored, so there is no row to carry a SystemId
-  ///       or an audit stamp -- `devenv-virtual-tables.md`: "Virtual tables aren't stored in the
-  ///       database, but are computed at runtime". This is why it does not derive from
-  ///       `SystemFieldNumbers` the way a generated table does.
+  /// \brief AL `Field.SystemId` -- blank, because a virtual table has no row to carry one.
+  Guid SystemId;
+  /// \brief AL `Field.SystemCreatedAt` -- blank, for the same reason.
+  DateTime SystemCreatedAt;
+  /// \brief AL `Field.SystemCreatedBy` -- blank.
+  Guid SystemCreatedBy;
+  /// \brief AL `Field.SystemModifiedAt` -- blank.
+  DateTime SystemModifiedAt;
+  /// \brief AL `Field.SystemModifiedBy` -- blank.
+  Guid SystemModifiedBy;
+
+  /// \note THE SYSTEM FIELDS ARE DECLARED AND NEVER FILLED. A virtual table is not stored
+  ///       (`devenv-virtual-tables.md`: "computed at runtime"), so there is no row to carry a
+  ///       SystemId or an audit stamp -- but AL reaches them anyway: `Config. Package Management`
+  ///       writes `Field.FieldNo(SystemId)` to filter the system fields OUT of a table's field
+  ///       list, and `FieldNo` needs the member to name. So they exist, at the platform's numbers,
+  ///       and read as blank.
   struct Field_No {
     /// \brief The AL field number of `TableNo`.
     static constexpr ::agiru::FieldNo TableNo{1};
@@ -256,7 +274,7 @@ public:
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.
-inline constexpr std::array<FieldDef, 15> kFieldFields{{
+inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 15>{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
     Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),
@@ -297,7 +315,7 @@ inline constexpr std::array<FieldDef, 15> kFieldFields{{
                                         "Is Part of Primary Key",
                                         "Is Part of Primary Key",
                                         offsetof(Field, IsPartOfPrimaryKey)),
-}};
+}});
 
 /// \brief The keys of the virtual `Field` table.
 inline constexpr std::array<KeyDef, 1> kFieldKeys{{

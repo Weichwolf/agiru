@@ -1,13 +1,16 @@
 #pragma once
 
 #include "runtime/Codeunit.h"
+#include "runtime/Events.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
+#include "type/Dictionary.h"
 #include "type/Integer.h"
+#include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
@@ -37,6 +40,17 @@
 ///       `std::optional` says which, and a default of `{}` could not.
 
 namespace agiru {
+
+/// \brief Whether a dialog kind has a handler standing in for the user right now.
+/// \param kind The dialog kind, as `HandlerKind` numbers it.
+/// \param text What the dialog would show.
+/// \param reply Where a `Confirm` or a `StrMenu` puts the answer.
+/// \return True when a handler answered, false when none is installed.
+///
+/// \note IT IS THE DOOR'S HALF OF THE HANDLER TABLE. The builtins that show something call it
+///       before refusing, so a test with `[HandlerFunctions]` gets its answer and one without gets
+///       the platform's refusal (board:0054).
+[[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
 
 /// \brief AL `Text.ConvertStr(Text, Text, Text)`. Replaces all chars in source found in
 /// FromCharacters with the corresponding char in ToCharacters and returns the converted string. If
@@ -257,6 +271,65 @@ std::string GetUrl(const ::agiru::ClientType &ClientType,
                    ::agiru::Boolean UseFilters = {},
                    std::string_view Layout = {});
 
+/// \brief AL `System.GetUrl(ClientType [, Company] [, ObjectType] [, ObjectId] [, Record]
+///        [, UseFilters] [, Layout])` -- the RECORD form.
+/// \tparam Record The generated table's class.
+/// \param ClientType Which client the URL is for.
+/// \param Company The company name.
+/// \param ObjectType What kind of object the URL opens.
+/// \param ObjectId Its number.
+/// \param Record The record the URL opens ON.
+/// \param UseFilters Whether the record's filters travel in the URL.
+/// \param Layout The report layout, where the object is a report.
+/// \return Never.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note `system-geturl-clienttype-string-objecttype-integer-table-boolean-method.md` IS ITS OWN
+///       PAGE beside the `recordref` one, so a record and a `RecordRef` are two overloads and not
+///       one with a conversion -- which is the overload-filename rule, and the reason a body that
+///       passes `Rec` did not compile.
+template <typename Record>
+  requires requires {
+    { Record::kId } -> std::convertible_to<::agiru::TableId>;
+  }
+std::string GetUrl(const ::agiru::ClientType &ClientType,
+                   std::string_view Company,
+                   const ::agiru::ObjectType &ObjectType,
+                   ::agiru::Integer ObjectId,
+                   const Record &Record_,
+                   ::agiru::Boolean UseFilters = {},
+                   std::string_view Layout = {}) {
+  static_cast<void>(ClientType);
+  static_cast<void>(Company);
+  static_cast<void>(ObjectType);
+  static_cast<void>(ObjectId);
+  static_cast<void>(Record_);
+  static_cast<void>(UseFilters);
+  static_cast<void>(Layout);
+  throw ::agiru::Error("System.GetUrl(ClientType, Text, ObjectType, Integer, Record, Boolean, "
+                       "Text) is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
+/// Dictionary of [Text, Text])`. Logs a trace message with its dimensions in one dictionary.
+/// \param EventId The event's identifier.
+/// \param Message The message.
+/// \param Verbosity How loud it is.
+/// \param DataClassification What kind of data it carries.
+/// \param TelemetryScope Who sees it.
+/// \param CustomDimensions The dimensions, by name.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note IT IS A SEPARATE OVERLOAD IN THE DOCUMENTATION and not a shape of the one below:
+///       `session-logmessage-...-dictionary[text,text]-method.md` is its own page, which is the
+///       filename rule CLAUDE.md names -- behaviour hangs off the ARGUMENT.
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                const ::agiru::Verbosity &Verbosity,
+                const ::agiru::DataClassification &DataClassification,
+                const ::agiru::TelemetryScope &TelemetryScope,
+                const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text,
 /// Text [, Text, Text])`. Logs a trace message to a telemetry account.
 /// \param EventId The event's identifier.
@@ -295,10 +368,17 @@ void LogMessage(std::string_view EventId,
 ///       a `Variant` takes none of them -- which made all 30 call sites over the 78 UT codeunits a
 ///       compile error. What they share is the `CodeunitTraits` their generator specialises.
 template <typename T>
-  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+  requires requires(T &held) {
+    ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
+  } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 BindSubscription(T &Codeunit) {
-  static_cast<void>(Codeunit);
-  throw ::agiru::Error("Session.BindSubscription is declared and not implemented yet (board:0035)");
+  if constexpr (requires { ::agiru::CodeunitTraits<T>::kId; }) {
+    return ::agiru::detail::BindSubscriptions(::agiru::CodeunitTraits<T>::kId, &Codeunit);
+  } else {
+    auto &held = *Codeunit.operator->();
+    return ::agiru::detail::BindSubscriptions(
+        ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(held)>>::kId, &held);
+  }
 }
 
 /// \brief AL `Session.UnbindSubscription(Codeunit)`. Unbinds what `BindSubscription` bound.
@@ -307,11 +387,17 @@ BindSubscription(T &Codeunit) {
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename T>
-  requires requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
+  requires requires(T &held) {
+    ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(*held.operator->())>>::kId;
+  } || requires { ::agiru::CodeunitTraits<T>::kId; } ::agiru::Boolean
 UnbindSubscription(T &Codeunit) {
-  static_cast<void>(Codeunit);
-  throw ::agiru::Error(
-      "Session.UnbindSubscription is declared and not implemented yet (board:0035)");
+  if constexpr (requires { ::agiru::CodeunitTraits<T>::kId; }) {
+    return ::agiru::detail::UnbindSubscriptions(::agiru::CodeunitTraits<T>::kId, &Codeunit);
+  } else {
+    auto &held = *Codeunit.operator->();
+    return ::agiru::detail::UnbindSubscriptions(
+        ::agiru::CodeunitTraits<std::remove_cvref_t<decltype(held)>>::kId, &held);
+  }
 }
 
 /// \brief AL `System.Clear(Any)` -- the value back to what it was before anything was assigned.
@@ -349,8 +435,20 @@ concept IsAlArray = requires(T &array, ::agiru::Integer at) {
 
 }
 
+/// \brief AL `Round(Duration, Precision)`: a Duration is a number of milliseconds and rounds as
+/// one.
+/// \param number    The duration.
+/// \param precision The precision.
+/// \return The rounded milliseconds.
+template <std::same_as<::agiru::Duration> D>
+::agiru::Decimal Round(const D &number, const ::agiru::Decimal &precision) {
+  return ::agiru::Round(::agiru::Decimal{static_cast<std::int64_t>(number)}, precision);
+}
+
 template <typename T> void Clear(T &Variable) {
-  if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
+  if constexpr (requires { Variable.operator->(); } && requires { *Variable; }) {
+    Clear(*Variable);
+  } else if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
     ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);
   } else if constexpr (detail::IsAlArray<T>) {
     for (::agiru::Integer at = 1; at <= Variable.Length(); ++at) { Clear(Variable[at]); }
@@ -368,4 +466,145 @@ template <typename T> void Clear(T &Variable) {
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date Today();
+
+/// \brief AL `System.IsNull(DotNet)`. Whether a .NET variable holds no object.
+///
+/// \tparam T The rebuilt .NET class, or a refused one.
+/// \param Variable The variable.
+/// \return Never.
+///
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note THE PARAMETER IS A TEMPLATE, NOT A `Variant`. The .NET stand-ins this run emits are
+///       unrelated structs with no common base, so a `Variant` signature takes none of them --
+///       the same shape `BindSubscription` needed for the generated codeunits.
+template <typename T>
+  requires(!std::convertible_to<const T &, ::agiru::Variant>)::agiru::Boolean
+IsNull(const T &Variable) {
+  static_cast<void>(Variable);
+  throw ::agiru::Error("System.IsNull(DotNet) is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on.
+/// \return The AL `Text` naming the user this session runs as.
+/// \note IT COMES FROM THE SESSION and not from a constant: a user is a property of the session,
+///       and 23 of the 61 UT cases that run today reach it through `Library - Utility`.
+::agiru::Text<0> UserId();
+
+/// \brief AL `Database.UserSecurityId()`. Gets the security id of the user who is logged on.
+/// \return The AL `Guid` this session's user carries.
+/// \note IT COMES FROM THE SESSION for the reason `UserId()` gives -- a user is a property of the
+///       session -- and 23 of the cases that run today reach it through `Library - Lower
+///       Permissions`.
+::agiru::Guid UserSecurityId();
+
+/// \brief AL `Dialog.Message(Text [, Any, ...])` -- a message with substitution values.
+/// \tparam Values The values' types.
+/// \param String The message, with `%1`-style placeholders.
+/// \param values What the placeholders are replaced with.
+/// \throws Error always -- a message needs a running UI (board:0030).
+/// \note VARIADIC, BECAUSE AL'S IS: the BaseApp passes up to five values.
+/// \brief AL `Dialog.Message(Text)` -- the message alone.
+/// \param String The message.
+/// \throws Error always -- a message needs a running UI (board:0030).
+inline void Message(std::string_view String) {
+  if (::agiru::AnsweredByHandler(1, String, nullptr)) { return; }
+  throw ::agiru::Error(std::string("Message(") + std::string(String) +
+                       ") needs a running UI (board:0030)");
+}
+
+template <typename First, typename... Values>
+void Message(std::string_view String, const First &first, const Values &...values) {
+  const std::string shown = ::agiru::StrSubstNo(String, first, values...);
+  if (::agiru::AnsweredByHandler(1, shown, nullptr)) { return; }
+  throw ::agiru::Error(std::string("Message(") + shown + ") needs a running UI (board:0030)");
+}
+
+/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
+///        Dictionary of [Text, Text])` -- the dictionary form of the custom dimensions.
+/// \param EventId            The event id.
+/// \param Message            The message.
+/// \param Verbosity          The verbosity.
+/// \param DataClassification The classification.
+/// \param Scope              The telemetry scope.
+/// \param CustomDimensions   The dimensions, as a dictionary.
+/// \note Telemetry has no sink here yet (board:0035), so the call is accepted and records nothing.
+/// \tparam K The dictionary's key type -- `Text<0>` from a generated variable, `std::string` from
+///           the door; both spell AL's `Text`.
+/// \tparam V The dictionary's value type.
+template <typename K, typename V>
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                ::agiru::Verbosity Verbosity,
+                ::agiru::DataClassification DataClassification,
+                ::agiru::TelemetryScope Scope,
+                const ::agiru::Dictionary<K, V> &CustomDimensions) {
+  static_cast<void>(EventId);
+  static_cast<void>(Message);
+  static_cast<void>(Verbosity);
+  static_cast<void>(DataClassification);
+  static_cast<void>(Scope);
+  static_cast<void>(CustomDimensions);
+}
+
+/// \brief AL `Dialog.Confirm(Text [, Boolean] [, Any, ...])`. Asks the user a yes/no question.
+/// \tparam Values The substitution values' types.
+/// \param String The question, with `%1`-style placeholders.
+/// \param Default Which button the dialog opens on.
+/// \param values What the placeholders are replaced with.
+/// \return Never.
+/// \throws Error always -- a confirm needs a running UI (board:0030).
+/// \note VARIADIC, BECAUSE AL'S IS. The BaseApp passes up to five values, and the generated
+///       three-parameter declaration refused the fourth.
+template <typename... Values>
+::agiru::Boolean
+Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...values) {
+  const std::string asked =
+      sizeof...(values) == 0 ? std::string(String) : ::agiru::StrSubstNo(String, values...);
+  ::agiru::Boolean reply = Default;
+  if (::agiru::AnsweredByHandler(0, asked, &reply)) { return reply; }
+  throw ::agiru::Error(std::string("Confirm(") + asked + ") needs a running UI (board:0030)");
+}
+
+/// \brief AL `Dialog.Confirm(Text)` -- the one-argument form.
+/// \param String The question.
+/// \return Never.
+/// \throws Error always -- a confirm needs a running UI (board:0030).
+inline ::agiru::Boolean Confirm(std::string_view String) {
+  return Confirm(String, false);
+}
+
+/// \brief A text builtin over anything that RENDERS as text, which is how AL hands a GUID to
+///        `CopyStr`, `LowerCase` or `UpperCase`.
+/// \tparam T The source, which must carry a `ToText()` and must not already read as text.
+template <typename T>
+concept RendersAsText = (!std::convertible_to<const T &, std::string_view>) &&
+                        requires(const T &value) { std::string_view{value.ToText()}; };
+
+/// \brief AL `Text.LowerCase(Text)` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \return The lower-cased rendering.
+template <RendersAsText T>::agiru::Text<0> LowerCase(const T &String) {
+  return LowerCase(std::string_view(String.ToText()));
+}
+
+/// \brief AL `Text.UpperCase(Text)` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \return The upper-cased rendering.
+template <RendersAsText T>::agiru::Text<0> UpperCase(const T &String) {
+  return UpperCase(std::string_view(String.ToText()));
+}
+
+/// \brief AL `Text.CopyStr(Text, Integer [, Integer])` over a value that renders as text.
+/// \tparam T The source.
+/// \param String The value.
+/// \param Position Where the copy starts, one-based.
+/// \param Length How many characters; the rest when omitted.
+/// \return The copied rendering.
+template <RendersAsText T>
+::agiru::Text<0> CopyStr(const T &String, ::agiru::Integer Position, ::agiru::Integer Length = {}) {
+  return CopyStr(std::string_view(String.ToText()), Position, Length);
+}
 }

@@ -18,7 +18,11 @@ std::string EnumeratorName(std::string_view optionMember);
 
 std::vector<std::string> EnumeratorNames(const std::vector<std::string> &members);
 
-std::string OptionEnumName(std::string_view tableName, std::string_view fieldName);
+std::string OptionContentName(const std::vector<std::string> &members);
+
+std::string OptionEnumName(std::string_view tableName,
+                           std::string_view fieldName,
+                           const std::vector<std::string> &members = {});
 
 std::string TypeName(std::string_view alType);
 

@@ -55,12 +55,50 @@ public:
     return Identifier(member.field);
   }
 
+  [[nodiscard]] virtual bool HasField(const OfVariable &member) const {
+    static_cast<void>(member);
+    return false;
+  }
+
   [[nodiscard]] virtual bool MemberIsCall(const OfVariable &member) const {
     return MembersAreCalls(member.variable);
   }
 
   [[nodiscard]] virtual bool MembersAreCalls(std::string_view variable) const {
     static_cast<void>(variable);
+    return false;
+  }
+
+  [[nodiscard]] virtual bool ReturnsAHandle(std::string_view procedure) const {
+    static_cast<void>(procedure);
+    return false;
+  }
+
+  [[nodiscard]] virtual std::string ThisTable() const { return {}; }
+
+  [[nodiscard]] virtual std::string ProcedureOf(const OfVariable &member) const {
+    static_cast<void>(member);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::string TableOf(std::string_view variable) const {
+    static_cast<void>(variable);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::string EnumMember(std::string_view enumeration,
+                                               std::string_view member) const {
+    static_cast<void>(enumeration);
+    return EnumeratorName(member);
+  }
+
+  [[nodiscard]] virtual std::vector<bool> VarParametersOfPublisher(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
+  [[nodiscard]] virtual bool IsVariable(std::string_view name) const {
+    static_cast<void>(name);
     return false;
   }
 
@@ -92,6 +130,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                                       const Objects &objects,
                                       const al::TableObject *source);
 
-[[nodiscard]] std::string ControlTrigger(std::string_view trigger, std::string_view control);
+[[nodiscard]] std::string ControlTrigger(std::string_view trigger,
+                                         std::string_view control,
+                                         const std::vector<al::ProcedureDecl> &procedures = {});
 
 }

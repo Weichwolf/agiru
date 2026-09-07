@@ -3,6 +3,7 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
 #include "type/Integer.h"
@@ -66,6 +67,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"Date"};
+
+  detail::StateHandle State_Block;
 
   /// \brief The declared length of `Period Name`, which is AL's and not this file's.
   static constexpr std::size_t kNameLength = 30;

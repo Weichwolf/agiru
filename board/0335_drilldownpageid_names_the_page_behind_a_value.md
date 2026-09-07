@@ -8,6 +8,16 @@ Class:    activation
 
 # `DrillDownPageId` names the page behind a value
 
+**The metadata half claimed to be done and was not, measured 2026-09-07.** The member existed and
+the generator wrote it only for a NUMERIC declaration -- and `DrillDownPageId` is a page NAME in 1 820 of 1 822
+declarations under `~/Git/BCApps` (2 are numeric). The number helper dropped everything
+non-numeric in silence, so the field table carried nothing at all. The generator now resolves the
+name through the page index, which is why `TableRef` carries the object's number: `Page "Customer
+List"` becomes `PageId{22}` at translation time and never at run time.
+
+**The metadata half is done:** carried as `FieldDef::drillDownPageId`, a strong `PageId`; the drilldown remains.
+
+
 > Sets the ID of the page to use as a drill-down.
 >
 > Drill-downs are a system-wide feature of fields (**normal fields and FlowFields**) that let you see
@@ -52,3 +62,11 @@ the cue equals the row count on the page.
 
 **The negative control is the equality** -- a drill-down that opens the page unfiltered still opens a
 page, and only comparing the two numbers catches it.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

@@ -21,10 +21,13 @@ void Notification::AddAction(std::string_view caption,
   ++actions_;
 }
 
-void Notification::Send() {
+::agiru::Boolean Notification::Send() {
   if (id_.IsNull()) { id_ = Guid::Create(); }
+  return true;
 }
 
-void Notification::Recall() {}
+::agiru::Boolean Notification::Recall() {
+  return true;
+}
 
 }

@@ -50,11 +50,13 @@ void AnInitValueIsTranslatedIntoTheColumnsOwnSpelling() {
 })",
                                    {});
   CHECK_TRUE("a Boolean carries its literal",
-             text.find("offsetof(Gate, DirectPosting), \"true\")") != std::string::npos);
+             text.find("offsetof(Gate, DirectPosting), Declared{.initValue = \"true\"})") !=
+                 std::string::npos);
   CHECK_TRUE("a Code carries the quoted text, spaces and all",
-             text.find("offsetof(Gate, Filler), \" \")") != std::string::npos);
+             text.find("offsetof(Gate, Filler), Declared{.initValue = \" \"})") !=
+                 std::string::npos);
   CHECK_TRUE("AN OPTION CARRIES ITS ORDINAL AND NOT ITS MEMBER NAME",
-             text.find("offsetof(Gate, Kind), \"2\")") != std::string::npos);
+             text.find("offsetof(Gate, Kind), Declared{.initValue = \"2\"})") != std::string::npos);
   CHECK_TRUE("a field that declares none carries nothing",
              text.find("offsetof(Gate, Code)),") != std::string::npos);
 }
@@ -66,7 +68,8 @@ void AnEnumInitValueResolvesThroughTheEnumIndex() {
   enums.insert_or_assign("gate answer",
                          agiru::gen::EnumRef{.identifier = "GateAnswer",
                                              .header = "GateAnswer.h",
-                                             .ordinals = {{"yes", 0}, {"no", 10}}});
+                                             .ordinals = {{"yes", 0}, {"no", 10}},
+                                             .members = {}});
   const std::string text = Emitted(R"(table 90001 "Gate"
 {
     fields
@@ -78,7 +81,8 @@ void AnEnumInitValueResolvesThroughTheEnumIndex() {
 })",
                                    enums);
   CHECK_TRUE("the DECLARED ordinal is emitted, not the position",
-             text.find("offsetof(Gate, Answer), \"10\")") != std::string::npos);
+             text.find("offsetof(Gate, Answer), Declared{.initValue = \"10\"})") !=
+                 std::string::npos);
 }
 
 // AND AN ENUM THIS RUN DOES NOT CARRY YIELDS NOTHING RATHER THAN A GUESS. The table already reports

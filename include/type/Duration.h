@@ -1,8 +1,10 @@
 #pragma once
 
 #include <compare>
+#include <concepts>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 
 /// \file
 /// \brief AL `Duration` -- how long, in milliseconds, and possibly negative.
@@ -40,6 +42,23 @@ public:
   /// \param milliseconds How long, negative for a duration that runs backwards.
   constexpr Duration(std::int64_t milliseconds) : milliseconds_(milliseconds) {}
 
+  /// \brief AL assigns a `Decimal` to a `Duration` -- `Duration := Round(...)` is 40-odd call
+  ///        sites -- and a duration IS a number of milliseconds.
+  /// \tparam D The number's type, which must convert to one.
+  /// \param milliseconds The milliseconds, rounded to whole ones.
+  template <typename D>
+    requires(!std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
+             !requires { typename D::IsAlRefusal; } &&
+             std::is_convertible_v<const D &, std::int32_t>)
+  constexpr Duration(const D &milliseconds)
+      : milliseconds_(static_cast<std::int64_t>(static_cast<std::int32_t>(milliseconds))) {}
+
+  /// \brief Reads as its milliseconds, which is how AL assigns a Duration to a BigInteger.
+  /// \return The milliseconds.
+  /// \note `DurationAsInt := CurrentDateTime - StartTime` in `Config. Package Management`; the
+  ///       duration IS a number of milliseconds in AL (`duration-data-type.md`).
+  constexpr explicit(false) operator std::int64_t() const { return milliseconds_; }
+
   /// \return The count of milliseconds, which is what the page says a Duration IS.
   [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }
 
@@ -72,6 +91,39 @@ public:
   /// \brief Reverses a duration.
   /// \return The same length, running the other way.
   [[nodiscard]] constexpr Duration operator-() const { return Duration{-milliseconds_}; }
+
+  /// \brief AL `Duration - Integer` -- milliseconds.
+  /// \param milliseconds The milliseconds.
+  /// \return The shorter duration.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD SO THE SUBTRACTION IS NOT AMBIGUOUS. A `Duration` converts to
+  ///       `std::int64_t` and takes one, so `Duration - 1440 * 1000 * 60` had a built-in reading
+  ///       and a member one, equally good. The `int` overload beside it is what an AL literal
+  ///       actually is, and an exact match beats the built-in outright.
+  [[nodiscard]] constexpr Duration operator-(std::int64_t milliseconds) const {
+    return Duration{milliseconds_ - milliseconds};
+  }
+
+  /// \brief AL `Duration + Integer` -- milliseconds.
+  /// \param milliseconds The milliseconds.
+  /// \return The longer duration.
+  [[nodiscard]] constexpr Duration operator+(std::int64_t milliseconds) const {
+    return Duration{milliseconds_ + milliseconds};
+  }
+
+  /// \brief AL `Duration - Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The shorter duration.
+  [[nodiscard]] constexpr Duration operator-(std::int32_t milliseconds) const {
+    return Duration{milliseconds_ - milliseconds};
+  }
+
+  /// \brief AL `Duration + Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The longer duration.
+  [[nodiscard]] constexpr Duration operator+(std::int32_t milliseconds) const {
+    return Duration{milliseconds_ + milliseconds};
+  }
 
   /// \brief Repeats a duration.
   /// \param factor How many times.
@@ -113,6 +165,24 @@ public:
   /// \return True when they are the same length.
   [[nodiscard]] constexpr bool operator==(const Duration &o) const = default;
 
+  /// \brief AL `Duration >= Integer`, `Duration / Integer` and the rest, with an integral operand
+  ///        -- exact, so the `int64` conversion above and the constructor from one never compete.
+  template <std::integral I> [[nodiscard]] constexpr std::strong_ordering operator<=>(I o) const {
+    return milliseconds_ <=> static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr bool operator==(I o) const {
+    return milliseconds_ == static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator/(I divisor) const {
+    return *this / static_cast<std::int64_t>(divisor);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator*(I factor) const {
+    return *this * static_cast<std::int64_t>(factor);
+  }
+
 private:
   std::int64_t milliseconds_{0};
 };
@@ -123,6 +193,18 @@ private:
 /// \return The product.
 [[nodiscard]] constexpr Duration operator*(std::int64_t factor, const Duration &d) {
   return d * factor;
+}
+
+/// \brief Repeats a duration, with an `Integer` written first.
+/// \param factor How many times.
+/// \param d      The duration.
+/// \return The product.
+///
+/// \note IT IS THE `int` OVERLOAD AND IT EARNS ITS PLACE. AL's literal and its `Integer` are
+///       `int`, and only an exact match on both operands beats the built-in arithmetic the
+///       duration's own conversion to a number offers.
+[[nodiscard]] constexpr Duration operator*(std::int32_t factor, const Duration &d) {
+  return d * static_cast<std::int64_t>(factor);
 }
 
 }

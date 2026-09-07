@@ -36,7 +36,7 @@ Integer TransferOldExtTextLines::TransferExtendedText(Integer OldLineNo,
                                                       Integer NewLineNo,
                                                       Integer AttachedLineNo) {
   Integer Result{};
-  Boolean IsHandled{};
+  [[maybe_unused]] Boolean IsHandled{};
 
   IsHandled = false;
   OnBeforeTransferExtendedText(OldLineNo, NewLineNo, AttachedLineNo, Result, IsHandled);

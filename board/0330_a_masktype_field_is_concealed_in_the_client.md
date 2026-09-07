@@ -8,6 +8,9 @@ Class:    activation
 
 # A `MaskType` field is concealed in the client, and the page says how far that goes
 
+**The metadata half is done:** carried as `FieldDef::maskType`, the text AL wrote; the input mask remains.
+
+
 > Specifies whether the field value should be masked for security purposes. `None` (default) or
 > `Concealed`.
 >

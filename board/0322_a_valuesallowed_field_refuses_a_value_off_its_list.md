@@ -8,6 +8,9 @@ Class:    activation
 
 # A `ValuesAllowed` field refuses a value that is not on its list
 
+**The metadata half is done:** carried as `FieldDef::valuesAllowed`, the text AL wrote; the parsed span remains.
+
+
 > Sets the values that are allowed in the field. Separate the values with a comma. For example, if
 > you only want the user to enter 1, 3, or 5 in this field, enter 1,3,5 for this property.
 

@@ -8,6 +8,9 @@ Class:    activation
 
 # A `CaptionClass` is resolved by an AL codeunit, and the runtime only calls it
 
+**The metadata half is done:** carried as `FieldDef::captionClass`, the text AL wrote; evaluating it remains.
+
+
 > Controls the caption that is used in the label of a field in a database table or in the label of a
 > control on a page. Applies to: **Table field, Page Label, Page Field.**
 >
@@ -66,3 +69,11 @@ the string produced by the transpiled codeunit 42 and not by `src/`.
 **The negative control is a grep**: removing every AL app from the build must leave `src/` unable to
 produce that caption. If `src/` can still render it, an area was hardcoded and the invariant is
 broken.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

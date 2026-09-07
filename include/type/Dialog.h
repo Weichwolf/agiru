@@ -45,8 +45,9 @@ public:
   /// \param Value1 The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean
-  Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1);
+  static ::agiru::Boolean Confirm(std::string_view String,
+                                  ::agiru::Boolean Default = {},
+                                  const ::agiru::Variant &Value1 = {});
 
   /// \brief AL `Dialog.Error(ErrorInfo)`. Displays an error message and ends the execution of AL
   /// code.
@@ -66,6 +67,12 @@ public:
   /// \param HideSubsequentDialogs The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `Dialog.HideSubsequentDialogs()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] Dialog.HideSubsequentDialogs([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean HideSubsequentDialogs();
+
   ::agiru::Boolean HideSubsequentDialogs(::agiru::Boolean HideSubsequentDialogs);
 
   /// \brief AL `Dialog.LogInternalError(Text, DataClassification, Verbosity)`. Log internal errors
@@ -94,13 +101,18 @@ public:
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static void Message(std::string_view String, const ::agiru::Variant &Value);
+  static void Message(std::string_view String, const ::agiru::Variant &Value = {});
 
   /// \brief AL `Dialog.Open(Text, Any)`. Opens a dialog window.
   /// \param String The AL `Text`.
   /// \param Variable1 The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void Open(std::string_view String, ::agiru::Variant &Variable1);
+
+  /// \brief AL `Dialog.Open(Text)` -- the same without a variable to show; `Window.Open(Msg)` is
+  ///        the BaseApp's usual form.
+  /// \param String The dialog text.
+  void Open(std::string_view String);
 
   /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series
   /// of options.
@@ -110,15 +122,15 @@ public:
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Integer StrMenu(std::string_view OptionMembers,
-                                  ::agiru::Integer DefaultNumber,
-                                  std::string_view Instruction);
+                                  ::agiru::Integer DefaultNumber = {},
+                                  std::string_view Instruction = {});
 
   /// \brief AL `Dialog.Update(Integer, Any)`. Updates the value of a '#'-or '@' field in the active
   /// window.
   /// \param Number The AL `Integer`.
   /// \param Value The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Update(::agiru::Integer Number, const ::agiru::Variant &Value);
+  void Update(::agiru::Integer Number = {}, const ::agiru::Variant &Value = {});
 };
 
 }

@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `BlankNumbers` clears a number by its sign when the field is formatted
 
+**The metadata half is done.** `BlankNumbers` reaches `FieldDef::blankNumbers` as AL wrote it;
+the predicate on the FIELD's rendering path is what remains.
+
 > Indicates whether the system will **clear a range of numbers as it formats them**.
 
 **This is a FORMAT property and not a constraint**, which is why it sits under board:0066 and not

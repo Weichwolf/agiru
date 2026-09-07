@@ -30,16 +30,20 @@ public:
   /// \param key   The key.
   /// \param value The value.
   /// \throws Error when the key is already there, as AL does.
-  void Add(const TKey &key, const TValue &value) {
+  ::agiru::Boolean Add(const TKey &key, const TValue &value) {
     if (!entries_.try_emplace(key, value).second) {
       throw Error("the dictionary already holds that key");
     }
+    return true;
   }
 
   /// \brief AL `Dictionary.Set(Key, Value)` -- adds or replaces.
   /// \param key   The key.
   /// \param value The value.
-  void Set(const TKey &key, const TValue &value) { entries_.insert_or_assign(key, value); }
+  /// \return True when a value stood under that key and was replaced, false when it was added.
+  Boolean Set(const TKey &key, const TValue &value) {
+    return !entries_.insert_or_assign(key, value).second;
+  }
 
   /// \brief AL `Dictionary.ContainsKey(Key)`.
   /// \param key The key.

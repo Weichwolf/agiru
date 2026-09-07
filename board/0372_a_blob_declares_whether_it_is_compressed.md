@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # A BLOB declares whether it is compressed, and the default is that it is
 
+**The metadata half is done.** `Compressed` reaches `FieldDef::compressed`; the compression
+itself belongs to board:0017, where a BLOB crosses between `Record` and the column.
+
 > Sets a value that specifies whether a BLOB is compressed. **True** if the BLOB is compressed,
 > otherwise false. **The default is true.**
 >

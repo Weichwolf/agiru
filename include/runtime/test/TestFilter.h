@@ -65,7 +65,7 @@ public:
   /// \brief AL `TestFilter.Ascending()`.
   /// \return Which way the page reads.
   /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Boolean Ascending() const { Unfiltered(); }
+  Boolean Ascending() const { Unfiltered(); }
 
 private:
   /// \note NOT STATIC, because it will name the page. A filter belongs to one, and the message a

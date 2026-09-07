@@ -111,8 +111,9 @@ void BigText::AddText(std::string_view String, ::agiru::Integer Position) {
   RefuseDoor("BigText.GetSubText(BigText, Integer, Integer)");
 }
 
-::agiru::Integer
-BigText::GetSubText(std::string &Variable, ::agiru::Integer Position, ::agiru::Integer Length) {
+::agiru::Integer BigText::GetSubText(::agiru::Text<0> &Variable,
+                                     ::agiru::Integer Position,
+                                     ::agiru::Integer Length) {
   static_cast<void>(Variable);
   static_cast<void>(Position);
   static_cast<void>(Length);
@@ -373,6 +374,11 @@ void Dialog::Message(std::string_view String, const ::agiru::Variant &Value) {
   RefuseDoor("Dialog.Message(Text, Any)");
 }
 
+void Dialog::Open(std::string_view String) {
+  RefuseDoor("Dialog.Open(Text)");
+  static_cast<void>(String);
+}
+
 void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
   static_cast<void>(String);
   static_cast<void>(Variable1);
@@ -394,139 +400,6 @@ void Dialog::Update(::agiru::Integer Number, const ::agiru::Variant &Value) {
   RefuseDoor("Dialog.Update(Integer, Any)");
 }
 
-void ErrorInfo::AddAction(std::string_view Caption,
-                          ::agiru::Integer CodeunitID,
-                          std::string_view MethodName) {
-  static_cast<void>(Caption);
-  static_cast<void>(CodeunitID);
-  static_cast<void>(MethodName);
-  RefuseDoor("ErrorInfo.AddAction(Text, Integer, Text)");
-}
-
-void ErrorInfo::AddAction(std::string_view Caption,
-                          ::agiru::Integer CodeunitID,
-                          std::string_view MethodName,
-                          std::string_view Description) {
-  static_cast<void>(Caption);
-  static_cast<void>(CodeunitID);
-  static_cast<void>(MethodName);
-  static_cast<void>(Description);
-  RefuseDoor("ErrorInfo.AddAction(Text, Integer, Text, Text)");
-}
-
-void ErrorInfo::AddNavigationAction(std::string_view Caption) {
-  static_cast<void>(Caption);
-  RefuseDoor("ErrorInfo.AddNavigationAction(Text)");
-}
-
-void ErrorInfo::AddNavigationAction(std::string_view Caption, std::string_view Description) {
-  static_cast<void>(Caption);
-  static_cast<void>(Description);
-  RefuseDoor("ErrorInfo.AddNavigationAction(Text, Text)");
-}
-
-std::string ErrorInfo::Callstack() {
-  RefuseDoor("ErrorInfo.Callstack()");
-}
-
-::agiru::Boolean ErrorInfo::Collectible(::agiru::Boolean Collectible) {
-  static_cast<void>(Collectible);
-  RefuseDoor("ErrorInfo.Collectible(Boolean)");
-}
-
-std::string ErrorInfo::ControlName(std::string_view ControlName) {
-  static_cast<void>(ControlName);
-  RefuseDoor("ErrorInfo.ControlName(Text)");
-}
-
-::agiru::ErrorInfo ErrorInfo::Create() {
-  RefuseDoor("ErrorInfo.Create()");
-}
-
-::agiru::ErrorInfo
-ErrorInfo::Create(std::string_view Message,
-                  ::agiru::Boolean Collectible,
-                  ::agiru::RecordRef &Record,
-                  ::agiru::Integer FieldNo,
-                  ::agiru::Integer PageNo,
-                  std::string_view ControlName,
-                  const ::agiru::Verbosity &Verbosity,
-                  const ::agiru::Variant &DataClassification,
-                  const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
-  static_cast<void>(Message);
-  static_cast<void>(Collectible);
-  static_cast<void>(Record);
-  static_cast<void>(FieldNo);
-  static_cast<void>(PageNo);
-  static_cast<void>(ControlName);
-  static_cast<void>(Verbosity);
-  static_cast<void>(DataClassification);
-  static_cast<void>(CustomDimensions);
-  RefuseDoor("ErrorInfo.Create(String, Boolean, Record, Integer, Integer, String, "
-             "Verbosity, DataClassification, Dictionary of [Text, Text])");
-}
-
-void ErrorInfo::CustomDimensions(
-    const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
-  static_cast<void>(CustomDimensions);
-  RefuseDoor("ErrorInfo.CustomDimensions(Dictionary of [Text, Text])");
-}
-
-::agiru::Variant ErrorInfo::DataClassification(const ::agiru::Variant &DataClassification) {
-  static_cast<void>(DataClassification);
-  RefuseDoor("ErrorInfo.DataClassification(DataClassification)");
-}
-
-std::string ErrorInfo::DetailedMessage(std::string_view DetailedMessage) {
-  static_cast<void>(DetailedMessage);
-  RefuseDoor("ErrorInfo.DetailedMessage(Text)");
-}
-
-::agiru::ErrorType ErrorInfo::ErrorType(const ::agiru::ErrorType &ErrorType) {
-  static_cast<void>(ErrorType);
-  RefuseDoor("ErrorInfo.ErrorType(ErrorType)");
-}
-
-::agiru::Integer ErrorInfo::FieldNo(::agiru::Integer FieldNo) {
-  static_cast<void>(FieldNo);
-  RefuseDoor("ErrorInfo.FieldNo(Integer)");
-}
-
-std::string ErrorInfo::Message(std::string_view Message) {
-  static_cast<void>(Message);
-  RefuseDoor("ErrorInfo.Message(Text)");
-}
-
-::agiru::Integer ErrorInfo::PageNo(::agiru::Integer PageNo) {
-  static_cast<void>(PageNo);
-  RefuseDoor("ErrorInfo.PageNo(Integer)");
-}
-
-::agiru::RecordId ErrorInfo::RecordId(::agiru::RecordId RecordId) {
-  static_cast<void>(RecordId);
-  RefuseDoor("ErrorInfo.RecordId(RecordId)");
-}
-
-::agiru::Guid ErrorInfo::SystemId(::agiru::Guid SystemId) {
-  static_cast<void>(SystemId);
-  RefuseDoor("ErrorInfo.SystemId(Guid)");
-}
-
-::agiru::Integer ErrorInfo::TableId(::agiru::Integer TableId) {
-  static_cast<void>(TableId);
-  RefuseDoor("ErrorInfo.TableId(Integer)");
-}
-
-std::string ErrorInfo::Title(std::string_view Title) {
-  static_cast<void>(Title);
-  RefuseDoor("ErrorInfo.Title(Text)");
-}
-
-::agiru::Verbosity ErrorInfo::Verbosity(const ::agiru::Verbosity &Verbosity) {
-  static_cast<void>(Verbosity);
-  RefuseDoor("ErrorInfo.Verbosity(Verbosity)");
-}
-
 void File::Close() {
   RefuseDoor("File.Close()");
 }
@@ -541,6 +414,20 @@ void File::Close() {
   static_cast<void>(Name);
   static_cast<void>(Encoding);
   RefuseDoor("File.Create(Text, TextEncoding)");
+}
+
+void File::CreateInStream(const ::agiru::InStream &InStream,
+                          const ::agiru::TextEncoding &Encoding) {
+  static_cast<void>(InStream);
+  static_cast<void>(Encoding);
+  RefuseDoor("File.CreateInStream(InStream, TextEncoding)");
+}
+
+void File::CreateOutStream(const ::agiru::OutStream &OutStream,
+                           const ::agiru::TextEncoding &Encoding) {
+  static_cast<void>(OutStream);
+  static_cast<void>(Encoding);
+  RefuseDoor("File.CreateOutStream(OutStream, TextEncoding)");
 }
 
 void File::CreateInStream(const ::agiru::InStream &InStream) {
@@ -562,7 +449,7 @@ void File::CreateOutStream(const ::agiru::OutStream &OutStream) {
                                 std::string_view DialogTitle,
                                 std::string_view ToFolder,
                                 std::string_view ToFilter,
-                                std::string &ToFile) {
+                                ::agiru::Text<0> &ToFile) {
   static_cast<void>(FromFile);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -575,7 +462,7 @@ void File::CreateOutStream(const ::agiru::OutStream &OutStream) {
                                           std::string_view DialogTitle,
                                           std::string_view ToFolder,
                                           std::string_view ToFilter,
-                                          std::string &ToFile) {
+                                          ::agiru::Text<0> &ToFile) {
   static_cast<void>(InStream);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -660,7 +547,7 @@ void File::Trunc() {
                               std::string_view FromFolder,
                               std::string_view FromFilter,
                               std::string_view FromFile,
-                              std::string &ToFile) {
+                              ::agiru::Text<0> &ToFile) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);
   static_cast<void>(FromFilter);
@@ -678,7 +565,7 @@ void File::Trunc() {
 ::agiru::Boolean File::UploadIntoStream(std::string_view DialogTitle,
                                         std::string_view FromFolder,
                                         std::string_view FromFilter,
-                                        std::string &FromFile,
+                                        ::agiru::Text<0> &FromFile,
                                         ::agiru::InStream &InStream) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);
@@ -1022,7 +909,7 @@ void HttpContent::Clear() {
   RefuseDoor("HttpContent.ReadAs(SecretText)");
 }
 
-::agiru::Boolean HttpContent::ReadAs(std::string &OutputString) {
+::agiru::Boolean HttpContent::ReadAs(::agiru::Text<0> &OutputString) {
   static_cast<void>(OutputString);
   RefuseDoor("HttpContent.ReadAs(Text)");
 }
@@ -1032,20 +919,9 @@ void HttpContent::WriteFrom(const ::agiru::InStream &InStream) {
   RefuseDoor("HttpContent.WriteFrom(InStream)");
 }
 
-void HttpContent::WriteFrom(const ::agiru::SecretText &SecretText) {
-  static_cast<void>(SecretText);
-  RefuseDoor("HttpContent.WriteFrom(SecretText)");
-}
-
 void HttpContent::WriteFrom(std::string_view Text) {
   static_cast<void>(Text);
   RefuseDoor("HttpContent.WriteFrom(Text)");
-}
-
-::agiru::Boolean HttpHeaders::Add(std::string_view Name, const ::agiru::SecretText &Value) {
-  static_cast<void>(Name);
-  static_cast<void>(Value);
-  RefuseDoor("HttpHeaders.Add(Text, SecretText)");
 }
 
 ::agiru::Boolean HttpHeaders::Add(std::string_view Name, std::string_view Value) {
@@ -1095,7 +971,7 @@ void HttpHeaders::Clear() {
   RefuseDoor("HttpHeaders.GetValues(Text, List of [Text])");
 }
 
-void HttpHeaders::Keys() {
+::agiru::List<std::string> HttpHeaders::Keys() {
   RefuseDoor("HttpHeaders.Keys()");
 }
 
@@ -1105,17 +981,14 @@ void HttpHeaders::Keys() {
 }
 
 ::agiru::Boolean HttpHeaders::TryAddWithoutValidation(std::string_view Name,
-                                                      const ::agiru::SecretText &Value) {
-  static_cast<void>(Name);
-  static_cast<void>(Value);
-  RefuseDoor("HttpHeaders.TryAddWithoutValidation(Text, SecretText)");
-}
-
-::agiru::Boolean HttpHeaders::TryAddWithoutValidation(std::string_view Name,
                                                       std::string_view Value) {
   static_cast<void>(Name);
   static_cast<void>(Value);
   RefuseDoor("HttpHeaders.TryAddWithoutValidation(Text, Text)");
+}
+
+::agiru::HttpContent HttpRequestMessage::Content() {
+  RefuseDoor("HttpRequestMessage.Content()");
 }
 
 ::agiru::HttpContent HttpRequestMessage::Content(const ::agiru::HttpContent &SetContent) {
@@ -1129,7 +1002,7 @@ void HttpHeaders::Keys() {
   RefuseDoor("HttpRequestMessage.GetCookie(Text, Cookie)");
 }
 
-void HttpRequestMessage::GetCookieNames() {
+::agiru::List<std::string> HttpRequestMessage::GetCookieNames() {
   RefuseDoor("HttpRequestMessage.GetCookieNames()");
 }
 
@@ -1187,7 +1060,7 @@ std::string HttpRequestMessage::Method(std::string_view NewMethod) {
   RefuseDoor("HttpResponseMessage.GetCookie(Text, Cookie)");
 }
 
-void HttpResponseMessage::GetCookieNames() {
+::agiru::List<std::string> HttpResponseMessage::GetCookieNames() {
   RefuseDoor("HttpResponseMessage.GetCookieNames()");
 }
 
@@ -1245,7 +1118,7 @@ std::string HttpResponseMessage::ReasonPhrase() {
 
 ::agiru::Boolean IsolatedStorage::Get(std::string_view Key,
                                       const ::agiru::DataScope &DataScope,
-                                      std::string &Value) {
+                                      ::agiru::Text<0> &Value) {
   static_cast<void>(Key);
   static_cast<void>(DataScope);
   static_cast<void>(Value);
@@ -1258,19 +1131,10 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.Get(Text, SecretText)");
 }
 
-::agiru::Boolean IsolatedStorage::Get(std::string_view Key, std::string &Value) {
+::agiru::Boolean IsolatedStorage::Get(std::string_view Key, ::agiru::Text<0> &Value) {
   static_cast<void>(Key);
   static_cast<void>(Value);
   RefuseDoor("IsolatedStorage.Get(Text, Text)");
-}
-
-::agiru::Boolean IsolatedStorage::Set(std::string_view Key,
-                                      const ::agiru::SecretText &Value,
-                                      const ::agiru::DataScope &DataScope) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  static_cast<void>(DataScope);
-  RefuseDoor("IsolatedStorage.Set(Text, SecretText, DataScope)");
 }
 
 ::agiru::Boolean IsolatedStorage::Set(std::string_view Key,
@@ -1763,7 +1627,7 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonArray.WriteTo(OutStream)");
 }
 
-::agiru::Boolean JsonArray::WriteTo(std::string &String) {
+::agiru::Boolean JsonArray::WriteTo(::agiru::Text<0> &String) {
   static_cast<void>(String);
   RefuseDoor("JsonArray.WriteTo(Text)");
 }
@@ -1965,7 +1829,7 @@ std::string JsonObject::GetText(std::string_view Key, ::agiru::Boolean DefaultIf
   RefuseDoor("JsonObject.GetTime(Text, Boolean)");
 }
 
-void JsonObject::Keys() {
+::agiru::List<std::string> JsonObject::Keys() {
   RefuseDoor("JsonObject.Keys()");
 }
 
@@ -2101,7 +1965,7 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.SelectTokens(Text, List of [JsonToken])");
 }
 
-void JsonObject::Values() {
+::agiru::List<::agiru::JsonToken> JsonObject::Values() {
   RefuseDoor("JsonObject.Values()");
 }
 
@@ -2110,7 +1974,7 @@ void JsonObject::Values() {
   RefuseDoor("JsonObject.WriteTo(OutStream)");
 }
 
-::agiru::Boolean JsonObject::WriteTo(std::string &String) {
+::agiru::Boolean JsonObject::WriteTo(::agiru::Text<0> &String) {
   static_cast<void>(String);
   RefuseDoor("JsonObject.WriteTo(Text)");
 }
@@ -2120,7 +1984,7 @@ void JsonObject::Values() {
   RefuseDoor("JsonObject.WriteToYaml(OutStream)");
 }
 
-::agiru::Boolean JsonObject::WriteToYaml(std::string &String) {
+::agiru::Boolean JsonObject::WriteToYaml(::agiru::Text<0> &String) {
   static_cast<void>(String);
   RefuseDoor("JsonObject.WriteToYaml(Text)");
 }
@@ -2202,7 +2066,7 @@ std::string JsonToken::Path() {
   RefuseDoor("JsonToken.WriteTo(OutStream)");
 }
 
-::agiru::Boolean JsonToken::WriteTo(std::string &String) {
+::agiru::Boolean JsonToken::WriteTo(::agiru::Text<0> &String) {
   static_cast<void>(String);
   RefuseDoor("JsonToken.WriteTo(Text)");
 }
@@ -2363,7 +2227,7 @@ void JsonValue::SetValueToUndefined() {
   RefuseDoor("JsonValue.WriteTo(OutStream)");
 }
 
-::agiru::Boolean JsonValue::WriteTo(std::string &Data) {
+::agiru::Boolean JsonValue::WriteTo(::agiru::Text<0> &Data) {
   static_cast<void>(Data);
   RefuseDoor("JsonValue.WriteTo(Text)");
 }
@@ -2491,7 +2355,7 @@ std::string NavApp::GetArchiveVersion() {
   RefuseDoor("NavApp.GetArchiveVersion()");
 }
 
-void NavApp::GetCallerCallstackModuleInfos() {
+::agiru::List<::agiru::ModuleInfo> NavApp::GetCallerCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallerCallstackModuleInfos()");
 }
 
@@ -2500,7 +2364,7 @@ void NavApp::GetCallerCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallerModuleInfo(ModuleInfo)");
 }
 
-void NavApp::GetCallstackModuleInfos() {
+::agiru::List<::agiru::ModuleInfo> NavApp::GetCallstackModuleInfos() {
   RefuseDoor("NavApp.GetCallstackModuleInfos()");
 }
 
@@ -2553,7 +2417,7 @@ std::string NavApp::GetResourceAsText(std::string_view ResourceName,
   RefuseDoor("NavApp.IsUnlicensed(Guid)");
 }
 
-void NavApp::ListResources(std::string_view Filter) {
+::agiru::List<std::string> NavApp::ListResources(std::string_view Filter) {
   static_cast<void>(Filter);
   RefuseDoor("NavApp.ListResources(Text)");
 }
@@ -2767,7 +2631,7 @@ std::string TestHttpRequestMessage::Path() {
   RefuseDoor("TestHttpRequestMessage.Path()");
 }
 
-void TestHttpRequestMessage::QueryParameters() {
+::agiru::Dictionary<std::string, std::string> TestHttpRequestMessage::QueryParameters() {
   RefuseDoor("TestHttpRequestMessage.QueryParameters()");
 }
 
@@ -3134,7 +2998,7 @@ std::string XmlAttribute::Value(std::string_view NewValue) {
   RefuseDoor("XmlAttribute.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlAttribute::WriteTo(std::string &Text) {
+::agiru::Boolean XmlAttribute::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlAttribute.WriteTo(Text)");
 }
@@ -3147,7 +3011,7 @@ std::string XmlAttribute::Value(std::string_view NewValue) {
 }
 
 ::agiru::Boolean XmlAttribute::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                       std::string &Text) {
+                                       ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlAttribute.WriteTo(XmlWriteOptions, Text)");
@@ -3292,7 +3156,7 @@ std::string XmlCData::Value(std::string_view NewValue) {
   RefuseDoor("XmlCData.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlCData::WriteTo(std::string &Text) {
+::agiru::Boolean XmlCData::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlCData.WriteTo(Text)");
 }
@@ -3305,7 +3169,7 @@ std::string XmlCData::Value(std::string_view NewValue) {
 }
 
 ::agiru::Boolean XmlCData::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                   std::string &Text) {
+                                   ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlCData.WriteTo(XmlWriteOptions, Text)");
@@ -3389,7 +3253,7 @@ std::string XmlComment::Value(std::string_view NewValue) {
   RefuseDoor("XmlComment.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlComment::WriteTo(std::string &Text) {
+::agiru::Boolean XmlComment::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlComment.WriteTo(Text)");
 }
@@ -3402,7 +3266,7 @@ std::string XmlComment::Value(std::string_view NewValue) {
 }
 
 ::agiru::Boolean XmlComment::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                     std::string &Text) {
+                                     ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlComment.WriteTo(XmlWriteOptions, Text)");
@@ -3502,7 +3366,7 @@ std::string XmlDeclaration::Version(std::string_view NewValue) {
   RefuseDoor("XmlDeclaration.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlDeclaration::WriteTo(std::string &Text) {
+::agiru::Boolean XmlDeclaration::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlDeclaration.WriteTo(Text)");
 }
@@ -3515,7 +3379,7 @@ std::string XmlDeclaration::Version(std::string_view NewValue) {
 }
 
 ::agiru::Boolean XmlDeclaration::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                         std::string &Text) {
+                                         ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlDeclaration.WriteTo(XmlWriteOptions, Text)");
@@ -3712,7 +3576,7 @@ void XmlDocument::RemoveNodes() {
   RefuseDoor("XmlDocument.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlDocument::WriteTo(std::string &Text) {
+::agiru::Boolean XmlDocument::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlDocument.WriteTo(Text)");
 }
@@ -3725,7 +3589,7 @@ void XmlDocument::RemoveNodes() {
 }
 
 ::agiru::Boolean XmlDocument::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                      std::string &Text) {
+                                      ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlDocument.WriteTo(XmlWriteOptions, Text)");
@@ -3781,12 +3645,12 @@ void XmlDocument::RemoveNodes() {
   RefuseDoor("XmlDocumentType.GetDocument(XmlDocument)");
 }
 
-::agiru::Boolean XmlDocumentType::GetInternalSubset(std::string &Result) {
+::agiru::Boolean XmlDocumentType::GetInternalSubset(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlDocumentType.GetInternalSubset(Text)");
 }
 
-::agiru::Boolean XmlDocumentType::GetName(std::string &Result) {
+::agiru::Boolean XmlDocumentType::GetName(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlDocumentType.GetName(Text)");
 }
@@ -3796,12 +3660,12 @@ void XmlDocument::RemoveNodes() {
   RefuseDoor("XmlDocumentType.GetParent(XmlElement)");
 }
 
-::agiru::Boolean XmlDocumentType::GetPublicId(std::string &Result) {
+::agiru::Boolean XmlDocumentType::GetPublicId(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlDocumentType.GetPublicId(Text)");
 }
 
-::agiru::Boolean XmlDocumentType::GetSystemId(std::string &Result) {
+::agiru::Boolean XmlDocumentType::GetSystemId(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlDocumentType.GetSystemId(Text)");
 }
@@ -3872,7 +3736,7 @@ XmlDocumentType::SelectSingleNode(std::string_view XPath,
   RefuseDoor("XmlDocumentType.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlDocumentType::WriteTo(std::string &Text) {
+::agiru::Boolean XmlDocumentType::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlDocumentType.WriteTo(Text)");
 }
@@ -3885,7 +3749,7 @@ XmlDocumentType::SelectSingleNode(std::string_view XPath,
 }
 
 ::agiru::Boolean XmlDocumentType::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                          std::string &Text) {
+                                          ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlDocumentType.WriteTo(XmlWriteOptions, Text)");
@@ -3990,7 +3854,8 @@ XmlDocumentType::SelectSingleNode(std::string_view XPath,
   RefuseDoor("XmlElement.GetDocument(XmlDocument)");
 }
 
-::agiru::Boolean XmlElement::GetNamespaceOfPrefix(std::string_view Prefix, std::string &Result) {
+::agiru::Boolean XmlElement::GetNamespaceOfPrefix(std::string_view Prefix,
+                                                  ::agiru::Text<0> &Result) {
   static_cast<void>(Prefix);
   static_cast<void>(Result);
   RefuseDoor("XmlElement.GetNamespaceOfPrefix(Text, Text)");
@@ -4001,7 +3866,8 @@ XmlDocumentType::SelectSingleNode(std::string_view XPath,
   RefuseDoor("XmlElement.GetParent(XmlElement)");
 }
 
-::agiru::Boolean XmlElement::GetPrefixOfNamespace(std::string_view Namespace, std::string &Result) {
+::agiru::Boolean XmlElement::GetPrefixOfNamespace(std::string_view Namespace,
+                                                  ::agiru::Text<0> &Result) {
   static_cast<void>(Namespace);
   static_cast<void>(Result);
   RefuseDoor("XmlElement.GetPrefixOfNamespace(Text, Text)");
@@ -4127,7 +3993,7 @@ void XmlElement::SetAttribute(std::string_view LocalName,
   RefuseDoor("XmlElement.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlElement::WriteTo(std::string &Text) {
+::agiru::Boolean XmlElement::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlElement.WriteTo(Text)");
 }
@@ -4140,7 +4006,7 @@ void XmlElement::SetAttribute(std::string_view LocalName,
 }
 
 ::agiru::Boolean XmlElement::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                     std::string &Text) {
+                                     ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlElement.WriteTo(XmlWriteOptions, Text)");
@@ -4151,7 +4017,7 @@ std::string XmlNameTable::Add(std::string_view Key) {
   RefuseDoor("XmlNameTable.Add(Text)");
 }
 
-::agiru::Boolean XmlNameTable::Get(std::string_view Key, std::string &Result) {
+::agiru::Boolean XmlNameTable::Get(std::string_view Key, ::agiru::Text<0> &Result) {
   static_cast<void>(Key);
   static_cast<void>(Result);
   RefuseDoor("XmlNameTable.Get(Text, Text)");
@@ -4169,13 +4035,13 @@ void XmlNamespaceManager::AddNamespace(std::string_view Prefix, std::string_view
 }
 
 ::agiru::Boolean XmlNamespaceManager::LookupNamespace(std::string_view Prefix,
-                                                      std::string &Result) {
+                                                      ::agiru::Text<0> &Result) {
   static_cast<void>(Prefix);
   static_cast<void>(Result);
   RefuseDoor("XmlNamespaceManager.LookupNamespace(Text, Text)");
 }
 
-::agiru::Boolean XmlNamespaceManager::LookupPrefix(std::string_view Uri, std::string &Result) {
+::agiru::Boolean XmlNamespaceManager::LookupPrefix(std::string_view Uri, ::agiru::Text<0> &Result) {
   static_cast<void>(Uri);
   static_cast<void>(Result);
   RefuseDoor("XmlNamespaceManager.LookupPrefix(Text, Text)");
@@ -4336,7 +4202,7 @@ void XmlNamespaceManager::RemoveNamespace(std::string_view Prefix, std::string_v
   RefuseDoor("XmlNode.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlNode::WriteTo(std::string &Text) {
+::agiru::Boolean XmlNode::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlNode.WriteTo(Text)");
 }
@@ -4348,7 +4214,8 @@ void XmlNamespaceManager::RemoveNamespace(std::string_view Prefix, std::string_v
   RefuseDoor("XmlNode.WriteTo(XmlWriteOptions, OutStream)");
 }
 
-::agiru::Boolean XmlNode::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text) {
+::agiru::Boolean XmlNode::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
+                                  ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlNode.WriteTo(XmlWriteOptions, Text)");
@@ -4385,7 +4252,7 @@ void XmlNamespaceManager::RemoveNamespace(std::string_view Prefix, std::string_v
   RefuseDoor("XmlProcessingInstruction.Create(Text, Text)");
 }
 
-::agiru::Boolean XmlProcessingInstruction::GetData(std::string &Result) {
+::agiru::Boolean XmlProcessingInstruction::GetData(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlProcessingInstruction.GetData(Text)");
 }
@@ -4400,7 +4267,7 @@ void XmlNamespaceManager::RemoveNamespace(std::string_view Prefix, std::string_v
   RefuseDoor("XmlProcessingInstruction.GetParent(XmlElement)");
 }
 
-::agiru::Boolean XmlProcessingInstruction::GetTarget(std::string &Result) {
+::agiru::Boolean XmlProcessingInstruction::GetTarget(::agiru::Text<0> &Result) {
   static_cast<void>(Result);
   RefuseDoor("XmlProcessingInstruction.GetTarget(Text)");
 }
@@ -4463,7 +4330,7 @@ XmlProcessingInstruction::SelectSingleNode(std::string_view XPath,
   RefuseDoor("XmlProcessingInstruction.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlProcessingInstruction::WriteTo(std::string &Text) {
+::agiru::Boolean XmlProcessingInstruction::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlProcessingInstruction.WriteTo(Text)");
 }
@@ -4476,7 +4343,7 @@ XmlProcessingInstruction::SelectSingleNode(std::string_view XPath,
 }
 
 ::agiru::Boolean XmlProcessingInstruction::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
-                                                   std::string &Text) {
+                                                   ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlProcessingInstruction.WriteTo(XmlWriteOptions, Text)");
@@ -4565,7 +4432,7 @@ std::string XmlText::Value(std::string_view NewValue) {
   RefuseDoor("XmlText.WriteTo(OutStream)");
 }
 
-::agiru::Boolean XmlText::WriteTo(std::string &Text) {
+::agiru::Boolean XmlText::WriteTo(::agiru::Text<0> &Text) {
   static_cast<void>(Text);
   RefuseDoor("XmlText.WriteTo(Text)");
 }
@@ -4577,7 +4444,8 @@ std::string XmlText::Value(std::string_view NewValue) {
   RefuseDoor("XmlText.WriteTo(XmlWriteOptions, OutStream)");
 }
 
-::agiru::Boolean XmlText::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text) {
+::agiru::Boolean XmlText::WriteTo(const ::agiru::XmlWriteOptions &WriteOptions,
+                                  ::agiru::Text<0> &Text) {
   static_cast<void>(WriteOptions);
   static_cast<void>(Text);
   RefuseDoor("XmlText.WriteTo(XmlWriteOptions, Text)");
@@ -4603,6 +4471,163 @@ std::string XmlText::Value(std::string_view NewValue) {
 
 ::agiru::RecordRef KeyRef::Record() {
   RefuseDoor("KeyRef.Record()");
+}
+
+std::string SessionSettings::Company() {
+  RefuseDoor("SessionSettings.Company()");
+}
+
+::agiru::Integer SessionSettings::LanguageId() {
+  RefuseDoor("SessionSettings.LanguageId()");
+}
+
+::agiru::Integer SessionSettings::LocaleId() {
+  RefuseDoor("SessionSettings.LocaleId()");
+}
+
+::agiru::Guid SessionSettings::ProfileAppId() {
+  RefuseDoor("SessionSettings.ProfileAppId()");
+}
+
+std::string SessionSettings::ProfileId() {
+  RefuseDoor("SessionSettings.ProfileId()");
+}
+
+::agiru::Boolean SessionSettings::ProfileSystemScope() {
+  RefuseDoor("SessionSettings.ProfileSystemScope()");
+}
+
+std::string SessionSettings::TimeZone() {
+  RefuseDoor("SessionSettings.TimeZone()");
+}
+
+::agiru::Boolean File::CreateTempFile() {
+  RefuseDoor("File.CreateTempFile()");
+}
+
+::agiru::Boolean File::TextMode() {
+  RefuseDoor("File.TextMode()");
+}
+
+::agiru::Boolean File::WriteMode() {
+  RefuseDoor("File.WriteMode()");
+}
+
+std::string XmlDeclaration::Encoding() {
+  RefuseDoor("XmlDeclaration.Encoding()");
+}
+
+std::string XmlDeclaration::Standalone() {
+  RefuseDoor("XmlDeclaration.Standalone()");
+}
+
+std::string XmlDeclaration::Version() {
+  RefuseDoor("XmlDeclaration.Version()");
+}
+
+::agiru::Boolean NavApp::IsUnlicensed() {
+  RefuseDoor("NavApp.IsUnlicensed()");
+}
+
+::agiru::Boolean TextBuilder::AppendLine() {
+  RefuseDoor("TextBuilder.AppendLine()");
+}
+
+::agiru::Integer TextBuilder::Capacity() {
+  RefuseDoor("TextBuilder.Capacity()");
+}
+
+::agiru::Boolean DataTransfer::UpdateAuditFields() {
+  RefuseDoor("DataTransfer.UpdateAuditFields()");
+}
+
+::agiru::Boolean Dialog::HideSubsequentDialogs() {
+  RefuseDoor("Dialog.HideSubsequentDialogs()");
+}
+
+std::string FilterPageBuilder::PageCaption() {
+  RefuseDoor("FilterPageBuilder.PageCaption()");
+}
+
+::agiru::Duration HttpClient::Timeout() {
+  RefuseDoor("HttpClient.Timeout()");
+}
+
+std::string HttpRequestMessage::Method() {
+  RefuseDoor("HttpRequestMessage.Method()");
+}
+
+::agiru::XmlNameTable XmlNamespaceManager::NameTable() {
+  RefuseDoor("XmlNamespaceManager.NameTable()");
+}
+
+::agiru::Boolean XmlReadOptions::PreserveWhitespace() {
+  RefuseDoor("XmlReadOptions.PreserveWhitespace()");
+}
+
+::agiru::Boolean XmlWriteOptions::PreserveWhitespace() {
+  RefuseDoor("XmlWriteOptions.PreserveWhitespace()");
+}
+
+std::string XmlAttribute::Value() {
+  RefuseDoor("XmlAttribute.Value()");
+}
+
+std::string XmlCData::Value() {
+  RefuseDoor("XmlCData.Value()");
+}
+
+std::string XmlComment::Value() {
+  RefuseDoor("XmlComment.Value()");
+}
+
+std::string XmlText::Value() {
+  RefuseDoor("XmlText.Value()");
+}
+
+::agiru::Boolean TestHttpResponseMessage::IsSuccessfulRequest() {
+  RefuseDoor("TestHttpResponseMessage.IsSuccessfulRequest()");
+}
+
+::agiru::Integer TestHttpResponseMessage::HttpStatusCode() {
+  RefuseDoor("TestHttpResponseMessage.HttpStatusCode()");
+}
+
+::agiru::Boolean TestHttpResponseMessage::IsBlockedByEnvironment() {
+  RefuseDoor("TestHttpResponseMessage.IsBlockedByEnvironment()");
+}
+
+std::string TestHttpResponseMessage::ReasonPhrase() {
+  RefuseDoor("TestHttpResponseMessage.ReasonPhrase()");
+}
+
+::agiru::Boolean File::GetStamp(std::string_view Name, ::agiru::Date &Date) {
+  static_cast<void>(Name);
+  static_cast<void>(Date);
+  RefuseDoor("File.GetStamp()");
+}
+
+::agiru::BigInteger NumberSequence::Range(std::string_view Name,
+                                          ::agiru::Integer Count,
+                                          ::agiru::BigInteger &Increment) {
+  static_cast<void>(Name);
+  static_cast<void>(Count);
+  static_cast<void>(Increment);
+  RefuseDoor("NumberSequence.Range()");
+}
+
+::agiru::Guid TaskScheduler::CreateTask(::agiru::Integer CodeunitId,
+                                        ::agiru::Integer FailureCodeunitId,
+                                        ::agiru::Boolean IsReady) {
+  static_cast<void>(CodeunitId);
+  static_cast<void>(FailureCodeunitId);
+  static_cast<void>(IsReady);
+  RefuseDoor("TaskScheduler.CreateTask()");
+}
+
+::agiru::Boolean File::GetStamp(std::string_view Name) {
+  static_cast<void>(Name);
+  RefuseDoor("File.GetStamp()");
 }
 
 }

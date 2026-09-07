@@ -14,6 +14,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -174,6 +175,12 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlAttribute.Value()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlAttribute.Value([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string Value();
+
   std::string Value(std::string_view NewValue);
 
   /// \brief AL `XmlAttribute.WriteTo(OutStream)`. Serializes and saves the current node to the
@@ -188,7 +195,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &Text);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &Text);
 
   /// \brief AL `XmlAttribute.WriteTo(XmlWriteOptions, OutStream)`. Serializes and saves the current
   /// node to the given variable.
@@ -205,7 +212,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text);
+  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
 };
 
 }

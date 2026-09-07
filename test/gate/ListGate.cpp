@@ -81,8 +81,9 @@ void RangesAreTakenAndRemovedByPositionAndCount() {
   CHECK_TRUE("beginning at the one-based index", middle.Get(1) == 20);
 
   List<int> shortened = Of(kFive);
-  shortened.RemoveRange(2, 2);
-  CHECK_TRUE("RemoveRange takes that many out", shortened.Count() == 3);
+  CHECK_TRUE("RemoveRange answers true for a range that is inside the list",
+             shortened.RemoveRange(2, 2));
+  CHECK_TRUE("and takes that many out", shortened.Count() == 3);
   CHECK_TRUE("and closes the gap", shortened.Get(2) == 40);
 
   std::string said;
@@ -121,6 +122,13 @@ void ADictionaryIsOrderedByItsKeys() {
   CHECK_TRUE("Remove reports what it removed", map.Remove("mango"));
   CHECK_TRUE("and says so when there is nothing", !map.Remove("mango"));
   CHECK_TRUE("Count follows", map.Count() == 2);
+
+  // `dictionary-set-method.md`: the return is "true if the Dictionary contained a value
+  // associated with the given key that was replaced with the new value, otherwise false".
+  agiru::Dictionary<std::string, int> answered;
+  CHECK_TRUE("Set reports false when it ADDED the key", !answered.Set("apple", 1));
+  CHECK_TRUE("and true when it REPLACED a value", answered.Set("apple", 2));
+  CHECK_TRUE("which is the value that stands afterwards", answered.Get("apple") == 2);
 }
 
 } // namespace

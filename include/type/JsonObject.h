@@ -17,6 +17,7 @@
 #include "type/RecordId.h"
 #include "type/SecretText.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -175,7 +176,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `JsonArray`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonArray GetArray(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::JsonArray GetArray(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetBigInteger(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a BigInteger.
@@ -183,7 +184,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::BigInteger GetBigInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::BigInteger GetBigInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetBoolean(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a Boolean.
@@ -191,7 +192,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean GetBoolean(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Boolean GetBoolean(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetByte(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Byte.
@@ -199,7 +200,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Byte`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Byte GetByte(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Byte GetByte(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetChar(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Char.
@@ -207,7 +208,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Char`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Char GetChar(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Char GetChar(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetDate(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Date.
@@ -215,7 +216,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Date`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Date GetDate(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Date GetDate(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetDateTime(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a DateTime.
@@ -223,7 +224,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `DateTime`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::DateTime GetDateTime(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::DateTime GetDateTime(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetDecimal(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as an Decimal.
@@ -231,7 +232,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Decimal GetDecimal(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Decimal GetDecimal(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetDuration(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a Duration.
@@ -239,7 +240,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Duration`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Duration GetDuration(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Duration GetDuration(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetInteger(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as an Integer.
@@ -247,7 +248,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer GetInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Integer GetInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetObject(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as a JsonObject.
@@ -255,7 +256,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `JsonObject`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::JsonObject GetObject(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::JsonObject GetObject(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetOption(Text, Boolean)`. Retrieves the value of a property with a
   /// given key from a JsonObject as an Option.
@@ -263,7 +264,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Option`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer GetOption(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Integer GetOption(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetText(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as Text.
@@ -271,7 +272,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  std::string GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetTime(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Time.
@@ -279,11 +280,11 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Time`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Time GetTime(std::string_view Key, ::agiru::Boolean DefaultIfNotFound);
+  ::agiru::Time GetTime(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.Keys()`. Gets a set of keys of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Keys();
+  [[nodiscard]] ::agiru::List<std::string> Keys();
 
   /// \brief AL `JsonObject.Path()`. Retrieves the JSON path of the object relative to the root of
   /// its containing tree.
@@ -463,7 +464,7 @@ public:
 
   /// \brief AL `JsonObject.Values()`. Gets a set of values of the JsonObject.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Values();
+  [[nodiscard]] ::agiru::List<::agiru::JsonToken> Values();
 
   /// \brief AL `JsonObject.WriteTo(OutStream)`. Serializes and writes the JSON data of the
   /// JsonObject to a given OutStream object.
@@ -477,7 +478,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &String);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &String);
 
   /// \brief AL `JsonObject.WriteToYaml(OutStream)`. Serializes and writes the content of the
   /// JsonObject as YAML text to a given OutStream object.
@@ -491,7 +492,7 @@ public:
   /// \param String The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteToYaml(std::string &String);
+  ::agiru::Boolean WriteToYaml(::agiru::Text<0> &String);
 
   /// \brief AL `JsonObject.WriteWithSecretsTo(Dictionary of [Text, SecretText], SecretText)`.
   /// Replaces the placeholder values based on their paths with the provided secrets and then

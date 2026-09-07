@@ -1,8 +1,10 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "meta/Subtype.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
+#include "type/Integer.h"
 
 #include <cstdint>
 #include <string_view>
@@ -31,19 +33,6 @@ namespace agiru {
 /// The generator specialises this beside the class, so that the class itself carries nothing but
 /// what AL wrote: its procedures and its variables. The number and the name live here, the same way
 /// a table's field and key tables do.
-/// \brief AL `Subtype` on a codeunit -- what the object is FOR.
-///
-/// `devenv-subtype-codeunit-property.md` gives five values and two of them decide how the object is
-/// run: a `Test` codeunit HOLDS test methods, a `TestRunner` codeunit RUNS test codeunits and
-/// carries `OnBeforeTestRun`/`OnAfterTestRun` instead.
-enum class Subtype : std::uint8_t {
-  Normal,     ///< The default: a general-purpose codeunit.
-  Test,       ///< Holds `[Test]` methods.
-  TestRunner, ///< Runs test codeunits.
-  Upgrade,    ///< Holds data-upgrade triggers.
-  Install,    ///< Holds extension-installation triggers.
-};
-
 template <typename T> struct CodeunitTraits;
 
 /// \brief One codeunit held by another, created the first time it is used.
@@ -80,6 +69,54 @@ public:
   /// \return This handle.
   Instance &operator=(const Instance &) {
     Release();
+    return *this;
+  }
+
+  /// \brief Assigns a VALUE into the instance, which is what AL writes for a record variable.
+  /// \param value What to hold.
+  /// \return This handle.
+  /// \note AL SPELLS BOTH SIDES THE SAME. `CurrentAllProfile := AllProfile` is an assignment
+  ///       between two variables of one table, and only one of them is held through an `Instance`
+  ///       -- so the handle has to take the bare value or the generated line does not compile.
+  Instance &operator=(const T &value) {
+    *operator->() = value;
+    return *this;
+  }
+
+  /// \brief AL `TempRec := Rec` between two records a codeunit holds by handle: the records
+  ///        assign, the handles stay.
+  /// \tparam U The other handle's record type.
+  /// \param other The other handle.
+  /// \brief AL assigns a record to a variable of a DERIVED record type -- `TempItem := Item`,
+  ///        where the left is `Record Item temporary`.
+  /// \tparam U The base record's type.
+  /// \param value The record, whose fields are copied.
+  /// \return This handle.
+  ///
+  /// \note TEMPORARINESS IS NOT PART OF THE VALUE. The assignment copies the FIELDS, and the
+  ///       left-hand side stays as temporary as it was declared.
+  ///
+  /// \warning THE CONSTRAINT NAMES ONLY `U`, NEVER `T`. A constraint that asked whether `T`
+  ///          derives from `U` is checked when the CONTAINING class declares its own copy
+  ///          assignment, and at that point `T` is often only forward-declared -- which is a hard
+  ///          error inside `std::is_base_of` rather than a substitution failure (measured
+  ///          2026-09-05 over eight tables). Nor does it name `TableTraits`, whose partial
+  ///          specialisation over a handle instantiates the traits of what the handle holds --
+  ///          undefined whenever that record's header is not in this translation unit. The
+  ///          record's own `kId` is the one thing every table declares and nothing chases.
+  template <typename U>
+    requires(!std::same_as<U, T>) && requires {
+      { U::kId } -> std::convertible_to<TableId>;
+    }
+  Instance &operator=(const U &value) {
+    static_cast<U &>(*operator->()) = value;
+    return *this;
+  }
+
+  template <typename U>
+    requires(!std::same_as<U, T>)
+  Instance &operator=(Instance<U> &other) {
+    *operator->() = static_cast<U &>(other);
     return *this;
   }
 
@@ -159,8 +196,35 @@ private:
 ///
 /// \note The base holds NO data, for the same reason `Table` holds none: a generated codeunit is a
 ///       plain class whose members are exactly the variables its `.al` declares.
+/// \brief AL `X[i]` on an array a codeunit holds by handle -- `array[2] of Record` as a global is
+///        an `Instance<AlArray<...>>`, and the one `At` spelling reaches through it.
+/// \tparam C     The array type held.
+/// \tparam Index The index type.
+/// \param held  The handle.
+/// \param index The ONE-BASED position.
+/// \return The element.
+template <typename C, typename Index>
+[[nodiscard]] decltype(auto) At(Instance<C> &held, Index index) {
+  return (*held)[index];
+}
+
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
-template <typename Derived> class Codeunit {
+template <typename Derived = void> class Codeunit {
+public:
+  /// \brief AL assigns a `Variant` holding a codeunit to a codeunit variable -- the platform's
+  ///        `OnRunPreview` hands the subscriber that way.
+  /// \tparam V The Variant's type, taken as a template because `Variant` is a door type this base
+  ///         does not include.
+  /// \param held The Variant.
+  /// \return This codeunit.
+  /// \throws Error always -- a codeunit instance does not travel in a Variant here (board:0035).
+  template <typename V>
+    requires requires(const V &value) { value.IsCodeunit(); }
+  Codeunit &operator=(const V &held) {
+    static_cast<void>(held);
+    throw Error("A Variant holding a codeunit cannot be assigned yet (board:0035)");
+  }
+
 public:
   /// \brief The codeunit's AL number.
   /// \return The number AL declared.
@@ -228,6 +292,27 @@ public:
 
 private:
   friend Derived;
+};
+
+/// \brief AL `Codeunit` with no object in reach -- the platform's `Codeunit.Run(Id, Rec)`.
+///
+/// \note THE `<>` IS THE SAME VISIBLE DEVIATION `Option<>` AND `Enum<>` CARRY: C++ cannot spell a
+///       class template with no arguments as a type. What it names is the platform half of the
+///       type -- running a codeunit BY NUMBER, which needs the catalogue (board:0038).
+template <> class Codeunit<void> {
+public:
+  /// \brief AL `Codeunit.Run(Integer [, Record])` -- runs a codeunit by its number.
+  /// \tparam Arguments The record handed to `OnRun`, if any.
+  /// \param Number The codeunit's AL number.
+  /// \param arguments The record.
+  /// \return Never.
+  /// \throws Error always -- reaching a codeunit by number needs the catalogue (board:0038).
+  template <typename... Arguments>
+  static bool Run(::agiru::Integer Number, Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Codeunit.Run(" + std::to_string(Number) +
+                ") by number needs the codeunit catalogue (board:0038)");
+  }
 };
 
 }

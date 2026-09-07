@@ -141,14 +141,17 @@ public:
   /// \brief AL `List.RemoveRange(Index, Count)`.
   /// \param index The one-based position of the first element to remove.
   /// \param count How many.
+  /// \return True; a range that is not valid refuses instead of answering false, which is the
+  ///         discard half of AL's value context and the half board:0028 owns.
   /// \throws Error when the range is not entirely inside the list.
-  void RemoveRange(Integer index, Integer count) {
+  Boolean RemoveRange(Integer index, Integer count) {
     if (count < 0 || !Inside(index) ||
         static_cast<std::size_t>(index) + static_cast<std::size_t>(count) > values_.size() + 1) {
       Refuse(index);
     }
     const auto first = values_.begin() + (static_cast<std::ptrdiff_t>(index) - 1);
     values_.erase(first, first + static_cast<std::ptrdiff_t>(count));
+    return true;
   }
 
   /// \brief AL `List.GetRange(Index, Count)`.
@@ -176,6 +179,19 @@ public:
 
   /// \brief The elements, for a `foreach`.
   /// \return An iterator to the first.
+  /// \brief The first element, for AL's `foreach`.
+  /// \return The iterator.
+  ///
+  /// \note AL'S `foreach` HANDS THE ELEMENT AND NOT A CONST VIEW OF IT: a body that calls a
+  ///       member on the loop variable -- `CurrentFile.CreateInStream(...)` -- needs one it can
+  ///       call a non-const method on, and AL's own rule that writing it does not write the list
+  ///       back is about the LIST, not about constness.
+  [[nodiscard]] auto begin() { return values_.begin(); }
+
+  /// \brief The last element, for AL's `foreach`.
+  /// \return The iterator.
+  [[nodiscard]] auto end() { return values_.end(); }
+
   [[nodiscard]] auto begin() const { return values_.begin(); }
 
   /// \brief The end of the elements, for a `foreach`.

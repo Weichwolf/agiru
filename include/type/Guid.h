@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/StringValue.h"
+
 #include <array>
 #include <compare>
 #include <cstddef>
@@ -56,7 +58,7 @@ public:
   ///       field in a key, because they are partially sequential instead of fully random." The
   ///       leading 48 bits are a millisecond timestamp and the rest is random -- the version 7
   ///       layout -- which is what gives a key inserted in creation order a rising prefix.
-  [[nodiscard]] static Guid CreateSequential();
+  [[nodiscard]] static Guid CreateSequentialGuid();
 
   /// \brief Reads the standard textual representation.
   ///
@@ -74,6 +76,13 @@ public:
   ///       A cast here would be a deviation the reader has to know about, for a conversion the
   ///       language performs silently.
   Guid(std::string_view text) : Guid(FromText(text)) {}
+
+  /// \brief A GUID from a string LITERAL -- `exit('bf856162-…')` from a procedure returning Guid.
+  /// \param text The literal.
+  /// \note A SECOND CONSTRUCTOR RATHER THAN A CAST AT THE CALL SITE: a literal reaches
+  ///       `std::string_view` by one user-defined conversion and `Guid` by another, and C++ allows
+  ///       only one of those in an implicit conversion sequence.
+  Guid(const char *text) : Guid(std::string_view(text)) {}
 
   /// \return True when every byte is zero, which is AL's empty Guid.
   [[nodiscard]] constexpr bool IsNull() const {
@@ -118,7 +127,7 @@ private:
 ///       gain one: a Guid is 16 bytes and its text is 38, so a conversion operator would need
 ///       storage on every Guid, and a Guid sits in every record as `SystemId`. The operator carries
 ///       it instead, where the text is actually wanted.
-[[nodiscard]] inline std::string operator+(const std::string &left, const Guid &right) {
+[[nodiscard]] inline std::string operator+(const ::agiru::Text<0> &left, const Guid &right) {
   return left + right.ToText();
 }
 

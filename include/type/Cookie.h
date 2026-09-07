@@ -51,7 +51,7 @@ public:
   /// \param Name The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Name(std::string_view Name);
+  std::string Name(std::string_view Name = {});
 
   /// \brief AL `Cookie.Path()`. The path of the cookie. It indicates the path that must exist in
   /// the request URL to send the cookie.
@@ -69,7 +69,7 @@ public:
   /// \param Value The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Value(std::string_view Value);
+  std::string Value(std::string_view Value = {});
 };
 
 }

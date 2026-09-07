@@ -19,6 +19,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -26,10 +27,15 @@ namespace agiru::gen {
 
 namespace {
 
-bool IsPublisher(const al::ProcedureDecl &procedure) {
-  return al::HasAttribute(procedure, "IntegrationEvent") ||
-         al::HasAttribute(procedure, "BusinessEvent") ||
-         al::HasAttribute(procedure, "InternalEvent");
+bool SameName(std::string_view a, std::string_view b) {
+  if (a.size() != b.size()) { return false; }
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i]))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 std::string TableNoOf(const al::CodeunitObject &unit) {
@@ -58,9 +64,36 @@ std::string SubtypeOf(const al::CodeunitObject &unit) {
   return "Normal";
 }
 
-bool IsTestCodeunit(const al::CodeunitObject &unit) {
-  const al::Property *subtype = al::Find(unit.properties, "Subtype");
-  return subtype != nullptr && LowerKey(subtype->text) == "test";
+std::string ScopeGuardsOf(const al::ProcedureDecl &procedure) {
+  std::string out;
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.starts_with("commitbehavior")) {
+      const bool error = lowered.find("error") != std::string::npos;
+      out += "  const ::agiru::CommitScope Commit_Block{::agiru::CommitBehavior::";
+      out += error ? "Error" : "Ignore";
+      out += "};\n";
+    }
+    if (lowered.starts_with("errorbehavior")) {
+      out += "  const ::agiru::ErrorScope Error_Block{::agiru::ErrorBehavior::Collect};\n";
+    }
+  }
+  return out;
+}
+
+std::string SecurityFilteringOf(const al::VarDecl &declared) {
+  if (TypeName(declared.type) != "Record") { return {}; }
+  for (const std::string &attribute : declared.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("securityfiltering") == std::string::npos) { continue; }
+    for (const std::string_view member : {"ignored", "validated", "filtered", "disallowed"}) {
+      if (lowered.find(member) == std::string::npos) { continue; }
+      std::string named(member);
+      named[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(named[0])));
+      return "::agiru::SecurityFilter::" + named;
+    }
+  }
+  return {};
 }
 
 std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
@@ -72,6 +105,29 @@ std::string TransactionModelOf(const al::ProcedureDecl &procedure) {
     return "TransactionModel::AutoRollback";
   }
   return "{}";
+}
+
+std::string PermissionsOf(const al::CodeunitObject &unit, const al::ProcedureDecl &procedure) {
+  const auto named = [](const std::string &lowered) -> std::string {
+    if (lowered.find("nonrestrictive") != std::string::npos) {
+      return "TestPermissions::NonRestrictive";
+    }
+    if (lowered.find("disabled") != std::string::npos) { return "TestPermissions::Disabled"; }
+    if (lowered.find("restrictive") != std::string::npos) { return "TestPermissions::Restrictive"; }
+    return {};
+  };
+  const al::Property *declared = al::Find(unit.properties, "TestPermissions");
+  const std::string unitValue =
+      declared == nullptr ? std::string{} : named(LowerKey(declared->text));
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("testpermissions") == std::string::npos) { continue; }
+    if (lowered.find("inheritfromtestcodeunit") != std::string::npos) { break; }
+    const std::string method = named(lowered);
+    if (!method.empty()) { return method; }
+    break;
+  }
+  return unitValue.empty() ? "TestPermissions::Restrictive" : unitValue;
 }
 
 bool IsTest(const al::ProcedureDecl &procedure) {
@@ -93,10 +149,212 @@ bool DeclaresOnRun(const al::CodeunitObject &unit) {
   });
 }
 
+}
+
+std::string RaisingBody(const al::ProcedureDecl &procedure,
+                        std::string_view kind,
+                        const std::string &objectId,
+                        const std::string &objectName) {
+  std::string out = "  static constexpr std::array<std::string_view, " +
+                    std::to_string(procedure.parameters.size()) + "> kNames{";
+  for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
+    if (i != 0) { out += ", "; }
+    out += Literal(procedure.parameters[i].name);
+  }
+  out += "};\n  ::agiru::detail::RaiseEvent(::agiru::" + std::string(kind) + ", " + objectId +
+         ", " + objectName + ", " + Literal(procedure.name) + ", kNames";
+  for (const al::VarDecl &parameter : procedure.parameters) {
+    out += ", " + Identifier(parameter.name);
+  }
+  return out + ");\n";
+}
+
+bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
+                      const std::vector<al::ProcedureDecl> &procedures) {
+  const auto option = [](const al::VarDecl &declared) {
+    return TypeName(declared.type) == "Option" && !declared.members.empty();
+  };
+  if (std::ranges::any_of(variables, option)) { return true; }
+  return std::ranges::any_of(procedures, [&option](const al::ProcedureDecl &procedure) {
+    return std::ranges::any_of(procedure.parameters, option) ||
+           std::ranges::any_of(procedure.variables, option) || option(procedure.returned);
+  });
+}
+
+bool IsTestCodeunit(const al::CodeunitObject &unit) {
+  const al::Property *subtype = al::Find(unit.properties, "Subtype");
+  return subtype != nullptr && LowerKey(subtype->text) == "test";
+}
+
+bool IsTryFunction(const al::ProcedureDecl &procedure) {
+  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
+    return LowerKey(attribute) == "tryfunction";
+  });
+}
+
+bool IsPublisher(const al::ProcedureDecl &procedure) {
+  return al::HasAttribute(procedure, "IntegrationEvent") ||
+         al::HasAttribute(procedure, "BusinessEvent") ||
+         al::HasAttribute(procedure, "InternalEvent");
+}
+
+namespace {
+
+std::string EventObjectOf(std::string_view objectType) {
+  const std::string kind = LowerKey(std::string(objectType.substr(objectType.find("::") + 2)));
+  if (kind == "codeunit") { return "EventObject::Codeunit"; }
+  if (kind == "table") { return "EventObject::Table"; }
+  if (kind == "page") { return "EventObject::Page"; }
+  if (kind == "report") { return "EventObject::Report"; }
+  if (kind == "xmlport") { return "EventObject::XmlPort"; }
+  if (kind == "query") { return "EventObject::Query"; }
+  throw std::runtime_error("[EventSubscriber] names an object type the runtime has no kind for: " +
+                           std::string(objectType));
+}
+
+std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
+  std::vector<const al::ProcedureDecl *> subscribers;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (al::HasAttribute(procedure, "EventSubscriber")) { subscribers.push_back(&procedure); }
+  }
+  if (subscribers.empty()) { return {}; }
+  std::string out = "\nnamespace {\nnamespace " + identifier + "_subscriptions {\n\n";
+  for (std::size_t i = 0; i < subscribers.size(); ++i) {
+    out += "constexpr std::array<std::string_view, " +
+           std::to_string(subscribers[i]->parameters.size()) + "> kSubscriber" +
+           std::to_string(i + 1) + "Names{";
+    for (std::size_t k = 0; k < subscribers[i]->parameters.size(); ++k) {
+      if (k != 0) { out += ", "; }
+      out += Literal(subscribers[i]->parameters[k].name);
+    }
+    out += "};\n";
+  }
+  out += "\nconstexpr std::array<Subscription, " + std::to_string(subscribers.size()) +
+         "> kSubscriptions{{\n";
+  for (std::size_t i = 0; i < subscribers.size(); ++i) {
+    const std::vector<std::string> arguments =
+        al::AttributeArguments(*subscribers[i], "EventSubscriber");
+    if (arguments.size() < 3) {
+      throw std::runtime_error("[EventSubscriber] on " + subscribers[i]->name + " in " + unit.name +
+                               " carries " + std::to_string(arguments.size()) +
+                               " argument(s), and the attribute takes at least three");
+    }
+    const std::string reference = arguments[1];
+    const std::size_t colons = reference.find("::");
+    const std::string objectName =
+        colons == std::string::npos ? reference : reference.substr(colons + 2);
+    out += "    {" + EventObjectOf(arguments[0]) + ", 0, " + Literal(objectName) + ", " +
+           Literal(arguments[2]) + ", " + Literal(arguments.size() > 3 ? arguments[3] : "") +
+           ", kSubscriber" + std::to_string(i + 1) + "Names, &detail::InvokeSubscriber<" +
+           identifier + ", &" + identifier + "::" + Identifier(subscribers[i]->name) + ">},\n";
+  }
+  out += "}};\n\n";
+  const al::Property *instance = al::Find(unit.properties, "EventSubscriberInstance");
+  const bool manual = instance != nullptr && LowerKey(instance->text) == "manual";
+  out += "const SubscriptionCatalogue kSubscriptionCatalogue{\n    CodeunitTraits<" + identifier +
+         ">::kId,\n    CodeunitTraits<" + identifier + ">::kName,\n    kSubscriptions,\n    " +
+         (manual ? "true" : "false") + ",\n    []() -> void * { return new " + identifier +
+         "(); },\n    [](void *instance) { delete static_cast<" + identifier +
+         " *>(instance); }};\n\n} // namespace " + identifier + "_subscriptions\n} // namespace\n";
+  return out;
+}
+
+std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
+  static constexpr std::array kKinds{
+      std::pair{std::string_view{"confirmhandler"}, std::string_view{"HandlerKind::Confirm"}},
+      std::pair{std::string_view{"messagehandler"}, std::string_view{"HandlerKind::Message"}},
+      std::pair{std::string_view{"strmenuhandler"}, std::string_view{"HandlerKind::StrMenu"}},
+      std::pair{std::string_view{"hyperlinkhandler"}, std::string_view{"HandlerKind::Hyperlink"}},
+      std::pair{std::string_view{"modalpagehandler"}, std::string_view{"HandlerKind::ModalPage"}},
+      std::pair{std::string_view{"pagehandler"}, std::string_view{"HandlerKind::Page"}},
+      std::pair{std::string_view{"requestpagehandler"},
+                std::string_view{"HandlerKind::RequestPage"}},
+      std::pair{std::string_view{"reporthandler"}, std::string_view{"HandlerKind::Report"}},
+      std::pair{std::string_view{"filterpagehandler"}, std::string_view{"HandlerKind::FilterPage"}},
+      std::pair{std::string_view{"sendnotificationhandler"},
+                std::string_view{"HandlerKind::SendNotification"}},
+      std::pair{std::string_view{"recallnotificationhandler"},
+                std::string_view{"HandlerKind::RecallNotification"}},
+      std::pair{std::string_view{"sessionsettingshandler"},
+                std::string_view{"HandlerKind::Session"}},
+      std::pair{std::string_view{"httpclienthandler"}, std::string_view{"HandlerKind::HttpClient"}},
+  };
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string name = LowerKey(attribute.substr(0, attribute.find('(')));
+    for (const auto &[declared, kind] : kKinds) {
+      if (name == declared) { return std::string(kind); }
+    }
+  }
+  return {};
+}
+
+bool HandlerIsOptional(const al::ProcedureDecl &procedure) {
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (lowered.find("handler(") == std::string::npos) { continue; }
+    if (lowered.find("true") != std::string::npos) { return true; }
+  }
+  return false;
+}
+
+std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
+  std::vector<std::string> named;
+  for (const std::string &attribute : procedure.attributes) {
+    const std::string lowered = LowerKey(attribute);
+    if (!lowered.starts_with("handlerfunctions")) { continue; }
+    const std::size_t open = attribute.find('\'');
+    const std::size_t close = attribute.rfind('\'');
+    if (open == std::string::npos || close <= open) { continue; }
+    std::string listed = attribute.substr(open + 1, close - open - 1);
+    std::string one;
+    for (const char c : listed + ",") {
+      if (c == ',') {
+        const std::size_t first = one.find_first_not_of(" \t");
+        const std::size_t last = one.find_last_not_of(" \t");
+        if (first != std::string::npos) { named.push_back(one.substr(first, last - first + 1)); }
+        one.clear();
+        continue;
+      }
+      one += c;
+    }
+  }
+  return named;
+}
+
+std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &identifier) {
+  std::vector<const al::ProcedureDecl *> handlers;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (!HandlerKindOf(procedure).empty()) { handlers.push_back(&procedure); }
+  }
+  if (handlers.empty()) { return {}; }
+  std::string out =
+      "constexpr std::array<TestHandler, " + std::to_string(handlers.size()) + "> kHandlers{{\n";
+  for (const al::ProcedureDecl *handler : handlers) {
+    out += "    {\"" + handler->name + "\", " + HandlerKindOf(*handler) + ", 0, &InvokeHandler<" +
+           identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">, " +
+           (HandlerIsOptional(*handler) ? "true" : "false") + "},\n";
+  }
+  out += "}};\n\n";
+  return out;
+}
+
 std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
-  std::string out = "\nnamespace {\n\nconstexpr std::array<TestMethod, ";
+  std::string out = "\nnamespace {\nnamespace " + identifier + "_tests {\n\n";
+  out += HandlerTableOf(unit, identifier);
+  for (const al::ProcedureDecl *test : tests) {
+    const std::vector<std::string> named = HandlersNamedBy(*test);
+    if (named.empty()) { continue; }
+    out += "constexpr std::array<std::string_view, " + std::to_string(named.size()) + "> k" +
+           Identifier(test->name) + "Handlers{{";
+    for (std::size_t i = 0; i < named.size(); ++i) {
+      out += (i == 0 ? "" : ", ");
+      out += Literal(named[i]);
+    }
+    out += "}};\n";
+  }
+  out += "\nconstexpr std::array<TestMethod, ";
   out += std::to_string(tests.size());
   out += "> kTestMethods{{\n";
   for (const al::ProcedureDecl *test : tests) {
@@ -110,6 +368,11 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
     out += Identifier(test->name);
     out += ">, ";
     out += TransactionModelOf(*test);
+    out += ", ";
+    const std::vector<std::string> named = HandlersNamedBy(*test);
+    out += named.empty() ? std::string("{}") : "k" + Identifier(test->name) + "Handlers";
+    out += ", ";
+    out += PermissionsOf(unit, *test);
     out += "},\n";
   }
   out += "}};\n\nconst TestCatalogue kTestCatalogue{CodeunitTraits<";
@@ -120,7 +383,12 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
   out += DeclaresOnRun(unit) ? "                                  &InvokeTest<" + identifier +
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
-  out += "                                  kTestMethods};\n\n} // namespace\n";
+  out += "                                  kTestMethods";
+  out += HandlerTableOf(unit, identifier).empty()
+             ? std::string{}
+             : std::string(",\n") + "                          "
+                                    "        kHandlers";
+  out += "};\n\n} // namespace " + identifier + "_tests\n} // namespace\n";
   return out;
 }
 
@@ -155,6 +423,9 @@ std::size_t FieldArguments(std::string_view method) {
   static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
       {"SetRange", 1},
       {"SetFilter", 1},
+      {"FindFirstField", 1},
+      {"FindNextField", 1},
+      {"FindPreviousField", 1},
       {"TestField", 1},
       {"FieldError", 1},
       {"FieldCaption", 1},
@@ -270,21 +541,9 @@ std::string OptionNameOf(const std::string &owner,
                          const std::string &within,
                          const al::VarDecl &declared,
                          const std::vector<al::ProcedureDecl> &procedures) {
-  std::string base = OptionName(owner, within, declared.name);
-  if (declared.members.empty()) { return base; }
-  const auto clashes = [&](const al::ProcedureDecl &procedure, const al::VarDecl &other) {
-    return !other.members.empty() && other.members != declared.members &&
-           OptionName(owner, procedure.name, other.name) == base;
-  };
-  for (const al::ProcedureDecl &procedure : procedures) {
-    const bool found =
-        std::ranges::any_of(procedure.parameters,
-                            [&](const al::VarDecl &o) { return clashes(procedure, o); }) ||
-        std::ranges::any_of(procedure.variables,
-                            [&](const al::VarDecl &o) { return clashes(procedure, o); });
-    if (found) { return base + EnumeratorName(declared.members.front()); }
-  }
-  return base;
+  static_cast<void>(procedures);
+  if (declared.members.empty()) { return OptionName(owner, within, declared.name); }
+  return OptionContentName(declared.members);
 }
 
 bool Hidden(const std::string &type, const std::set<std::string> &names) {
@@ -343,6 +602,9 @@ std::string Signature(const al::VarDecl &declared,
                       const std::set<std::string> &names,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
+  if (type.starts_with("Temporary<") && type.ends_with(">")) {
+    type = type.substr(10, type.size() - 11);
+  }
   if (Hidden(type, names)) { type = Qualified(type, names); }
   if (declared.byReference) { type = Unsized(type); }
   return type + (declared.byReference ? " &" : " ");
@@ -382,53 +644,18 @@ std::string Parameters(const al::ProcedureDecl &procedure,
 std::string InlineOptionsIn(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures) {
-  std::string out;
-  std::map<std::string, std::vector<std::string>> emitted;
-  const auto declare = [&](const std::string &within, const al::VarDecl &declared) {
-    if (TypeName(declared.type) != "Option" || declared.members.empty()) { return; }
-    const std::string name = OptionNameOf(owner, within, declared, procedures);
-    const auto seen = emitted.find(name);
-    if (seen != emitted.end()) {
-      if (seen->second != declared.members) {
-        throw std::runtime_error("\"" + owner +
-                                 "\" declares two different options under the name " + name);
-      }
-      return;
-    }
-    emitted.insert_or_assign(name, declared.members);
-    const std::vector<std::string> names = EnumeratorNames(declared.members);
-    out += "namespace agiru::app::" + space + " {\n\nenum class " + name + " : std::int32_t {\n";
-    for (std::size_t i = 0; i < names.size(); ++i) {
-      out += "  " + names[i] + " = " + std::to_string(i) + ",\n";
-    }
-    out += "};\n\n} // namespace agiru::app::" + space + "\n\n";
-    out += "template <> struct agiru::OptionTraits<agiru::app::" + space + "::" + name + "> {\n";
-    out += "  static constexpr std::array<EnumValueDef, " +
-           std::to_string(declared.members.size()) + "> kValues{{\n";
-    for (std::size_t i = 0; i < declared.members.size(); ++i) {
-      out += "      EnumValueDef{.ordinal = " + std::to_string(i) +
-             ", .name = " + Literal(declared.members[i]) +
-             ", .caption = " + Literal(declared.members[i]) + "},\n";
-    }
-    out += "  }};\n};\n\n";
-  };
-  for (const al::VarDecl &declared : variables) { declare(std::string{}, declared); }
-  for (const al::ProcedureDecl &procedure : procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) { declare(procedure.name, declared); }
-    for (const al::VarDecl &declared : procedure.variables) { declare(procedure.name, declared); }
-  }
-  return out;
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already) {
+  static_cast<void>(owner);
+  static_cast<void>(space);
+  static_cast<void>(variables);
+  static_cast<void>(procedures);
+  static_cast<void>(already);
+  return {};
 }
 
 std::string InlineOptions(const al::CodeunitObject &unit) {
-  return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures);
-}
-
-bool IsTryFunction(const al::ProcedureDecl &procedure) {
-  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
-    return LowerKey(attribute) == "tryfunction";
-  });
+  return InlineOptionsIn(unit.name, "codeunits", unit.variables, unit.procedures, {});
 }
 
 std::string Returns(const al::ProcedureDecl &procedure,
@@ -466,6 +693,24 @@ bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
 
 bool HandleMember(const al::VarDecl &declared) {
   return NamesAnObject(declared);
+}
+
+std::string DoorMemberSpelling(std::string_view field) {
+  const std::string plain = Identifier(field);
+  const std::string spelled = AsTheDoorSpellsIt(plain);
+  return DoorCalls(field) && !IsAlTypeName(spelled) ? spelled : plain;
+}
+
+bool IsSystemField(std::string_view name) {
+  static constexpr std::array kSystem{std::string_view{"SystemId"},
+                                      std::string_view{"SystemCreatedAt"},
+                                      std::string_view{"SystemCreatedBy"},
+                                      std::string_view{"SystemModifiedAt"},
+                                      std::string_view{"SystemModifiedBy"},
+                                      std::string_view{"SystemRowVersion"}};
+  return std::ranges::any_of(kSystem, [name](std::string_view known) {
+    return LowerKey(std::string(known)) == LowerKey(std::string(name));
+  });
 }
 
 bool NamesAPage(std::string_view type) {
@@ -559,7 +804,9 @@ void ReachTableNo(const al::CodeunitObject &unit,
 void Reaching(const al::VarDecl &declared, const Objects &objects, std::set<std::string> &headers) {
   const std::string kind = TypeName(declared.type);
   const bool whole = kind == "Interface" && !declared.subtype.empty();
-  if (!whole && (!NamesAnObject(declared) || HandleMember(declared))) { return; }
+  if (!whole && (!NamesAnObject(declared) || (HandleMember(declared) && !declared.temporary))) {
+    return;
+  }
   const TableRef *ref = Reach(declared, objects);
   if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
 }
@@ -596,9 +843,13 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
     both(procedure.returned);
+    if (!procedure.returned.byReference) { reach(procedure.returned); }
   }
   std::string out = std::string(kDoorMarker);
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
+  if (DeclaresAnOption(unit.variables, unit.procedures)) {
+    out += "#include \"options/Types.h\"\n";
+  }
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
 
   if (!forward.empty()) { out += "\n"; }
@@ -740,11 +991,14 @@ public:
 
   [[nodiscard]] std::string ExitValue() const override {
     if (!procedure_.returnName.empty()) { return " " + Identifier(procedure_.returnName); }
+    if (::agiru::gen::IsTryFunction(procedure_)) { return " true"; }
     return procedure_.returnType.empty() ? std::string{} : std::string(" {}");
   }
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
-    if (LowerKey(std::string(variable)) == "rec") { return !TableNoOf(unit_).empty(); }
+    if (LowerKey(std::string(variable)) == "rec") {
+      return !TableNoOf(unit_).empty() || !SubtypeOfRecord(variable).empty();
+    }
     const al::VarDecl *declared = Declaration(variable);
     return declared != nullptr && TypeName(declared->type) == "Record";
   }
@@ -753,8 +1007,8 @@ public:
     const al::VarDecl *declared = Declaration(variable);
     if (declared == nullptr) { return false; }
     const std::string type = TypeName(declared->type);
-    return type == "RecordRef" || type == "FieldRef" || type == "KeyRef" || type == "Variant" ||
-           type == "RecordId" || type == "ModuleInfo" || type == "Version";
+    if (NamesAnObject(*declared) || NamesAPage(type)) { return false; }
+    return IsAlTypeName(type) && type != "Option" && type != "Enum";
   }
 
   [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
@@ -773,13 +1027,18 @@ public:
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
-    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(member.variable);
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) {
       return !NamesAControl(*held, member.field) && DoorCalls(member.field);
     }
+    if (held != nullptr && NamesAPage(TypeName(held->type))) {
+      return !NamesAControl(*held, member.field) && DoorCalls(member.field);
+    }
+    if (IsSystemField(member.field)) { return false; }
     if (subtype.empty() || !DoorCalls(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
@@ -788,26 +1047,86 @@ public:
     return !table->second.fields.contains(LowerKey(std::string(member.field)));
   }
 
+  [[nodiscard]] bool IsVariable(std::string_view name) const override {
+    return Declaration(name) != nullptr;
+  }
+
+  [[nodiscard]] std::string EnumMember(std::string_view enumeration,
+                                       std::string_view member) const override {
+    return DeclaredEnumMember(objects_, enumeration, member);
+  }
+
+  [[nodiscard]] std::vector<bool> VarParametersOfPublisher(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : unit_.procedures) {
+      if (!SameName(procedure.name, name) || !IsPublisher(procedure)) { continue; }
+      std::vector<bool> vars;
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        vars.push_back(parameter.byReference);
+      }
+      return vars;
+    }
+    return {};
+  }
+
+  [[nodiscard]] bool ReturnsAHandle(std::string_view procedure) const override {
+    for (const al::ProcedureDecl &declared : unit_.procedures) {
+      if (LowerKey(declared.name) == LowerKey(std::string(procedure))) {
+        return TypeName(declared.returned.type) == "Interface";
+      }
+    }
+    return false;
+  }
+
+  [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
+    if (subtype.empty()) { return false; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    if (table == objects_.tables.end()) { return false; }
+    if (table->second.fields.contains(LowerKey(std::string(member.field)))) { return true; }
+    const std::string spelled = Identifier(member.field);
+    return std::ranges::any_of(table->second.fields,
+                               [&](const auto &field) { return field.second == spelled; });
+  }
+
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
+    if (declared != nullptr && TypeName(declared->type) == "DotNet") {
+      return Identifier(member.field);
+    }
+    if (declared != nullptr && TypeName(declared->type) == "Codeunit" &&
+        !declared->subtype.empty()) {
+      const auto unit = objects_.codeunits.find(LowerKey(declared->subtype));
+      if (unit != objects_.codeunits.end()) {
+        const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
+        if (found != unit->second.procedures.end()) { return found->second; }
+      }
+    }
     if (declared != nullptr && !NamesAnObject(*declared)) {
       const std::string control = ControlNamed(*declared, member.field);
       return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
     }
-    const std::string subtype = LowerKey(std::string(member.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(member.variable);
-    if (subtype.empty()) { return Identifier(member.field); }
+    const std::string subtype =
+        SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(member.variable);
+    if (subtype.empty()) {
+      return DoorCalls(member.field) ? AsTheDoorSpellsIt(Identifier(member.field))
+                                     : Identifier(member.field);
+    }
     const std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
     if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
-                                  : Identifier(member.field);
+      return DoorMemberSpelling(member.field);
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }
+    const auto declaredThere = table->second.procedures.find(LowerKey(std::string(member.field)));
+    if (declaredThere != table->second.procedures.end()) { return declaredThere->second; }
     return AsTheDoorSpellsIt(Identifier(member.field));
   }
 
@@ -819,6 +1138,8 @@ public:
     if (kind == "pages") { index = &objects_.pages; }
     if (kind == "interfaces") { index = &objects_.interfaces; }
     if (kind == "reports") { index = &objects_.reports; }
+    if (kind == "xmlports") { index = &objects_.xmlports; }
+    if (kind == "queries") { index = &objects_.queries; }
     if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
@@ -862,7 +1183,7 @@ public:
 
   [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     for (const al::VarDecl &declared : procedure_.variables) {
       if (same(declared)) { return &declared; }
@@ -875,7 +1196,7 @@ public:
 
   [[nodiscard]] const al::VarDecl *Declaration(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     for (const al::VarDecl &declared : procedure_.variables) {
       if (same(declared)) { return &declared; }
@@ -894,7 +1215,7 @@ public:
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     const auto same = [&name](const al::VarDecl &declared) {
-      return LowerKey(declared.name) == LowerKey(std::string(name));
+      return SameName(declared.name, name);
     };
     const auto face = [](const al::VarDecl &declared) {
       return TypeName(declared.type) == "Interface";
@@ -913,29 +1234,22 @@ public:
 
   [[nodiscard]] std::string Resolve(std::string_view name) const override {
     for (const al::VarDecl &declared : procedure_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
     for (const al::VarDecl &declared : procedure_.parameters) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
-    if (!procedure_.returnName.empty() &&
-        LowerKey(procedure_.returnName) == LowerKey(std::string(name))) {
+    if (!procedure_.returnName.empty() && SameName(procedure_.returnName, name)) {
       return Identifier(procedure_.returnName);
     }
     for (const al::VarDecl &declared : unit_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
-      }
+      if (SameName(declared.name, name)) { return Identifier(declared.name); }
     }
     for (const al::LabelDecl &label : unit_.labels) {
-      if (LowerKey(label.name) == LowerKey(std::string(name))) { return Identifier(label.name); }
+      if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &other : unit_.procedures) {
-      if (LowerKey(other.name) == LowerKey(std::string(name))) { return Identifier(other.name); }
+      if (SameName(other.name, name)) { return Identifier(other.name); }
     }
     if (LowerKey(std::string(name)) == "rec" && al::Find(unit_.properties, "TableNo") != nullptr) {
       return "Rec";
@@ -996,7 +1310,11 @@ bool Mentions(const std::string &body, const std::string &name) {
     const bool behind =
         after < body.size() &&
         (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
-    if (!before && !behind) { return true; }
+    const bool scope = after + 1 < body.size() && body[after] == ':' && body[after + 1] == ':';
+    const bool scoped = at >= 2 && body[at - 1] == ':' && body[at - 2] == ':';
+    const bool member =
+        at >= 1 && (body[at - 1] == '.' || (at >= 2 && body[at - 1] == '>' && body[at - 2] == '-'));
+    if (!before && !behind && !scope && !scoped && !member) { return true; }
   }
   return false;
 }
@@ -1006,8 +1324,13 @@ std::string Locals(const al::ProcedureDecl &procedure,
                    const std::string &unit,
                    const std::vector<al::ProcedureDecl> &all = {},
                    const std::string &body = {},
-                   const std::set<std::string> &shadowed = {}) {
-  std::string out;
+                   const std::set<std::string> &shadowedByOwner = {}) {
+  std::set<std::string> shadowed = shadowedByOwner;
+  for (const al::VarDecl &parameter : procedure.parameters) {
+    shadowed.insert(Identifier(parameter.name));
+  }
+  if (!procedure.returnName.empty()) { shadowed.insert(Identifier(procedure.returnName)); }
+  std::string out = ScopeGuardsOf(procedure);
   const std::string code = WithoutLiterals(body);
   const auto shadows = [&code](const std::string &name) {
     return code.find("for ([[maybe_unused]] auto &" + name + " :") != std::string::npos;
@@ -1017,28 +1340,74 @@ std::string Locals(const al::ProcedureDecl &procedure,
     return Mentions(code, name) && !shadows(name) ? std::string{}
                                                   : std::string("[[maybe_unused]] ");
   };
-  if (!procedure.returnName.empty()) {
-    out += "  " + Returns(procedure, objects) + " " + Identifier(procedure.returnName) + "{};\n";
-  }
+  const auto local = [&body](const std::string &) {
+    return body.empty() ? std::string{} : std::string("[[maybe_unused]] ");
+  };
   std::set<std::string> names = shadowed;
   for (const al::VarDecl &declared : procedure.variables) {
     names.insert(Identifier(declared.name));
   }
   for (const al::LabelDecl &label : procedure.labels) { names.insert(Identifier(label.name)); }
   if (!procedure.returnName.empty()) { names.insert(Identifier(procedure.returnName)); }
+  if (!procedure.returnName.empty()) {
+    out +=
+        "  " + unused(Identifier(procedure.returnName)) +
+        (Hidden(Returns(procedure, objects), names) ? Qualified(Returns(procedure, objects), names)
+                                                    : Returns(procedure, objects)) +
+        " " + Identifier(procedure.returnName) + "{};\n";
+  }
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
     if (Hidden(type, names)) { type = Qualified(type, names); }
     out +=
-        "  " + unused(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
+        "  " + local(Identifier(declared.name)) + type + " " + Identifier(declared.name) + "{};\n";
   }
   for (const al::LabelDecl &label : procedure.labels) {
     out += "  static constexpr std::string_view " + Identifier(label.name) + "{" +
            Literal(label.text) + "};\n";
   }
+  for (const al::VarDecl &declared : procedure.variables) {
+    const std::string filtering = SecurityFilteringOf(declared);
+    if (filtering.empty()) { continue; }
+    out += "  " + Identifier(declared.name) + ".SecurityFiltering(" + filtering + ");\n";
+  }
   return out;
 }
 
+}
+
+std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string &identifier) {
+  const auto said = [&unit](std::string_view name) {
+    const al::Property *found = Find(unit.properties, name);
+    return found == nullptr ? std::string{} : found->text;
+  };
+  const std::string traits = "::agiru::CodeunitTraits<" + identifier + ">";
+  std::string out = "constexpr CodeunitDef k" + identifier + "Codeunit{\n";
+  out += "    .id = " + traits + "::kId,\n";
+  out += "    .name = " + traits + "::kName,\n";
+  out += "    .subtype = " + traits + "::kSubtype,\n";
+  const std::string table = said("TableNo");
+  if (!table.empty() && table.find_first_not_of("0123456789") == std::string::npos) {
+    out += "    .tableNo = ::agiru::TableId{" + table + "},\n";
+  }
+  const auto text = [&out, &said](std::string_view member, std::string_view property) {
+    const std::string value = said(property);
+    if (value.empty()) { return; }
+    out += "    ." + std::string(member) + " = " + Literal(value) + ",\n";
+  };
+  text("permissions", "Permissions");
+  text("inherentPermissions", "InherentPermissions");
+  text("inherentEntitlements", "InherentEntitlements");
+  if (LowerKey(said("SingleInstance")) == "true") { out += "    .singleInstance = true,\n"; }
+  text("eventSubscriberInstance", "EventSubscriberInstance");
+  text("testPermissions", "TestPermissions");
+  text("testType", "TestType");
+  text("testIsolation", "TestIsolation");
+  text("description", "Description");
+  text("access", "Access");
+  text("obsoleteState", "ObsoleteState");
+  out += "};\n\n";
+  return out;
 }
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
@@ -1051,22 +1420,41 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "#include \"" + identifier + ".h\"\n\n";
   out += kDoorMarker;
   const std::size_t includeAt = out.size();
-  const std::string catalogue = TestCatalogueOf(unit, identifier);
-  if (!catalogue.empty()) { out += "\n#include <array>\n"; }
+  const std::string catalogue =
+      TestCatalogueOf(unit, identifier) + SubscriptionCatalogueOf(unit, identifier);
+  if (!catalogue.empty()) { out += "\n#include <array>\n#include <string_view>\n"; }
   out += "\nnamespace agiru::app::codeunits {\n\n";
   const std::size_t bodyAt = out.size();
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
+    const CodeunitNames names(unit, procedure, objects);
     const std::string body =
-        publisher ? std::string{}
-                  : WriteStatements(CodeunitNames(unit, procedure, objects), procedure.body, 2) +
-                        FallsOff(procedure, CodeunitNames(unit, procedure, objects));
+        publisher ? RaisingBody(procedure,
+                                "EventObject::Codeunit",
+                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
+                                    ">::kId.Value()",
+                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
+                                    ">::kName")
+                  : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
     out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" + Parameters(procedure, objects, !publisher, unit.name, {}, unit.procedures, body) +
+           "(" +
+           Parameters(procedure,
+                      objects,
+                      true,
+                      unit.name,
+                      Shadowing(unit.variables, unit.procedures, unit.labels),
+                      unit.procedures,
+                      body) +
            ") {";
     const std::string locals =
-        publisher ? std::string{} : Locals(procedure, objects, unit.name, unit.procedures, body);
+        publisher ? std::string{}
+                  : Locals(procedure,
+                           objects,
+                           unit.name,
+                           unit.procedures,
+                           body,
+                           Shadowing(unit.variables, unit.procedures, unit.labels));
     if (locals.empty() && body.empty()) {
       out += "}\n\n";
       continue;
@@ -1079,6 +1467,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   }
 
   out += catalogue;
+  out += CodeunitDefinition(unit, identifier);
   out += "} // namespace agiru::app::codeunits\n";
   out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Codeunit);
@@ -1123,7 +1512,7 @@ std::string MemberDeclarations(const std::string &owner,
   const std::set<std::string> shadowed = Shadowing(variables, procedures, labels);
   std::string out;
   for (const al::VarDecl &declared : variables) {
-    std::string type = TypeOf(declared, objects, OptionName(owner, {}, declared.name));
+    std::string type = TypeOf(declared, objects, OptionNameOf(owner, {}, declared, procedures));
     if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
     const bool handle = HandleMember(declared);
     out +=
@@ -1146,33 +1535,89 @@ std::string ProcedureLocals(const al::ProcedureDecl &procedure,
   return Locals(procedure, objects, owner, all, body, shadowed);
 }
 
-std::string BodyIncludes(const std::string &text, const Objects &objects) {
-  static const std::regex named(
-      R"(\b(codeunits|pages|tables|interfaces|reports)::([A-Za-z0-9_]+))");
-  std::set<std::string> headers;
-  for (std::sregex_iterator it(text.begin(), text.end(), named), end; it != end; ++it) {
-    const std::string kind = (*it)[1].str();
-    const std::string identifier = (*it)[2].str();
-    const TableIndex *index = nullptr;
-    if (kind == "codeunits") { index = &objects.codeunits; }
-    if (kind == "pages") { index = &objects.pages; }
-    if (kind == "tables") { index = &objects.tables; }
-    if (kind == "interfaces") { index = &objects.interfaces; }
-    if (kind == "reports") { index = &objects.reports; }
-    if (index == nullptr) { continue; }
-    std::string qualified = kind;
-    qualified += "::";
-    qualified += identifier;
+namespace {
+
+struct HeaderIndex {
+  const Objects *objects = nullptr;
+  std::size_t indexed = 0;
+  std::unordered_map<std::string, std::string> byIdentifier;
+};
+
+std::size_t Indexed(const Objects &objects) {
+  return objects.codeunits.size() + objects.pages.size() + objects.tables.size() +
+         objects.interfaces.size() + objects.reports.size() + objects.enums.size();
+}
+
+const HeaderIndex &HeadersOf(const Objects &objects) {
+  static HeaderIndex cached;
+  if (cached.objects == &objects && cached.indexed == Indexed(objects)) { return cached; }
+  cached = HeaderIndex{.objects = &objects, .indexed = Indexed(objects), .byIdentifier = {}};
+  for (const TableIndex *index : {&objects.codeunits,
+                                  &objects.pages,
+                                  &objects.xmlports,
+                                  &objects.queries,
+                                  &objects.tables,
+                                  &objects.interfaces,
+                                  &objects.reports}) {
     for (const auto &[key, ref] : *index) {
-      if (ref.identifier == qualified && !ref.header.empty()) {
-        headers.insert(ref.header);
-        break;
-      }
+      if (!ref.header.empty()) { cached.byIdentifier.emplace(ref.identifier, ref.header); }
     }
+  }
+  for (const auto &[key, ref] : objects.enums) {
+    if (!ref.header.empty()) {
+      cached.byIdentifier.emplace("enums::" + ref.identifier, ref.header);
+    }
+  }
+  return cached;
+}
+
+bool IdentifierChar(char c) {
+  return (std::isalnum(static_cast<unsigned char>(c)) != 0) || c == '_';
+}
+
+}
+
+std::string
+DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::string_view member) {
+  static const Objects *cachedFor = nullptr;
+  static std::size_t cachedSize = 0;
+  static std::unordered_map<std::string, const EnumRef *> byIdentifier;
+  if (cachedFor != &objects || cachedSize != objects.enums.size()) {
+    byIdentifier.clear();
+    for (const auto &[key, ref] : objects.enums) {
+      byIdentifier.emplace("enums::" + ref.identifier, &ref);
+    }
+    cachedFor = &objects;
+    cachedSize = objects.enums.size();
+  }
+  const auto found = byIdentifier.find(std::string(enumeration));
+  if (found == byIdentifier.end()) { return EnumeratorName(member); }
+  const auto spelled = found->second->members.find(LowerKey(std::string(member)));
+  return spelled == found->second->members.end() ? EnumeratorName(member) : spelled->second;
+}
+
+std::string BodyIncludes(const std::string &text, const Objects &objects) {
+  std::string named;
+  if (text.find("options::") != std::string::npos) { named = "#include \"options/Types.h\"\n"; }
+  static constexpr std::array<std::string_view, 8> kKinds{
+      "codeunits", "pages", "tables", "interfaces", "reports", "xmlports", "queries", "enums"};
+  const HeaderIndex &known = HeadersOf(objects);
+  std::set<std::string> headers;
+  for (std::size_t at = text.find("::"); at != std::string::npos; at = text.find("::", at + 2)) {
+    std::size_t begin = at;
+    while (begin > 0 && IdentifierChar(text[begin - 1])) { --begin; }
+    if (begin == at) { continue; }
+    const std::string_view kind(text.data() + begin, at - begin);
+    if (std::ranges::find(kKinds, kind) == kKinds.end()) { continue; }
+    std::size_t finish = at + 2;
+    while (finish < text.size() && IdentifierChar(text[finish])) { ++finish; }
+    if (finish == at + 2) { continue; }
+    const auto found = known.byIdentifier.find(std::string(text, begin, finish - begin));
+    if (found != known.byIdentifier.end()) { headers.insert(found->second); }
   }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
-  return out;
+  return named + out;
 }
 
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
@@ -1237,8 +1682,9 @@ const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects)
 std::string InlineOptionsOf(const std::string &owner,
                             const std::string &space,
                             const std::vector<al::VarDecl> &variables,
-                            const std::vector<al::ProcedureDecl> &procedures) {
-  return InlineOptionsIn(owner, space, variables, procedures);
+                            const std::vector<al::ProcedureDecl> &procedures,
+                            const std::map<std::string, std::vector<std::string>> &already) {
+  return InlineOptionsIn(owner, space, variables, procedures, already);
 }
 
 std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
@@ -1248,7 +1694,10 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
-    const TableRef ref{.identifier = "platform::" + Identifier(name), .header = {}, .fields = {}};
+    const TableRef ref{.identifier = "platform::" + Identifier(name),
+                       .header = {},
+                       .fields = {},
+                       .procedures = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
@@ -1256,6 +1705,7 @@ TableIndex PlatformTables() {
   add("Integer", "2000000026");
   add("Date", "2000000007");
   add("User", "2000000120");
+  add("User Personalization", "2000000073");
   return tables;
 }
 
@@ -1356,7 +1806,8 @@ std::string HiddenMembers(const al::CodeunitObject &unit,
                           const std::set<std::string> &shadowed) {
   std::string hidden;
   for (const al::VarDecl &declared : unit.variables) {
-    std::string type = TypeOf(declared, objects, OptionName(unit.name, {}, declared.name));
+    std::string type =
+        TypeOf(declared, objects, OptionNameOf(unit.name, {}, declared, unit.procedures));
     if (Hidden(type, shadowed)) { type = Qualified(type, shadowed); }
     const bool handle = HandleMember(declared);
     hidden +=
@@ -1396,14 +1847,18 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += ", public " + found->second.identifier;
   }
   out += " {\npublic:\n";
+  out += "  using Codeunit<" + unitClass + ">::operator=;\n\n";
 
   const std::string source = SourceTableOf(unit, objects);
   if (!source.empty()) { out += "  " + source + " Rec;\n\n"; }
 
   bool previousWasTrigger = false;
   bool first = true;
+  const auto platformCalls = [](const al::ProcedureDecl &procedure) {
+    return al::HasAttribute(procedure, "EventSubscriber");
+  };
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    if (procedure.isLocal) { continue; }
+    if (procedure.isLocal && !platformCalls(procedure)) { continue; }
     if (!first && previousWasTrigger != procedure.isTrigger) { out += "\n"; }
     out += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
     previousWasTrigger = procedure.isTrigger;
@@ -1413,7 +1868,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   const std::string hidden = HiddenMembers(unit, objects, shadowed);
   std::string locals;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    if (!procedure.isLocal) { continue; }
+    if (!procedure.isLocal || platformCalls(procedure)) { continue; }
     locals += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
   }
   if (!hidden.empty() || !locals.empty()) {
@@ -1423,12 +1878,15 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += locals;
   }
   out += "};\n\n";
+  out += "extern const CodeunitDef k" + identifier + "Codeunit;\n\n";
   out += "} // namespace agiru::app::codeunits\n\n";
 
   out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "  static constexpr Subtype kSubtype{Subtype::" + SubtypeOf(unit) + "};\n";
+  out += "  static constexpr const CodeunitDef &kCodeunit = agiru::app::codeunits::k" + identifier +
+         "Codeunit;\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
@@ -1437,6 +1895,13 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
                         .unresolvedTables = Unresolved(unit, objects),
                         .dotnet = std::move(dotnet),
                         .absent = std::move(absent)};
+}
+
+std::string OptionTypeName(const std::string &owner,
+                           const std::string &within,
+                           const al::VarDecl &declared,
+                           const std::vector<al::ProcedureDecl> &procedures) {
+  return OptionNameOf(owner, within, declared, procedures);
 }
 
 }

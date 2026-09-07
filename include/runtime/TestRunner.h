@@ -1,6 +1,12 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "runtime/Error.h"
+#include "type/Text.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
+#include "runtime/test/Handlers.h"
+#include "runtime/test/TestPermissions.h"
 #include "type/TransactionModel.h"
 
 #include <cstddef>
@@ -20,6 +26,19 @@ struct TestMethod {
   std::string_view name;                 ///< The procedure's AL name.
   void (*invoke)();                      ///< Makes the codeunit and calls the procedure.
   std::optional<TransactionModel> model; ///< Its `[TransactionModel]`, empty when it declares none.
+  std::span<const std::string_view> handlers; ///< The names its `[HandlerFunctions]` listed, in
+                                             ///< the order AL wrote them. A named handler that
+                                             ///< never ran fails the case (board:0054).
+  ::agiru::TestPermissions permissions =
+      ::agiru::TestPermissions::Restrictive; ///< Its `[TestPermissions]`, RESOLVED: a method that
+                                             ///< inherits carries its codeunit's value, and a
+                                             ///< codeunit that declares none carries `Restrictive`,
+                                             ///< which is AL's own default
+                                             ///< (`devenv-testing-with-permission-sets.md`).
+                                             ///< \warning THE SENTINEL NEVER TRAVELS. AL hands the
+                                             ///< value to `OnBeforeTestRun`, and the 8 907
+                                             ///< `LibraryLowerPermissions` call sites resolve
+                                             ///< nothing (board:0224).
                                          ///< \warning EMPTY IS NOT `AutoRollback`. A declared
                                          ///< `AutoRollback` discards the method's writes, as
                                          ///< `attributes/devenv-transactionmodel-attribute.md`
@@ -41,6 +60,41 @@ template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest() {
   (codeunit.*Method)();
 }
 
+/// \brief Calls one HANDLER procedure on a freshly made codeunit, with whatever the dialog hands
+///        it.
+/// \tparam Codeunit The test codeunit's class.
+/// \tparam Method   The handler procedure.
+/// \tparam Arguments What the dialog passes -- the question and the reply, the text, the page.
+/// \param arguments The dialog's own arguments.
+///
+/// \note THE THUNK IS THE ONLY PLACE THE SIGNATURE IS KNOWN. `TestHandler::invoke` is a `void *`
+///       because AL's thirteen handler kinds have thirteen signatures; the caller casts it back to
+///       the one its kind states, and this template is what it points at (board:0054).
+template <typename Codeunit, auto Method>
+void InvokeHandler(std::string_view text, void *reply) {
+  Codeunit codeunit{};
+  if constexpr (requires { (codeunit.*Method)(); }) {
+    static_cast<void>(text);
+    static_cast<void>(reply);
+    (codeunit.*Method)();
+  } else if constexpr (requires { (codeunit.*Method)(::agiru::Text<0>{}); }) {
+    static_cast<void>(reply);
+    (codeunit.*Method)(::agiru::Text<0>{text});
+  } else if constexpr (requires(::agiru::Boolean answer) {
+                         (codeunit.*Method)(::agiru::Text<0>{}, answer);
+                       }) {
+    (codeunit.*Method)(::agiru::Text<0>{text}, *static_cast<::agiru::Boolean *>(reply));
+  } else if constexpr (requires(::agiru::Integer answer) {
+                         (codeunit.*Method)(::agiru::Text<0>{}, answer);
+                       }) {
+    (codeunit.*Method)(::agiru::Text<0>{text}, *static_cast<::agiru::Integer *>(reply));
+  } else {
+    static_cast<void>(text);
+    static_cast<void>(reply);
+    throw Error("A handler of this shape needs a running UI (board:0030)");
+  }
+}
+
 /// \brief One `Subtype = Test` codeunit, as the runner sees it.
 ///
 /// \note IT REGISTERS ITSELF FROM THE GENERATED SOURCE. The alternative is a catalogue file the
@@ -58,7 +112,8 @@ public:
   TestCatalogue(CodeunitId id,
                 std::string_view name,
                 void (*onRun)(),
-                std::span<const TestMethod> methods);
+                std::span<const TestMethod> methods,
+                std::span<const TestHandler> handlers = {});
 
   TestCatalogue(const TestCatalogue &) = delete;
   TestCatalogue(TestCatalogue &&) = delete;
@@ -82,11 +137,16 @@ public:
   /// \return Them, in declaration order.
   [[nodiscard]] std::span<const TestMethod> Methods() const { return methods_; }
 
+  /// \brief The codeunit's handler procedures, whichever cases name them.
+  /// \return The table, empty when the codeunit declares none.
+  [[nodiscard]] std::span<const TestHandler> Handlers() const { return handlers_; }
+
 private:
   CodeunitId id_;
   std::string_view name_;
   void (*onRun_)();
   std::span<const TestMethod> methods_;
+  std::span<const TestHandler> handlers_;
 };
 
 /// \brief What one `[Test]` procedure did.

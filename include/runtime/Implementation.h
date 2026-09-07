@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 #include "type/Enum.h"
 
+#include <concepts>
 #include <string>
 #include <utility>
 
@@ -87,6 +88,38 @@ public:
     return *this = value.Value();
   }
 
+  /// \brief AL `IPrice := PriceCodeunit` -- an interface variable assigned a codeunit that
+  ///        implements the interface refers to THAT instance from now on, and does not own it.
+  /// \tparam C The codeunit, derived from the interface.
+  /// \param codeunit The instance the caller holds.
+  template <typename C>
+    requires std::derived_from<C, I> && (!std::same_as<C, I>)
+  Implementation &operator=(C &codeunit) {
+    Forget();
+    held_ = &codeunit;
+    borrowed_ = true;
+    return *this;
+  }
+
+  /// \brief AL `exit(Rec.Implementation)` from a procedure returning the interface: an enum
+  ///        value becomes the interface variable it names, the same way the assignment does.
+  /// \tparam E The enumeration that implements the interface.
+  /// \param value The value.
+  template <typename E>
+    requires requires(E v) { ImplementationOf(v, static_cast<I *>(nullptr)); }
+  Implementation(const Enum<E> &value) {
+    *this = value;
+  }
+
+  /// \brief The same from a bare enumerator.
+  /// \tparam E The enumeration.
+  /// \param value The enumerator.
+  template <typename E>
+    requires requires(E v) { ImplementationOf(v, static_cast<I *>(nullptr)); }
+  Implementation(E value) {
+    *this = value;
+  }
+
   /// \brief The codeunit bound to this variable.
   /// \return It.
   /// \throws Error when nothing was assigned, which AL calls "the interface is not initialized".
@@ -104,11 +137,13 @@ public:
 
 private:
   void Forget() {
-    delete held_;
+    if (!borrowed_) { delete held_; }
     held_ = nullptr;
+    borrowed_ = false;
   }
 
   I *held_ = nullptr;
+  bool borrowed_ = false;
 };
 
 }

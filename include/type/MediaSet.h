@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/List.h"
 
 #include <string_view>
 
@@ -53,9 +54,10 @@ public:
 
   /// \brief AL `MediaSet.Insert(Guid)`.
   /// \param mediaId The media object to add.
+  /// \return True when the media object was added.
   /// \throws Error always.
   /// \warning REFUSED, for the reason Item gives.
-  void Insert(const Guid &mediaId);
+  ::agiru::Boolean Insert(const Guid &mediaId);
 
   /// \brief AL `MediaSet.ImportFile(Text, Text)`.
   /// \param filename    The full path and name of the file to add.
@@ -64,6 +66,23 @@ public:
   /// \throws Error always.
   /// \warning REFUSED, for the reason Item gives. The refusal names the file.
   Guid ImportFile(std::string_view filename, std::string_view description);
+
+  /// \brief AL `MediaSet.ImportStream(InStream, Text [, Text])`.
+  /// \param Stream      The stream the bytes are read from.
+  /// \param Description Text the client uses to describe the media.
+  /// \param MimeType    The content type; deduced when omitted.
+  /// \return The identifier the media object was given.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason Item gives (board:0031).
+  Guid ImportStream(class InStream &Stream,
+                    std::string_view Description,
+                    std::string_view MimeType = {});
+
+  /// \brief AL `MediaSet.FindOrphans()`.
+  /// \return The identifiers of media sets no record references.
+  /// \throws Error always.
+  /// \warning REFUSED. Finding orphans is a sweep over the tenant media table (board:0031).
+  [[nodiscard]] static ::agiru::List<Guid> FindOrphans();
 
   /// \brief Orders two references by identifier.
   /// \param o The other.

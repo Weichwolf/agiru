@@ -476,6 +476,20 @@ item that cannot say this is not understood yet, and writing that line is most o
 can aim at. **Grep the history before filing**: a removal was a decision. **A defect found while
 working on something else becomes an item in the same round**, even if it closes in that round.
 
+**Three rules for an item whose table a SCRIPT filled, because all three cost a round here.**
+
+- **A generated row carries its source, not only the header.** Two rows of one sweep were wrong --
+  `MediaSet.Insert` returns `Boolean` and not `Guid`, `GetCollectedErrors` a `List of [ErrorInfo]`
+  and not of `Text` -- under an item saying five rows had been read by hand. With the page path
+  beside the row a wrong row is a `grep`; without it, a find.
+- **A mechanical pass cannot tell a NAMING DEFECT from a GAP, so it folds case before reporting
+  one.** `GoToRecord` and `CreateSequentialGuid` were filed as absent while both were written and
+  reachable, spelled `GotoRecord` and `CreateSequential`. That is the name-equality invariant
+  failing silently: another item, another fix, and the counter it belongs to is not this one.
+- **A reason ages and a finding does not.** `Enum.Names()` was filed unwritable "because there is no
+  List type in the runtime", and `include/type/List.h` was there by the time anyone read it. A
+  reason carries the date it was true on, or the item carries only its finding.
+
 ## How the work goes
 
 **Order: get the foundation to the target first, build on it, then close the gaps.** A rebuild
@@ -518,7 +532,7 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **an out parameter never written** | a builtin with a `var` parameter that sets the value only locally | `var` is a reference and the compiler checks it -- closed in C++, provided the generator never copies |
 | **value context** | AL decides at consumption-versus-discard whether a failure throws or yields `false` | the contexts are named: assignment, `if`/`while`, `exit`, argument, `case` selector |
 | **identifier casing** | AL is case-insensitive; diverging casing produces two symbols | collapse match, once, in the generator |
-| **local option enums** | the same bare field name in two objects resolves to wrong ordinals | synthetic, unique names |
+| **local option enums** | the same bare field name in two objects resolves to wrong ordinals; and the SAME `Option A,B` in two procedures named per variable was two C++ types, so a value crossing the boundary was a conversion error (19 over the UT suite) | a synthetic name made of the UNIT and the MEMBER LIST, so equal options are one type and different ones cannot collide |
 | **platform events** | fire whether or not the object declares the trigger | the runtime fires, not the object |
 | **a blind gate** | the analysis finds nothing and reports success because it never ran | a count of 0 over N units is an ABORT, not a pass |
 | **a green negative control** | the control passes, so the proof proves nothing | restate the claim or delete it -- but first check the control tests the right thing |
@@ -526,6 +540,11 @@ Measured failure modes. The first five are inherited from the predecessor and we
 | **a silent no-op edit** | a scripted replacement whose anchor no longer matches after a reformat | **A PATCH ASSERTS ITS ANCHOR BEFORE WRITING** -- one that finds nothing must ABORT, never write the file unchanged. It has happened five times, each after `clang-format` folded a line the anchor spanned, once on a NEGATIVE CONTROL that then reported green because the subject was never removed |
 | **a golden file updated from the output** | the expected file is overwritten with what the generator produced, so it can never disagree again | the target image under `test/target/` is edited BY HAND, one line at a time, and the change is argued for |
 | **a list somebody has to remember to fill** | one entry point sets it, the others get an empty one and emit nothing | it FINDS ITSELF and an empty result is an ABORT -- the door's type list is the `include/type/` directory |
+| **a chain that outlives its failure** | `make 2>&1 \| tail` returns TAIL's status, so the step after a failed build runs anyway -- once as a second transpile beside the next chain's, which corrupted the build directory | a chain sets `pipefail`, tests `PIPESTATUS[0]` and ABORTS; and before a chain starts, `ps` shows no other `agirutc` or `ninja` |
+| **a build step nobody asked for** | CMake scanned every source for C++20 modules -- a second preprocessor pass per unit, and the reason `UNITY_BUILD` silently did nothing for a day (a scanned source is never batched) | `CMAKE_CXX_SCAN_FOR_MODULES OFF`; and a build option is proved by `build.ninja` (`grep -c unity_`), never by the CMakeLists line that asks for it |
+| **a kill that matches its own shell** | `pkill -f chain.sh`, or a `ps \| grep chain.sh \| kill`, from a shell whose command line contains that text -- the shell dies first and nothing after it runs; three shells in one day | a pattern that cannot match itself: `pkill -f "chai[n]\.sh"`, and never `kill` a list a `grep` over `ps` produced without the same bracket |
+| **two ninja runs in one build directory** | `make tc` beside a running `make` writes the same `.ninja_log` and `.ninja_deps`, and the loser rebuilds from a corrupted graph | ONE BUILD AT A TIME, and the wait is filled with reading rather than a second build. `make transpile` and a syntax check on one file are safe; anything that reaches `cmake --build` is not |
+| **a header edited under a running build** | the background `make` compiles a half-written header and dies, or worse records the new mtime over an object built from the old text | **A FULL BUILD OWNS THE TREE WHILE IT RUNS.** What fills the wait is analysis, the board and patches PREPARED in the scratchpad; the edit lands when the build is done, and a door edit is pre-checked with `-fsyntax-only` on one translation unit before it is written at all |
 | **a header trimmed by its own text** | a declaration the HEADER does not name is removed, and its own `.cpp` needed it | a `.cpp` includes its header and stands on what is declared there -- the two halves are written apart and neither may be trimmed alone |
 
 ## The environment
@@ -534,12 +553,40 @@ Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: 7 885
 at ~1 s each is over an hour. Hence `ccache`, hence `lld`, hence the door's parse cost is a measured
 quantity and `make lint` has a node budget.
 
+- **EVERY MINUTE TAKEN OFF COMPILE AND TRANSPILE NOW IS DAYS AND WEEKS OVER THE WHOLE RUN.** This
+  loop is driven by a model and runs hundreds of iterations; compile time is ITS bottleneck, so
+  a build-time saving ranks with a semantic fix and is measured the same way (seconds per unit,
+  minutes per full build, `build/times.log`).
+- **INCREMENTAL FIRST, FULL ONLY WHEN NECESSARY, AND A FULL BUILD ALWAYS IN THE BACKGROUND with
+  the next edit going on beside it.** A change in `src/rt` or `src/gen` is a library rebuild and a
+  relink; a change in a DOOR header is every generated unit, so a door change is tried on ONE
+  generated translation unit with `-fsyntax-only` first and batched with the other door changes
+  of the round. The transpiler runs nearly every iteration while the generator is being worked on,
+  so it is measured like a build step and kept in seconds (board:0589).
+- **A DOOR EDIT IS THE EXPENSIVE EDIT: it invalidates the precompiled header and every unity group.**
+  So door edits are BATCHED per round, each is tried on one generated unit with `-fsyntax-only`
+  (3 s) before the full build, and the full build runs in the background while the next round is
+  prepared. A `src/rt` or `src/gen` edit is a library and a relink; a slice change is one unity
+  group (16 sources, ~30 s). Anything over a few minutes in the foreground is a finding.
+- **`make` LOGS ITS WALL TIME to `build/times.log`** -- timestamp, seconds, slice size -- and the
+  number is watched like a baseline: compile time is THE bottleneck of a loop a model drives, and
+  a door header that costs every generated unit a second is a finding (board:0589 carries the
+  measurements: 8.2 s per 1 000-line table source, 6.6 s of it the door parse).
 - **libstdc++-14 has no `mdspan` and no `flat_map`** (measured; `__cpp_lib_*` undefined under both
   g++-14 and clang++-19). Present and used: `expected`, `print`, `format`, `ranges::to`.
 - **`__int128` is a GNU extension** that `-Wpedantic` rejects on g++ and accepts on clang. Written
   as `__extension__ using U128 = unsigned __int128;`, which silences exactly that one diagnostic on
   both.
-- **PostgreSQL and SQL Server run as Podman containers**, never as system services.
+- **PostgreSQL and SQL Server run as Podman containers**, never as system services. They are
+  `agiru-pg` and `agiru-mssql`, they are STOPPED between sessions, and `podman start agiru-pg` is
+  the whole of bringing the database back -- the data survives. The user is `agiru`; the databases
+  are `cronus` (the demo dataset, 311 MB), `agiru_master` (the read-only template, which refuses
+  connections because that is what a template does), `agiru_test_0`, `agiru_gate` and `agiru`.
+- **A COMPANY IS A SCHEMA AND NOT A PREFIX.** `cronus` holds `"CRONUS International Ltd"` with
+  1 864 tables, `system` with 220, `platform` with 44 -- and `public` is EMPTY. A query over
+  `information_schema.tables WHERE table_schema = 'public'` therefore reports a full database as
+  empty, which has happened here (board:0004). `system` is what `DataPerCompany = false` puts
+  aside and `platform` is the virtual tables.
 - **`max_locks_per_transaction = 1024`** on the PG instance. The BC schema has some 1 600 tables; an
   all-in-one transaction takes one lock per object and blows the default of 64. Set it again when
   the container is recreated -- `postgresql.auto.conf` does not survive `podman rm`.

@@ -8,6 +8,9 @@ Class:    activation
 
 # A field refuses a value below its `MinValue`, but only when the value came from the UI
 
+**The metadata half is done:** carried as `FieldDef::minValue`, the text AL wrote; the parsed bound and the UI boundary remain.
+
+
 `MinValue` "sets the minimum numeric value for a field", and the page tabulates the type it applies
 to: Integer, Decimal, Date and Time -- with `January 1, 0` and `00:00:00` as the Date and Time
 floors, so it is not a numeric-only property.

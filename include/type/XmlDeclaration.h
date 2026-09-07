@@ -14,6 +14,7 @@
 #include "type/Integer.h"
 #include "type/RecordId.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -71,6 +72,12 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Encoding()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Encoding([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string Encoding();
+
   std::string Encoding(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.GetDocument(XmlDocument)`. Gets the XmlDocument for this node.
@@ -139,12 +146,24 @@ public:
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Standalone()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Standalone([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string Standalone();
+
   std::string Standalone(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.Version(Text)`. Gets or sets the version property for this document.
   /// \param NewValue The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlDeclaration.Version()` -- the READING form, which the documentation's syntax
+  /// block brackets: `[X := ] XmlDeclaration.Version([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  std::string Version();
+
   std::string Version(std::string_view NewValue);
 
   /// \brief AL `XmlDeclaration.WriteTo(OutStream)`. Serializes and saves the current node to the
@@ -159,7 +178,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(std::string &Text);
+  ::agiru::Boolean WriteTo(::agiru::Text<0> &Text);
 
   /// \brief AL `XmlDeclaration.WriteTo(XmlWriteOptions, OutStream)`. Serializes and saves the
   /// current node to the given variable.
@@ -176,7 +195,7 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, std::string &Text);
+  ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
 };
 
 }

@@ -49,6 +49,12 @@ public:
   /// \param SetStatusCode The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TestHttpResponseMessage.HttpStatusCode()` -- the READING form, which the documentation
+  ///        brackets: `[X := ] TestHttpResponseMessage.HttpStatusCode([NewX])`.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  [[nodiscard]] ::agiru::Integer HttpStatusCode();
+
   ::agiru::Integer HttpStatusCode(::agiru::Integer SetStatusCode);
 
   /// \brief AL `TestHttpResponseMessage.IsBlockedByEnvironment(Boolean)`. Gets or sets a value that
@@ -57,7 +63,20 @@ public:
   /// \param SetIsBlockedByEnvironment The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TestHttpResponseMessage.IsBlockedByEnvironment()` -- the READING form, which the documentation
+  ///        brackets: `[X := ] TestHttpResponseMessage.IsBlockedByEnvironment([NewX])`.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  [[nodiscard]] ::agiru::Boolean IsBlockedByEnvironment();
+
   ::agiru::Boolean IsBlockedByEnvironment(::agiru::Boolean SetIsBlockedByEnvironment);
+
+  /// \brief AL `TestHttpResponseMessage.IsSuccessfulRequest()` -- the READING form, which the
+  /// documentation's syntax block brackets: `[X := ]
+  /// TestHttpResponseMessage.IsSuccessfulRequest([NewX])`.
+  /// \return Whether the request the mock answers is a successful one.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean IsSuccessfulRequest();
 
   /// \brief AL `TestHttpResponseMessage.IsSuccessfulRequest(Boolean)`. Gets or sets a value that
   /// indicates if the HTTP request was successful or not. By setting this value it is possible to
@@ -72,6 +91,12 @@ public:
   /// \param SetReasonPhrase The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `TestHttpResponseMessage.ReasonPhrase()` -- the READING form, which the documentation
+  ///        brackets: `[X := ] TestHttpResponseMessage.ReasonPhrase([NewX])`.
+  /// \return The value.
+  /// \throws Error always -- the surface is declared, the behaviour is not.
+  [[nodiscard]] std::string ReasonPhrase();
+
   std::string ReasonPhrase(std::string_view SetReasonPhrase);
 };
 

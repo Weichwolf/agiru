@@ -71,9 +71,10 @@ std::string Name(const TableDef &table) {
 
 std::string Columns(const TableDef &table) {
   std::string columns;
-  for (std::size_t i = 0; i < table.fields.size(); ++i) {
-    if (i != 0) { columns += ", "; }
-    columns += Quoted(table.fields[i].name);
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (!columns.empty()) { columns += ", "; }
+    columns += Quoted(field.name);
   }
   return columns;
 }

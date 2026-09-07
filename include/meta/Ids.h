@@ -43,6 +43,8 @@ struct FieldNoTag;    ///< \internal
 struct CodeunitIdTag; ///< \internal
 struct PageIdTag;     ///< \internal
 struct ReportIdTag;   ///< \internal
+struct XmlPortIdTag;  ///< \internal
+struct QueryIdTag;    ///< \internal
 
 using TableId = Id<TableIdTag>;       ///< An AL table number.
 using FieldNo = Id<FieldNoTag>;       ///< An AL field number, unique within its table.
@@ -56,5 +58,7 @@ using PageId = Id<PageIdTag>;         ///< An AL page number.
 ///       `Object ID to Run`, or to a `TestField`. Nothing about the dataitems or the layout is
 ///       needed for that, and board:0034 keeps the rest a hole with a count.
 using ReportId = Id<ReportIdTag>;
+using XmlPortId = Id<XmlPortIdTag>;   ///< An AL xmlport number.
+using QueryId = Id<QueryIdTag>;       ///< An AL query number.
 
 }

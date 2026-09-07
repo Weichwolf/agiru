@@ -12,11 +12,13 @@
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
+#include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
+#include "type/List.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -82,7 +84,11 @@ std::string ApplicationPath();
 /// \param DotNet The AL `DotNet`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean CanLoadType(const ::agiru::Variant &DotNet);
+template <typename T>::agiru::Boolean CanLoadType(const T &DotNet) {
+  static_cast<void>(DotNet);
+  throw ::agiru::Error("System.CanLoadType(DotNet) is declared and not implemented yet "
+                       "(board:0035)");
+}
 
 /// \brief AL `System.CaptionClassTranslate(Text)`. Returns a translated version of the caption
 /// string. The string is translated to the current local language.
@@ -136,7 +142,13 @@ void CodeCoverageRefresh();
 /// \param StringArray The AL `Array of [Text]`.
 /// \return The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer CompressArray(const ::agiru::Variant &StringArray);
+template <typename A>
+  requires requires(const A &array) { array.Length(); } ::agiru::Integer
+CompressArray(A &StringArray) {
+  static_cast<void>(StringArray);
+  throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
+                       "(board:0035)");
+}
 
 /// \brief AL `System.CopyArray(Array of [Any], Array of [Any], Integer, Integer)`. Copies one or
 /// more elements in an array to a new array.
@@ -145,10 +157,18 @@ void CodeCoverageRefresh();
 /// \param Position The AL `Integer`.
 /// \param Length The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void CopyArray(const ::agiru::Variant &NewArray,
-               const ::agiru::Variant &Array,
+template <typename A, typename B>
+  requires requires(const B &array) { array.Length(); }
+void CopyArray(A &NewArray,
+               const B &Array,
                ::agiru::Integer Position,
-               ::agiru::Integer Length = {});
+               ::agiru::Integer Length = {}) {
+  static_cast<void>(NewArray);
+  static_cast<void>(Array);
+  static_cast<void>(Position);
+  static_cast<void>(Length);
+  throw ::agiru::Error("System.CopyArray is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `System.CopyStream(OutStream, InStream, Integer)`. Copies the information that is
 /// contained in an InStream to an OutStream.
@@ -272,6 +292,21 @@ std::string Encrypt(std::string_view PlainTextString);
 /// \param Number The AL `Integer`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+template <typename Any1, typename T>
+  requires requires { typename T::IsAlRefusal; } ::agiru::Boolean
+Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
+  static_cast<void>(Variable);
+  static_cast<void>(Number);
+  return static_cast<::agiru::Boolean>(refusal);
+}
+
+/// \brief AL `Evaluate(Variable, String [, Number])`. Reads a value from its text form.
+/// \tparam Any1 The AL `Any`.
+/// \param Variable The AL `Any`.
+/// \param String The AL `Text`.
+/// \param Number The AL `Integer`.
+/// \return The AL `Boolean`.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 template <typename Any1>
 ::agiru::Boolean Evaluate(Any1 &Variable, std::string_view String, ::agiru::Integer Number = {}) {
   static_cast<void>(Variable);
@@ -304,8 +339,9 @@ void ExportObjects(std::string_view FileName,
 /// \brief AL `System.GetCollectedErrors(Boolean)`. Gets all collected errors in the current
 /// collection scope.
 /// \param Clear The AL `Boolean`.
+/// \return The AL `List of [ErrorInfo]`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void GetCollectedErrors(::agiru::Boolean Clear = {});
+::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear = {});
 
 /// \brief AL `System.GetDocumentUrl(Guid)`. Gets the URL for the specified temporary media object
 /// ID.
@@ -538,12 +574,12 @@ CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
-                                     std::string &FileName,
-                                     std::string &Description,
+                                     ::agiru::Text<0> &FileName,
+                                     ::agiru::Text<0> &Description,
                                      ::agiru::Boolean &HasApplication,
                                      ::agiru::Boolean &HasApplicationData,
                                      ::agiru::Boolean &HasGlobalData,
-                                     std::string &tenantId,
+                                     ::agiru::Text<0> &tenantId,
                                      ::agiru::DateTime &exportDate,
                                      ::agiru::RecordRef &CompanyRecord);
 
@@ -559,7 +595,7 @@ CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             std::string_view Description = {},
                             ::agiru::Boolean IncludeApplication = {},
                             ::agiru::Boolean IncludeApplicationData = {},
@@ -593,7 +629,7 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type);
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             ::agiru::Boolean IncludeApplicationData = {},
                             ::agiru::Boolean IncludeGlobalData = {},
                             const ::agiru::RecordRef &CompanyRecord = {});
@@ -713,18 +749,6 @@ std::string TenantId();
 /// \param Name The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::string_view Name);
-
-/// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on to the
-/// current session.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string UserId();
-
-/// \brief AL `Database.UserSecurityId()`. Gets the unique identifier of the user that is logged on
-/// to the current session.
-/// \return The AL `Guid`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Guid UserSecurityId();
 
 /// \brief AL `Session.ApplicationArea(Text)`. Gets or sets the application areas for the current
 /// session.
@@ -859,11 +883,28 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              ::agiru::Duration Timeout,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record);
+/// \brief AL `StartSession(Timeout, Company, Record)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             ::agiru::Duration Timeout,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Timeout);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record, Duration)`. Starts a session
 /// without a UI and runs the specified codeunit.
@@ -874,11 +915,28 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Timeout The AL `Duration`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record,
-                              ::agiru::Duration Timeout);
+/// \brief AL `StartSession(Company, Record, Timeout)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record,
+             ::agiru::Duration Timeout) {
+  static_cast<void>(Timeout);
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StartSession(Integer, Integer, Text, Record)`. Starts a session without a UI
 /// and runs the specified codeunit.
@@ -888,10 +946,26 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \param Record The AL `Record`.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record);
+/// \brief AL `StartSession(Company, Record)` -- the record travels as its OWN table.
+/// \tparam R The record's class, because AL hands a `var Record` of any table.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in.
+/// \param Record     The record it starts on.
+/// \return Never.
+/// \throws Error always -- a background session needs a session layer (board:0035).
+template <typename R>
+  requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
+StartSession(::agiru::Integer &SessionId,
+             ::agiru::Integer CodeunitId,
+             std::string_view Company,
+             R &Record) {
+  static_cast<void>(SessionId);
+  static_cast<void>(CodeunitId);
+  static_cast<void>(Company);
+  static_cast<void>(Record);
+  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
 
 /// \brief AL `Session.StopSession(Integer, Text)`. Stops a session.
 /// \param SessionId The AL `Integer`.
@@ -907,17 +981,6 @@ void SetDocumentServiceToken(std::string_view Token);
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean UnbindSubscription(const ::agiru::Variant &Codeunit);
-
-/// \brief AL `Dialog.Confirm(Text, Boolean, Any)`. Creates a dialog box that prompts the user for a
-/// yes or no answer. The dialog box is centered on the screen.
-/// \param String The AL `Text`.
-/// \param Default The AL `Boolean`.
-/// \param Value1 The AL `Any`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Confirm(std::string_view String,
-                         ::agiru::Boolean Default = {},
-                         const ::agiru::Variant &Value1 = {});
 
 /// \brief AL `Dialog.LogInternalError(Text, DataClassification, Verbosity)`. Log internal errors
 /// for telemetry.
@@ -940,12 +1003,6 @@ void LogInternalError(std::string_view Message,
                       std::string_view SubstitutionString,
                       const ::agiru::DataClassification &DataClassificationInstance,
                       const ::agiru::Verbosity &VerbosityInstance);
-
-/// \brief AL `Dialog.Message(Text, Any)`. Displays a text string in a message window.
-/// \param String The AL `Text`.
-/// \param Value The AL `Any`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Message(std::string_view String, const ::agiru::Variant &Value = {});
 
 /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series of
 /// options.
@@ -979,7 +1036,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                           std::string_view DialogTitle,
                           std::string_view ToFolder,
                           std::string_view ToFilter,
-                          std::string &ToFile);
+                          ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from server
 /// computer to the client computer. The client computer is the computer that is running the Windows
@@ -995,7 +1052,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,
                                     std::string_view ToFilter,
-                                    std::string &ToFile);
+                                    ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.Erase(Text)`. Deletes a file.
 /// \param Name The AL `Text`.
@@ -1054,7 +1111,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
                         std::string_view FromFolder,
                         std::string_view FromFilter,
                         std::string_view FromFile,
-                        std::string &ToFile);
+                        ::agiru::Text<0> &ToFile);
 
 /// \brief AL `File.UploadIntoStream(Text, InStream)`. Sends a file from the client computer to the
 /// corresponding server. The client computer is the computer that is running a browser that
@@ -1078,7 +1135,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value = {});
 ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                   std::string_view FromFolder,
                                   std::string_view FromFilter,
-                                  std::string &FromFile,
+                                  ::agiru::Text<0> &FromFile,
                                   ::agiru::InStream &InStream);
 
 /// \brief AL `File.View(Text, Boolean)`. Opens a file from server computer on the client computer

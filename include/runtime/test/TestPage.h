@@ -6,6 +6,7 @@
 #include "runtime/test/TestField.h"
 #include "runtime/test/TestFilter.h"
 #include "type/Boolean.h"
+#include "type/Dictionary.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 
@@ -107,13 +108,35 @@ public:
   /// \throws Error until a page runs (board:0030).
   Boolean Prev() { Unopened(); }
 
-  /// \brief AL `TestPage.GotoRecord(Record)` -- positions the page on a record.
+  /// \brief AL `TestPage.GoToRecord(Record)` -- positions the page on a record.
   /// \tparam R The record's type.
   /// \param Record The record to stand on.
   /// \return Whether the page could.
   /// \throws Error until a page runs (board:0030).
-  template <typename R> Boolean GotoRecord(const R &Record) {
+  template <typename R> Boolean GoToRecord(const R &Record) {
     static_cast<void>(Record);
+    Unopened();
+  }
+
+  /// \brief AL `TestPage.Edit()` -- switches a page opened for viewing into edit mode.
+  /// \return The action the page answered with.
+  /// \throws Error until a page runs (board:0030).
+  TestAction Edit() { Unopened(); }
+
+  /// \brief AL `TestPage.RunPageBackgroundTask(Integer [, var Dictionary of [Text, Text]]
+  ///        [, Boolean])`.
+  /// \param CodeunitId           The codeunit the task runs.
+  /// \param Parameters           What the task is handed; the task may write into it.
+  /// \param RunCompletionTriggers Whether `OnPageBackgroundTaskCompleted` fires.
+  /// \return What the task put into its result dictionary.
+  /// \throws Error until a page runs (board:0030).
+  Dictionary<std::string, std::string>
+  RunPageBackgroundTask(Integer CodeunitId,
+                        Dictionary<std::string, std::string> &Parameters,
+                        Boolean RunCompletionTriggers = {}) {
+    static_cast<void>(CodeunitId);
+    static_cast<void>(Parameters);
+    static_cast<void>(RunCompletionTriggers);
     Unopened();
   }
 
@@ -192,17 +215,29 @@ public:
   /// \brief AL `TestPage.FindFirstField()` -- the first control that takes input.
   /// \return The control.
   /// \throws Error until a page runs (board:0030).
-  TestField FindFirstField() { Unopened(); }
+  template <typename V> Boolean FindFirstField(const TestField &field, const V &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
+    Unopened();
+  }
 
   /// \brief AL `TestPage.FindNextField()` -- the control after the current one.
   /// \return The control.
   /// \throws Error until a page runs (board:0030).
-  TestField FindNextField() { Unopened(); }
+  template <typename V> Boolean FindNextField(const TestField &field, const V &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
+    Unopened();
+  }
 
   /// \brief AL `TestPage.FindPreviousField()` -- the control before the current one.
   /// \return The control.
   /// \throws Error until a page runs (board:0030).
-  TestField FindPreviousField() { Unopened(); }
+  template <typename V> Boolean FindPreviousField(const TestField &field, const V &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
+    Unopened();
+  }
 
   /// \brief AL `TestPage.GetField(No)` -- a control by its field number.
   /// \param No The field number.

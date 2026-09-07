@@ -242,6 +242,11 @@ else
   printf 'lint: doxygen is not installed, so the door is not checked.\n' >&2
 fi
 
+printf '\n== the documented triggers ==\n'
+# THE COUNT OF NAMED TRIGGERS IS A BASELINE THAT MAY ONLY RISE (board:0588): a documented trigger
+# the tree never names is fired by nothing, declared by nothing and refused by nothing.
+python3 test/triggers.py --record || exit 1
+
 printf '\n== the AL population ==\n'
 # THE COUNT OF TRANSLATED OBJECTS IS A BASELINE THAT MAY ONLY RISE. It is the one number that says
 # how much of BC this tree can read, and it is measured over the WHOLE population rather than a

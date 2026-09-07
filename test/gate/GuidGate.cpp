@@ -78,9 +78,9 @@ void SequentialGuidsRiseWithTime() {
   // has to rise; the rest may not.
   constexpr int kHowMany = 64;
   bool rising = true;
-  Guid previous = Guid::CreateSequential();
+  Guid previous = Guid::CreateSequentialGuid();
   for (int i = 0; i < kHowMany; ++i) {
-    const Guid next = Guid::CreateSequential();
+    const Guid next = Guid::CreateSequentialGuid();
     // The timestamp has millisecond resolution, so two in the same millisecond may tie on the
     // prefix; what must never happen is the prefix going backwards.
     for (std::size_t at = 0; at < kTimestampBytes; ++at) {
@@ -94,7 +94,7 @@ void SequentialGuidsRiseWithTime() {
   CHECK_TRUE("the leading bytes never go backwards", rising);
   CHECK_TRUE("and it is still a well-formed version 7", IsWellFormed(previous, 7));
   CHECK_TRUE("a sequential GUID differs from a random one",
-             Guid::CreateSequential() != Guid::Create());
+             Guid::CreateSequentialGuid() != Guid::Create());
 }
 
 } // namespace

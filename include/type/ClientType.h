@@ -28,6 +28,14 @@ enum class ClientType : std::int32_t {
   ODataV4,      ///< A ODataV4 client.
   Api,          ///< An API client.
   Teams,        ///< Microsoft Teams client.
+
+  /// \brief An ODataV3 client.
+  ///
+  /// \warning IT STANDS LAST BECAUSE THE ORDER IS THE ORDINALS. `clienttype-option.md` does not
+  ///          name this member and the BaseApp's own test suite uses it eight times, so it is
+  ///          carried -- but putting it beside `ODataV4`, where it belongs by name, would move
+  ///          `ODataV4`, `Api` and `Teams` by one.
+  ODataV3,
 };
 
 }

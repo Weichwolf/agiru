@@ -43,6 +43,14 @@ feature but 298 `CREATE TABLE`s for tables BC never creates.
 Not among the nine properties the generator consumes (board:0067). `src/rt/Storage.cpp:94` creates a
 relation for every table; `src/rt/Table.cpp` knows no temporary mode.
 
+## Done 2026-09-05: the enumerator and the refusal
+
+`TableDef::tableType` is `enum class TableType` in the page's order, emitted by name; `CRM`, `CDS`,
+`ExternalSQL`, `Exchange` and `MicrosoftGraph` are refused value rules in `src/gen/Refused.cpp`
+and land in the refused-property census. **The storage half stays open**: `Temporary` still gets a
+`CREATE TABLE`, because skipping it before the in-memory store exists (board:0583) turns a green
+`Insert` into a missing relation -- the activation trap, so it waits for the store.
+
 ## The choice
 
 A `TableType` enumerator on `TableDef`, and three different fates:

@@ -29,7 +29,6 @@ constexpr std::array kLevels{
     Level{.precedence = 1, .word = "<="},
     Level{.precedence = 1, .word = ">"},
     Level{.precedence = 1, .word = ">="},
-    Level{.precedence = 1, .word = "in"},
     Level{.precedence = 1, .word = "is"},
     Level{.precedence = 1, .word = "as"},
     Level{.precedence = 2, .word = "+"},
@@ -41,6 +40,7 @@ constexpr std::array kLevels{
     Level{.precedence = 3, .word = "mod"},
     Level{.precedence = 3, .word = "and"},
     Level{.precedence = 3, .word = "xor"},
+    Level{.precedence = 4, .word = "in"},
 };
 
 class Reader {
@@ -148,7 +148,18 @@ private:
       }
       return leave;
     }
-    if (AtKeyword("break")) {
+    if (AtKeyword("continue") && !IsPunctuation(Peek(1), ":=") && !IsPunctuation(Peek(1), ".") &&
+        !IsPunctuation(Peek(1), "(") && !IsPunctuation(Peek(1), "[")) {
+      Advance();
+      return Stmt{.kind = StmtKind::Continue,
+                  .expression = {},
+                  .labels = {},
+                  .body = {},
+                  .otherwise = {},
+                  .descending = false};
+    }
+    if (AtKeyword("break") && !IsPunctuation(Peek(1), ":=") && !IsPunctuation(Peek(1), ".") &&
+        !IsPunctuation(Peek(1), "(") && !IsPunctuation(Peek(1), "[")) {
       Advance();
       return Stmt{.kind = StmtKind::Break,
                   .expression = {},
@@ -350,6 +361,14 @@ private:
         Advance();
         Expr scope{.kind = ExprKind::Scope, .text = Peek().text, .children = {}};
         Advance();
+        while (AtPunctuation(".") && position_ + 2 < tokens_.size() &&
+               tokens_[position_ + 1].kind != TokenKind::Punctuation &&
+               !(tokens_[position_ + 2].kind == TokenKind::Punctuation &&
+                 tokens_[position_ + 2].text == "(")) {
+          Advance();
+          scope.text = Peek().text;
+          Advance();
+        }
         scope.children.push_back(std::move(value));
         value = std::move(scope);
         continue;

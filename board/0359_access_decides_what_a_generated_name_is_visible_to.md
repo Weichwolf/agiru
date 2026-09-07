@@ -8,6 +8,9 @@ Class:    activation
 
 # `Access` decides what a generated name is visible to
 
+**The metadata half is done:** carried as `FieldDef::access`, the text AL wrote; the C++ member access remains.
+
+
 > **Version**: runtime 4.0. Applies to: Codeunit, Query, Table, **Table field**, Enum Type,
 > Interface, Permission Set.
 >
@@ -102,3 +105,11 @@ table fails to compile; `Protected` compiles from a table extension and not from
 **The negative control is the compile failure** -- a gate that only checks the generated text passes
 on a member spelled `private` in a class that has no access control anywhere, and only an actual
 failing translation unit proves the visibility.
+
+## The metadata half landed 2026-09-07 (board:0553)
+
+The property this item is about now reaches `constexpr` metadata -- `ControlDef`/`PageDef` in
+`include/meta/PageDef.h`, `FieldDef`/`TableDef` in `meta/TableDef.h`, `CodeunitDef` in
+`meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
+What is open here is what READS it, not what carries it: the property census over the whole BaseApp
+went from 46 203 declarations dropped in silence to 813 in the same round.

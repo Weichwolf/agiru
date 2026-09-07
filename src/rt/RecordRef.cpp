@@ -58,9 +58,22 @@ std::string_view FieldRef::GetEnumValueNameFromOrdinalValue(Integer ordinal) con
   return value != nullptr ? value->name : std::string_view{};
 }
 
-List<std::string> FieldRef::OptionMembers() const {
-  List<std::string> members;
-  for (const EnumValueDef &value : def_->values) { members.Add(std::string(value.name)); }
+std::string_view FieldRef::GetEnumValueCaption(Integer index) const {
+  if (index < 1 || static_cast<std::size_t>(index) > def_->values.size()) { return {}; }
+  return def_->values[static_cast<std::size_t>(index) - 1].caption;
+}
+
+std::string_view FieldRef::GetEnumValueCaptionFromOrdinalValue(Integer ordinal) const {
+  const EnumValueDef *value = ValueOf(def_->values, ordinal);
+  return value != nullptr ? value->caption : std::string_view{};
+}
+
+std::string FieldRef::OptionMembers() const {
+  std::string members;
+  for (const EnumValueDef &value : def_->values) {
+    if (!members.empty()) { members += ','; }
+    members += value.name;
+  }
   return members;
 }
 

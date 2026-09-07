@@ -8,6 +8,10 @@ Class:    silent-wrong-data
 
 # An `ObsoleteTag` is carried and never interpreted
 
+**The metadata half is done.** `ObsoleteTag` reaches `FieldDef::obsoleteTag`; carrying it was the whole item's target for the
+field case, and what remains is the object case and the diagnostic that prints it.
+Emitted by `src/gen/TableWriter.cpp` into `constexpr` `.rodata` beside every table.
+
 > Specifies a **free-form text** to support tracking of where and when the object was marked as
 > obsolete, for example, **branch, build, or date** of obsoleting the object.
 

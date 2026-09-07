@@ -2,6 +2,8 @@
 
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Scopes.h"
+#include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -13,15 +15,18 @@
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
+#include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/KeyRef.h"
+#include "type/List.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/TableConnectionType.h"
+#include "type/Text.h"
 #include "type/Time.h"
 #include "type/TransactionType.h"
 #include "type/Variant.h"
@@ -59,11 +64,6 @@ std::string ApplicationPath() {
   RefuseDoor("System.CalcDate(Text, Date)");
 }
 
-::agiru::Boolean CanLoadType(const ::agiru::Variant &DotNet) {
-  static_cast<void>(DotNet);
-  RefuseDoor("System.CanLoadType(DotNet)");
-}
-
 std::string CaptionClassTranslate(std::string_view CaptionClassText) {
   static_cast<void>(CaptionClassText);
   RefuseDoor("System.CaptionClassTranslate(Text)");
@@ -74,7 +74,7 @@ void ClearAll() {
 }
 
 void ClearCollectedErrors() {
-  RefuseDoor("System.ClearCollectedErrors()");
+  ErrorScope::Clear();
 }
 
 ::agiru::Date ClosingDate(::agiru::Date Date) {
@@ -99,22 +99,6 @@ void CodeCoverageLoad() {
 
 void CodeCoverageRefresh() {
   RefuseDoor("System.CodeCoverageRefresh()");
-}
-
-::agiru::Integer CompressArray(const ::agiru::Variant &StringArray) {
-  static_cast<void>(StringArray);
-  RefuseDoor("System.CompressArray(Array of [Text])");
-}
-
-void CopyArray(const ::agiru::Variant &NewArray,
-               const ::agiru::Variant &Array,
-               ::agiru::Integer Position,
-               ::agiru::Integer Length) {
-  static_cast<void>(NewArray);
-  static_cast<void>(Array);
-  static_cast<void>(Position);
-  static_cast<void>(Length);
-  RefuseDoor("System.CopyArray(Array of [Any], Array of [Any], Integer, Integer)");
 }
 
 ::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,
@@ -218,9 +202,13 @@ void ExportObjects(std::string_view FileName,
   RefuseDoor("System.ExportObjects(Text, Record, Integer)");
 }
 
-void GetCollectedErrors(::agiru::Boolean Clear) {
-  static_cast<void>(Clear);
-  RefuseDoor("System.GetCollectedErrors(Boolean)");
+::agiru::List<::agiru::ErrorInfo> GetCollectedErrors(::agiru::Boolean Clear) {
+  ::agiru::List<::agiru::ErrorInfo> collected;
+  for (const std::string &message : ErrorScope::Collected()) {
+    collected.Add(::agiru::ErrorInfo::Create(message, true));
+  }
+  if (Clear) { ErrorScope::Clear(); }
+  return collected;
 }
 
 std::string GetDocumentUrl(::agiru::Guid ID) {
@@ -255,15 +243,25 @@ std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
   RefuseDoor("System.GlobalLanguage(Integer)");
 }
 
+bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
+  const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
+  if (handler == nullptr) { return false; }
+  HandlerTable::Ran(*handler);
+  handler->invoke(text, reply);
+  return true;
+}
+
 ::agiru::Boolean GuiAllowed() {
+  if (HandlerTable::Installed()) { return true; }
   RefuseDoor("System.GuiAllowed()");
 }
 
 ::agiru::Boolean HasCollectedErrors() {
-  RefuseDoor("System.HasCollectedErrors()");
+  return !ErrorScope::Collected().empty();
 }
 
 void Hyperlink(std::string_view URL) {
+  if (AnsweredByHandler(3, URL, nullptr)) { return; }
   static_cast<void>(URL);
   RefuseDoor("System.Hyperlink(Text)");
 }
@@ -389,12 +387,12 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
 }
 
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
-                                     std::string &FileName,
-                                     std::string &Description,
+                                     ::agiru::Text<0> &FileName,
+                                     ::agiru::Text<0> &Description,
                                      ::agiru::Boolean &HasApplication,
                                      ::agiru::Boolean &HasApplicationData,
                                      ::agiru::Boolean &HasGlobalData,
-                                     std::string &tenantId,
+                                     ::agiru::Text<0> &tenantId,
                                      ::agiru::DateTime &exportDate,
                                      ::agiru::RecordRef &CompanyRecord) {
   static_cast<void>(ShowDialog);
@@ -411,7 +409,7 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
 }
 
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             std::string_view Description,
                             ::agiru::Boolean IncludeApplication,
                             ::agiru::Boolean IncludeApplicationData,
@@ -440,7 +438,7 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) 
 }
 
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
-                            std::string &FileName,
+                            ::agiru::Text<0> &FileName,
                             ::agiru::Boolean IncludeApplicationData,
                             ::agiru::Boolean IncludeGlobalData,
                             const ::agiru::RecordRef &CompanyRecord) {
@@ -532,14 +530,6 @@ void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::st
   static_cast<void>(Type);
   static_cast<void>(Name);
   RefuseDoor("Database.UnregisterTableConnection(TableConnectionType, Text)");
-}
-
-std::string UserId() {
-  RefuseDoor("Database.UserId()");
-}
-
-::agiru::Guid UserSecurityId() {
-  RefuseDoor("Database.UserSecurityId()");
 }
 
 std::string ApplicationArea(std::string_view ApplicationArea) {
@@ -643,43 +633,6 @@ void SetDocumentServiceToken(std::string_view Token) {
   RefuseDoor("Session.SetDocumentServiceToken(Text)");
 }
 
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              ::agiru::Duration Timeout,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Timeout);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  RefuseDoor("Session.StartSession(Integer, Integer, Duration, Text, Record)");
-}
-
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record,
-                              ::agiru::Duration Timeout) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  static_cast<void>(Timeout);
-  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record, Duration)");
-}
-
-::agiru::Boolean StartSession(::agiru::Integer &SessionId,
-                              ::agiru::Integer CodeunitId,
-                              std::string_view Company,
-                              ::agiru::RecordRef &Record) {
-  static_cast<void>(SessionId);
-  static_cast<void>(CodeunitId);
-  static_cast<void>(Company);
-  static_cast<void>(Record);
-  RefuseDoor("Session.StartSession(Integer, Integer, Text, Record)");
-}
-
 ::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment) {
   static_cast<void>(SessionId);
   static_cast<void>(Comment);
@@ -689,14 +642,6 @@ void SetDocumentServiceToken(std::string_view Token) {
 ::agiru::Boolean UnbindSubscription(const ::agiru::Variant &Codeunit) {
   static_cast<void>(Codeunit);
   RefuseDoor("Session.UnbindSubscription(Codeunit)");
-}
-
-::agiru::Boolean
-Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1) {
-  static_cast<void>(String);
-  static_cast<void>(Default);
-  static_cast<void>(Value1);
-  RefuseDoor("Dialog.Confirm(Text, Boolean, Any)");
 }
 
 void LogInternalError(std::string_view Message,
@@ -719,12 +664,6 @@ void LogInternalError(std::string_view Message,
   RefuseDoor("Dialog.LogInternalError(Text, Text, DataClassification, Verbosity)");
 }
 
-void Message(std::string_view String, const ::agiru::Variant &Value) {
-  static_cast<void>(String);
-  static_cast<void>(Value);
-  RefuseDoor("Dialog.Message(Text, Any)");
-}
-
 ::agiru::Integer StrMenu(std::string_view OptionMembers,
                          ::agiru::Integer DefaultNumber,
                          std::string_view Instruction) {
@@ -744,7 +683,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                           std::string_view DialogTitle,
                           std::string_view ToFolder,
                           std::string_view ToFilter,
-                          std::string &ToFile) {
+                          ::agiru::Text<0> &ToFile) {
   static_cast<void>(FromFile);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -757,7 +696,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,
                                     std::string_view ToFilter,
-                                    std::string &ToFile) {
+                                    ::agiru::Text<0> &ToFile) {
   static_cast<void>(InStream);
   static_cast<void>(DialogTitle);
   static_cast<void>(ToFolder);
@@ -805,7 +744,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
                         std::string_view FromFolder,
                         std::string_view FromFilter,
                         std::string_view FromFile,
-                        std::string &ToFile) {
+                        ::agiru::Text<0> &ToFile) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);
   static_cast<void>(FromFilter);
@@ -823,7 +762,7 @@ void Message(std::string_view String, const ::agiru::Variant &Value) {
 ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
                                   std::string_view FromFolder,
                                   std::string_view FromFilter,
-                                  std::string &FromFile,
+                                  ::agiru::Text<0> &FromFile,
                                   ::agiru::InStream &InStream) {
   static_cast<void>(DialogTitle);
   static_cast<void>(FromFolder);

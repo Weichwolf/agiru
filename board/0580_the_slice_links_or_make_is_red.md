@@ -9,6 +9,32 @@ than nowhere, because the commits that made this item still say the old one.
 
 # The slice links, or `make` is red -- and the ApplicationArea chain is what it is waiting for
 
+## Measured 2026-09-04: the slice is OPEN by 1 072 symbols and the loader picks which one kills the run
+
+`nm -uC build/libagiru_slice.so | grep agiru::app` counts **1 072 undefined symbols** over some
+sixty objects. That is not new -- it was true while the run reported 7 of 61 -- and the reason the
+run worked at all is that nothing REACHED any of them. Implementing `Database.UserId()` moved one
+into reach and the process died at load with `symbol lookup error`, which is what board:0071
+originally recorded as "the run dies at the first call".
+
+**So the criterion is not "the slice compiles" and it is not "the slice is closed" either -- it is
+whether a symbol a test reaches has a definition linked**, and no static check answers that without
+a call graph. Three findings from working it:
+
+- **Shrinking the slice is the wrong move and it was tried.** A script that dropped whichever slice
+  entry named the missing owner took out `ERMVATToolUT` and `ERMDocumentTotalsUT`, which are
+  COMMITTED entries, and the run fell from 7 of 61 to 7 of 18. The slice may only grow; the fix is
+  always on the callee's side.
+- **The callees are the TEST LIBRARIES and most of them compile.** `LibrarySales`,
+  `LibraryERMCountryData` and `EnvironmentInfoTestLibrary` are clean today;
+  `LibraryNonDeductibleVAT` failed on one `-Wunused-variable` in generated code and `LibraryERM` on
+  one `Validate(Field, Variant)`. Both were generic gaps and both are closed now -- which is the
+  shape this item should expect: **a library that does not link names one gap in `src/`, not a
+  reason to leave it out.**
+- **`-Wl,--no-undefined` is still the wrong gate at 1 072.** It would make `make` red until the
+  whole transitive closure compiles, and `make` is the one-second loop. What fits is a COUNTER: the
+  undefined-symbol count beside the slice's line count, which a commit may lower and never raise.
+
 `test/slice` names the generated sources linked into `agiru`, and CLAUDE.md gives it one rule: it
 may only GROW, and `make` is red the day one of them stops compiling. **It says nothing about
 LINKING, and that gap has a shape:** a slice with an unresolved symbol builds green, and the run
@@ -27,6 +53,14 @@ It is not applied yet, and the reason is a rule collision that has to be decided
 guessed: with it, a slice member whose closure is incomplete cannot be in the slice -- and the slice
 may only GROW, so nothing may leave. Today `ERM Document Totals UT` is in it and its closure is not
 complete, so the two rules cannot both hold.
+
+**The loop that grows the slice (2026-09-04, evening).** A candidate joins `test/slice`, the tree
+builds, `agiru run-tests` runs; a `symbol lookup error` names the OWNER of the missing definition,
+and the owner's own `.cpp` is the next candidate if it compiles clean. Run over 35 candidates it kept
+23 and named the same handful of owners every time -- `Library - ERM`, `Library - Sales`,
+`Library - Purchase`, `Library - Variable Storage`, `Library - Random`, `API Mock Events`,
+`Environment Information Impl.` -- which is the closure this item is waiting on, sized from the
+run rather than from `nm`.
 
 ## What the chain actually is, measured 2026-09-04
 

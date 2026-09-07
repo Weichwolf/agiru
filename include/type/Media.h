@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
+#include "type/List.h"
 
 #include <string_view>
 
@@ -82,7 +83,35 @@ public:
   /// \return The file that was written.
   /// \throws Error always.
   /// \warning REFUSED, for the reason ImportFile gives. The refusal names the media object.
-  [[nodiscard]] std::string_view ExportFile(std::string_view filename) const;
+  std::string_view ExportFile(std::string_view filename) const;
+
+  /// \brief AL `Media.ExportStream(OutStream)`.
+  /// \param Stream The stream the media object's bytes are written to.
+  /// \return True when the media object was written.
+  /// \throws Error always.
+  /// \warning REFUSED. Exporting reads bytes out of the tenant media table (board:0031).
+  Boolean ExportStream(class OutStream &Stream);
+
+  /// \brief AL `Media.ImportStream(InStream, Text [, Text] [, Text])`.
+  /// \param Stream      The stream the bytes are read from.
+  /// \param Description Text the client uses to describe the media.
+  /// \param MimeType    The content type; deduced when omitted.
+  /// \param FileName    The name the client shows for the media.
+  /// \return The identifier the media object was given.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason ImportFile gives (board:0031).
+  Guid ImportStream(class InStream &Stream,
+                    std::string_view Description,
+                    std::string_view MimeType = {},
+                    std::string_view FileName = {});
+
+  /// \brief AL `Media.FindOrphans()`.
+  /// \return The identifiers of media objects no record references.
+  /// \throws Error always.
+  /// \warning REFUSED. Finding orphans is a sweep over the tenant media table (board:0031).
+  /// \note A STATIC method, as `media-findorphans-method.md` writes it: the syntax is
+  ///       `Orphans := Media.FindOrphans()` with no instance in the parameter list.
+  [[nodiscard]] static ::agiru::List<Guid> FindOrphans();
 
   /// \brief Orders two references by identifier.
   /// \param o The other.
