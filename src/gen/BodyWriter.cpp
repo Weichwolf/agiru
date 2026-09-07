@@ -1387,8 +1387,10 @@ public:
       }
       return AsTheDoorSpellsIt(Identifier(member.field));
     }
-    if (IsRecord(member.variable) && FieldNamed(table_, member.field) != nullptr) {
-      return Identifier(member.field);
+    if (const al::FieldDecl *own =
+            IsRecord(member.variable) ? FieldNamed(table_, member.field) : nullptr;
+        own != nullptr) {
+      return FieldIdentifier(table_, own->name);
     }
     for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
       if (where == nullptr) { continue; }
@@ -1596,9 +1598,13 @@ public:
           PlatformFieldSpelling(PlatformField{.table = where->subtype, .field = member.field});
       if (!platform.empty()) { return platform; }
     }
-    if (!IsRecord(member.variable) || FieldNamed(*source_, member.field) != nullptr) {
-      return Identifier(member.field);
+    if (const al::FieldDecl *own = IsRecord(member.variable) && source_ != nullptr
+                                       ? FieldNamed(*source_, member.field)
+                                       : nullptr;
+        own != nullptr) {
+      return FieldIdentifier(*source_, own->name);
     }
+    if (!IsRecord(member.variable)) { return Identifier(member.field); }
     return AsTheDoorSpellsIt(member.field);
   }
 
