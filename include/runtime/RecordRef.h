@@ -289,13 +289,14 @@ public:
   [[nodiscard]] std::string_view
   GetEnumValueCaptionFromOrdinalValue(::agiru::Integer Ordinal) const;
 
-  /// \brief AL `FieldRef.GetFilter()`. Gets the filter that is currently applied to the field
-  /// referred to by FieldRef.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetFilter() const {
-    throw Error("FieldRef.GetFilter() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.GetFilter()`. The filter standing on this field.
+  ///
+  /// \return The filter expression, or the empty string when nothing narrows the field.
+  ///
+  /// \note IT READS WHAT `SetRange` AND `SetFilter` WROTE, out of the record's own state and out
+  ///       of the CURRENT filter group -- the same list `Record.GetFilter(Field)` reads, reached
+  ///       by number instead of by member.
+  [[nodiscard]] std::string GetFilter() const;
 
   /// \brief AL `FieldRef.GetRangeMax()`. Gets the maximum value in a range for a field.
   /// \return The AL `Any`.
@@ -400,17 +401,19 @@ public:
                 std::string(String));
   }
 
-  /// \brief AL `FieldRef.SetRange(Any, Any)`. Sets a simple filter on a field, such as a single
-  /// range or a single value.
-  /// \param FromValue The AL `Any`.
-  /// \param ToValue The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetRange(const ::agiru::Variant &FromValue = {},
-                const ::agiru::Variant &ToValue = {}) const {
-    static_cast<void>(FromValue);
-    static_cast<void>(ToValue);
-    throw Error("FieldRef.SetRange(Any, Any) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.SetRange([From] [, To])`. Narrows the field to a value or a range.
+  ///
+  /// \param FromValue The value, or the lower bound; omitted, the filter is cleared.
+  /// \param ToValue   The upper bound; omitted, the field must EQUAL `FromValue`.
+  ///
+  /// \note IT WRITES THE SAME FILTER `Record.SetRange` WRITES, into the same per-field list in the
+  ///       record's own state. A FieldRef is a field of a record reached by number instead of by
+  ///       member, so there is nothing else for it to write into.
+  ///
+  /// \note THE VALUE RENDERS AS FORMAT 9 AND NOT AS A CAPTION. A filter holds what the COLUMN
+  ///       holds, so an option is its ordinal -- `Format(Value, 0, 9)` is the invariant form, and
+  ///       the caption form would put `Email` where the column wants `3` (openerp WI-1008).
+  void SetRange(const ::agiru::Variant &FromValue = {}, const ::agiru::Variant &ToValue = {}) const;
 
   /// \brief AL `FieldRef.Validate(Any)`. Use this method to enter a new value into a field and have
   /// the new value validated by the properties and code that have been defined for that field.
@@ -655,9 +658,7 @@ public:
   /// currently applied to the table referred to by the RecordRef.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Count() {
-    throw Error("RecordRef.Count() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Integer Count();
 
   /// \brief AL `RecordRef.CountApprox()`. Gets an approximate count of the number of records in the
   /// table
@@ -753,18 +754,13 @@ public:
   /// \param Which The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Find(std::string_view Which = {}) {
-    static_cast<void>(Which);
-    throw Error("RecordRef.Find(Text) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean Find(std::string_view Which = {});
 
   /// \brief AL `RecordRef.FindFirst()`. Finds the first record in a table based on the current key
   /// and filter.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindFirst() {
-    throw Error("RecordRef.FindFirst() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean FindFirst();
 
   /// \brief AL `RecordRef.FindLast()`. Finds the last record in a table based on the current key
   /// and filter.
@@ -912,9 +908,7 @@ public:
   /// records in a table.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsEmpty() {
-    throw Error("RecordRef.IsEmpty() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsEmpty();
 
   /// \brief AL `RecordRef.IsTemporary()`. Determines whether a RecordRef refers to a temporary
   /// table.

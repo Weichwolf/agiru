@@ -5,6 +5,7 @@
 #include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -20,6 +21,8 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+
+#include "BuiltinsWritten.h"
 
 #include <cstddef>
 #include <string>
@@ -37,6 +40,52 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
   return *reinterpret_cast<const T *>(At(record, def));
 }
 
+}
+
+::agiru::Boolean RecordRef::IsEmpty() {
+  return detail::RuntimeIsEmpty(record_, Table());
+}
+
+::agiru::Integer RecordRef::Count() {
+  return detail::RuntimeCount(record_, Table());
+}
+
+::agiru::Boolean RecordRef::Find(std::string_view Which) {
+  return detail::RuntimeFind(record_, Table(), Which.empty() ? "=" : Which);
+}
+
+::agiru::Boolean RecordRef::FindFirst() {
+  return detail::RuntimeFind(record_, Table(), "-");
+}
+
+constexpr ::agiru::Integer kInvariantFormat = 9;
+
+std::string FieldRef::GetFilter() const {
+  if (record_ == nullptr || def_ == nullptr) { return {}; }
+  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if (state == nullptr) { return {}; }
+  for (const detail::FieldFilter &one : state->filters) {
+    if (one.field == def_->no && one.group == state->group) { return one.text; }
+  }
+  return {};
+}
+
+void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Variant &ToValue) const {
+  if (record_ == nullptr || def_ == nullptr) {
+    throw Error("FieldRef.SetRange: the FieldRef names no field yet");
+  }
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record_)->Ensure();
+  if (FromValue.IsEmpty()) {
+    detail::Narrow(state, def_->no, {});
+    return;
+  }
+  const std::string from = detail::Literally(Format(FromValue, 0, kInvariantFormat));
+  if (ToValue.IsEmpty()) {
+    detail::Narrow(state, def_->no, from);
+    return;
+  }
+  detail::Narrow(
+      state, def_->no, from + ".." + detail::Literally(Format(ToValue, 0, kInvariantFormat)));
 }
 
 FieldType FieldRef::Type() const {
