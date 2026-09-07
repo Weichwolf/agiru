@@ -144,9 +144,34 @@ public:
   ///       `Type: Action` as its return, and AL compares it against `Action::LookupOK` --
   ///       `if Page.RunModal(...) = Action::LookupOK then` is how the whole BaseApp reads a
   ///       lookup. An `Integer` there is not comparable to an `Action` and never was.
+  /// \warning A CONTROL HAS ITS OWN TRIGGERS AND THEY ARE THE FIELD'S, NOT THE PAGE'S: a page
+  ///          field runs `OnLookup`, `OnDrillDown`, `OnAssistEdit` and `OnControlAddIn`, and around
+  ///          a write `OnBeforeValidate` then `OnAfterValidate`; a `pagefieldextension` adds
+  ///          `OnAfterAfterLookup` beside them, an `actionextension` `OnBeforeAction` and
+  ///          `OnAfterAction`. A table field's own `OnLookup` is the one AL declares in the TABLE
+  ///          and the page's control inherits. Each is one page under `triggers-auto/`.
+
+  /// \warning THE PLATFORM EVENTS FIRE WHETHER OR NOT THE PAGE DECLARES THE TRIGGER, which is why
+  ///          they are the RUNTIME's and never the generated object's: `OnOpenPageEvent`,
+  ///          `OnClosePageEvent`, `OnQueryClosePageEvent`, `OnAfterGetRecordEvent`,
+  ///          `OnAfterGetCurrRecordEvent`, `OnNewRecordEvent`, `OnInsertRecordEvent`,
+  ///          `OnModifyRecordEvent`, `OnDeleteRecordEvent`, and around an action
+  ///          `OnBeforeActionEvent` then `OnAfterActionEvent`. A page that declares none of them
+  ///          still raises all of them, the way `Table::Insert` raises `OnBeforeInsertEvent`
+  ///          without asking the table.
+  ///
+  /// \warning THE TRIGGER ORDER IS OWED AND NAMED HERE, because a page that runs must run them in
+  ///          the platform's order and not in the generator's: `OnInit`, then `OnOpenPage`, then
+  ///          per record `OnFindRecord`, `OnAfterGetRecord` and `OnAfterGetCurrRecord`; a write
+  ///          runs `OnInsertRecord`, `OnModifyRecord` or `OnDeleteRecord`; the close runs
+  ///          `OnQueryClosePage` and then `OnClosePage`. Each is one page under `triggers-auto/`,
+  ///          and naming them here is what keeps them from being a silent hole while the UI is
+  ///          board:0030's work -- nothing fires until there is a page to fire it on.
   template <typename... Arguments> static ::agiru::Action RunModal(Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Page.RunModal needs a running UI (board:0030)");
+    throw Error("Page.RunModal needs a running UI (board:0030). When it runs it owes OnInit, "
+                "OnOpenPage, OnFindRecord, OnNextRecord, OnNewRecord, OnAfterGetRecord, "
+                "OnAfterGetCurrRecord, and on close OnQueryClosePage then OnClosePage");
   }
 
   /// \brief AL `Page.Activate(Boolean)`. Activates the current page on the client if possible. The

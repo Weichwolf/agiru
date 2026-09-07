@@ -412,6 +412,11 @@ public:
 
   /// \brief AL `Record.Insert(RunTrigger)`.
   ///
+  /// \note AN EXTENSION'S TRIGGERS RUN BESIDE THE TABLE'S OWN. A `tableextension` declares
+  ///       `OnBeforeInsert`, `OnAfterInsert`, `OnBeforeModify`, `OnAfterModify`, `OnBeforeDelete`,
+  ///       `OnAfterDelete`, `OnBeforeRename` and `OnAfterRename` (`triggers-auto/`), and BC merges
+  ///       them into the table at build time -- which is what this tree does in the transpiler, so
+  ///       an extension's trigger is the merged table's trigger and needs no second path here.
   /// \param RunTrigger True to run the table's `OnInsert` trigger first.
   /// \throws Error when the row cannot be written, and whatever the trigger raises.
   ///
@@ -1360,14 +1365,25 @@ public:
     throw Error("Record.Relation is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Rename(...)`. Changes the value of a primary key in a table.
+  /// \brief AL `Record.Rename(Value1 [, Value2,...])`. Changes the value of a primary key.
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  ///
+  /// \warning IT REFUSES BEFORE IT FIRES ANYTHING, and that is the point. `Insert`, `Modify` and
+  ///          `Delete` run `OnBeforeXEvent`, then the table's own trigger, then the row operation,
+  ///          then `OnAfterXEvent`. Rename owes the same three -- `OnBeforeRenameEvent`,
+  ///          `OnRename`, `OnAfterRenameEvent` (`devenv-onrename-trigger.md`) -- and running AL
+  ///          code before an operation that cannot happen would leave the trigger's writes behind
+  ///          a rename that never occurred. So nothing runs until board:0035 gives the row
+  ///          operation, and the message names what will run then (board:0231).
   template <typename... Arguments> Boolean Rename(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.Rename is declared and not implemented yet (board:0035)");
+    throw Error("Record.Rename is declared and not implemented yet (board:0035). When it is, it "
+                "runs OnBeforeRenameEvent, then the table's OnRename trigger, then the row "
+                "operation, then OnAfterRenameEvent -- and none of them run before that, because "
+                "a trigger's writes must not survive a rename that did not happen");
   }
 
   /// \brief AL `Record.Reset()` -- everything the variable held, gone.

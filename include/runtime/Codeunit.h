@@ -211,6 +211,21 @@ template <typename C, typename Index>
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see runtime/Table.h.
 template <typename Derived = void> class Codeunit {
 public:
+  /// \brief The install and upgrade triggers the platform runs on a codeunit, named while
+  ///        board:0070 owes them.
+  ///
+  /// \warning THEY ARE THE PLATFORM'S AND NOT A CALLER'S. A `Subtype = Install` codeunit is run by
+  ///          the platform on install with `OnInstallAppPerDatabase` then `OnInstallAppPerCompany`,
+  ///          and a `Subtype = Upgrade` one with `OnCheckPreconditionsPerDatabase`,
+  ///          `OnCheckPreconditionsPerCompany`, `OnUpgradePerDatabase`, `OnUpgradePerCompany`,
+  ///          `OnValidateUpgradePerDatabase` and `OnValidateUpgradePerCompany` -- per database
+  ///          before per company, every time (`triggers-auto/`). Nothing here runs them yet; naming
+  ///          them keeps the order visible rather than silent.
+  static constexpr std::string_view kLifecycleTriggers =
+      "OnInstallAppPerDatabase, OnInstallAppPerCompany, OnCheckPreconditionsPerDatabase, "
+      "OnCheckPreconditionsPerCompany, OnUpgradePerDatabase, OnUpgradePerCompany, "
+      "OnValidateUpgradePerDatabase, OnValidateUpgradePerCompany";
+
   /// \brief AL assigns a `Variant` holding a codeunit to a codeunit variable -- the platform's
   ///        `OnRunPreview` hands the subscriber that way.
   /// \tparam V The Variant's type, taken as a template because `Variant` is a door type this base

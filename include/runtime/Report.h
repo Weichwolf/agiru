@@ -36,6 +36,30 @@ template <typename T> struct XmlPortTraits;
 ///       for, which a missing symbol never would.
 template <typename Derived = void> class Report {
 public:
+  /// \brief The order a report owes its triggers, named while it cannot run them.
+  ///
+  /// \warning A REPORT'S TRIGGERS ARE AN ORDER AND NOT A SET, and board:0063 has to keep it:
+  ///          `OnInitReport`, then `OnPreReport`, then per data item `OnPreDataItem`,
+  ///          `OnAfterGetRecord` for each row and `OnPostDataItem` at its end, then `OnPostReport`,
+  ///          and `OnPreRendering` before the layout is applied. Each is one page under
+  ///          `triggers-auto/`. Naming them here is what keeps them from being the silent kind of
+  ///          hole while no report body is translated -- nothing fires until there is one.
+  static constexpr std::string_view kTriggerOrder =
+      "OnInitReport, OnPreReport, OnPreDataItem, OnAfterGetRecord, OnPostDataItem, OnPostReport, "
+      "OnPreRendering";
+
+  /// \brief What a `reportextension` adds around the report's own data-item triggers.
+  ///
+  /// \warning AN EXTENSION WRAPS, IT DOES NOT REPLACE. `OnBeforePreDataItem` and
+  ///          `OnAfterPreDataItem` stand around the report's `OnPreDataItem`, and the same for
+  ///          `OnBeforeAfterGetRecord`/`OnAfterAfterGetRecord` around `OnAfterGetRecord` and
+  ///          `OnBeforePostDataItem`/`OnAfterPostDataItem` around `OnPostDataItem`. The doubled
+  ///          names are the documentation's own (`triggers-auto/`): the inner `After` belongs to
+  ///          the trigger, the outer `Before`/`After` to the extension.
+  static constexpr std::string_view kExtensionTriggerOrder =
+      "OnBeforePreDataItem, OnAfterPreDataItem, OnBeforeAfterGetRecord, OnAfterAfterGetRecord, "
+      "OnBeforePostDataItem, OnAfterPostDataItem";
+
   /// \brief The report's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr ReportId Id() { return ReportTraits<Derived>::kId; }
@@ -708,6 +732,19 @@ public:
 ///         `XMLPORT`.
 template <typename Derived = void> class XmlPort {
 public:
+  /// \brief The order an xmlport owes its triggers, named while it cannot run them.
+  ///
+  /// \warning `OnInitXmlPort`, then `OnPreXmlPort`, then per table element `OnAfterInitRecord`,
+  ///          `OnBeforeInsertRecord` and `OnAfterInsertRecord` on an import or `OnAfterGetRecord`
+  ///          on an export, and `OnPostXmlPort` at the end; a field element runs
+  ///          `OnBeforePassField` and `OnAfterAssignField`, a text element `OnBeforePassVariable`
+  ///          and `OnAfterAssignVariable`. Each is one page under `triggers-auto/` and board:0065
+  ///          owes the order, not merely the names.
+  static constexpr std::string_view kTriggerOrder =
+      "OnInitXmlPort, OnPreXmlPort, OnAfterInitRecord, OnBeforeInsertRecord, OnAfterInsertRecord, "
+      "OnAfterGetRecord, OnBeforeModifyRecord, OnAfterModifyRecord, OnPreXmlItem, OnPostXmlPort, "
+      "OnBeforePassField, OnAfterAssignField, OnBeforePassVariable, OnAfterAssignVariable";
+
   /// \brief The xmlport's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr XmlPortId Id() { return XmlPortTraits<Derived>::kId; }
@@ -998,6 +1035,13 @@ template <typename T> struct QueryTraits;
 ///         `QUERY`.
 template <typename Derived = void> class Query {
 public:
+  /// \brief The trigger a query owes, named while board:0064 owes the object.
+  ///
+  /// \warning `OnBeforeOpen` is the only one a query declares (`triggers-auto/`), and it runs
+  ///          before the query reads its first row -- which is where a filter set in AL still
+  ///          reaches the SQL rather than the result.
+  static constexpr std::string_view kTriggerOrder = "OnBeforeOpen";
+
   /// \brief The query's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr QueryId Id() { return QueryTraits<Derived>::kId; }
