@@ -736,7 +736,8 @@ std::string FilterPageBuilder::AddRecordRef(std::string_view Name,
   RefuseDoor("FilterPageBuilder.AddRecordRef(Text, RecordRef)");
 }
 
-std::string FilterPageBuilder::AddTable(std::string_view Name, ::agiru::Integer TableNo) {
+std::string FilterPageBuilder::AddTable(const ::agiru::TextArgument &Name,
+                                        ::agiru::Integer TableNo) {
   static_cast<void>(Name);
   static_cast<void>(TableNo);
   RefuseDoor("FilterPageBuilder.AddTable(Text, Integer)");
@@ -1084,7 +1085,7 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("HttpResponseMessage.ReasonPhrase()");
 }
 
-::agiru::Boolean IsolatedStorage::Contains(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Contains(const ::agiru::TextArgument &Key,
                                            const ::agiru::DataScope &DataScope,
                                            ::agiru::Boolean &isSecret) {
   static_cast<void>(Key);
@@ -1093,21 +1094,21 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.Contains(Text, DataScope, Boolean)");
 }
 
-::agiru::Boolean IsolatedStorage::Contains(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Contains(const ::agiru::TextArgument &Key,
                                            const ::agiru::DataScope &DataScope) {
   static_cast<void>(Key);
   static_cast<void>(DataScope);
   RefuseDoor("IsolatedStorage.Contains(Text, DataScope)");
 }
 
-::agiru::Boolean IsolatedStorage::Delete(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Delete(const ::agiru::TextArgument &Key,
                                          const ::agiru::DataScope &DataScope) {
   static_cast<void>(Key);
   static_cast<void>(DataScope);
   RefuseDoor("IsolatedStorage.Delete(Text, DataScope)");
 }
 
-::agiru::Boolean IsolatedStorage::Get(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Get(const ::agiru::TextArgument &Key,
                                       const ::agiru::DataScope &DataScope,
                                       ::agiru::SecretText &Value) {
   static_cast<void>(Key);
@@ -1116,7 +1117,7 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.Get(Text, DataScope, SecretText)");
 }
 
-::agiru::Boolean IsolatedStorage::Get(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Get(const ::agiru::TextArgument &Key,
                                       const ::agiru::DataScope &DataScope,
                                       ::agiru::Text<0> &Value) {
   static_cast<void>(Key);
@@ -1125,19 +1126,20 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.Get(Text, DataScope, Text)");
 }
 
-::agiru::Boolean IsolatedStorage::Get(std::string_view Key, ::agiru::SecretText &Value) {
+::agiru::Boolean IsolatedStorage::Get(const ::agiru::TextArgument &Key,
+                                      ::agiru::SecretText &Value) {
   static_cast<void>(Key);
   static_cast<void>(Value);
   RefuseDoor("IsolatedStorage.Get(Text, SecretText)");
 }
 
-::agiru::Boolean IsolatedStorage::Get(std::string_view Key, ::agiru::Text<0> &Value) {
+::agiru::Boolean IsolatedStorage::Get(const ::agiru::TextArgument &Key, ::agiru::Text<0> &Value) {
   static_cast<void>(Key);
   static_cast<void>(Value);
   RefuseDoor("IsolatedStorage.Get(Text, Text)");
 }
 
-::agiru::Boolean IsolatedStorage::Set(std::string_view Key,
+::agiru::Boolean IsolatedStorage::Set(const ::agiru::TextArgument &Key,
                                       std::string_view Value,
                                       const ::agiru::DataScope &DataScope) {
   static_cast<void>(Key);
@@ -1146,7 +1148,7 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.Set(Text, Text, DataScope)");
 }
 
-::agiru::Boolean IsolatedStorage::SetEncrypted(std::string_view Key,
+::agiru::Boolean IsolatedStorage::SetEncrypted(const ::agiru::TextArgument &Key,
                                                const ::agiru::SecretText &Value,
                                                const ::agiru::DataScope &DataScope) {
   static_cast<void>(Key);
@@ -1155,8 +1157,8 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("IsolatedStorage.SetEncrypted(Text, SecretText, DataScope)");
 }
 
-::agiru::Boolean IsolatedStorage::SetEncrypted(std::string_view Key,
-                                               std::string_view Value,
+::agiru::Boolean IsolatedStorage::SetEncrypted(const ::agiru::TextArgument &Key,
+                                               const ::agiru::TextArgument &Value,
                                                const ::agiru::DataScope &DataScope) {
   static_cast<void>(Key);
   static_cast<void>(Value);

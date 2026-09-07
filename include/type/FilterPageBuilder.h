@@ -86,7 +86,7 @@ public:
   /// \param TableNo The AL `Integer`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string AddTable(std::string_view Name, ::agiru::Integer TableNo);
+  std::string AddTable(const ::agiru::TextArgument &Name, ::agiru::Integer TableNo);
 
   /// \brief AL `FilterPageBuilder.Count()`. Gets the number of filter controls that are specified
   /// in the FilterPageBuilder object instance.

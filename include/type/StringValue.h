@@ -619,6 +619,66 @@ private:
   std::size_t max_ = 0;
 };
 
+/// \brief What a door parameter takes where AL's page says `Text`.
+///
+/// \note AL'S CONVERSIONS ARE THE SPECIFICATION AND `std::string_view` IS NOT. A page that says
+///       `FilterPageBuilder.AddTable(Name: Text, TableNo: Integer)` accepts everything AL accepts
+///       at a `Text` parameter -- a literal, a `Text` or `Code`, and a `Guid`, which
+///       `guid-data-type.md` says plainly may be assigned to and compared with `Text`. Typed
+///       `std::string_view`, the door takes the first two and refuses the rest, and 433 parameters
+///       are typed that way (board:0605).
+///
+/// \warning IT IS A PARAMETER AND NEVER A MEMBER. It may hold a view INTO its argument, so it is
+///          taken by `const &`, lives for the call and is not copyable -- a stored one would
+///          outlive what it points at.
+class TextArgument {
+public:
+  /// \brief From an AL string literal or any view of one.
+  /// \param text The characters.
+  constexpr TextArgument(std::string_view text) : view_(text) {} // NOLINT(*-explicit-constructor)
+
+  /// \brief From a `std::string` a door method already returns -- `TableCaption()` is one.
+  /// \param text The characters, which outlive the call they are an argument to.
+  /// \note IT IS ITS OWN CONSTRUCTOR AND NOT A CONVERSION CHAIN. `std::string` reaches
+  ///       `std::string_view` through a conversion of its own, and C++ takes only ONE
+  ///       user-defined step -- so without this the call does not compile at all.
+  TextArgument(const std::string &text) : view_(text) {} // NOLINT(*-explicit-constructor)
+
+  /// \brief From AL's own `Text` and `Code`, which share `StringValue`.
+  /// \param value The AL string.
+  TextArgument(const StringValue &value) // NOLINT(*-explicit-constructor)
+      : view_(value.Value()) {}
+
+  /// \brief From any AL value that renders itself as text -- `Guid` is the one the door needs.
+  /// \tparam T The value's type.
+  /// \param value The value, rendered once and held for the call.
+  /// \note A REFUSAL IS NOT TAKEN HERE, and it says so itself: `dotnet::Refused` carries
+  ///       `IsAlRefusal` for exactly this. Without the exclusion its `operator T()` and this
+  ///       constructor are equally viable and the call is ambiguous; with it the refusal converts
+  ///       and THROWS at the call site, which is where a member nobody rebuilt should be heard.
+  template <typename T>
+    requires requires(const T &value) { value.ToText(); } && (!std::is_base_of_v<StringValue, T>) &&
+                 (!requires { typename T::IsAlRefusal; })
+  TextArgument(const T &value) // NOLINT(*-explicit-constructor)
+      : owned_(value.ToText()), view_(owned_) {}
+
+  TextArgument(const TextArgument &) = delete;
+  TextArgument(TextArgument &&) = delete;
+  TextArgument &operator=(const TextArgument &) = delete;
+  TextArgument &operator=(TextArgument &&) = delete;
+  ~TextArgument() = default;
+
+  /// \brief What the door reads.
+  /// \return The characters, for as long as the call lasts.
+  [[nodiscard]] constexpr operator std::string_view() const {
+    return view_;
+  } // NOLINT(*-explicit-constructor)
+
+private:
+  std::string owned_;
+  std::string_view view_;
+};
+
 /// \brief AL `Text` -- a text with no declared length, and the base every sized one derives from.
 ///
 /// \note THE SIZED ONES DERIVE FROM IT BECAUSE AL PASSES ONE FOR THE OTHER. `var CityTxt: Text`

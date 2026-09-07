@@ -43,8 +43,9 @@ public:
   /// \param isSecret The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean
-  Contains(std::string_view Key, const ::agiru::DataScope &DataScope, ::agiru::Boolean &isSecret);
+  static ::agiru::Boolean Contains(const ::agiru::TextArgument &Key,
+                                   const ::agiru::DataScope &DataScope,
+                                   ::agiru::Boolean &isSecret);
 
   /// \brief AL `IsolatedStorage.Contains(Text, DataScope)`. Determines whether the storage contains
   /// a value with the specified key.
@@ -52,7 +53,8 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Contains(std::string_view Key, const ::agiru::DataScope &DataScope);
+  static ::agiru::Boolean Contains(const ::agiru::TextArgument &Key,
+                                   const ::agiru::DataScope &DataScope);
 
   /// \brief AL `IsolatedStorage.Contains(Guid, DataScope)` and every other key AL converts to Text
   ///        on the way in -- `"OAuth 2.0 Setup"."Client ID"` is a Guid and the key is its text.
@@ -74,7 +76,8 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Delete(std::string_view Key, const ::agiru::DataScope &DataScope = {});
+  static ::agiru::Boolean Delete(const ::agiru::TextArgument &Key,
+                                 const ::agiru::DataScope &DataScope = {});
 
   /// \brief AL `IsolatedStorage.Get(Text, DataScope, SecretText)`. Gets the value associated with
   /// the specified key.
@@ -83,8 +86,9 @@ public:
   /// \param Value The AL `SecretText`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean
-  Get(std::string_view Key, const ::agiru::DataScope &DataScope, ::agiru::SecretText &Value);
+  static ::agiru::Boolean Get(const ::agiru::TextArgument &Key,
+                              const ::agiru::DataScope &DataScope,
+                              ::agiru::SecretText &Value);
 
   /// \brief AL `IsolatedStorage.Get(Text, DataScope, Text)`. Gets the value associated with the
   /// specified key.
@@ -93,8 +97,9 @@ public:
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean
-  Get(std::string_view Key, const ::agiru::DataScope &DataScope, ::agiru::Text<0> &Value);
+  static ::agiru::Boolean Get(const ::agiru::TextArgument &Key,
+                              const ::agiru::DataScope &DataScope,
+                              ::agiru::Text<0> &Value);
 
   /// \brief AL `IsolatedStorage.Get(Text, SecretText)`. Gets the value associated with the
   /// specified key.
@@ -102,14 +107,14 @@ public:
   /// \param Value The AL `SecretText`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Get(std::string_view Key, ::agiru::SecretText &Value);
+  static ::agiru::Boolean Get(const ::agiru::TextArgument &Key, ::agiru::SecretText &Value);
 
   /// \brief AL `IsolatedStorage.Get(Text, Text)`. Gets the value associated with the specified key.
   /// \param Key The AL `Text`.
   /// \param Value The AL `Text`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Get(std::string_view Key, ::agiru::Text<0> &Value);
+  static ::agiru::Boolean Get(const ::agiru::TextArgument &Key, ::agiru::Text<0> &Value);
 
   /// \brief AL `IsolatedStorage.Set(Text, SecretText, DataScope)`. Sets the value associated with
   /// the specified key.
@@ -123,7 +128,7 @@ public:
   template <typename S>
     requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
   static ::agiru::Boolean
-  Set(std::string_view Key, const S &Value, const ::agiru::DataScope &DataScope = {}) {
+  Set(const ::agiru::TextArgument &Key, const S &Value, const ::agiru::DataScope &DataScope = {}) {
     static_cast<void>(Key);
     static_cast<void>(Value);
     static_cast<void>(DataScope);
@@ -138,8 +143,9 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean
-  Set(std::string_view Key, std::string_view Value, const ::agiru::DataScope &DataScope = {});
+  static ::agiru::Boolean Set(const ::agiru::TextArgument &Key,
+                              std::string_view Value,
+                              const ::agiru::DataScope &DataScope = {});
 
   /// \brief AL `IsolatedStorage.SetEncrypted(Text, SecretText, DataScope)`. Encrypts and sets the
   /// value associated with the specified key. The input string cannot exceed a length of 215 plain
@@ -149,7 +155,7 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean SetEncrypted(std::string_view Key,
+  static ::agiru::Boolean SetEncrypted(const ::agiru::TextArgument &Key,
                                        const ::agiru::SecretText &Value,
                                        const ::agiru::DataScope &DataScope = {});
 
@@ -161,8 +167,8 @@ public:
   /// \param DataScope The AL `DataScope`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean SetEncrypted(std::string_view Key,
-                                       std::string_view Value,
+  static ::agiru::Boolean SetEncrypted(const ::agiru::TextArgument &Key,
+                                       const ::agiru::TextArgument &Value,
                                        const ::agiru::DataScope &DataScope = {});
 };
 
