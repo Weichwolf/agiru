@@ -60,6 +60,8 @@ public:
   template <typename... Arguments> Refused operator()(Arguments &&...arguments) const;
 
   /// \brief The chained member `Groups`, which a body reaches on the RESULT of a refused call.
+  /// \brief The chained member `GetBytes`, which a body reaches on the RESULT of a refused call.
+  static Refused GetBytes;
   /// \brief The chained member `GetString`, which a body reaches on the RESULT of a refused call.
   static Refused GetString;
   /// \brief The chained member `CreateOutStream`, which a body reaches on the RESULT of a refused
@@ -663,6 +665,7 @@ struct AbsentObject : AbsentType {
 /// \brief What a refused CALL answers with, which is a refusal again.
 using RefusedResult = Refused;
 
+inline Refused Refused::GetBytes{{.type = "<result>", .member = "GetBytes"}};
 inline Refused Refused::GetString{{.type = "<result>", .member = "GetString"}};
 inline Refused Refused::CreateOutStream{{.type = "<result>", .member = "CreateOutStream"}};
 inline Refused Refused::GetResponseStream{{.type = "<result>", .member = "GetResponseStream"}};

@@ -1039,15 +1039,21 @@ public:
     throw Error("RecordRef.RecordLevelLocking() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.Rename(Any, Any)`. Changes the value of a primary key in a table.
+  /// \brief AL `RecordRef.Rename(Value1: Any [, Value2: Any,...])`. Changes the value of a
+  ///        primary key in a table.
+  /// \tparam More The remaining key values, which AL writes as the page's own `...`.
   /// \param Value1 The AL `Any`.
-  /// \param Value2 The AL `Any`.
+  /// \param more The AL `Any` values of the remaining primary key fields.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Rename(const ::agiru::Variant &Value1, const ::agiru::Variant &Value2 = {}) {
+  /// \warning THE COUNT IS THE PRIMARY KEY'S AND NOT THIS FILE'S. `recordref-rename-method.md`
+  ///          writes `Rename(Value1: Any [, Value2: Any,...])`, and a primary key names at most 16
+  ///          fields (`devenv-table-keys.md`), so a fixed two refused what AL accepts.
+  template <typename... More>
+  ::agiru::Boolean Rename(const ::agiru::Variant &Value1, const More &...more) {
     static_cast<void>(Value1);
-    static_cast<void>(Value2);
-    throw Error("RecordRef.Rename(Any, Any) is declared and not implemented yet (board:0035)");
+    (static_cast<void>(more), ...);
+    throw Error("RecordRef.Rename(Any) is declared and not implemented yet (board:0035)");
   }
 
   /// \brief AL `RecordRef.Reset()`. Removes all filters, including any special filters set by the

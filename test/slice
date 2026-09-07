@@ -6900,3 +6900,7 @@ tests/core/codeunit/LibraryDocumentApprovals.cpp
 tests/core/codeunit/ProfileImportExportTest.cpp
 tests/core/codeunit/WFPartnerExtensionTests.cpp
 tests/service/test/codeunit/ServicePriceManagement.cpp
+base/system/environment/configuration/table/AADApplication.cpp
+base/warehouse/adcs/table/ADCSUser.cpp
+base/crm/duplicates/table/MergeDuplicatesBuffer.cpp
+base/integration/graph/table/AttachmentEntityBuffer.cpp

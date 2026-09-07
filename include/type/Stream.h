@@ -56,8 +56,21 @@ public:
   /// \warning REFUSED. A typed Write puts the platform's own BINARY layout into the stream, and
   ///          inventing one would produce a BLOB that reads back wrong wherever BC reads it. Only
   ///          the text forms are here.
-  template <typename T> void Write(const T &value) {
+  template <typename T> Integer Write(const T &value) {
     static_cast<void>(value);
+    RefuseTyped();
+  }
+
+  /// \brief AL `OutStream.Write(Value, Length)` for a typed value.
+  /// \tparam T The value's type.
+  /// \param value The value.
+  /// \param length The AL `Integer` the page names as the second parameter.
+  /// \return The AL `Written`, which the page brackets.
+  /// \throws Error always.
+  /// \warning REFUSED for the same reason as the one-argument form.
+  template <typename T> Integer Write(const T &value, const Integer &length) {
+    static_cast<void>(value);
+    static_cast<void>(length);
     RefuseTyped();
   }
 

@@ -74,6 +74,8 @@ public:
   Text<kEmailLength> ContactEmail;
   /// \brief AL `User."Exchange Identifier"`.
   Text<kFullNameLength> ExchangeIdentifier;
+  /// \brief AL `User."Application ID"`, the Entra application a service user authenticates as.
+  Guid ApplicationID;
 
   /// \brief The field numbers, from the predecessor's measured layout.
   struct Field_No {
@@ -99,6 +101,12 @@ public:
     static constexpr ::agiru::FieldNo ContactEmail{11};
     /// \brief The AL field number of `Exchange Identifier`.
     static constexpr ::agiru::FieldNo ExchangeIdentifier{12};
+    /// \brief The AL field number of `Application ID`.
+    ///
+    /// \note MEASURED over the restored 28.4 demo database: the `User` table's columns run
+    ///       `Exchange Identifier` then `Application ID`, and every column from `User Name` on
+    ///       carries its own field number, so this one is 13.
+    static constexpr ::agiru::FieldNo ApplicationID{13};
   };
 
   /// \brief The primary key.
@@ -109,7 +117,7 @@ public:
 using User = User_Table;
 
 /// \brief The field table of the system `User` table.
-inline constexpr std::array<FieldDef, 11> kUserFields{{
+inline constexpr std::array<FieldDef, 12> kUserFields{{
     Declare<&User::UserSecurityID>(User::Field_No::UserSecurityID,
                                    "User Security ID",
                                    "User Security ID",
@@ -143,6 +151,10 @@ inline constexpr std::array<FieldDef, 11> kUserFields{{
                                        "Exchange Identifier",
                                        "Exchange Identifier",
                                        offsetof(User, ExchangeIdentifier)),
+    Declare<&User::ApplicationID>(User::Field_No::ApplicationID,
+                                  "Application ID",
+                                  "Application ID",
+                                  offsetof(User, ApplicationID)),
 }};
 
 /// \brief The keys of the system `User` table.

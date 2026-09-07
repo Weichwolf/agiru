@@ -35,6 +35,14 @@ slice. A data symbol is bound at load, so one of them is the whole program.
 | `MergeDuplicatesBuffer` | a call with three arguments where two are declared |
 | `PermissionSetBuffer` | board:0599 -- the name collides and the header path collides with it |
 
+**Six of the thirteen are closed (2026-09-07), and the data symbols stand at 7:**
+`RetentionPolicySetup` by folding a record field's spelling to the table's own declaration;
+`AADApplication` by `User."Application ID"`, field 13, measured in the restored demo database;
+`ADCSUser` by the 73rd entry in `Refused`'s hand-kept member list; `MergeDuplicatesBuffer` and
+`AttachmentEntityBuffer` by two door signatures the documentation carries and the door did not --
+`RecordRef.Rename(Value1 [, Value2,...])` was capped at two of a primary key's sixteen, and
+`OutStream.Write(Value [, Length])` had neither the length nor the `Written` return.
+
 **Eleven causes for thirteen tables**, which is board:0598's classification arriving one table at a
 time. Two of them are worth naming as their own mechanism:
 
