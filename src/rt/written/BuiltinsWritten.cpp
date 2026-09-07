@@ -29,10 +29,13 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include <array>
 #include <cctype>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -461,8 +464,108 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
 }
 
 ::agiru::Decimal Abs(::agiru::Decimal Number) {
-  static_cast<void>(Number);
-  RefuseDoor("System.Abs(Decimal)");
+  return Number.Abs();
+}
+
+::agiru::Date DMY2Date(::agiru::Integer Day, ::agiru::Integer Month, ::agiru::Integer Year) {
+  const ::agiru::Date today = ::agiru::Today();
+  const ::agiru::Integer month = Month != 0 ? Month : today.Month();
+  const ::agiru::Integer year = Year != 0 ? Year : today.Year();
+  const ::agiru::Date built =
+      ::agiru::Date::FromYmd(year, static_cast<unsigned>(month), static_cast<unsigned>(Day));
+  if (built.IsUndefined()) {
+    throw ::agiru::Error(std::format("{}-{}-{} is not a date", year, month, Day));
+  }
+  return built;
+}
+
+::agiru::Boolean IsNullGuid(::agiru::Guid Guid) {
+  return Guid.IsNull();
+}
+
+::agiru::Decimal Power(::agiru::Decimal Number, ::agiru::Decimal Power) {
+  const double raised =
+      std::pow(std::stod(Number.ToInvariantString()), std::stod(Power.ToInvariantString()));
+  if (!std::isfinite(raised)) {
+    throw ::agiru::Error("Power(" + Number.ToInvariantString() + ", " + Power.ToInvariantString() +
+                         ") is not a number");
+  }
+  return ::agiru::Decimal::FromInvariantString(std::format("{:.10f}", raised));
+}
+
+namespace {
+
+class DotNetRandom {
+public:
+  explicit DotNetRandom(std::int32_t seed) { Reseed(seed); }
+
+  void Reseed(std::int32_t seed) {
+    const std::int64_t subtraction = seed == std::numeric_limits<std::int32_t>::min()
+                                         ? std::numeric_limits<std::int32_t>::max()
+                                         : std::abs(static_cast<std::int64_t>(seed));
+    std::int64_t mj = kSeed - subtraction;
+    state_[55] = mj;
+    std::int64_t mk = 1;
+    for (std::size_t i = 1; i < 55; ++i) {
+      const std::size_t ii = (21 * i) % 55;
+      state_[ii] = mk;
+      mk = mj - mk;
+      if (mk < 0) { mk += kBig; }
+      mj = state_[ii];
+    }
+    for (int round = 1; round < 5; ++round) {
+      for (std::size_t i = 1; i < 56; ++i) {
+        state_[i] -= state_[1 + ((i + 30) % 55)];
+        if (state_[i] < 0) { state_[i] += kBig; }
+      }
+    }
+    next_ = 0;
+    nextp_ = 21;
+  }
+
+  [[nodiscard]] std::int32_t Between(std::int32_t low, std::int32_t high) {
+    const double drawn = static_cast<double>(Sample()) * (1.0 / static_cast<double>(kBig));
+    return static_cast<std::int32_t>(drawn * static_cast<double>(high - low)) + low;
+  }
+
+private:
+  [[nodiscard]] std::int64_t Sample() {
+    std::size_t at = next_ + 1;
+    if (at >= 56) { at = 1; }
+    std::size_t other = nextp_ + 1;
+    if (other >= 56) { other = 1; }
+    std::int64_t drawn = state_[at] - state_[other];
+    if (drawn == kBig) { drawn -= 1; }
+    if (drawn < 0) { drawn += kBig; }
+    state_[at] = drawn;
+    next_ = at;
+    nextp_ = other;
+    return drawn;
+  }
+
+  static constexpr std::int64_t kBig = 2147483647;
+  static constexpr std::int64_t kSeed = 161803398;
+  std::array<std::int64_t, 56> state_{};
+  std::size_t next_ = 0;
+  std::size_t nextp_ = 0;
+};
+
+constexpr ::agiru::Integer kDefaultSeed = 1;
+
+DotNetRandom &Sequence() {
+  static thread_local DotNetRandom sequence{kDefaultSeed};
+  return sequence;
+}
+
+}
+
+void Randomize(::agiru::Integer Seed) {
+  Sequence().Reseed(Seed != 0 ? Seed : kDefaultSeed);
+}
+
+::agiru::Integer Random(::agiru::Integer MaxNumber) {
+  const ::agiru::Integer largest = MaxNumber < 1 ? 1 : MaxNumber;
+  return Sequence().Between(1, largest + 1);
 }
 
 ::agiru::Time CurrentTime() {

@@ -9,7 +9,6 @@
 #include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
-#include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ExecutionContext.h"
@@ -183,16 +182,6 @@ std::string Decrypt(std::string_view EncryptedString);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void DeleteEncryptionKey();
 
-/// \brief AL `System.DMY2Date(Integer, Integer, Integer)`. Gets a Date object based on a day,
-/// month, and year.
-/// \param Day The AL `Integer`.
-/// \param Month The AL `Integer`.
-/// \param Year The AL `Integer`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date
-DMY2Date(::agiru::Integer Day, ::agiru::Integer Month = {}, ::agiru::Integer Year = {});
-
 /// \brief AL `System.DT2Date(DateTime)`. Gets the date part of a DateTime object.
 /// \param Datetime The AL `DateTime`.
 /// \return The AL `Date`.
@@ -354,13 +343,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean IsNull(const ::agiru::Variant &DotNet);
 
-/// \brief AL `System.IsNullGuid(Guid)`. Indicates whether a value has been assigned to a GUID. A
-/// null GUID that consists only of zeros is valid but must never be used for references.
-/// \param Guid The AL `Guid`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean IsNullGuid(::agiru::Guid Guid);
-
 /// \brief AL `System.IsServiceTier()`. Gets a value indicating whether the runtime is a service
 /// tier.
 /// \return The AL `Boolean`.
@@ -373,26 +355,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date NormalDate(::agiru::Date Date);
-
-/// \brief AL `System.Power(Decimal, Decimal)`. Raises a number to a power. For example, you can use
-/// this method to square the number 2 to get the result of 4.
-/// \param Number The AL `Decimal`.
-/// \param Power The AL `Decimal`.
-/// \return The AL `Decimal`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Decimal Power(::agiru::Decimal Number, ::agiru::Decimal Power);
-
-/// \brief AL `System.Random(Integer)`. Returns a pseudo-random number.
-/// \param MaxNumber The AL `Integer`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer Random(::agiru::Integer MaxNumber);
-
-/// \brief AL `System.Randomize(Integer)`. Generates a set of random numbers from which the RANDOM
-/// method (Integer) will select a random number.
-/// \param Seed The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void Randomize(::agiru::Integer Seed = {});
 
 /// \brief AL `System.RoundDateTime(DateTime, BigInteger, Text)`. Rounds a DateTime.
 /// \param Datetime The AL `DateTime`.

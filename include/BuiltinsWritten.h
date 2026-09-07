@@ -13,6 +13,7 @@
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
@@ -225,6 +226,60 @@ CopyStream(Out &OutStream, In &InStream, ::agiru::Integer BytesToRead = {}) {
   throw ::agiru::Error("System.CopyStream reached a .NET stream this run does not have "
                        "(board:0609)");
 }
+
+/// \brief AL `System.DMY2Date(Day [, Month] [, Year])`. Builds a date from its parts.
+/// \param Day   The day of the month, 1 to 31.
+/// \param Month The month, 1 to 12; the current month when omitted.
+/// \param Year  The four-digit year; the current year when omitted.
+/// \return The date.
+/// \throws Error when the three do not name a day.
+///
+/// \note THE DEFAULTS ARE THE PAGE'S, not zero: `dmy2date-method.md` says "if you omit this
+///       optional parameter, the current month will be used as the default", and the same for the
+///       year. Zero would build an undefined date and say nothing.
+[[nodiscard]] ::agiru::Date
+DMY2Date(::agiru::Integer Day, ::agiru::Integer Month = {}, ::agiru::Integer Year = {});
+
+/// \brief AL `System.IsNullGuid(Guid)`. Whether every byte of the GUID is zero.
+/// \param Guid The GUID.
+/// \return True when it is the null GUID.
+[[nodiscard]] ::agiru::Boolean IsNullGuid(::agiru::Guid Guid);
+
+/// \brief AL `System.Power(Number, Power)`. Raises a number to a power.
+/// \param Number The base.
+/// \param Power  The exponent.
+/// \return The result, as a Decimal.
+/// \throws Error when the result is not a number -- a negative base with a fractional exponent.
+///
+/// \warning IT COMPUTES IN BINARY FLOATING POINT AND CONVERTS BACK, and that is allowed here for
+///          the reason the invariant names: no binary float carries an AMOUNT. A power is a
+///          multiplier -- `Power(10, Decimals)` is what the test library writes -- and BC computes
+///          it the same way, through .NET's `Math.Pow`. Nothing in a posting line is produced by
+///          this function; where a rounding matters, `Round` is what AL writes next to it.
+[[nodiscard]] ::agiru::Decimal Power(::agiru::Decimal Number, ::agiru::Decimal Power);
+
+/// \brief AL `System.Randomize([Seed])`. Seeds the session's random generator.
+/// \param Seed The seed; 1 when omitted.
+///
+/// \note THE OMITTED SEED IS 1 AND NOT THE CLOCK. `randomize-method.md` says BC seeds from "the
+///       total number of milliseconds since midnight" when the seed is omitted -- and DETERMINISM
+///       IS COMPULSORY here (CLAUDE.md), so the same run must produce the same entries twice. The
+///       BaseApp's own `Library - Random` calls `SetSeed` with 1, which is where the number comes
+///       from; a test that wants a different sequence passes one.
+void Randomize(::agiru::Integer Seed = {});
+
+/// \brief AL `System.Random(Number)`. A pseudo-random integer between 1 and Number.
+/// \param MaxNumber The largest number that may come back.
+/// \return A number in `[1, MaxNumber]`.
+///
+/// \note IT IS .NET'S OWN GENERATOR, REBUILT. BC's `Random` is `System.Random.Next`, whose
+///       algorithm is a subtractive lagged-Fibonacci generator with a documented seeding step --
+///       and a test that seeds it and compares a SEQUENCE fails against any other generator. The
+///       predecessor rebuilt the same one for the same reason.
+///
+/// \note THE GENERATOR IS PER SESSION, which the page states outright: "the random generator is
+///       specific to each connection". It is `thread_local` here, which is what a session owns.
+[[nodiscard]] ::agiru::Integer Random(::agiru::Integer MaxNumber);
 
 /// \brief AL `System.Abs(Number)`. The absolute value of a number.
 /// \param Number The input value.

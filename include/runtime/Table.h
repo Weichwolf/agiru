@@ -1084,15 +1084,24 @@ public:
     throw Error("Record.GetBySystemId is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.GetFilter(...)`. Gets a list of the filters within the current filter group
-  /// that are applied to a field.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string GetFilter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetFilter is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.GetFilter(Field)`. The filter standing on one field.
+  ///
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it: `Rec.GetFilter("Document Type")`.
+  /// \return The filter expression as AL's own filter language spells it, or the empty string
+  ///         when nothing narrows that field.
+  ///
+  /// \note IT READS THE CURRENT FILTER GROUP AND NOTHING ELSE, which is what
+  ///       `record-getfilter-method.md` describes and what `SetFilter` wrote. A record that never
+  ///       filtered has no state at all and answers empty rather than allocating one.
+  template <typename Field> [[nodiscard]] std::string GetFilter(const Field &member) const {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr) { return {}; }
+    const ::agiru::FieldNo no = NumberOf(&member);
+    for (const detail::FieldFilter &one : state->filters) {
+      if (one.field == no && one.group == state->group) { return one.text; }
+    }
+    return {};
   }
 
   /// \brief AL `Record.GetFilters(...)`. Gets a string that contains a list of the filters within

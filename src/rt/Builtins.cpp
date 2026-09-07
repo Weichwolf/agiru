@@ -11,7 +11,6 @@
 #include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
-#include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ExecutionContext.h"
@@ -144,13 +143,6 @@ void DeleteEncryptionKey() {
   RefuseDoor("System.DeleteEncryptionKey()");
 }
 
-::agiru::Date DMY2Date(::agiru::Integer Day, ::agiru::Integer Month, ::agiru::Integer Year) {
-  static_cast<void>(Day);
-  static_cast<void>(Month);
-  static_cast<void>(Year);
-  RefuseDoor("System.DMY2Date(Integer, Integer, Integer)");
-}
-
 ::agiru::Date DT2Date(::agiru::DateTime Datetime) {
   static_cast<void>(Datetime);
   RefuseDoor("System.DT2Date(DateTime)");
@@ -257,11 +249,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
   RefuseDoor("System.IsNull(DotNet)");
 }
 
-::agiru::Boolean IsNullGuid(::agiru::Guid Guid) {
-  static_cast<void>(Guid);
-  RefuseDoor("System.IsNullGuid(Guid)");
-}
-
 ::agiru::Boolean IsServiceTier() {
   RefuseDoor("System.IsServiceTier()");
 }
@@ -269,22 +256,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
 ::agiru::Date NormalDate(::agiru::Date Date) {
   static_cast<void>(Date);
   RefuseDoor("System.NormalDate(Date)");
-}
-
-::agiru::Decimal Power(::agiru::Decimal Number, ::agiru::Decimal Power) {
-  static_cast<void>(Number);
-  static_cast<void>(Power);
-  RefuseDoor("System.Power(Decimal, Decimal)");
-}
-
-::agiru::Integer Random(::agiru::Integer MaxNumber) {
-  static_cast<void>(MaxNumber);
-  RefuseDoor("System.Random(Integer)");
-}
-
-void Randomize(::agiru::Integer Seed) {
-  static_cast<void>(Seed);
-  RefuseDoor("System.Randomize(Integer)");
 }
 
 ::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
