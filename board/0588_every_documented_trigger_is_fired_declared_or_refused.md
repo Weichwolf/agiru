@@ -10,6 +10,16 @@ Tags:     surface, counted
 the tree NAMES anywhere in `src/rt`, `src/gen` and `include` -- fired, declared or refused -- and
 `test/trigger-baseline` holds the count: **27 of 151 on 2026-09-06**, and it may only rise.
 
+**STANDING (2026-09-07): the census is 151 of 151 NAMED, from 27 -- and nothing new FIRES.** Every
+refusal now says which triggers it owes and in which order: `Record.Rename` names the rename trio
+and refuses before any of it runs, `Page.RunModal` names the open-to-close sequence beside the
+platform events that fire whether or not a page declares them, `Report`, `XmlPort` and `Query` carry
+their data-item order, `Codeunit` the install and upgrade lifecycle per database before per company,
+and a `tableextension`'s eight are named where the transpiler MERGES them into the table. What this
+item still owes is its own rule: a kind whose generator exists FIRES every trigger its pages list.
+The measurement below is the state of 2026-09-06 and is kept because it is what the naming was
+measured against.
+
 ## Measured 2026-09-06
 
     page                          4 named / 23 absent   OnAfterActionEvent, OnAfterGetCurrRecordEvent, OnAfterGetRecordEvent, OnBeforeActionEvent, OnClosePageEvent, OnDeleteRecordEvent, OnInsertRecordEvent, OnModifyRecordEvent, OnNewRecordEvent, OnOpenPageEvent, OnQueryClosePageEvent, OnAfterGetCurrRecord, OnAfterGetRecord, OnClosePage, OnDeleteRecord, OnFindRecord, OnInit, OnInsertRecord, OnModifyRecord, OnNewRecord, OnNextRecord, OnOpenPage, OnQueryClosePage
