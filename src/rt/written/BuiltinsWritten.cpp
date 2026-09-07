@@ -460,6 +460,10 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
   return std::string(Session::Current().CompanyName());
 }
 
+::agiru::Time CurrentTime() {
+  return ::agiru::CurrentDateTime().Time();
+}
+
 ::agiru::Date Today() {
   return ::agiru::CurrentDateTime().Date();
 }

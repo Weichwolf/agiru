@@ -85,6 +85,15 @@ Guid MediaSet::ImportStream(class InStream &Stream,
   RefuseWithoutStore(Importing("", Description) + " from a stream");
 }
 
+Integer MediaSet::ExportFile(std::string_view FilenamePrefix) {
+  RefuseWithoutStore("exporting media set " + id_.ToText() + " to '" + std::string(FilenamePrefix) +
+                     "'");
+}
+
+::agiru::Boolean MediaSet::Remove(const Guid &MediaId) {
+  RefuseWithoutStore("removing media " + MediaId.ToText() + " from set " + id_.ToText());
+}
+
 List<Guid> MediaSet::FindOrphans() {
   RefuseWithoutStore("sweeping the tenant media table for orphan sets");
 }

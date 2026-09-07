@@ -21,6 +21,7 @@ import argparse
 import json
 import pathlib
 import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -79,26 +80,114 @@ def predecessor_names() -> set[str]:
     return names
 
 
-def implemented_here() -> set[str]:
-    """What this tree implements, as collapse keys.
+def doxygen_xml() -> pathlib.Path:
+    """The door, as doxygen parsed it -- regenerated when it is missing or older than the door.
 
-    Read from DOXYGEN'S XML rather than from a regular expression over the headers: doxygen has
-    already parsed the door and knows what is a declaration and what is a word inside a comment.
-    Only `include/` is in that XML, which is the point -- a method that exists in `src/` and
-    not in the door cannot be reached by generated code and does not count as implemented."""
-    names: set[str] = set()
+    IT REGENERATES RATHER THAN RETURNING NOTHING. This directory is not build output anybody makes
+    on the way here: `make` does not run doxygen, so a fresh checkout or a `make clean` leaves it
+    absent, and a counter that reads an absent directory reports 0 of 1 253 implemented and calls
+    it a measurement. That is CLAUDE.md's blind gate, and it was live: `test/surface-baseline`
+    says 1173 and this script answered 0 (measured 2026-09-07).
+    """
     xml = ROOT / "build" / "doc" / "xml"
-    if not xml.is_dir():
-        return names
+    stamp = xml / "index.xml"
+    newest = max((path.stat().st_mtime for path in (ROOT / "include").rglob("*.h")), default=0.0)
+    if not stamp.is_file() or stamp.stat().st_mtime < newest:
+        done = subprocess.run(["doxygen", "doc/Doxyfile"], cwd=ROOT, capture_output=True)
+        if done.returncode != 0:
+            print("al surface: doxygen refused -- " + done.stderr.decode("utf-8", "replace")[-400:],
+                  file=sys.stderr)
+            raise SystemExit(1)
+    if not stamp.is_file():
+        print(f"al surface: {stamp} is still missing after running doxygen. ABORT, not a zero.",
+              file=sys.stderr)
+        raise SystemExit(1)
+    return xml
+
+
+# THE DOOR SPELLS AN AL TYPE THE WAY AL SPELLS IT, and these five are where it cannot.
+# `Record` is `Table<Derived>` because AL's `Record` IS the base every table extends, and a CRTP
+# base cannot be called `Record` while the concrete tables are the records. `TestPart` is a
+# `TestPage` in a subpage's place and AL documents the two apart. `RequestPage` is the report's
+# own page. Each is a deviation this file NAMES rather than hides, because the alternative is a
+# type whose whole method list silently counts as missing (CLAUDE.md: a mechanical pass cannot
+# tell a naming defect from a gap).
+DOOR_NAME = {"record": "table", "testpart": "testpage", "requestpage": "page"}
+
+# THE ONE METHOD THE DOOR SPELLS APART FROM AL, and it is named here as well as in
+# `src/gen/Door.cpp` because a measure that does not know about the deviation counts it as a gap
+# for ever. `Time` is an AL data type AND an AL builtin, and C++ holds one name once per namespace.
+DOOR_METHOD = {("system", "time"): "currenttime"}
+
+
+def door_surface() -> tuple[dict[str, set[str]], set[str]]:
+    """What the door declares, per CLASS and as free functions.
+
+    A GLOBAL NAME SET SATURATES AND STOPS MEASURING. Compared against one bag of every name in
+    `include/`, the documented surface reads 1 253 of 1 253 -- `Insert` counts for `XmlElement`
+    because `Record` has one. Per type it reads what is actually missing. The free functions are
+    kept beside it because AL documents a STATIC method on the type (`Text.CopyStr`,
+    `Session.CurrentClientType`) and the door writes exactly those as free functions.
+    """
+    xml = doxygen_xml()
+    members: dict[str, set[str]] = {}
+    bases: dict[str, set[str]] = {}
+    free: set[str] = set()
     for path in xml.glob("*.xml"):
         text = path.read_text(encoding="utf-8", errors="replace")
-        for match in re.finditer(
-            r'<memberdef[^>]*kind="(function|variable)"[^>]*>.*?<name>([^<]+)</name>', text, re.S
+        for compound in re.finditer(
+            r'<compounddef[^>]*kind="(class|struct|namespace|file)".*?</compounddef>', text, re.S
         ):
-            names.add(collapse(match.group(2)))
-        for match in re.finditer(r"<compoundname>([^<]+)</compoundname>", text):
-            names.add(collapse(match.group(1).rsplit("::", 1)[-1]))
-    return names
+            block, kind = compound.group(0), compound.group(1)
+            named = re.search(r"<compoundname>([^<]+)</compoundname>", block)
+            if named is None:
+                continue
+            short = collapse(named.group(1).split("&lt;")[0].rsplit("::", 1)[-1])
+            for base in re.finditer(r"<basecompoundref[^>]*>([^<]+)</basecompoundref>", block):
+                spelled = collapse(base.group(1).split("&lt;")[0].rsplit("::", 1)[-1])
+                bases.setdefault(short, set()).add(spelled)
+            for member in re.finditer(
+                r'<memberdef[^>]*kind="(function|variable)"[^>]*>.*?<name>([^<]+)</name>',
+                block,
+                re.S,
+            ):
+                if kind in ("class", "struct"):
+                    members.setdefault(short, set()).add(collapse(member.group(2)))
+                else:
+                    free.add(collapse(member.group(2)))
+    if not members or not free:
+        print("al surface: the door parsed to nothing at all. ABORT, not a zero.", file=sys.stderr)
+        raise SystemExit(1)
+
+    def inherited(name: str, seen: set[str] | None = None) -> set[str]:
+        seen = seen or set()
+        if name in seen:
+            return set()
+        seen.add(name)
+        reachable = set(members.get(name, ()))
+        for base in bases.get(name, ()):
+            reachable |= inherited(base, seen)
+        return reachable
+
+    return {name: inherited(name) for name in members}, free
+
+
+def missing_per_type(data: dict) -> list[tuple[str, int, list[str]]]:
+    """Per AL type: how many methods the documentation names, and which the door does not have."""
+    classes, free = door_surface()
+    rows = []
+    for name, entry in data["types"].items():
+        key = DOOR_NAME.get(collapse(name), collapse(name))
+        reachable = classes.get(key, set()) | free
+        missing = [
+            m
+            for m in entry["methods"]
+            if collapse(m) not in reachable
+            and DOOR_METHOD.get((collapse(name), collapse(m)), "") not in reachable
+        ]
+        rows.append((name, len(entry["methods"]), missing))
+    rows.sort(key=lambda row: -len(row[2]))
+    return rows
 
 
 def build() -> dict:
@@ -120,27 +209,17 @@ def build() -> dict:
 
 
 def report(data: dict) -> int:
-    here = implemented_here()
-    rows = []
-    for name, entry in data["types"].items():
-        methods = entry["methods"]
-        mine = [m for m in methods if collapse(m) in here]
-        rows.append((name, len(methods), len(entry["predecessor"]), len(mine)))
-
-    rows.sort(key=lambda r: -r[2])
-    total = sum(r[1] for r in rows)
-    prior = sum(r[2] for r in rows)
-    mine = sum(r[3] for r in rows)
-
+    rows = missing_per_type(data)
+    total = sum(count for _, count, _ in rows)
+    gaps = sum(len(missing) for _, _, missing in rows)
     print(f"al surface  {total} documented methods over {len(rows)} types")
-    print(f"            {prior} implemented by the predecessor, {mine} here")
+    print(f"            {total - gaps} reachable from the door, {gaps} missing")
     print()
-    print(f"{'type':<22}{'doc':>6}{'openerp':>9}{'agiru':>7}")
-    for name, count, prior_count, my_count in rows[:20]:
-        if prior_count == 0:
-            continue
-        print(f"{name:<22}{count:>6}{prior_count:>9}{my_count:>7}")
-    return mine
+    print(f"{'type':<22}{'doc':>6}{'missing':>9}  the missing ones")
+    for name, count, missing in rows:
+        if missing:
+            print(f"{name:<22}{count:>6}{len(missing):>9}  {', '.join(missing)}")
+    return total - gaps
 
 
 def main() -> int:
@@ -163,8 +242,8 @@ def main() -> int:
         return 1
     data = json.loads(SURFACE.read_text(encoding="utf-8"))
     if arguments.count:
-        here = implemented_here()
-        print(sum(1 for e in data["types"].values() for m in e["methods"] if collapse(m) in here))
+        rows = missing_per_type(data)
+        print(sum(count - len(missing) for _, count, missing in rows))
         return 0
     report(data)
     return 0

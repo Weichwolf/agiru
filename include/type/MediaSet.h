@@ -78,6 +78,21 @@ public:
                     std::string_view Description,
                     std::string_view MimeType = {});
 
+  /// \brief AL `MediaSet.ExportFile(Text)`.
+  /// \param FilenamePrefix The path and prefix each file is written under; the platform appends
+  ///                       `-<index>.<type>`, so `Image.jpg` becomes `Image-1.jpg`, `Image-2.jpg`.
+  /// \return How many elements were exported.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason Item gives (board:0031).
+  Integer ExportFile(std::string_view FilenamePrefix);
+
+  /// \brief AL `MediaSet.Remove(Guid)`.
+  /// \param MediaId The media object to take out of the set.
+  /// \return True when it was in the set, false when it was not.
+  /// \throws Error always.
+  /// \warning REFUSED, for the reason Item gives (board:0031).
+  ::agiru::Boolean Remove(const Guid &MediaId);
+
   /// \brief AL `MediaSet.FindOrphans()`.
   /// \return The identifiers of media sets no record references.
   /// \throws Error always.

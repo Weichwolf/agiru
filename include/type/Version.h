@@ -56,6 +56,28 @@ public:
   /// \brief AL `Version.Revision()`. \return The fourth part.
   [[nodiscard]] constexpr Integer Revision() const { return parts_[3]; }
 
+  /// \brief AL `Version.Create(Major, Minor [, Build] [, Revision])`.
+  /// \param Major    The major number.
+  /// \param Minor    The minor number.
+  /// \param Build    The build number; zero when omitted.
+  /// \param Revision The revision number; zero when omitted.
+  /// \return The version.
+  ///
+  /// \note IT IS AL'S OWN STATIC AND NOT A SECOND CONSTRUCTOR. `version-create-method.md` names
+  ///       two overloads, `Create(Integer, Integer [, Integer] [, Integer])` and `Create(Text)`,
+  ///       and a reader who knows AL looks for `Create` (CLAUDE.md's name equality). The
+  ///       constructors stay, because a `constexpr` version is written as one.
+  [[nodiscard]] static constexpr Version
+  Create(Integer Major, Integer Minor, Integer Build = {}, Integer Revision = {}) {
+    return Version{Major, Minor, Build, Revision};
+  }
+
+  /// \brief AL `Version.Create(Text)`.
+  /// \param Text The version in its text form, `Major.Minor.Build.Revision`.
+  /// \return The version.
+  /// \throws Error when the text does not spell one.
+  [[nodiscard]] static Version Create(std::string_view Text) { return FromText(Text); }
+
   /// \brief AL `Version.ToText()`.
   /// \return `Major.Minor.Build.Revision`.
   [[nodiscard]] std::string ToText() const;

@@ -510,8 +510,8 @@ private:
     const std::string_view builtin = BareBuiltin(callee.text);
     if (builtin.empty()) { return AsTheDoorSpellsIt(Identifier(callee.text)); }
     return scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text})
-               ? "::agiru::" + std::string(builtin)
-               : std::string(builtin);
+               ? "::agiru::" + BuiltinSpelling(builtin)
+               : BuiltinSpelling(builtin);
   }
 
   std::string Tried(const al::Expr &expression) {
@@ -659,7 +659,7 @@ private:
         const bool hidden =
             scope_.HasField(OfVariable{.variable = "Rec", .field = expression.text}) ||
             !scope_.Resolve(expression.text).empty();
-        return (hidden ? "::agiru::" : "") + std::string(builtin) + "()";
+        return (hidden ? "::agiru::" : "") + BuiltinSpelling(builtin) + "()";
       }
       if (IsSystemFieldName(expression.text)) { return Identifier(expression.text); }
       if (scope_.MemberIsCall(OfVariable{.variable = "Rec", .field = expression.text})) {

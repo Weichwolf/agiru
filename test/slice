@@ -6865,6 +6865,7 @@ base/system/environment/configuration/page/AADApplicationList.cpp
 base/system/environment/configuration/page/ReportResGovernSettings.cpp
 base/system/io/codeunit/ImportXMLFileToDataExch.cpp
 base/system/io/codeunit/XMLBufferReader.cpp
+base/system/io/table/ConfigSetup.cpp
 base/system/security/encryption/codeunit/CertificateManagement.cpp
 base/system/tooling/page/NewPage.cpp
 base/system/tooling/page/PageFieldsSelectionList.cpp

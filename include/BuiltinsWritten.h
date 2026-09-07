@@ -17,6 +17,7 @@
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
+#include "type/Time.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
@@ -192,6 +193,16 @@ StartSession(::agiru::Integer &SessionId,
   static_cast<void>(Record);
   throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
 }
+
+/// \brief AL `System.Time()` -- the time of day, from the session's clock.
+/// \return The current time.
+///
+/// \note THE DOOR SPELLS IT APART FROM AL, and this is the one place in the door that does.
+///       `Time` is an AL data type as well as an AL builtin, and C++ cannot hold a class and a
+///       function of one name in one namespace. The generator translates AL's `Time` into this
+///       name (`kSpelledApart` in `src/gen/Door.cpp`); a reader who knows AL sees the deviation
+///       here rather than guessing at it.
+[[nodiscard]] ::agiru::Time CurrentTime();
 
 /// \brief AL `System.ClearCollectedErrors()`. Clears the errors collected so far.
 ///

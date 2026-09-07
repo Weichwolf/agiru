@@ -142,6 +142,10 @@ void NoteSpellings(const std::string &line, std::map<std::string, std::string> &
   }
 }
 
+constexpr std::array<std::pair<std::string_view, std::string_view>, 1> kSpelledApart{{
+    {"time", "CurrentTime"},
+}};
+
 std::map<std::string, std::string> ReadSpellings() {
   std::map<std::string, std::string> found;
   const std::filesystem::path root = std::filesystem::path(AGIRU_SOURCE_DIR) / "include";
@@ -408,6 +412,17 @@ bool HiddenByABaseMember(std::string_view name) {
 bool DoorCalls(std::string_view name) {
   const std::string spelled = AsTheDoorSpellsIt(name);
   return Callables().contains(spelled);
+}
+
+std::string BuiltinSpelling(std::string_view name) {
+  std::string key;
+  for (const char c : name) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  for (const auto &[al, door] : kSpelledApart) {
+    if (al == key) { return std::string(door); }
+  }
+  return AsTheDoorSpellsIt(name);
 }
 
 std::string AsTheDoorSpellsIt(std::string_view name) {

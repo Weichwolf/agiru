@@ -1593,6 +1593,68 @@ const std::set<std::string> &Rebuilt() {
   return kRebuilt;
 }
 
+const std::map<std::string, std::string> &DotNetBase() {
+  static const std::map<std::string, std::string> kBase{
+      {"XmlLinkedNode", "XmlNode"},
+      {"XmlCharacterData", "XmlLinkedNode"},
+      {"XmlElement", "XmlLinkedNode"},
+      {"XmlAttribute", "XmlNode"},
+      {"XmlDocument", "XmlNode"},
+      {"XmlDocumentFragment", "XmlNode"},
+      {"XmlDeclaration", "XmlLinkedNode"},
+      {"XmlDocumentType", "XmlLinkedNode"},
+      {"XmlEntityReference", "XmlLinkedNode"},
+      {"XmlProcessingInstruction", "XmlLinkedNode"},
+      {"XmlText", "XmlCharacterData"},
+      {"XmlComment", "XmlCharacterData"},
+      {"XmlCDataSection", "XmlCharacterData"},
+      {"XmlAttributeCollection", "XmlNamedNodeMap"},
+      {"XmlTextReader", "XmlReader"},
+      {"XmlNodeReader", "XmlReader"},
+      {"XmlDictionaryReader", "XmlReader"},
+      {"XmlTextWriter", "XmlWriter"},
+      {"XmlDictionaryWriter", "XmlWriter"},
+  };
+  return kBase;
+}
+
+std::string NearestPresent(const std::string &type, const agiru::gen::DotNetUse &use) {
+  std::string walking = type;
+  for (auto found = DotNetBase().find(walking); found != DotNetBase().end();
+       found = DotNetBase().find(walking)) {
+    walking = found->second;
+    if (use.contains(walking)) { return walking; }
+  }
+  return {};
+}
+
+std::string StubBase(const std::string &type, const agiru::gen::DotNetUse &use, bool alObjects) {
+  const std::string base = NearestPresent(type, use);
+  if (!base.empty()) { return base; }
+  return alObjects ? "AbsentObject" : "AbsentType";
+}
+
+std::vector<std::string> BasesFirst(const agiru::gen::DotNetUse &use) {
+  std::vector<std::string> order;
+  std::set<std::string> written;
+  bool moved = true;
+  while (moved) {
+    moved = false;
+    for (const auto &[type, named] : use) {
+      if (written.contains(type)) { continue; }
+      const std::string base = NearestPresent(type, use);
+      if (!base.empty() && !written.contains(base)) { continue; }
+      order.push_back(type);
+      written.insert(type);
+      moved = true;
+    }
+  }
+  for (const auto &[type, named] : use) {
+    if (!written.contains(type)) { order.push_back(type); }
+  }
+  return order;
+}
+
 struct Counted {
   std::size_t types = 0;
   std::size_t members = 0;
@@ -1603,13 +1665,15 @@ Counted Stubs(std::string &text,
               bool skipRebuilt,
               bool alObjects = false) {
   Counted counted;
-  for (const auto &[type, named] : use) {
+  for (const std::string &type : BasesFirst(use)) {
     if (skipRebuilt && Rebuilt().contains(type)) { continue; }
+    const std::set<std::string> &named = use.at(type);
     ++counted.types;
     text += "\nstruct ";
     text += type;
-    text +=
-        alObjects ? " : ::agiru::dotnet::AbsentObject {\n" : " : ::agiru::dotnet::AbsentType {\n";
+    text += " : ::agiru::dotnet::";
+    text += StubBase(type, use, alObjects);
+    text += " {\n";
     for (const std::string &member : named) {
       ++counted.members;
       text += "  ::agiru::dotnet::Refused ";
