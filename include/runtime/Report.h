@@ -746,7 +746,7 @@ public:
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
   /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Export(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Boolean Export(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("XmlPort.Export is declared and has no translated xmlport body yet (board:0065)");
   }
@@ -787,7 +787,7 @@ public:
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
   /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Import(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Boolean Import(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error("XmlPort.Import is declared and has no translated xmlport body yet (board:0065)");
   }
@@ -796,7 +796,7 @@ public:
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
   /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void ImportFile(Arguments &&...arguments) const {
+  template <typename... Arguments>::agiru::Boolean ImportFile(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
     throw Error(
         "XmlPort.ImportFile is declared and has no translated xmlport body yet (board:0065)");
