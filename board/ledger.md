@@ -44,6 +44,24 @@ they are left as they are.
 - **the POPULATION is measured over `~/Git/BCApps/src`**, which is what `apps/` will contain once
   `make transpile` runs. Every count in an item names that tree and its date.
 
+### Whether an item is DONE cannot be grepped, and two attempts say why
+
+**A property's name is not its metadata member's name.** `OptionMembers` reaches `FieldDef::values`,
+`Subtype` on a BLOB reaches `FieldDef::subtype` from a page called `devenv-subtype-blob-property.md`,
+and `TableRelation` reaches two members and a board item. Grepping `include/meta/` for the property
+name reported 50 items as carrying no metadata (2026-09-07); the list contained false negatives from
+the name alone.
+
+**And the item's own text is no better on its own.** 31 of the property items say "the metadata half
+is done"; 134 do not -- but most of those 134 are report, query and xmlport properties, which have
+no metadata to reach and never will until those object kinds have a generator. Neither count is the
+number of items that could be implemented today.
+
+**What actually decides it is the item's ORDERING line**, which the sweep wrote and which no grep
+can infer: `0365` says "Behind board:0364, which decides whether those tables exist at all",
+`0371` says "Strictly behind board:0013". Both look mechanical from the outside -- one member each in
+`TableDef` and `FieldDef` -- and both would be wrong to write today.
+
 ### How a population is measured, and what it took to get there
 
 **A property DECLARATION begins at a statement boundary**: the start of a line, an opening brace, or
