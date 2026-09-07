@@ -401,6 +401,7 @@ bool NamesAnObject(const al::VarDecl &declared) {
 
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
+  if (type == "Report" || type == "Query" || type == "XmlPort") { return nullptr; }
   const TableIndex &index = type == "Codeunit"    ? objects.codeunits
                             : type == "Page"      ? objects.pages
                             : type == "Interface" ? objects.interfaces

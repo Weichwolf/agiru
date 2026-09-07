@@ -6904,3 +6904,4 @@ base/system/environment/configuration/table/AADApplication.cpp
 base/warehouse/adcs/table/ADCSUser.cpp
 base/crm/duplicates/table/MergeDuplicatesBuffer.cpp
 base/integration/graph/table/AttachmentEntityBuffer.cpp
+base/system/test_tools/test_runner/table/CALTestSuite.cpp
