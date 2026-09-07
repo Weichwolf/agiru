@@ -1540,6 +1540,11 @@ public:
       const auto field = fields->find(LowerKey(std::string(member.field)));
       return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
     }
+    if (const al::VarDecl *where = DeclarationOf(member.variable); where != nullptr) {
+      const std::string platform =
+          PlatformFieldSpelling(PlatformField{.table = where->subtype, .field = member.field});
+      if (!platform.empty()) { return platform; }
+    }
     if (!IsRecord(member.variable) || FieldNamed(*source_, member.field) != nullptr) {
       return Identifier(member.field);
     }

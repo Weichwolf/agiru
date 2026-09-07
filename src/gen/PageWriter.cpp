@@ -713,22 +713,36 @@ std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
 }
 
+std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
+  std::vector<al::ProcedureDecl> all = page.procedures;
+  const auto walk = [&all](auto &&self, const std::vector<al::PageControl> &controls) -> void {
+    for (const al::PageControl &control : controls) {
+      all.insert(all.end(), control.triggers.begin(), control.triggers.end());
+      self(self, control.children);
+    }
+  };
+  walk(walk, page.layout);
+  walk(walk, page.actions);
+  return all;
+}
+
 PageHeader
 WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
   const std::string identifier = Identifier(object.name);
+  const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object);
   const std::string pageClass = ClassName(identifier, ObjectKind::Page);
   const std::string controlsClass = identifier + "_Controls";
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
   out += kDoorMarker;
-  if (NamesAbsentIn(object.variables, object.procedures, objects) ||
+  if (NamesAbsentIn(object.variables, bodies, objects) ||
       SourceTable(object, objects).starts_with("absent::")) {
     out += "#include \"absent/Types.h\"\n";
   }
   const std::string includes = Includes(object, objects);
   if (!includes.empty()) { out += "\n" + includes; }
   out += "\n#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
-  out += InlineOptionsOf(object.name, "pages", object.variables, object.procedures);
+  out += InlineOptionsOf(object.name, "pages", object.variables, bodies);
 
   Controls all;
   Flatten(object.layout, all);
@@ -808,7 +822,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
-  GatherAbsentIn(object.variables, object.procedures, objects, dotnet, absent);
+  GatherAbsentIn(object.variables, bodies, objects, dotnet, absent);
   return PageHeader{.text = WithDoor(out, ObjectKind::Page), .dotnet = dotnet, .absent = absent};
 }
 

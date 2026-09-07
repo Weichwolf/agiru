@@ -62,6 +62,41 @@ public:
   /// \brief The chained member `Groups`, which a body reaches on the RESULT of a refused call.
   /// \brief The chained member `GetString`, which a body reaches on the RESULT of a refused call.
   static Refused GetString;
+  /// \brief The chained member `CreateOutStream`, which a body reaches on the RESULT of a refused
+  /// call.
+  static Refused CreateOutStream;
+  /// \brief The chained member `GetResponseStream`, which a body reaches on the RESULT of a refused
+  /// call.
+  static Refused GetResponseStream;
+  /// \brief The chained member `Latitude`, which a body reaches on the RESULT of a refused call.
+  static Refused Latitude;
+  /// \brief The chained member `MediaId`, which a body reaches on the RESULT of a refused call.
+  static Refused MediaId;
+  /// \brief The chained member `ReportId`, which a body reaches on the RESULT of a refused call.
+  static Refused ReportId;
+  /// \brief The chained member `SelectSingleNode`, which a body reaches on the RESULT of a refused
+  /// call.
+  static Refused SelectSingleNode;
+  /// \brief The chained member `Status`, which a body reaches on the RESULT of a refused call.
+  static Refused Status;
+  /// \brief The chained member `ToLower`, which a body reaches on the RESULT of a refused call.
+  static Refused ToLower;
+  /// \brief The chained member `Severity`, which a body reaches on the RESULT of a refused call.
+  static Refused Severity;
+  /// \brief The chained member `Worksheet`, which a body reaches on the RESULT of a refused call.
+  static Refused Worksheet;
+  /// \brief The chained member `SetNamedItem`, which a body reaches on the RESULT of a refused
+  /// call.
+  static Refused SetNamedItem;
+  /// \brief The chained member `RevocationMode`, which a body reaches on the RESULT of a refused
+  /// call.
+  static Refused RevocationMode;
+  /// \brief The chained member `OuterXML`, which a body reaches on the RESULT of a refused call.
+  static Refused OuterXML;
+  /// \brief The chained member `ImportFile`, which a body reaches on the RESULT of a refused call.
+  static Refused ImportFile;
+  /// \brief The chained member `FullPath`, which a body reaches on the RESULT of a refused call.
+  static Refused FullPath;
   static Refused Groups;
   /// \brief The chained member `Captures`, which a body reaches on the RESULT of a refused call.
   static Refused Captures;
@@ -629,6 +664,21 @@ struct AbsentObject : AbsentType {
 using RefusedResult = Refused;
 
 inline Refused Refused::GetString{{.type = "<result>", .member = "GetString"}};
+inline Refused Refused::CreateOutStream{{.type = "<result>", .member = "CreateOutStream"}};
+inline Refused Refused::GetResponseStream{{.type = "<result>", .member = "GetResponseStream"}};
+inline Refused Refused::Latitude{{.type = "<result>", .member = "Latitude"}};
+inline Refused Refused::MediaId{{.type = "<result>", .member = "MediaId"}};
+inline Refused Refused::ReportId{{.type = "<result>", .member = "ReportId"}};
+inline Refused Refused::SelectSingleNode{{.type = "<result>", .member = "SelectSingleNode"}};
+inline Refused Refused::Status{{.type = "<result>", .member = "Status"}};
+inline Refused Refused::ToLower{{.type = "<result>", .member = "ToLower"}};
+inline Refused Refused::Severity{{.type = "<result>", .member = "Severity"}};
+inline Refused Refused::Worksheet{{.type = "<result>", .member = "Worksheet"}};
+inline Refused Refused::SetNamedItem{{.type = "<result>", .member = "SetNamedItem"}};
+inline Refused Refused::RevocationMode{{.type = "<result>", .member = "RevocationMode"}};
+inline Refused Refused::OuterXML{{.type = "<result>", .member = "OuterXML"}};
+inline Refused Refused::ImportFile{{.type = "<result>", .member = "ImportFile"}};
+inline Refused Refused::FullPath{{.type = "<result>", .member = "FullPath"}};
 inline Refused Refused::Groups{{.type = "<result>", .member = "Groups"}};
 inline Refused Refused::Captures{{.type = "<result>", .member = "Captures"}};
 inline Refused Refused::Item{{.type = "<result>", .member = "Item"}};

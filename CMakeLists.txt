@@ -23,8 +23,36 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # fall out of the compiler, and that is the hold which replaces it.
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 
+# A TEMPLATE'S INLINE FUNCTIONS ARE NOT AN EXPORTED SYMBOL. The door is templates all the way down --
+# `Table<Derived>`, `Text<N>`, `Declare<&Member>` -- and every instantiation lands in the dynamic
+# symbol table of the library that made it, which the linker then has to merge and the loader to
+# resolve. Hiding them is what `-fvisibility-inlines-hidden` is for, and it changes no observable
+# behaviour: an inline function's ADDRESS is not something AL can take.
+add_compile_options(-fvisibility-inlines-hidden)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif()
+
+# THE GENERATED TREE IS COMPILED FOR THE LOOP AND NOT FOR THE CLOCK, and the measurement is the
+# whole argument. One 1 022-line table source, clang++-19, 2026-09-07, same machine and same load:
+#
+#   -O2 -g    67.9 s   18.2 MB object   <- what the build did
+#   -O2 -g0   44.3 s    3.0 MB
+#   -O0 -g0   12.8 s    5.3 MB          <- 5.3x faster
+#
+# and the library it lands in was 1 001 MB of which 864 MB was DWARF, which the linker merges and
+# relocates on every build. NOBODY STEPS THROUGH A GENERATED BODY: its defect is a defect in
+# `src/gen`, and `src/` keeps the build type's own flags, debugger and all.
+#
+# `AGIRU_FAST_LOOP=OFF` gives the generated tree the build type's flags back, and ANY statement
+# about run time has to be measured that way -- CLAUDE.md's benchmark is the same operation in
+# plain SQL, and an -O0 build cannot answer it.
+option(AGIRU_FAST_LOOP "Compile the generated tree for compile time rather than for run time" ON)
+if(AGIRU_FAST_LOOP)
+  set(AGIRU_GENERATED_FLAGS -O0 -g0)
+else()
+  set(AGIRU_GENERATED_FLAGS "")
 endif()
 
 find_program(LLD ld.lld-19 ld.lld)
@@ -81,6 +109,18 @@ foreach(tier IN LISTS TIERS)
     # in practice: an app is bound to the DOOR, and a change inside the runtime relinks the runtime.
     add_library(agiru_${tier} SHARED ${sources})
     set(target agiru_${tier})
+  endif()
+
+  # THE TRANSPILER KEEPS ITS OPTIMISER AND EVERYTHING ELSE LOSES IT. `agirutc` runs on EVERY round
+  # -- 95 s over 9 300 objects -- so its run time IS build time and `-O0` would cost more than the
+  # compile saves; `al` and `gen` are its libraries. The runtime and the CLI are compiled for the
+  # loop like the generated tree, because nothing measures their run time yet.
+  if(AGIRU_FAST_LOOP)
+    if(tier STREQUAL tc OR tier STREQUAL gen OR tier STREQUAL al)
+      target_compile_options(${target} PRIVATE -g0)
+    else()
+      target_compile_options(${target} PRIVATE ${AGIRU_GENERATED_FLAGS})
+    endif()
   endif()
 
   # Its own tier, the door, and exactly what `reaches` names.
@@ -175,7 +215,9 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
     # table source: 8.2 s, of which 6.6 s parse the door and 0.5 s are the back end. A unity batch
     # of 16 pays that parse once for 16 sources; every generated file keeps its file-scope names in
     # a namespace of its own so the batch has nothing to collide on (board:0589).
-    set_target_properties(agiru_slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
+    set_target_properties(agiru_slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP
+                                                 UNITY_BUILD_BATCH_SIZE 32)
+    target_compile_options(agiru_slice PRIVATE ${AGIRU_GENERATED_FLAGS})
     target_link_libraries(agiru PRIVATE agiru_slice)
   endif()
 endif()
@@ -203,6 +245,7 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    target_compile_options(agiru_app_${app} PRIVATE ${AGIRU_GENERATED_FLAGS})
 
     string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)
     if(depends)

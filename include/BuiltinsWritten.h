@@ -271,6 +271,65 @@ std::string GetUrl(const ::agiru::ClientType &ClientType,
                    ::agiru::Boolean UseFilters = {},
                    std::string_view Layout = {});
 
+/// \brief AL `System.GetUrl(ClientType [, Company] [, ObjectType] [, ObjectId] [, Record]
+///        [, UseFilters] [, Layout])` -- the RECORD form.
+/// \tparam Record The generated table's class.
+/// \param ClientType Which client the URL is for.
+/// \param Company The company name.
+/// \param ObjectType What kind of object the URL opens.
+/// \param ObjectId Its number.
+/// \param Record The record the URL opens ON.
+/// \param UseFilters Whether the record's filters travel in the URL.
+/// \param Layout The report layout, where the object is a report.
+/// \return Never.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note `system-geturl-clienttype-string-objecttype-integer-table-boolean-method.md` IS ITS OWN
+///       PAGE beside the `recordref` one, so a record and a `RecordRef` are two overloads and not
+///       one with a conversion -- which is the overload-filename rule, and the reason a body that
+///       passes `Rec` did not compile.
+template <typename Record>
+  requires requires {
+    { Record::kId } -> std::convertible_to<::agiru::TableId>;
+  }
+std::string GetUrl(const ::agiru::ClientType &ClientType,
+                   std::string_view Company,
+                   const ::agiru::ObjectType &ObjectType,
+                   ::agiru::Integer ObjectId,
+                   const Record &Record_,
+                   ::agiru::Boolean UseFilters = {},
+                   std::string_view Layout = {}) {
+  static_cast<void>(ClientType);
+  static_cast<void>(Company);
+  static_cast<void>(ObjectType);
+  static_cast<void>(ObjectId);
+  static_cast<void>(Record_);
+  static_cast<void>(UseFilters);
+  static_cast<void>(Layout);
+  throw ::agiru::Error("System.GetUrl(ClientType, Text, ObjectType, Integer, Record, Boolean, "
+                       "Text) is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope,
+/// Dictionary of [Text, Text])`. Logs a trace message with its dimensions in one dictionary.
+/// \param EventId The event's identifier.
+/// \param Message The message.
+/// \param Verbosity How loud it is.
+/// \param DataClassification What kind of data it carries.
+/// \param TelemetryScope Who sees it.
+/// \param CustomDimensions The dimensions, by name.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+///
+/// \note IT IS A SEPARATE OVERLOAD IN THE DOCUMENTATION and not a shape of the one below:
+///       `session-logmessage-...-dictionary[text,text]-method.md` is its own page, which is the
+///       filename rule CLAUDE.md names -- behaviour hangs off the ARGUMENT.
+void LogMessage(std::string_view EventId,
+                std::string_view Message,
+                const ::agiru::Verbosity &Verbosity,
+                const ::agiru::DataClassification &DataClassification,
+                const ::agiru::TelemetryScope &TelemetryScope,
+                const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text,
 /// Text [, Text, Text])`. Logs a trace message to a telemetry account.
 /// \param EventId The event's identifier.

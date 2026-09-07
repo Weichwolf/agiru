@@ -430,6 +430,15 @@ public:
     Throw();
   }
 
+  /// \brief AL `Option.AsInteger()` on an enumeration this run does not have.
+  /// \return Never.
+  /// \throws Error always, naming the expression that asked for it.
+  ///
+  /// \note IT IS A MEMBER AND NOT A CONVERSION. `Rec.Status.AsInteger()` is a CALL, and a
+  ///       conversion operator answers a value and not a call -- so a refusal that converts to
+  ///       everything still had no `AsInteger`, and 12 bodies stopped there.
+  [[nodiscard]] std::int32_t AsInteger() const { Throw(); }
+
   /// \brief Refuses to be compared with anything.
   /// \tparam T The other operand's type.
   /// \param left The refusal. \param right The other operand.

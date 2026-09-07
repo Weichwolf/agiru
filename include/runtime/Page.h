@@ -85,9 +85,7 @@ public:
   /// \brief AL `CurrPage.<Part>.PAGE` -- the sub-page behind the part.
   /// \return Never.
   /// \throws Error always -- a part's page needs a running UI (board:0030).
-  [[nodiscard]] P &Page() const {
-    throw Error("A part's PAGE needs a running UI (board:0030)");
-  }
+  [[nodiscard]] P &Page() const { throw Error("A part's PAGE needs a running UI (board:0030)"); }
 
   /// \brief AL `CurrPage.<Part>.Visible(Boolean)`.
   /// \param NewVisible Whether it shows.
@@ -176,9 +174,7 @@ public:
   /// brackets: `[X := ] Page.Caption([NewCaption])`.
   /// \return The caption the page shows.
   /// \throws Error until the UI runs (board:0030).
-  std::string Caption() const {
-    throw Error("Page.Caption() needs a running UI (board:0030)");
-  }
+  std::string Caption() const { throw Error("Page.Caption() needs a running UI (board:0030)"); }
 
   /// \brief AL `Page.Caption(Text)`. The caption shown in the title bar. For example, the default
   /// value in English (United States) is the same as the name of the page.
@@ -383,6 +379,27 @@ public:
 ///        (board:0038).
 template <> class Page<void> {
 public:
+  /// \brief AL `PAGE.GetBackgroundParameters(...)` -- the parameters a page background task was
+  /// started with.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- there is no running page yet (board:0030).
+  template <typename... Arguments>
+  static ::agiru::Text<0> GetBackgroundParameters(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.GetBackgroundParameters is declared and needs a running UI (board:0030)");
+  }
+
+  /// \brief AL `PAGE.SetFilterToMultipleValues(...)` -- a filter naming several values at once.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \throws Error always -- there is no running page yet (board:0030).
+  template <typename... Arguments> static void SetFilterToMultipleValues(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.SetFilterToMultipleValues is declared and needs a running UI (board:0030)");
+  }
+
   template <typename... Arguments>
   static void Run(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
