@@ -31,8 +31,8 @@
 # without it `T &` will not bind: `error: non-const lvalue reference to type 'int' cannot bind to a
 # temporary` (measured 2026-09-07). A cast that makes the binding is not a cast that says nothing.
 
-# `bugprone-easily-swappable-parameters` argues with AL's own signatures, which this tree may not
-# change: `record-insert-boolean-boolean-method.md` is `Record.Insert(RunTrigger, InsertWithSystemId)`
+# `bugprone-easily-swappable-parameters` is SET TO THREE rather than switched off. AL's own
+# signatures put two alike parameters side by side and this tree may not change them: `record-insert-boolean-boolean-method.md` is `Record.Insert(RunTrigger, InsertWithSystemId)`
 # and `textbuilder-remove-integer-integer-method.md` is `Remove(StartIndex, Length)`. Name equality
 # with AL is an architectural invariant here, so the two adjacent parameters are the specification.
 #
@@ -47,17 +47,16 @@
 # `requires { value.ToInvariantString(); }` share a BODY and not a condition. The order decides
 # which of a type's two renderings is used, so merging them would change the answer.
 
-# `clang-analyzer-optin.performance.Padding` PAID FOR ITSELF AND IS THEN SWITCHED OFF, which needs
-# both halves said. It found 57 padding bytes in `FieldDef` -- stored once per field -- and the
+# `clang-analyzer-optin.performance.Padding` IS ON, WITH ITS THRESHOLD SET IN `test/lint.sh`. It found 57 padding bytes in `FieldDef` -- stored once per field -- and the
 # reorder took it from 568 to 512 bytes and the library from 938.40 to 936.53 MB over 27 666 fields
 # (measured 2026-09-07). What it names now is `Declared`, and that one is NEVER STORED: it is the
 # parameter object `Declare()` takes, so its 48 bytes cost nothing at rest. Following it there means
 # reordering the generator's emission too, because C++ ties a designated initialiser to the
 # declaration order -- 101 lines of generator, a transpile and a full build, for zero bytes.
 #
-# `optin.performance.Padding:AllowedPad` is the documented threshold and would have been the right
-# answer; set in `CheckOptions` it does not reach the analyser through `make lint`, which passes its
-# own `-analyzer-config`. That is board:0606, and the check comes back on when it is settled.
+# `optin.performance.Padding:AllowedPad` is the threshold, and it travels the way the node budget
+# travels -- as an `-analyzer-config` argument in `test/lint.sh`. Under `CheckOptions` it never
+# arrives, because the analyser reads its own configuration and not clang-tidy's.
 #
 # THE OLD TEXT, kept because it says what the check is worth:: it found 57 padding bytes
 # in `FieldDef`, which is stored once per field -- 568 bytes became 512 and the library lost 1.99 MB
@@ -88,11 +87,9 @@ Checks: >
   -readability-redundant-member-init,
   -modernize-use-nodiscard,
   -readability-redundant-casting,
-  -bugprone-easily-swappable-parameters,
   -modernize-avoid-c-arrays,
   -misc-unconventional-assign-operator,
-  -bugprone-branch-clone,
-  -clang-analyzer-optin.performance.Padding
+  -bugprone-branch-clone
 WarningsAsErrors: '*'
 
 CheckOptions:
@@ -101,6 +98,12 @@ CheckOptions:
   # and both are right in their own terms: these are POSIX functions and POSIX has no C++ header for
   # them. Ignoring the one header resolves it at the narrowest point available -- neither check is
   # switched off, and every other missing include is still a finding.
+  # `bugprone-easily-swappable-parameters` is SET rather than switched off: AL's own signatures put
+  # two alike parameters side by side -- `Record.Insert(RunTrigger, InsertWithSystemId)`,
+  # `TextBuilder.Remove(StartIndex, Length)` -- and name equality with AL is an invariant here.
+  # Three in a row is nobody's specification, so the check keeps that half of its reach.
+  bugprone-easily-swappable-parameters.MinimumLength: '3'
+
   misc-include-cleaner.IgnoreHeaders: 'stdio.h'
 
   # `readability-identifier-length` belongs SET, not switched off. Its default asks for three

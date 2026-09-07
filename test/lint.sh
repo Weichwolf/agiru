@@ -58,6 +58,14 @@ NODES=${NODES:-50000}
 # rather than reporting a pass, which is the behaviour that caught it.
 BUDGET="-extra-arg=-Xclang -extra-arg=-analyzer-config -extra-arg=-Xclang -extra-arg=max-nodes=$NODES"
 ONEBUDGET="--extra-arg=-Xclang --extra-arg=-analyzer-config --extra-arg=-Xclang --extra-arg=max-nodes=$NODES"
+# AND THE ANALYSER'S OWN OPTIONS COME THE SAME WAY. `optin.performance.Padding:AllowedPad` is what
+# keeps the padding check on the structs that are STORED and off the one that is a parameter object:
+# `FieldDef` carries 57 bytes of padding per field and was worth 1.99 MB, `Declared` carries 48 and
+# is never stored. Set in `.clang-tidy` under `CheckOptions` it does not arrive -- the analyser
+# reads its own config, which these arguments carry (measured 2026-09-07).
+PAD=${PAD:-64}
+BUDGET="$BUDGET -extra-arg=-Xclang -extra-arg=-analyzer-config -extra-arg=-Xclang -extra-arg=optin.performance.Padding:AllowedPad=$PAD"
+ONEBUDGET="$ONEBUDGET --extra-arg=-Xclang --extra-arg=-analyzer-config --extra-arg=-Xclang --extra-arg=optin.performance.Padding:AllowedPad=$PAD"
 # ONLY WHAT CHANGED, UNLESS THE WHOLE TREE IS ASKED FOR. clang-tidy costs 16 times what the
 # compiler costs on the same file -- measured 2026-09-02 on src/rt/Table.cpp: 2.0 s to parse it,
 # 32.6 s to check it, of which 20.8 s is the path-sensitive analyzer alone. Over 97 units that is
