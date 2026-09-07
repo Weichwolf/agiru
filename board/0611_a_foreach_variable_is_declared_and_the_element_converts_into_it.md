@@ -43,10 +43,17 @@ constructor swallowed `PriceSourceList.Add(Type, Code[20])`. A `Enum<E>` constru
 integer makes every `Enum<E>` parameter reachable by every integer expression in the tree, and the
 failure mode is the one all three share: it compiles, it runs, it returns a value.
 
-**So it needs the A/B, not the argument.** The measurement is a full build with the conversion in:
-what breaks is the population, and the population decides whether the conversion is implicit,
-`explicit` plus a generator that spells `Enum<E>::FromInteger(x)` at the loop, or restricted to the
-`foreach` emission alone.
+**AND THE ONE MEASUREMENT THAT WAS CHEAP TO TAKE SETTLES HALF OF IT: `::agiru::Integer` IS
+`std::int32_t`.** It is a type ALIAS and not a class (`include/type/Integer.h`), so a constructor
+`Enum(Integer)` is a constructor from `int` -- every integer literal and every integer expression
+in the tree converts to every enum, in ONE user-defined conversion. Written and taken back the same
+round, before the build: the `\warning` that would have defended it ("it takes `Integer` and not
+`int`") is simply false, and the catch-all is the whole one.
+
+**So the implicit road is closed and the remaining question is which of the other two:** an
+`explicit Enum(Integer)` with the generator direct-initialising the loop variable from its DECLARED
+type, or a `foreach` emission that converts only where the declared type and the element type
+disagree. Both need the generator to know the declared type, which the scope does not answer today.
 
 **The population that wants it is ONE call site today** -- `IDAutomation1DProvider` -- and its cost
 is one vtable of the eight that stop `agiru run-tests`. That is the whole argument for filing it
