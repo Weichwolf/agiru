@@ -2038,3 +2038,12 @@ base/system/threading/codeunit/JobQueueStartReportBase.cpp
 system/system/globalization/table/AllowedLanguage.cpp
 base/foundation/reporting/table/DocumentSendingProfile.cpp
 base/foundation/reporting/table/DocumentSendingProfile.cpp
+system/system/environment/configuration/codeunit/SystemInitializationImpl.cpp
+base/finance/consolidation/page/CompanySelector.cpp
+system/system/environment/configuration/page/Roles.cpp
+base/system/device/page/ServerPrinters.cpp
+base/cash_flow/setup/table/CashFlowSetup.cpp
+base/cash_flow/setup/table/CashFlowSetup.cpp
+system/system/security/encryption/codeunit/CryptographyManagement.cpp
+system/system/environment/configuration/table/SignupContextValues.cpp
+system/system/security/encryption/codeunit/SignatureKey.cpp

@@ -301,6 +301,14 @@ public:
     return *this;
   }
 
+  /// \brief AL `Text[Index] := 'x'` where the literal is still an array.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return This position.
+  template <std::size_t N> CharAt &operator=(const char (&text)[N]) {
+    return *this = std::string_view(text, N - 1);
+  }
+
   /// \brief AL `Text[Index] := Integer` -- a code point.
   /// \param code The code point.
   /// \return This position.
@@ -341,6 +349,25 @@ public:
   /// \param text The text.
   /// \return Whether they are the same.
   [[nodiscard]] bool operator==(std::string_view text) const { return Read() == text; }
+
+  /// \brief Compares against a character literal, which reaches here as an array.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return Whether they are the same.
+  /// \warning IT BINDS THE ARRAY ITSELF. Without it the literal could become a `Char` or a
+  ///          `std::string_view` and the two overloads were equally good.
+  template <std::size_t N> [[nodiscard]] bool operator==(const char (&text)[N]) const {
+    return Read() == std::string_view(text, N - 1);
+  }
+
+  /// \brief Orders against a character literal, which reaches here as an array.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return The ordering.
+  template <std::size_t N>
+  [[nodiscard]] std::strong_ordering operator<=>(const char (&text)[N]) const {
+    return Read() <=> std::string_view(text, N - 1);
+  }
 
   /// \brief Orders the character against a one-character text -- AL's `>= '0'`.
   /// \param text The text.

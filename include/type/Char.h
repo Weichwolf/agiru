@@ -35,7 +35,10 @@ public:
   /// \brief AL passes `'+'` where a `Char` is declared -- a one-character text IS a character.
   /// \param text The text, whose single character is taken.
   /// \throws Error when the text is not exactly one character.
-  constexpr explicit(false) Char(std::string_view text)
+  /// \warning IT IS EXPLICIT AND THE LITERAL OVERLOAD BESIDE IT IS NOT. Implicit, every
+  ///          `std::string_view` in the tree was also a `Char`, and `Text + Text` became
+  ///          ambiguous with `Char + Text` (73 diagnostics over the slice).
+  constexpr explicit Char(std::string_view text)
       : code_(text.size() == 1 ? static_cast<std::int32_t>(static_cast<unsigned char>(text.front()))
                                : throw Error("A text of length " + std::to_string(text.size()) +
                                              " is not one character")) {}
@@ -118,6 +121,25 @@ public:
   /// \return Whether it is that one character.
   [[nodiscard]] constexpr bool operator==(std::string_view text) const {
     return code_ == OneOf(text);
+  }
+
+  /// \brief AL `Char = 'a'` where the literal is still an array.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return Whether it is that one character.
+  /// \warning IT BINDS THE ARRAY ITSELF, which is why it exists: against the constructor above
+  ///          the comparison had two user conversions to choose between and neither won.
+  template <std::size_t N> [[nodiscard]] constexpr bool operator==(const char (&text)[N]) const {
+    return *this == std::string_view(text, N - 1);
+  }
+
+  /// \brief AL `Char >= '0'` where the literal is still an array.
+  /// \tparam N The literal's length, one character and its terminator.
+  /// \param text The literal.
+  /// \return The ordering of this against the literal's one character.
+  template <std::size_t N>
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const char (&text)[N]) const {
+    return *this <=> std::string_view(text, N - 1);
   }
 
 private:
