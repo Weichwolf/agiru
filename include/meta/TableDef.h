@@ -78,12 +78,9 @@ enum class TableType : std::uint8_t {
 };
 
 struct FieldDef {
-  FieldNo no{};               ///< The AL field number.
+  std::size_t offset{};       ///< `offsetof` within the generated record.
   std::string_view name{};    ///< The AL name, spaces and all: `"Work Type Code"`.
   std::string_view caption{}; ///< The `Caption` property, which AL error messages quote.
-  FieldType type{};           ///< The AL data type.
-  std::uint16_t length{};     ///< Declared length for Code and Text, 0 otherwise.
-  std::size_t offset{};       ///< `offsetof` within the generated record.
 
   /// \brief The declared values of an Option or Enum field, empty otherwise.
   ///
@@ -93,41 +90,8 @@ struct FieldDef {
   /// ordinal.
   std::span<const EnumValueDef> values{};
 
-  /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
-  ///
-  /// `devenv-initvalue-property.md`: "Sets the initial value of this field when a user creates a
-  /// new record", and it is what `Init`, `Clear` and `ClearAll` reach for. 815 fields declare one
-  /// under `Layers/W1` (measured 2026-09-04), most of them `true` on a Boolean.
-  ///
-  /// \note THE MEMBER NAME IS RESOLVED TO ITS ORDINAL BY THE GENERATOR. AL writes
-  ///       `InitValue = "Gen. Prod. Posting Group"` and the column holds a number, so the
-  ///       translation happens where the enumeration is in scope and not at run time.
-  ///
-  /// \note EMPTY IS NOT ABSENT. `InitValue = ''` on a Code field is a declaration and an absent
-  ///       property is not, and a bare `string_view` could not tell them apart.
-  std::optional<std::string_view> initValue{};
-
-  /// \brief The `FieldClass` property: whether the field is stored, computed or a filter.
-  ///
-  /// `properties/devenv-fieldclass-property.md`. A `FlowField` is COMPUTED and has no column
-  /// (board:0047); a `FlowFilter` holds a filter and has none either. 2 712 declarations under the
-  /// read roots.
-  ::agiru::FieldClass fieldClass = ::agiru::FieldClass::Normal;
-
   /// \brief The `CalcFormula` property, as AL wrote it, for a FlowField.
   std::string_view calcFormula{};
-
-  /// \brief The `NotBlank` property: the field refuses the empty value. 949 declarations.
-  bool notBlank = false;
-
-  /// \brief The `AutoIncrement` property: the platform assigns the number. 151 declarations.
-  bool autoIncrement = false;
-
-  /// \brief The `Editable` property. A table field's `false` is a UI refusal and not a write one.
-  bool editable = true;
-
-  /// \brief The `ValidateTableRelation` property, which `Validate` reads before the trigger.
-  bool validateTableRelation = true;
 
   /// \brief The `TableRelation`'s target table, empty where the declaration is conditional or
   ///        filtered.
@@ -140,9 +104,6 @@ struct FieldDef {
 
   /// \brief The `TableRelation`'s target field, empty where it names the table's own primary key.
   std::string_view relationField{};
-
-  /// \brief The `BlankZero` property: a zero renders as nothing.
-  bool blankZero = false;
 
   /// \brief The `MinValue` and `MaxValue` properties, as AL wrote them.
   ///
@@ -163,21 +124,11 @@ struct FieldDef {
   ///          given a value and not a field (board:0323).
   std::string_view blankNumbers{};
 
-  /// \brief The `Compressed` property: whether a BLOB is stored compressed. The default is true,
-  ///        which is BC's own (board:0372).
-  bool compressed = true;
-
-  /// \brief The `Numeric` property: the client accepts only digits (board:0320).
-  bool numeric = false;
-
   /// \brief The `CharAllowed` property, as AL wrote it: `A-Z0-9` -- pairs of range ends.
   std::string_view charAllowed{};
 
   /// \brief The `ValuesAllowed` property, as AL wrote it: the comma list of permitted values.
   std::string_view valuesAllowed{};
-
-  /// \brief The `ClosingDates` property: the field takes BC's closing dates (board:0326).
-  bool closingDates = false;
 
   /// \brief The `ExtendedDataType` property, as AL wrote it: `EMail`, `URL`, `Ratio`, `Masked`,
   ///        `Person`, `PhoneNo`, `Barcode` or `None`.
@@ -197,20 +148,8 @@ struct FieldDef {
   ///        (board:0377).
   std::string_view accessByPermission{};
 
-  /// \brief The `LookupPageId` property: the list the dropdown opens (board:0334).
-  PageId lookupPageId{};
-
-  /// \brief The `DrillDownPageId` property: the rows behind a value (board:0335).
-  PageId drillDownPageId{};
-
-  /// \brief The `OptimizeForTextSearch` property (board:0370).
-  bool optimizeForTextSearch = false;
-
   /// \brief The `CaptionClass` property, as AL wrote it: the expression a caption is built from.
   std::string_view captionClass{};
-
-  /// \brief The `Width` property: the column width the client shows, 0 when none is declared.
-  std::uint16_t width = 0;
 
   /// \brief The `AutoFormatType` and `AutoFormatExpression` properties, as AL wrote them.
   std::string_view autoFormatType{};
@@ -227,9 +166,6 @@ struct FieldDef {
   ///        `Json`, `Xml` or `UserDefined`.
   std::string_view subtype{};
 
-  /// \brief The `Enabled` property on a FIELD: a disabled field is declared and not maintained.
-  bool enabled = true;
-
   /// \brief The `MovedFrom` and `MovedTo` properties on the FIELD (board:0357).
   std::string_view movedFrom{};
   std::string_view movedTo{}; ///< \see movedFrom
@@ -245,6 +181,69 @@ struct FieldDef {
 
   /// \brief The `ObsoleteTag` property: the version the removal is scheduled for.
   std::string_view obsoleteTag{};
+  /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
+  ///
+  /// `devenv-initvalue-property.md`: "Sets the initial value of this field when a user creates a
+  /// new record", and it is what `Init`, `Clear` and `ClearAll` reach for. 815 fields declare one
+  /// under `Layers/W1` (measured 2026-09-04), most of them `true` on a Boolean.
+  ///
+  /// \note THE MEMBER NAME IS RESOLVED TO ITS ORDINAL BY THE GENERATOR. AL writes
+  ///       `InitValue = "Gen. Prod. Posting Group"` and the column holds a number, so the
+  ///       translation happens where the enumeration is in scope and not at run time.
+  ///
+  /// \note EMPTY IS NOT ABSENT. `InitValue = ''` on a Code field is a declaration and an absent
+  ///       property is not, and a bare `string_view` could not tell them apart.
+  std::optional<std::string_view> initValue{};
+  FieldNo no{}; ///< The AL field number.
+
+  /// \brief The `FieldClass` property: whether the field is stored, computed or a filter.
+  ///
+  /// `properties/devenv-fieldclass-property.md`. A `FlowField` is COMPUTED and has no column
+  /// (board:0047); a `FlowFilter` holds a filter and has none either. 2 712 declarations under the
+  /// read roots.
+  ::agiru::FieldClass fieldClass = ::agiru::FieldClass::Normal;
+
+  /// \brief The `LookupPageId` property: the list the dropdown opens (board:0334).
+  PageId lookupPageId{};
+
+  /// \brief The `DrillDownPageId` property: the rows behind a value (board:0335).
+  PageId drillDownPageId{};
+  std::uint16_t length{}; ///< Declared length for Code and Text, 0 otherwise.
+
+  /// \brief The `Width` property: the column width the client shows, 0 when none is declared.
+  std::uint16_t width = 0;
+  FieldType type{}; ///< The AL data type.
+
+  /// \brief The `NotBlank` property: the field refuses the empty value. 949 declarations.
+  bool notBlank = false;
+
+  /// \brief The `AutoIncrement` property: the platform assigns the number. 151 declarations.
+  bool autoIncrement = false;
+
+  /// \brief The `Editable` property. A table field's `false` is a UI refusal and not a write one.
+  bool editable = true;
+
+  /// \brief The `ValidateTableRelation` property, which `Validate` reads before the trigger.
+  bool validateTableRelation = true;
+
+  /// \brief The `BlankZero` property: a zero renders as nothing.
+  bool blankZero = false;
+
+  /// \brief The `Compressed` property: whether a BLOB is stored compressed. The default is true,
+  ///        which is BC's own (board:0372).
+  bool compressed = true;
+
+  /// \brief The `Numeric` property: the client accepts only digits (board:0320).
+  bool numeric = false;
+
+  /// \brief The `ClosingDates` property: the field takes BC's closing dates (board:0326).
+  bool closingDates = false;
+
+  /// \brief The `OptimizeForTextSearch` property (board:0370).
+  bool optimizeForTextSearch = false;
+
+  /// \brief The `Enabled` property on a FIELD: a disabled field is declared and not maintained.
+  bool enabled = true;
 };
 
 /// \brief Whether a field is a COLUMN.

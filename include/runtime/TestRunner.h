@@ -2,11 +2,11 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
-#include "type/Text.h"
-#include "type/Boolean.h"
-#include "type/Integer.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/TestPermissions.h"
+#include "type/Boolean.h"
+#include "type/Integer.h"
+#include "type/Text.h"
 #include "type/TransactionModel.h"
 
 #include <cstddef>
@@ -27,8 +27,8 @@ struct TestMethod {
   void (*invoke)();                      ///< Makes the codeunit and calls the procedure.
   std::optional<TransactionModel> model; ///< Its `[TransactionModel]`, empty when it declares none.
   std::span<const std::string_view> handlers; ///< The names its `[HandlerFunctions]` listed, in
-                                             ///< the order AL wrote them. A named handler that
-                                             ///< never ran fails the case (board:0054).
+                                              ///< the order AL wrote them. A named handler that
+                                              ///< never ran fails the case (board:0054).
   ::agiru::TestPermissions permissions =
       ::agiru::TestPermissions::Restrictive; ///< Its `[TestPermissions]`, RESOLVED: a method that
                                              ///< inherits carries its codeunit's value, and a
@@ -39,12 +39,12 @@ struct TestMethod {
                                              ///< value to `OnBeforeTestRun`, and the 8 907
                                              ///< `LibraryLowerPermissions` call sites resolve
                                              ///< nothing (board:0224).
-                                         ///< \warning EMPTY IS NOT `AutoRollback`. A declared
-                                         ///< `AutoRollback` discards the method's writes, as
-                                         ///< `attributes/devenv-transactionmodel-attribute.md`
-                                         ///< states; an ABSENT attribute leaves the decision to the
-                                         ///< runner's `TestIsolation`, and under `Codeunit` a
-                                         ///< passing method's writes reach the next one.
+                                             ///< \warning EMPTY IS NOT `AutoRollback`. A declared
+                                             ///< `AutoRollback` discards the method's writes, as
+                                             ///< `attributes/devenv-transactionmodel-attribute.md`
+  ///< states; an ABSENT attribute leaves the decision to the
+  ///< runner's `TestIsolation`, and under `Codeunit` a
+  ///< passing method's writes reach the next one.
 };
 
 /// \brief Calls one `[Test]` procedure on a freshly made codeunit.
@@ -70,8 +70,7 @@ template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest() {
 /// \note THE THUNK IS THE ONLY PLACE THE SIGNATURE IS KNOWN. `TestHandler::invoke` is a `void *`
 ///       because AL's thirteen handler kinds have thirteen signatures; the caller casts it back to
 ///       the one its kind states, and this template is what it points at (board:0054).
-template <typename Codeunit, auto Method>
-void InvokeHandler(std::string_view text, void *reply) {
+template <typename Codeunit, auto Method> void InvokeHandler(std::string_view text, void *reply) {
   Codeunit codeunit{};
   if constexpr (requires { (codeunit.*Method)(); }) {
     static_cast<void>(text);

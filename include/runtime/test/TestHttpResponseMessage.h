@@ -49,7 +49,8 @@ public:
   /// \param SetStatusCode The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  /// \brief AL `TestHttpResponseMessage.HttpStatusCode()` -- the READING form, which the documentation
+  /// \brief AL `TestHttpResponseMessage.HttpStatusCode()` -- the READING form, which the
+  /// documentation
   ///        brackets: `[X := ] TestHttpResponseMessage.HttpStatusCode([NewX])`.
   /// \return The value.
   /// \throws Error always -- the surface is declared, the behaviour is not.
@@ -63,7 +64,8 @@ public:
   /// \param SetIsBlockedByEnvironment The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  /// \brief AL `TestHttpResponseMessage.IsBlockedByEnvironment()` -- the READING form, which the documentation
+  /// \brief AL `TestHttpResponseMessage.IsBlockedByEnvironment()` -- the READING form, which the
+  /// documentation
   ///        brackets: `[X := ] TestHttpResponseMessage.IsBlockedByEnvironment([NewX])`.
   /// \return The value.
   /// \throws Error always -- the surface is declared, the behaviour is not.
@@ -91,7 +93,8 @@ public:
   /// \param SetReasonPhrase The AL `Text`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  /// \brief AL `TestHttpResponseMessage.ReasonPhrase()` -- the READING form, which the documentation
+  /// \brief AL `TestHttpResponseMessage.ReasonPhrase()` -- the READING form, which the
+  /// documentation
   ///        brackets: `[X := ] TestHttpResponseMessage.ReasonPhrase([NewX])`.
   /// \return The value.
   /// \throws Error always -- the surface is declared, the behaviour is not.

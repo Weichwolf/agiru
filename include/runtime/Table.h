@@ -424,7 +424,8 @@ public:
   /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` -- the row keeps the `SystemId`
   ///        the caller put in it (`record-insert-boolean-boolean-method.md`).
   /// \param RunTrigger         Whether `OnInsert` runs.
-  /// \param InsertWithSystemId Whether the record's own `SystemId` is written rather than a new one.
+  /// \param InsertWithSystemId Whether the record's own `SystemId` is written rather than a new
+  /// one.
   /// \return Whether the row was written.
   /// \throws Error when the row is already there.
   ///
@@ -1790,7 +1791,7 @@ private:
     for (const FieldDef &def : TableTraits<Derived>::kTable.fields) {
       if (def.no == no) { element = def.name; }
     }
-    Derived &rec = static_cast<Derived &>(*this);
+    auto &rec = static_cast<Derived &>(*this);
     Derived xRec = before;
     ::agiru::Integer currFieldNo = no.Value();
     detail::RaiseEventOn(EventObject::Table,
@@ -1806,7 +1807,7 @@ private:
 
   void TableEvent(std::string_view event, Boolean RunTrigger) {
     static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
-    Derived &rec = static_cast<Derived &>(*this);
+    auto &rec = static_cast<Derived &>(*this);
     detail::RaiseEvent(EventObject::Table,
                        TableTraits<Derived>::kTable.id.Value(),
                        TableTraits<Derived>::kTable.name,

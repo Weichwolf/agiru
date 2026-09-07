@@ -60,7 +60,9 @@ public:
   ///        documentation brackets.
   /// \return The value.
   /// \throws Error always -- the surface is declared, the behaviour is not.
-  static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId, ::agiru::Integer FailureCodeunitId, ::agiru::Boolean IsReady);
+  static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId,
+                                  ::agiru::Integer FailureCodeunitId,
+                                  ::agiru::Boolean IsReady);
 
   static ::agiru::Guid CreateTask(::agiru::Integer CodeunitId,
                                   ::agiru::Integer FailureCodeunitId,

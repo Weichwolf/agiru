@@ -83,7 +83,7 @@ public:
 
   /// \brief AL `TextBuilder.MaxCapacity()`. Gets the maximum capacity of this TextBuilder instance.
   /// \return The AL `Integer`.
-  ::agiru::Integer MaxCapacity();
+  static ::agiru::Integer MaxCapacity();
 
   /// \brief AL `TextBuilder.Remove(Integer, Integer)`. Removes the specified range of characters
   /// from this TextBuilder instance.

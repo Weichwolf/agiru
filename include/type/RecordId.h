@@ -1,9 +1,8 @@
 #pragma once
 
 #include "meta/Ids.h"
-#include "type/Integer.h"
-
 #include "runtime/Error.h"
+#include "type/Integer.h"
 
 #include <compare>
 #include <string>
@@ -74,7 +73,7 @@ public:
   ///
   /// \note IT REFUSES THE CONVERSION rather than naming `RecordRef`, which is built ON the record
   ///       base this header sits under: a return type here would turn the door's direction around.
-  [[nodiscard]] detail::RefusedRow GetRecord() const { return detail::RefusedRow{}; }
+  static detail::RefusedRow GetRecord() { return detail::RefusedRow{}; }
 
   /// \brief AL `Format(RecordId)`.
   /// \return `Caption: key,key`, or the empty string when blank.

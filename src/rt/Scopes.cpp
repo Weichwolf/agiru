@@ -1,5 +1,9 @@
 #include "runtime/Scopes.h"
 
+#include "runtime/Error.h"
+#include "type/CommitBehavior.h"
+#include "type/ErrorBehavior.h"
+
 #include <exception>
 #include <optional>
 #include <string>
@@ -28,7 +32,9 @@ std::vector<std::string> &CollectedErrors() {
 
 }
 
-CommitScope::CommitScope(::agiru::CommitBehavior behaviour) { Commits().push_back(behaviour); }
+CommitScope::CommitScope(::agiru::CommitBehavior behaviour) {
+  Commits().push_back(behaviour);
+}
 
 CommitScope::~CommitScope() {
   if (!Commits().empty()) { Commits().pop_back(); }
@@ -39,7 +45,9 @@ std::optional<::agiru::CommitBehavior> CommitScope::Standing() {
   return Commits().back();
 }
 
-ErrorScope::ErrorScope(::agiru::ErrorBehavior behaviour) { Errors().push_back(behaviour); }
+ErrorScope::ErrorScope(::agiru::ErrorBehavior behaviour) {
+  Errors().push_back(behaviour);
+}
 
 ErrorScope::~ErrorScope() noexcept(false) {
   if (Errors().empty()) { return; }
@@ -54,13 +62,21 @@ ErrorScope::~ErrorScope() noexcept(false) {
   if (std::uncaught_exceptions() == 0) { throw Error(aggregated); }
 }
 
-bool ErrorScope::Collecting() { return !Errors().empty(); }
+bool ErrorScope::Collecting() {
+  return !Errors().empty();
+}
 
-void ErrorScope::Collect(std::string message) { CollectedErrors().push_back(std::move(message)); }
+void ErrorScope::Collect(std::string message) {
+  CollectedErrors().push_back(std::move(message));
+}
 
-const std::vector<std::string> &ErrorScope::Collected() { return CollectedErrors(); }
+const std::vector<std::string> &ErrorScope::Collected() {
+  return CollectedErrors();
+}
 
-void ErrorScope::Clear() { CollectedErrors().clear(); }
+void ErrorScope::Clear() {
+  CollectedErrors().clear();
+}
 
 void RaiseOrCollect(std::string_view message) {
   if (!ErrorScope::Collecting()) { throw Error(message); }

@@ -1,8 +1,13 @@
 #include "type/ErrorInfo.h"
 
 #include "runtime/RecordRef.h"
+#include "type/Boolean.h"
 #include "type/DataClassification.h"
+#include "type/Dictionary.h"
 #include "type/ErrorType.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
+#include "type/RecordId.h"
 #include "type/Verbosity.h"
 
 #include <string>
@@ -28,7 +33,9 @@ void ErrorInfo::AddAction(std::string_view Caption,
                             .navigation = false});
 }
 
-void ErrorInfo::AddNavigationAction(std::string_view Caption) { AddNavigationAction(Caption, {}); }
+void ErrorInfo::AddNavigationAction(std::string_view Caption) {
+  AddNavigationAction(Caption, {});
+}
 
 void ErrorInfo::AddNavigationAction(std::string_view Caption, std::string_view Description) {
   actions_.push_back(Action{.caption = std::string(Caption),
@@ -38,16 +45,22 @@ void ErrorInfo::AddNavigationAction(std::string_view Caption, std::string_view D
                             .navigation = true});
 }
 
-std::string ErrorInfo::Callstack() { return callstack_; }
+std::string ErrorInfo::Callstack() {
+  return callstack_;
+}
 
-::agiru::Boolean ErrorInfo::Collectible() { return collectible_; }
+::agiru::Boolean ErrorInfo::Collectible() const {
+  return collectible_;
+}
 
 ::agiru::Boolean ErrorInfo::Collectible(::agiru::Boolean Collectible) {
   collectible_ = Collectible;
   return collectible_;
 }
 
-std::string ErrorInfo::ControlName() { return controlName_; }
+std::string ErrorInfo::ControlName() {
+  return controlName_;
+}
 
 std::string ErrorInfo::ControlName(std::string_view ControlName) {
   controlName_ = std::string(ControlName);
@@ -97,7 +110,9 @@ void ErrorInfo::CustomDimensions(
   customDimensions_ = CustomDimensions;
 }
 
-::agiru::DataClassification ErrorInfo::DataClassification() { return dataClassification_; }
+::agiru::DataClassification ErrorInfo::DataClassification() {
+  return dataClassification_;
+}
 
 ::agiru::DataClassification
 ErrorInfo::DataClassification(::agiru::DataClassification NewDataClassification) {
@@ -105,35 +120,45 @@ ErrorInfo::DataClassification(::agiru::DataClassification NewDataClassification)
   return dataClassification_;
 }
 
-std::string ErrorInfo::DetailedMessage() { return detailedMessage_; }
+std::string ErrorInfo::DetailedMessage() {
+  return detailedMessage_;
+}
 
 std::string ErrorInfo::DetailedMessage(std::string_view DetailedMessage) {
   detailedMessage_ = std::string(DetailedMessage);
   return detailedMessage_;
 }
 
-::agiru::ErrorType ErrorInfo::ErrorType() { return errorType_; }
+::agiru::ErrorType ErrorInfo::ErrorType() {
+  return errorType_;
+}
 
 ::agiru::ErrorType ErrorInfo::ErrorType(const ::agiru::ErrorType &ErrorType) {
   errorType_ = ErrorType;
   return errorType_;
 }
 
-::agiru::Integer ErrorInfo::FieldNo() { return fieldNo_; }
+::agiru::Integer ErrorInfo::FieldNo() const {
+  return fieldNo_;
+}
 
 ::agiru::Integer ErrorInfo::FieldNo(::agiru::Integer FieldNo) {
   fieldNo_ = FieldNo;
   return fieldNo_;
 }
 
-std::string ErrorInfo::Message() { return message_; }
+std::string ErrorInfo::Message() {
+  return message_;
+}
 
 std::string ErrorInfo::Message(std::string_view Message) {
   message_ = std::string(Message);
   return message_;
 }
 
-::agiru::Integer ErrorInfo::PageNo() { return pageNo_; }
+::agiru::Integer ErrorInfo::PageNo() const {
+  return pageNo_;
+}
 
 ::agiru::Integer ErrorInfo::PageNo(::agiru::Integer PageNo) {
   pageNo_ = PageNo;
@@ -145,28 +170,36 @@ std::string ErrorInfo::Message(std::string_view Message) {
   return recordId_;
 }
 
-::agiru::Guid ErrorInfo::SystemId() { return systemId_; }
+::agiru::Guid ErrorInfo::SystemId() {
+  return systemId_;
+}
 
 ::agiru::Guid ErrorInfo::SystemId(::agiru::Guid SystemId) {
   systemId_ = SystemId;
   return systemId_;
 }
 
-::agiru::Integer ErrorInfo::TableId() { return tableId_; }
+::agiru::Integer ErrorInfo::TableId() const {
+  return tableId_;
+}
 
 ::agiru::Integer ErrorInfo::TableId(::agiru::Integer TableId) {
   tableId_ = TableId;
   return tableId_;
 }
 
-std::string ErrorInfo::Title() { return title_; }
+std::string ErrorInfo::Title() {
+  return title_;
+}
 
 std::string ErrorInfo::Title(std::string_view Title) {
   title_ = std::string(Title);
   return title_;
 }
 
-::agiru::Verbosity ErrorInfo::Verbosity() { return verbosity_; }
+::agiru::Verbosity ErrorInfo::Verbosity() {
+  return verbosity_;
+}
 
 ::agiru::Verbosity ErrorInfo::Verbosity(const ::agiru::Verbosity &Verbosity) {
   verbosity_ = Verbosity;

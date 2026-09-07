@@ -26,8 +26,7 @@ std::vector<const SubscriptionCatalogue *> &Registered() {
 }
 
 bool SameName(std::string_view a, std::string_view b) {
-  return a.size() == b.size() &&
-         std::ranges::equal(a, b, [](unsigned char x, unsigned char y) {
+  return a.size() == b.size() && std::ranges::equal(a, b, [](unsigned char x, unsigned char y) {
            return std::tolower(x) == std::tolower(y);
          });
 }
@@ -45,6 +44,7 @@ std::vector<Bound> &ManualBindings() {
 struct Automatic {
   const SubscriptionCatalogue *catalogue;
   void *instance;
+
   ~Automatic() { catalogue->Free(instance); }
 };
 
@@ -52,8 +52,8 @@ void *AutomaticInstance(const SubscriptionCatalogue &catalogue) {
   thread_local std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> made;
   auto found = made.find(&catalogue);
   if (found == made.end()) {
-    found = made.emplace(&catalogue, std::make_unique<Automatic>(&catalogue, catalogue.Make()))
-                .first;
+    found =
+        made.emplace(&catalogue, std::make_unique<Automatic>(&catalogue, catalogue.Make())).first;
   }
   return found->second->instance;
 }
@@ -78,9 +78,8 @@ std::vector<std::size_t> Bind(const Subscription &subscription,
   std::vector<std::size_t> bound;
   bound.reserve(subscription.parameters.size());
   for (const std::string_view name : subscription.parameters) {
-    const auto at = std::ranges::find_if(args.names, [&](std::string_view published) {
-      return SameName(published, name);
-    });
+    const auto at = std::ranges::find_if(
+        args.names, [&](std::string_view published) { return SameName(published, name); });
     if (at == args.names.end()) {
       throw Error("the subscriber " + std::string(catalogue.Name()) + " names a parameter " +
                   std::string(name) + " that the event " + std::string(subscription.event) +
@@ -94,10 +93,10 @@ std::vector<std::size_t> Bind(const Subscription &subscription,
 const std::vector<const SubscriptionCatalogue *> &Catalogues() {
   static std::once_flag once;
   std::call_once(once, [] {
-    std::ranges::sort(Registered(), [](const SubscriptionCatalogue *a,
-                                       const SubscriptionCatalogue *b) {
-      return a->Id().Value() < b->Id().Value();
-    });
+    std::ranges::sort(Registered(),
+                      [](const SubscriptionCatalogue *a, const SubscriptionCatalogue *b) {
+                        return a->Id().Value() < b->Id().Value();
+                      });
   });
   return Registered();
 }
@@ -110,7 +109,11 @@ SubscriptionCatalogue::SubscriptionCatalogue(CodeunitId id,
                                              bool manual,
                                              void *(*make)(),
                                              void (*free)(void *))
-    : id_(id), name_(name), subscriptions_(subscriptions), manual_(manual), make_(make),
+    : id_(id),
+      name_(name),
+      subscriptions_(subscriptions),
+      manual_(manual),
+      make_(make),
       free_(free) {
   Registered().push_back(this);
 }

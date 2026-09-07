@@ -66,14 +66,14 @@ void AnEmptySetStepsNowhere(const Connection &connection) {
 // THE FILTER IS BOUND AND NEVER CONCATENATED. The value below carries a quote and a percent sign,
 // either of which would end the statement or change the pattern if it were pasted in.
 void TheFilterBindsItsValues(const Connection &connection) {
-  const agiru::FieldDef def{.no = agiru::FieldNo{1},
+  const agiru::FieldDef def{.offset = 0,
                             .name = "n",
                             .caption = "n",
-                            .type = agiru::FieldType::Integer,
-                            .length = 0,
-                            .offset = 0,
                             .values = {},
-                            .initValue = {}};
+                            .initValue = {},
+                            .no = agiru::FieldNo{1},
+                            .length = 0,
+                            .type = agiru::FieldType::Integer};
   const agiru::detail::Clause clause = Where(def, ParseFilter("10..20|>195"), 1);
   Cursor cursor(
       connection, "SELECT n FROM cursor_gate WHERE " + clause.sql + " ORDER BY n", clause.binds);
@@ -84,14 +84,14 @@ void TheFilterBindsItsValues(const Connection &connection) {
 
 void AWildcardBecomesALikeAndAnEmptyValueIsAValue(const Connection &connection) {
   connection.Run("INSERT INTO cursor_gate (n, name) VALUES (900, ''), (901, '100% sure')");
-  const agiru::FieldDef def{.no = agiru::FieldNo{2},
+  const agiru::FieldDef def{.offset = 0,
                             .name = "name",
                             .caption = "name",
-                            .type = agiru::FieldType::Text,
-                            .length = 0,
-                            .offset = 0,
                             .values = {},
-                            .initValue = {}};
+                            .initValue = {},
+                            .no = agiru::FieldNo{2},
+                            .length = 0,
+                            .type = agiru::FieldType::Text};
   {
     const agiru::detail::Clause clause = Where(def, ParseFilter("row 1*"), 1);
     Cursor cursor(

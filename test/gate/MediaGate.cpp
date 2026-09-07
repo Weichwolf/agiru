@@ -24,14 +24,14 @@ namespace {
 const Guid kSomeMedia = Guid::FromText("{B6666666-F5A2-E911-8180-001DD8B7338E}");
 
 FieldDef Declared(FieldType type) {
-  return FieldDef{.no = agiru::FieldNo{1},
+  return FieldDef{.offset = 0,
                   .name = "Picture",
                   .caption = "Picture",
-                  .type = type,
-                  .length = 0,
-                  .offset = 0,
                   .values = std::span<const agiru::EnumValueDef>{},
-                  .initValue = {}};
+                  .initValue = {},
+                  .no = agiru::FieldNo{1},
+                  .length = 0,
+                  .type = type};
 }
 
 /// A Media FIELD HOLDS AN IDENTIFIER, NOT BYTES. The media object lives in the tenant media table

@@ -1,6 +1,7 @@
 #include "runtime/test/Handlers.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <span>
 #include <string_view>
@@ -23,9 +24,8 @@ Standing &Held() {
 }
 
 bool Declared(const Standing &held, std::string_view name) {
-  return std::ranges::any_of(held.declared, [name](std::string_view declared) {
-    return declared == name;
-  });
+  return std::ranges::any_of(held.declared,
+                             [name](std::string_view declared) { return declared == name; });
 }
 
 }
@@ -43,9 +43,8 @@ std::vector<std::string_view> HandlerTable::Uninstall() {
   Standing &held = Held();
   std::vector<std::string_view> missed;
   for (const std::string_view name : held.declared) {
-    const auto found = std::ranges::find_if(held.handlers, [name](const TestHandler &handler) {
-      return handler.name == name;
-    });
+    const auto found = std::ranges::find_if(
+        held.handlers, [name](const TestHandler &handler) { return handler.name == name; });
     if (found == held.handlers.end()) {
       missed.push_back(name);
       continue;
@@ -68,8 +67,12 @@ const TestHandler *HandlerTable::For(HandlerKind kind, std::int32_t object) {
   return nullptr;
 }
 
-void HandlerTable::Ran(const TestHandler &handler) { Held().ran.insert(&handler); }
+void HandlerTable::Ran(const TestHandler &handler) {
+  Held().ran.insert(&handler);
+}
 
-bool HandlerTable::Installed() { return Held().installed; }
+bool HandlerTable::Installed() {
+  return Held().installed;
+}
 
 }

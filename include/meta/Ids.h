@@ -58,7 +58,7 @@ using PageId = Id<PageIdTag>;         ///< An AL page number.
 ///       `Object ID to Run`, or to a `TestField`. Nothing about the dataitems or the layout is
 ///       needed for that, and board:0034 keeps the rest a hole with a count.
 using ReportId = Id<ReportIdTag>;
-using XmlPortId = Id<XmlPortIdTag>;   ///< An AL xmlport number.
-using QueryId = Id<QueryIdTag>;       ///< An AL query number.
+using XmlPortId = Id<XmlPortIdTag>; ///< An AL xmlport number.
+using QueryId = Id<QueryIdTag>;     ///< An AL query number.
 
 }

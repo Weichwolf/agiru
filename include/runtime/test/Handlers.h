@@ -6,8 +6,8 @@
 #include <cstdint>
 #include <span>
 #include <string>
-#include <vector>
 #include <string_view>
+#include <vector>
 
 /// \file
 /// \brief AL's TEST HANDLERS -- the methods that stand in for the user while one case runs.
@@ -20,16 +20,16 @@ namespace agiru {
 ///       (`attributes/devenv-confirmhandler-attribute.md` and its siblings), and the runtime
 ///       reaches a handler by the kind of thing it is about to show.
 enum class HandlerKind : std::uint8_t {
-  Confirm,          ///< `[ConfirmHandler]` -- `Confirm(Question, var Reply)`.
-  Message,          ///< `[MessageHandler]` -- `Message(Text)`.
-  StrMenu,          ///< `[StrMenuHandler]` -- `StrMenu(Options, var Choice, Instruction)`.
-  Hyperlink,        ///< `[HyperlinkHandler]` -- `Hyperlink(Url)`.
-  Page,             ///< `[PageHandler]` -- a page run non-modally.
-  ModalPage,        ///< `[ModalPageHandler]` -- a page run modally.
-  RequestPage,      ///< `[RequestPageHandler]` -- a report's request page.
-  Report,           ///< `[ReportHandler]` -- a report run without its request page.
-  FilterPage,       ///< `[FilterPageHandler]` -- a generated filter page.
-  SendNotification, ///< `[SendNotificationHandler]` -- a notification on its way out.
+  Confirm,            ///< `[ConfirmHandler]` -- `Confirm(Question, var Reply)`.
+  Message,            ///< `[MessageHandler]` -- `Message(Text)`.
+  StrMenu,            ///< `[StrMenuHandler]` -- `StrMenu(Options, var Choice, Instruction)`.
+  Hyperlink,          ///< `[HyperlinkHandler]` -- `Hyperlink(Url)`.
+  Page,               ///< `[PageHandler]` -- a page run non-modally.
+  ModalPage,          ///< `[ModalPageHandler]` -- a page run modally.
+  RequestPage,        ///< `[RequestPageHandler]` -- a report's request page.
+  Report,             ///< `[ReportHandler]` -- a report run without its request page.
+  FilterPage,         ///< `[FilterPageHandler]` -- a generated filter page.
+  SendNotification,   ///< `[SendNotificationHandler]` -- a notification on its way out.
   RecallNotification, ///< `[RecallNotificationHandler]` -- a notification being recalled.
   Session,            ///< `[SessionSettingsHandler]` -- a session-settings dialog.
   HttpClient,         ///< `[HttpClientHandler]` -- an outbound request.
@@ -54,9 +54,9 @@ struct TestHandler {
   std::int32_t object;   ///< The page or report number it answers, 0 where the kind has none.
   HandlerThunk invoke;   ///< Calls it on a fresh codeunit with the dialog's own arguments.
   bool optional;         ///< `HandlerIsOptional` -- a notification handler AL lets a case declare
-                         ///< and not reach (`attributes/devenv-sendnotificationhandler-attribute.md`);
-                         ///< it is excluded from the "named and never ran" failure (openerp
-                         ///< WI-1305, board:0054).
+                 ///< and not reach (`attributes/devenv-sendnotificationhandler-attribute.md`);
+                 ///< it is excluded from the "named and never ran" failure (openerp
+                 ///< WI-1305, board:0054).
 };
 
 /// \brief The handlers of ONE test codeunit, installed while one of its cases runs.

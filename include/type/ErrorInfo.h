@@ -83,7 +83,7 @@ public:
   /// \brief AL `ErrorInfo.Collectible()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.Collectible([NewX])`.
   /// \return The value it holds.
-  ::agiru::Boolean Collectible();
+  ::agiru::Boolean Collectible() const;
 
   ::agiru::Boolean Collectible(::agiru::Boolean Collectible);
 
@@ -218,7 +218,7 @@ public:
   /// \brief AL `ErrorInfo.FieldNo()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.FieldNo([NewX])`.
   /// \return The value it holds.
-  ::agiru::Integer FieldNo();
+  ::agiru::Integer FieldNo() const;
 
   ::agiru::Integer FieldNo(::agiru::Integer FieldNo);
 
@@ -239,7 +239,7 @@ public:
   /// \brief AL `ErrorInfo.PageNo()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.PageNo([NewX])`.
   /// \return The value it holds.
-  ::agiru::Integer PageNo();
+  ::agiru::Integer PageNo() const;
 
   ::agiru::Integer PageNo(::agiru::Integer PageNo);
 
@@ -266,7 +266,7 @@ public:
   /// \brief AL `ErrorInfo.TableId()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.TableId([NewX])`.
   /// \return The value it holds.
-  ::agiru::Integer TableId();
+  ::agiru::Integer TableId() const;
 
   ::agiru::Integer TableId(::agiru::Integer TableId);
 

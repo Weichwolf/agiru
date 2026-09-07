@@ -16,26 +16,26 @@ using agiru::detail::ParseFilter;
 namespace {
 
 const FieldDef &TextField() {
-  static const FieldDef def{.no = agiru::FieldNo{1},
+  static const FieldDef def{.offset = 0,
                             .name = "Name",
                             .caption = "Name",
-                            .type = FieldType::Text,
-                            .length = 50,
-                            .offset = 0,
                             .values = {},
-                            .initValue = {}};
+                            .initValue = {},
+                            .no = agiru::FieldNo{1},
+                            .length = 50,
+                            .type = FieldType::Text};
   return def;
 }
 
 const FieldDef &NumberField() {
-  static const FieldDef def{.no = agiru::FieldNo{2},
+  static const FieldDef def{.offset = 0,
                             .name = "Entry No.",
                             .caption = "Entry No.",
-                            .type = FieldType::Integer,
-                            .length = 0,
-                            .offset = 0,
                             .values = {},
-                            .initValue = {}};
+                            .initValue = {},
+                            .no = agiru::FieldNo{2},
+                            .length = 0,
+                            .type = FieldType::Integer};
   return def;
 }
 

@@ -40,7 +40,9 @@ std::size_t Span(Integer count, std::size_t from, std::size_t length) {
   return AppendLine();
 }
 
-::agiru::Integer TextBuilder::Capacity() { return static_cast<Integer>(text_.capacity()); }
+::agiru::Integer TextBuilder::Capacity() {
+  return static_cast<Integer>(text_.capacity());
+}
 
 ::agiru::Integer TextBuilder::Capacity(::agiru::Integer NewCapacity) {
   const Integer was = Capacity();
@@ -48,7 +50,9 @@ std::size_t Span(Integer count, std::size_t from, std::size_t length) {
   return was;
 }
 
-void TextBuilder::Clear() { text_.clear(); }
+void TextBuilder::Clear() {
+  text_.clear();
+}
 
 ::agiru::Boolean TextBuilder::EnsureCapacity(::agiru::Integer NewCapacity) {
   if (NewCapacity > 0) { text_.reserve(static_cast<std::size_t>(NewCapacity)); }
@@ -68,7 +72,9 @@ void TextBuilder::Clear() { text_.clear(); }
   return was;
 }
 
-::agiru::Integer TextBuilder::MaxCapacity() { return std::numeric_limits<Integer>::max(); }
+::agiru::Integer TextBuilder::MaxCapacity() {
+  return std::numeric_limits<Integer>::max();
+}
 
 ::agiru::Boolean TextBuilder::Remove(::agiru::Integer StartIndex, ::agiru::Integer Count) {
   const std::size_t from = At(StartIndex, text_.size());
@@ -96,7 +102,9 @@ void TextBuilder::Clear() { text_.clear(); }
   return Replace(OldText, NewText, 1, static_cast<Integer>(text_.size()));
 }
 
-std::string TextBuilder::ToText() { return text_; }
+std::string TextBuilder::ToText() {
+  return text_;
+}
 
 std::string TextBuilder::ToText(::agiru::Integer StartIndex, ::agiru::Integer Count) {
   const std::size_t from = At(StartIndex, text_.size());

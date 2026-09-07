@@ -1,7 +1,7 @@
+#include "runtime/Error.h"
 #include "type/ErrorInfo.h"
 
 #include "Check.h"
-#include "runtime/Error.h"
 
 #include <string>
 
@@ -25,9 +25,7 @@ void ErrorRaisesTheMessage() {
   std::string raised;
   try {
     throw Error(ErrorInfo::Create("Amount must be positive"));
-  } catch (const Error &error) {
-    raised = error.what();
-  }
+  } catch (const Error &error) { raised = error.what(); }
   CHECK_TEXT("the thrown text is the info's message", raised, "Amount must be positive");
 }
 

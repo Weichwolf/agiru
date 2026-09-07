@@ -138,7 +138,7 @@ template <typename T, auto Method, typename... P>
 void CallBound(T &unit,
                const EventArgs &args,
                std::span<const std::size_t> bound,
-               void (T::*)(P...)) {
+               [[maybe_unused]] void (T::*signature)(P...)) {
   [&]<std::size_t... I>(std::index_sequence<I...>) {
     (unit.*Method)(*static_cast<std::remove_cvref_t<P> *>(args.values[bound[I]])...); // NOLINT
   }(std::index_sequence_for<P...>{});

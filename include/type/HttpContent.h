@@ -90,7 +90,8 @@ public:
     requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
   void WriteFrom(const S &SecretText) {
     static_cast<void>(SecretText);
-    throw Error("HttpContent.WriteFrom(SecretText) is declared and not implemented yet (board:0035)");
+    throw Error(
+        "HttpContent.WriteFrom(SecretText) is declared and not implemented yet (board:0035)");
   }
 
   /// \brief AL `HttpContent.WriteFrom(Text)`. Sets HttpContent content to the provided text or

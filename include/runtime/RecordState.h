@@ -132,12 +132,12 @@ struct TempOps {
 /// \brief The rows a temporary record holds, shared by every variable that `Copy(From, true)`d
 ///        them, and how often they changed.
 struct TempTable {
-  const TempOps *ops;    ///< How to reach the rows.
-  void *rows;            ///< The rows, owned here.
-  std::uint64_t version; ///< Rises on every structural change, so a walk can notice.
-  std::size_t held;      ///< How many records share it; the last one frees it.
+  const TempOps *ops;       ///< How to reach the rows.
+  void *rows;               ///< The rows, owned here.
+  std::uint64_t version{0}; ///< Rises on every structural change, so a walk can notice.
+  std::size_t held{0};      ///< How many records share it; the last one frees it.
 
-  TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_), version(0), held(0) {}
+  TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_) {}
 
   TempTable(const TempTable &) = delete;
   TempTable(TempTable &&) = delete;
