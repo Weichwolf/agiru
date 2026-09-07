@@ -137,9 +137,10 @@ struct Reached {
 };
 
 void Ahead(Reached &reached, const std::string &qualified) {
-  const std::size_t colons = qualified.find("::");
-  if (colons == std::string::npos) { return; }
-  reached.forward[qualified.substr(0, colons)].insert(qualified.substr(colons + 2));
+  const std::string reachable = Unprefixed(qualified);
+  const std::size_t colons = reachable.rfind("::");
+  reached.forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
+      colons == std::string::npos ? reachable : reachable.substr(colons + 2));
 }
 
 void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects, bool complete) {
@@ -226,12 +227,10 @@ std::string Includes(const al::PageObject &object, const Objects &objects) {
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   if (!reached.forward.empty()) { out += "\n"; }
   for (const auto &[space, named] : reached.forward) {
-    const ObjectKind kind = KindOfNamespace(space);
-    out += "namespace agiru::app::" + space + " {\n";
-    for (const std::string &one : named) {
-      out += "class " + ClassName(one, kind) + ";\n" + ClassAlias(one, kind);
-    }
-    out += "} // namespace agiru::app::" + space + "\n";
+    const std::string within = space.empty() ? "agiru" : "agiru::" + space;
+    out += "namespace " + within + " {\n";
+    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + within + "\n";
   }
   return out;
 }
@@ -608,9 +607,10 @@ std::string PageTypeOf(const al::PageObject &page) {
 
 std::string
 PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source) {
-  const std::string identifier = Identifier(page.name);
-  const std::string prefix = "k" + identifier;
-  std::string out = "namespace agiru::app::pages {\n\n";
+  const std::string identifier = ClassName(Identifier(page.name), ObjectKind::Page);
+  const std::string space = NamespaceOf(page.nameSpace);
+  const std::string prefix = "k" + Identifier(page.name);
+  std::string out = "namespace " + space + " {\n\n";
   int counter = 0;
   const std::string layout =
       ControlArrays(page.layout, prefix, prefix + "Layout", objects, source, counter, out);
@@ -705,7 +705,7 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
            ",\n              \"a page's layout is a TREE and the generator keeps it -- a "
            "flattened one is one level deep (board:0553)\");\n";
   }
-  out += "\n} // namespace agiru::app::pages\n";
+  out += "\n} // namespace " + space + "\n";
   return out;
 }
 
@@ -748,7 +748,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   Flatten(object.layout, all);
   Flatten(object.actions, all);
 
-  out += "namespace agiru::app::pages {\n\n";
+  const std::string space = NamespaceOf(object.nameSpace);
+  out += "namespace " + space + " {\n\n";
   out +=
       "template <typename Field_Kind, typename Action_Kind, template <typename> class Part_Kind>\n"
       "class " +
@@ -764,7 +765,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     out += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
   }
   out += "};\n\n";
-  out += "class " + pageClass + ";\n" + ClassAlias(identifier, ObjectKind::Page) + "\n";
+  out += "class " + pageClass + ";\n\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
@@ -810,15 +811,15 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   out += "};\n\n";
   out += "extern const PageDef k" + identifier + "Page;\n\n";
-  out += "} // namespace agiru::app::pages\n\n";
-  out += "template <> struct agiru::PageTraits<agiru::app::pages::" + identifier + "> {\n";
+  out += "} // namespace " + space + "\n\n";
+  out += "template <> struct agiru::PageTraits<" + space + "::" + pageClass + "> {\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-  out += "  static constexpr const PageDef &kPage = agiru::app::pages::k" + identifier + "Page;\n";
+  out += "  static constexpr const PageDef &kPage = " + space + "::k" + identifier + "Page;\n";
   out += "  template <typename Field_Kind, typename Action_Kind, template <typename> class "
          "Part_Kind>\n"
-         "  using Controls = agiru::app::pages::" +
-         controlsClass + "<Field_Kind, Action_Kind, Part_Kind>;\n";
+         "  using Controls = " +
+         space + "::" + controlsClass + "<Field_Kind, Action_Kind, Part_Kind>;\n";
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;

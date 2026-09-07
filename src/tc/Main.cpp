@@ -743,12 +743,14 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
       const std::string identifier = agiru::gen::Identifier(object.name);
       objects.interfaces.insert_or_assign(
           agiru::gen::LowerKey(object.name),
-          agiru::gen::TableRef{.identifier = "interfaces::" + identifier,
-                               .header = agiru::gen::OutputDirectory(
-                                             object.nameSpace, agiru::gen::ObjectKind::Interface) +
-                                         "/" + identifier + ".h",
-                               .fields = {},
-                               .procedures = {}});
+          agiru::gen::TableRef{
+              .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
+                            agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Interface),
+              .header =
+                  agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) +
+                  "/" + identifier + ".h",
+              .fields = {},
+              .procedures = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -882,7 +884,10 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           agiru::gen::ControlIdentifiers(object, objects);
       objects.pages.insert_or_assign(
           agiru::gen::LowerKey(object.name),
-          agiru::gen::TableRef{.identifier = "pages::" + agiru::gen::Identifier(object.name),
+          agiru::gen::TableRef{.identifier =
+                                   "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
+                                   agiru::gen::ClassName(agiru::gen::Identifier(object.name),
+                                                         agiru::gen::ObjectKind::Page),
                                .header = agiru::gen::PageHeaderPath(object),
                                .id = object.id,
                                .fields = std::move(controlNames),
@@ -1097,11 +1102,15 @@ void ScanEnums(
       members.insert_or_assign(agiru::gen::LowerKey(value.name),
                                agiru::gen::EnumeratorName(value.name));
     }
-    index.insert_or_assign(agiru::gen::LowerKey(object.name),
-                           agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
-                                               .header = agiru::gen::EnumHeaderPath(object),
-                                               .ordinals = std::move(ordinals),
-                                               .members = std::move(members)});
+    index.insert_or_assign(
+        agiru::gen::LowerKey(object.name),
+        agiru::gen::EnumRef{.identifier =
+                                "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
+                                agiru::gen::ClassName(agiru::gen::Identifier(object.name),
+                                                      agiru::gen::ObjectKind::Enum),
+                            .header = agiru::gen::EnumHeaderPath(object),
+                            .ordinals = std::move(ordinals),
+                            .members = std::move(members)});
   }
   if (run.output.empty()) { return; }
   held.objects = std::move(objects);
@@ -1178,12 +1187,16 @@ void NoteOptions(const std::vector<agiru::al::VarDecl> &variables,
   }
 }
 
-void NoteFieldEnums(const agiru::al::TableObject &table, agiru::gen::FieldEnums &into) {
+void NoteFieldEnums(const agiru::al::TableObject &table,
+                    const agiru::gen::EnumIndex &enums,
+                    agiru::gen::FieldEnums &into) {
   auto &fields = into[agiru::gen::LowerKey(table.name)];
   for (const agiru::al::FieldDecl &field : table.fields) {
     if (agiru::gen::TypeName(field.type) == "Enum" && !field.subtype.empty()) {
-      fields.insert_or_assign(agiru::gen::LowerKey(field.name),
-                              "enums::" + agiru::gen::Identifier(field.subtype));
+      const auto known = enums.find(agiru::gen::LowerKey(field.subtype));
+      if (known != enums.end()) {
+        fields.insert_or_assign(agiru::gen::LowerKey(field.name), known->second.identifier);
+      }
       continue;
     }
     if (const agiru::al::Property *members = agiru::al::Find(field.properties, "OptionMembers");
@@ -1221,13 +1234,16 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
         procedureNames.emplace(agiru::gen::LowerKey(procedure.name),
                                agiru::gen::ProcedureIdentifier(table, procedure.name));
       }
-      const agiru::gen::TableRef ref{.identifier = "tables::" + agiru::gen::Identifier(table.name),
-                                     .header = TableHeaderPath(table),
-                                     .fields = std::move(fieldNames),
-                                     .procedures = std::move(procedureNames)};
+      const agiru::gen::TableRef ref{
+          .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
+                        agiru::gen::ClassName(agiru::gen::Identifier(table.name),
+                                              agiru::gen::ObjectKind::Table),
+          .header = TableHeaderPath(table),
+          .fields = std::move(fieldNames),
+          .procedures = std::move(procedureNames)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
-      NoteFieldEnums(table, objects.fieldEnums);
+      NoteFieldEnums(table, objects.enums, objects.fieldEnums);
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(table));
     } catch (const std::exception &e) {
@@ -1351,7 +1367,8 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
     objects.codeunits.insert_or_assign(
         agiru::gen::LowerKey(name),
         agiru::gen::TableRef{
-            .identifier = "codeunits::" + identifier,
+            .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(nameSpace) +
+                          agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Codeunit),
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h",
             .fields = {},
@@ -1368,7 +1385,8 @@ void IndexReports(const Run &run, agiru::gen::Objects &objects) {
     objects.reports.insert_or_assign(
         agiru::gen::LowerKey(declared.name),
         agiru::gen::TableRef{
-            .identifier = "reports::" + identifier,
+            .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(declared.nameSpace) +
+                          agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Report),
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Report) +
                 "/" + identifier + ".h",
@@ -1380,21 +1398,26 @@ void IndexReports(const Run &run, agiru::gen::Objects &objects) {
 void WriteReports(Run &run, const agiru::gen::Objects &objects) {
   if (run.output.empty()) { return; }
   for (const auto &[key, ref] : objects.reports) {
-    const std::string identifier = ref.identifier.substr(std::string("reports::").size());
+    const std::string reachable = agiru::gen::Unprefixed(ref.identifier);
+    const std::size_t colons = reachable.rfind("::");
+    const std::string space =
+        colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
+    const std::string identifier =
+        colons == std::string::npos ? reachable : reachable.substr(colons + 2);
     const auto number = ref.fields.find("id");
     std::string out = "// Generated from the report\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
     out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
-    out += "namespace agiru::app::reports {\n\n";
+    out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::Report<" + identifier + "> {\npublic:\n";
     out += "  static constexpr ReportId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::reports\n\n";
-    out += "template <> struct agiru::ReportTraits<agiru::app::reports::" + identifier + "> {\n";
+    out += "} // namespace " + space + "\n\n";
+    out += "template <> struct agiru::ReportTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr ReportId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
@@ -1411,7 +1434,8 @@ void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
     objects.xmlports.insert_or_assign(
         agiru::gen::LowerKey(declared.name),
         agiru::gen::TableRef{
-            .identifier = "xmlports::" + identifier,
+            .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(declared.nameSpace) +
+                          agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::XmlPort),
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::XmlPort) +
                 "/" + identifier + ".h",
@@ -1423,21 +1447,26 @@ void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
 void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
   if (run.output.empty()) { return; }
   for (const auto &[key, ref] : objects.xmlports) {
-    const std::string identifier = ref.identifier.substr(std::string("xmlports::").size());
+    const std::string reachable = agiru::gen::Unprefixed(ref.identifier);
+    const std::size_t colons = reachable.rfind("::");
+    const std::string space =
+        colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
+    const std::string identifier =
+        colons == std::string::npos ? reachable : reachable.substr(colons + 2);
     const auto number = ref.fields.find("id");
     std::string out = "// Generated from the xmlport\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
     out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
-    out += "namespace agiru::app::xmlports {\n\n";
+    out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::XmlPort<" + identifier + "> {\npublic:\n";
     out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::xmlports\n\n";
-    out += "template <> struct agiru::XmlPortTraits<agiru::app::xmlports::" + identifier + "> {\n";
+    out += "} // namespace " + space + "\n\n";
+    out += "template <> struct agiru::XmlPortTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
@@ -1454,7 +1483,8 @@ void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
     objects.queries.insert_or_assign(
         agiru::gen::LowerKey(declared.name),
         agiru::gen::TableRef{
-            .identifier = "queries::" + identifier,
+            .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(declared.nameSpace) +
+                          agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Query),
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Query) +
                 "/" + identifier + ".h",
@@ -1466,21 +1496,26 @@ void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
 void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
   if (run.output.empty()) { return; }
   for (const auto &[key, ref] : objects.queries) {
-    const std::string identifier = ref.identifier.substr(std::string("queries::").size());
+    const std::string reachable = agiru::gen::Unprefixed(ref.identifier);
+    const std::size_t colons = reachable.rfind("::");
+    const std::string space =
+        colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
+    const std::string identifier =
+        colons == std::string::npos ? reachable : reachable.substr(colons + 2);
     const auto number = ref.fields.find("id");
     std::string out = "// Generated from the query\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
     out += "#include \"meta/Ids.h\"\n";
     out += "#include \"runtime/Report.h\"\n\n";
     out += "#include <string_view>\n\n";
-    out += "namespace agiru::app::queries {\n\n";
+    out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::Query<" + identifier + "> {\npublic:\n";
     out += "  static constexpr QueryId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n";
     out += "};\n\n";
-    out += "} // namespace agiru::app::queries\n\n";
-    out += "template <> struct agiru::QueryTraits<agiru::app::queries::" + identifier + "> {\n";
+    out += "} // namespace " + space + "\n\n";
+    out += "template <> struct agiru::QueryTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr QueryId kId{" + number->second + "};\n";
     out += "  static constexpr std::string_view kName{" +
            agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
@@ -1607,12 +1642,12 @@ void WriteOptions(const std::filesystem::path &out, const OptionsInScope &option
   for (const auto &[qualified, members] : options) {
     const std::string name = qualified.substr(qualified.rfind(':') + 1);
     const std::vector<std::string> names = agiru::gen::EnumeratorNames(members);
-    text += "namespace agiru::app::options {\n\nenum class " + name + " : std::int32_t {\n";
+    text += "namespace agiru::options {\n\nenum class " + name + " : std::int32_t {\n";
     for (std::size_t i = 0; i < names.size(); ++i) {
       text += "  " + names[i] + " = " + std::to_string(i) + ",\n";
     }
-    text += "};\n\n} // namespace agiru::app::options\n\n";
-    text += "template <> struct agiru::OptionTraits<agiru::app::options::" + name + "> {\n";
+    text += "};\n\n} // namespace agiru::options\n\n";
+    text += "template <> struct agiru::OptionTraits<agiru::options::" + name + "> {\n";
     text += "  static constexpr std::array<EnumValueDef, " + std::to_string(members.size()) +
             "> kValues{{\n";
     for (std::size_t i = 0; i < members.size(); ++i) {
@@ -1637,9 +1672,9 @@ void WriteAbsent(const std::filesystem::path &out,
   text += "// Do not edit.\n\n#pragma once\n\n#include \"dotnet/Refused.h\"\n";
   text += "\nnamespace agiru::dotnet {\n";
   const Counted net = Stubs(text, dotnet, true);
-  text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::app::absent {\n";
+  text += "\n} // namespace agiru::dotnet\n\nnamespace agiru::absent {\n";
   const Counted objects = Stubs(text, absent, false, true);
-  text += "\n} // namespace agiru::app::absent\n";
+  text += "\n} // namespace agiru::absent\n";
 
   const std::filesystem::path path = out / "absent" / "absent" / "Types.h";
   std::filesystem::create_directories(path.parent_path());
@@ -1792,7 +1827,7 @@ int Scan(const Job &job) {
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
-      NoteFieldEnums(table, objects.fieldEnums);
+      NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
@@ -1806,6 +1841,7 @@ int Scan(const Job &job) {
         found->second.fields = agiru::gen::ControlIdentifiers(page, objects);
       }
     }
+    agiru::gen::NoteObjectNames(objects);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteOptions(table.variables, table.procedures, gathered.options);

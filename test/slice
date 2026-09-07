@@ -4535,7 +4535,6 @@ base/system/security/access_control/page/SetWebServiceAccessKey.cpp
 base/system/security/access_control/table/PermissionBuffer.cpp
 base/system/security/access_control/table/PermissionConflicts.cpp
 base/system/security/access_control/table/PermissionConflictsOverview.cpp
-base/system/security/access_control/table/PermissionSetBuffer.cpp
 base/system/security/access_control/table/PermissionSetLink.cpp
 base/system/security/access_control/table/PermSetAssignmentBuffer.cpp
 base/system/security/access_control/table/UserGroupAccessControl.cpp
@@ -5436,7 +5435,6 @@ system/system/security/access_control/page/SecurityGroups.cpp
 system/system/security/access_control/page/TenantPermissionSubform.cpp
 system/system/security/access_control/page/UserSecurityGroupsPart.cpp
 system/system/security/access_control/table/PermissionLookupBuffer.cpp
-system/system/security/access_control/table/PermissionSetBuffer.cpp
 system/system/security/access_control/table/PermissionSetRelationBuffer.cpp
 system/system/security/access_control/table/SecurityGroupBuffer.cpp
 system/system/security/access_control/table/SecurityGroup.cpp
@@ -5634,8 +5632,6 @@ system_test_library/system/test_libraries/media/table/MyVideoSource.cpp
 system_test_library/system/test_libraries/reflection/codeunit/TestClientTypeSubscriber.cpp
 system_test_library/system/test_libraries/reflection/page/RecordSelectionTestPage.cpp
 system_test_library/system/test_libraries/reflection/table/RecordSelectionTestTable.cpp
-system_test_library/system/test_libraries/reflection/table/TestTableA.cpp
-system_test_library/system/test_libraries/reflection/table/TestTableB.cpp
 system_test_library/system/test_libraries/security/access_control/codeunit/LibraryPassword.cpp
 system_test_library/system/test_libraries/security/access_control/codeunit/LibraryPermissionSet.cpp
 system_test_library/system/test_libraries/security/access_control/codeunit/SecurityGroupsTestLibrary.cpp

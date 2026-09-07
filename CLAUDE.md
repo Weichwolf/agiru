@@ -513,9 +513,10 @@ list names the deeper roots and those come first.
 if taken first -- 2 717 page HEADERS with zero page sources, so 790 761 lines of AL on the floor;
 `<memory>` in one door header costing 1.2 s of every one of 7 885 translation units.
 
-**A LONG RUN GOES IN THE BACKGROUND AND THE BOARD IS WHAT FILLS THE WAIT.** `make tree` is minutes
-on two cores, `make lint FULL=1` five, a full sweep an hour, and waiting for any of them is never
-the next step. What fills it is ANALYSIS -- the AL population counted, the platform page read, the
+**A LONG RUN GOES IN THE BACKGROUND AND THE BOARD IS WHAT FILLS THE WAIT.** `make tree`,
+`make lint FULL=1` and a full sweep are all long enough that waiting for any of them is never the
+next step. **How long is READ, not remembered**: `build/times.log` carries every build with its
+seconds and its source count, and `nproc` says what the machine is. What fills it is ANALYSIS -- the AL population counted, the platform page read, the
 predecessor's board grepped -- written into the item, so the fix that follows is typing. And the
 documentation is SWEPT rather than only consulted: `record-init-method.md` says `Init` leaves the
 primary key and the timestamp alone, and `Init` refuses outright in 53 of the 78 UT codeunits. No
@@ -549,9 +550,11 @@ Measured failure modes. The first five are inherited from the predecessor and we
 
 ## The environment
 
-Debian 13 (trixie), x86_64, 2 cores, 16 GB. Two cores are the scarce good: 7 885 generated sources
-at ~1 s each is over an hour. Hence `ccache`, hence `lld`, hence the door's parse cost is a measured
-quantity and `make lint` has a node budget.
+Debian 13 (trixie), x86_64. **THE MACHINE IS LOOKED UP AND NEVER QUOTED FROM HERE** -- `nproc`,
+`free`, `build/times.log` -- because a number written down here is wrong the first time the tree
+moves to another box, and it is wrong in the direction that decides arguments. What does not change
+is that CPU is the scarce good against 7 885 generated sources: hence `ccache`, hence `lld`, hence
+the door's parse cost is a measured quantity and `make lint` has a node budget.
 
 - **EVERY MINUTE TAKEN OFF COMPILE AND TRANSPILE NOW IS DAYS AND WEEKS OVER THE WHOLE RUN.** This
   loop is driven by a model and runs hundreds of iterations; compile time is ITS bottleneck, so

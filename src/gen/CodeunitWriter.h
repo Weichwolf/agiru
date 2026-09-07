@@ -49,6 +49,8 @@ struct Objects {
   FieldEnums fieldEnums;
 };
 
+void NoteObjectNames(const Objects &objects);
+
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,
                            const al::VarDecl &declared,

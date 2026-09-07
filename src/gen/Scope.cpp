@@ -126,6 +126,28 @@ std::string_view DirectoryOf(ObjectKind kind) {
   return "core";
 }
 
+std::string NamespaceSuffix(std::string_view nameSpace) {
+  std::string_view rest = nameSpace;
+  constexpr std::string_view kRoot = "Microsoft";
+  if (rest == kRoot) { return {}; }
+  if (rest.starts_with(std::string(kRoot) + ".")) { rest.remove_prefix(kRoot.size() + 1); }
+  if (rest.empty()) { return {}; }
+  std::string out;
+  for (const char c : rest) {
+    if (c == '.') {
+      out += "::";
+      continue;
+    }
+    out += c;
+  }
+  return out + "::";
+}
+
+std::string NamespaceOf(std::string_view nameSpace) {
+  const std::string suffix = NamespaceSuffix(nameSpace);
+  return suffix.empty() ? "agiru" : "agiru::" + suffix.substr(0, suffix.size() - 2);
+}
+
 std::string OutputDirectory(std::string_view nameSpace, ObjectKind kind) {
   const std::string_view directory = DirectoryOf(kind);
   std::string_view rest = nameSpace;

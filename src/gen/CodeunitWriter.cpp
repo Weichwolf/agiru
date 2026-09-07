@@ -486,7 +486,8 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
 }
 
 std::string Unhidden(const std::string &type) {
-  return HiddenByABaseMember(type) ? "agiru::" + type : type;
+  const std::string bare = type.substr(0, type.find('<'));
+  return HiddenByABaseMember(bare) || ShadowsADoorType(bare) ? "::agiru::" + type : type;
 }
 
 struct Named {
@@ -511,7 +512,7 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
 
   if (NamesAbsentType(declared)) { return "absent::" + Identifier(declared.type); }
   if (type == "Code" || type == "Text") {
-    return type + "<" + std::to_string(declared.length) + ">";
+    return Unhidden(type + "<" + std::to_string(declared.length) + ">");
   }
   return Unhidden(type);
 }
@@ -525,8 +526,7 @@ std::string Element(const al::VarDecl &declared, const Objects &objects, const s
   if (type == "Enum") {
     if (declared.subtype.empty()) { return "Enum<>"; }
     const auto found = objects.enums.find(LowerKey(declared.subtype));
-    return found != objects.enums.end() ? "Enum<enums::" + found->second.identifier + ">"
-                                        : "Enum<>";
+    return found != objects.enums.end() ? "Enum<" + found->second.identifier + ">" : "Enum<>";
   }
   if (type == "Interface") { return InterfaceType(declared, objects); }
   return Parameterised(declared, objects, Named{.type = type, .owner = owner});
@@ -825,9 +825,10 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   };
   std::map<std::string, std::set<std::string>> forward;
   const auto ahead = [&forward](const std::string &qualified) {
-    const std::size_t colons = qualified.find("::");
-    if (colons == std::string::npos) { return; }
-    forward[qualified.substr(0, colons)].insert(qualified.substr(colons + 2));
+    const std::string reachable = Unprefixed(qualified);
+    const std::size_t colons = reachable.rfind("::");
+    forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
+        colons == std::string::npos ? reachable : reachable.substr(colons + 2));
   };
   const auto reachPage = [&](const std::string &subtype) {
     IndexedHeader(objects.pages, subtype, headers);
@@ -854,12 +855,10 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
 
   if (!forward.empty()) { out += "\n"; }
   for (const auto &[space, named] : forward) {
-    out += "namespace agiru::app::" + space + " {\n";
-    const ObjectKind kind = KindOfNamespace(space);
-    for (const std::string &one : named) {
-      out += "class " + ClassName(one, kind) + ";\n" + ClassAlias(one, kind);
-    }
-    out += "} // namespace agiru::app::" + space + "\n";
+    const std::string within = space.empty() ? "agiru" : "agiru::" + space;
+    out += "namespace " + within + " {\n";
+    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + within + "\n";
   }
   out += "\n";
   return out;
@@ -1140,7 +1139,12 @@ public:
     if (kind == "reports") { index = &objects_.reports; }
     if (kind == "xmlports") { index = &objects_.xmlports; }
     if (kind == "queries") { index = &objects_.queries; }
-    if (index == nullptr) { return std::string(kind) + "::" + Identifier(name); }
+    if (kind == "enums") {
+      const auto known = objects_.enums.find(LowerKey(std::string(name)));
+      return known == objects_.enums.end() ? "absent::" + Identifier(name)
+                                           : known->second.identifier;
+    }
+    if (index == nullptr) { return "::agiru::" + Identifier(name); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
     return "absent::" + Identifier(name);
@@ -1148,7 +1152,7 @@ public:
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     const auto found = objects_.enums.find(LowerKey(std::string(name)));
-    return found == objects_.enums.end() ? std::string{} : "enums::" + Identifier(name);
+    return found == objects_.enums.end() ? std::string{} : found->second.identifier;
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
@@ -1263,7 +1267,7 @@ public:
     const std::string type = TypeName(declared->type);
     if (type == "Enum" && !declared->subtype.empty()) {
       const auto found = objects_.enums.find(LowerKey(declared->subtype));
-      if (found != objects_.enums.end()) { return "enums::" + found->second.identifier; }
+      if (found != objects_.enums.end()) { return found->second.identifier; }
       return {};
     }
     if (type != "Option" || declared->members.empty()) { return {}; }
@@ -1381,7 +1385,8 @@ std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string
     const al::Property *found = Find(unit.properties, name);
     return found == nullptr ? std::string{} : found->text;
   };
-  const std::string traits = "::agiru::CodeunitTraits<" + identifier + ">";
+  const std::string traits =
+      "::agiru::CodeunitTraits<" + ClassName(identifier, ObjectKind::Codeunit) + ">";
   std::string out = "constexpr CodeunitDef k" + identifier + "Codeunit{\n";
   out += "    .id = " + traits + "::kId,\n";
   out += "    .name = " + traits + "::kName,\n";
@@ -1421,24 +1426,25 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += kDoorMarker;
   const std::size_t includeAt = out.size();
   const std::string catalogue =
-      TestCatalogueOf(unit, identifier) + SubscriptionCatalogueOf(unit, identifier);
+      TestCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit)) +
+      SubscriptionCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit));
   if (!catalogue.empty()) { out += "\n#include <array>\n#include <string_view>\n"; }
-  out += "\nnamespace agiru::app::codeunits {\n\n";
+  const std::string space = NamespaceOf(unit.nameSpace);
+  const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
+  out += "\nnamespace " + space + " {\n\n";
   const std::size_t bodyAt = out.size();
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
     const CodeunitNames names(unit, procedure, objects);
     const std::string body =
-        publisher ? RaisingBody(procedure,
-                                "EventObject::Codeunit",
-                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
-                                    ">::kId.Value()",
-                                "::agiru::CodeunitTraits<::agiru::app::codeunits::" + identifier +
-                                    ">::kName")
+        publisher ? RaisingBody(
+                        procedure,
+                        "EventObject::Codeunit",
+                        "::agiru::CodeunitTraits<::" + space + "::" + unitClass + ">::kId.Value()",
+                        "::agiru::CodeunitTraits<::" + space + "::" + unitClass + ">::kName")
                   : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
-    out += Returns(procedure, objects) + " " + identifier + "::" + Identifier(procedure.name) +
-           "(" +
+    out += Returns(procedure, objects) + " " + unitClass + "::" + Identifier(procedure.name) + "(" +
            Parameters(procedure,
                       objects,
                       true,
@@ -1468,7 +1474,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   out += catalogue;
   out += CodeunitDefinition(unit, identifier);
-  out += "} // namespace agiru::app::codeunits\n";
+  out += "} // namespace " + space + "\n";
   out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Codeunit);
 }
@@ -1560,12 +1566,14 @@ const HeaderIndex &HeadersOf(const Objects &objects) {
                                   &objects.interfaces,
                                   &objects.reports}) {
     for (const auto &[key, ref] : *index) {
-      if (!ref.header.empty()) { cached.byIdentifier.emplace(ref.identifier, ref.header); }
+      if (!ref.header.empty()) {
+        cached.byIdentifier.emplace(Unprefixed(ref.identifier), ref.header);
+      }
     }
   }
   for (const auto &[key, ref] : objects.enums) {
     if (!ref.header.empty()) {
-      cached.byIdentifier.emplace("enums::" + ref.identifier, ref.header);
+      cached.byIdentifier.emplace(Unprefixed(ref.identifier), ref.header);
     }
   }
   return cached;
@@ -1585,12 +1593,12 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
   if (cachedFor != &objects || cachedSize != objects.enums.size()) {
     byIdentifier.clear();
     for (const auto &[key, ref] : objects.enums) {
-      byIdentifier.emplace("enums::" + ref.identifier, &ref);
+      byIdentifier.emplace(Unprefixed(ref.identifier), &ref);
     }
     cachedFor = &objects;
     cachedSize = objects.enums.size();
   }
-  const auto found = byIdentifier.find(std::string(enumeration));
+  const auto found = byIdentifier.find(Unprefixed(enumeration));
   if (found == byIdentifier.end()) { return EnumeratorName(member); }
   const auto spelled = found->second->members.find(LowerKey(std::string(member)));
   return spelled == found->second->members.end() ? EnumeratorName(member) : spelled->second;
@@ -1599,21 +1607,33 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
   std::string named;
   if (text.find("options::") != std::string::npos) { named = "#include \"options/Types.h\"\n"; }
-  static constexpr std::array<std::string_view, 8> kKinds{
-      "codeunits", "pages", "tables", "interfaces", "reports", "xmlports", "queries", "enums"};
   const HeaderIndex &known = HeadersOf(objects);
   std::set<std::string> headers;
-  for (std::size_t at = text.find("::"); at != std::string::npos; at = text.find("::", at + 2)) {
-    std::size_t begin = at;
-    while (begin > 0 && IdentifierChar(text[begin - 1])) { --begin; }
-    if (begin == at) { continue; }
-    const std::string_view kind(text.data() + begin, at - begin);
-    if (std::ranges::find(kKinds, kind) == kKinds.end()) { continue; }
-    std::size_t finish = at + 2;
-    while (finish < text.size() && IdentifierChar(text[finish])) { ++finish; }
-    if (finish == at + 2) { continue; }
-    const auto found = known.byIdentifier.find(std::string(text, begin, finish - begin));
-    if (found != known.byIdentifier.end()) { headers.insert(found->second); }
+  for (std::size_t at = 0; at < text.size();) {
+    if (!IdentifierChar(text[at])) {
+      ++at;
+      continue;
+    }
+    std::size_t finish = at;
+    while (finish < text.size() &&
+           (IdentifierChar(text[finish]) ||
+            (text[finish] == ':' && finish + 1 < text.size() && text[finish + 1] == ':' &&
+             finish + 2 < text.size() && IdentifierChar(text[finish + 2])))) {
+      finish += text[finish] == ':' ? 2 : 1;
+    }
+    std::string_view named(text.data() + at, finish - at);
+    if (named.starts_with("agiru::")) { named.remove_prefix(std::string_view("agiru::").size()); }
+    while (!named.empty()) {
+      const auto found = known.byIdentifier.find(std::string(named));
+      if (found != known.byIdentifier.end()) {
+        headers.insert(found->second);
+        break;
+      }
+      const std::size_t colons = named.rfind("::");
+      if (colons == std::string_view::npos) { break; }
+      named.remove_suffix(named.size() - colons);
+    }
+    at = finish;
   }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
@@ -1694,7 +1714,7 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
-    const TableRef ref{.identifier = "platform::" + Identifier(name),
+    const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = {},
                        .fields = {},
                        .procedures = {}};
@@ -1730,7 +1750,10 @@ void FaceReach(const al::VarDecl &declared,
   if (TypeName(declared.type) == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
     if (found != objects.interfaces.end()) {
-      forward["interfaces"].insert(found->second.identifier.substr(std::size("interfaces::") - 1));
+      const std::string reachable = Unprefixed(found->second.identifier);
+      const std::size_t colons = reachable.rfind("::");
+      forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
+          colons == std::string::npos ? reachable : reachable.substr(colons + 2));
     }
     return;
   }
@@ -1759,12 +1782,10 @@ std::string FaceDeclarations(const al::InterfaceObject &object, const Objects &o
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   if (NamesAbsentIn({}, object.procedures, objects)) { out += "#include \"absent/Types.h\"\n"; }
   for (const auto &[space, named] : forward) {
-    out += "\nnamespace agiru::app::" + space + " {\n";
-    for (const std::string &one : named) {
-      out += "class " + ClassName(one, ObjectKind::Interface) + ";\n" +
-             ClassAlias(one, ObjectKind::Interface);
-    }
-    out += "} // namespace agiru::app::" + space + "\n";
+    const std::string within = space.empty() ? "agiru" : "agiru::" + space;
+    out += "\nnamespace " + within + " {\n";
+    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + within + "\n";
   }
   return out;
 }
@@ -1780,9 +1801,10 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   out += "\n#pragma once\n\n";
   out += kDoorMarker;
   out += FaceDeclarations(object, objects);
-  out += "\nnamespace agiru::app::interfaces {\n\n";
+  const std::string space = NamespaceOf(object.nameSpace);
+  out += "\nnamespace " + space + " {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
-  out += "class " + faceClass + ";\n" + ClassAlias(identifier, ObjectKind::Interface) + "\n";
+  out += "class " + faceClass + ";\n\n";
   out += "class " + faceClass + " {\n";
   out += "public:\n";
   out += "  virtual ~" + faceClass + "() = default;\n\n";
@@ -1790,7 +1812,7 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
   }
-  out += "};\n\n} // namespace agiru::app::interfaces\n";
+  out += "};\n\n} // namespace " + space + "\n";
   DotNetUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
@@ -1837,9 +1859,10 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
   out += InlineOptions(unit);
 
-  out += "namespace agiru::app::codeunits {\n\n";
+  const std::string space = NamespaceOf(unit.nameSpace);
+  out += "namespace " + space + " {\n\n";
   const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
-  out += "class " + unitClass + ";\n" + ClassAlias(identifier, ObjectKind::Codeunit) + "\n";
+  out += "class " + unitClass + ";\n\n";
   out += "class " + unitClass + " : public Codeunit<" + unitClass + ">";
   for (const std::string &face : unit.implements) {
     const auto found = objects.interfaces.find(LowerKey(face));
@@ -1879,13 +1902,13 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   }
   out += "};\n\n";
   out += "extern const CodeunitDef k" + identifier + "Codeunit;\n\n";
-  out += "} // namespace agiru::app::codeunits\n\n";
+  out += "} // namespace " + space + "\n\n";
 
-  out += "template <> struct agiru::CodeunitTraits<agiru::app::codeunits::" + identifier + "> {\n";
+  out += "template <> struct agiru::CodeunitTraits<" + space + "::" + unitClass + "> {\n";
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "  static constexpr Subtype kSubtype{Subtype::" + SubtypeOf(unit) + "};\n";
-  out += "  static constexpr const CodeunitDef &kCodeunit = agiru::app::codeunits::k" + identifier +
+  out += "  static constexpr const CodeunitDef &kCodeunit = " + space + "::k" + identifier +
          "Codeunit;\n";
   out += "};\n";
   DotNetUse dotnet;
@@ -1902,6 +1925,38 @@ std::string OptionTypeName(const std::string &owner,
                            const al::VarDecl &declared,
                            const std::vector<al::ProcedureDecl> &procedures) {
   return OptionNameOf(owner, within, declared, procedures);
+}
+
+void NoteObjectNames(const Objects &objects) {
+  const auto note = [](const std::string &identifier) {
+    const std::string reachable = Unprefixed(identifier);
+    const std::size_t colons = reachable.rfind("::");
+    NoteObjectName(colons == std::string::npos ? reachable : reachable.substr(colons + 2));
+  };
+  const auto segments = [](const std::string &identifier) {
+    for (std::size_t at = 0; at < identifier.size();) {
+      const std::size_t next = identifier.find("::", at);
+      if (next == std::string::npos) { break; }
+      NoteObjectName(identifier.substr(at, next - at));
+      at = next + 2;
+    }
+  };
+  for (const TableIndex *index : {&objects.tables,
+                                  &objects.reports,
+                                  &objects.xmlports,
+                                  &objects.queries,
+                                  &objects.codeunits,
+                                  &objects.interfaces,
+                                  &objects.pages}) {
+    for (const auto &[key, ref] : *index) {
+      note(ref.identifier);
+      segments(ref.identifier);
+    }
+  }
+  for (const auto &[key, ref] : objects.enums) {
+    note(ref.identifier);
+    segments(ref.identifier);
+  }
 }
 
 }

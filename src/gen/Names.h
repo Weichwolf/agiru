@@ -11,6 +11,8 @@ namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
 
+std::string Unprefixed(std::string_view identifier);
+
 std::vector<std::string> Distinct(const std::vector<std::string> &alNames,
                                   std::set<std::string> taken = {});
 
@@ -28,13 +30,13 @@ std::string TypeName(std::string_view alType);
 
 bool IsAlTypeName(std::string_view alType);
 
+void NoteObjectName(std::string_view identifier);
+
+bool ShadowsADoorType(std::string_view name);
+
 std::string Literal(std::string_view text);
 
 std::string ClassName(std::string_view identifier, ObjectKind kind);
-
-std::string ClassAlias(std::string_view identifier, ObjectKind kind);
-
-ObjectKind KindOfNamespace(std::string_view space);
 
 struct ObjectDeclaration {
   bool found = false;

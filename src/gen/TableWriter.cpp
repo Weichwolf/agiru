@@ -172,7 +172,9 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
 }
 
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
-  if (type == "FieldNo" || HiddenByABaseMember(type)) { return "::agiru::" + bare; }
+  if (type == "FieldNo" || HiddenByABaseMember(type) || ShadowsADoorType(type)) {
+    return "::agiru::" + bare;
+  }
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
 }
 
@@ -183,9 +185,8 @@ std::string MemberType(const al::TableObject &table,
   if (option != nullptr) { return Reach(table, "Option", "Option<" + option->enumName + ">"); }
   if (IsEnumField(field)) {
     const auto found = enums.find(LowerKey(field.subtype));
-    return found != enums.end()
-               ? Reach(table, "Enum", "Enum<enums::" + found->second.identifier + ">")
-               : Reach(table, "Enum", "Enum<>");
+    return found != enums.end() ? Reach(table, "Enum", "Enum<" + found->second.identifier + ">")
+                                : Reach(table, "Enum", "Enum<>");
   }
   const std::string type = TypeName(field.type);
   if (type == "Code" || type == "Text") {
@@ -398,18 +399,19 @@ std::string FieldTable(const al::TableObject &table,
                        const EnumIndex &enums,
                        const TableIndex &pages) {
   const std::size_t declaredCount = sorted.size() - kSystemFieldCount;
+  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
   std::string out = "constexpr auto k" + tableIdentifier + "Fields = WithSystemFields<" +
-                    tableIdentifier + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
+                    tableClass + ">(std::array<FieldDef, " + std::to_string(declaredCount) +
                     ">{{\n";
   for (const al::FieldDecl *field : sorted) {
     if (IsSystemField(*field)) { continue; }
     const std::string identifier = FieldIdentifier(table, field->name);
     out += "    Declare<&";
-    out += tableIdentifier;
+    out += tableClass;
     out += "::";
     out += identifier;
     out += ">(";
-    out += tableIdentifier;
+    out += tableClass;
     out += "::Field_No::";
     out += identifier;
     out += ", ";
@@ -417,7 +419,7 @@ std::string FieldTable(const al::TableObject &table,
     out += ", ";
     out += Literal(Caption(*field));
     out += ", offsetof(";
-    out += tableIdentifier;
+    out += tableClass;
     out += ", ";
     out += identifier;
     out += ")";
@@ -515,8 +517,10 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
   if (alType == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
     if (found != objects.interfaces.end()) {
-      reached.ahead["interfaces"].insert(
-          found->second.identifier.substr(std::size("interfaces::") - 1));
+      const std::string reachable = Unprefixed(found->second.identifier);
+      const std::size_t colons = reachable.rfind("::");
+      reached.ahead[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)]
+          .insert(colons == std::string::npos ? reachable : reachable.substr(colons + 2));
     }
     return;
   }
@@ -530,9 +534,10 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
     reached.headers.insert(ref->header);
     return;
   }
-  const std::size_t colons = ref->identifier.find("::");
-  if (colons == std::string::npos) { return; }
-  reached.ahead[ref->identifier.substr(0, colons)].insert(ref->identifier.substr(colons + 2));
+  const std::string reachable = Unprefixed(ref->identifier);
+  const std::size_t colons = reachable.rfind("::");
+  reached.ahead[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
+      colons == std::string::npos ? reachable : reachable.substr(colons + 2));
 }
 
 std::string Declarations(const al::TableObject &table, const Objects &objects) {
@@ -565,12 +570,10 @@ std::string Declarations(const al::TableObject &table, const Objects &objects) {
   for (const std::string &header : memberHeaders) { out += "#include \"" + header + "\"\n"; }
   if (!memberHeaders.empty()) { out += "\n"; }
   for (const auto &[space, objectNames] : ahead) {
-    const ObjectKind kind = KindOfNamespace(space);
-    out += "namespace agiru::app::" + space + " {\n";
-    for (const std::string &one : objectNames) {
-      out += "class " + ClassName(one, kind) + ";\n" + ClassAlias(one, kind);
-    }
-    out += "} // namespace agiru::app::" + space + "\n";
+    const std::string named = space.empty() ? "agiru" : "agiru::" + space;
+    out += "namespace " + named + " {\n";
+    for (const std::string &one : objectNames) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + named + "\n";
   }
   if (!ahead.empty()) { out += "\n"; }
   return out;
@@ -631,10 +634,11 @@ std::string ClassBody(const al::TableObject &table,
                       const std::vector<OptionField> &options,
                       const EnumIndex &enums,
                       const Objects &objects) {
+  const std::string space = NamespaceOf(table.nameSpace);
   std::string out;
-  out += "namespace agiru::app::tables {\n\n";
+  out += "namespace " + space + " {\n\n";
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
-  out += "class " + tableClass + ";\n" + ClassAlias(tableIdentifier, ObjectKind::Table) + "\n";
+  out += "class " + tableClass + ";\n\n";
   out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
   out += "  using Table<" + tableClass + ">::operator=;\n\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
@@ -699,12 +703,15 @@ std::set<std::string> Shadowed(const al::TableObject &table) {
 }
 
 std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
+  const std::string space = NamespaceOf(declared.nameSpace);
   const EnumIndex &enums = objects.enums;
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
-  std::string out = "namespace agiru::app::tables {\n\n";
+  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  const std::string qualified = space + "::" + tableClass;
+  std::string out = "namespace " + space + " {\n\n";
   out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
 
   out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
@@ -715,12 +722,12 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
       return found == nullptr ? absent : LowerKey(found->text) == "true";
     };
     const al::Property *sums = Find(table.keys[i].properties, "SumIndexFields");
-    out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableIdentifier +
+    out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableClass +
            "::" + KeyArrayName(i) +
            ", .clustered = " + (said("Clustered", false) ? "true" : "false");
     if (!said("Enabled", true)) { out += ", .enabled = false"; }
     if (sums != nullptr) {
-      out += ", .sumIndexFields = " + tableIdentifier + "::" + KeyArrayName(i) + "Sums";
+      out += ", .sumIndexFields = " + tableClass + "::" + KeyArrayName(i) + "Sums";
     }
     if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
     if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
@@ -738,11 +745,11 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += "}};\n\n";
 
   out += "constexpr TableDef k" + tableIdentifier + "Table{\n";
-  out += "    .id = " + tableIdentifier + "::kId,\n";
-  out += "    .name = " + tableIdentifier + "::kName,\n";
+  out += "    .id = " + tableClass + "::kId,\n";
+  out += "    .name = " + tableClass + "::kName,\n";
   const al::Property *named = Find(table.properties, "Caption");
   out += "    .caption = ";
-  out += named == nullptr ? tableIdentifier + "::kName" : Literal(named->text);
+  out += named == nullptr ? tableClass + "::kName" : Literal(named->text);
   out += ",\n";
   out += "    .fields = k" + tableIdentifier + "Fields,\n";
   out += "    .keys = k" + tableIdentifier + "Keys,\n";
@@ -770,7 +777,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
   }
   if (!property("DataCaptionFields").empty()) {
-    out += "    .dataCaptionFields = " + tableIdentifier + "::kDataCaptionFields,\n";
+    out += "    .dataCaptionFields = " + tableClass + "::kDataCaptionFields,\n";
   }
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"Permissions", "permissions"},
@@ -809,14 +816,13 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += "              \"the field table is emitted sorted by field number, which is what lets ";
   out += "Field() \"\n";
   out += "              \"binary-search it\");\n";
-  out += "static_assert(offsetof(agiru::app::tables::";
-  out += tableIdentifier;
+  out += "static_assert(offsetof(" + qualified;
   out += ", State_Block) == 0,\n";
   out += "              \"the record variable's state is the FIRST member, which is how the base ";
   out += "reaches it \"\n";
   out += "              \"through the address of the object\");\n";
   out += "static_assert(std::is_standard_layout_v<";
-  out += tableIdentifier;
+  out += tableClass;
   out += ">,\n";
   out += "              \"offsetof over the field table requires standard layout. The base ";
   out += "carries NO data, \"\n";
@@ -836,7 +842,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += "              \"a table declares at most 40 keys (devenv-table-keys.md)\");\n";
   if (!table.keys.empty()) {
     out += "static_assert(";
-    out += tableIdentifier;
+    out += tableClass;
     out += "::" + KeyArrayName(0) + ".size() <= ::agiru::kMaximumPrimaryKeyFields,\n";
     out += "              \"a primary key names at most 16 fields "
            "(devenv-table-keys.md)\");\n";
@@ -845,7 +851,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     out += "Keys.empty(), \"keys[0] IS the primary key, so a table has one\");\n";
   }
   out += "\n";
-  out += "} // namespace agiru::app::tables\n\n";
+  out += "} // namespace " + space + "\n\n";
   return out;
 }
 
@@ -855,6 +861,8 @@ TableHeader WriteHeader(const al::TableObject &declared,
                         const Objects &objects) {
   const al::TableObject table = WithSystemFields(declared);
   const std::string tableIdentifier = Identifier(table.name);
+  const std::string space = NamespaceOf(table.nameSpace);
+  const std::string qualified = space + "::" + ClassName(tableIdentifier, ObjectKind::Table);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
 
@@ -885,23 +893,21 @@ TableHeader WriteHeader(const al::TableObject &declared,
   out += ClassBody(table, tableIdentifier, options, enums, objects);
 
   out += "extern const TableDef k" + tableIdentifier + "Table;\n\n";
-  out += "} // namespace agiru::app::tables\n\n";
+  out += "} // namespace " + space + "\n\n";
 
-  out += "template <> struct agiru::TableTraits<agiru::app::tables::" + tableIdentifier + "> {\n";
-  out += "  static constexpr const TableDef &kTable = agiru::app::tables::k" + tableIdentifier +
-         "Table;\n";
+  out += "template <> struct agiru::TableTraits<" + qualified + "> {\n";
+  out +=
+      "  static constexpr const TableDef &kTable = " + space + "::k" + tableIdentifier + "Table;\n";
   std::string validators;
   std::size_t validated = 0;
   for (const al::FieldDecl &field : table.fields) {
     for (const al::Trigger &trigger : field.triggers) {
       if (LowerKey(trigger.name) != "onvalidate") { continue; }
       const std::string member = FieldIdentifier(table, field.name);
-      validators += "      {.field = agiru::app::tables::";
-      validators += tableIdentifier;
+      validators += "      {.field = " + qualified;
       validators += "::Field_No::";
       validators += member;
-      validators += ",\n       .run = [](agiru::app::tables::";
-      validators += tableIdentifier;
+      validators += ",\n       .run = [](" + qualified;
       validators += " &record) { record.OnValidate";
       validators += member;
       validators += "(); }},\n";
@@ -909,9 +915,8 @@ TableHeader WriteHeader(const al::TableObject &declared,
     }
   }
   if (!validators.empty()) {
-    out +=
-        "  static constexpr std::array<agiru::OnValidateOf<agiru::app::tables::" + tableIdentifier +
-        ">, " + std::to_string(validated) + "> kOnValidate{{\n" + validators + "  }};\n";
+    out += "  static constexpr std::array<agiru::OnValidateOf<" + qualified + ">, " +
+           std::to_string(validated) + "> kOnValidate{{\n" + validators + "  }};\n";
   }
   out += "};\n";
   DotNetUse dotnet;

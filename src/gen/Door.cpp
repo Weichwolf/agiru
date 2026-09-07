@@ -265,8 +265,8 @@ bool Mentions(std::string_view text, std::string_view name) {
 }
 
 std::string WithoutEmptyNamespaces(std::string text) {
-  for (std::size_t at = text.find("namespace agiru::app::"); at != std::string::npos;
-       at = text.find("namespace agiru::app::", at + 1)) {
+  for (std::size_t at = text.find("namespace agiru::"); at != std::string::npos;
+       at = text.find("namespace agiru::", at + 1)) {
     const std::size_t open = text.find(" {\n", at);
     if (open == std::string::npos) { break; }
     if (text.compare(open + 3, std::string_view("} // namespace").size(), "} // namespace") != 0) {

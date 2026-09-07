@@ -6,9 +6,9 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <set>
 #include <sstream>
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -89,20 +89,15 @@ std::string ClassName(std::string_view identifier, ObjectKind kind) {
   return std::string(identifier) + "_" + std::string(KindSuffix(kind));
 }
 
-std::string ClassAlias(std::string_view identifier, ObjectKind kind) {
-  return "using " + std::string(identifier) + " = " + ClassName(identifier, kind) + ";\n";
-}
-
-ObjectKind KindOfNamespace(std::string_view space) {
-  if (space == "tables") { return ObjectKind::Table; }
-  if (space == "interfaces") { return ObjectKind::Interface; }
-  if (space == "enums") { return ObjectKind::Enum; }
-  if (space == "pages") { return ObjectKind::Page; }
-  return ObjectKind::Codeunit;
-}
-
 std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
+}
+
+std::string Unprefixed(std::string_view identifier) {
+  for (const std::string_view root : {"::agiru::", "agiru::"}) {
+    if (identifier.starts_with(root)) { return std::string(identifier.substr(root.size())); }
+  }
+  return std::string(identifier);
 }
 
 std::vector<std::string> Distinct(const std::vector<std::string> &alNames,
@@ -147,7 +142,7 @@ std::string OptionContentName(const std::vector<std::string> &members) {
     }
     joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % 1000000007ULL);
   }
-  return "options::Option" + joined;
+  return "::agiru::options::Option" + joined;
 }
 
 std::string OptionEnumName(std::string_view tableName,
@@ -326,6 +321,23 @@ std::string TypeName(std::string_view alType) {
 
 bool IsAlTypeName(std::string_view alType) {
   return CanonicalType(alType) != nullptr;
+}
+
+namespace {
+
+std::set<std::string> &ObjectNames() {
+  static std::set<std::string> named;
+  return named;
+}
+
+}
+
+void NoteObjectName(std::string_view identifier) {
+  if (IsAlTypeName(identifier)) { ObjectNames().emplace(identifier); }
+}
+
+bool ShadowsADoorType(std::string_view name) {
+  return ObjectNames().contains(std::string(name));
 }
 
 namespace {

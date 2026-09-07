@@ -39,4 +39,8 @@ private:
 
 std::string OutputDirectory(std::string_view nameSpace, ObjectKind kind);
 
+std::string NamespaceSuffix(std::string_view nameSpace);
+
+std::string NamespaceOf(std::string_view nameSpace);
+
 }

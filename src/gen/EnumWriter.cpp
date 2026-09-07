@@ -53,22 +53,25 @@ std::string EnumSourcePath(const al::EnumObject &object) {
 
 std::string ImplementationDeclarations(const al::EnumObject &object,
                                        const std::string &identifier,
+                                       const std::string &space,
                                        const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));
     if (known == objects.interfaces.end()) { continue; }
-    const std::string bare =
-        known->second.identifier.substr(known->second.identifier.find("::") + 2);
-    out += "\nnamespace agiru::app::interfaces {\nclass ";
-    out += ClassName(bare, ObjectKind::Interface);
+    const std::string reachable = Unprefixed(known->second.identifier);
+    const std::size_t colons = reachable.rfind("::");
+    const std::string faceSpace =
+        colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
+    const std::string bare = colons == std::string::npos ? reachable : reachable.substr(colons + 2);
+    out += "\nnamespace " + faceSpace + " {\nclass ";
+    out += bare;
     out += ";\n";
-    out += ClassAlias(bare, ObjectKind::Interface);
-    out += "}\n\nnamespace agiru::app::enums {\n\nagiru::app::";
+    out += "}\n\nnamespace " + space + " {\n\n";
     out += known->second.identifier;
     out += " *ImplementationOf(";
     out += identifier;
-    out += " value, agiru::app::";
+    out += " value, ";
     out += known->second.identifier;
     out += " *);\n\n}\n";
   }
@@ -110,13 +113,14 @@ std::string ImplementationFor(std::string_view text, std::string_view face) {
 
 std::string ImplementationBodies(const al::EnumObject &object,
                                  const std::string &identifier,
+                                 const std::string &space,
                                  const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));
     if (known == objects.interfaces.end()) { continue; }
-    const std::string faceType = "agiru::app::" + known->second.identifier;
-    out += "\nnamespace agiru::app::enums {\n\n";
+    const std::string faceType = known->second.identifier;
+    out += "\nnamespace " + space + " {\n\n";
     out += faceType;
     out += " *ImplementationOf(";
     out += identifier;
@@ -134,7 +138,7 @@ std::string ImplementationBodies(const al::EnumObject &object,
       out += identifier;
       out += "::";
       out += EnumeratorName(value.name);
-      out += ":\n      return new agiru::app::";
+      out += ":\n      return new ";
       out += unit->second.identifier;
       out += "{};\n";
     }
@@ -151,7 +155,7 @@ std::string ImplementationBodies(const al::EnumObject &object,
       }
     }
     out += fallback.empty() ? "    default: break;\n"
-                            : "    default: return new agiru::app::" + fallback + "{};\n";
+                            : "    default: return new " + fallback + "{};\n";
     out += "  }\n  throw agiru::Error(\"this value of ";
     out += object.name;
     out += " names no implementation of ";
@@ -164,12 +168,14 @@ std::string ImplementationBodies(const al::EnumObject &object,
 std::string WriteEnumSource(const al::EnumObject &object,
                             const std::string &sourcePath,
                             const Objects &objects) {
-  const std::string identifier = Identifier(object.name);
-  const std::string bodies = ImplementationBodies(object, identifier, objects);
+  const std::string fileName = Identifier(object.name);
+  const std::string identifier = ClassName(fileName, ObjectKind::Enum);
+  const std::string bodies =
+      ImplementationBodies(object, identifier, NamespaceOf(object.nameSpace), objects);
   if (bodies.empty()) { return {}; }
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n\n";
-  out += "#include \"" + identifier + ".h\"\n\n";
+  out += "#include \"" + fileName + ".h\"\n\n";
   out += kDoorMarker;
   out += BodyIncludes(bodies, objects);
   out += bodies;
@@ -178,8 +184,9 @@ std::string WriteEnumSource(const al::EnumObject &object,
 
 std::string
 WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Objects &objects) {
-  const std::string identifier = Identifier(object.name);
-  const std::string qualified = "agiru::app::enums::" + identifier;
+  const std::string identifier = ClassName(Identifier(object.name), ObjectKind::Enum);
+  const std::string space = NamespaceOf(object.nameSpace);
+  const std::string qualified = space + "::" + identifier;
   const std::vector<const al::EnumValueDecl *> sorted = ByOrdinal(object);
 
   std::string out;
@@ -190,13 +197,13 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "\n";
   out += "#include <array>\n#include <cstdint>\n\n";
 
-  out += "namespace agiru::app::enums {\n\n";
+  out += "namespace " + space + " {\n\n";
   out += "enum class " + identifier + " : std::int32_t {\n";
   for (const al::EnumValueDecl &value : object.values) {
     out += "  " + EnumeratorName(value.name) + " = " + std::to_string(value.ordinal) + ",\n";
   }
   out += "};\n\n";
-  out += "} // namespace agiru::app::enums\n\n";
+  out += "} // namespace " + space + "\n\n";
 
   out += "template <> struct agiru::EnumTraits<" + qualified + "> {\n";
   if (sorted.empty()) {
@@ -221,7 +228,7 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
          ">::kValues.size() == " + std::to_string(object.values.size()) + ",\n";
   out += "              \"enum " + std::to_string(object.id) + " declares " +
          std::to_string(object.values.size()) + " values\");\n";
-  out += ImplementationDeclarations(object, identifier, objects);
+  out += ImplementationDeclarations(object, identifier, space, objects);
   return WithDoor(out, ObjectKind::Enum);
 }
 
