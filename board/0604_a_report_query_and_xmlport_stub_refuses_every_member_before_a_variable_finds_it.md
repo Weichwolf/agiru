@@ -45,6 +45,23 @@ everything with a type that swallows nothing.
 second. `dotnet::Refused` is the shape that already exists for exactly this -- an object that
 answers any member and throws on use, naming what was asked for.
 
+## The .NET stubs are the same rule, measured 2026-09-07
+
+`dotnet::XmlElement` will not bind to a `dotnet::XmlNode &` because .NET's inheritance is not in this
+tree -- `XmlElement IS an XmlNode` there, and here both are flat stubs under `dotnet::AbsentType`.
+Typing the `var` parameter as that shared base makes the binding work and **costs 64 errors in 19
+units**: the NAMED stub carries a `Refused` member per .NET member, the base carries none, so every
+`Node.OwnerDocument` and `Type.CreateInstance` after the parameter stops compiling. Taken back.
+
+**Same order as above**: the base must refuse ANY member before it can stand in for a named stub.
+That is one shape for both halves of this item -- a generated report, query or xmlport stub, and a
+.NET stub whose hierarchy this tree cannot know.
+
+**And one thing it is NOT**: reaching for the door's type of the same name. `include/type/XmlElement.h`
+exists and is AL's OWN `XmlElement`, not .NET's; 26 of the 547 `DotNet` subtypes AL declares share a
+name with an AL type (`Byte`, `Char`, `DateTime`, `Decimal`, `File`). Mapping them together would
+merge two different types across 26 names in silence.
+
 ## What that also closes
 
 board:0571 counts 31 report methods, 14 xmlport and 7 query as documented and undeclared. They are

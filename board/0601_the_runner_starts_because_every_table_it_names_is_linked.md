@@ -4,10 +4,20 @@ Area:     rt, gen, net
 Source:   the first start of `agiru run-tests` after the namespace round, 2026-09-07
 Class:    activation
 
-**STANDING: 9 of the 13 tables link (2026-09-07). What is left is 4 -- `ICPartner`,
-`WorkflowWebhookSubscription`, `ConfigSetup`, `OAuth20Setup` -- and two of them are board:0605's
-`std::string_view` parameter, one is an ambiguous interface overload, one a `dotnet::XmlNode`
-that will not bind to a reference. `PermissionSetBuffer` is board:0599 and out of the slice.**
+**STANDING: 12 of the 13 tables link (2026-09-07). One is left and it is not a missing declaration:**
+
+```cpp
+void ICPartner_Table::AutosetICPartnerName(absent::Company Company) {
+  ICDataExchange->GetICPartnerICSetup(Company.Name(), TempPartnerICSetup);   // ambiguous
+```
+
+`Company` is an ABSENT AL object, so `Company.Name()` is a `dotnet::Refused`, and a refusal converts
+to EVERY type -- both `GetICPartnerICSetup(ICPartner_Table, ...)` and
+`GetICPartnerICSetup(Text<0>, ...)` are equally viable and C++ has no ground to choose. AL chooses by
+the DECLARED return type of `Name()`, which this tree cannot know while the object it belongs to is
+absent. So the fix is not a signature: it is either the absent object carrying its methods' types
+(board:0035's family) or a refusal that refuses to participate in overload resolution at all.
+`PermissionSetBuffer` is board:0599 and out of the slice.**
 
 # `agiru run-tests` starts, because every table the slice names is linked
 
