@@ -44,6 +44,22 @@ they are left as they are.
 - **the POPULATION is measured over `~/Git/BCApps/src`**, which is what `apps/` will contain once
   `make transpile` runs. Every count in an item names that tree and its date.
 
+### The "carry or refuse" category is at ZERO, and the transpiler prints it every run
+
+Before hunting for a mechanical batch, read the run. Measured 2026-09-07:
+
+    properties  287 059 declaration(s) of 234 kind(s); 7 095 dropped by decision,
+                0 of 0 kind(s) read and dropped in silence          (board:0067)
+    attributes  22 of 28 kind(s) acted on, 45 493 acknowledged as no-ops,
+                0 declaration(s) read and dropped                    (board:0190)
+    triggers    151 of 151 named                                     (test/trigger-baseline)
+    declared    855 object(s) carrying number, name and a refusing surface, no body (board:0034)
+
+**So nothing is dropped in silence any more.** What is left in those categories is not a
+declaration to carry but a BEHAVIOUR to implement -- 7 095 properties are dropped BY DECISION and
+855 objects carry a surface with no body. An item that reads like "carry this property as metadata"
+is therefore either already done or waiting on the object kind, and the ordering line says which.
+
 ### Whether an item is DONE cannot be grepped, and two attempts say why
 
 **A property's name is not its metadata member's name.** `OptionMembers` reaches `FieldDef::values`,
