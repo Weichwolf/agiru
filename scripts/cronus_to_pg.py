@@ -109,7 +109,19 @@ def escaped(column, name):
         # BC MIXES COLLATIONS INSIDE ONE TABLE -- `Latin1_General_100_CS_AS` beside `CI_AS` -- and
         # `+` between two of them is ambiguous rather than merely odd. One collation for every
         # string in the row settles it without touching a value.
-        value = f"CAST({quoted} AS nvarchar(max)) COLLATE DATABASE_DEFAULT"
+        #
+        # U+0000 BECOMES U+FFFD, AND THAT IS A LOSS TAKEN ON PURPOSE. Two platform tables keep an
+        # app hash in an `nvarchar` column -- the value is not text: it holds NULs and unpaired
+        # surrogates, and `bcp` has already turned every surrogate into U+FFFD before this side
+        # sees it. PostgreSQL cannot store U+0000 in a text type under ANY encoding, so the choice
+        # is between one damaged character per hash and 170 rows that never arrive at all. A NUL
+        # also does not announce itself: `psql` reads the line as a C string, stops at the byte and
+        # reports "extra data after last expected column", which names neither the column nor the
+        # cause. REPLACE is done under a BINARY collation because SQL Server's own REPLACE does not
+        # find CHAR(0) under every other one.
+        value = f"CAST({quoted} AS nvarchar(max))"
+        value = (f"REPLACE({value} COLLATE Latin1_General_BIN2, NCHAR(0) COLLATE "
+                 f"Latin1_General_BIN2, NCHAR(65533)) COLLATE DATABASE_DEFAULT")
         value = (f"REPLACE(REPLACE(REPLACE(REPLACE({value}, CHAR(92), CHAR(92)+CHAR(92)), "
                  f"CHAR(9), CHAR(92)+'t'), CHAR(10), CHAR(92)+'n'), CHAR(13), CHAR(92)+'r')")
     return f"CASE WHEN {quoted} IS NULL THEN CHAR(92)+'N' ELSE {value} END"
@@ -284,10 +296,11 @@ def copy_rows(table, schema, name, columns, args):
     _, err = write.communicate()
     if write.returncode != 0:
         # ONE TABLE THAT CANNOT BE CARRIED MUST NOT STOP THE OTHER 734, AND MUST NOT VANISH EITHER.
-        # `NAV App Installed App` keeps a hash in an `nvarchar` column: the value is not text, it
-        # holds an unpaired surrogate and a U+0000, and PostgreSQL cannot store U+0000 in `text` at
-        # all. No transfer format fixes that -- the column would have to become `bytea`, which is no
-        # longer a copy of the schema. So it is reported and counted.
+        # The refusal that used to arrive here was the U+0000 in the app hash of
+        # `NAV App Installed App` and `Published Application`; `escaped` now carries those two by
+        # spending one character of the hash, so nothing is known to land here today. The path
+        # stays: a table this side cannot carry is named on stderr and counted, never dropped in
+        # silence.
         return None, err.strip().splitlines()[0]
     return int([line for line in out.stdout.splitlines()
                 if "rows copied" in line][0].split()[0]), None
