@@ -274,6 +274,12 @@ constexpr std::array kAcknowledgedAttributes{
               std::string_view{"a compile-time warning in AL; the body stands"}},
     std::pair{std::string_view{"nondebuggable"},
               std::string_view{"debugger visibility; no debugger here"}},
+    std::pair{std::string_view{"inherentpermissions"},
+              std::string_view{"it ELEVATES one method's access, and no permission is checked "
+                               "before a read yet (board:0062, board:0202)"}},
+    std::pair{std::string_view{"serviceenabled"},
+              std::string_view{"it publishes one method as a web-service action, and there is no "
+                               "web-service surface (board:0030)"}},
 };
 
 constexpr std::string_view kTranslatedProperties[] = {
@@ -1864,6 +1870,8 @@ int Scan(const Job &job) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
   }
+  std::size_t silentProperties = 0;
+  std::size_t silentAttributes = 0;
   {
     std::size_t counted = 0;
     std::size_t decided = 0;
@@ -1904,6 +1912,7 @@ int Scan(const Job &job) {
     for (std::size_t i = 0; i < silent.size() && i < 60; ++i) {
       std::println("          {:>7} x {}", silent[i].second, silent[i].first);
     }
+    if (dropped != 0) { silentProperties = dropped; }
     for (const auto &[name, found] : partial) {
       const auto known = std::ranges::find_if(
           kPartlyTranslatedProperties, [&name](const auto &one) { return one.first == name; });
@@ -1966,6 +1975,7 @@ int Scan(const Job &job) {
       ranked.emplace_back(name, count);
     }
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    if (dropped != 0) { silentAttributes = dropped; }
     std::println("attributes acted on {} of {} kind(s) declared, {} declaration(s) acknowledged as "
                  "no-ops; {} declaration(s) of {} kind(s) are read and dropped (board:0190)",
                  gathered.attributes.size() - ranked.size() - kAcknowledgedAttributes.size(),
@@ -1997,6 +2007,28 @@ int Scan(const Job &job) {
     std::println("");
     std::println("refused   what parses and cannot be written yet");
     Cluster(refusals);
+  }
+  if (silentAttributes != 0) {
+    std::println("");
+    std::println("ABORT     {} attribute declaration(s) are read and dropped, and the count is 0 "
+                 "(board:0190)",
+                 silentAttributes);
+    std::println("          Every one belongs in `kActedOnAttributes` with a generator behind it "
+                 "or in");
+    std::println("          `kAcknowledgedAttributes` with the reason it is a no-op here.");
+    return 1;
+  }
+  if (silentProperties != 0) {
+    std::println("");
+    std::println("ABORT     {} property declaration(s) are read and dropped in silence, and the "
+                 "count is 0 (board:0067)",
+                 silentProperties);
+    std::println("          Every one belongs in `kTranslatedProperties` with a member behind it, "
+                 "in");
+    std::println("          `kDroppedProperties` with a reason, or in `kPartlyTranslatedProperties` "
+                 "with what");
+    std::println("          reaches the metadata and what does not.");
+    return 1;
   }
   return 0;
 }
