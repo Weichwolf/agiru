@@ -1204,6 +1204,7 @@ public:
       return DoorCalls(member.field) &&
              !PlatformFieldNamed(PlatformField{.table = local->subtype, .field = member.field});
     }
+    if (FieldNamed(table_, member.variable) != nullptr) { return DoorCalls(member.field); }
     return IsRecord(member.variable) && DoorCalls(member.field) &&
            FieldNamed(table_, member.field) == nullptr;
   }

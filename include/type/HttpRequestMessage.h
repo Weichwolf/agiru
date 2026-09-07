@@ -36,12 +36,23 @@ class HttpHeaders;
 ///          body refuses by name rather than returning a plausible wrong answer (board:0035).
 class HttpRequestMessage {
 public:
-  /// \brief AL `HttpRequestMessage.Content(HttpContent)`. Gets or sets the contents of the HTTP
-  /// message.
+  /// \brief AL `HttpRequestMessage.Content()`. Gets the contents of the HTTP message.
+  /// \return The AL `HttpContent`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ///
+  /// \warning IT IS AN OVERLOAD AND NOT A DEFAULT ARGUMENT. `HttpContent` is only forward
+  ///          declared here -- including it would put the whole HTTP surface in the door of every
+  ///          file that names a request -- and a default argument of an incomplete type is
+  ///          declarable and not callable, so the reading form the documentation states
+  ///          (`[Content := ] HttpRequestMessage.Content([SetContent])`) did not compile
+  ///          (board:0593).
+  ::agiru::HttpContent Content();
+
+  /// \brief AL `HttpRequestMessage.Content(HttpContent)`. Sets the contents of the HTTP message.
   /// \param SetContent The AL `HttpContent`.
   /// \return The AL `HttpContent`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::HttpContent Content(const ::agiru::HttpContent &SetContent = {});
+  ::agiru::HttpContent Content(const ::agiru::HttpContent &SetContent);
 
   /// \brief AL `HttpRequestMessage.GetCookie(Text, Cookie)`. Gets the specified cookie given a
   /// name.

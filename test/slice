@@ -2050,3 +2050,14 @@ system/system/security/encryption/codeunit/SignatureKey.cpp
 base/system/environment/configuration/codeunit/NotificationEntryDispatcher.cpp
 base/pricing/calculation/table/PriceCalculationSetup.cpp
 base/pricing/calculation/table/PriceCalculationSetup.cpp
+base/finance/general_ledger/account/codeunit/CalcGLAccWhereUsed.cpp
+base/system/io/codeunit/FileManagement.cpp
+base/integration/graph/codeunit/GraphCollectionMgtItem.cpp
+base/integration/graph/codeunit/GraphMgtComplexTypes.cpp
+system/system/security/encryption/codeunit/SignatureKeyImpl.cpp
+base/system/io/codeunit/TransformRuleMatch.cpp
+base/system/io/page/ConfigPackageWarning.cpp
+base/foundation/attachment/table/DocumentAttachment.cpp
+base/foundation/attachment/table/DocumentAttachment.cpp
+base/system/text/codeunit/JSONManagement.cpp
+base/system/utilities/table/MediaRepository.cpp

@@ -987,6 +987,10 @@ void HttpHeaders::Clear() {
   RefuseDoor("HttpHeaders.TryAddWithoutValidation(Text, Text)");
 }
 
+::agiru::HttpContent HttpRequestMessage::Content() {
+  RefuseDoor("HttpRequestMessage.Content()");
+}
+
 ::agiru::HttpContent HttpRequestMessage::Content(const ::agiru::HttpContent &SetContent) {
   static_cast<void>(SetContent);
   RefuseDoor("HttpRequestMessage.Content(HttpContent)");
