@@ -577,7 +577,16 @@ quantity and `make lint` has a node budget.
 - **`__int128` is a GNU extension** that `-Wpedantic` rejects on g++ and accepts on clang. Written
   as `__extension__ using U128 = unsigned __int128;`, which silences exactly that one diagnostic on
   both.
-- **PostgreSQL and SQL Server run as Podman containers**, never as system services.
+- **PostgreSQL and SQL Server run as Podman containers**, never as system services. They are
+  `agiru-pg` and `agiru-mssql`, they are STOPPED between sessions, and `podman start agiru-pg` is
+  the whole of bringing the database back -- the data survives. The user is `agiru`; the databases
+  are `cronus` (the demo dataset, 311 MB), `agiru_master` (the read-only template, which refuses
+  connections because that is what a template does), `agiru_test_0`, `agiru_gate` and `agiru`.
+- **A COMPANY IS A SCHEMA AND NOT A PREFIX.** `cronus` holds `"CRONUS International Ltd"` with
+  1 864 tables, `system` with 220, `platform` with 44 -- and `public` is EMPTY. A query over
+  `information_schema.tables WHERE table_schema = 'public'` therefore reports a full database as
+  empty, which has happened here (board:0004). `system` is what `DataPerCompany = false` puts
+  aside and `platform` is the virtual tables.
 - **`max_locks_per_transaction = 1024`** on the PG instance. The BC schema has some 1 600 tables; an
   all-in-one transaction takes one lock per object and blows the default of 64. Set it again when
   the container is recreated -- `postgresql.auto.conf` does not survive `podman rm`.

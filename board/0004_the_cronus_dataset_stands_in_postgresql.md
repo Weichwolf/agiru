@@ -91,3 +91,41 @@ anyway.
       digit for digit -- the arithmetic proof `Decimal` still owes, now that the type stands.
 - [ ] **Negative control**: drop one column from the mapping and require the comparison to go red. A
       comparison that only counts rows does not notice a missing column.
+
+## THE DATA IS ACROSS. Measured 2026-09-07, on the running instance
+
+`podman start agiru-pg` and the instance answers. What is in it:
+
+| database | size | what |
+|---|---:|---|
+| `cronus` | **311 MB** | the demo dataset, copied out of SQL Server |
+| `agiru_test_0` | 19 MB | a test run's own database, 341 tables in `public` |
+| `agiru_master` | 8.2 MB | the template; it refuses connections, which is what a template does |
+| `agiru_gate` | 8.1 MB | the gate cases' database, 3 tables |
+| `agiru` | 7.5 MB | empty |
+
+**A COMPANY IS A SCHEMA AND NOT A PREFIX, and that is the thing to remember about this instance.**
+`cronus` holds
+
+| schema | tables |
+|---|---:|
+| `CRONUS International Ltd` | **1 864** |
+| `system` | 220 |
+| `platform` | 44 |
+| `AIT Eval Monthly Copilot Cred` | 1 |
+
+and **`public` is empty**, which is how a session that queries `information_schema.tables WHERE
+table_schema = 'public'` concludes the database is empty and is wrong. That happened here, and it is
+recorded rather than corrected in silence: the company's own schema is where a company's data lives,
+`system` is what `DataPerCompany = false` puts aside, and `platform` is the virtual tables.
+
+**412 544 live rows**, the widest being the platform's own text storage (`$ndo$textmap` 139 173,
+`$ndo$textobjectmap` 139 173, `$ndo$textlookup` 52 030) and then `Application Object Metadata`
+14 192 and `Calendar Entry` 9 378.
+
+`max_locks_per_transaction` is 1 024 on the running instance, so the note in CLAUDE.md about
+`postgresql.auto.conf` not surviving `podman rm` has held.
+
+**What this closes and what it does not.** The first three boxes of the list above are answered by
+the transfer having happened; the ROW-COUNT PROOF and the negative control are not, because nothing
+has compared the two sides since. The item stays open for the proof and not for the transfer.
