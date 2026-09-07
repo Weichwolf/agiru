@@ -6821,9 +6821,6 @@ base/inventory/item/page/ItemUnitGroupList.cpp
 base/inventory/item/page/ItemUnitsOfMeasure.cpp
 base/inventory/journal/page/ItemJournal.cpp
 base/inventory/location/page/LocationList.cpp
-base/inventory/requisition/codeunit/CarryOutAction.cpp
-base/inventory/tracking/codeunit/AsmItemTrackingMgt.cpp
-base/inventory/tracking/codeunit/MfgItemTrackingMgt.cpp
 base/inventory/tracking/page/LotNoInformationCard.cpp
 base/inventory/tracking/page/LotNoInformationList.cpp
 base/inventory/tracking/page/SerialNoInformationCard.cpp
@@ -6848,7 +6845,6 @@ base/sales/document/page/SalesOrder.cpp
 base/sales/document/page/SalesReturnOrder.cpp
 base/sales/history/page/PostedSalesInvoice.cpp
 base/sales/history/page/PostedSalesInvoices.cpp
-base/sales/pricing/codeunit/SalesPriceCalcMgt.cpp
 base/sales/pricing/page/CustomerPriceGroups.cpp
 base/sales/pricing/page/SalesPriceList.cpp
 base/sales/pricing/page/SalesPriceLists.cpp
@@ -6882,10 +6878,8 @@ base/warehouse/request/page/FiltersToGetSourceDocs.cpp
 base/warehouse/request/page/SourceDocumentFilterCard.cpp
 base/warehouse/structure/page/BinCreationWorksheet.cpp
 system/system/data_administration/codeunit/MediaCleanupImpl.cpp
-system/system/email/page/EmailAttachments.cpp
 system/system/environment/configuration/page/AccessibleCompanies.cpp
 system/system/environment/configuration/page/EarlyAccessPreviewFeatures.cpp
-system/system/integration/word/page/WordTemplates.cpp
 system/system/media/page/ProductVideos.cpp
 system/system/rest_client/codeunit/HttpClientHandler.cpp
 system/system/rest_client/codeunit/HttpContentImpl.cpp
@@ -6902,10 +6896,7 @@ tests/core/codeunit/DocumentApprovalDocuments.cpp
 tests/core/codeunit/DocumentApprovalErrors.cpp
 tests/core/codeunit/DocumentApprovalUsers.cpp
 tests/core/codeunit/ERMCostAccountingCodeunit.cpp
-tests/core/codeunit/ERMGeneralJournalUT.cpp
-tests/core/codeunit/LibraryAccountSchedule.cpp
 tests/core/codeunit/LibraryDocumentApprovals.cpp
 tests/core/codeunit/ProfileImportExportTest.cpp
-tests/core/codeunit/RSTableInfoTelemetryTest.cpp
 tests/core/codeunit/WFPartnerExtensionTests.cpp
 tests/service/test/codeunit/ServicePriceManagement.cpp
