@@ -6905,3 +6905,5 @@ base/warehouse/adcs/table/ADCSUser.cpp
 base/crm/duplicates/table/MergeDuplicatesBuffer.cpp
 base/integration/graph/table/AttachmentEntityBuffer.cpp
 base/system/test_tools/test_runner/table/CALTestSuite.cpp
+test_runner/system/test_tools/test_runner/table/ALTestSuite.cpp
+tests/core/table/AsmAvailabilityTestBuffer.cpp

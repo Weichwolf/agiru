@@ -53,6 +53,25 @@ const std::set<std::string> &BaseMembers() {
   return members;
 }
 
+const std::map<std::string, std::string> &TestDoorHeaders() {
+  static const std::map<std::string, std::string> found = [] {
+    const std::filesystem::path door =
+        std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "runtime" / "test";
+    if (!std::filesystem::is_directory(door)) {
+      throw std::runtime_error("the door has no runtime/test/ directory at " + door.string());
+    }
+    std::map<std::string, std::string> named;
+    for (const auto &entry : std::filesystem::directory_iterator(door)) {
+      if (entry.path().extension() != ".h") { continue; }
+      const std::string stem = entry.path().stem().string();
+      named.emplace(stem, "runtime/test/" + stem + ".h");
+    }
+    if (named.empty()) { throw std::runtime_error("the door declares no test type"); }
+    return named;
+  }();
+  return found;
+}
+
 std::vector<std::string> &DoorTypes() {
   static const std::vector<std::string> types = [] {
     const std::filesystem::path door = std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "type";
@@ -316,6 +335,9 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   }
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
+  }
+  for (const auto &[name, header] : TestDoorHeaders()) {
+    if (Mentions(text, name)) { headers.insert(header); }
   }
   if (text.find(") {\n") != std::string_view::npos) {
     headers.insert("Builtins.h");

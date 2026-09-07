@@ -1363,7 +1363,25 @@ public:
     return SameName("Rec", variable) || SameName("xRec", variable);
   }
 
+  [[nodiscard]] std::string ControlNamed(const al::VarDecl &declared,
+                                         std::string_view member) const {
+    const std::string type = TypeName(declared.type);
+    if ((type != "TestPage" && type != "TestRequestPage" && type != "Page") ||
+        declared.subtype.empty()) {
+      return {};
+    }
+    const auto page = objects_.pages.find(LowerKey(declared.subtype));
+    if (page == objects_.pages.end()) { return {}; }
+    const auto control = page->second.fields.find(LowerKey(std::string(member)));
+    return control == page->second.fields.end() ? std::string{} : control->second;
+  }
+
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (where == nullptr) { continue; }
+      const std::string control = ControlNamed(*where, member.field);
+      if (!control.empty()) { return control; }
+    }
     for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
       if (where == nullptr || TypeName(where->type) != "Codeunit" || where->subtype.empty()) {
         continue;
