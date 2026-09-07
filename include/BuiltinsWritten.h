@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dotnet/Refused.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Events.h"
 #include "runtime/RecordRef.h"
@@ -192,6 +193,36 @@ StartSession(::agiru::Integer &SessionId,
   static_cast<void>(Company);
   static_cast<void>(Record);
   throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `System.CopyStream(OutStream, InStream [, Integer])` where either side is a .NET
+///        stream this run does not have.
+///
+/// \tparam Out The destination -- an AL `OutStream` or an absent .NET type.
+/// \tparam In  The source -- an AL `InStream` or an absent .NET type.
+/// \param OutStream   Where the bytes go.
+/// \param InStream    Where they come from.
+/// \param BytesToRead How many; the rest when omitted.
+/// \return Never.
+/// \throws Error always -- an absent .NET type has no stream behind it (board:0035).
+///
+/// \note NOT `[[nodiscard]]`, because AL's own syntax block writes the return as OPTIONAL --
+///       `[Ok := ] CopyStream(...)` -- and `RSACryptoServiceProviderImpl` calls it as a statement.
+///
+/// \note AL PASSES A `DotNet MemoryStream` STRAIGHT TO `CopyStream`, in either position:
+///       `RSACryptoServiceProviderImpl` writes `CopyStream(OutputOutStream, DotNetMemoryStream)`
+///       and `CopyStream(DotNetMemoryStream, InputInStream)` one procedure apart. The platform
+///       bridges a .NET `Stream` to an AL stream; this tree has the .NET type as a refusing stub,
+///       so the overload exists to REFUSE at the right place rather than to fail to compile at the
+///       call site (board:0609).
+template <typename Out, typename In>
+  requires(::agiru::dotnet::IsAbsent<Out> || ::agiru::dotnet::IsAbsent<In>)::agiru::Boolean
+CopyStream(Out &OutStream, In &InStream, ::agiru::Integer BytesToRead = {}) {
+  static_cast<void>(OutStream);
+  static_cast<void>(InStream);
+  static_cast<void>(BytesToRead);
+  throw ::agiru::Error("System.CopyStream reached a .NET stream this run does not have "
+                       "(board:0609)");
 }
 
 /// \brief AL `System.Time()` -- the time of day, from the session's clock.

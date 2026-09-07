@@ -502,6 +502,9 @@ private:
         !IsAlTypeName(callee.text) && DoorCalls(callee.text)) {
       return "::agiru::" + AsTheDoorSpellsIt(Identifier(callee.text));
     }
+    if (!known.empty() && scope_.IsVariable(callee.text) && !BareBuiltin(callee.text).empty()) {
+      return "::agiru::" + BuiltinSpelling(BareBuiltin(callee.text));
+    }
     if (!known.empty() && scope_.IsVariable(callee.text) && DoorCalls(callee.text)) {
       const std::string rec = scope_.Resolve("Rec");
       if (!rec.empty()) { return rec + "." + AsTheDoorSpellsIt(Identifier(callee.text)); }

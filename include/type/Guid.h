@@ -85,6 +85,27 @@ public:
   ///       only one of those in an implicit conversion sequence.
   Guid(const char *text) : Guid(std::string_view(text)) {}
 
+  /// \brief AL passes a `Text[N]` where a `Guid` is declared, and converts it on the way.
+  ///
+  /// \tparam N The declared length, which the conversion ignores.
+  /// \param text The GUID in its text form, with or without braces.
+  /// \throws Error when the text is not a GUID.
+  ///
+  /// \note ARGUMENT PASSING IS ASSIGNMENT IN AL, and `guid-data-type.md` states the assignment.
+  ///       `AltCustVATRegDocImpl` declares `AddAltCustVATRegNotificationId(): Text` and hands the
+  ///       result straight to `MyNotifications.IsEnabled(NotificationId: Guid)`; nothing at the
+  ///       call site says convert, because AL converts.
+  ///
+  /// \warning IT TAKES `Text` AND NOT `Code`, AND THAT IS A MEASURED LINE RATHER THAN A TASTE.
+  ///          A converting constructor makes `Guid` a candidate wherever a text-shaped argument
+  ///          meets an overload set, and AL resolves such a set by the DECLARED type while C++
+  ///          ranks every user-defined conversion the same. `PriceSourceList.Add(Type, Code[20])`
+  ///          beside `Add(Type, Guid)` then has no answer -- 7 call sites, measured 2026-09-07.
+  ///          AL writes a GUID as `Text` and a code as `Code`, so the conversion follows that:
+  ///          `Text` converts, `Code` does not, and a `Code` that really holds a GUID reaches one
+  ///          through the assignment below.
+  template <std::size_t N> Guid(const Text<N> &text) : Guid(text.Value()) {}
+
   /// \brief AL assigns a Text, a Code or a `std::string` to a Guid.
   ///
   /// \tparam T The text side -- a `Text[N]`, a `Code[N]`, a `std::string` or a literal.

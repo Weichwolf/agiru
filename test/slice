@@ -1247,6 +1247,8 @@ base/finance/vat/registration/codeunit/AltCustVATRegConsImpl.cpp
 base/finance/vat/registration/codeunit/AltCustVATRegOrchest.cpp
 base/finance/vat/registration/codeunit/VATLookupExtDataHndl.cpp
 base/finance/vat/registration/codeunit/VATRegistrationLogMgt.cpp
+base/finance/vat/registration/codeunit/AltCustVATRegDocImpl.cpp
+base/finance/vat/registration/codeunit/ShipAltCustVATRegImpl.cpp
 base/finance/vat/registration/enum/AltCustVATRegConsist.cpp
 base/finance/vat/registration/enum/AltCustVATRegDoc.cpp
 base/finance/vat/registration/enum/ShipToAltCustVATReg.cpp
@@ -5208,6 +5210,8 @@ system/system/email/codeunit/EmailViewer.cpp
 system/system/email/codeunit/SendEmail.cpp
 system/system/email/codeunit/ViewAllEmailsPolicy.cpp
 system/system/email/codeunit/ViewOnlyOwnEmailsPolicy.cpp
+system/system/email/codeunit/ViewIfAllRelatedRecords.cpp
+system/system/email/codeunit/ViewIfAnyRelatedRecords.cpp
 system/system/email/enum/EmailConnector.cpp
 system/system/email/enum/EmailViewPolicy.cpp
 system/system/email/page/EmailAccountFolders.cpp
@@ -5464,6 +5468,9 @@ system/system/security/encryption/codeunit/SignatureKeyImpl.cpp
 system/system/security/encryption/codeunit/SignedXml.cpp
 system/system/security/encryption/codeunit/TripleDESCryptoSvcProvImpl.cpp
 system/system/security/encryption/codeunit/X509Certificate2.cpp
+system/system/security/encryption/codeunit/RSACryptoServiceProviderImpl.cpp
+system/system/security/encryption/codeunit/DSACryptoServiceProviderImpl.cpp
+system/system/security/encryption/codeunit/RSAImpl.cpp
 system/system/security/encryption/enum/SignatureAlgorithm.cpp
 system/system/security/encryption/enum/SymmetricAlgorithm.cpp
 system/system/security/encryption/page/DataEncryptionManagement.cpp
