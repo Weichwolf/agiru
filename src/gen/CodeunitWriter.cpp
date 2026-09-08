@@ -143,6 +143,12 @@ std::vector<const al::ProcedureDecl *> TestsOf(const al::CodeunitObject &unit) {
   return tests;
 }
 
+bool DeclaresClearAll(const al::CodeunitObject &unit) {
+  return std::ranges::any_of(unit.procedures, [](const al::ProcedureDecl &procedure) {
+    return Identifier(procedure.name) == "ClearAll";
+  });
+}
+
 bool DeclaresOnRun(const al::CodeunitObject &unit) {
   return std::ranges::any_of(unit.procedures, [](const al::ProcedureDecl &procedure) {
     return procedure.isTrigger && Identifier(procedure.name) == "OnRun";
@@ -1482,6 +1488,15 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "}\n\n";
   }
 
+  if (!unit.variables.empty() && !DeclaresClearAll(unit)) {
+    out += "void " + unitClass + "::ClearAll() {\n";
+    for (const al::VarDecl &declared : unit.variables) {
+      const std::string named = Identifier(declared.name);
+      out += "  " + named + " = decltype(" + named + "){};\n";
+    }
+    out += "}\n\n";
+  }
+
   out += catalogue;
   out += CodeunitDefinition(unit, identifier);
   out += "} // namespace " + space + "\n";
@@ -1903,6 +1918,8 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     previousWasTrigger = procedure.isTrigger;
     first = false;
   }
+
+  if (!unit.variables.empty() && !DeclaresClearAll(unit)) { out += "\n  void ClearAll();\n"; }
 
   const std::string hidden = HiddenMembers(unit, objects, shadowed);
   std::string locals;
