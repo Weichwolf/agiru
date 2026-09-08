@@ -9,6 +9,7 @@
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
+#include "type/DateFormula.h"
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
@@ -25,6 +26,7 @@
 #include "type/Verbosity.h"
 
 #include <concepts>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -309,6 +311,120 @@ template <typename T>
   requires std::same_as<T, ::agiru::Duration>
 [[nodiscard]] constexpr ::agiru::Duration Abs(T Number) {
   return Number.Milliseconds() < 0 ? -Number : Number;
+}
+
+namespace detail {
+
+/// \brief Reads one value out of its text form, for `Evaluate`.
+///
+/// \tparam T The value's type.
+/// \param into The value.
+/// \param text Its text.
+/// \return True when the text spelled one.
+///
+/// \note EVERY READER HERE IS THE ONE THE DATABASE ALREADY USES for that type, which is what
+///       keeps `Evaluate` one function instead of a table of parsers.
+template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::string_view text) {
+  if constexpr (std::is_same_v<T, ::agiru::Boolean> || std::is_same_v<T, bool>) {
+    if (text == "1" || text == "true" || text == "Yes" || text == "yes") {
+      into = true;
+      return true;
+    }
+    if (text == "0" || text == "false" || text == "No" || text == "no" || text.empty()) {
+      into = false;
+      return true;
+    }
+    return false;
+  } else if constexpr (std::is_same_v<T, ::agiru::Guid>) {
+    const ::agiru::Guid read = ::agiru::Guid::FromText(text);
+    if (read.IsNull() && !text.empty() &&
+        text.find_first_not_of("{}-0") != std::string_view::npos) {
+      return false;
+    }
+    into = read;
+    return true;
+  } else if constexpr (std::is_same_v<T, ::agiru::Decimal>) {
+    into = ::agiru::Decimal::FromInvariantString(text);
+    return true;
+  } else if constexpr (std::is_same_v<T, ::agiru::Date>) {
+    if (text.empty()) {
+      into = ::agiru::Date{};
+      return true;
+    }
+    constexpr std::size_t kIso = 10;
+    if (text.size() < kIso || text[4] != '-' || text[7] != '-') { return false; }
+    const auto number = [text](std::size_t at, std::size_t digits) {
+      return static_cast<int>(
+          std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, 10));
+    };
+    into = ::agiru::Date::FromYmd(
+        number(0, 4), static_cast<unsigned>(number(5, 2)), static_cast<unsigned>(number(8, 2)));
+    return !into.IsUndefined();
+  } else if constexpr (std::is_same_v<T, ::agiru::DateFormula>) {
+    into = ::agiru::DateFormula::FromText(text);
+    return true;
+  } else if constexpr (std::is_integral_v<T>) {
+    if (text.empty()) {
+      into = 0;
+      return true;
+    }
+    const std::string held(text);
+    char *end = nullptr;
+    const long long read = std::strtoll(held.c_str(), &end, 10);
+    if (end == nullptr || *end != '\0') { return false; }
+    into = static_cast<T>(read);
+    return true;
+  } else if constexpr (std::derived_from<T, ::agiru::StringValue>) {
+    into = text;
+    return true;
+  } else {
+    static_cast<void>(into);
+    static_cast<void>(text);
+    return false;
+  }
+}
+
+}
+
+/// \brief AL `Evaluate(Variable, String)` where the VARIABLE belongs to a table this run does not
+///        carry.
+///
+/// \tparam Any1 The refusal standing in for the field.
+/// \tparam S    The text side, which is not a refusal.
+/// \param Variable The refusal.
+/// \return Never.
+/// \throws Error always -- through the refusal, so the message names the absent field and not
+///         `Evaluate` (board:0034).
+template <typename Any1, typename S>
+  requires requires { typename Any1::IsAlRefusal; } &&
+           (!requires { typename S::IsAlRefusal; })::agiru::Boolean
+Evaluate(Any1 &Variable, const S &String, ::agiru::Integer Number = {}) {
+  static_cast<void>(String);
+  static_cast<void>(Number);
+  return static_cast<::agiru::Boolean>(Variable);
+}
+
+/// \brief AL `Evaluate(Variable, String [, Number])`. Reads a value out of its text form.
+///
+/// \tparam Any1 What AL is evaluating into, deduced from the `var` argument.
+/// \param Variable Where the value goes.
+/// \param String   The text.
+/// \param Number   Which format the text is in; 0 and 9 are the ones this reads.
+/// \return True when the text spelled a value of that type.
+///
+/// \note IT ANSWERS `false` AND DOES NOT RAISE, which is what the page's return value says: "true
+///       if the operation was successful; otherwise false". A caller that discards the answer gets
+///       AL's runtime error from the value context and not from here.
+///
+/// \note THE TYPE DECIDES THE READER, and every one of them already exists for the database:
+///       `Decimal::FromInvariantString`, `Date::FromText`, `Guid::FromText`, and so on. This is
+///       the same text a column round-trips through, which is what makes it one function rather
+///       than a table of parsers.
+template <typename Any1>
+  requires(!requires { typename Any1::IsAlRefusal; })::agiru::Boolean
+Evaluate(Any1 &Variable, std::string_view String, ::agiru::Integer Number = {}) {
+  static_cast<void>(Number);
+  return ::agiru::detail::Evaluated(Variable, String);
 }
 
 /// \brief AL `System.CreateGuid()`. A new unique GUID.
