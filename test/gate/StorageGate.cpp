@@ -202,7 +202,7 @@ void ThePlatformStampsWhatItWrites() {
 /// false." A reader who assumed the assignment survives would be wrong, and so would a runtime that
 /// only filled a blank one.
 void AnAssignedSystemIdDoesNotSurviveAPlainInsert() {
-  const agiru::Guid chosen = agiru::Guid::FromText("{B6666666-F5A2-E911-8180-001DD8B7338E}");
+  const agiru::Guid chosen = *agiru::Guid::FromText("{B6666666-F5A2-E911-8180-001DD8B7338E}");
   ResourceCost rec = Sample();
   rec.Code = "chosen";
   rec.SystemId = chosen;

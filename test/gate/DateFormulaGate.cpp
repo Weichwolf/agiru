@@ -21,7 +21,7 @@ Date Base() {
 }
 
 std::string Reached(const char *formula) {
-  return DateFormula::FromText(formula).CalcDate(Base()).ToInvariantString();
+  return DateFormula::FromText(formula)->CalcDate(Base()).ToInvariantString();
 }
 
 /// THE PLATFORM'S OWN THREE EXAMPLES, with the results it prints. They are what pin CM and CQ to
@@ -53,15 +53,15 @@ void TheOtherEndOfThePeriodGivesADifferentDate() {
 void MonthsKeepTheDayAndClampIt() {
   const Date december = Date::FromYmd(2025, 12, 31);
   CHECK_TEXT("31 December plus one month is 31 January",
-             DateFormula::FromText("<1M>").CalcDate(december).ToInvariantString(),
+             DateFormula::FromText("<1M>")->CalcDate(december).ToInvariantString(),
              "2026-01-31");
   const Date january = Date::FromYmd(2026, 1, 31);
   CHECK_TEXT("31 January plus one month clamps to the end of February",
-             DateFormula::FromText("<1M>").CalcDate(january).ToInvariantString(),
+             DateFormula::FromText("<1M>")->CalcDate(january).ToInvariantString(),
              "2026-02-28");
   const Date leapDay = Date::FromYmd(2024, 2, 29);
   CHECK_TEXT("and a leap day plus one year clamps too",
-             DateFormula::FromText("<1Y>").CalcDate(leapDay).ToInvariantString(),
+             DateFormula::FromText("<1Y>")->CalcDate(leapDay).ToInvariantString(),
              "2025-02-28");
   CHECK_TEXT("a quarter is three months", Reached("<1Q>"), "1996-08-21");
 }
@@ -79,16 +79,16 @@ void PlainQuantitiesMoveByTheirUnit() {
 void TheWeekSelectorIsNotAWeekQuantity() {
   const Date newYear = Date::FromYmd(kYear, 1, 1);
   CHECK_TEXT("<W1> is the Monday of ISO week 1",
-             DateFormula::FromText("<W1>").CalcDate(newYear).ToInvariantString(),
+             DateFormula::FromText("<W1>")->CalcDate(newYear).ToInvariantString(),
              "1996-01-01");
   CHECK_TEXT("<W10> is nine weeks later",
-             DateFormula::FromText("<W10>").CalcDate(newYear).ToInvariantString(),
+             DateFormula::FromText("<W10>")->CalcDate(newYear).ToInvariantString(),
              "1996-03-04");
   // THE NEGATIVE CONTROL: the same text without the selector reading is a QUANTITY and moves the
   // base date instead, which is a different answer.
   CHECK_TRUE("<W1> and <1W> are not the same formula",
-             DateFormula::FromText("<W1>").CalcDate(newYear) !=
-                 DateFormula::FromText("<1W>").CalcDate(newYear));
+             DateFormula::FromText("<W1>")->CalcDate(newYear) !=
+                 DateFormula::FromText("<1W>")->CalcDate(newYear));
 }
 
 void AnUnsetFormulaMovesNothingAndSaysSo() {
@@ -96,9 +96,9 @@ void AnUnsetFormulaMovesNothingAndSaysSo() {
   CHECK_TRUE("an unset formula is empty", empty.IsEmpty());
   CHECK_TRUE("and leaves the date where it was", empty.CalcDate(Base()) == Base());
   CHECK_TRUE("an undefined date stays undefined",
-             DateFormula::FromText("<1M>").CalcDate(Date{}).IsUndefined());
+             DateFormula::FromText("<1M>")->CalcDate(Date{}).IsUndefined());
   CHECK_TEXT("the text comes back without its brackets, as Format gives it",
-             DateFormula::FromText("<CM+10D>").ToText(),
+             DateFormula::FromText("<CM+10D>")->ToText(),
              "CM+10D");
 }
 

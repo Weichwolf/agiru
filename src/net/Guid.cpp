@@ -13,6 +13,8 @@ namespace agiru {
 namespace {
 
 constexpr std::array<std::size_t, 5> kGroups{4, 2, 2, 2, 6};
+constexpr std::string_view kNotHexadecimal = "a GUID is written in hexadecimal";
+constexpr std::string_view kWrongLength = "a GUID is sixteen bytes, and this text is not";
 constexpr int kHexPerByte = 2;
 constexpr unsigned kBitsPerByte = 8;
 constexpr unsigned kBitsPerNibble = 4;
@@ -94,7 +96,7 @@ Guid Guid::CreateSequentialGuid() {
   return Guid{bytes};
 }
 
-Guid Guid::FromText(std::string_view text) {
+std::expected<Guid, Refusal> Guid::FromText(std::string_view text) {
   if (!text.empty() && text.front() == '{' && text.back() == '}') {
     text.remove_prefix(1);
     text.remove_suffix(1);
@@ -109,12 +111,15 @@ Guid Guid::FromText(std::string_view text) {
     }
     const int high = HexValue(text[cursor]);
     const int low = HexValue(text[cursor + 1]);
-    if (high < 0 || low < 0) { return Guid{}; }
+    if (high < 0 || low < 0) {
+      return std::unexpected(Refusal{.what = kNotHexadecimal, .at = cursor + 1});
+    }
     bytes[at] = static_cast<std::uint8_t>((high << kBitsPerNibble) | low);
     ++at;
     cursor += kHexPerByte;
   }
-  return at == kSize ? Guid{bytes} : Guid{};
+  if (at != kSize) { return std::unexpected(Refusal{.what = kWrongLength}); }
+  return Guid{bytes};
 }
 
 std::string Guid::ToText() const {

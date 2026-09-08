@@ -48,9 +48,10 @@ void TheTextGoesBothWays() {
   CHECK_TRUE("and so does an unbraced one", Guid::FromText(kNamed.ToStorageText()) == kNamed);
   CHECK_TRUE("upper case reads the same",
              Guid::FromText("{AAAAAAAA-0000-1111-2222-BBBBBBBBBBBB}") == kNamed);
-  CHECK_TRUE("text that is not a GUID gives the null one",
-             Guid::FromText("not a guid at all").IsNull());
-  CHECK_TRUE("and so does one that stops short", Guid::FromText("{aaaaaaaa-0000-1111}").IsNull());
+  CHECK_TRUE("text that is not a GUID refuses, and says why",
+             !Guid::FromText("not a guid at all").has_value());
+  CHECK_TRUE("and so does one that stops short",
+             !Guid::FromText("{aaaaaaaa-0000-1111}").has_value());
 }
 
 // The layout the RFC gives a UUID and every platform's GUID follows: the version in the high

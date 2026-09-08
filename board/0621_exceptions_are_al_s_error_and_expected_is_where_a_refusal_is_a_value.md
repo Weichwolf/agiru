@@ -54,3 +54,31 @@ Each of those is inside `src/` and reaches no generated file, so none of them to
 
 `std::expected` rises from 0 with each of the three groups, and the door's `throw` count does not:
 a refusal that AL asks about by value stops being a `throw` that something has to catch.
+
+## STANDING: THE READERS ARE DONE, AND THE DOOR PAID ALMOST NOTHING (2026-09-08)
+
+`std::expected` went from 0 to the first of the three groups:
+
+- **`Guid::FromText`** answers `std::expected<Guid, Refusal>`; the refusal names whether the text
+  was not hexadecimal (with the POSITION) or the wrong length.
+- **`DateFormula::FromText`** the same -- and it is the one that changes behaviour: a character the
+  grammar does not know was SKIPPED, so `<1Q+garbage>` parsed as `1Q` and moved the date somewhere
+  plausible. That is board:0082's silent-wrong-data, and it refuses now.
+- **`Evaluate`** reads both through the new form and still answers AL's `false`, which is the point:
+  the caller decides, and the reason is there for the caller that wants it.
+- **A COLUMN THAT HOLDS NEITHER** is an `Error` naming the field rather than a blank value.
+  `SetFieldText` turned an unparsable GUID into the null GUID, which is a row that reads back wrong
+  and never says so.
+
+**`agiru::Refusal` IS THE ERROR TYPE, and it is two words**: a `std::string_view` naming a declared
+case and a position counting from one. No allocation, and the text is a label rather than a free
+literal, which is the rule every diagnostic here follows.
+
+**THE DOOR COST IS MEASURED AND IT IS NOT WHAT IT LOOKS LIKE.** `<expected>` in `type/Guid.h` and
+`type/DateFormula.h` takes a bare door parse from 0.857 s to 0.883 s -- 3 % -- but the full build
+went 515 s to 519 s, which is noise: the slice compiles through a PRECOMPILED HEADER, so a standard
+header the door names is parsed ONCE for the whole slice and not once per unit.
+
+**WHAT IS STILL OPEN** is the other two groups the item names: the AL parser's boundary, where the
+transpiler catches `std::exception` in eight places and would rather have a value with a line; and
+the database layer, where the transaction above it should decide between a refusal and an AL error.

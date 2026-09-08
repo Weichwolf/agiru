@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # An external table carries the name the other database uses
 
+**The metadata half is done (2026-09-08):** the property reaches `FieldDef` and
+`TableDef` as `constexpr` data, emitted by the generator; what remains is the behaviour.
+
 **Two pages, one item**: `ExternalName` is the table's or field's name in the foreign database and
 `ExternalSchema` is the schema it lives in. Both exist only for the same two `TableType` values and
 neither means anything without the other or without board:0364.

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "type/Date.h"
+#include "type/Refusal.h"
 
 #include <compare>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -34,7 +36,12 @@ public:
   /// \brief Reads a formula.
   /// \param text The formula, with or without its angle brackets.
   /// \return The formula; an empty one when the text is not a formula.
-  [[nodiscard]] static DateFormula FromText(std::string_view text);
+  /// \return The formula, or WHY the text is not one.
+  ///
+  /// \note A CHARACTER THE GRAMMAR DOES NOT KNOW IS A REFUSAL AND NOT A SKIP. It was skipped
+  ///       until this returned a value: `<1Q+garbage>` parsed as `1Q` and moved the date
+  ///       somewhere plausible, which is the silent-wrong-data board:0082 is filed for.
+  [[nodiscard]] static std::expected<DateFormula, Refusal> FromText(std::string_view text);
 
   /// \return True when the formula has no terms, which is what an unset field holds.
   [[nodiscard]] bool IsEmpty() const { return terms_.empty(); }

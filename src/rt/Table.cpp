@@ -179,6 +179,23 @@ FieldValues KeyOf(const void *record, const TableDef &table) {
 
 constexpr int kHexBase = 16;
 
+namespace {
+
+template <typename T> T Read(std::string_view text, const FieldDef &def) {
+  if (text.empty()) { return T{}; }
+  const std::expected<T, Refusal> got = T::FromText(text);
+  if (got.has_value()) { return *got; }
+  if constexpr (std::is_same_v<T, DateFormula>) {
+    static_cast<void>(def);
+    return T{};
+  } else {
+    throw Error("the column of " + std::string(def.name) + " holds " + std::string(text) +
+                ", and " + std::string(got.error().what));
+  }
+}
+
+}
+
 void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
   switch (def.type) {
     case FieldType::Code: {
@@ -219,18 +236,20 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
     case FieldType::DateTime:
       *reinterpret_cast<DateTime *>(At(record, def)) = DateTimeFromStorageText(text);
       return;
-    case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid::FromText(text); return;
+    case FieldType::Guid:
+      *reinterpret_cast<Guid *>(At(record, def)) = Read<Guid>(text, def);
+      return;
     case FieldType::Duration:
       *reinterpret_cast<Duration *>(At(record, def)) = Duration{std::stoll(std::string(text))};
       return;
     case FieldType::DateFormula:
-      *reinterpret_cast<DateFormula *>(At(record, def)) = DateFormula::FromText(text);
+      *reinterpret_cast<DateFormula *>(At(record, def)) = Read<DateFormula>(text, def);
       return;
     case FieldType::Media:
-      *reinterpret_cast<Media *>(At(record, def)) = Media{Guid::FromText(text)};
+      *reinterpret_cast<Media *>(At(record, def)) = Media{Read<Guid>(text, def)};
       return;
     case FieldType::MediaSet:
-      *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{Guid::FromText(text)};
+      *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{Read<Guid>(text, def)};
       return;
     case FieldType::Blob: {
       std::vector<std::uint8_t> bytes;

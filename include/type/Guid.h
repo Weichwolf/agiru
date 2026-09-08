@@ -1,5 +1,6 @@
 #pragma once
 
+#include "type/Refusal.h"
 #include "type/StringValue.h"
 
 #include <array>
@@ -7,6 +8,7 @@
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 
@@ -65,7 +67,12 @@ public:
   ///
   /// \param text `{aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee}`, with or without the braces.
   /// \return The GUID, or the null GUID when the text does not spell one.
-  [[nodiscard]] static Guid FromText(std::string_view text);
+  /// \return The GUID, or WHY the text is not one.
+  ///
+  /// \note IT REFUSES BY VALUE AND NOT BY UNWINDING, because AL asks this question with
+  ///       `Evaluate`, which answers `false` -- the caller decides whether a text that is not a
+  ///       GUID is an error (board:0621).
+  [[nodiscard]] static std::expected<Guid, Refusal> FromText(std::string_view text);
 
   /// \brief AL assigns a Text to a Guid without a cast.
   ///
@@ -76,7 +83,7 @@ public:
   ///       assigns a `Label` holding `'8fcf129e-...'` to a Guid, and AL converts it on the spot.
   ///       A cast here would be a deviation the reader has to know about, for a conversion the
   ///       language performs silently.
-  Guid(std::string_view text) : Guid(FromText(text)) {}
+  Guid(std::string_view text) : Guid(FromText(text).value_or(Guid{})) {}
 
   /// \brief A GUID from a string LITERAL -- `exit('bf856162-…')` from a procedure returning Guid.
   /// \param text The literal.
@@ -126,7 +133,7 @@ public:
   template <typename T>
     requires std::convertible_to<const T &, std::string_view>
   Guid &operator=(const T &text) {
-    *this = FromText(std::string_view(text));
+    *this = FromText(std::string_view(text)).value_or(Guid{});
     return *this;
   }
 
@@ -186,7 +193,7 @@ private:
 template <typename T, typename G>
   requires std::convertible_to<const T &, std::string_view> && std::same_as<G, Guid>
 [[nodiscard]] inline bool operator==(const T &left, const G &right) {
-  return Guid::FromText(std::string_view(left)) == right;
+  return Guid::FromText(std::string_view(left)).value_or(Guid{}) == right;
 }
 
 /// \brief AL `+` on text and a Guid.

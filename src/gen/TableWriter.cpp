@@ -389,6 +389,9 @@ std::string DeclaredBlock(const al::FieldDecl &field,
   text("obsoleteState", PropertyText(field, "ObsoleteState"));
   text("obsoleteReason", PropertyText(field, "ObsoleteReason"));
   text("obsoleteTag", PropertyText(field, "ObsoleteTag"));
+  text("externalName", PropertyText(field, "ExternalName"));
+  text("optionOrdinalValues", PropertyText(field, "OptionOrdinalValues"));
+  flag("sqlTimestamp", PropertyIs(field, "SqlTimestamp", false), false);
   return out;
 }
 
@@ -772,6 +775,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   if (LowerKey(replicate) == "false") { out += "    .replicateData = false,\n"; }
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
+        std::pair<std::string_view, std::string_view>{"ExternalName", "externalName"},
         std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"}}) {
     const std::string said = property(name);
     if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }

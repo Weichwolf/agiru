@@ -21,7 +21,7 @@ using agiru::MediaSet;
 
 namespace {
 
-const Guid kSomeMedia = Guid::FromText("{B6666666-F5A2-E911-8180-001DD8B7338E}");
+const Guid kSomeMedia = *Guid::FromText("{B6666666-F5A2-E911-8180-001DD8B7338E}");
 
 FieldDef Declared(FieldType type) {
   return FieldDef{.offset = 0,

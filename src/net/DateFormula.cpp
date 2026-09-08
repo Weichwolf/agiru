@@ -11,6 +11,9 @@ namespace agiru {
 
 namespace {
 
+constexpr std::string_view kNotAFormula =
+    "a date formula is a sign, a number and a unit, and this character is none of them";
+
 constexpr int kMonthsPerQuarter = 3;
 constexpr int kMonthsPerYear = 12;
 constexpr int kDaysPerWeek = 7;
@@ -97,7 +100,7 @@ Date Weekday(const Date &d, int target, bool backwards) {
 
 }
 
-DateFormula DateFormula::FromText(std::string_view text) {
+std::expected<DateFormula, Refusal> DateFormula::FromText(std::string_view text) {
   DateFormula formula;
   if (!text.empty() && text.front() == '<' && text.back() == '>') {
     text.remove_prefix(1);
@@ -151,7 +154,7 @@ DateFormula DateFormula::FromText(std::string_view text) {
       negative = false;
       continue;
     }
-    ++at;
+    return std::unexpected(Refusal{.what = kNotAFormula, .at = at + 1});
   }
   return formula;
 }

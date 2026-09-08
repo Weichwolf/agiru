@@ -318,11 +318,19 @@ constexpr ::agiru::Integer kThirdPart = 3;
 }
 
 ::agiru::Date CalcDate(std::string_view DateExpression) {
-  return ::agiru::DateFormula::FromText(DateExpression).CalcDate(Today());
+  return CalcDate(DateExpression, Today());
 }
 
 ::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date) {
-  return ::agiru::DateFormula::FromText(DateExpression).CalcDate(Date);
+  const std::expected<::agiru::DateFormula, ::agiru::Refusal> formula =
+      ::agiru::DateFormula::FromText(DateExpression);
+  if (!formula.has_value()) {
+    throw ::agiru::Error("System.CalcDate: " + std::string(DateExpression) +
+                         " is not a date "
+                         "formula -- " +
+                         std::string(formula.error().what));
+  }
+  return formula->CalcDate(Date);
 }
 
 ::agiru::Text<0>

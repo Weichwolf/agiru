@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `OptionOrdinalValues` maps a member onto a foreign number
 
+**The metadata half is done (2026-09-08):** the property reaches `FieldDef` and
+`TableDef` as `constexpr` data, emitted by the generator; what remains is the behaviour.
+
 **The refusal is in place.** `OptionOrdinalValues` is on `src/gen/Refused.cpp`'s list, which
 follows board:0364's decision about `CRM` tables. What remains is the second ordinal on
 `EnumValueDef` -- and only if those tables are ever translated.

@@ -181,6 +181,20 @@ struct FieldDef {
 
   /// \brief The `ObsoleteTag` property: the version the removal is scheduled for.
   std::string_view obsoleteTag{};
+
+  /// \brief The `ExternalName` property: the name the OTHER database gives this field.
+  ///
+  /// \note IT IS NOT A RENAME. `devenv-externalname-property.md` applies it to a table and to a
+  ///       table field of an EXTERNAL table -- one whose `TableType` names a database this tree
+  ///       does not have -- so it is carried and read by whatever opens that database.
+  std::string_view externalName{};
+
+  /// \brief The `OptionOrdinalValues` property, as AL wrote it: a member's FOREIGN number.
+  ///
+  /// \note IT IS NOT THE ORDINAL. An option member's ordinal is its position in this table; this
+  ///       is the number some other system gives the same member, and the two are different
+  ///       questions about one value.
+  std::string_view optionOrdinalValues{};
   /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
   ///
   /// `devenv-initvalue-property.md`: "Sets the initial value of this field when a user creates a
@@ -241,6 +255,13 @@ struct FieldDef {
 
   /// \brief The `OptimizeForTextSearch` property (board:0370).
   bool optimizeForTextSearch = false;
+
+  /// \brief The `SqlTimestamp` property: the field IS the row's version rather than a column.
+  ///
+  /// \note EVERY TABLE HAS A ROWVERSION AND THIS FIELD EXPOSES IT. `devenv-table-system-fields.md`
+  ///       gives every table a `SystemRowVersion`; a field declared this way is another name for
+  ///       it, so it is READ from the rowversion and never written (board:0013).
+  bool sqlTimestamp = false;
 
   /// \brief The `Enabled` property on a FIELD: a disabled field is declared and not maintained.
   bool enabled = true;
@@ -326,6 +347,9 @@ struct TableDef {
   std::string_view caption{};         ///< The `Caption` property.
   std::span<const FieldDef> fields{}; ///< Every declared field, in declaration order.
   std::span<const KeyDef> keys{};     ///< Every declared key; `keys[0]` is the primary key.
+
+  /// \brief The `ExternalName` property: the name the OTHER database gives this table.
+  std::string_view externalName{};
 
   /// \brief The `TableType` property. `Normal` is a relation; `Temporary` is an in-memory row set
   ///        (board:0032) and gets a relation until that exists; the external kinds are refused by

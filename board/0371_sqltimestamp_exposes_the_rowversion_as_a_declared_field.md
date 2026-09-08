@@ -8,6 +8,9 @@ Class:    silent-wrong-data
 
 # `SqlTimestamp` exposes the rowversion as a declared field
 
+**The metadata half is done (2026-09-08):** the property reaches `FieldDef` and
+`TableDef` as `constexpr` data, emitted by the generator; what remains is the behaviour.
+
 > Specifies a field to be a timestamp field. **The default is false.**
 >
 > **Each table includes a hidden timestamp field.** The timestamp field contains **row version

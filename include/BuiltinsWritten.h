@@ -480,12 +480,9 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
     }
     return false;
   } else if constexpr (std::is_same_v<T, ::agiru::Guid>) {
-    const ::agiru::Guid read = ::agiru::Guid::FromText(text);
-    if (read.IsNull() && !text.empty() &&
-        text.find_first_not_of("{}-0") != std::string_view::npos) {
-      return false;
-    }
-    into = read;
+    const std::expected<::agiru::Guid, ::agiru::Refusal> read = ::agiru::Guid::FromText(text);
+    if (!read.has_value()) { return false; }
+    into = *read;
     return true;
   } else if constexpr (std::is_same_v<T, ::agiru::Decimal>) {
     into = ::agiru::Decimal::FromInvariantString(text);
@@ -513,7 +510,10 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
                                   static_cast<unsigned>(number(kDayAt, kPartDigits)));
     return !into.IsUndefined();
   } else if constexpr (std::is_same_v<T, ::agiru::DateFormula>) {
-    into = ::agiru::DateFormula::FromText(text);
+    const std::expected<::agiru::DateFormula, ::agiru::Refusal> read =
+        ::agiru::DateFormula::FromText(text);
+    if (!read.has_value()) { return false; }
+    into = *read;
     return true;
   } else if constexpr (std::is_integral_v<T>) {
     if (text.empty()) {
