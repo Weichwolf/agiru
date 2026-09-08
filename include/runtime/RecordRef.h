@@ -459,16 +459,14 @@ public:
 
   /// \brief AL `RecordRef.GetTable(Record)` -- when what AL held was an `Any`.
   ///
-  /// \param rec The Variant.
-  /// \throws Error always.
+  /// \param rec The Variant, which must hold a record.
+  /// \throws Error when it holds something else, or a table this binary does not carry.
   ///
-  /// \note A VARIANT HOLDS NO RECORD YET, and `Assert.RecordIsEmpty(RecVariant)` hands one over --
-  ///       AL passes a record through an `Any` and the platform unwraps it. Refusing by name is
-  ///       what a Variant that cannot hold a record owes the caller (board:0035).
-  void GetTable(Variant &rec) {
-    static_cast<void>(rec);
-    throw Error("RecordRef.GetTable(Any) needs a Variant that can hold a record (board:0035)");
-  }
+  /// \note AL PASSES A RECORD THROUGH AN `Any` AND THE PLATFORM UNWRAPS IT.
+  ///       `Assert.RecordIsEmpty(RecVariant)` is the shape, and the Variant carries the record's
+  ///       address beside its table NUMBER -- which is what the catalogue looks the declaration up
+  ///       by when the caller cannot name the table either.
+  void GetTable(Variant &rec);
 
   /// \brief AL `RecordRef.GetTable(Record)` -- points at an existing record.
   /// \tparam T The generated table class.
@@ -589,13 +587,10 @@ public:
     throw Error("RecordRef.Ascending(Boolean) is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.Caption()`. Gets the caption of the table that is currently selected.
-  /// Returns an error if no table is selected.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string Caption() {
-    throw Error("RecordRef.Caption() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.Caption()` -- the caption of the table this RecordRef is open on.
+  /// \return The caption, which the declaration carries as `constexpr` data.
+  /// \throws Error when the RecordRef is not open.
+  [[nodiscard]] std::string Caption() const { return std::string(Table().caption); }
 
   /// \brief AL `RecordRef.ChangeCompany(Text)`. Redirects references to table data from one company
   /// to another.
@@ -819,13 +814,15 @@ public:
     throw Error("RecordRef.GetBySystemId(Guid) is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.GetFilters()`. Determines which filters have been applied to the table
-  /// referred to by the RecordRef.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetFilters() {
-    throw Error("RecordRef.GetFilters() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.GetFilters()` -- every filter standing on the record, as BC shows it.
+  ///
+  /// \return `<Field Caption>: <filter>` per filtered field, joined by `, ` and ordered by field
+  ///         number; the empty string when nothing filters.
+  ///
+  /// \note THE SHAPE IS BC'S OWN AND CODE BRANCHES ON IT. A report header prints it, and
+  ///       `PlanningRoutingLine.Caption` starts with `if GetFilters = '' then exit('')` -- a record
+  ///       with no filter has no meaningful caption (openerp read the same call site).
+  [[nodiscard]] std::string GetFilters() const;
 
   /// \brief AL `RecordRef.GetPosition(Boolean)`. Gets a string that contains the primary key of the
   /// current record.

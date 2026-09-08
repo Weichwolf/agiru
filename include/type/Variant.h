@@ -653,6 +653,17 @@ public:
   ///       can be inside one (board:0035).
   ::agiru::Boolean IsPromptMode() const { return false; }
 
+  /// \brief The record this Variant refers to, without naming its table.
+  ///
+  /// \return The record's address and its table number, or `nullptr` when it holds no record.
+  ///
+  /// \note IT IS WHAT `RecordRef.GetTable(Any)` NEEDS. `AsRecord<R>()` above asks for a table by
+  ///       name and refuses the wrong one; a RecordRef is the case where the CALLER does not know
+  ///       the table either, and the number is what it looks the declaration up by.
+  [[nodiscard]] const RecordInVariant *HeldRecord() const {
+    return std::get_if<RecordInVariant>(&held_);
+  }
+
   /// \brief AL `Variant.IsRecord()`. Indicates whether an AL variant contains a Record variable.
   /// \return The AL `Boolean`.
   ::agiru::Boolean IsRecord() const { return std::holds_alternative<RecordInVariant>(held_); }

@@ -24,9 +24,11 @@
 
 #include "BuiltinsWritten.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace agiru {
 
@@ -56,6 +58,41 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
 
 ::agiru::Boolean RecordRef::FindFirst() {
   return detail::RuntimeFind(record_, Table(), "-");
+}
+
+void RecordRef::GetTable(Variant &rec) {
+  const RecordInVariant *held = rec.HeldRecord();
+  if (held == nullptr) { throw Error("RecordRef.GetTable: this Variant holds no record"); }
+  const TableEntry *entry = FindTable(held->table);
+  if (entry == nullptr) {
+    throw Error("RecordRef.GetTable: table " + std::to_string(held->table.Value()) +
+                " is not installed in this binary");
+  }
+  record_ = const_cast<void *>(held->record); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  table_ = entry->table;
+}
+
+std::string RecordRef::GetFilters() const {
+  if (record_ == nullptr) { return {}; }
+  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if (state == nullptr) { return {}; }
+  std::vector<const detail::FieldFilter *> standing;
+  for (const detail::FieldFilter &one : state->filters) {
+    if (one.group == state->group && !one.text.empty()) { standing.push_back(&one); }
+  }
+  std::ranges::sort(standing, [](const detail::FieldFilter *a, const detail::FieldFilter *b) {
+    return a->field.Value() < b->field.Value();
+  });
+  std::string out;
+  for (const detail::FieldFilter *one : standing) {
+    const FieldDef *def = ::agiru::Field(Table(), one->field);
+    if (def == nullptr) { continue; }
+    if (!out.empty()) { out += ", "; }
+    out += def->caption;
+    out += ": ";
+    out += one->text;
+  }
+  return out;
 }
 
 constexpr ::agiru::Integer kInvariantFormat = 9;

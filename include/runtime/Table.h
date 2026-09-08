@@ -796,14 +796,10 @@ public:
     throw Error("Record.ChangeCompany is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.ClearMarks(...)`. Removes all the marks from a record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void ClearMarks(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ClearMarks is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.ClearMarks()` -- takes every mark off this variable.
+  void ClearMarks() {
+    detail::RecordState *state = const_cast<detail::RecordState *>(Filtered());
+    if (state != nullptr) { state->marks.clear(); }
   }
 
   /// \brief AL `Record.Consistent(...)`. Marks a table as being consistent or inconsistent.
@@ -1241,16 +1237,40 @@ public:
     throw Error("Record.LockTable is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.Mark(...)`. Marks a record. You can also use this method to determine
-  /// whether a record is marked.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean Mark(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Mark is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.Mark()` -- whether the record the variable stands on is marked.
+  /// \return True when it carries a mark.
+  [[nodiscard]] Boolean Mark() const {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr) { return false; }
+    const std::string key = PrimaryKeyText();
+    for (const std::string &marked : state->marks) {
+      if (marked == key) { return true; }
+    }
+    return false;
   }
+
+  /// \brief AL `Record.Mark(Boolean)` -- marks or unmarks the record the variable stands on.
+  ///
+  /// \param mark True to mark it, false to take the mark off.
+  ///
+  /// \note A MARK BELONGS TO THE VARIABLE AND NOT TO THE ROW. `record-mark-method.md` and the
+  ///       `MarkedOnly` page describe a set carried by the record variable, so two variables over
+  ///       the same table mark independently and a mark dies with the variable. It is the primary
+  ///       key that is remembered, because that is what identifies the row again after a `Find`.
+  void Mark(Boolean mark) {
+    detail::RecordState &state = State();
+    const std::string key = PrimaryKeyText();
+    for (std::size_t at = 0; at < state.marks.size(); ++at) {
+      if (state.marks[at] != key) { continue; }
+      if (!mark) { state.marks.erase(state.marks.begin() + static_cast<std::ptrdiff_t>(at)); }
+      return;
+    }
+    if (mark) { state.marks.push_back(key); }
+  }
+
+  /// \note NO `<algorithm>` IN THE DOOR. A linear walk over a handful of marks is written out
+  ///       rather than reached for, because one standard header here is parsed by every one of the
+  ///       generated translation units (CLAUDE.md: `<memory>` alone was 1.2 s of 3.4 s).
 
   /// \brief AL `Record.MarkedOnly(...)`. Activates a special filter. After you use this function,
   /// your view of the table includes only records marked by the Mark (Record) method.
