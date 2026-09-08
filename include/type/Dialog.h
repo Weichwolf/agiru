@@ -35,7 +35,9 @@ class ErrorInfo;
 class Dialog {
 public:
   /// \brief AL `Dialog.Close()`. Closes a dialog window that has been opened by the OPEN method.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
+  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
+  ///       Error is a different call and both reach the test.
   void Close();
 
   /// \brief AL `Dialog.Confirm(Text, Boolean, Any)`. Creates a dialog box that prompts the user for
@@ -106,7 +108,9 @@ public:
   /// \brief AL `Dialog.Open(Text, Any)`. Opens a dialog window.
   /// \param String The AL `Text`.
   /// \param Variable1 The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
+  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
+  ///       Error is a different call and both reach the test.
   void Open(std::string_view String, ::agiru::Variant &Variable1);
 
   /// \brief AL `Dialog.Open(Text)` -- the same without a variable to show; `Window.Open(Msg)` is
@@ -129,7 +133,9 @@ public:
   /// window.
   /// \param Number The AL `Integer`.
   /// \param Value The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \note A DIALOG IS HEADLESS HERE: opened, updated and closed silently, the way BC's own test
+  ///       runner shows none (board:0030). What it would have shown is not lost -- a Message or an
+  ///       Error is a different call and both reach the test.
   void Update(::agiru::Integer Number = {}, const ::agiru::Variant &Value = {});
 };
 

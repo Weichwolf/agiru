@@ -2,10 +2,13 @@
 
 #include "runtime/Error.h"
 
+#include <string>
+
 namespace agiru {
 
-void Variant::Refuse() {
-  throw Error("the Variant does not hold that type");
+void Variant::Refuse() const {
+  throw Error("the Variant does not hold that type (it holds alternative " +
+              std::to_string(held_.index()) + " of Variant::Held)");
 }
 
 }

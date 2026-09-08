@@ -50,6 +50,10 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
   return detail::RuntimeIsEmpty(record_, Table());
 }
 
+::agiru::Boolean RecordRef::IsTemporary() {
+  return detail::RuntimeIsTemporary(record_);
+}
+
 ::agiru::Integer RecordRef::Count() {
   return detail::RuntimeCount(record_, Table());
 }

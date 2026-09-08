@@ -372,12 +372,18 @@ public:
   }
 
   void SetControlFilter(std::string_view control, std::string_view filter) override {
-    const ControlDef *def = ControlNamed_(control);
-    if (def == nullptr || def->field.Value() == 0) {
-      throw Error("the control '" + std::string(control) + "' shows no field to filter");
-    }
     if constexpr (kHasRecord) {
-      Record_().SetFilterOn(def->field, filter);
+      const ControlDef *def = ControlNamed_(control);
+      ::agiru::FieldNo no = def != nullptr ? def->field : ::agiru::FieldNo{};
+      if (no.Value() == 0) {
+        for (const FieldDef &field : RecordTraits_().kTable.fields) {
+          if (SameWord_(field.name, control)) { no = field.no; }
+        }
+      }
+      if (no.Value() == 0) {
+        throw Error("the control '" + std::string(control) + "' shows no field to filter");
+      }
+      Record_().SetFilterOn(no, filter);
       static_cast<void>(First());
     } else {
       static_cast<void>(filter);

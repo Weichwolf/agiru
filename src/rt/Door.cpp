@@ -320,9 +320,7 @@ std::string Debugger::GetLastErrorText() {
   RefuseDoor("Debugger.Stop()");
 }
 
-void Dialog::Close() {
-  RefuseDoor("Dialog.Close()");
-}
+void Dialog::Close() {}
 
 ::agiru::Boolean
 Dialog::Confirm(std::string_view String, ::agiru::Boolean Default, const ::agiru::Variant &Value1) {
@@ -375,14 +373,12 @@ void Dialog::Message(std::string_view String, const ::agiru::Variant &Value) {
 }
 
 void Dialog::Open(std::string_view String) {
-  RefuseDoor("Dialog.Open(Text)");
   static_cast<void>(String);
 }
 
 void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
   static_cast<void>(String);
   static_cast<void>(Variable1);
-  RefuseDoor("Dialog.Open(Text, Any)");
 }
 
 ::agiru::Integer Dialog::StrMenu(std::string_view OptionMembers,
@@ -397,7 +393,6 @@ void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
 void Dialog::Update(::agiru::Integer Number, const ::agiru::Variant &Value) {
   static_cast<void>(Number);
   static_cast<void>(Value);
-  RefuseDoor("Dialog.Update(Integer, Any)");
 }
 
 ::agiru::Boolean File::Download(std::string_view FromFile,

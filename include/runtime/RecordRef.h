@@ -908,10 +908,7 @@ public:
   /// \brief AL `RecordRef.IsTemporary()`. Determines whether a RecordRef refers to a temporary
   /// table.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean IsTemporary() {
-    throw Error("RecordRef.IsTemporary() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean IsTemporary();
 
   /// \brief AL `RecordRef.KeyIndex(Integer)`. Gets the KeyRef of the key that has the index
   /// specified in the table that is currently selected. The key can be composed of fields of any

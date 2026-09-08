@@ -1113,7 +1113,7 @@ public:
   }
 
 private:
-  [[noreturn]] static void Refuse();
+  [[noreturn]] void Refuse() const;
 
   Held held_;
 };
