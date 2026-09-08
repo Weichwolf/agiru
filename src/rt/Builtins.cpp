@@ -112,10 +112,6 @@ void CodeCoverageRefresh() {
   RefuseDoor("System.CreateEncryptionKey()");
 }
 
-::agiru::Guid CreateGuid() {
-  RefuseDoor("System.CreateGuid()");
-}
-
 ::agiru::Integer Date2DMY(::agiru::Date Date, ::agiru::Integer Value) {
   static_cast<void>(Date);
   static_cast<void>(Value);
@@ -199,10 +195,6 @@ std::string GetDocumentUrl(::agiru::Guid ID) {
 
 std::string GetLastErrorCallStack() {
   RefuseDoor("System.GetLastErrorCallStack()");
-}
-
-std::string GetLastErrorCode() {
-  RefuseDoor("System.GetLastErrorCode()");
 }
 
 ::agiru::Variant GetLastErrorObject() {

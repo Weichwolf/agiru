@@ -141,13 +141,6 @@ void CodeCoverageRefresh();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean CreateEncryptionKey();
 
-/// \brief AL `System.CreateGuid()`. Creates a new unique GUID. The value can then be assigned to a
-/// GUID data type or a text data type. Use the text data type if you want to compare the GUID to
-/// another text string.
-/// \return The AL `Guid`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Guid CreateGuid();
-
 /// \brief AL `System.Date2DMY(Date, Integer)`. Gets the day, month, or year of a Date Data Type.
 /// \param Date The AL `Date`.
 /// \param Value The AL `Integer`.
@@ -277,11 +270,6 @@ std::string GetDocumentUrl(::agiru::Guid ID);
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string GetLastErrorCallStack();
-
-/// \brief AL `System.GetLastErrorCode()`. Gets the classification of the last error that occurred.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string GetLastErrorCode();
 
 /// \brief AL `System.GetLastErrorObject()`. Gets the last System.Exception object that occurred.
 /// \return The AL `DotNet`.

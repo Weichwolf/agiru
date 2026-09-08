@@ -1353,10 +1353,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean ReadPermission(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.ReadPermission is declared and not implemented yet (board:0035)");
-  }
+  ///
+  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
+  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
+  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
+  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
+  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
+  ///       board:0030's family is where that lives.
+  [[nodiscard]] Boolean ReadPermission() const { return true; }
 
   /// \brief AL `Record.RecordId(...)`. Gets the RecordId of the record that is currently selected
   /// in the table. If no table is selected, an error is generated.
@@ -1717,10 +1721,14 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean WritePermission(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.WritePermission is declared and not implemented yet (board:0035)");
-  }
+  ///
+  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
+  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
+  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
+  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
+  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
+  ///       board:0030's family is where that lives.
+  [[nodiscard]] Boolean WritePermission() const { return true; }
 
 private:
   friend Derived;

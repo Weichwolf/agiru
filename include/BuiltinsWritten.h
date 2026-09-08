@@ -311,6 +311,23 @@ template <typename T>
   return Number.Milliseconds() < 0 ? -Number : Number;
 }
 
+/// \brief AL `System.CreateGuid()`. A new unique GUID.
+/// \return The GUID.
+///
+/// \note IT IS THE ONE PLACE THE RUNTIME IS DELIBERATELY NOT DETERMINISTIC, because the AL method
+///       it implements is not either. `Guid::Create` carries the reasoning.
+[[nodiscard]] ::agiru::Guid CreateGuid();
+
+/// \brief AL `System.GetLastErrorCode()`. The CODE of the last error, not its text.
+/// \return The code, which is the empty string for an error that carries none.
+///
+/// \note EVERY ERROR THIS RUNTIME RAISES IS UNCODED TODAY, and the empty string is what BC answers
+///       for one. `system-getlasterrorcode-method.md` pairs it with `GetLastErrorText`: the code
+///       identifies the KIND (`StreamIO`, `DB:RecordNotFound`) and is never translated, the text is
+///       the message and is. When `agiru::Error` carries a code, this reads it instead of
+///       answering empty -- and the test that compares against `'StreamIO'` is what will say so.
+[[nodiscard]] ::agiru::Text<0> GetLastErrorCode();
+
 /// \brief AL `System.Time()` -- the time of day, from the session's clock.
 /// \return The current time.
 ///

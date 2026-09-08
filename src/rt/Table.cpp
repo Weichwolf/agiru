@@ -18,6 +18,7 @@
 #include "type/Integer.h"
 #include "type/Media.h"
 #include "type/MediaSet.h"
+#include "type/RecordId.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 
@@ -248,6 +249,7 @@ void ClearField(void *record, const FieldDef &def) {
     case FieldType::Blob: *reinterpret_cast<Blob *>(At(record, def)) = Blob{}; return;
     case FieldType::Media: *reinterpret_cast<Media *>(At(record, def)) = Media{}; return;
     case FieldType::MediaSet: *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{}; return;
+    case FieldType::RecordId: *reinterpret_cast<RecordId *>(At(record, def)) = RecordId{}; return;
     default:
       throw Error("Init: field " + std::string(def.name) +
                   " has a type this runtime cannot return to its default yet");

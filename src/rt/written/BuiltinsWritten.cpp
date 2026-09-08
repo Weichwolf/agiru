@@ -568,6 +568,14 @@ void Randomize(::agiru::Integer Seed) {
   return Sequence().Between(1, largest + 1);
 }
 
+::agiru::Guid CreateGuid() {
+  return ::agiru::Guid::Create();
+}
+
+::agiru::Text<0> GetLastErrorCode() {
+  return ::agiru::Text<0>{};
+}
+
 ::agiru::Time CurrentTime() {
   return ::agiru::CurrentDateTime().Time();
 }

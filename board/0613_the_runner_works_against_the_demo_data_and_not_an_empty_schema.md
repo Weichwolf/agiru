@@ -70,3 +70,21 @@ the process can catch it. `agiru run-tests --isolate` re-enters the same binary 
 per codeunit, so the isolation is the operating system's; the runner's database is made once and
 kept, so every child finds it rather than cloning it. 3 codeunits die and the other 852 report.
 That is board:0612's standing half, and it closes with this item's measurement.
+
+## The MILESTONE's own number, which is not the whole population's (2026-09-08)
+
+The goal is the 78 UT codeunits and their 2 291 `[Test]` procedures, not the 855 codeunits the
+binary carries. Measured apart:
+
+| | |
+|---|---|
+| UT codeunits the binary carries | 62 |
+| their `[Test]` procedures | 1 708 |
+| passing | **201** |
+
+The gap to 78 and 2 291 is codeunits whose generated source is not yet in `test/slice`, which is
+the compile-fix loop's own backlog and not the runtime's.
+
+**AND THE SETUP DATA IS ~600 OF THE 1 507 FAILURES HERE TOO** -- Purchases & Payables 140, Sales &
+Receivables 138, General Ledger 123, Inventory 89, VAT Report 70, VAT Reg. No. Srv Config 40. The
+same lever, one third the size of the whole population's, and still the second largest after `xRec`.
