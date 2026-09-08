@@ -7,7 +7,6 @@
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
-#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
@@ -52,22 +51,6 @@ namespace agiru {
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string ApplicationPath();
-
-/// \brief AL `System.CalcDate(DateFormula, Date)`. Calculates a new date that is based on a date
-/// expression and a reference date.
-/// \param DateExpression The AL `DateFormula`.
-/// \param Date The AL `Date`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date CalcDate(::agiru::DateFormula DateExpression, ::agiru::Date Date = {});
-
-/// \brief AL `System.CalcDate(Text, Date)`. Calculates a new date that is based on a date
-/// expression and a reference date.
-/// \param DateExpression The AL `Text`.
-/// \param Date The AL `Date`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date = {});
 
 /// \brief AL `System.CaptionClassTranslate(Text)`. Returns a translated version of the caption
 /// string. The string is translated to the current local language.
@@ -118,24 +101,6 @@ void CodeCoverageRefresh();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer CompressArray(const ::agiru::Variant &StringArray);
 
-/// \brief AL `System.CopyStream(OutStream, InStream, Integer)`. Copies the information that is
-/// contained in an InStream to an OutStream.
-/// \param OutStream The AL `OutStream`.
-/// \param InStream The AL `InStream`.
-/// \param BytesToRead The AL `Integer`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,
-                            const ::agiru::InStream &InStream,
-                            ::agiru::Integer BytesToRead = {});
-
-/// \brief AL `System.CreateDateTime(Date, Time)`. Creates a DateTime object from a date and a time.
-/// \param Date The AL `Date`.
-/// \param Time The AL `Time`.
-/// \return The AL `DateTime`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::DateTime CreateDateTime(::agiru::Date Date, ::agiru::Time Time);
-
 /// \brief AL `System.CreateEncryptionKey()`. Creates an encryption key for the current tenant.
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -174,18 +139,6 @@ std::string Decrypt(std::string_view EncryptedString);
 /// \brief AL `System.DeleteEncryptionKey()`. Deletes an encryption key for the current tenant.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void DeleteEncryptionKey();
-
-/// \brief AL `System.DT2Date(DateTime)`. Gets the date part of a DateTime object.
-/// \param Datetime The AL `DateTime`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date DT2Date(::agiru::DateTime Datetime);
-
-/// \brief AL `System.DT2Time(DateTime)`. Gets the time part of a DateTime object.
-/// \param Datetime The AL `DateTime`.
-/// \return The AL `Time`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Time DT2Time(::agiru::DateTime Datetime);
 
 /// \brief AL `System.DWY2Date(Integer, Integer, Integer)`. Gets a Date that is based on a week day,
 /// a week, and a year.
@@ -343,16 +296,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 /// \return The AL `Date`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date NormalDate(::agiru::Date Date);
-
-/// \brief AL `System.RoundDateTime(DateTime, BigInteger, Text)`. Rounds a DateTime.
-/// \param Datetime The AL `DateTime`.
-/// \param Precision The AL `BigInteger`.
-/// \param Direction The AL `Text`.
-/// \return The AL `DateTime`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
-                                ::agiru::BigInteger Precision = {},
-                                std::string_view Direction = {});
 
 /// \brief AL `System.Sleep(Integer)`. Returns control to the operating system for a specified time.
 /// \param Duration The AL `Integer`.

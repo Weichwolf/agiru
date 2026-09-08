@@ -21,7 +21,6 @@
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
-#include "type/ErrorType.h"
 #include "type/File.h"
 #include "type/FileUpload.h"
 #include "type/FilterPageBuilder.h"
@@ -51,6 +50,7 @@
 #include "type/SessionInformation.h"
 #include "type/SessionSettings.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/TaskScheduler.h"
 #include "type/TextBuilder.h"
 #include "type/TextConst.h"
@@ -4456,23 +4456,6 @@ std::string XmlText::Value(std::string_view NewValue) {
 ::agiru::Boolean XmlWriteOptions::PreserveWhitespace(::agiru::Boolean NewValue) {
   static_cast<void>(NewValue);
   RefuseDoor("XmlWriteOptions.PreserveWhitespace(Boolean)");
-}
-
-::agiru::Boolean KeyRef::Active() {
-  RefuseDoor("KeyRef.Active()");
-}
-
-::agiru::Integer KeyRef::FieldCount() {
-  RefuseDoor("KeyRef.FieldCount()");
-}
-
-::agiru::FieldRef KeyRef::FieldIndex(::agiru::Integer Index) {
-  static_cast<void>(Index);
-  RefuseDoor("KeyRef.FieldIndex(Integer)");
-}
-
-::agiru::RecordRef KeyRef::Record() {
-  RefuseDoor("KeyRef.Record()");
 }
 
 std::string SessionSettings::Company() {

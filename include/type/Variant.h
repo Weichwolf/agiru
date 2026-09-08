@@ -934,6 +934,28 @@ public:
     return *value;
   }
 
+  /// \brief AL `Proc(var Typed: T)` given a Variant: the alternative it already holds, by
+  ///        reference, so what the callee writes lands in the Variant itself.
+  ///
+  /// \tparam T The AL type the parameter is declared as.
+  /// \return The value, in the Variant's own storage.
+  /// \throws Error when the Variant holds something else, or cannot hold a `T` at all.
+  ///
+  /// \note IT IS NAMED AND NOT IMPLICIT, and the reason is that C++ cannot tell "bind to `T &`"
+  ///       from "make a `T`" at a conversion operator: the reference form wins BOTH on a non-const
+  ///       Variant, which is why `Decimal` and `BigInteger` had to be kept out of it -- a reference
+  ///       cannot widen. The generator knows which it means, because it wrote the callee's
+  ///       signature, so it says so here and the two questions stop competing (board:0614).
+  template <typename T> [[nodiscard]] T &Lend() {
+    if constexpr (detail::InVariant<T, Held>::value) {
+      T *value = std::get_if<T>(&held_);
+      if (value == nullptr) { Refuse(); }
+      return *value;
+    } else {
+      Refuse();
+    }
+  }
+
   /// \brief Reads as one of its alternatives, when that is what it holds.
   ///
   /// \tparam T The AL type wanted.

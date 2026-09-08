@@ -466,6 +466,11 @@ std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
 std::string
 TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {});
 
+bool LendsInto(const al::VarDecl &parameter) {
+  return parameter.byReference && parameter.subtype.empty() && parameter.dimensions.empty() &&
+         !SameName(TypeName(parameter.type), "Variant");
+}
+
 std::string Generic(const std::string &type,
                     const std::vector<al::VarDecl> &arguments,
                     const Objects &objects) {
@@ -1055,6 +1060,28 @@ public:
 
   [[nodiscard]] bool IsVariable(std::string_view name) const override {
     return Declaration(name) != nullptr;
+  }
+
+  [[nodiscard]] bool TakesArguments(std::string_view name, std::size_t count) const override {
+    return ArityFits(unit_.procedures, name, count);
+  }
+
+  [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
+    const al::VarDecl *where = Declaration(variable);
+    return where == nullptr ? std::string{} : TypeName(where->type);
+  }
+
+  [[nodiscard]] std::vector<std::string> LentParameters(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : unit_.procedures) {
+      if (!SameName(procedure.name, name)) { continue; }
+      std::vector<std::string> lent;
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        lent.push_back(LendsInto(parameter) ? Unhidden(TypeOf(parameter, objects_))
+                                            : std::string{});
+      }
+      return lent;
+    }
+    return {};
   }
 
   [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
@@ -1714,6 +1741,18 @@ bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
   unit.variables = variables;
   unit.procedures = procedures;
   return NamesAbsent(unit, objects);
+}
+
+bool ArityFits(const std::vector<al::ProcedureDecl> &procedures,
+               std::string_view name,
+               std::size_t count) {
+  bool named = false;
+  for (const al::ProcedureDecl &procedure : procedures) {
+    if (!SameName(procedure.name, name)) { continue; }
+    named = true;
+    if (procedure.parameters.size() == count) { return true; }
+  }
+  return !named;
 }
 
 bool DeclaresAnObject(const al::VarDecl &declared) {

@@ -1770,6 +1770,7 @@ base/integration/graph/codeunit/GraphMgtComplexTypes.cpp
 base/integration/graph/codeunit/GraphMgtCustomer.cpp
 base/integration/graph/codeunit/GraphMgtCustomerPayments.cpp
 base/integration/graph/codeunit/GraphMgtEmployee.cpp
+base/integration/graph/codeunit/GraphMgtGeneralTools.cpp
 base/integration/graph/codeunit/GraphMgtIncDocAttachment.cpp
 base/integration/graph/codeunit/GraphMgtInServicesSetup.cpp
 base/integration/graph/codeunit/GraphMgtJournal.cpp
@@ -4519,6 +4520,7 @@ base/system/io/table/XMLBuffer.cpp
 base/system/media/codeunit/ImageHandlerManagement.cpp
 base/system/media/codeunit/ImageHelpers.cpp
 base/system/reflection/codeunit/DataTypeManagement.cpp
+base/system/reflection/codeunit/TypeHelper.cpp
 base/system/reflection/page/AllObjects.cpp
 base/system/reflection/page/AvailableFieldSelectionPage.cpp
 base/system/reflection/page/AvailableTableSelectionList.cpp

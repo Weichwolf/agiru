@@ -3889,3 +3889,20 @@ Two rules, and the tree already states both in other words:
 And the reason those 16 got slower is worth keeping: they were failing FAST before and now do real
 work. A test that reaches further takes longer, so a timeout tuned to the broken state is a timeout
 that fails the fixed one.
+
+## The same harness, the same denominator, one week later -- and a CRASH this time (2026-09-08)
+
+The loop was fixed for the TIMEOUT and not for the general case: it counted a codeunit when the
+`N of M passed` line appeared and skipped it otherwise, and only a timeout was named. Three
+codeunits then segfaulted between two tests and the run reported **310 of 1 605 over 59
+codeunits** -- a number that looks like progress and is a suite three codeunits smaller.
+
+**THE RULE IS NOT "COUNT TIMEOUTS", IT IS "A UNIT THAT REPORTS NOTHING IS A LOSS".** The harness
+now names every silent codeunit with its exit status, and the denominator stayed at 1 708 through
+the next four rounds. A special case for the failure mode that bit last time is not the rule; it is
+the rule's shadow.
+
+**AND THE CRASH ITSELF PRINTED NOTHING**, which is why it took a rebuild to see. `agiru` carries a
+signal handler now that writes its frames -- and it has to run on an ALTERNATE STACK, because the
+second of the two crashes was a stack overflow and a handler on the overflowed stack never runs.
+The first version used `std::signal`, printed nothing, and looked like a different defect.

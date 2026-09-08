@@ -83,6 +83,10 @@ Connection &Connection::operator=(Connection &&o) noexcept {
 
 Result Connection::Execute(std::string_view sql,
                            std::span<const std::optional<std::string>> params) const {
+  if (handle_ == nullptr) {
+    throw DatabaseError("the connection is closed and this statement cannot run: " +
+                        std::string(sql));
+  }
   std::vector<const char *> values;
   values.reserve(params.size());
   for (const std::optional<std::string> &p : params) {

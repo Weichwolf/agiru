@@ -5,6 +5,7 @@
 #include "Expr.h"
 #include "Names.h"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -120,6 +121,22 @@ public:
   [[nodiscard]] virtual std::string DeclaredEnum(std::string_view variable) const {
     static_cast<void>(variable);
     return {};
+  }
+
+  [[nodiscard]] virtual std::string DeclaredType(std::string_view variable) const {
+    static_cast<void>(variable);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::vector<std::string> LentParameters(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
+  [[nodiscard]] virtual bool TakesArguments(std::string_view name, std::size_t count) const {
+    static_cast<void>(name);
+    static_cast<void>(count);
+    return true;
   }
 };
 

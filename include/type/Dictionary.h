@@ -5,6 +5,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 
+#include <concepts>
 #include <map>
 
 /// \file
@@ -27,22 +28,35 @@ public:
   Dictionary() = default;
 
   /// \brief AL `Dictionary.Add(Key, Value)`.
+  /// \tparam K What the key is written as.
+  /// \tparam V What the value is written as.
   /// \param key   The key.
   /// \param value The value.
   /// \throws Error when the key is already there, as AL does.
-  ::agiru::Boolean Add(const TKey &key, const TValue &value) {
-    if (!entries_.try_emplace(key, value).second) {
+  ///
+  /// \note IT TAKES WHAT MAKES A `TValue` AND NOT A `TValue`. AL declares `Dictionary of [Text,
+  ///       Text]` and hands it whatever reads as a text -- a `Text`, a `Code`, a literal, the
+  ///       result of `Format` -- and a parameter spelled as the element type made each of those a
+  ///       conversion the caller had to write.
+  template <typename K, typename V>
+    requires std::constructible_from<TKey, const K &> && std::constructible_from<TValue, const V &>
+  Boolean Add(const K &key, const V &value) {
+    if (!entries_.try_emplace(TKey(key), TValue(value)).second) {
       throw Error("the dictionary already holds that key");
     }
     return true;
   }
 
   /// \brief AL `Dictionary.Set(Key, Value)` -- adds or replaces.
+  /// \tparam K What the key is written as.
+  /// \tparam V What the value is written as.
   /// \param key   The key.
   /// \param value The value.
   /// \return True when a value stood under that key and was replaced, false when it was added.
-  Boolean Set(const TKey &key, const TValue &value) {
-    return !entries_.insert_or_assign(key, value).second;
+  template <typename K, typename V>
+    requires std::constructible_from<TKey, const K &> && std::constructible_from<TValue, const V &>
+  Boolean Set(const K &key, const V &value) {
+    return !entries_.insert_or_assign(TKey(key), TValue(value)).second;
   }
 
   /// \brief AL `Dictionary.ContainsKey(Key)`.

@@ -40,6 +40,34 @@ namespace agiru {
 /// virtual call and without the runtime knowing a single AL object.
 [[nodiscard]] std::string FieldText(const void *record, const FieldDef &def);
 
+namespace detail {
+
+/// \brief One field as the DATABASE holds it, which is not always how a message shows it.
+///
+/// \param record The record, addressed as raw storage.
+/// \param def    The field.
+/// \return The value in its round-tripping form.
+///
+/// \warning AN OPTION IS ITS ORDINAL HERE AND ITS MEMBER NAME IN `FieldText`, and a value that
+///          has to be READ BACK must come through this one. The pair is what `TransferFields`
+///          moves a value with, and what a `RecordId` carries so that `Get(RecordId)` finds the
+///          row again.
+[[nodiscard]] std::string StorageText(const void *record, const FieldDef &def);
+
+/// \brief What `Format(Any)` makes of a value, reached from where `Format` is not yet declared.
+///
+/// \param value The value, held in a Variant.
+/// \return Its text.
+///
+/// \note IT EXISTS TO BREAK A CYCLE AND NOT TO ADD A SPELLING. `AsText` renders what `Format`
+///       renders, and the door's `Format(Any, ...)` is declared in `BuiltinsWritten.h`, which
+///       includes this header -- so `AsText` cannot name it. Calling the OTHER `Format`, the
+///       constrained template beneath it, is what a fallback here means, and that one is defined
+///       as `AsText`: the two recursed until the stack ran out (board:0616).
+[[nodiscard]] std::string VariantText(const Variant &value);
+
+}
+
 /// \brief Orders one field of two records of the same table.
 ///
 /// \param a   One record.
@@ -229,7 +257,7 @@ void TestFieldValue(const void *record, const TableDef &table, FieldNo no, const
 ///          below; only the declaration belongs up here.
 template <typename T>
   requires(!std::convertible_to<const T &, const Variant &>)
-[[nodiscard]] std::string Format(const T &value);
+[[nodiscard]] ::agiru::Text<0> Format(const T &value);
 
 /// \brief AL `Format(Value)` for an option -- its caption.
 ///
@@ -272,8 +300,10 @@ template <typename T> [[nodiscard]] std::string AsText(const T &value) {
                : std::string(member->caption.empty() ? member->name : member->caption);
   } else if constexpr (std::is_enum_v<T>) {
     return std::to_string(static_cast<std::underlying_type_t<T>>(value));
+  } else if constexpr (std::convertible_to<const T &, const Variant &>) {
+    return detail::VariantText(Variant(value));
   } else {
-    return Format(value);
+    throw Error("there is no text form for this value yet");
   }
 }
 
@@ -312,7 +342,7 @@ template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
 ///       AL calls it by.
 template <typename T>
   requires(!std::convertible_to<const T &, const Variant &>)
-[[nodiscard]] std::string Format(const T &value) {
+[[nodiscard]] ::agiru::Text<0> Format(const T &value) {
   return AsText(value);
 }
 

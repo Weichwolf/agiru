@@ -6,6 +6,7 @@
 #include "type/Integer.h"
 #include "type/StringValue.h"
 
+#include <concepts>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -49,32 +50,74 @@ public:
   ///          generated file on one line, and nothing would raise.
   Integer WriteText();
 
-  /// \brief AL `OutStream.Write(Value)` for a typed value.
+  /// \brief AL `OutStream.Write(Value)` for a TEXT value.
+  ///
+  /// \tparam T The value's type, which must read as a `std::string_view`.
+  /// \param value The value.
+  /// \return How many bytes were written, the terminator counted.
+  ///
+  /// \note IT WRITES A ZERO BYTE AFTER THE TEXT AND `WriteText` DOES NOT.
+  ///       `devenv-write-read-methods-line-break-behavior.md` states that difference as the whole
+  ///       point of the pair, and works it through an example: what `Write` puts in, `Read` takes
+  ///       out again, terminator and all, while `ReadText` stops at the first line break as well.
+  ///       So this is the platform's own layout for a string rather than an invention -- which is
+  ///       what the numeric forms below still lack.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Integer Write(const T &value) {
+    return WriteTerminated(std::string_view(value), -1);
+  }
+
+  /// \brief AL `OutStream.Write(Value, Length)` for a TEXT value.
+  ///
+  /// \tparam T The value's type, which must read as a `std::string_view`.
+  /// \param value The value.
+  /// \param length How many bytes of it to write.
+  /// \return How many bytes were written, the terminator counted.
+  ///
+  /// \note THE LENGTH CUTS AND DOES NOT PAD. The page says a length that differs from the size of
+  ///       the variable is an ERROR "in the case of data types other than string, code, and
+  ///       binary" -- so for those three it is a length and nothing else.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Integer Write(const T &value, const Integer &length) {
+    return WriteTerminated(std::string_view(value), length);
+  }
+
+  /// \brief AL `OutStream.Write(Value [, Length])` for a value that is not text.
   /// \tparam T The value's type.
   /// \param value The value.
   /// \throws Error always.
   /// \warning REFUSED. A typed Write puts the platform's own BINARY layout into the stream, and
   ///          inventing one would produce a BLOB that reads back wrong wherever BC reads it. Only
   ///          the text forms are here.
-  template <typename T> Integer Write(const T &value) {
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>)
+  Integer Write(const T &value) {
     static_cast<void>(value);
     RefuseTyped();
   }
 
-  /// \brief AL `OutStream.Write(Value, Length)` for a typed value.
+  /// \brief AL `OutStream.Write(Value, Length)` for a value that is not text.
   /// \tparam T The value's type.
   /// \param value The value.
   /// \param length The AL `Integer` the page names as the second parameter.
   /// \return The AL `Written`, which the page brackets.
   /// \throws Error always.
   /// \warning REFUSED for the same reason as the one-argument form.
-  template <typename T> Integer Write(const T &value, const Integer &length) {
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>)
+  Integer Write(const T &value, const Integer &length) {
     static_cast<void>(value);
     static_cast<void>(length);
     RefuseTyped();
   }
 
 private:
+  Integer WriteTerminated(std::string_view text, Integer length);
+
+  [[nodiscard]] Blob &Bound() const;
+
   [[noreturn]] static void RefuseTyped();
 
   Blob *blob_ = nullptr;
@@ -126,17 +169,52 @@ public:
   /// \return How many characters were read.
   Integer ReadText(::agiru::Text<0> &text);
 
-  /// \brief AL `InStream.Read(var Value)` for a typed value.
+  /// \brief AL `InStream.Read(var Value [, Length])` for a TEXT value.
+  ///
+  /// \tparam T The value's type, which must assign from a `std::string_view`.
+  /// \param value Receives what was read.
+  /// \param length How many bytes at most; the rest of the stream when omitted.
+  /// \return How many bytes were read, the terminator counted.
+  ///
+  /// \note IT READS UNTIL A ZERO BYTE AND NOT UNTIL A LINE BREAK, which is the whole difference
+  ///       from `ReadText`: `devenv-write-read-methods-line-break-behavior.md` reads
+  ///       `A<CR><LF>B` back as one value here and as two there.
+  template <typename T>
+    requires std::assignable_from<T &, std::string_view>
+  Integer Read(T &value, Integer length) {
+    std::string got;
+    const Integer read = ReadTerminated(got, length);
+    value = std::string_view(got);
+    return read;
+  }
+
+  /// \brief AL `InStream.Read(var Value)` for a TEXT value.
+  /// \tparam T The value's type, which must assign from a `std::string_view`.
+  /// \param value Receives what was read.
+  /// \return How many bytes were read, the terminator counted.
+  template <typename T>
+    requires std::assignable_from<T &, std::string_view>
+  Integer Read(T &value) {
+    return Read(value, -1);
+  }
+
+  /// \brief AL `InStream.Read(var Value)` for a value that is not text.
   /// \tparam T The value's type.
   /// \param value Receives the value.
   /// \throws Error always.
   /// \warning REFUSED, for the reason OutStream::Write gives.
-  template <typename T> void Read(T &value) {
+  template <typename T>
+    requires(!std::assignable_from<T &, std::string_view>)
+  void Read(T &value) {
     static_cast<void>(value);
     RefuseTyped();
   }
 
 private:
+  Integer ReadTerminated(std::string &into, Integer length);
+
+  [[nodiscard]] const Blob &Bound() const;
+
   [[noreturn]] static void RefuseTyped();
 
   const Blob *blob_ = nullptr;

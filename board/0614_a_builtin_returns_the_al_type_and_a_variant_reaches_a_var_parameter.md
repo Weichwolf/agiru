@@ -63,7 +63,39 @@ WIDEN: the value form reads a Variant holding an `Integer` as a `Decimal`, and t
 refused instead. `Decimal` and `BigInteger` are the only two the value form widens into, so those
 two are left to it; with that the count is 281 again and the `var Date` class works.
 
-**WHAT IS STANDING ON `TypeHelper`:** its own `Evaluate(Variant, Text, Text, Text)` HIDES the
+**STANDING: BOTH SOURCES COMPILE (2026-09-08).** Four generic gaps were behind them, and only one
+was the one this item was filed for.
+
+1. **`Format` RETURNS `::agiru::Text<0>`**, in all three of its declarations -- the two Variant
+   overloads in `BuiltinsWritten.h` and the non-Variant template in `Record.h`, which has a
+   FORWARD DECLARATION as well and returning a different type there is an ambiguous call rather
+   than a redeclaration error. `AsText` renders through it and wants a `std::string`, so it makes
+   one; `detail::Literally` takes a `std::string_view` now, which is what it should have taken.
+2. **`SYSTEM.X(...)` IS THE PLATFORM'S OWN X.** The failing line was not an arity problem at all:
+   `TypeHelper` writes `exit(SYSTEM.Evaluate(Decimal, Text))`, which is AL's escape hatch for
+   naming the builtin when the object declares a procedure of the same name. The generator now
+   emits `::agiru::Evaluate` for a call qualified by `System` when the qualifier is not a variable
+   and the door declares the member -- 90 call sites over BCApps.
+3. **THE ARITY FALLBACK IS WRITTEN AND WAS NOT WHAT THIS NEEDED.** `TakesArguments` on the scope
+   answers whether the unit's own procedures include one of that name taking that many arguments,
+   and `Callee` qualifies the door's when none does. It stands because AL resolves the whole
+   overload set including the platform's; it is not what fixed `TypeHelper`.
+4. **A VARIANT LENDS BY NAME AND NOT BY CONVERSION: `Variant::Lend<T>()`.** C++ cannot tell "bind
+   to `T &`" from "make a `T`" at a conversion operator -- the reference form wins BOTH on a
+   non-const Variant -- which is why `Decimal` and `BigInteger` had to be kept out of it. The
+   generator knows which one it means, because it wrote the callee's signature, so it says so: an
+   argument that is a Variant variable, handed to a `var` parameter with a type of its own, is
+   emitted as `Arg.Lend<T>()`. The implicit reference form stays for what already works.
+
+**AND AN ABSENT .NET VALUE READ AS AN AL VALUE REFUSES, WHICH COST ONE MEASUREMENT.**
+`GetCurrUTCDateTime` returns a `DotNet DateTime` into an AL `DateTime`, and a stub converted to
+nothing but another stub. It converts to any value type now and throws, naming the type -- but NOT
+to a `Variant`: a stub that converts to everything also converts to a Variant, and that made
+`Instance<absent::X>` stop converting to one, so `BindSubscription(SomeCodeunit)` lost its Variant
+overload at every site whose codeunit is not transpiled. `dotnet::ReadableAsAValue` is that
+exclusion, with the measurement beside it.
+
+**WHAT WAS STANDING ON `TypeHelper`:** its own `Evaluate(Variant, Text, Text, Text)` HIDES the
 2-argument builtin, so a body calling `Evaluate(x, y)` inside that codeunit does not compile. AL
 falls back to the builtin when no own overload takes that many arguments; C++ hides the free
 function outright. The generator has the unit's own procedures WITH their parameters, so it can

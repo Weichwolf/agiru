@@ -5,6 +5,7 @@
 #include "type/Integer.h"
 
 #include <compare>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -58,6 +59,14 @@ public:
 
   /// \return True when this identifies no record.
   [[nodiscard]] bool IsEmpty() const { return key_.empty(); }
+
+  /// \brief The primary key values this id carries, in key order.
+  /// \return The values, in the form the database round-trips.
+  ///
+  /// \note IT IS NOT AN AL MEMBER. `Record.Get(RecordId)` is, and it has to write these into the
+  ///       record's own key fields -- so the id lends what it holds rather than the record base
+  ///       reaching into it.
+  [[nodiscard]] std::span<const std::string> KeyValues() const { return key_; }
 
   /// \brief AL `RecordId.TableNo()`.
   ///

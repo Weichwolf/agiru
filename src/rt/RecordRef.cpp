@@ -16,7 +16,7 @@
 #include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
-#include "type/List.h"
+#include "type/KeyRef.h"
 #include "type/RecordId.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
@@ -58,6 +58,27 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
 
 ::agiru::Boolean RecordRef::FindFirst() {
   return detail::RuntimeFind(record_, Table(), "-");
+}
+
+std::string FieldRef::ToText() const {
+  if (def_ == nullptr) { throw Error("this FieldRef names no field"); }
+  return ::agiru::FieldText(record_, *def_);
+}
+
+::agiru::Boolean RecordRef::FindLast() {
+  return detail::RuntimeFind(record_, Table(), "+");
+}
+
+::agiru::RecordId RecordRef::RecordId() const {
+  const TableDef &table = Table();
+  std::vector<std::string> key;
+  if (!table.keys.empty()) {
+    for (const FieldNo no : table.keys.front().fields) {
+      const FieldDef *def = agiru::Field(table, no);
+      if (def != nullptr) { key.push_back(::agiru::detail::StorageText(record_, *def)); }
+    }
+  }
+  return ::agiru::RecordId{table.id, std::string(table.caption), std::move(key)};
 }
 
 void RecordRef::GetTable(Variant &rec) {
@@ -277,6 +298,45 @@ FieldRef RecordRef::FieldIndex(Integer index) const {
                 std::to_string(table.fields.size()));
   }
   return FieldRef{record_, table, table.fields[static_cast<std::size_t>(index) - 1]};
+}
+
+KeyRef RecordRef::KeyIndex(Integer Index) const {
+  const TableDef &table = Table();
+  if (Index < 1 || static_cast<std::size_t>(Index) > table.keys.size()) {
+    throw Error("the key index " + std::to_string(Index) + " is outside 1.." +
+                std::to_string(table.keys.size()));
+  }
+  return KeyRef{record_, table, table.keys[static_cast<std::size_t>(Index) - 1]};
+}
+
+Boolean KeyRef::Active() const {
+  if (def_ == nullptr) { throw Error("this KeyRef selects no key"); }
+  return def_->enabled;
+}
+
+Integer KeyRef::FieldCount() const {
+  if (def_ == nullptr) { throw Error("this KeyRef selects no key"); }
+  return static_cast<Integer>(def_->fields.size());
+}
+
+FieldRef KeyRef::FieldIndex(Integer Index) const {
+  if (def_ == nullptr || table_ == nullptr) { throw Error("this KeyRef selects no key"); }
+  if (Index < 1 || static_cast<std::size_t>(Index) > def_->fields.size()) {
+    throw Error("the field index " + std::to_string(Index) + " is outside 1.." +
+                std::to_string(def_->fields.size()) + " of key " + std::string(def_->name));
+  }
+  const FieldNo no = def_->fields[static_cast<std::size_t>(Index) - 1];
+  const FieldDef *field = agiru::Field(*table_, no);
+  if (field == nullptr) {
+    throw Error("key " + std::string(def_->name) + " names field " + std::to_string(no.Value()) +
+                ", which the table does not declare");
+  }
+  return FieldRef{record_, *table_, *field};
+}
+
+RecordRef KeyRef::Record() const {
+  if (table_ == nullptr) { throw Error("this KeyRef selects no key"); }
+  return RecordRef{record_, *table_};
 }
 
 bool RecordRef::FieldExist(Integer fieldNo) const {

@@ -1,6 +1,5 @@
 #include "Builtins.h"
 
-#include "platform/Company.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
@@ -9,7 +8,6 @@
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
-#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
@@ -21,8 +19,8 @@
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 #include "type/TableConnectionType.h"
-#include "type/Text.h"
 #include "type/Time.h"
 #include "type/TransactionType.h"
 #include "type/Variant.h"
@@ -41,18 +39,6 @@ namespace agiru {
 
 std::string ApplicationPath() {
   RefuseDoor("System.ApplicationPath()");
-}
-
-::agiru::Date CalcDate(::agiru::DateFormula DateExpression, ::agiru::Date Date) {
-  static_cast<void>(DateExpression);
-  static_cast<void>(Date);
-  RefuseDoor("System.CalcDate(DateFormula, Date)");
-}
-
-::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date) {
-  static_cast<void>(DateExpression);
-  static_cast<void>(Date);
-  RefuseDoor("System.CalcDate(Text, Date)");
 }
 
 std::string CaptionClassTranslate(std::string_view CaptionClassText) {
@@ -93,21 +79,6 @@ void CodeCoverageRefresh() {
   RefuseDoor("System.CompressArray(Array of [Text])");
 }
 
-::agiru::Boolean CopyStream(const ::agiru::OutStream &OutStream,
-                            const ::agiru::InStream &InStream,
-                            ::agiru::Integer BytesToRead) {
-  static_cast<void>(OutStream);
-  static_cast<void>(InStream);
-  static_cast<void>(BytesToRead);
-  RefuseDoor("System.CopyStream(OutStream, InStream, Integer)");
-}
-
-::agiru::DateTime CreateDateTime(::agiru::Date Date, ::agiru::Time Time) {
-  static_cast<void>(Date);
-  static_cast<void>(Time);
-  RefuseDoor("System.CreateDateTime(Date, Time)");
-}
-
 ::agiru::Boolean CreateEncryptionKey() {
   RefuseDoor("System.CreateEncryptionKey()");
 }
@@ -137,16 +108,6 @@ std::string Decrypt(std::string_view EncryptedString) {
 
 void DeleteEncryptionKey() {
   RefuseDoor("System.DeleteEncryptionKey()");
-}
-
-::agiru::Date DT2Date(::agiru::DateTime Datetime) {
-  static_cast<void>(Datetime);
-  RefuseDoor("System.DT2Date(DateTime)");
-}
-
-::agiru::Time DT2Time(::agiru::DateTime Datetime) {
-  static_cast<void>(Datetime);
-  RefuseDoor("System.DT2Time(DateTime)");
 }
 
 ::agiru::Date DWY2Date(::agiru::Integer WeekDay, ::agiru::Integer Week, ::agiru::Integer Year) {
@@ -248,15 +209,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
 ::agiru::Date NormalDate(::agiru::Date Date) {
   static_cast<void>(Date);
   RefuseDoor("System.NormalDate(Date)");
-}
-
-::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
-                                ::agiru::BigInteger Precision,
-                                std::string_view Direction) {
-  static_cast<void>(Datetime);
-  static_cast<void>(Precision);
-  static_cast<void>(Direction);
-  RefuseDoor("System.RoundDateTime(DateTime, BigInteger, Text)");
 }
 
 void Sleep(::agiru::Integer Duration) {

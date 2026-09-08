@@ -32,7 +32,8 @@ for d, pre in (("include/type", "type"), ("include/runtime", "runtime"),
         # gave `platform/Integer.h`, which declares something else of that name.
         existing.setdefault(f.stem, f"{pre}/{f.name}")
 existing.update({"InStream": "type/Stream.h", "OutStream": "type/Stream.h",
-                 "FieldRef": "runtime/RecordRef.h", "RecordRef": "runtime/RecordRef.h"})
+                 "FieldRef": "runtime/RecordRef.h", "RecordRef": "runtime/RecordRef.h",
+                 "Text": "type/StringValue.h"})
 # A BARE OBJECT TYPE IS NOT A TYPE HERE. `Codeunit.Run(Codeunit, Record)` names an object by number
 # and hands it a record; both are values whose type the CALLER decides, which is what Variant is.
 for bare in ("Codeunit", "Record", "Page", "Report", "Query", "XmlPort", "Table", "TestPage",
@@ -196,12 +197,16 @@ bodytext = "\n".join(allbodies)
 # `RefuseDoor("Session.CurrentClientType()")` -- so searching the raw source found `Session` and
 # `Any` and asked for headers no code uses.
 code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', bodytext)
-inbody = {t for t in existing if re.search(r"\b" + t + r"\b", code)}
+# A PARAMETER NAME IS NOT A TYPE. AL names a parameter after its own subject -- `Company`,
+# `Date`, `Time` -- and a bare word search asked for `platform/Company.h` because a refusal
+# spells `std::string_view Company`. The door writes every type QUALIFIED, so that is what is
+# looked for.
+inbody = {t for t in existing if re.search(r"::agiru::" + t + r"\b", code)}
 # The same suppression the header carries, for the same reason: these are AL's parameter orders.
 guard = ("// NOLINTBEGIN(bugprone-easily-swappable-parameters,"
          "performance-unnecessary-value-param)")
 src = ['#include "Builtins.h"', "", '#include "runtime/Error.h"'] + \
-      [f'#include "{existing[t]}"' for t in sorted(inbody)] + \
+      [f'#include "{h}"' for h in sorted({existing[t] for t in inbody})] + \
       ["", "#include <string>", "#include <string_view>", "", "namespace agiru {", "",
        "[[noreturn]] void RefuseDoor(std::string_view what) {",
        '  throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");',

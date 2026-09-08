@@ -204,6 +204,15 @@ public:
   /// \throws Error when the field's type has no Variant alternative yet.
   [[nodiscard]] Variant Value() const;
 
+  /// \brief AL `Format(FieldRef)` -- the field's value as text.
+  /// \return The value, rendered the way a message shows it.
+  ///
+  /// \note WITHOUT IT `Format(FieldRef)` WAS INFINITE RECURSION. `AsText` falls through to
+  ///       `Format` for a value it cannot render, and the non-Variant `Format` is defined as
+  ///       `AsText` -- so a type with neither a text conversion nor a `ToText` called the two in
+  ///       turn until the stack ran out (measured 2026-09-08, `ERM Table Fields UT`).
+  [[nodiscard]] std::string ToText() const;
+
   /// \brief AL `FieldRef.Value(NewValue)` -- the setter, written as a call.
   ///
   /// \tparam T What AL handed it.
@@ -756,11 +765,8 @@ public:
 
   /// \brief AL `RecordRef.FindLast()`. Finds the last record in a table based on the current key
   /// and filter.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindLast() {
-    throw Error("RecordRef.FindLast() is declared and not implemented yet (board:0035)");
-  }
+  /// \return True when a row was read.
+  ::agiru::Boolean FindLast();
 
   /// \brief AL `RecordRef.FindSet(Boolean, Boolean)`. Finds a set of records in a table based on
   /// the current key and filter. FindSet can only retrieve records in ascending order.
@@ -915,10 +921,7 @@ public:
   /// \param Index The AL `Integer`.
   /// \return The AL `KeyRef`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::KeyRef KeyIndex(::agiru::Integer Index) {
-    static_cast<void>(Index);
-    throw Error("RecordRef.KeyIndex(Integer) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::KeyRef KeyIndex(::agiru::Integer Index) const;
 
   /// \brief AL `RecordRef.LoadFields(Integer)`. Accesses the table's corresponding data source and
   /// loads the values of the specified fields on the record.
@@ -1007,9 +1010,7 @@ public:
   /// in the table. If no table is selected, an error is generated.
   /// \return The AL `RecordId`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::RecordId RecordId() {
-    throw Error("RecordRef.RecordId() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::RecordId RecordId() const;
 
   /// \brief AL `RecordRef.RecordLevelLocking()`. Gets a value indicating whether record level
   /// locking is enabled.
@@ -1230,6 +1231,10 @@ public:
   [[nodiscard]] Integer KeyCount() const;
 
 private:
+  friend class KeyRef;
+
+  RecordRef(void *record, const TableDef &table) : record_(record), table_(&table) {}
+
   [[nodiscard]] const TableDef &Table() const;
 
   void *record_ = nullptr;

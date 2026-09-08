@@ -18,6 +18,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
+#include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
@@ -59,6 +60,80 @@ namespace agiru {
 ///       before refusing, so a test with `[HandlerFunctions]` gets its answer and one without gets
 ///       the platform's refusal (board:0054).
 [[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
+
+/// \brief AL `System.CalcDate(DateFormula)`. Calculates a new date from the current system date.
+///
+/// \param DateExpression The formula.
+/// \return The date the formula reaches from today.
+///
+/// \note THE OMITTED REFERENCE DATE IS TODAY AND NOT THE WORKDATE.
+///       `system-calcdate-dateformula-date-method.md` says "the current system date", which is
+///       `Today()`; the workdate is a session setting a formula never consults.
+///
+/// \note THE ONE-ARGUMENT FORM IS ITS OWN OVERLOAD, because a default of `0D` cannot say whether
+///       the caller omitted the date or passed a blank one -- and those two answers differ: an
+///       explicit blank date stays blank, an omitted one is today.
+::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression);
+
+/// \brief AL `System.CalcDate(DateFormula, Date)`. Calculates a new date from a reference date.
+///
+/// \param DateExpression The formula.
+/// \param Date The reference date.
+/// \return The date the formula reaches from it, or the undefined date when it is undefined.
+::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression, ::agiru::Date Date);
+
+/// \brief AL `System.CalcDate(Text)`. Calculates a new date from the current system date.
+///
+/// \param DateExpression The formula, as text.
+/// \return The date the formula reaches from today.
+///
+/// \note THE TEXT IS READ IN THE INVARIANT FORM. `DateFormula::FromText` takes the formula with
+///       or without its angle brackets and refuses a language-dependent spelling by answering an
+///       empty formula, which moves the date nowhere.
+::agiru::Date CalcDate(std::string_view DateExpression);
+
+/// \brief AL `System.CalcDate(Text, Date)`. Calculates a new date from a reference date.
+///
+/// \param DateExpression The formula, as text.
+/// \param Date The reference date.
+/// \return The date the formula reaches from it, or the undefined date when it is undefined.
+::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date);
+
+/// \brief AL `System.CreateDateTime(Date, Time)`. Creates a DateTime from a date and a time.
+/// \param Date The date.
+/// \param Time The time.
+/// \return The instant.
+///
+/// \note IT IS THE ONLY WAY IN. `datetime-data-type.md`: "The only constant available when you
+///       use the DateTime data type is the undefined DateTime, 0DT" -- there is no literal, so
+///       every DateTime an AL body builds comes through here.
+::agiru::DateTime CreateDateTime(::agiru::Date Date, ::agiru::Time Time);
+
+/// \brief AL `System.DT2Date(DateTime)`. Gets the date part of a DateTime.
+/// \param Datetime The instant.
+/// \return Its date.
+::agiru::Date DT2Date(::agiru::DateTime Datetime);
+
+/// \brief AL `System.DT2Time(DateTime)`. Gets the time part of a DateTime.
+/// \param Datetime The instant.
+/// \return Its time.
+::agiru::Time DT2Time(::agiru::DateTime Datetime);
+
+/// \brief AL `System.RoundDateTime(DateTime [, BigInteger] [, Text])`. Rounds a DateTime.
+///
+/// \param Datetime  The instant to round.
+/// \param Precision How many milliseconds one step is; 1000 -- a second -- when omitted.
+/// \param Direction `=` to the nearest (the default), `>` up, `<` down.
+/// \return The rounded instant.
+/// \throws Error when the precision is not positive, which the page forbids, and when the
+///         direction is none of the three.
+///
+/// \note IT ROUNDS THE MILLISECONDS AND NOTHING ELSE. The page says so outright -- "the DateTime
+///       integer value is rounded as a numeric variable" -- so no calendar arithmetic is involved
+///       and a precision of 3 600 000 rounds to the hour by division.
+::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
+                                ::agiru::BigInteger Precision = 1000,
+                                std::string_view Direction = "=");
 
 /// \brief AL `System.CanLoadType(DotNet)`. Whether a .NET type can be loaded.
 /// \tparam T Whatever AL handed it -- a `DotNet` variable is a refusal in this tree.
@@ -199,6 +274,21 @@ StartSession(::agiru::Integer &SessionId,
   throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
 }
 
+/// \brief AL `System.CopyStream(OutStream, InStream [, Integer])` between two AL streams.
+///
+/// \param OutStream   Where the bytes go.
+/// \param InStream    Where they come from.
+/// \param BytesToRead How many; the rest of the source when omitted or zero.
+/// \return True when the bytes were copied.
+///
+/// \note IT COPIES BYTES AND ADDS NOTHING. `WriteText` is what puts characters in without a
+///       terminator, and that is what a copy is: `system-copystream-outstream-instream-method.md`
+///       calls it "the information that is contained in an InStream object to an OutStream
+///       object", which is the bytes and no framing of this runtime's invention.
+::agiru::Boolean CopyStream(::agiru::OutStream &OutStream,
+                            ::agiru::InStream &InStream,
+                            ::agiru::Integer BytesToRead = {});
+
 /// \brief AL `System.CopyStream(OutStream, InStream [, Integer])` where either side is a .NET
 ///        stream this run does not have.
 ///
@@ -220,8 +310,9 @@ StartSession(::agiru::Integer &SessionId,
 ///       so the overload exists to REFUSE at the right place rather than to fail to compile at the
 ///       call site (board:0609).
 template <typename Out, typename In>
-  requires(::agiru::dotnet::IsAbsent<Out> || ::agiru::dotnet::IsAbsent<In>)::agiru::Boolean
-CopyStream(Out &OutStream, In &InStream, ::agiru::Integer BytesToRead = {}) {
+  requires(::agiru::dotnet::IsAbsent<Out> || ::agiru::dotnet::IsAbsent<In> ||
+           ::agiru::dotnet::IsRefusal<Out> || ::agiru::dotnet::IsRefusal<In>)::agiru::Boolean
+CopyStream(Out &&OutStream, In &&InStream, ::agiru::Integer BytesToRead = {}) {
   static_cast<void>(OutStream);
   static_cast<void>(InStream);
   static_cast<void>(BytesToRead);
@@ -643,9 +734,9 @@ InsStr(std::string_view String, std::string_view SubString, ::agiru::Integer Pos
 ///       is the case that needs it; padding every shorter result to the length is what the
 ///       predecessor measured as a regression across its asserts, so this cuts and leaves the rest
 ///       alone. A length of 0 is no length at all, which is AL's own default.
-std::string Format(const ::agiru::Variant &Value,
-                   ::agiru::Integer Length = {},
-                   ::agiru::Integer FormatNumber = {});
+::agiru::Text<0> Format(const ::agiru::Variant &Value,
+                        ::agiru::Integer Length = {},
+                        ::agiru::Integer FormatNumber = {});
 
 /// \brief AL `System.Format(Any, Integer, Text)`. Formats a value with a format SPECIFICATION.
 ///
@@ -669,7 +760,7 @@ std::string Format(const ::agiru::Variant &Value,
 /// \note THE FILLER IS READ FROM THE WHOLE SPECIFICATION BEFORE ANYTHING IS RENDERED, because AL
 ///       writes it AFTER what it fills: `'<Integer,2><Filler Character,0>'` pads the integer with
 ///       zeroes, and a left-to-right reading would have found the filler too late.
-std::string
+::agiru::Text<0>
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString);
 
 /// \brief AL `System.GetUrl(ClientType [, Text, ObjectType, Integer, RecordRef, Boolean])`.

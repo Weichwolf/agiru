@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -29,34 +30,55 @@ class RecordRef;
 
 /// \brief AL `KeyRef`.
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/keyref/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// \note IT IS A KEY'S DECLARATION AND A RECORD, the same pair `FieldRef` is. `RecordRef.KeyIndex`
+///       hands one out, so what it points at is the record the RecordRef points at and the
+///       `KeyDef` the table declares -- both of which are already there, the second as `constexpr`
+///       data in `.rodata`.
 class KeyRef {
 public:
+  /// \brief A KeyRef pointing at nothing, which is what `var K: KeyRef` declares.
+  KeyRef() = default;
+
+  /// \brief A KeyRef over one key of one record.
+  /// \param record The record.
+  /// \param table  Its declaration.
+  /// \param def    The key's declaration.
+  KeyRef(void *record, const TableDef &table, const KeyDef &def)
+      : record_(record), table_(&table), def_(&def) {}
+
   /// \brief AL `KeyRef.Active()`. Indicates whether the key is enabled.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Active();
+  /// \throws Error when no key is selected.
+  ///
+  /// \note THE `Enabled` PROPERTY AND NOT THE INDEX. A disabled key is declared and not
+  ///       maintained, which is exactly what `KeyDef::enabled` carries.
+  ::agiru::Boolean Active() const;
 
   /// \brief AL `KeyRef.FieldCount()`. Gets the number of fields that have been defined in a key.
-  /// Returns an error if no key is selected.
   /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer FieldCount();
+  /// \throws Error when no key is selected.
+  ///
+  /// \note THE KEY'S OWN FIELDS AND NOT ITS INCLUDED ONES. `IncludedFields` is a separate span on
+  ///       the declaration for that reason: no key selects by them.
+  ::agiru::Integer FieldCount() const;
 
   /// \brief AL `KeyRef.FieldIndex(Integer)`. Gets the FieldRef of the field that has this index in
-  /// the key referred to by the KeyRef variable. Returns an error if no key is selected.
-  /// \param Index The AL `Integer`.
+  /// the key referred to by the KeyRef variable.
+  /// \param Index The AL `Integer`, counting from ONE.
   /// \return The AL `FieldRef`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::FieldRef FieldIndex(::agiru::Integer Index);
+  /// \throws Error when no key is selected, and when the index is outside the key.
+  ::agiru::FieldRef FieldIndex(::agiru::Integer Index) const;
 
   /// \brief AL `KeyRef.Record()`. Returns a RecordRef for the current record referred to by the
   /// key.
   /// \return The AL `RecordRef`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::RecordRef Record();
+  /// \throws Error when no key is selected.
+  ::agiru::RecordRef Record() const;
+
+private:
+  void *record_ = nullptr;
+  const TableDef *table_ = nullptr;
+  const KeyDef *def_ = nullptr;
 };
 
 }

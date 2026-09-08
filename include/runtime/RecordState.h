@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -439,7 +440,7 @@ void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text)
 ///
 /// \note `SetRange(No, 'A..B')` FILTERS FOR THAT LITERAL CODE and not for a range: the value came
 ///       from a variable and AL never re-reads it as an expression. Quoting is what says so.
-[[nodiscard]] std::string Literally(const std::string &value);
+[[nodiscard]] std::string Literally(std::string_view value);
 
 /// \brief Whether the table declares a key those fields select.
 ///

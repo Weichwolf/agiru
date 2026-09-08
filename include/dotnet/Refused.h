@@ -11,6 +11,12 @@
 /// \file
 /// \brief What a .NET member that has not been rebuilt answers with: nothing, loudly.
 
+namespace agiru {
+
+class Variant;
+
+}
+
 namespace agiru::dotnet {
 
 /// \brief A .NET member the runtime carries by name and cannot yet perform.
@@ -557,6 +563,28 @@ struct AbsentType;
 template <typename T>
 concept IsAbsent = requires { typename std::remove_cvref_t<T>::IsAnAbsentType; };
 
+/// \brief Whether a value is a refusal -- what a .NET member that was not rebuilt answers with.
+/// \tparam T The type.
+template <typename T>
+concept IsRefusal = requires { typename std::remove_cvref_t<T>::IsAlRefusal; };
+
+/// \brief Whether an absent .NET value may be READ as a `T` -- and refuse there.
+///
+/// \tparam T The type the caller wants.
+///
+/// \note A `Variant` IS EXCLUDED BY MEASUREMENT AND NOT BY TASTE. A stub that converts to
+///       everything also converts to a Variant, and that made `Instance<absent::X>` STOP
+///       converting to one: `BindSubscription(SomeCodeunit)` lost its Variant overload at every
+///       site whose codeunit is not transpiled (measured 2026-09-08, `ERMUpdateCurrencySales`).
+///       A refusal that removes a working conversion is worse than the compile error it replaces.
+///
+/// \note THE STANDARD STRINGS ARE EXCLUDED FOR `Refused`'S OWN REASON. `Code<50> = Obj.Member`
+///       had two viable conversions once a std::string was among them, and two user-defined
+///       conversions to two different parameters is ambiguous rather than wrong.
+template <typename T>
+concept ReadableAsAValue = !IsAbsent<T> && !std::is_same_v<T, ::agiru::Variant> &&
+                           !std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>;
+
 /// \brief What every stub for a type this runtime does not have derives from.
 ///
 /// \note IT EXISTS SO THE STUBS INTERCONVERT. AL hands a `JToken` to a parameter declared
@@ -580,6 +608,23 @@ struct AbsentType {
     requires IsAbsent<T>
   [[nodiscard]] operator T() const {
     return T{};
+  }
+
+  /// \brief Refuses to be read as a value, which is what AL asks of it at an assignment.
+  /// \tparam T The AL type the caller wants.
+  /// \return Never.
+  /// \throws Error always.
+  ///
+  /// \note IT LIVES IN THE BASE BESIDE THE OTHER ONE AND NOT IN THE STUB, because a conversion
+  ///       operator declared in a derived class HIDES every one the base declares: emitted per
+  ///       stub, it took the stub-to-stub conversion away and `JToken` stopped reaching `JObject`
+  ///       (measured 2026-09-08, `WorkflowWebhookSubscription`). The price is that the message
+  ///       names no type, and the stub's own members still do.
+  template <typename T>
+    requires ReadableAsAValue<T>
+  [[nodiscard]] operator T() const {
+    return Refused{
+        {.type = "<a .NET type this runtime has not rebuilt>", .member = "(read as a value)"}};
   }
 };
 

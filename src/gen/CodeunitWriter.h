@@ -165,6 +165,10 @@ bool NamesAbsentIn(const std::vector<al::VarDecl> &variables,
 
 bool DeclaresAnObject(const al::VarDecl &declared);
 
+bool ArityFits(const std::vector<al::ProcedureDecl> &procedures,
+               std::string_view name,
+               std::size_t count);
+
 const TableRef *ReachObject(const al::VarDecl &declared, const Objects &objects);
 
 }

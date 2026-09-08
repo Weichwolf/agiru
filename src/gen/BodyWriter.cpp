@@ -497,9 +497,27 @@ private:
     return out + ")";
   }
 
-  std::string Callee(const al::Expr &callee) {
+  std::string PlatformCall(const al::Expr &callee) const {
+    if (callee.kind != al::ExprKind::Binary || callee.text != "." || callee.children.size() != 2) {
+      return {};
+    }
+    const al::Expr &qualifier = callee.children[0];
+    const al::Expr &member = callee.children[1];
+    if (qualifier.kind != al::ExprKind::Name || member.kind != al::ExprKind::Name ||
+        !SameName(qualifier.text, "System") || scope_.IsVariable(qualifier.text) ||
+        !DoorCalls(member.text)) {
+      return {};
+    }
+    return "::agiru::" + BuiltinSpelling(member.text);
+  }
+
+  std::string Callee(const al::Expr &callee, std::size_t arguments) {
+    if (const std::string platform = PlatformCall(callee); !platform.empty()) { return platform; }
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
+    if (DoorCalls(callee.text) && !scope_.TakesArguments(callee.text, arguments)) {
+      return "::agiru::" + BuiltinSpelling(callee.text);
+    }
     std::string known = scope_.Resolve(callee.text);
     if (!scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
@@ -552,7 +570,8 @@ private:
         !scope_.IsVariable(callee.children[0].text)) {
       return RunObject(expression, callee);
     }
-    const std::string spelled = Callee(callee);
+    const std::string spelled =
+        Callee(callee, expression.children.empty() ? 0 : expression.children.size() - 1);
     std::string out = spelled + "(";
     std::string receiver;
     std::string reach = ".";
@@ -576,6 +595,9 @@ private:
     const std::vector<bool> publisherVars = callee.kind == al::ExprKind::Name
                                                 ? scope_.VarParametersOfPublisher(callee.text)
                                                 : std::vector<bool>{};
+    const std::vector<std::string> lent = callee.kind == al::ExprKind::Name
+                                              ? scope_.LentParameters(callee.text)
+                                              : std::vector<std::string>{};
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
       const al::Expr &argument = expression.children[i];
@@ -585,6 +607,11 @@ private:
            SameName(argument.text, "Rec") || SameName(argument.text, "xRec"));
       const bool lvalue = named || argument.kind == al::ExprKind::Index ||
                           (argument.kind == al::ExprKind::Binary && argument.text == ".");
+      if (i - 1 < lent.size() && !lent[i - 1].empty() && argument.kind == al::ExprKind::Name &&
+          SameName(scope_.DeclaredType(argument.text), "Variant")) {
+        out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
+        continue;
+      }
       if (i - 1 < publisherVars.size() && publisherVars[i - 1] && !lvalue) {
         out += "::agiru::Materialised(" + Expression(argument, 0) + ")";
         continue;
@@ -1096,6 +1123,10 @@ std::string NamedEnum(const Objects &objects, std::string_view name) {
 
 class TableNames : public Names {
 public:
+  [[nodiscard]] bool TakesArguments(std::string_view name, std::size_t count) const override {
+    return ArityFits(table_.procedures, name, count);
+  }
+
   TableNames(const al::TableObject &table,
              const Objects &objects,
              const al::ProcedureDecl *running = nullptr)
@@ -1473,6 +1504,10 @@ private:
 
 class PageNames : public Names {
 public:
+  [[nodiscard]] bool TakesArguments(std::string_view name, std::size_t count) const override {
+    return ArityFits(page_.procedures, name, count);
+  }
+
   [[nodiscard]] std::string EnumMember(std::string_view enumeration,
                                        std::string_view member) const override {
     return DeclaredEnumMember(objects_, enumeration, member);

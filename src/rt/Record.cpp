@@ -18,6 +18,8 @@
 #include "type/RecordId.h"
 #include "type/Time.h"
 
+#include "BuiltinsWritten.h"
+
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -43,6 +45,14 @@ std::string PrimaryKeyText(const void *record, const TableDef &table, std::strin
     out += std::string(def->caption) + "='" + FieldText(record, *def) + "'";
   }
   return out;
+}
+
+}
+
+namespace detail {
+
+std::string VariantText(const Variant &value) {
+  return std::string(std::string_view(::agiru::Format(value)));
 }
 
 }

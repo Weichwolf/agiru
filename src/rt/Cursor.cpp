@@ -2,6 +2,7 @@
 
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/Session.h"
 
 #include <atomic>
 #include <cstddef>
@@ -30,6 +31,7 @@ Cursor::Cursor(const Connection &connection,
 }
 
 Cursor::~Cursor() {
+  if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
   try {
     connection_->Run("CLOSE " + name_);
   } catch (const Error &e) {

@@ -6,8 +6,13 @@
 
 #include <algorithm>
 #include <array>
+#include <csetjmp>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#if __has_include(<execinfo.h>) && !defined(__MINGW32__)
+#include <execinfo.h>
+#endif
 #include <exception>
 #include <print>
 #include <span>
@@ -189,7 +194,45 @@ int Version() {
 
 }
 
+namespace {
+
+#if __has_include(<execinfo.h>) && !defined(__MINGW32__)
+constexpr int kFrames = 64;
+constexpr int kSignalBase = 128;
+constexpr std::size_t kAltStack = 1U << 18U;
+
+extern "C" void Fell(int signal) {
+  std::array<void *, kFrames> frames{};
+  const int depth = backtrace(frames.data(), kFrames);
+  std::println(stderr, "agiru: signal {} -- {} frame(s) follow", signal, depth);
+  std::fflush(stderr);
+  backtrace_symbols_fd(frames.data(), depth, 2);
+  std::_Exit(signal + kSignalBase);
+}
+
+void WatchForFalls() {
+  static std::array<char, kAltStack> spare{};
+  stack_t alt{};
+  alt.ss_sp = spare.data();
+  alt.ss_size = spare.size();
+  alt.ss_flags = 0;
+  static_cast<void>(sigaltstack(&alt, nullptr));
+  struct sigaction how{};
+  how.sa_handler = Fell;
+  how.sa_flags = SA_ONSTACK | SA_RESETHAND;
+  sigemptyset(&how.sa_mask);
+  for (const int signal : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
+    static_cast<void>(sigaction(signal, &how, nullptr));
+  }
+}
+#else
+void WatchForFalls() {}
+#endif
+
+}
+
 int main(int argc, char **argv) {
+  WatchForFalls();
   try {
     std::vector<std::string_view> arguments;
     arguments.reserve(static_cast<std::size_t>(argc > 1 ? argc - 1 : 0));

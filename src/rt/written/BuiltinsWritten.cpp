@@ -22,6 +22,7 @@
 #include "type/List.h"
 #include "type/ObjectType.h"
 #include "type/RecordId.h"
+#include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
@@ -220,7 +221,69 @@ std::string SpecToken(const ::agiru::Variant &Value, const Token &token, char fi
 
 }
 
-std::string
+::agiru::Boolean CopyStream(::agiru::OutStream &OutStream,
+                            ::agiru::InStream &InStream,
+                            ::agiru::Integer BytesToRead) {
+  ::agiru::Text<0> read;
+  const ::agiru::Integer left = InStream.Length() - (InStream.Position() - 1);
+  const ::agiru::Integer want = BytesToRead > 0 && BytesToRead < left ? BytesToRead : left;
+  InStream.ReadText(read, want);
+  OutStream.WriteText(std::string_view(read));
+  return true;
+}
+
+::agiru::DateTime CreateDateTime(::agiru::Date Date, ::agiru::Time Time) {
+  return ::agiru::DateTime::Create(Date, Time);
+}
+
+::agiru::Date DT2Date(::agiru::DateTime Datetime) {
+  return Datetime.Date();
+}
+
+::agiru::Time DT2Time(::agiru::DateTime Datetime) {
+  return Datetime.Time();
+}
+
+::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
+                                ::agiru::BigInteger Precision,
+                                std::string_view Direction) {
+  if (Precision <= 0) {
+    throw ::agiru::Error("System.RoundDateTime: the precision must be a positive BigInteger");
+  }
+  if (Direction != "=" && Direction != ">" && Direction != "<") {
+    throw ::agiru::Error("System.RoundDateTime: the direction is '=', '>' or '<' and not '" +
+                         std::string(Direction) + "'");
+  }
+  const std::int64_t step = Precision;
+  const std::int64_t at = Datetime.AsMilliseconds();
+  const std::int64_t below = at - (at % step);
+  if (below == at) { return Datetime; }
+  std::int64_t rounded = below;
+  if (Direction == ">") {
+    rounded = below + step;
+  } else if (Direction == "=") {
+    rounded = ((at - below) * 2 >= step) ? below + step : below;
+  }
+  return ::agiru::DateTime::FromMilliseconds(rounded);
+}
+
+::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression) {
+  return DateExpression.CalcDate(Today());
+}
+
+::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression, ::agiru::Date Date) {
+  return DateExpression.CalcDate(Date);
+}
+
+::agiru::Date CalcDate(std::string_view DateExpression) {
+  return ::agiru::DateFormula::FromText(DateExpression).CalcDate(Today());
+}
+
+::agiru::Date CalcDate(std::string_view DateExpression, ::agiru::Date Date) {
+  return ::agiru::DateFormula::FromText(DateExpression).CalcDate(Date);
+}
+
+::agiru::Text<0>
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, ::agiru::Integer FormatNumber) {
   if (FormatNumber != kDisplayFormat && FormatNumber != kEditFormat &&
       FormatNumber != kCodeFormat && FormatNumber != kXmlFormat) {
@@ -230,7 +293,7 @@ Format(const ::agiru::Variant &Value, ::agiru::Integer Length, ::agiru::Integer 
   return Fitted(Rendered(Value, FormatNumber), Length, Numeric(Value), ' ');
 }
 
-std::string
+::agiru::Text<0>
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view FormatString) {
   const std::vector<Token> tokens = Parsed(FormatString);
   char filler = ' ';
@@ -504,23 +567,23 @@ public:
                                          ? std::numeric_limits<std::int32_t>::max()
                                          : std::abs(static_cast<std::int64_t>(seed));
     std::int64_t mj = kSeed - subtraction;
-    state_[55] = mj;
+    state_[kLag] = mj;
     std::int64_t mk = 1;
-    for (std::size_t i = 1; i < 55; ++i) {
-      const std::size_t ii = (21 * i) % 55;
+    for (std::size_t i = 1; i < kLag; ++i) {
+      const std::size_t ii = (kStride * i) % kLag;
       state_[ii] = mk;
       mk = mj - mk;
       if (mk < 0) { mk += kBig; }
       mj = state_[ii];
     }
-    for (int round = 1; round < 5; ++round) {
-      for (std::size_t i = 1; i < 56; ++i) {
-        state_[i] -= state_[1 + ((i + 30) % 55)];
+    for (int round = 1; round < kWarmups; ++round) {
+      for (std::size_t i = 1; i < kSlots; ++i) {
+        state_[i] -= state_[1 + ((i + kSecondLag) % kLag)];
         if (state_[i] < 0) { state_[i] += kBig; }
       }
     }
     next_ = 0;
-    nextp_ = 21;
+    nextp_ = kStride;
   }
 
   [[nodiscard]] std::int32_t Between(std::int32_t low, std::int32_t high) {
@@ -531,9 +594,9 @@ public:
 private:
   [[nodiscard]] std::int64_t Sample() {
     std::size_t at = next_ + 1;
-    if (at >= 56) { at = 1; }
+    if (at >= kSlots) { at = 1; }
     std::size_t other = nextp_ + 1;
-    if (other >= 56) { other = 1; }
+    if (other >= kSlots) { other = 1; }
     std::int64_t drawn = state_[at] - state_[other];
     if (drawn == kBig) { drawn -= 1; }
     if (drawn < 0) { drawn += kBig; }
@@ -545,7 +608,12 @@ private:
 
   static constexpr std::int64_t kBig = 2147483647;
   static constexpr std::int64_t kSeed = 161803398;
-  std::array<std::int64_t, 56> state_{};
+  static constexpr std::size_t kLag = 55;
+  static constexpr std::size_t kSecondLag = 30;
+  static constexpr std::size_t kStride = 21;
+  static constexpr std::size_t kSlots = kLag + 1;
+  static constexpr int kWarmups = 5;
+  std::array<std::int64_t, kSlots> state_{};
   std::size_t next_ = 0;
   std::size_t nextp_ = 0;
 };

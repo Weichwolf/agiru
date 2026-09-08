@@ -3,8 +3,9 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 
-#include <algorithm>
+#include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace agiru::detail {
@@ -18,8 +19,8 @@ void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text)
   state.filters.push_back(FieldFilter{.field = field, .group = state.group, .text = text});
 }
 
-std::string Literally(const std::string &value) {
-  if (value.find_first_of("..|&<>=*?@'()") == std::string::npos) { return value; }
+std::string Literally(std::string_view value) {
+  if (value.find_first_of("..|&<>=*?@'()") == std::string_view::npos) { return std::string(value); }
   std::string out = "'";
   for (const char c : value) {
     if (c == '\'') { out += '\''; }

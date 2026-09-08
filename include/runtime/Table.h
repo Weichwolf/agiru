@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
@@ -11,12 +12,15 @@
 #include "type/Integer.h"
 #include "type/IsolationLevel.h"
 #include "type/Option.h"
+#include "type/RecordId.h"
 #include "type/SecurityFilter.h"
 
 #include <array>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <span>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -542,6 +546,45 @@ public:
     return Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
   }
 
+  /// \brief AL `Record.Get(RecordId)` -- the row that id names.
+  ///
+  /// \param id The id, which carries the table and the primary key values.
+  /// \return True when the row was there.
+  /// \throws Error when the id is blank, and when it names another table.
+  ///
+  /// \note THE BASEAPP CALLS IT AND `record-get-method.md` DOES NOT SPELL IT OUT.
+  ///       `ItemCategoryManagement.GetLastChildCode` pushes `ItemCategory.RecordId()` onto a
+  ///       stack and reads each one back with `ItemCategory.Get(RecId)`, so the id's key values
+  ///       ARE the `Any...` the page names. What the page does say is the near miss: a key field
+  ///       of type RecordID cannot be fetched this way, "because RecordId already is the primary
+  ///       key itself and not one of the fields that forms it".
+  ///
+  /// \warning WITHOUT THIS OVERLOAD THE VARIADIC ONE TOOK IT and wrote a `RecordId` -- a string
+  ///          and a vector -- over a `Code[20]` field through a `reinterpret_cast`, which is a
+  ///          segmentation fault three frames later (measured 2026-09-08, `ERM VAT Tool - UT`).
+  ///          `AssignKey` now refuses a value whose type is not the field's, so the same mistake
+  ///          elsewhere is an error rather than a corrupted record.
+  bool Get(const ::agiru::RecordId &id) {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (id.IsEmpty()) { throw Error("Get: the RecordId names no record"); }
+    if (id.TableNo() != table.id.Value()) {
+      throw Error("Get: the RecordId names table " + std::to_string(id.TableNo()) +
+                  " and this is " + std::to_string(table.id.Value()));
+    }
+    const std::span<const std::string> values = id.KeyValues();
+    if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
+      throw Error("Get: the RecordId carries " + std::to_string(values.size()) +
+                  " key value(s) and the primary key has " +
+                  std::to_string(table.keys.empty() ? 0 : table.keys[0].fields.size()));
+    }
+    for (std::size_t at = 0; at < values.size(); ++at) {
+      const FieldDef *def = Field(table, table.keys[0].fields[at]);
+      if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
+      detail::SetFieldText(Self(), *def, values[at]);
+    }
+    return Read(detail::RuntimeGet(Self(), table));
+  }
+
   /// \brief AL `Record.FieldError(Field [, Text])`, naming the field itself.
   ///
   /// \tparam FieldType The field member's type.
@@ -963,14 +1006,24 @@ public:
     return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, no);
   }
 
-  /// \brief AL `Record.FilterGroup(...)`. Gets or sets the filter group that is applied to a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Integer FilterGroup(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.FilterGroup is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.FilterGroup()` -- which group `SetRange` and `SetFilter` write into.
+  /// \return The group in force.
+  [[nodiscard]] Integer FilterGroup() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr ? 0 : state->group;
+  }
+
+  /// \brief AL `Record.FilterGroup(Integer)` -- moves the record into a filter group.
+  /// \param group The group.
+  /// \return The group that was in force before.
+  ///
+  /// \note EVERY GROUP IS ACTIVE AT ONCE AND THIS ONLY SAYS WHERE THE NEXT FILTER GOES, which is
+  ///       what the state already holds: the filters carry their group and are ANDed across them,
+  ///       with -1 the one whose own fields OR together.
+  Integer FilterGroup(Integer group) {
+    const Integer was = State().group;
+    State().group = group;
+    return was;
   }
 
   /// \brief AL `Record.Find([Which])` -- reads the one row `Which` names.
@@ -1279,11 +1332,19 @@ public:
   /// transactions that conflict with each other.
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void LockTable(Arguments &&...arguments) const {
+  ///
+  /// \note IT RAISES THE RECORD'S ISOLATION AND READS NOTHING. `devenv-tri-state-locking.md`
+  ///       makes the level a per-record state machine -- a read takes `READUNCOMMITTED` until the
+  ///       session writes, and `LockTable()` raises it to `UPDLOCK` -- so the whole of what the
+  ///       call does is move that state, and the next read carries it.
+  ///
+  /// \warning THE ARGUMENTS ARE DISCARDED. `LockTable(true, true)` asks the platform to WAIT and
+  ///          to read the record again; neither is expressible until the cursor layer carries a
+  ///          lock (board:0012), and refusing the whole call over that stopped 28 UT procedures
+  ///          that only ask for the lock before writing (measured 2026-09-08).
+  template <typename... Arguments> void LockTable(Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.LockTable is declared and not implemented yet (board:0035)");
+    State().isolation = IsolationLevel::UpdLock;
   }
 
   /// \brief AL `Record.Mark()` -- whether the record the variable stands on is marked.
@@ -1421,9 +1482,21 @@ public:
   ///       `record-recordid-method.md` names the type, and AL hands the result straight to a
   ///       parameter that takes one -- so a `Boolean` there is a compile error at every call site
   ///       and the refusal never gets the chance to say what it is.
+  ///
+  /// \note IT IS THE TABLE AND THE PRIMARY KEY AND NOTHING ELSE, which is what the id IS: the
+  ///       declaration carries the key as `constexpr` data, so the id is assembled from the record
+  ///       in front of it rather than read from anywhere.
   template <typename... Arguments>::agiru::RecordId RecordId(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Record.RecordId is declared and not implemented yet (board:0035)");
+    const TableDef &table = TableTraits<Derived>::kTable;
+    std::vector<std::string> key;
+    if (!table.keys.empty()) {
+      for (const ::agiru::FieldNo no : table.keys.front().fields) {
+        const FieldDef *def = ::agiru::Field(table, no);
+        if (def != nullptr) { key.push_back(::agiru::detail::StorageText(Self(), *def)); }
+      }
+    }
+    return ::agiru::RecordId{table.id, std::string(table.caption), std::move(key)};
   }
 
   /// \brief AL `Record.RecordLevelLocking(...)`. Determines whether the table supports record-level
@@ -2024,6 +2097,13 @@ private:
     if constexpr (std::convertible_to<const Key &, std::string_view>) {
       detail::SetFieldText(Self(), *def, std::string_view(value));
     } else {
+      if constexpr (requires { FieldTypeOf<Key>::kType; }) {
+        if (def->type != FieldTypeOf<Key>::kType) {
+          throw Error("Get: " + std::string(def->name) +
+                      " is not the type this key value is, and writing it there would write past "
+                      "the field");
+        }
+      }
       *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
     }
   }

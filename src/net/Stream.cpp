@@ -4,6 +4,7 @@
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/StringValue.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -20,6 +21,22 @@ constexpr std::string_view kLineBreak = "\r\n";
 
 }
 
+Blob &OutStream::Bound() const {
+  if (blob_ == nullptr) {
+    throw Error("this OutStream was never given a source: AL declares the variable and "
+                "`CreateOutStream` binds it");
+  }
+  return *blob_;
+}
+
+const Blob &InStream::Bound() const {
+  if (blob_ == nullptr) {
+    throw Error("this InStream was never given a source: AL declares the variable and "
+                "`CreateInStream` binds it");
+  }
+  return *blob_;
+}
+
 void OutStream::RefuseTyped() {
   throw Error("a typed Write puts the platform's own binary layout into the stream, and this "
               "runtime does not have it. Only the text forms are here");
@@ -30,10 +47,20 @@ void InStream::RefuseTyped() {
               "runtime does not have it. Only the text forms are here");
 }
 
+Integer OutStream::WriteTerminated(std::string_view text, Integer length) {
+  const std::size_t want = length < 0 ? text.size() : static_cast<std::size_t>(length);
+  const std::string_view cut = text.substr(0, want < text.size() ? want : text.size());
+  std::vector<std::uint8_t> bytes = Bound().Bytes();
+  for (const char c : cut) { bytes.push_back(static_cast<std::uint8_t>(c)); }
+  bytes.push_back(0);
+  Bound().Set(std::move(bytes));
+  return static_cast<Integer>(cut.size() + 1);
+}
+
 Integer OutStream::WriteText(std::string_view text) {
-  std::vector<std::uint8_t> bytes = blob_->Bytes();
+  std::vector<std::uint8_t> bytes = Bound().Bytes();
   for (const char c : text) { bytes.push_back(static_cast<std::uint8_t>(c)); }
-  blob_->Set(std::move(bytes));
+  Bound().Set(std::move(bytes));
   return static_cast<Integer>(text.size());
 }
 
@@ -42,25 +69,44 @@ Integer OutStream::WriteText() {
 }
 
 Boolean InStream::EOS() const {
-  return position_ >= blob_->Length();
+  return position_ >= Bound().Length();
 }
 
 Integer InStream::Length() const {
-  return static_cast<Integer>(blob_->Length());
+  return static_cast<Integer>(Bound().Length());
+}
+
+Integer InStream::ReadTerminated(std::string &into, Integer length) {
+  const std::vector<std::uint8_t> &bytes = Bound().Bytes();
+  const std::size_t end = bytes.size();
+  const std::size_t want = length < 0 ? end : static_cast<std::size_t>(length);
+  std::size_t at = position_;
+  std::size_t taken = 0;
+  while (at < end && taken < want && bytes[at] != 0) {
+    into.push_back(static_cast<char>(bytes[at]));
+    ++at;
+    ++taken;
+  }
+  if (at < end && bytes[at] == 0) {
+    ++at;
+    ++taken;
+  }
+  position_ = at;
+  return static_cast<Integer>(taken);
 }
 
 Integer InStream::ReadText(::agiru::Text<0> &text, Integer length) {
   const std::size_t left =
-      blob_->Length() - (position_ < blob_->Length() ? position_ : blob_->Length());
+      Bound().Length() - (position_ < Bound().Length() ? position_ : Bound().Length());
   const std::size_t want = length < 0 ? 0 : static_cast<std::size_t>(length);
   const std::size_t take = want < left ? want : left;
-  text = std::string_view(reinterpret_cast<const char *>(blob_->Bytes().data()) + position_, take);
+  text = std::string_view(reinterpret_cast<const char *>(Bound().Bytes().data()) + position_, take);
   position_ += take;
   return static_cast<Integer>(take);
 }
 
 Integer InStream::ReadText(::agiru::Text<0> &text) {
-  return ReadText(text, static_cast<Integer>(blob_->Length() - position_));
+  return ReadText(text, static_cast<Integer>(Bound().Length() - position_));
 }
 
 }
