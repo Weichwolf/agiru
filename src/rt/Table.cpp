@@ -481,8 +481,13 @@ bool RuntimeGet(void *record, const TableDef &table) {
 }
 
 namespace {
-std::vector<const void *> &BeforeStack() {
-  static thread_local std::vector<const void *> stack;
+struct BeforeEntry {
+  const void *before;
+  const void *owner;
+};
+
+std::vector<BeforeEntry> &BeforeStack() {
+  static thread_local std::vector<BeforeEntry> stack;
   return stack;
 }
 }
@@ -500,8 +505,8 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   static_cast<void>(no);
 }
 
-void PushBefore(const void *record) {
-  BeforeStack().push_back(record);
+void PushBefore(const void *record, const void *owner) {
+  BeforeStack().push_back({record, owner});
 }
 
 void PopBefore() {
@@ -509,7 +514,14 @@ void PopBefore() {
 }
 
 const void *CurrentBefore() {
-  return BeforeStack().empty() ? nullptr : BeforeStack().back();
+  return BeforeStack().empty() ? nullptr : BeforeStack().back().before;
+}
+
+const void *OutermostBefore(const void *owner) {
+  for (const BeforeEntry &entry : BeforeStack()) {
+    if (entry.owner == owner) { return entry.before; }
+  }
+  return nullptr;
 }
 
 }

@@ -202,7 +202,7 @@ public:
   /// \brief AL `Field."OptionString"`.
   Text<kOptionStringLength> OptionString;
   /// \brief AL `Field."ObsoleteState"`.
-  Option<ObsoleteState> ObsoleteState;
+  Option<::agiru::platform::ObsoleteState> ObsoleteState;
   /// \brief AL `Field."ObsoleteReason"`.
   Text<kReasonLength> ObsoleteReason;
   /// \brief AL `Field."Field Caption"`.

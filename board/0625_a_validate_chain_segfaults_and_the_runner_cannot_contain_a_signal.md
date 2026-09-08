@@ -51,6 +51,30 @@ lose the rest of the codeunit. A case that dies on a signal should be a failed C
 the child-process isolation to be per case or a handler that can longjmp out -- and the second is
 not something to write without a reason.
 
+## Standing: the free site is `Modify()` inside the trigger, and `xRec` was the stored image (2026-09-08)
+
+ASan names it in one block: `heap-use-after-free` at `Job.cpp:2241`, reading `XJob.BillToCustomerNo`;
+freed by `CaptureImage()` from `Modify()` at `Job.cpp:1539` (`CopyDefaultDimensionsFromCustomer`),
+called INSIDE the same `OnValidate`. The generated trigger binds `XRec = this->StoredImage()`,
+which is a reference into the held image, and a `Modify` under the trigger replaces that image
+and frees the old one under the reference.
+
+**THE SEMANTIC WAS WRONG BEFORE IT WAS UNSAFE.** `devenv-system-defined-variables.md`: `xRec`
+holds the original values of the record BEFORE THE CHANGES -- not the record as last read or
+modified. The predecessor paid the same lesson as openerp WI-1242: an `OnValidate` that validates a
+second field is the BaseApp's normal shape, and the inner trigger's `xRec` still carries the values
+from before the OUTER one began; a snapshot per call handed the inner trigger a mixed record.
+
+**THE FIX IS IN THE DOOR AND THE GENERATOR IS UNCHANGED.** `Validate` already copies the record
+into a `before` local and pushes it as the trigger's before-image; the stack now records WHICH
+record variable each entry belongs to, `detail::OutermostBefore(owner)` finds the outermost entry
+of one variable, and `StoredImage()` answers that entry while a trigger of this record runs. The
+`before` local outlives every nested trigger, and the held image can be replaced freely.
+`Before<T>()` (board:0042) keeps its meaning over the innermost entry.
+
+Class: silent-wrong-data (a mixed `xRec` in a cascade) plus the crash. Measured: pending the
+full build (`ut_xrec.log`).
+
 ## What proves it
 
 `Price Source UT` reports 115 again. The negative control is the frame list: with the fault fixed,

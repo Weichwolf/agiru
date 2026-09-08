@@ -49,7 +49,13 @@ endif()
 # about run time has to be measured that way -- CLAUDE.md's benchmark is the same operation in
 # plain SQL, and an -O0 build cannot answer it.
 option(AGIRU_FAST_LOOP "Compile the generated tree for compile time rather than for run time" ON)
-if(AGIRU_FAST_LOOP)
+# `AGIRU_LINES=ON` keeps line tables in the generated tree, which is what turns a crash's
+# `Symbol+0x2127` into a line of the `.al` it came from. It costs build time and object size, so it
+# is off by default and switched on for the round that is chasing one (board:0625).
+option(AGIRU_LINES "Keep line tables in the generated tree, for a crash that needs an address" OFF)
+if(AGIRU_FAST_LOOP AND AGIRU_LINES)
+  set(AGIRU_GENERATED_FLAGS -O0 -g1)
+elseif(AGIRU_FAST_LOOP)
   set(AGIRU_GENERATED_FLAGS -O0 -g0)
 else()
   set(AGIRU_GENERATED_FLAGS "")
@@ -117,7 +123,9 @@ foreach(tier IN LISTS TIERS)
   # loop like the generated tree, because nothing measures their run time yet.
   if(AGIRU_FAST_LOOP)
     if(tier STREQUAL tc OR tier STREQUAL gen OR tier STREQUAL al)
-      target_compile_options(${target} PRIVATE -g0)
+      if(NOT AGIRU_LINES)
+        target_compile_options(${target} PRIVATE -g0)
+      endif()
     else()
       target_compile_options(${target} PRIVATE ${AGIRU_GENERATED_FLAGS})
     endif()

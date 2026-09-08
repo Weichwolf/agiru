@@ -99,11 +99,25 @@ private:
 ///
 /// \param record The record as it was BEFORE the change, which the caller owns and must outlive
 ///               the trigger.
+/// \param owner  The record variable the trigger runs on, so that its `xRec` can be found again.
 ///
 /// \note THE PLATFORM PROVIDES `xRec`, NOT THE OBJECT. A table trigger takes no parameters and AL
 ///       still names two records inside it, so what supplies the second one is whoever invoked the
 ///       trigger -- which here is `Validate`, `Insert(true)`, `Modify(true)` and `Delete(true)`.
-void PushBefore(const void *record);
+void PushBefore(const void *record, const void *owner);
+
+/// \brief The before-image of the OUTERMOST trigger running on one record variable.
+/// \param owner The record variable.
+/// \return Its before-image, or `nullptr` when no trigger of it is running.
+///
+/// \warning `xRec` IS THE RECORD BEFORE THE CHANGES, NOT BEFORE THE INNERMOST CALL
+///          (`devenv-system-defined-variables.md`). An `OnValidate` that validates a second field
+///          is the BaseApp's normal shape, and the inner trigger's `xRec` still carries the values
+///          from before the outer one began; a snapshot per call handed the inner trigger a MIXED
+///          record, one field new and the rest old (openerp WI-1242). And it is not the stored
+///          image either: a `Modify` inside the trigger replaces that, and freeing it under a
+///          running trigger was the use-after-free of board:0625.
+[[nodiscard]] const void *OutermostBefore(const void *owner);
 
 /// \brief Ends what PushBefore began.
 void PopBefore();
@@ -138,7 +152,8 @@ class BeforeImage {
 public:
   /// \brief Makes a record the running trigger's `xRec`.
   /// \param record The record before the change.
-  explicit BeforeImage(const void *record) { PushBefore(record); }
+  /// \param owner  The record variable the trigger runs on.
+  BeforeImage(const void *record, const void *owner) { PushBefore(record, owner); }
 
   BeforeImage(const BeforeImage &) = delete;
   BeforeImage(BeforeImage &&) = delete;
@@ -1293,6 +1308,9 @@ public:
   ///       that `var` parameter. Writing to it changes nothing that is written back, which is AL's
   ///       behaviour too.
   [[nodiscard]] Derived &StoredImage() {
+    if (const void *before = detail::OutermostBefore(Self()); before != nullptr) {
+      return *const_cast<Derived *>(static_cast<const Derived *>(before));
+    }
     const detail::RecordState *state = Filtered();
     if (state == nullptr || state->image.Get() == nullptr) { BlankImage(); }
     return *static_cast<Derived *>(State().image.Get());
@@ -1846,8 +1864,8 @@ public:
   ///          does not (openerp WI, "MinValue/MaxValue sind Eingabe-Grenzen").
   template <typename Field, typename Value> void Validate(Field &member, const Value &value) {
     const ::agiru::FieldNo no = NumberOf(&member);
-    const Derived before = static_cast<Derived &>(*this);
-    detail::BeforeImage image(&before);
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
     const detail::ValidatingField current(no);
     if constexpr (requires { member = value; }) {
       member = value;
@@ -1878,8 +1896,8 @@ public:
   ///       trigger over the value the field already holds.
   template <typename Field> void Validate(Field &member) {
     const ::agiru::FieldNo no = NumberOf(&member);
-    const Derived before = static_cast<Derived &>(*this);
-    detail::BeforeImage image(&before);
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
     const detail::ValidatingField current(no);
     detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
     RunOnValidate(no);
