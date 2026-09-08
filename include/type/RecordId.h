@@ -3,8 +3,10 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "type/Integer.h"
+#include "type/Refusal.h"
 
 #include <compare>
+#include <expected>
 #include <span>
 #include <string>
 #include <vector>
@@ -83,6 +85,23 @@ public:
   /// \note IT REFUSES THE CONVERSION rather than naming `RecordRef`, which is built ON the record
   ///       base this header sits under: a return type here would turn the door's direction around.
   static detail::RefusedRow GetRecord() { return detail::RefusedRow{}; }
+
+  /// \brief The form a COLUMN holds, which round-trips and is not the one a message shows.
+  ///
+  /// \return `<table>\x1f<caption>\x1f<key>\x1f<key>`, or the empty string when blank.
+  ///
+  /// \warning IT IS NOT `ToText()`, AND THE PAIR IS THE SAME ONE `FieldText` AND `StorageText`
+  ///          ARE. `Format(RecordId)` renders `Customer: 10000` -- a caption, a colon and the key
+  ///          -- and nothing can read that back, because a caption is not a table number and is
+  ///          translated. The stored form carries the NUMBER, the caption beside it so the display
+  ///          form survives the round trip, and the key values as their own columns hold them.
+  ///          The separator is ASCII UNIT SEPARATOR, which no AL value contains.
+  [[nodiscard]] std::string ToStorageText() const;
+
+  /// \brief Reads back what `ToStorageText` wrote.
+  /// \param text The stored form.
+  /// \return The id, or WHY the text is not one.
+  [[nodiscard]] static std::expected<RecordId, Refusal> FromStorageText(std::string_view text);
 
   /// \brief AL `Format(RecordId)`.
   /// \return `Caption: key,key`, or the empty string when blank.

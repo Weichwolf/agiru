@@ -52,6 +52,32 @@ runtime takes:
 3. **The record REGISTERS itself** while it is alive, and the Variant holds a generation beside the
    address -- which is what the cursor guard (board:0617) also wants, and would settle both.
 
+## AND THE SECOND ATTEMPT NARROWED IT FURTHER, WHICH IS WHY IT IS WRITTEN DOWN (2026-09-08)
+
+The obvious answer to a pointer that outlives its record is a SNAPSHOT: render the record's
+`RecordId` -- table, caption and primary key -- while the record is certainly alive, at the moment
+the Variant is built, and let `Format` read that. It needs no ownership, no `<memory>` in the door
+and no lifetime rule.
+
+**IT CRASHED THE SAME CODEUNIT IN THE SAME WAY**: 326 of 1 708 over 62 became 288 of 1 593 over 61,
+`Price Source UT` gone with `std::bad_array_new_length` again.
+
+**AND THE CONTROL THAT FOLLOWED IS THE FINDING.** Keeping the member and NOT filling it --
+`.id = {}`, so nothing renders and nothing reads a record -- crashes exactly the same. So it is not
+the read, not the render and not the stale pointer:
+
+> **ADDING A NON-TRIVIAL MEMBER TO `RecordInVariant` IS ENOUGH.** `RecordId` holds a `std::string`
+> and a `std::vector`, which makes the alternative non-trivially-copyable -- and something in this
+> tree treats a `Variant`'s storage as if it were trivial.
+
+That is a defect of its own and a more serious one than the rendering: it means a `Variant`
+alternative that allocates is already unsafe, and three of them do (`std::string`, `RecordId`,
+`OrdinalInVariant`'s span). Where the assumption lives is the next step -- the candidates are the
+generated `Any` parameter passing, `LibraryVariableStorage`'s own storage, and anything that copies
+a `RecordState`.
+
+**BOTH ATTEMPTS ARE TAKEN BACK**, and the count is 330 of 1 708 either way.
+
 ## What proves it
 
 `Price Source UT` reports 115 again with `Format(SomeRecord)` rendering `Price Source: ...`, and the

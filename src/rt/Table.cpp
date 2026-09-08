@@ -148,6 +148,9 @@ std::string StorageText(const void *record, const FieldDef &def) {
     case FieldType::Guid:
       return reinterpret_cast<const Guid *>(static_cast<const std::byte *>(record) + def.offset)
           ->ToStorageText();
+    case FieldType::RecordId:
+      return reinterpret_cast<const RecordId *>(static_cast<const std::byte *>(record) + def.offset)
+          ->ToStorageText();
     default: return FieldText(record, def);
   }
 }
@@ -262,7 +265,15 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       reinterpret_cast<Blob *>(At(record, def))->Set(std::move(bytes));
       return;
     }
-    case FieldType::RecordId:
+    case FieldType::RecordId: {
+      const std::expected<RecordId, Refusal> read = RecordId::FromStorageText(text);
+      if (!read.has_value()) {
+        throw Error("the column of " + std::string(def.name) + " holds " + std::string(text) +
+                    ", and " + std::string(read.error().what));
+      }
+      *reinterpret_cast<RecordId *>(At(record, def)) = *read;
+      return;
+    }
     case FieldType::TableFilter:
     default: throw Error("no reader for the field type of " + std::string(def.name) + " yet");
   }
