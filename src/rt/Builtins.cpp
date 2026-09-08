@@ -401,10 +401,6 @@ std::string ApplicationIdentifier() {
   RefuseDoor("Session.BindSubscription(Codeunit)");
 }
 
-::agiru::ClientType CurrentClientType() {
-  RefuseDoor("Session.CurrentClientType()");
-}
-
 ::agiru::ExecutionMode CurrentExecutionMode() {
   RefuseDoor("Session.CurrentExecutionMode()");
 }
@@ -422,10 +418,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 
 ::agiru::ExecutionContext GetCurrentModuleExecutionContext() {
   RefuseDoor("Session.GetCurrentModuleExecutionContext()");
-}
-
-::agiru::ExecutionContext GetExecutionContext() {
-  RefuseDoor("Session.GetExecutionContext()");
 }
 
 ::agiru::ExecutionContext GetModuleExecutionContext(::agiru::Guid AppId) {

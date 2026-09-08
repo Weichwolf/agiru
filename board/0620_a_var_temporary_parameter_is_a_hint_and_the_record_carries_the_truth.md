@@ -65,3 +65,19 @@ candidates are named rather than guessed:
 A gate case with a temporary local, a temporary global reached through an `Instance`, and a `Copy`
 with `ShareTable` between them -- and the same three after an assignment and after a copy. The
 negative control is a genuinely non-temporary target, which must still refuse.
+
+## Standing (2026-09-08): the record lost its rows in `Reset`, not in any of the three candidates
+
+None of the three candidates above was it. The temporary gate now proves FOUR share shapes -- a
+global reached through an `Instance`, a temporary handed on by value, a `var` base-typed
+parameter, a global made inside the `Copy`'s own argument conversion -- and every one shared.
+What did not was a Reset in between: `StateHandle::Forget()` deleted the whole `RecordState`,
+and the temporary table lives in it, so `TempRec.Reset()` turned the variable into a database
+record. `record-reset-method.md` lists what `Reset` clears and the rows are not on it;
+`detail::RuntimeReset` keeps the `TempHandle` and forgets the rest. `Forget()` itself stays as it
+was, because the temporary store calls it on a ROW COPY to strip the state a stored row must not
+carry -- keeping the handle there would make every row hold its own table.
+
+The refusal now names the side (`the source is not temporary`), which is what turned four
+guesses into one measurement.
+

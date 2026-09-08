@@ -14,6 +14,7 @@
 #include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
+#include "type/ExecutionContext.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/List.h"
@@ -118,6 +119,20 @@ namespace agiru {
 ///       the caller omitted the date or passed a blank one -- and those two answers differ: an
 ///       explicit blank date stays blank, an omitted one is today.
 ::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression);
+
+/// \brief AL `Session.CurrentClientType()`. Gets the client type that is running in the current
+///        session.
+/// \return `Web`, the client BC's test tool runs a test session in.
+///
+/// \note THE BASEAPP'S `= ClientType::Background` CHECKS guard the paths with no user to talk to,
+///       and a test session is the opposite of that; 124 UT failures stood on the refusal
+///       (measured 2026-09-08). A session opened for a job queue will say `Background` when there
+///       is one (board:0035).
+::agiru::ClientType CurrentClientType();
+
+/// \brief AL `Session.GetExecutionContext()`. Gets the current session's execution context.
+/// \return `Normal`; install, upgrade and background contexts have no runner yet (board:0035).
+::agiru::ExecutionContext GetExecutionContext();
 
 /// \brief AL `System.CalcDate(DateFormula, Date)`. Calculates a new date from a reference date.
 ///

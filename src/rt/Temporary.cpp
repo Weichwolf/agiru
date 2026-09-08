@@ -172,15 +172,29 @@ void RuntimeMakeTemporary(void *record, const TempOps *ops) {
   state->positioned = false;
 }
 
+void RuntimeReset(void *record) {
+  auto *handle = reinterpret_cast<StateHandle *>(record);
+  const RecordState *state = PeekOf(record);
+  if (state == nullptr) { return; }
+  TempHandle keep = state->temporary;
+  handle->Forget();
+  if (keep != nullptr) { StateOf(record)->temporary = std::move(keep); }
+}
+
 bool RuntimeIsTemporary(const void *record) {
   return TempOf(record) != nullptr;
 }
 
 void RuntimeShareTemporary(void *record, const void *from) {
   const RecordState *source = PeekOf(from);
-  if (source == nullptr || source->temporary == nullptr || TempOf(record) == nullptr) {
-    throw Error("Record.Copy(From, true) shares temporary rows, and one of the two records is "
-                "not temporary");
+  const bool sourceTemporary = source != nullptr && source->temporary != nullptr;
+  const bool targetTemporary = TempOf(record) != nullptr;
+  if (!sourceTemporary || !targetTemporary) {
+    throw Error(std::string("Record.Copy(From, true) shares temporary rows, and ") +
+                (!sourceTemporary && !targetTemporary ? "neither record is temporary"
+                 : !sourceTemporary                   ? "the source is not temporary"
+                                                      : "the target is not temporary") +
+                (source == nullptr ? " (the source has no state at all)" : ""));
   }
   RecordState *state = StateOf(record);
   state->temporary = source->temporary;

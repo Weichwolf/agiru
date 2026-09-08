@@ -18,6 +18,7 @@
 #include "type/Decimal.h"
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
+#include "type/ExecutionContext.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/List.h"
@@ -311,6 +312,14 @@ constexpr ::agiru::Integer kThirdPart = 3;
   const ::agiru::Integer was = session.Language();
   if (NewLanguageID != 0) { session.Language(NewLanguageID); }
   return was;
+}
+
+::agiru::ClientType CurrentClientType() {
+  return ::agiru::ClientType::Web;
+}
+
+::agiru::ExecutionContext GetExecutionContext() {
+  return ::agiru::ExecutionContext::Normal;
 }
 
 ::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression) {

@@ -363,6 +363,18 @@ void RuntimeMakeTemporary(void *record, const TempOps *ops);
 /// \throws Error when either is not temporary, which is what the platform refuses too.
 void RuntimeShareTemporary(void *record, const void *from);
 
+/// \brief AL `Record.Reset()` on any record: the filters, marks, key and load selection go, and
+///        a temporary record's ROWS stay.
+/// \param record The record.
+///
+/// \warning A TEMPORARY RECORD STAYS TEMPORARY ACROSS A RESET. `record-reset-method.md` lists what
+///          `Reset` clears, and the temporary table is not on the list: `TempRec.Reset()` before a
+///          `FindSet` is the BaseApp's most common line. Dropping the whole state turned the
+///          variable into a DATABASE record, so the next `Insert` wrote a real row; 222 UT
+///          failures said `Copy(From, true)` found its source not temporary, and that was the
+///          visible half (measured 2026-09-08).
+void RuntimeReset(void *record);
+
 /// \brief Writes one field from the text a column returned.
 /// \param record The record.
 /// \param def    The field.
@@ -1581,7 +1593,7 @@ public:
   /// \note IT CLEARS MORE THAN THE FILTERS. `record-reset-method.md` lists the marks, `MarkedOnly`,
   ///       the load-field selection, the isolation level and the current key -- which goes back to
   ///       the PRIMARY key and not to whatever `SetCurrentKey` last chose.
-  void Reset() { reinterpret_cast<detail::StateHandle *>(Self())->Forget(); }
+  void Reset() { detail::RuntimeReset(Self()); }
 
   /// \brief AL `Record.SecurityFiltering(...)`. Gets or sets how security filters are applied to
   /// the record.

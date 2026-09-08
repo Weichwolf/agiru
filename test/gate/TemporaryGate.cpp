@@ -7,6 +7,7 @@
 #include "Check.h"
 #include "LineNumberBuffer.h"
 
+#include <exception>
 #include <string>
 #include <vector>
 
@@ -90,7 +91,14 @@ void GetsRowFinds() {
   CHECK_TRUE("Delete reports the row it removed", buffer.Delete());
   CHECK_TRUE("the store is one shorter", buffer.Count() == 2);
   CHECK_TRUE("and the row is gone", !buffer.Get(2));
-  CHECK_TRUE("Delete on a key that is not there answers false", !buffer.Delete());
+  // THE STATEMENT FORM RAISES, as AL's does: `Rec.Delete();` on a row that is not there is a
+  // runtime error, and only `if Rec.Delete() then` answers false (board:0035 names the contexts).
+  std::string said;
+  try {
+    static_cast<void>(buffer.Delete());
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_TRUE("Delete on a key that is not there refuses, naming the key",
+             said.find('2') != std::string::npos);
 }
 
 /// AL `Copy(From, true)` makes two variables share ONE set of rows. It is why the version rides on
@@ -179,46 +187,82 @@ void AFilterNarrowsATemporaryWalk() {
 /// reached through an `Instance`, a temporary handed on BY VALUE, and a `var` parameter whose
 /// declared type is the base table and whose argument is a temporary.
 void SharedThroughAnInstanceAndByValue() {
-  agiru::Instance<Temporary<LineNumberBuffer>> global;
-  Temporary<LineNumberBuffer> &owner = global;
-  owner.OldLineNumber = 1;
-  owner.NewLineNumber = kTens;
-  owner.Insert();
-
-  Temporary<LineNumberBuffer> shared;
-  std::string said;
+  std::string step = "session";
   try {
+    const agiru::Session session(AGIRU_TEST_DSN);
+    step = "instance";
+    agiru::Instance<Temporary<LineNumberBuffer>> global;
+    step = "made";
+    Temporary<LineNumberBuffer> &owner = global;
+    step = "insert";
+    owner.OldLineNumber = 1;
+    owner.NewLineNumber = kTens;
+    owner.Insert();
+    step = "copy-share";
+    Temporary<LineNumberBuffer> shared;
     shared.Copy(global, true);
-  } catch (const Error &e) { said = e.what(); }
-  CHECK_SILENT("a temporary reached through an Instance shares", said);
-  CHECK_TRUE("and the copy sees its row", shared.Count() == 1);
-
-  const LineNumberBuffer byValue = owner;
-  CHECK_TRUE("a temporary copied BY VALUE is still temporary", byValue.IsTemporary());
-  Temporary<LineNumberBuffer> again;
-  said.clear();
-  try {
+    CHECK_TRUE("a temporary reached through an Instance shares", shared.Count() == 1);
+    step = "by-value";
+    const LineNumberBuffer byValue = owner;
+    CHECK_TRUE("a temporary copied BY VALUE is still temporary", byValue.IsTemporary());
+    step = "share-from-by-value";
+    Temporary<LineNumberBuffer> again;
     again.Copy(byValue, true);
-  } catch (const Error &e) { said = e.what(); }
-  CHECK_SILENT("and shares", said);
-  CHECK_TRUE("with the same rows", again.Count() == 1);
-
-  const auto throughVar = [](LineNumberBuffer &viaVar, Temporary<LineNumberBuffer> &into) {
-    into.Copy(viaVar, true);
-  };
-  Temporary<LineNumberBuffer> third;
-  said.clear();
-  try {
+    CHECK_TRUE("and shares with the same rows", again.Count() == 1);
+    step = "var-parameter";
+    const auto throughVar = [](LineNumberBuffer &viaVar, Temporary<LineNumberBuffer> &into) {
+      into.Copy(viaVar, true);
+    };
+    Temporary<LineNumberBuffer> third;
     throughVar(owner, third);
-  } catch (const Error &e) { said = e.what(); }
-  CHECK_SILENT("a temporary passed as a var base-typed parameter shares", said);
-  CHECK_TRUE("with the same rows", third.Count() == 1);
+    CHECK_TRUE("a temporary passed as a var base-typed parameter shares", third.Count() == 1);
+    step = "reset";
+    owner.Reset();
+    CHECK_TRUE("a temporary stays temporary across a Reset", owner.IsTemporary());
+    CHECK_TRUE("and keeps its rows", owner.Count() == 1);
+    Temporary<LineNumberBuffer> fifth;
+    fifth.Copy(owner, true);
+    CHECK_TRUE("and still shares", fifth.Count() == 1);
+    step = "scope-end";
+  } catch (const std::exception &e) {
+    CHECK_TEXT("no step throws (the step that did)", step, "scope-end");
+    CHECK_TEXT("and what it said", std::string(e.what()), "");
+  }
 }
+}
+
+/// THE CODEUNIT SHAPE: a global that is MADE inside the argument conversion of the Copy, in a
+/// session, because that is where the BaseApp does it (`GenJnlCheckLine.GetErrors`).
+void SharedFromAGlobalMadeInTheCall() {
+  std::string step = "session";
+  try {
+    const agiru::Session session(AGIRU_TEST_DSN);
+    step = "holder";
+
+    struct Holder {
+      agiru::Instance<Temporary<LineNumberBuffer>> TempErrorMessage;
+
+      void GetErrors(LineNumberBuffer &into) { into.Copy(TempErrorMessage, true); }
+    };
+
+    Holder holder;
+    step = "made";
+    Temporary<LineNumberBuffer> &made = holder.TempErrorMessage;
+    CHECK_TRUE("the global made through the Instance is temporary", made.IsTemporary());
+    step = "copy";
+    Temporary<LineNumberBuffer> fourth;
+    holder.GetErrors(fourth);
+    CHECK_TRUE("and the copy is temporary afterwards", fourth.IsTemporary());
+    step = "scope-end";
+  } catch (const std::exception &e) {
+    CHECK_TEXT("no step throws (the step that did)", step, "scope-end");
+  }
 }
 
 int main() {
   return gate::Run("Temporary", [] {
     SharedThroughAnInstanceAndByValue();
+    SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
     RowsWalkInPrimaryKeyOrder();

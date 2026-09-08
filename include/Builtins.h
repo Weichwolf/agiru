@@ -547,12 +547,6 @@ std::string ApplicationIdentifier();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean BindSubscription(const ::agiru::Variant &Codeunit);
 
-/// \brief AL `Session.CurrentClientType()`. Gets the client type that is running in current
-/// session.
-/// \return The AL `ClientType`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::ClientType CurrentClientType();
-
 /// \brief AL `Session.CurrentExecutionMode()`. Specifies the mode in which the session is running.
 /// \return The AL `ExecutionMode`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -577,11 +571,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 /// \return The AL `ExecutionContext`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::ExecutionContext GetCurrentModuleExecutionContext();
-
-/// \brief AL `Session.GetExecutionContext()`. Gets the current session's execution context.
-/// \return The AL `ExecutionContext`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::ExecutionContext GetExecutionContext();
 
 /// \brief AL `Session.GetModuleExecutionContext(Guid)`. Gets the current session's execution
 /// context scoped to a specific module.
