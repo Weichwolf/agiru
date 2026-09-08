@@ -129,11 +129,7 @@ public:
     requires(std::is_same_v<std::remove_cvref_t<S>, ::agiru::SecretText>)
   static ::agiru::Boolean
   Set(const ::agiru::TextArgument &Key, const S &Value, const ::agiru::DataScope &DataScope = {}) {
-    static_cast<void>(Key);
-    static_cast<void>(Value);
-    static_cast<void>(DataScope);
-    throw Error("IsolatedStorage.Set(Text, SecretText, DataScope) is declared and not implemented "
-                "yet (board:0035)");
+    return Set(Key, std::string_view(Value.Unwrap()), DataScope);
   }
 
   /// \brief AL `IsolatedStorage.Set(Text, Text, DataScope)`. Sets the value associated with the
