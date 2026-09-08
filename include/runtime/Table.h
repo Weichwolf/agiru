@@ -428,6 +428,14 @@ template <typename T> bool SameKey(const T &a, const T &b) {
 // NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see above.
 template <typename Derived> class Table {
 public:
+  /// \brief The platform half of this record, by name.
+  ///
+  /// \note A TABLE MAY DECLARE A PROCEDURE NAMED LIKE A PLATFORM METHOD -- `Total Value Insured`
+  ///       has its own `FindFirst(SearchString)` -- and in the generated class that hides the
+  ///       platform's. A caller that means the platform's says so:
+  ///       `static_cast<T::Platform_Half &>(rec).FindFirst()`.
+  using Platform_Half = Table<Derived>;
+
   /// \brief AL `Record.Insert()`.
   ///
   /// \throws Error when the row cannot be written, a duplicate key included.
@@ -689,6 +697,8 @@ public:
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
     } else if constexpr (std::is_enum_v<Value>) {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
+    } else if constexpr (std::constructible_from<FieldType, const Value &>) {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
     } else {
       ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
     }

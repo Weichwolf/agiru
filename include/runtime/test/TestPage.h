@@ -140,19 +140,19 @@ public:
   /// \brief AL `TestPage.First()`.
   /// \return Whether there is a first record.
   Boolean First() {
-    return Landed_([](auto &rec) { return static_cast<bool>(rec.FindFirst()); });
+    return Landed_([](auto &rec) { return static_cast<bool>(Platform_(rec).FindFirst()); });
   }
 
   /// \brief AL `TestPage.Next()`.
   /// \return Whether there is a next record.
   Boolean Next() {
-    return Landed_([](auto &rec) { return rec.Next() != 0; });
+    return Landed_([](auto &rec) { return Platform_(rec).Next() != 0; });
   }
 
   /// \brief AL `TestPage.Previous()`.
   /// \return Whether there is a previous record.
   Boolean Previous() {
-    return Landed_([](auto &rec) { return rec.Next(-1) != 0; });
+    return Landed_([](auto &rec) { return Platform_(rec).Next(-1) != 0; });
   }
 
   /// \brief AL `TestPage.Prev()`, the older spelling of `Previous`.
@@ -162,13 +162,13 @@ public:
   /// \brief AL `TestPage.Last()`.
   /// \return Whether there is a last record.
   Boolean Last() {
-    return Landed_([](auto &rec) { return static_cast<bool>(rec.FindLast()); });
+    return Landed_([](auto &rec) { return static_cast<bool>(Platform_(rec).FindLast()); });
   }
 
   /// \brief AL `TestPage.New()` -- moves to a new record and runs `OnNewRecord`.
   void New() {
     if constexpr (kHasRecord) {
-      Record_().Init();
+      Platform_(Record_()).Init();
       if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
       detail::AfterGetRecord(Page_());
     } else {
@@ -182,7 +182,7 @@ public:
   /// \return Whether it was found within the page's filters.
   template <typename R> Boolean GoToRecord(const R &Record) {
     if constexpr (requires { Record.RecordId(); }) {
-      return Landed_([&](auto &rec) { return rec.Get(Record.RecordId()); });
+      return Landed_([&](auto &rec) { return Platform_(rec).Get(Record.RecordId()); });
     } else {
       static_cast<void>(Record);
       throw Error("TestPage.GoToRecord needs a record and not a Variant (board:0030)");
@@ -194,7 +194,7 @@ public:
   /// \param values The key values, in key order.
   /// \return Whether it was found.
   template <typename... Values> Boolean GoToKey(const Values &...values) {
-    return Landed_([&](auto &rec) { return rec.Get(values...); });
+    return Landed_([&](auto &rec) { return Platform_(rec).Get(values...); });
   }
 
   /// \brief AL `TestPage.Trap()` -- the next non-modal run of this page lands here.
@@ -421,6 +421,10 @@ public:
 private:
   [[noreturn]] static void Unopened_() {
     throw Error("a TestPage needs a running page (board:0030)");
+  }
+
+  template <typename R> static typename std::remove_cvref_t<R>::Platform_Half &Platform_(R &rec) {
+    return static_cast<typename std::remove_cvref_t<R>::Platform_Half &>(rec);
   }
 
   static bool SameWord_(std::string_view text, std::string_view word) {

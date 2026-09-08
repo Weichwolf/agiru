@@ -1,7 +1,9 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "meta/PageDef.h"
 #include "meta/TableDef.h"
+#include "type/Action.h"
 
 #include <span>
 
@@ -52,6 +54,26 @@ inline constexpr TableEntry kTableEntry{
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.
 void RegisterTableEntry(const TableEntry *entry);
+
+/// \brief What the runtime knows about a generated page: its declaration and how to run it.
+struct PageEntry {
+  const PageDef *page; ///< The declaration, `constexpr` data in `.rodata`.
+  /// \brief Runs the page headless, the way `Page.Run`/`Page.RunModal` do on the generated class.
+  /// \param modal  Whether it is `RunModal`.
+  /// \param record The record passed, or `nullptr`.
+  /// \param table  Its declaration, or `nullptr`.
+  /// \return The action the page closed with.
+  ::agiru::Action (*run)(bool modal, const void *record, const TableDef *table);
+};
+
+/// \brief Puts a page in the catalogue, once per generated page, at load time.
+/// \param entry The entry, which lives for the program.
+void RegisterPageEntry(const PageEntry *entry);
+
+/// \brief Finds a page by its number.
+/// \param id The number.
+/// \return The entry, or `nullptr` when this build carries no such page.
+[[nodiscard]] const PageEntry *FindPage(PageId id);
 
 /// \brief Puts a generated table in the catalogue by existing.
 ///

@@ -50,11 +50,6 @@ void ClearAll() {
   RefuseDoor("System.ClearAll()");
 }
 
-::agiru::Date ClosingDate(::agiru::Date Date) {
-  static_cast<void>(Date);
-  RefuseDoor("System.ClosingDate(Date)");
-}
-
 void CodeCoverageInclude(::agiru::RecordRef &ObjectRecord) {
   static_cast<void>(ObjectRecord);
   RefuseDoor("System.CodeCoverageInclude(Record)");

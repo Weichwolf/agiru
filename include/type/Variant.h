@@ -25,6 +25,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <typeinfo>
 #include <variant>
 
 /// \file
@@ -453,7 +454,7 @@ public:
             (!requires { T::Traits::kValues; }) && (!requires(const T &held) { held.AsInteger(); })
   Variant(const T &value) { // NOLINT(*-explicit-constructor)
     static_cast<void>(value);
-    Refuse();
+    Refuse("that type");
   }
 
   /// \brief Holds a `BigText`, which AL hands to an `Any` like any other text.
@@ -953,7 +954,7 @@ public:
   ///          type error into a wrong date, silently.
   template <typename T> [[nodiscard]] const T &Get() const {
     const T *value = std::get_if<T>(&held_);
-    if (value == nullptr) { Refuse(); }
+    if (value == nullptr) { Refuse(typeid(T).name()); }
     return *value;
   }
 
@@ -969,7 +970,7 @@ public:
   ///       Integer, which is the wrong answer wearing the right type.
   operator std::string_view() const {
     const std::string *text = std::get_if<std::string>(&held_);
-    if (text == nullptr) { Refuse(); }
+    if (text == nullptr) { Refuse("Text"); }
     return *text;
   }
 
@@ -1001,7 +1002,7 @@ public:
              (!std::is_same_v<T, BigInteger>)
   operator T &() {
     T *value = std::get_if<T>(&held_);
-    if (value == nullptr) { Refuse(); }
+    if (value == nullptr) { Refuse(typeid(T).name()); }
     return *value;
   }
 
@@ -1020,10 +1021,10 @@ public:
   template <typename T> [[nodiscard]] T &Lend() {
     if constexpr (detail::InVariant<T, Held>::value) {
       T *value = std::get_if<T>(&held_);
-      if (value == nullptr) { Refuse(); }
+      if (value == nullptr) { Refuse("that type"); }
       return *value;
     } else {
-      Refuse();
+      Refuse("that type");
     }
   }
 
@@ -1054,7 +1055,7 @@ public:
         return BigInteger{*narrow};
       }
     }
-    Refuse();
+    Refuse("that type");
   }
 
   /// \brief Reads as an enumeration or an option, which a Variant holds by ORDINAL.
@@ -1072,7 +1073,7 @@ public:
             requires(std::int32_t ordinal) { T::FromInteger(ordinal); }
   operator T() const {
     const OrdinalInVariant *held = std::get_if<OrdinalInVariant>(&held_);
-    if (held == nullptr) { Refuse(); }
+    if (held == nullptr) { Refuse("that type"); }
     return T::FromInteger(held->ordinal);
   }
 
@@ -1113,7 +1114,7 @@ public:
   }
 
 private:
-  [[noreturn]] void Refuse() const;
+  [[noreturn]] void Refuse(const char *wanted) const;
 
   Held held_;
 };

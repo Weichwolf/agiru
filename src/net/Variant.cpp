@@ -6,8 +6,8 @@
 
 namespace agiru {
 
-void Variant::Refuse() const {
-  throw Error("the Variant does not hold that type (it holds alternative " +
+void Variant::Refuse(const char *wanted) const {
+  throw Error(std::string("the Variant does not hold ") + wanted + " (it holds alternative " +
               std::to_string(held_.index()) + " of Variant::Held)");
 }
 

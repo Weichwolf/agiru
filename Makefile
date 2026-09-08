@@ -23,10 +23,16 @@ all: comments db   ## strip the comments, then the library, the transpiler and t
 
 # THE FORMATTER RUNS AFTER THE STRIP, because removing a line changes what fits on the next one and
 # `make lint` would otherwise fail on a tree `make` just wrote. The two together are idempotent.
+# AND IT WRITES ONLY WHAT IT CHANGES. `clang-format -i` rewrites a file it leaves byte-identical,
+# and a rewritten door header is a new mtime: the precompiled header and every generated unit
+# behind it rebuilt on EVERY `make` and every `make test` while a door edit was uncommitted --
+# two full builds per round, measured 2026-09-08 (518 s each). The comparison costs a pipe.
 comments:          ## delete every comment in src/; include/ keeps its Doxygen
 	@python3 $(SELF)/test/strip-comments.py $(SELF)/src $(SELF)/include
 	@git -C $(SELF) diff --name-only --diff-filter=ACM -- '*.h' '*.cpp' 2>/dev/null | \
-	  grep -v '^apps/' | xargs -r clang-format -i 2>/dev/null || true
+	  grep -v '^apps/' | while read -r f; do \
+	    clang-format "$(SELF)/$$f" 2>/dev/null | cmp -s - "$(SELF)/$$f" || clang-format -i "$(SELF)/$$f"; \
+	  done || true
 
 db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json

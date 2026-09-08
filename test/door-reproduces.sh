@@ -14,7 +14,9 @@ cd "$(dirname "$0")/.."
 # on the second build and pass on the first.
 before=$(cat include/Builtins.h src/rt/Builtins.cpp | sha1sum | cut -d' ' -f1)
 python3 scripts/gen_builtins.py > /dev/null
-clang-format -i include/Builtins.h src/rt/Builtins.cpp 2> /dev/null || true
+for f in include/Builtins.h src/rt/Builtins.cpp; do
+  clang-format "$f" 2> /dev/null | cmp -s - "$f" || clang-format -i "$f" 2> /dev/null || true
+done
 after=$(cat include/Builtins.h src/rt/Builtins.cpp | sha1sum | cut -d' ' -f1)
 
 if [ "$before" != "$after" ]; then

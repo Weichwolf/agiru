@@ -779,6 +779,9 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
            ",\n              \"a page's layout is a TREE and the generator keeps it -- a "
            "flattened one is one level deep (board:0553)\");\n";
   }
+  out += "\nnamespace {\nnamespace " + Identifier(page.name) + "_unit {\nconst RegisterPage<" +
+         identifier + "> kInPageCatalogue;\n} // namespace " + Identifier(page.name) +
+         "_unit\n} // namespace\n";
   out += "\n} // namespace " + space + "\n";
   return out;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/test/Handlers.h"
@@ -137,12 +138,14 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
   page.OpenedAs(editable);
   if constexpr (requires { page.OnInit(); }) { page.OnInit(); }
   bool found = false;
-  if constexpr (requires { page.Rec; }) {
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
     if (isNew) {
-      page.Rec.Init();
+      platform.Init();
       if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(false); }
     } else {
-      found = static_cast<bool>(page.Rec.FindFirst());
+      found = static_cast<bool>(platform.FindFirst());
     }
   }
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
@@ -170,8 +173,12 @@ template <typename P> void ClosePage(P &page) {
 /// \param page   The page.
 /// \param record The argument.
 template <typename P, typename Record> void AdoptRecord(P &page, const Record &record) {
-  if constexpr (requires { page.Rec.Copy(record); }) {
-    page.Rec.Copy(record);
+  if constexpr (requires {
+                  page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
+                  page.Rec.Copy(record);
+                }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    static_cast<typename Source::Platform_Half &>(page.Rec).Copy(record);
   } else {
     static_cast<void>(record);
   }
@@ -216,6 +223,74 @@ template <typename P, typename... Arguments>
 
 }
 
+/// \brief Runs a generated page for the catalogue: `Page.Run(Number, Rec)` lands here.
+/// \tparam P The generated page class.
+/// \param modal  Whether it is `RunModal`.
+/// \param record The record passed, or `nullptr`.
+/// \param table  Its declaration, or `nullptr`.
+/// \return The action the page closed with.
+template <typename P>
+::agiru::Action RunPageEntry(bool modal, const void *record, const TableDef *table) {
+  if constexpr (requires(P &page) {
+                  page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
+                }) {
+    using Source = std::remove_cvref_t<decltype(std::declval<P &>().Rec)>;
+    if (record != nullptr && table != nullptr && table->id == TableTraits<Source>::kTable.id) {
+      return detail::RunPage<P>(modal, *static_cast<const Source *>(record));
+    }
+  }
+  static_cast<void>(record);
+  static_cast<void>(table);
+  return detail::RunPage<P>(modal);
+}
+
+/// \brief The catalogue entry of a generated page.
+/// \tparam P The generated page class.
+template <typename P>
+inline const PageEntry kPageEntry{.page = &PageTraits<P>::kPage, .run = &RunPageEntry<P>};
+
+/// \brief Puts a generated page in the catalogue by existing, the way `RegisterTable` does.
+/// \tparam P The generated page class.
+template <typename P> struct RegisterPage {
+  RegisterPage() { RegisterPageEntry(&kPageEntry<P>); }
+
+  RegisterPage(const RegisterPage &) = delete;
+  RegisterPage(RegisterPage &&) = delete;
+  RegisterPage &operator=(const RegisterPage &) = delete;
+  RegisterPage &operator=(RegisterPage &&) = delete;
+  ~RegisterPage() = default;
+};
+
+namespace detail {
+
+/// \brief `Page.Run(Number)` / `Page.RunModal(Number)`, with or without a record.
+/// \tparam Arguments The record, when one was passed.
+/// \param modal     Whether it is `RunModal`.
+/// \param id        The page number.
+/// \param arguments The record, when one was passed.
+/// \return The action the page closed with.
+/// \throws Error when this build carries no page of that number.
+template <typename... Arguments>
+::agiru::Action RunPageByNumber(bool modal, ::agiru::Integer id, const Arguments &...arguments) {
+  const PageEntry *entry = FindPage(PageId{id});
+  if (entry == nullptr) {
+    throw Error("Page.Run(" + std::to_string(id) + "): this build carries no page of that number");
+  }
+  const void *record = nullptr;
+  const TableDef *table = nullptr;
+  const auto take = [&](const auto &argument) {
+    using A = std::remove_cvref_t<decltype(argument)>;
+    if constexpr (requires { TableTraits<A>::kTable; }) {
+      record = &argument;
+      table = &TableTraits<A>::kTable;
+    }
+  };
+  (take(arguments), ...);
+  return entry->run(modal, record, table);
+}
+
+}
+
 template <typename Derived = void> class Page {
 public:
   /// \brief Marks the page opened, in the mode a runner chose.
@@ -252,8 +327,7 @@ public:
   ///       `pages::X::Run(Rec)`: the object is the receiver, which is what the call means.
   template <typename... Arguments> static void Run(const Arguments &...arguments) {
     if constexpr (std::is_void_v<Derived>) {
-      (static_cast<void>(arguments), ...);
-      throw Error("Page.Run by number needs the page catalogue (board:0030)");
+      static_cast<void>(detail::RunPageByNumber(false, arguments...));
     } else {
       static_cast<void>(detail::RunPage<Derived>(false, arguments...));
     }
@@ -293,8 +367,7 @@ public:
   ///          board:0030's work -- nothing fires until there is a page to fire it on.
   template <typename... Arguments> static ::agiru::Action RunModal(const Arguments &...arguments) {
     if constexpr (std::is_void_v<Derived>) {
-      (static_cast<void>(arguments), ...);
-      throw Error("Page.RunModal by number needs the page catalogue (board:0030)");
+      return detail::RunPageByNumber(true, arguments...);
     } else {
       return detail::RunPage<Derived>(true, arguments...);
     }

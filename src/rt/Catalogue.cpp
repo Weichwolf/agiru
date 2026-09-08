@@ -51,4 +51,37 @@ std::span<const TableEntry *const> InstalledTables() {
   return Entries();
 }
 
+namespace {
+
+std::vector<const PageEntry *> &PageEntries() {
+  static std::vector<const PageEntry *> entries;
+  return entries;
+}
+
+std::once_flag &PagesOnce() {
+  static std::once_flag once;
+  return once;
+}
+
+}
+
+void RegisterPageEntry(const PageEntry *entry) {
+  PageEntries().push_back(entry);
+}
+
+const PageEntry *FindPage(PageId id) {
+  std::call_once(PagesOnce(), [] {
+    std::ranges::sort(PageEntries(), [](const PageEntry *a, const PageEntry *b) {
+      return a->page->id.Value() < b->page->id.Value();
+    });
+  });
+  const auto found = std::lower_bound(
+      PageEntries().begin(),
+      PageEntries().end(),
+      id.Value(),
+      [](const PageEntry *entry, auto number) { return entry->page->id.Value() < number; });
+  if (found == PageEntries().end() || (*found)->page->id != id) { return nullptr; }
+  return *found;
+}
+
 }

@@ -314,6 +314,10 @@ constexpr ::agiru::Integer kThirdPart = 3;
   return was;
 }
 
+::agiru::Date ClosingDate(::agiru::Date Date) {
+  return Date.IsUndefined() || Date.IsClosing() ? Date : Date.Closing();
+}
+
 ::agiru::ClientType CurrentClientType() {
   return ::agiru::ClientType::Web;
 }

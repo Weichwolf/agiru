@@ -130,6 +130,12 @@ namespace agiru {
 ///       is one (board:0035).
 ::agiru::ClientType CurrentClientType();
 
+/// \brief AL `System.ClosingDate(Date)`. The closing date of a normal date: after every posting
+///        of that day and before the next day (`date-data-type.md`).
+/// \param Date The normal date.
+/// \return Its closing twin; a closing date answers itself, the undefined date itself.
+::agiru::Date ClosingDate(::agiru::Date Date);
+
 /// \brief AL `Session.GetExecutionContext()`. Gets the current session's execution context.
 /// \return `Normal`; install, upgrade and background contexts have no runner yet (board:0035).
 ::agiru::ExecutionContext GetExecutionContext();

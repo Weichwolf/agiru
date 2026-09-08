@@ -65,12 +65,6 @@ std::string CaptionClassTranslate(std::string_view CaptionClassText);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void ClearAll();
 
-/// \brief AL `System.ClosingDate(Date)`. Gets the closing date for a Date Data Type.
-/// \param Date The AL `Date`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date ClosingDate(::agiru::Date Date);
-
 /// \brief AL `System.CodeCoverageInclude(Record)`. Includes the code that has been logged.
 /// \param ObjectRecord The AL `Record`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
