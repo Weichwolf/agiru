@@ -101,3 +101,25 @@ with an ABORT rather than a zero when `build/doc/xml` is missing. The negative c
 `Time` half is the count: a bare `Time()` in `apps/` was 178 and is 0, and `CurrentTime()` is 167 --
 the eleven that are not in the difference are the sites where AL wrote `Time` as a member of
 something else, which is the rename staying where it belongs.
+
+## THE LAST TWO ARE NOT A GAP, THEY ARE A TYPE THAT DOES NOT EXIST YET (2026-09-08)
+
+The counter's remainder is `TestPart.Enabled()` and `TestPart.Visible()`, and writing them onto
+`TestPage` -- where the other eighteen of `testpart-data-type.md`'s twenty live -- **does not
+compile**:
+
+```
+CurrencyExchRateUnitTests.cpp:325: Assert->IsTrue(CurrExchRateServiceCard.Enabled.Editable(), "")
+  error: reference to non-static member function must be called
+```
+
+`TestPage<P>` reaches the page's controls through `P`, and a method on `TestPage` HIDES a control of
+the same name. `Enabled` and `Visible` are two of the commonest control names there are --
+`CurrExchRateServiceCard` declares `Field_Kind Enabled{"Enabled"}` -- so the two names that close
+the counter are exactly the two that may not be added.
+
+**`TestPart` HAS TO BE ITS OWN TYPE**, reached from a `TestPage` rather than being one, and that is
+board:0030's work: a part is a page RUN INSIDE another page, and neither exists until a page can be
+opened. Until then the counter stands at **1 251 of 1 253 with a reason**, which is what a baseline
+with a citation is for -- and NOT at 1 253, which is what taking the two shortcuts would have
+written.

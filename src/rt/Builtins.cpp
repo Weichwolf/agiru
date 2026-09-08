@@ -83,18 +83,6 @@ void CodeCoverageRefresh() {
   RefuseDoor("System.CreateEncryptionKey()");
 }
 
-::agiru::Integer Date2DMY(::agiru::Date Date, ::agiru::Integer Value) {
-  static_cast<void>(Date);
-  static_cast<void>(Value);
-  RefuseDoor("System.Date2DMY(Date, Integer)");
-}
-
-::agiru::Integer Date2DWY(::agiru::Date Date, ::agiru::Integer Value) {
-  static_cast<void>(Date);
-  static_cast<void>(Value);
-  RefuseDoor("System.Date2DWY(Date, Integer)");
-}
-
 ::agiru::Variant DaTi2Variant(::agiru::Date Date, ::agiru::Time Time) {
   static_cast<void>(Date);
   static_cast<void>(Time);
@@ -120,10 +108,6 @@ void DeleteEncryptionKey() {
 std::string Encrypt(std::string_view PlainTextString) {
   static_cast<void>(PlainTextString);
   RefuseDoor("System.Encrypt(Text)");
-}
-
-::agiru::Boolean EncryptionEnabled() {
-  RefuseDoor("System.EncryptionEnabled()");
 }
 
 ::agiru::Boolean EncryptionKeyExists() {
@@ -165,11 +149,6 @@ std::string GetLastErrorCallStack() {
 std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
   static_cast<void>(ExcludeCustomerContent);
   RefuseDoor("System.GetLastErrorText(Boolean)");
-}
-
-::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID) {
-  static_cast<void>(NewLanguageID);
-  RefuseDoor("System.GlobalLanguage(Integer)");
 }
 
 ::agiru::Boolean ImportEncryptionKey(std::string_view Path, std::string_view Password) {

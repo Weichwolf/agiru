@@ -106,21 +106,6 @@ void CodeCoverageRefresh();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean CreateEncryptionKey();
 
-/// \brief AL `System.Date2DMY(Date, Integer)`. Gets the day, month, or year of a Date Data Type.
-/// \param Date The AL `Date`.
-/// \param Value The AL `Integer`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer Date2DMY(::agiru::Date Date, ::agiru::Integer Value);
-
-/// \brief AL `System.Date2DWY(Date, Integer)`. Gets the day of the week, week number, or year of a
-/// Date Data Type.
-/// \param Date The AL `Date`.
-/// \param Value The AL `Integer`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer Date2DWY(::agiru::Date Date, ::agiru::Integer Value);
-
 /// \brief AL `System.DaTi2Variant(Date, Time)`. Creates a variant that contains an encapsulation of
 /// a COM VT\\_DATE.
 /// \param Date The AL `Date`.
@@ -156,11 +141,6 @@ DWY2Date(::agiru::Integer WeekDay, ::agiru::Integer Week = {}, ::agiru::Integer 
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string Encrypt(std::string_view PlainTextString);
-
-/// \brief AL `System.EncryptionEnabled()`. Checks if the tenant is configured to allow encryption.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean EncryptionEnabled();
 
 /// \brief AL `System.EncryptionKeyExists()`. Checks whether an encryption key for the current
 /// tenant is present on the server tenant.
@@ -234,12 +214,6 @@ std::string GetLastErrorCallStack();
 /// \return The AL `Text`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent);
-
-/// \brief AL `System.GlobalLanguage(Integer)`. Gets and sets the current global language setting.
-/// \param NewLanguageID The AL `Integer`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID = {});
 
 /// \brief AL `System.ImportEncryptionKey(Text, Text)`. Points to a password protected file that
 /// contains the key on the current server. When encrypting or decrypting data in Dynamics 365

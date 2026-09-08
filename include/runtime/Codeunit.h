@@ -63,11 +63,18 @@ public:
   Instance() = default;
 
   /// \brief A copy that has made nothing yet.
-  Instance(const Instance &) {}
+  /// \param other The handle copied from, whose instance is NOT shared.
+  Instance(const Instance &other) { static_cast<void>(other); }
 
   /// \brief Lets go of what this one made; the other's instance is not shared.
+  /// \param other The handle assigned from, whose instance is NOT shared.
   /// \return This handle.
-  Instance &operator=(const Instance &) {
+  ///
+  /// \note SELF-ASSIGNMENT IS THE ORDINARY PATH AND NOT A SPECIAL ONE. What it does is RELEASE,
+  ///       so `a = a` frees what `a` made and leaves it to make it again on the next use -- which
+  ///       is the same answer as for any other right-hand side, because the handle copies nothing.
+  Instance &operator=(const Instance &other) {
+    static_cast<void>(other);
     Release();
     return *this;
   }
@@ -240,7 +247,6 @@ public:
     throw Error("A Variant holding a codeunit cannot be assigned yet (board:0035)");
   }
 
-public:
   /// \brief The codeunit's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr CodeunitId Id() { return CodeunitTraits<Derived>::kId; }

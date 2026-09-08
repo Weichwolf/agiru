@@ -7,6 +7,7 @@
 #include "type/Boolean.h"
 #include "type/Date.h"
 #include "type/Guid.h"
+#include "type/Integer.h"
 
 #include <string>
 
@@ -33,6 +34,12 @@ public:
 ///
 /// \note Constructing a session makes it current and destroying it restores the previous one, so
 ///       nesting works and nothing has to be unwound by hand.
+/// \brief The Windows language id a session runs in until something moves it.
+///
+/// 1033 is `en-US`, which is the language the BaseApp's own captions are written in and the one
+/// every AL test compares its error texts against.
+constexpr ::agiru::Integer kEnglishUnitedStates = 1033;
+
 class Session {
 public:
   /// \brief Opens a session on a database.
@@ -69,6 +76,19 @@ public:
   ///       lives on the SESSION rather than in a function, because a user is a property of a
   ///       session and a hardcoded GUID inside a call could never become one.
   [[nodiscard]] const Guid &UserSecurityId() const { return userSecurityId_; }
+
+  /// \brief AL `GlobalLanguage()` -- the language this session runs in.
+  /// \return The Windows language id.
+  [[nodiscard]] ::agiru::Integer Language() const { return language_; }
+
+  /// \brief AL `GlobalLanguage(Integer)` -- moves the session to another language.
+  /// \param id The Windows language id.
+  ///
+  /// \note IT IS SESSION STATE AND NOT PROCESS STATE, which is what the name hides:
+  ///       `system-globallanguage-method.md` calls it "the current global language setting", and a
+  ///       service tier runs ten thousand sessions in one process. A global here would be one
+  ///       session's language answering for every other.
+  void Language(::agiru::Integer id) { language_ = id; }
 
   /// \brief AL `UserId()`.
   ///
@@ -143,6 +163,7 @@ private:
   Guid userSecurityId_;
   std::string userId_{"SYSTEM"};
   Date workDate_;
+  ::agiru::Integer language_ = kEnglishUnitedStates;
   std::string company_;
   TenantSettings tenant_;
 };

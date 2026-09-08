@@ -245,14 +245,27 @@ std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::s
                                " carries " + std::to_string(arguments.size()) +
                                " argument(s), and the attribute takes at least three");
     }
-    const std::string reference = arguments[1];
+    const std::string &reference = arguments[1];
     const std::size_t colons = reference.find("::");
     const std::string objectName =
         colons == std::string::npos ? reference : reference.substr(colons + 2);
-    out += "    {" + EventObjectOf(arguments[0]) + ", 0, " + Literal(objectName) + ", " +
-           Literal(arguments[2]) + ", " + Literal(arguments.size() > 3 ? arguments[3] : "") +
-           ", kSubscriber" + std::to_string(i + 1) + "Names, &detail::InvokeSubscriber<" +
-           identifier + ", &" + identifier + "::" + Identifier(subscribers[i]->name) + ">},\n";
+    out += "    {";
+    out += EventObjectOf(arguments[0]);
+    out += ", 0, ";
+    out += Literal(objectName);
+    out += ", ";
+    out += Literal(arguments[2]);
+    out += ", ";
+    out += Literal(arguments.size() > 3 ? arguments[3] : "");
+    out += ", kSubscriber";
+    out += std::to_string(i + 1);
+    out += "Names, &detail::InvokeSubscriber<";
+    out += identifier;
+    out += ", &";
+    out += identifier;
+    out += "::";
+    out += Identifier(subscribers[i]->name);
+    out += ">},\n";
   }
   out += "}};\n\n";
   const al::Property *instance = al::Find(unit.properties, "EventSubscriberInstance");
@@ -295,12 +308,11 @@ std::string HandlerKindOf(const al::ProcedureDecl &procedure) {
 }
 
 bool HandlerIsOptional(const al::ProcedureDecl &procedure) {
-  for (const std::string &attribute : procedure.attributes) {
+  return std::ranges::any_of(procedure.attributes, [](const std::string &attribute) {
     const std::string lowered = LowerKey(attribute);
-    if (lowered.find("handler(") == std::string::npos) { continue; }
-    if (lowered.find("true") != std::string::npos) { return true; }
-  }
-  return false;
+    return lowered.find("handler(") != std::string::npos &&
+           lowered.find("true") != std::string::npos;
+  });
 }
 
 std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
@@ -311,7 +323,7 @@ std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
     const std::size_t open = attribute.find('\'');
     const std::size_t close = attribute.rfind('\'');
     if (open == std::string::npos || close <= open) { continue; }
-    std::string listed = attribute.substr(open + 1, close - open - 1);
+    const std::string listed = attribute.substr(open + 1, close - open - 1);
     std::string one;
     for (const char c : listed + ",") {
       if (c == ',') {
@@ -336,9 +348,19 @@ std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &id
   std::string out =
       "constexpr std::array<TestHandler, " + std::to_string(handlers.size()) + "> kHandlers{{\n";
   for (const al::ProcedureDecl *handler : handlers) {
-    out += "    {\"" + handler->name + "\", " + HandlerKindOf(*handler) + ", 0, &InvokeHandler<" +
-           identifier + ", &" + identifier + "::" + Identifier(handler->name) + ">, " +
-           (HandlerIsOptional(*handler) ? "true" : "false") + "},\n";
+    out += "    {\"";
+    out += handler->name;
+    out += "\", ";
+    out += HandlerKindOf(*handler);
+    out += ", 0, &InvokeHandler<";
+    out += identifier;
+    out += ", &";
+    out += identifier;
+    out += "::";
+    out += Identifier(handler->name);
+    out += ">, ";
+    out += HandlerIsOptional(*handler) ? "true" : "false";
+    out += "},\n";
   }
   out += "}};\n\n";
   return out;
@@ -614,8 +636,9 @@ std::string Signature(const al::VarDecl &declared,
                       const std::set<std::string> &names,
                       const std::string &owner = {}) {
   std::string type = TypeOf(declared, objects, owner);
-  if (type.starts_with("Temporary<") && type.ends_with(">")) {
-    type = type.substr(10, type.size() - 11);
+  constexpr std::string_view kTemporary = "Temporary<";
+  if (type.starts_with(kTemporary) && type.ends_with(">")) {
+    type = type.substr(kTemporary.size(), type.size() - kTemporary.size() - 1);
   }
   if (Hidden(type, names)) { type = Qualified(type, names); }
   if (declared.byReference) { type = Unsized(type); }
@@ -1075,6 +1098,7 @@ public:
     for (const al::ProcedureDecl &procedure : unit_.procedures) {
       if (!SameName(procedure.name, name)) { continue; }
       std::vector<std::string> lent;
+      lent.reserve(procedure.parameters.size());
       for (const al::VarDecl &parameter : procedure.parameters) {
         lent.push_back(LendsInto(parameter) ? Unhidden(TypeOf(parameter, objects_))
                                             : std::string{});
@@ -1102,6 +1126,7 @@ public:
     for (const al::ProcedureDecl &procedure : unit_.procedures) {
       if (!SameName(procedure.name, name) || !IsPublisher(procedure)) { continue; }
       std::vector<bool> vars;
+      vars.reserve(procedure.parameters.size());
       for (const al::VarDecl &parameter : procedure.parameters) {
         vars.push_back(parameter.byReference);
       }
@@ -1158,7 +1183,7 @@ public:
       return DoorCalls(member.field) ? AsTheDoorSpellsIt(Identifier(member.field))
                                      : Identifier(member.field);
     }
-    const std::string platform =
+    std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
     if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
@@ -1423,7 +1448,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
 
 }
 
-std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string &identifier) {
+static std::string CodeunitDefinition(const al::CodeunitObject &unit,
+                                      const std::string &identifier) {
   const auto said = [&unit](std::string_view name) {
     const al::Property *found = Find(unit.properties, name);
     return found == nullptr ? std::string{} : found->text;
@@ -1481,11 +1507,10 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     const bool publisher = IsPublisher(procedure);
     const CodeunitNames names(unit, procedure, objects);
     const std::string body =
-        publisher ? RaisingBody(
-                        procedure,
-                        "EventObject::Codeunit",
-                        "::agiru::CodeunitTraits<::" + space + "::" + unitClass + ">::kId.Value()",
-                        "::agiru::CodeunitTraits<::" + space + "::" + unitClass + ">::kName")
+        publisher ? RaisingBody(procedure,
+                                "EventObject::Codeunit",
+                                TraitsOf("CodeunitTraits", space, unitClass) + "::kId.Value()",
+                                TraitsOf("CodeunitTraits", space, unitClass) + "::kName")
                   : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
     out += Returns(procedure, objects) + " " + unitClass + "::" + Identifier(procedure.name) + "(" +
            Parameters(procedure,
@@ -1519,7 +1544,11 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "void " + unitClass + "::ClearAll() {\n";
     for (const al::VarDecl &declared : unit.variables) {
       const std::string named = Identifier(declared.name);
-      out += "  " + named + " = decltype(" + named + "){};\n";
+      out += "  ";
+      out += named;
+      out += " = decltype(";
+      out += named;
+      out += "){};\n";
     }
     out += "}\n\n";
   }

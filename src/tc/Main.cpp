@@ -1583,6 +1583,7 @@ void ScanCodeunits(Run &run,
 }
 
 constexpr std::size_t kUnresolvedShown = 10;
+constexpr std::size_t kSilentShown = 60;
 
 const std::set<std::string> &Rebuilt() {
   static const std::set<std::string> kRebuilt{"ALConfigSettings",
@@ -1629,7 +1630,7 @@ std::string NearestPresent(const std::string &type, const agiru::gen::DotNetUse 
 }
 
 std::string StubBase(const std::string &type, const agiru::gen::DotNetUse &use, bool alObjects) {
-  const std::string base = NearestPresent(type, use);
+  std::string base = NearestPresent(type, use);
   if (!base.empty()) { return base; }
   return alObjects ? "AbsentObject" : "AbsentType";
 }
@@ -2010,7 +2011,7 @@ int Scan(const Job &job) {
                  decided,
                  dropped,
                  silent.size());
-    for (std::size_t i = 0; i < silent.size() && i < 60; ++i) {
+    for (std::size_t i = 0; i < silent.size() && i < kSilentShown; ++i) {
       std::println("          {:>7} x {}", silent[i].second, silent[i].first);
     }
     if (dropped != 0) { silentProperties = dropped; }

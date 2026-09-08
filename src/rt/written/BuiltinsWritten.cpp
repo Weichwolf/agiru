@@ -267,6 +267,48 @@ std::string SpecToken(const ::agiru::Variant &Value, const Token &token, char fi
   return ::agiru::DateTime::FromMilliseconds(rounded);
 }
 
+namespace {
+
+constexpr ::agiru::Integer kFirstPart = 1;
+constexpr ::agiru::Integer kSecondPart = 2;
+constexpr ::agiru::Integer kThirdPart = 3;
+
+[[noreturn]] void RefusePart(std::string_view what, ::agiru::Integer value) {
+  throw ::agiru::Error("System." + std::string(what) + ": the valid options are 1, 2 and 3, and " +
+                       std::to_string(value) + " is none of them");
+}
+
+}
+
+::agiru::Integer Date2DMY(::agiru::Date Date, ::agiru::Integer Value) {
+  switch (Value) {
+    case kFirstPart: return Date.Day();
+    case kSecondPart: return Date.Month();
+    case kThirdPart: return Date.Year();
+    default: RefusePart("Date2DMY", Value);
+  }
+}
+
+::agiru::Integer Date2DWY(::agiru::Date Date, ::agiru::Integer Value) {
+  switch (Value) {
+    case kFirstPart: return Date.DayOfWeek();
+    case kSecondPart: return Date.WeekNo();
+    case kThirdPart: return Date.IsUndefined() ? 0 : Date.WeekYear();
+    default: RefusePart("Date2DWY", Value);
+  }
+}
+
+::agiru::Boolean EncryptionEnabled() {
+  return false;
+}
+
+::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID) {
+  ::agiru::Session &session = ::agiru::Session::Current();
+  const ::agiru::Integer was = session.Language();
+  if (NewLanguageID != 0) { session.Language(NewLanguageID); }
+  return was;
+}
+
 ::agiru::Date CalcDate(const ::agiru::DateFormula &DateExpression) {
   return DateExpression.CalcDate(Today());
 }

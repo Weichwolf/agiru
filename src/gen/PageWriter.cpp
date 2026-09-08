@@ -9,11 +9,13 @@
 #include "Scope.h"
 #include "Token.h"
 
+#include <algorithm>
 #include <array>
 #include <cctype>
 #include <cstddef>
 #include <map>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -320,46 +322,46 @@ struct KindName {
 };
 
 constexpr std::array kControlKinds{
-    KindName{"area", "Area"},
-    KindName{"group", "Group"},
-    KindName{"repeater", "Repeater"},
-    KindName{"cuegroup", "CueGroup"},
-    KindName{"grid", "Grid"},
-    KindName{"fixed", "Fixed"},
-    KindName{"field", "Field"},
-    KindName{"label", "Label"},
-    KindName{"part", "Part"},
-    KindName{"systempart", "SystemPart"},
-    KindName{"chartpart", "ChartPart"},
-    KindName{"usercontrol", "UserControl"},
-    KindName{"view", "View"},
-    KindName{"action", "Action"},
-    KindName{"actionref", "ActionRef"},
-    KindName{"separator", "Separator"},
-    KindName{"fileuploadaction", "FileUploadAction"},
-    KindName{"systemaction", "SystemAction"},
-    KindName{"actions", "Actions"},
+    KindName{.spelled = "area", .kind = "Area"},
+    KindName{.spelled = "group", .kind = "Group"},
+    KindName{.spelled = "repeater", .kind = "Repeater"},
+    KindName{.spelled = "cuegroup", .kind = "CueGroup"},
+    KindName{.spelled = "grid", .kind = "Grid"},
+    KindName{.spelled = "fixed", .kind = "Fixed"},
+    KindName{.spelled = "field", .kind = "Field"},
+    KindName{.spelled = "label", .kind = "Label"},
+    KindName{.spelled = "part", .kind = "Part"},
+    KindName{.spelled = "systempart", .kind = "SystemPart"},
+    KindName{.spelled = "chartpart", .kind = "ChartPart"},
+    KindName{.spelled = "usercontrol", .kind = "UserControl"},
+    KindName{.spelled = "view", .kind = "View"},
+    KindName{.spelled = "action", .kind = "Action"},
+    KindName{.spelled = "actionref", .kind = "ActionRef"},
+    KindName{.spelled = "separator", .kind = "Separator"},
+    KindName{.spelled = "fileuploadaction", .kind = "FileUploadAction"},
+    KindName{.spelled = "systemaction", .kind = "SystemAction"},
+    KindName{.spelled = "actions", .kind = "Actions"},
 };
 
 constexpr std::array kAreaKinds{
-    KindName{"content", "Content"},
-    KindName{"factboxes", "FactBoxes"},
-    KindName{"sections", "Sections"},
-    KindName{"rolecenter", "RoleCenter"},
-    KindName{"embedding", "Embedding"},
-    KindName{"processing", "Processing"},
-    KindName{"navigation", "Navigation"},
-    KindName{"reporting", "Reporting"},
-    KindName{"creation", "Creation"},
-    KindName{"promoted", "Promoted"},
-    KindName{"systemactions", "SystemActions"},
-    KindName{"prompt", "Prompt"},
-    KindName{"promptoptions", "PromptOptions"},
-    KindName{"prompting", "Prompting"},
-    KindName{"promptguide", "PromptGuide"},
+    KindName{.spelled = "content", .kind = "Content"},
+    KindName{.spelled = "factboxes", .kind = "FactBoxes"},
+    KindName{.spelled = "sections", .kind = "Sections"},
+    KindName{.spelled = "rolecenter", .kind = "RoleCenter"},
+    KindName{.spelled = "embedding", .kind = "Embedding"},
+    KindName{.spelled = "processing", .kind = "Processing"},
+    KindName{.spelled = "navigation", .kind = "Navigation"},
+    KindName{.spelled = "reporting", .kind = "Reporting"},
+    KindName{.spelled = "creation", .kind = "Creation"},
+    KindName{.spelled = "promoted", .kind = "Promoted"},
+    KindName{.spelled = "systemactions", .kind = "SystemActions"},
+    KindName{.spelled = "prompt", .kind = "Prompt"},
+    KindName{.spelled = "promptoptions", .kind = "PromptOptions"},
+    KindName{.spelled = "prompting", .kind = "Prompting"},
+    KindName{.spelled = "promptguide", .kind = "PromptGuide"},
 };
 
-std::string_view KindOf(const std::array<KindName, 19> &known, const std::string &spelled) {
+std::string_view KindOf(std::span<const KindName> known, const std::string &spelled) {
   for (const KindName &one : known) {
     if (one.spelled == spelled) { return one.kind; }
   }
@@ -569,7 +571,7 @@ std::size_t DepthOf(const std::vector<al::PageControl> &controls) {
   std::size_t deepest = 0;
   for (const al::PageControl &control : controls) {
     const std::size_t below = DepthOf(control.children) + 1;
-    if (below > deepest) { deepest = below; }
+    deepest = std::max(deepest, below);
   }
   return deepest;
 }
@@ -713,7 +715,7 @@ std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
 }
 
-std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
+static std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
   std::vector<al::ProcedureDecl> all = page.procedures;
   const auto walk = [&all](auto &&self, const std::vector<al::PageControl> &controls) -> void {
     for (const al::PageControl &control : controls) {

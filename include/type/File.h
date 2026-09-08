@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "type/BigInteger.h"
+#include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
 #include "type/Char.h"
@@ -20,6 +21,7 @@
 #include "type/Time.h"
 #include "type/Variant.h"
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 
@@ -32,11 +34,21 @@ class BigText;
 
 /// \brief AL `File`.
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/file/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// \note IT HOLDS THE WHOLE FILE AND NOT A HANDLE, and that is a decision rather than an
+///       omission. AL's `File` is opened, streamed through and closed; a `Blob` is what this
+///       runtime already streams through, so `Open` reads the file into one and `Close` writes it
+///       back. The cost is the file's size in memory, and the population says that is the right
+///       trade here: every `File` the BaseApp opens is a document, a report layout or an import,
+///       none of them the 100-million-row table the streaming rule was written for (board:0045).
+///
+/// \warning WHAT NEEDS A CLIENT STILL REFUSES. `Download`, `Upload` and `View` move a file
+///          between the server and a browser, and there is no browser (board:0030). They are the
+///          only members here that still say so.
 class File {
 public:
+  /// \brief A file variable that names nothing yet.
+  File() = default;
+
   /// \brief AL `File.Close()`. Closes a file that has been opened by the OPEN method (File).
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void Close();
@@ -59,26 +71,26 @@ public:
   /// you to import or read data from the file.
   /// \param InStream The AL `InStream`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void CreateInStream(const ::agiru::InStream &InStream);
+  void CreateInStream(::agiru::InStream &InStream);
 
   /// \brief AL `File.CreateInStream(InStream, TextEncoding)` -- the encoding the file is read in.
   /// \param InStream The stream.
   /// \param Encoding The encoding.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void CreateInStream(const ::agiru::InStream &InStream, const ::agiru::TextEncoding &Encoding);
+  void CreateInStream(::agiru::InStream &InStream, const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.CreateOutStream(OutStream)`. Creates an OutStream object for a file. This
   /// enables you to export or write data to the file.
   /// \param OutStream The AL `OutStream`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void CreateOutStream(const ::agiru::OutStream &OutStream);
+  void CreateOutStream(::agiru::OutStream &OutStream);
 
   /// \brief AL `File.CreateOutStream(OutStream, TextEncoding)` -- the encoding the file is written
   ///        in.
   /// \param OutStream The stream.
   /// \param Encoding  The encoding.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void CreateOutStream(const ::agiru::OutStream &OutStream, const ::agiru::TextEncoding &Encoding);
+  void CreateOutStream(::agiru::OutStream &OutStream, const ::agiru::TextEncoding &Encoding);
 
   /// \brief AL `File.CreateTempFile(TextEncoding)`. Creates a temporary file. This enables you to
   /// save data of any format to a temporary file. This file has a unique name and will be stored in
@@ -398,6 +410,16 @@ public:
   ::agiru::Boolean WriteMode();
 
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
+
+private:
+  void Bind(std::string_view name, bool truncate);
+
+  ::agiru::Blob held_;
+  std::string name_;
+  std::size_t position_ = 0;
+  bool open_ = false;
+  bool textMode_ = true;
+  bool writeMode_ = true;
 };
 
 }

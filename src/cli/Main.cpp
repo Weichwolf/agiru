@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <array>
-#include <csetjmp>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -35,6 +34,7 @@ struct Options {
 };
 
 constexpr int kUsage = 2;
+constexpr std::size_t kLineBytes = 4096;
 
 constexpr std::string_view kDatabase = AGIRU_DATABASE;
 
@@ -119,7 +119,7 @@ int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *co
       continue;
     }
     std::string tail;
-    std::array<char, 4096> line{};
+    std::array<char, kLineBytes> line{};
     while (std::fgets(line.data(), static_cast<int>(line.size()), child) != nullptr) {
       const std::string_view read(line.data());
       std::print("{}", read);

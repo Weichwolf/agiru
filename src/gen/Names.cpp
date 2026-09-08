@@ -89,6 +89,23 @@ std::string ClassName(std::string_view identifier, ObjectKind kind) {
   return std::string(identifier) + "_" + std::string(KindSuffix(kind));
 }
 
+std::string InNamespace(std::string_view space, std::string_view name) {
+  std::string out = "::";
+  out += space;
+  out += "::";
+  out += name;
+  return out;
+}
+
+std::string TraitsOf(std::string_view traits, std::string_view space, std::string_view name) {
+  std::string out = "::agiru::";
+  out += traits;
+  out += "<";
+  out += InNamespace(space, name);
+  out += ">";
+  return out;
+}
+
 std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
 }
@@ -136,11 +153,12 @@ std::string OptionContentName(const std::vector<std::string> &members) {
   for (const std::string &member : EnumeratorNames(members)) { joined += member; }
   constexpr std::size_t kReadable = 48;
   if (joined.size() > kReadable) {
-    std::uint64_t hash = 14695981039346656037ULL;
-    for (const char c : joined) {
-      hash = (hash ^ static_cast<unsigned char>(c)) * 1099511628211ULL;
-    }
-    joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % 1000000007ULL);
+    constexpr std::uint64_t kFnvOffset = 14695981039346656037ULL;
+    constexpr std::uint64_t kFnvPrime = 1099511628211ULL;
+    constexpr std::uint64_t kShortened = 1000000007ULL;
+    std::uint64_t hash = kFnvOffset;
+    for (const char c : joined) { hash = (hash ^ static_cast<unsigned char>(c)) * kFnvPrime; }
+    joined = joined.substr(0, kReadable) + "_" + std::to_string(hash % kShortened);
   }
   return "::agiru::options::Option" + joined;
 }

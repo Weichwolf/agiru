@@ -51,10 +51,10 @@ std::string EnumSourcePath(const al::EnumObject &object) {
          ".cpp";
 }
 
-std::string ImplementationDeclarations(const al::EnumObject &object,
-                                       const std::string &identifier,
-                                       const std::string &space,
-                                       const Objects &objects) {
+static std::string ImplementationDeclarations(const al::EnumObject &object,
+                                              const std::string &identifier,
+                                              const std::string &space,
+                                              const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));
@@ -78,7 +78,7 @@ std::string ImplementationDeclarations(const al::EnumObject &object,
   return out;
 }
 
-std::string Unquoted(std::string_view text) {
+static std::string Unquoted(std::string_view text) {
   while (!text.empty() && text.front() == ' ') { text.remove_prefix(1); }
   while (!text.empty() && text.back() == ' ') { text.remove_suffix(1); }
   if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
@@ -87,7 +87,7 @@ std::string Unquoted(std::string_view text) {
   return std::string(text);
 }
 
-std::string ImplementationFor(std::string_view text, std::string_view face) {
+static std::string ImplementationFor(std::string_view text, std::string_view face) {
   std::string current;
   bool quoted = false;
   std::vector<std::string> pairs;
@@ -111,10 +111,10 @@ std::string ImplementationFor(std::string_view text, std::string_view face) {
   return {};
 }
 
-std::string ImplementationBodies(const al::EnumObject &object,
-                                 const std::string &identifier,
-                                 const std::string &space,
-                                 const Objects &objects) {
+static std::string ImplementationBodies(const al::EnumObject &object,
+                                        const std::string &identifier,
+                                        const std::string &space,
+                                        const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));

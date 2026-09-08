@@ -371,7 +371,7 @@ bool DoorDeclares(std::string_view name) {
   return DoorSpellings().contains(key);
 }
 
-const std::map<std::string, std::string> &PlatformMembers(std::string_view table) {
+static const std::map<std::string, std::string> &PlatformMembers(std::string_view table) {
   static std::map<std::string, std::map<std::string, std::string>> members;
   const std::string key = LowerKey(std::string(table));
   const auto held = members.find(key);

@@ -26,6 +26,7 @@ namespace {
 // A SET LARGER THAN ONE FETCH BLOCK. `Cursor` fetches 64 rows at a time, so a walk that stops at 64
 // or reads the same block twice is a defect this number is chosen to expose. A gate that inserted
 // ten rows would be green over both.
+constexpr std::size_t kCodeLength = 20;
 constexpr int kRows = 150;
 
 void Fill() {
@@ -34,8 +35,8 @@ void Fill() {
   for (int i = 0; i < kRows; ++i) {
     ResourceCost rec;
     rec.Type = i % 2 == 0 ? ResourceCostType::Resource : ResourceCostType::GroupResource;
-    rec.Code = agiru::Code<20>(std::string("R") + (i < 10 ? "00" : (i < 100 ? "0" : "")) +
-                               std::to_string(i));
+    rec.Code = agiru::Code<kCodeLength>(std::string("R") + (i < 10 ? "00" : (i < 100 ? "0" : "")) +
+                                        std::to_string(i));
     rec.WorkTypeCode = "hours";
     rec.CostType = ResourceCostCostType::Fixed;
     rec.DirectUnitCost = Decimal::FromInvariantString("1.00");
@@ -51,7 +52,7 @@ void TheWalkCrossesTheFetchBlock() {
   ResourceCost rec;
   CHECK_TRUE("FindSet finds the set", static_cast<bool>(rec.FindSet()));
   int seen = 1;
-  std::string first(rec.Code.Value());
+  const std::string first(rec.Code.Value());
   std::string last = first;
   while (rec.Next() != 0) {
     ++seen;
@@ -94,7 +95,7 @@ void AFilterNarrowsWhatTheCursorSelects() {
   CHECK_TRUE("every one of which matches the filter", onlyResource);
 
   ResourceCost none;
-  none.SetRange(none.Code, agiru::Code<20>("nothing at all"));
+  none.SetRange(none.Code, agiru::Code<kCodeLength>("nothing at all"));
   CHECK_TRUE("a filter that matches nothing is empty", static_cast<bool>(none.IsEmpty()));
   CHECK_TRUE("and FindSet says so", !static_cast<bool>(none.FindSet()));
   CHECK_TRUE("and Next on an unpositioned record stays 0", static_cast<int>(none.Next()) == 0);

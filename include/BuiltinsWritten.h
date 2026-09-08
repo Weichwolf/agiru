@@ -61,6 +61,50 @@ namespace agiru {
 ///       the platform's refusal (board:0054).
 [[nodiscard]] bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply);
 
+/// \brief AL `System.Date2DMY(Date, Integer)`. Gets the day, month or year of a Date.
+///
+/// \param Date  The date.
+/// \param Value 1 for the day, 2 for the month, 3 for the year.
+/// \return The part asked for, or 0 for the undefined date.
+/// \throws Error when `Value` is none of the three, which the page calls the valid options.
+::agiru::Integer Date2DMY(::agiru::Date Date, ::agiru::Integer Value);
+
+/// \brief AL `System.Date2DWY(Date, Integer)`. Gets the weekday, week number or week year.
+///
+/// \param Date  The date.
+/// \param Value 1 for the day of the week, 2 for the week number, 3 for the year.
+/// \return The part asked for, or 0 for the undefined date.
+/// \throws Error when `Value` is none of the three.
+///
+/// \note THE YEAR IS THE ISO WEEK-NUMBERING YEAR AND NOT THE CALENDAR ONE.
+///       `system-date2dwy-method.md`: "Date2DWY always uses the ISO week-numbering year scheme",
+///       so 2019-12-30 is week 1 of 2020 and its `Date2DWY(3)` is 2020.
+::agiru::Integer Date2DWY(::agiru::Date Date, ::agiru::Integer Value);
+
+/// \brief AL `System.EncryptionEnabled()`. Whether the tenant allows encryption.
+///
+/// \return False, because no key has been created here.
+///
+/// \note IT IS AN ANSWER AND NOT A REFUSAL. The page asks whether the TENANT is configured for
+///       encryption, and this one is not: `CreateEncryptionKey` refuses, so nothing could have
+///       enabled it. A refusal here stopped 22 UT procedures that only ask the question before
+///       choosing a branch (measured 2026-09-08).
+::agiru::Boolean EncryptionEnabled();
+
+/// \brief AL `System.GlobalLanguage([Integer])`. Gets and sets the session's language.
+///
+/// \param NewLanguageID The Windows language id to move to; 0 -- which no language has -- leaves
+///        it where it is, and that is how the reading form is spelled.
+/// \return The language that was in force BEFORE the call.
+///
+/// \note THE RETURN IS THE OLD ONE, because that is what every call site does with it:
+///       `Saved := GlobalLanguage; GlobalLanguage(Other); ...; GlobalLanguage(Saved)` is the shape
+///       the BaseApp writes, and it needs the value it is about to replace.
+///
+/// \note IT IS THE SESSION'S AND NOT THE PROCESS'S. A service tier holds ten thousand sessions in
+///       one process, so a global here would be one session answering for every other.
+::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID = {});
+
 /// \brief AL `System.CalcDate(DateFormula)`. Calculates a new date from the current system date.
 ///
 /// \param DateExpression The formula.
@@ -119,6 +163,15 @@ namespace agiru {
 /// \return Its time.
 ::agiru::Time DT2Time(::agiru::DateTime Datetime);
 
+/// \brief The precision `RoundDateTime` uses when the caller names none: one second.
+///
+/// `system-rounddatetime-datetime-biginteger-text-method.md`: "The default value is 1000, which
+/// rounds to the nearest second."
+constexpr ::agiru::BigInteger kRoundToTheSecond = 1000;
+
+/// \brief The base `Evaluate` reads a number in, which AL fixes at ten.
+constexpr int kDecimal = 10;
+
 /// \brief AL `System.RoundDateTime(DateTime [, BigInteger] [, Text])`. Rounds a DateTime.
 ///
 /// \param Datetime  The instant to round.
@@ -132,7 +185,7 @@ namespace agiru {
 ///       integer value is rounded as a numeric variable" -- so no calendar arithmetic is involved
 ///       and a precision of 3 600 000 rounds to the hour by division.
 ::agiru::DateTime RoundDateTime(::agiru::DateTime Datetime,
-                                ::agiru::BigInteger Precision = 1000,
+                                ::agiru::BigInteger Precision = kRoundToTheSecond,
                                 std::string_view Direction = "=");
 
 /// \brief AL `System.CanLoadType(DotNet)`. Whether a .NET type can be loaded.
@@ -443,13 +496,21 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
       return true;
     }
     constexpr std::size_t kIso = 10;
-    if (text.size() < kIso || text[4] != '-' || text[7] != '-') { return false; }
+    constexpr std::size_t kYearAt = 0;
+    constexpr std::size_t kYearDigits = 4;
+    constexpr std::size_t kMonthAt = 5;
+    constexpr std::size_t kDayAt = 8;
+    constexpr std::size_t kPartDigits = 2;
+    constexpr std::size_t kFirstDash = 4;
+    constexpr std::size_t kSecondDash = 7;
+    if (text.size() < kIso || text[kFirstDash] != '-' || text[kSecondDash] != '-') { return false; }
     const auto number = [text](std::size_t at, std::size_t digits) {
       return static_cast<int>(
-          std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, 10));
+          std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, kDecimal));
     };
-    into = ::agiru::Date::FromYmd(
-        number(0, 4), static_cast<unsigned>(number(5, 2)), static_cast<unsigned>(number(8, 2)));
+    into = ::agiru::Date::FromYmd(number(kYearAt, kYearDigits),
+                                  static_cast<unsigned>(number(kMonthAt, kPartDigits)),
+                                  static_cast<unsigned>(number(kDayAt, kPartDigits)));
     return !into.IsUndefined();
   } else if constexpr (std::is_same_v<T, ::agiru::DateFormula>) {
     into = ::agiru::DateFormula::FromText(text);

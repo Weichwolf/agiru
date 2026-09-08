@@ -92,7 +92,7 @@ std::string ColumnType(const FieldDef &def) {
   throw Error("ColumnType: no SQL type for this field type yet");
 }
 
-std::string ColumnZero(const FieldDef &def) {
+static std::string ColumnZero(const FieldDef &def) {
   switch (def.type) {
     case FieldType::Boolean: return "false";
     case FieldType::Option:
@@ -155,11 +155,11 @@ void DropTable(const Connection &connection, const TableDef &table) {
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
 }
 
-std::size_t StoredCount(const TableDef &table) {
+static std::size_t StoredCount(const TableDef &table) {
   return static_cast<std::size_t>(std::ranges::count_if(table.fields, Stored));
 }
 
-std::string StoredColumns(const TableDef &table) {
+static std::string StoredColumns(const TableDef &table) {
   std::string columns;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
@@ -169,7 +169,7 @@ std::string StoredColumns(const TableDef &table) {
   return columns;
 }
 
-std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
+static std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
   std::size_t column = 0;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }

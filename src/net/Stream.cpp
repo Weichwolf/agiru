@@ -5,6 +5,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/StringValue.h"
+#include "type/TextEncoding.h"
 
 #include <cstddef>
 #include <cstdint>

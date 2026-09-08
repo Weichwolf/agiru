@@ -284,7 +284,10 @@ public:
   /// \tparam T The type the caller assigned.
   /// \return Never.
   /// \throws Error always.
-  template <typename T> Refused &operator=(const T &) { Throw(); }
+  template <typename T> Refused &operator=(const T &value) {
+    static_cast<void>(value);
+    Throw();
+  }
 
   /// \brief Refuses to stand on either side of `a + b`.
   /// \tparam T The other operand's type.

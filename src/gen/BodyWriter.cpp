@@ -473,7 +473,7 @@ private:
     const al::Expr &named = expression.children[1];
     const std::string member = Identifier(callee.children[1].text);
     std::string subject = Expression(named, kPrimaryPrecedence);
-    std::size_t first = 2;
+    const std::size_t first = 2;
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
         named.children.front().kind == al::ExprKind::Name) {
       const std::string_view kind = KindNamespace(named.children.front().text);
@@ -1054,7 +1054,7 @@ private:
            {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
            {.arrow = handle && i == chain.size(),
             .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
-                      !(asCallee && i == 1),
+                      (!asCallee || i != 1),
             .precedence = precedence,
             .callee = asCallee && i == 1});
     }
@@ -1230,6 +1230,7 @@ public:
     for (const al::ProcedureDecl &procedure : table_.procedures) {
       if (!SameName(procedure.name, name) || !IsPublisher(procedure)) { continue; }
       std::vector<bool> vars;
+      vars.reserve(procedure.parameters.size());
       for (const al::VarDecl &parameter : procedure.parameters) {
         vars.push_back(parameter.byReference);
       }
@@ -1815,13 +1816,13 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
       out += "void " + tableClass + "::" + trigger.name + Identifier(field.name) + "() {\n";
       out +=
           ProcedureLocals(trigger, objects, table.name, table.procedures, shadowedByFields, body);
-      out += BindsBefore(body, "::" + space + "::" + tableClass, true);
+      out += BindsBefore(body, InNamespace(space, tableClass), true);
       out += body;
       out += "}\n\n";
     }
   }
   for (const al::ProcedureDecl &procedure : table.procedures) {
-    const std::string traits = "::agiru::TableTraits<::" + space + "::" + tableClass + ">";
+    const std::string traits = TraitsOf("TableTraits", space, tableClass);
     const std::string body =
         IsPublisher(procedure)
             ? RaisingBody(procedure,
@@ -1835,7 +1836,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
             ? std::string{}
             : ProcedureLocals(
                   procedure, objects, table.name, table.procedures, shadowedByFields, body) +
-                  BindsBefore(body, "::" + space + "::" + tableClass, true);
+                  BindsBefore(body, InNamespace(space, tableClass), true);
     out += ProcedureSignature(
                procedure,
                objects,
@@ -1938,7 +1939,7 @@ std::string WriteSource(const al::PageObject &page,
   ControlBodies(bodies, page.layout, pageClass, page, source, objects, named);
   ControlBodies(bodies, page.actions, pageClass, page, source, objects, named);
   for (const al::ProcedureDecl &procedure : page.procedures) {
-    const std::string traits = "::agiru::PageTraits<::" + space + "::" + pageClass + ">";
+    const std::string traits = TraitsOf("PageTraits", space, pageClass);
     const std::string body =
         IsPublisher(procedure)
             ? RaisingBody(

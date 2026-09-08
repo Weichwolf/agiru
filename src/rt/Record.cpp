@@ -17,6 +17,7 @@
 #include "type/MediaSet.h"
 #include "type/RecordId.h"
 #include "type/Time.h"
+#include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
 

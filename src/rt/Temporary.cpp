@@ -39,6 +39,7 @@ const FieldDef &FieldOf(const TableDef &table, FieldNo no) {
 
 std::vector<FieldNo> OrderOf(const std::vector<SortField> &key, const TableDef &table) {
   std::vector<FieldNo> named;
+  named.reserve(key.size());
   for (const SortField &one : key) { named.push_back(one.field); }
   if (table.keys.empty()) { return named; }
   for (const FieldNo no : table.keys[0].fields) {
@@ -91,11 +92,10 @@ bool SameKeyAt(const TempTable &temp, const TableDef &table, std::size_t at, con
 }
 
 bool Passes(const void *row, const std::vector<FieldFilter> &filters, const TableDef &table) {
-  for (const FieldFilter &filter : filters) {
+  return std::ranges::all_of(filters, [row, &table](const FieldFilter &filter) {
     const FieldDef &def = FieldOf(table, filter.field);
-    if (!Matches(ParseFilter(filter.text), FieldText(row, def), def)) { return false; }
-  }
-  return true;
+    return Matches(ParseFilter(filter.text), FieldText(row, def), def);
+  });
 }
 
 void Build(Held held, const TableDef &table) {

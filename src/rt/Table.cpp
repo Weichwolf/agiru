@@ -359,7 +359,7 @@ void Defaulted(void *record, const TableDef &table, bool sparePrimaryKey) {
 
 }
 
-bool Convertible(FieldType into, FieldType from) {
+static bool Convertible(FieldType into, FieldType from) {
   if (into == from) { return true; }
   const auto textLike = [](FieldType type) {
     return type == FieldType::Text || type == FieldType::Code;
@@ -370,12 +370,9 @@ bool Convertible(FieldType into, FieldType from) {
   return (textLike(into) && textLike(from)) || (ordinal(into) && ordinal(from));
 }
 
-bool InPrimaryKey(const TableDef &table, FieldNo no) {
-  if (table.keys.empty()) { return false; }
-  for (const FieldNo held : table.keys[0].fields) {
-    if (held == no) { return true; }
-  }
-  return false;
+static bool InPrimaryKey(const TableDef &table, FieldNo no) {
+  return !table.keys.empty() &&
+         std::ranges::any_of(table.keys[0].fields, [no](FieldNo held) { return held == no; });
 }
 
 void RuntimeTransferFields(void *into,

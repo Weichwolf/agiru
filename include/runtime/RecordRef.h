@@ -21,7 +21,7 @@
 /// \file
 /// \brief AL `RecordRef` and `FieldRef` -- a record reached by NUMBER rather than by name.
 
-// NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
 namespace agiru::detail {
 
 /// \brief A record several `RecordRef`s hold at once, freed when the last one lets go.
@@ -1243,6 +1243,6 @@ private:
   detail::SharedRecord owned_;
 };
 
-// NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)
 
 }

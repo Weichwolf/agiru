@@ -26,9 +26,15 @@ namespace agiru {
 
 /// \brief AL `NumberSequence`.
 ///
-/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
-///          `methods-auto/numbersequence/` states, so a call site compiles and is CHECKED; the body
-///          refuses by name rather than returning a plausible wrong answer (board:0035).
+/// \note IT IS A DATABASE SEQUENCE AND NOT A TABLE, which is what the pages describe: "The value
+///       is retrieved out of transaction. The value will not be returned on transaction rollback."
+///       PostgreSQL's own `SEQUENCE` has exactly that property, so this is the object rather than
+///       an imitation of it -- and a number series shared by every service tier has to be, because
+///       nothing in a process is authoritative.
+///
+/// \warning `CompanySpecific` DEFAULTS TO TRUE, and the door said `false` for a round. Every page
+///          in `methods-auto/numbersequence/` states "Default is true", so a caller that omitted it
+///          was silently reaching the OTHER sequence.
 class NumberSequence {
 public:
   /// \brief AL `NumberSequence.Current(Text, Boolean)`. Gets the current value from the number
@@ -38,13 +44,14 @@ public:
   /// \param CompanySpecific The AL `Boolean`.
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::BigInteger Current(std::string_view Name, ::agiru::Boolean CompanySpecific = {});
+  static ::agiru::BigInteger Current(std::string_view Name,
+                                     ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Delete(Text, Boolean)`. Deletes a specific number sequence.
   /// \param Name The AL `Text`.
   /// \param CompanySpecific The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static void Delete(std::string_view Name, ::agiru::Boolean CompanySpecific = {});
+  static void Delete(std::string_view Name, ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Exists(Text, Boolean)`. Checks whether a specific number sequence
   /// exists.
@@ -52,7 +59,7 @@ public:
   /// \param CompanySpecific The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::Boolean Exists(std::string_view Name, ::agiru::Boolean CompanySpecific = {});
+  static ::agiru::Boolean Exists(std::string_view Name, ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Insert(Text, BigInteger, BigInteger, Boolean)`. Creates a number
   /// sequence in the database, with the given parameters.
@@ -63,8 +70,8 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static void Insert(std::string_view Name,
                      ::agiru::BigInteger Seed = {},
-                     ::agiru::BigInteger Increment = {},
-                     ::agiru::Boolean CompanySpecific = {});
+                     ::agiru::BigInteger Increment = 1,
+                     ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Next(Text, Boolean)`. Retrieves the next value from the number
   /// sequence.
@@ -72,7 +79,7 @@ public:
   /// \param CompanySpecific The AL `Boolean`.
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::BigInteger Next(std::string_view Name, ::agiru::Boolean CompanySpecific = {});
+  static ::agiru::BigInteger Next(std::string_view Name, ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Range(Text, Integer, BigInteger, Boolean)`. Retrieves a range of
   /// values from the number sequence.
@@ -98,7 +105,7 @@ public:
   /// \return The AL `BigInteger`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::BigInteger
-  Range(std::string_view Name, ::agiru::Integer Count, ::agiru::Boolean CompanySpecific = {});
+  Range(std::string_view Name, ::agiru::Integer Count, ::agiru::Boolean CompanySpecific = true);
 
   /// \brief AL `NumberSequence.Restart(Text, BigInteger, Boolean)`. Restarts a number sequence.
   /// \param Name The AL `Text`.
@@ -107,7 +114,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static void Restart(std::string_view Name,
                       ::agiru::BigInteger Seed = {},
-                      ::agiru::Boolean CompanySpecific = {});
+                      ::agiru::Boolean CompanySpecific = true);
 };
 
 }

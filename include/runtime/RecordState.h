@@ -7,6 +7,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -303,7 +304,13 @@ struct RecordState {
   int group = 0;                    ///< The group `SetRange` and `SetFilter` write into.
 
   /// \brief The primary keys `Mark(true)` set, for this VARIABLE and no other.
-  std::vector<std::string> marks;
+  ///
+  /// \note A SET AND NOT A VECTOR, and that is the shape rather than the container's convenience.
+  ///       `record-mark-method.md` describes marks as a SET the variable carries: marking twice
+  ///       marks once, and the question asked of it is only ever "is this key in it". A vector
+  ///       answered that with a linear walk written out by hand, because `<algorithm>` may not
+  ///       enter the door.
+  std::set<std::string> marks;
   bool markedOnly = false; ///< `MarkedOnly(true)`.
 
   /// \brief AL `xRec` -- the record as it was last READ, INSERTED or MODIFIED.

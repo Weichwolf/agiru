@@ -246,12 +246,9 @@ void FieldRef::TestField() const {
   agiru::detail::TestField(record_, *table_, def_->no);
 }
 
-// NOLINTBEGIN(readability-convert-member-functions-to-static)
 RecordRef FieldRef::Record() const {
   throw Error("FieldRef.Record() is declared and not implemented yet (board:0035)");
 }
-
-// NOLINTEND(readability-convert-member-functions-to-static)
 
 void RecordRef::Open(Integer tableNo) {
   Close();

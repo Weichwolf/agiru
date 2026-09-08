@@ -60,14 +60,26 @@ void Reads() {
 }
 
 constexpr std::array<TestMethod, 4> kOrdered{{
-    {"DefaultLeaves", &DefaultLeaves, {}, {}, agiru::TestPermissions::Restrictive},
-    {"RollbackLeavesNothing",
-     &RollbackLeavesNothing,
-     TransactionModel::AutoRollback,
-     {},
-     agiru::TestPermissions::Restrictive},
-    {"Fails", &Fails, {}, {}, agiru::TestPermissions::Restrictive},
-    {"Reads", &Reads, {}, {}, agiru::TestPermissions::Restrictive},
+    {.name = "DefaultLeaves",
+     .invoke = &DefaultLeaves,
+     .model = {},
+     .handlers = {},
+     .permissions = agiru::TestPermissions::Restrictive},
+    {.name = "RollbackLeavesNothing",
+     .invoke = &RollbackLeavesNothing,
+     .model = TransactionModel::AutoRollback,
+     .handlers = {},
+     .permissions = agiru::TestPermissions::Restrictive},
+    {.name = "Fails",
+     .invoke = &Fails,
+     .model = {},
+     .handlers = {},
+     .permissions = agiru::TestPermissions::Restrictive},
+    {.name = "Reads",
+     .invoke = &Reads,
+     .model = {},
+     .handlers = {},
+     .permissions = agiru::TestPermissions::Restrictive},
 }};
 
 // THE ROLLBACK IS PER CODEUNIT AND NOT PER METHOD. `devenv-testisolation-property.md` gives three

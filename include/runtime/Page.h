@@ -99,7 +99,10 @@ public:
   /// \param value The value to find.
   /// \return Whether a row carries it.
   /// \throws Error until a report can be run (board:0034).
-  template <typename Field, typename Value> Boolean FindFirstField(const Field &, const Value &) {
+  template <typename Field, typename Value>
+  Boolean FindFirstField(const Field &field, const Value &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
     Unrun();
   }
 
@@ -107,7 +110,10 @@ public:
   /// \tparam Value What the field is compared against.
   /// \return Whether a later row carries it.
   /// \throws Error until a report can be run (board:0034).
-  template <typename Field, typename Value> Boolean FindNextField(const Field &, const Value &) {
+  template <typename Field, typename Value>
+  Boolean FindNextField(const Field &field, const Value &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
     Unrun();
   }
 
@@ -116,7 +122,9 @@ public:
   /// \return Whether an earlier row carries it.
   /// \throws Error until a report can be run (board:0034).
   template <typename Field, typename Value>
-  Boolean FindPreviousField(const Field &, const Value &) {
+  Boolean FindPreviousField(const Field &field, const Value &value) {
+    static_cast<void>(field);
+    static_cast<void>(value);
     Unrun();
   }
 
@@ -151,7 +159,10 @@ public:
   ///
   /// \note VARIADIC BECAUSE THE KEY IS. `testrequestpage-gotokey-method.md` writes
   ///       `GoToKey([Value: Any,...])`, and a primary key is up to sixteen fields.
-  template <typename... Values> Boolean GoToKey(const Values &...) { Unrun(); }
+  template <typename... Values> Boolean GoToKey(const Values &...values) {
+    (static_cast<void>(values), ...);
+    Unrun();
+  }
 
   /// \brief AL `TestRequestPage.GetValidationError([Integer])` -- one of the errors the request
   ///        page collected.

@@ -123,7 +123,7 @@ std::string FieldIdentifier(const al::TableObject &table, const std::string &nam
   if (const auto found = known.byName.find(LowerKey(name)); found != known.byName.end()) {
     return found->second;
   }
-  const std::string bare = Identifier(name);
+  std::string bare = Identifier(name);
   if (const auto found = known.byBare.find(LowerKey(bare)); found != known.byBare.end()) {
     return found->second;
   }

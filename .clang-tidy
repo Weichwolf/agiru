@@ -27,6 +27,18 @@
 # (`apps/base/sales/customer/page/CustomerPicture.cpp:68`, measured 2026-09-07) -- the check is
 # arguing with the language, not with us.
 #
+# `readability-convert-member-functions-to-static` is switched off because AN AL METHOD IS CALLED
+# ON AN INSTANCE. `Blob.Export(Name)`, `Media.ImportStream(...)`, `Notification.Recall()` are how AL
+# spells them, and a body that refuses until board:0030 brings a client touches no member YET -- the
+# check reads "make it static" from a body that is a placeholder. Making it static would also break
+# the registration shape: every subscriber and every test is registered through a MEMBER FUNCTION
+# POINTER (`InvokeSubscriber<C, &C::M>`), which a static member cannot form.
+#
+# IT WAS ALREADY OFF, four times, in `NOLINT` regions -- `src/rt/Door.cpp`, `src/rt/RecordRef.cpp`,
+# `include/type/Variant.h`, `include/runtime/RecordRef.h`. A reason repeated in four files is a
+# reason that belongs here once, and moving it lowers the silent-places count rather than raising
+# it (2026-09-08).
+#
 # `readability-redundant-casting` called `static_cast<T &>(value)` in `Materialised` redundant, and
 # without it `T &` will not bind: `error: non-const lvalue reference to type 'int' cannot bind to a
 # temporary` (measured 2026-09-07). A cast that makes the binding is not a cast that says nothing.
@@ -89,7 +101,8 @@ Checks: >
   -readability-redundant-casting,
   -modernize-avoid-c-arrays,
   -misc-unconventional-assign-operator,
-  -bugprone-branch-clone
+  -bugprone-branch-clone,
+  -readability-convert-member-functions-to-static
 WarningsAsErrors: '*'
 
 CheckOptions:
@@ -104,7 +117,12 @@ CheckOptions:
   # Three in a row is nobody's specification, so the check keeps that half of its reach.
   bugprone-easily-swappable-parameters.MinimumLength: '3'
 
-  misc-include-cleaner.IgnoreHeaders: 'stdio.h'
+  # `signal.h` is the same contradiction as `stdio.h` above, one header further: `sigaltstack`,
+  # `stack_t` and `sigaction` are POSIX and have no C++ header, `<csignal>` carries only the four
+  # names the standard names, and `modernize-deprecated-headers` forbids writing `signal.h`. The
+  # runtime needs the POSIX three so a crash can print its frames -- on an ALTERNATE STACK, because
+  # a stack overflow is the crash a handler on the overflowed stack cannot report (board:0616).
+  misc-include-cleaner.IgnoreHeaders: 'stdio.h;signal.h'
 
   # `readability-identifier-length` belongs SET, not switched off. Its default asks for three
   # characters, which is wrong here: the tree carries AL vocabulary, and `i`, `n`, `no` are the

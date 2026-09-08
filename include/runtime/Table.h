@@ -859,7 +859,7 @@ public:
 
   /// \brief AL `Record.ClearMarks()` -- takes every mark off this variable.
   void ClearMarks() {
-    detail::RecordState *state = const_cast<detail::RecordState *>(Filtered());
+    auto *state = const_cast<detail::RecordState *>(Filtered());
     if (state != nullptr) { state->marks.clear(); }
   }
 
@@ -1352,11 +1352,7 @@ public:
   [[nodiscard]] Boolean Mark() const {
     const detail::RecordState *state = Filtered();
     if (state == nullptr) { return false; }
-    const std::string key = PrimaryKeyText();
-    for (const std::string &marked : state->marks) {
-      if (marked == key) { return true; }
-    }
-    return false;
+    return state->marks.contains(PrimaryKeyText());
   }
 
   /// \brief AL `Record.Mark(Boolean)` -- marks or unmarks the record the variable stands on.
@@ -1370,12 +1366,11 @@ public:
   void Mark(Boolean mark) {
     detail::RecordState &state = State();
     const std::string key = PrimaryKeyText();
-    for (std::size_t at = 0; at < state.marks.size(); ++at) {
-      if (state.marks[at] != key) { continue; }
-      if (!mark) { state.marks.erase(state.marks.begin() + static_cast<std::ptrdiff_t>(at)); }
-      return;
+    if (mark) {
+      state.marks.insert(key);
+    } else {
+      state.marks.erase(key);
     }
-    if (mark) { state.marks.push_back(key); }
   }
 
   /// \note NO `<algorithm>` IN THE DOOR. A linear walk over a handful of marks is written out
@@ -2052,7 +2047,7 @@ private:
   }
 
   void CaptureImage() {
-    Derived *copy =
+    auto *copy =
         new Derived(*static_cast<const Derived *>(this)); // NOLINT(cppcoreguidelines-owning-memory)
     copy->State_Block = detail::StateHandle{};
     State().image.Hold(

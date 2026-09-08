@@ -363,8 +363,8 @@ private:
         Advance();
         while (AtPunctuation(".") && position_ + 2 < tokens_.size() &&
                tokens_[position_ + 1].kind != TokenKind::Punctuation &&
-               !(tokens_[position_ + 2].kind == TokenKind::Punctuation &&
-                 tokens_[position_ + 2].text == "(")) {
+               (tokens_[position_ + 2].kind != TokenKind::Punctuation ||
+                tokens_[position_ + 2].text != "(")) {
           Advance();
           scope.text = Peek().text;
           Advance();

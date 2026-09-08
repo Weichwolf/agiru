@@ -38,6 +38,10 @@ std::string Literal(std::string_view text);
 
 std::string ClassName(std::string_view identifier, ObjectKind kind);
 
+std::string InNamespace(std::string_view space, std::string_view name);
+
+std::string TraitsOf(std::string_view traits, std::string_view space, std::string_view name);
+
 struct ObjectDeclaration {
   bool found = false;
   int id = 0;

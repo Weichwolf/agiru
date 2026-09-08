@@ -109,13 +109,13 @@ namespace {
 
 constexpr std::array<std::string_view, 2> kDoublesNames{"IsHandled", "Amount"};
 constexpr std::array<Subscription, 1> kListenerSubscriptions{{
-    {EventObject::Codeunit,
-     0,
-     "Event Gate Publisher",
-     "OnBeforePost",
-     "",
-     kDoublesNames,
-     &agiru::detail::InvokeSubscriber<Listener_Codeunit, &Listener_Codeunit::Doubles>},
+    {.kind = EventObject::Codeunit,
+     .objectId = 0,
+     .objectName = "Event Gate Publisher",
+     .event = "OnBeforePost",
+     .element = "",
+     .parameters = kDoublesNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Listener_Codeunit, &Listener_Codeunit::Doubles>},
 }};
 const SubscriptionCatalogue kListenerCatalogue{
     CodeunitTraits<Listener_Codeunit>::kId,
@@ -127,13 +127,13 @@ const SubscriptionCatalogue kListenerCatalogue{
 
 constexpr std::array<std::string_view, 1> kWrongNames{"Total"};
 constexpr std::array<Subscription, 1> kMisnamedSubscriptions{{
-    {EventObject::Codeunit,
-     0,
-     "Event Gate Publisher",
-     "OnBeforePost",
-     "",
-     kWrongNames,
-     &agiru::detail::InvokeSubscriber<Misnamed_Codeunit, &Misnamed_Codeunit::Wrong>},
+    {.kind = EventObject::Codeunit,
+     .objectId = 0,
+     .objectName = "Event Gate Publisher",
+     .event = "OnBeforePost",
+     .element = "",
+     .parameters = kWrongNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Misnamed_Codeunit, &Misnamed_Codeunit::Wrong>},
 }};
 const SubscriptionCatalogue kMisnamedCatalogue{
     CodeunitTraits<Misnamed_Codeunit>::kId,
@@ -145,13 +145,13 @@ const SubscriptionCatalogue kMisnamedCatalogue{
 
 constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
 constexpr std::array<Subscription, 1> kWatcherSubscriptions{{
-    {EventObject::Table,
-     0,
-     "Line Number Buffer",
-     "OnBeforeInsertEvent",
-     "",
-     kSeenNames,
-     &agiru::detail::InvokeSubscriber<Watcher_Codeunit, &Watcher_Codeunit::Seen>},
+    {.kind = EventObject::Table,
+     .objectId = 0,
+     .objectName = "Line Number Buffer",
+     .event = "OnBeforeInsertEvent",
+     .element = "",
+     .parameters = kSeenNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Watcher_Codeunit, &Watcher_Codeunit::Seen>},
 }};
 const SubscriptionCatalogue kWatcherCatalogue{
     CodeunitTraits<Watcher_Codeunit>::kId,
@@ -167,19 +167,22 @@ void ATableTriggerEventReachesASubscriber() {
   Watcher_Codeunit watcher;
   static_cast<void>(agiru::BindSubscription(watcher));
   agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
-  buffer.OldLineNumber = 7;
+  constexpr agiru::Integer kOldLine = 7;
+  constexpr agiru::Integer kNewLine = 8;
+  buffer.OldLineNumber = kOldLine;
   buffer.Insert(true);
   CHECK_TRUE("Insert raised OnBeforeInsertEvent once", watcher.seen == 1);
   CHECK_TRUE("with RunTrigger as given", watcher.sawRunTrigger);
   CHECK_TRUE("and the subscriber's write to Rec is what was inserted",
-             buffer.Get(7) && buffer.NewLineNumber == 8);
+             buffer.Get(kOldLine) && buffer.NewLineNumber == kNewLine);
   static_cast<void>(agiru::UnbindSubscription(watcher));
 }
 
 void AManualSubscriberHearsOnlyWhileBound() {
   Publisher_Codeunit publisher;
   Listener_Codeunit listener;
-  Integer amount = 5;
+  constexpr Integer kAmount = 5;
+  Integer amount = kAmount;
   Boolean handled = false;
   publisher.OnBeforePost(amount, Text<0>("note"), handled);
   CHECK_TRUE("unbound, a Manual subscriber hears nothing", listener.calls == 0 && amount == 5);

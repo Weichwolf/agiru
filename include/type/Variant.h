@@ -45,7 +45,7 @@ struct InVariant<T, std::variant<Ts...>> : std::bool_constant<(std::is_same_v<T,
 
 }
 
-// NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 namespace agiru {
 
 /// \brief The runtime's codeunit traits, declared here so a Variant can constrain on them.
@@ -1047,6 +1047,6 @@ private:
   Held held_;
 };
 
-// NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
+// NOLINTEND(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
 
 }

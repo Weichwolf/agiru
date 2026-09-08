@@ -1,4 +1,4 @@
-// NOLINTBEGIN(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
+// NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/test/TestHttpRequestMessage.h"
@@ -400,51 +400,6 @@ void Dialog::Update(::agiru::Integer Number, const ::agiru::Variant &Value) {
   RefuseDoor("Dialog.Update(Integer, Any)");
 }
 
-void File::Close() {
-  RefuseDoor("File.Close()");
-}
-
-::agiru::Boolean File::Copy(std::string_view FromName, std::string_view ToName) {
-  static_cast<void>(FromName);
-  static_cast<void>(ToName);
-  RefuseDoor("File.Copy(Text, Text)");
-}
-
-::agiru::Boolean File::Create(std::string_view Name, const ::agiru::TextEncoding &Encoding) {
-  static_cast<void>(Name);
-  static_cast<void>(Encoding);
-  RefuseDoor("File.Create(Text, TextEncoding)");
-}
-
-void File::CreateInStream(const ::agiru::InStream &InStream,
-                          const ::agiru::TextEncoding &Encoding) {
-  static_cast<void>(InStream);
-  static_cast<void>(Encoding);
-  RefuseDoor("File.CreateInStream(InStream, TextEncoding)");
-}
-
-void File::CreateOutStream(const ::agiru::OutStream &OutStream,
-                           const ::agiru::TextEncoding &Encoding) {
-  static_cast<void>(OutStream);
-  static_cast<void>(Encoding);
-  RefuseDoor("File.CreateOutStream(OutStream, TextEncoding)");
-}
-
-void File::CreateInStream(const ::agiru::InStream &InStream) {
-  static_cast<void>(InStream);
-  RefuseDoor("File.CreateInStream(InStream)");
-}
-
-void File::CreateOutStream(const ::agiru::OutStream &OutStream) {
-  static_cast<void>(OutStream);
-  RefuseDoor("File.CreateOutStream(OutStream)");
-}
-
-::agiru::Boolean File::CreateTempFile(const ::agiru::TextEncoding &Encoding) {
-  static_cast<void>(Encoding);
-  RefuseDoor("File.CreateTempFile(TextEncoding)");
-}
-
 ::agiru::Boolean File::Download(std::string_view FromFile,
                                 std::string_view DialogTitle,
                                 std::string_view ToFolder,
@@ -471,16 +426,6 @@ void File::CreateOutStream(const ::agiru::OutStream &OutStream) {
   RefuseDoor("File.DownloadFromStream(InStream, Text, Text, Text, Text)");
 }
 
-::agiru::Boolean File::Erase(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.Erase(Text)");
-}
-
-::agiru::Boolean File::Exists(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.Exists(Text)");
-}
-
 ::agiru::Boolean File::GetStamp(std::string_view Name, ::agiru::Date &Date, ::agiru::Time &Time) {
   static_cast<void>(Name);
   static_cast<void>(Date);
@@ -488,55 +433,11 @@ void File::CreateOutStream(const ::agiru::OutStream &OutStream) {
   RefuseDoor("File.GetStamp(Text, Date, Time)");
 }
 
-::agiru::Boolean File::IsPathTemporary(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.IsPathTemporary(Text)");
-}
-
-::agiru::Integer File::Len() {
-  RefuseDoor("File.Len()");
-}
-
-std::string File::Name() {
-  RefuseDoor("File.Name()");
-}
-
-::agiru::Boolean File::Open(std::string_view Name, const ::agiru::TextEncoding &Encoding) {
-  static_cast<void>(Name);
-  static_cast<void>(Encoding);
-  RefuseDoor("File.Open(Text, TextEncoding)");
-}
-
-::agiru::Integer File::Pos() {
-  RefuseDoor("File.Pos()");
-}
-
-::agiru::Integer File::Read(::agiru::Variant &Read) {
-  static_cast<void>(Read);
-  RefuseDoor("File.Read(Any)");
-}
-
-::agiru::Boolean File::Rename(std::string_view OldName, std::string_view NewName) {
-  static_cast<void>(OldName);
-  static_cast<void>(NewName);
-  RefuseDoor("File.Rename(Text, Text)");
-}
-
-void File::Seek(::agiru::Integer Position) {
-  static_cast<void>(Position);
-  RefuseDoor("File.Seek(Integer)");
-}
-
 ::agiru::Boolean File::SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time) {
   static_cast<void>(Name);
   static_cast<void>(Date);
   static_cast<void>(Time);
   RefuseDoor("File.SetStamp(Text, Date, Time)");
-}
-
-::agiru::Boolean File::TextMode(::agiru::Boolean Mode) {
-  static_cast<void>(Mode);
-  RefuseDoor("File.TextMode(Boolean)");
 }
 
 void File::Trunc() {
@@ -615,11 +516,6 @@ void File::Write(::agiru::Char Value) {
   RefuseDoor("File.Write(Char)");
 }
 
-void File::Write(std::string_view Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Code)");
-}
-
 void File::Write(::agiru::Date Value) {
   static_cast<void>(Value);
   RefuseDoor("File.Write(Date)");
@@ -673,11 +569,6 @@ void File::Write(const ::agiru::RecordRef &Value) {
 void File::Write(::agiru::Time Value) {
   static_cast<void>(Value);
   RefuseDoor("File.Write(Time)");
-}
-
-::agiru::Boolean File::WriteMode(::agiru::Boolean Mode) {
-  static_cast<void>(Mode);
-  RefuseDoor("File.WriteMode(Boolean)");
 }
 
 void FileUpload::CreateInStream(const ::agiru::InStream &InStream) {
@@ -2433,71 +2324,6 @@ void NavApp::LoadPackageData(::agiru::Integer TableNo) {
   static_cast<void>(TableNo);
   static_cast<void>(RunTrigger);
   RefuseDoor("NavApp.RestoreArchiveData(Integer, Boolean)");
-}
-
-::agiru::BigInteger NumberSequence::Current(std::string_view Name,
-                                            ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Current(Text, Boolean)");
-}
-
-void NumberSequence::Delete(std::string_view Name, ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Delete(Text, Boolean)");
-}
-
-::agiru::Boolean NumberSequence::Exists(std::string_view Name, ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Exists(Text, Boolean)");
-}
-
-void NumberSequence::Insert(std::string_view Name,
-                            ::agiru::BigInteger Seed,
-                            ::agiru::BigInteger Increment,
-                            ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(Seed);
-  static_cast<void>(Increment);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Insert(Text, BigInteger, BigInteger, Boolean)");
-}
-
-::agiru::BigInteger NumberSequence::Next(std::string_view Name, ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Next(Text, Boolean)");
-}
-
-::agiru::BigInteger NumberSequence::Range(std::string_view Name,
-                                          ::agiru::Integer Count,
-                                          ::agiru::BigInteger &Increment,
-                                          ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(Count);
-  static_cast<void>(Increment);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Range(Text, Integer, BigInteger, Boolean)");
-}
-
-::agiru::BigInteger NumberSequence::Range(std::string_view Name,
-                                          ::agiru::Integer Count,
-                                          ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(Count);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Range(Text, Integer, Boolean)");
-}
-
-void NumberSequence::Restart(std::string_view Name,
-                             ::agiru::BigInteger Seed,
-                             ::agiru::Boolean CompanySpecific) {
-  static_cast<void>(Name);
-  static_cast<void>(Seed);
-  static_cast<void>(CompanySpecific);
-  RefuseDoor("NumberSequence.Restart(Text, BigInteger, Boolean)");
 }
 
 std::string ProductName::Full() {
@@ -4486,18 +4312,6 @@ std::string SessionSettings::TimeZone() {
   RefuseDoor("SessionSettings.TimeZone()");
 }
 
-::agiru::Boolean File::CreateTempFile() {
-  RefuseDoor("File.CreateTempFile()");
-}
-
-::agiru::Boolean File::TextMode() {
-  RefuseDoor("File.TextMode()");
-}
-
-::agiru::Boolean File::WriteMode() {
-  RefuseDoor("File.WriteMode()");
-}
-
 std::string XmlDeclaration::Encoding() {
   RefuseDoor("XmlDeclaration.Encoding()");
 }
@@ -4592,15 +4406,6 @@ std::string TestHttpResponseMessage::ReasonPhrase() {
   RefuseDoor("File.GetStamp()");
 }
 
-::agiru::BigInteger NumberSequence::Range(std::string_view Name,
-                                          ::agiru::Integer Count,
-                                          ::agiru::BigInteger &Increment) {
-  static_cast<void>(Name);
-  static_cast<void>(Count);
-  static_cast<void>(Increment);
-  RefuseDoor("NumberSequence.Range()");
-}
-
 ::agiru::Guid TaskScheduler::CreateTask(::agiru::Integer CodeunitId,
                                         ::agiru::Integer FailureCodeunitId,
                                         ::agiru::Boolean IsReady) {
@@ -4617,4 +4422,4 @@ std::string TestHttpResponseMessage::ReasonPhrase() {
 
 }
 
-// NOLINTEND(readability-convert-member-functions-to-static,bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
+// NOLINTEND(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
