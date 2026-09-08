@@ -298,10 +298,11 @@ struct RecordState {
   std::vector<SortField> viewKey;       ///< And the key.
   bool viewAscending = true;            ///< And the direction.
 
-  std::vector<FieldFilter> filters; ///< AND across fields and groups.
-  std::vector<SortField> key;       ///< `SetCurrentKey`; empty means the primary key.
-  bool ascending = true;            ///< `Ascending()`, over the whole key.
-  int group = 0;                    ///< The group `SetRange` and `SetFilter` write into.
+  std::vector<FieldFilter> filters;       ///< AND across fields and groups.
+  std::vector<::agiru::FieldNo> autoCalc; ///< `SetAutoCalcFields`: calculated after every read.
+  std::vector<SortField> key;             ///< `SetCurrentKey`; empty means the primary key.
+  bool ascending = true;                  ///< `Ascending()`, over the whole key.
+  int group = 0;                          ///< The group `SetRange` and `SetFilter` write into.
 
   /// \brief The primary keys `Mark(true)` set, for this VARIABLE and no other.
   ///

@@ -197,3 +197,24 @@ Three implementations, and the first is the one this item does not yet carry:
 `TableType = Temporary` is a translation-time fact: such a table gets no `CREATE TABLE` and no
 columns, which `src/rt/Storage.cpp` currently has no way to know. It is one `constexpr bool` on the
 `TableDef` and it removes the table from the schema entirely.
+
+## Standing (2026-09-08): `CalcFields`, `CalcSums` and `SetAutoCalcFields` run
+
+`detail::CalcField` reads the field's `CalcFormula` -- seven kinds, six filter forms, the leading
+`-` for `ReverseSign` -- with a reader written against `devenv-calcformula-property.md`, and
+evaluates it as ONE aggregate statement over the target table through the session's connection:
+`COALESCE(SUM(col), 0)`, `COUNT(*)`, `EXISTS(...)`, `MIN`/`MAX`, `AVG` (rounded into a whole
+field), and `Lookup` as the first row in primary-key order. A `FIELD(FlowFilter)` term reads the
+filter standing on that FlowFilter through the record's state and applies it to the target
+column; `FIELD(UPPERLIMIT(x))` takes what follows `..`. A term whose source carries no filter is
+dropped, which is what BC does. `CalcSums` totals a stored numeric column over `Select(state)`.
+`SetAutoCalcFields` lists FieldNos in the state, and `Read`/`Stepped` calculate them BEFORE the
+image is captured, so `xRec` carries the calculated values too.
+
+**Not in this round, each a hole with a count:** a FILTER on a FlowField (`SetRange("Balance",
+...)`) still reaches SQL as a predicate on a column that does not exist and fails loudly;
+`FieldRef.CalcField`/`CalcSum`; a temporary TARGET table (the formula reads the database, never a
+temporary's rows); SIFT (board:0019) is the index that makes the statement fast and is not a second
+path. WI-890 (openerp) warns that making FlowField FILTERS bite was net negative there twice; that
+is the filter-on-FlowField hole above, not the calculation, and it gets its own A/B.
+

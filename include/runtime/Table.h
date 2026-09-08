@@ -839,26 +839,35 @@ public:
     return value;
   }
 
-  /// \brief AL `Record.CalcFields(...)`. Calculates the FlowFields in a record. You specify which
-  /// fields to calculate by using parameters.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CalcFields(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CalcFields is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.CalcFields(Field, ...)` -- evaluates the named FlowFields into the record.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The FlowFields, named the way AL names them: `Rec.CalcFields(Balance)`.
+  /// \return True, as AL's statement form does; the value form has nothing to refuse.
+  /// \throws Error when a formula names what this build does not carry (board:0047).
+  ///
+  /// \note A FlowField is ZERO until calculated (`record-calcfields-method.md`): `Find` and `Next`
+  ///       leave it so, and only this, `SetAutoCalcFields`, or a page control whose source is the
+  ///       field itself, fills it. A stored field passed here is left alone.
+  template <typename... Fields> Boolean CalcFields(Fields &...members) {
+    (detail::CalcField(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    return true;
   }
 
-  /// \brief AL `Record.CalcSums(...)`. Calculates the total of a column in a table. You specify
-  /// which fields to calculate by using parameters.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean CalcSums(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CalcSums is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.CalcSums(Field, ...)` -- the sum of each named column over the rows the
+  ///        record's filters select.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The stored, numeric fields to total; each result lands in that field.
+  /// \return True, as AL's statement form does.
+  /// \throws Error when a field is a FlowField or not numeric.
+  ///
+  /// \note IT USES THE CURRENT FILTERS and never the current row: `SetRange` first, then
+  ///       `CalcSums`, and the record's own values are not among what is summed
+  ///       (`devenv-calcfields-calcsums-...-methods.md`).
+  template <typename... Fields> Boolean CalcSums(Fields &...members) {
+    (detail::CalcSum(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    return true;
   }
 
   /// \brief AL `Record.ChangeCompany(...)`. Redirects references to table data from one company to
@@ -1612,15 +1621,20 @@ public:
     throw Error("Record.SetAscending is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.SetAutoCalcFields(...)`. Sets the FlowFields that you specify to be
-  /// automatically calculated when the record is retrieved from the database.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean SetAutoCalcFields(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetAutoCalcFields is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.SetAutoCalcFields(Field, ...)` -- the FlowFields every later read
+  ///        calculates by itself.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The FlowFields; with none, the list is cleared.
+  /// \return True, as AL's statement form does.
+  ///
+  /// \note IT IS PER VARIABLE AND TRAVELS WITH THE STATE, like the filters: `Find`, `Next`, and
+  ///       `Get` calculate the listed fields after loading the row, so a loop over ledger entries
+  ///       that reads a FlowField per row does one aggregate per row and not `CalcFields` by hand.
+  template <typename... Fields> Boolean SetAutoCalcFields(Fields &...members) {
+    State().autoCalc.clear();
+    (State().autoCalc.push_back(NumberOf(&members)), ...);
+    return true;
   }
 
   /// \brief AL `Record.SetBaseLoadFields(...)`. Sets that only fields for the base table to be
@@ -2067,13 +2081,27 @@ private:
   /// A read that found a row leaves the record carrying that row as its image. WI-1078: `xRec` is
   /// the record's own STORED image and not a trigger-scoped hand-in, so a plain `Get` gives it one.
   bool Read(bool found) {
-    if (found) { CaptureImage(); }
+    if (found) {
+      CalcAuto();
+      CaptureImage();
+    }
     return found;
+  }
+
+  void CalcAuto() {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr || state->autoCalc.empty()) { return; }
+    for (const ::agiru::FieldNo no : state->autoCalc) {
+      detail::CalcField(Self(), TableTraits<Derived>::kTable, state, no);
+    }
   }
 
   /// The same, for a step whose answer is how many rows it moved.
   Integer Stepped(Integer moved) {
-    if (moved != 0) { CaptureImage(); }
+    if (moved != 0) {
+      CalcAuto();
+      CaptureImage();
+    }
     return moved;
   }
 

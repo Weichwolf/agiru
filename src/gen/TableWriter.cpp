@@ -272,6 +272,28 @@ std::string PropertyText(const al::FieldDecl &field, std::string_view name) {
   return found->text;
 }
 
+std::string FormulaText(const al::FieldDecl &field) {
+  const al::Property *found = Find(field.properties, "CalcFormula");
+  if (found == nullptr) { return {}; }
+  std::string out;
+  for (const al::Token &token : found->value) {
+    if (!out.empty()) { out += ' '; }
+    if (token.kind == al::TokenKind::QuotedIdentifier) {
+      out += '"';
+      for (const char c : token.text) {
+        if (c == '"') { out += '"'; }
+        out += c;
+      }
+      out += '"';
+    } else if (token.kind == al::TokenKind::String) {
+      out += '\'' + token.text + '\'';
+    } else {
+      out += token.text;
+    }
+  }
+  return out;
+}
+
 bool PropertyIs(const al::FieldDecl &field, std::string_view name, bool absent) {
   const std::string text = PropertyText(field, name);
   if (text.empty()) { return absent; }
@@ -322,7 +344,7 @@ std::string DeclaredBlock(const al::FieldDecl &field,
     out += ".fieldClass = ::agiru::FieldClass::";
     out += kind == "flowfield" ? "FlowField" : "FlowFilter";
   }
-  text("calcFormula", PropertyText(field, "CalcFormula"));
+  text("calcFormula", FormulaText(field));
   flag("notBlank", PropertyIs(field, "NotBlank", false), false);
   flag("autoIncrement", PropertyIs(field, "AutoIncrement", false), false);
   flag("editable", PropertyIs(field, "Editable", true), true);

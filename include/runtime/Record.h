@@ -186,7 +186,9 @@ namespace detail {
 /// \brief The member of an Option or Enum field spelled by NAME, as a filter spells it.
 ///
 /// \param def  The field, which carries the member names.
-/// \param text The name, matched without regard to case, or the ordinal as digits.
+/// \param text The name or the CAPTION, matched without regard to case, or the ordinal as digits;
+///             `%1` of an enum in `StrSubstNo` renders the caption, and a filter built that way
+///             carries `Project Usage` for the member named `Job Usage`.
 /// \return The ordinal as digits, or `text` unchanged when it names no member -- the database
 ///         then refuses it loudly rather than this layer guessing.
 ///
@@ -195,6 +197,38 @@ namespace detail {
 ///       integer. 114 UT failures were `invalid input syntax for type integer: "Open"`
 ///       (measured 2026-09-08).
 [[nodiscard]] std::string MemberOrdinal(const FieldDef &def, std::string_view text);
+
+struct RecordState;
+
+/// \brief AL `Record.CalcFields(Field)` for ONE FlowField: evaluates its `CalcFormula` and writes
+///        the result into the record.
+///
+/// \param record The record, whose ordinary fields and FlowFilters the formula reads.
+/// \param table  Its declaration.
+/// \param state  Its filters, or `nullptr` when it never filtered; a `FIELD(FlowFilter)` term
+///               reads the filter standing on that FlowFilter.
+/// \param no     The FlowField. A stored field is left as it is, which is what AL does for a
+///               `CalcFields` over a BLOB: the row already carried it.
+/// \throws Error when the formula names a table or field this build does not carry, or a shape
+///         the reader does not know -- loudly, never as a zero.
+///
+/// \note THE FORMULA IS THE DOCUMENTATION'S GRAMMAR (`devenv-calcformula-property.md`): seven
+///       kinds -- `Sum`, `Average`, `Exist`, `Count`, `Min`, `Max`, `Lookup` -- over a table and
+///       a field, narrowed by `CONST`, `FILTER`, `FIELD`, `FIELD(FILTER)`, `FIELD(UPPERLIMIT)`
+///       and `FIELD(UPPERLIMIT(FILTER))`, with a leading `-` for `ReverseSign`. It is evaluated
+///       as ONE aggregate statement over the target table (board:0047); SIFT (board:0019) is the
+///       index that makes that statement fast, not a second code path.
+void CalcField(void *record, const TableDef &table, const RecordState *state, FieldNo no);
+
+/// \brief AL `Record.CalcSums(Field)` for ONE field: the sum of that column over the rows the
+///        record's filters select.
+///
+/// \param record The record; the sum lands in the field.
+/// \param table  Its declaration.
+/// \param state  Its filters, or `nullptr`.
+/// \param no     The field, which must be stored and numeric.
+/// \throws Error when the field is a FlowField or not numeric.
+void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no);
 
 /// \brief Replaces the numbered placeholders in a pattern.
 ///

@@ -4,6 +4,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/Session.h"
@@ -22,14 +23,21 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 
+#include "Filter.h"
 #include "Rows.h"
+#include "Selection.h"
 #include "Temporary.h"
+#include "Where.h"
 
 #include <algorithm>
+#include <array>
+#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <format>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <string>
@@ -530,6 +538,430 @@ namespace agiru {
 
 ::agiru::Integer CurrFieldNo() {
   return detail::Validating();
+}
+
+namespace {
+
+bool SameName(std::string_view a, std::string_view b) {
+  return std::ranges::equal(
+      a, b, [](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
+}
+
+const FieldDef *FieldNamed(const TableDef &table, std::string_view name) {
+  for (const FieldDef &def : table.fields) {
+    if (SameName(def.name, name)) { return &def; }
+  }
+  return nullptr;
+}
+
+const TableDef &TableNamed(std::string_view name, const FieldDef &asked) {
+  static std::once_flag once;
+  static std::map<std::string, const TableDef *> byName;
+  std::call_once(once, [] {
+    for (const TableEntry *entry : InstalledTables()) {
+      std::string key(entry->table->name);
+      for (char &c : key) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+      byName.emplace(std::move(key), entry->table);
+    }
+  });
+  std::string key(name);
+  for (char &c : key) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+  const auto found = byName.find(key);
+  if (found == byName.end()) {
+    throw Error("the CalcFormula of " + std::string(asked.name) + " names the table " +
+                std::string(name) + ", which this build does not carry");
+  }
+  return *found->second;
+}
+
+struct FlowTerm {
+  enum class How : std::uint8_t {
+    Const,
+    Filter,
+    Field,
+    FieldFilter,
+    FieldUpperLimit,
+    FieldUpperLimitFilter
+  };
+  std::string target;
+  How how = How::Const;
+  std::string value;
+};
+
+struct FlowFormula {
+  enum class Kind : std::uint8_t { Sum, Average, Exist, Count, Min, Max, Lookup };
+  Kind kind = Kind::Sum;
+  bool reverseSign = false;
+  std::string table;
+  std::string field;
+  std::vector<FlowTerm> terms;
+};
+
+class FormulaReader {
+public:
+  FormulaReader(std::string_view text, const FieldDef &asked) : text_(text), asked_(asked) {}
+
+  FlowFormula Read() {
+    FlowFormula made;
+    Space();
+    if (Take('-')) { made.reverseSign = true; }
+    const std::string kind = Word();
+    made.kind = KindOf(kind);
+    Expect('(');
+    made.table = Name();
+    Space();
+    if (Take('.')) { made.field = Name(); }
+    Space();
+    if (SameName(Peek(), "where")) {
+      Word();
+      Expect('(');
+      for (;;) {
+        FlowTerm term;
+        term.target = Name();
+        Space();
+        Expect('=');
+        const std::string how = Word();
+        Expect('(');
+        if (SameName(how, "const")) {
+          term.how = FlowTerm::How::Const;
+          term.value = Unquoted(Balanced());
+        } else if (SameName(how, "filter")) {
+          term.how = FlowTerm::How::Filter;
+          term.value = Balanced();
+        } else if (SameName(how, "field")) {
+          Space();
+          if (SameName(Peek(), "upperlimit")) {
+            Word();
+            Expect('(');
+            Space();
+            if (SameName(Peek(), "filter")) {
+              Word();
+              Expect('(');
+              term.how = FlowTerm::How::FieldUpperLimitFilter;
+              term.value = Name();
+              Expect(')');
+            } else {
+              term.how = FlowTerm::How::FieldUpperLimit;
+              term.value = Name();
+            }
+            Expect(')');
+          } else if (SameName(Peek(), "filter")) {
+            Word();
+            Expect('(');
+            term.how = FlowTerm::How::FieldFilter;
+            term.value = Name();
+            Expect(')');
+          } else {
+            term.how = FlowTerm::How::Field;
+            term.value = Name();
+          }
+          Expect(')');
+        } else {
+          Refuse("a filter of the kind " + how);
+        }
+        made.terms.push_back(std::move(term));
+        Space();
+        if (Take(',')) { continue; }
+        Expect(')');
+        break;
+      }
+    }
+    Space();
+    Expect(')');
+    return made;
+  }
+
+private:
+  [[noreturn]] void Refuse(const std::string &what) const {
+    throw Error("the CalcFormula of " + std::string(asked_.name) + " has " + what +
+                " at position " + std::to_string(at_) + ": " + std::string(text_));
+  }
+
+  FlowFormula::Kind KindOf(std::string_view word) const {
+    static constexpr std::array<std::pair<std::string_view, FlowFormula::Kind>, 7> kinds{
+        {{"sum", FlowFormula::Kind::Sum},
+         {"average", FlowFormula::Kind::Average},
+         {"exist", FlowFormula::Kind::Exist},
+         {"count", FlowFormula::Kind::Count},
+         {"min", FlowFormula::Kind::Min},
+         {"max", FlowFormula::Kind::Max},
+         {"lookup", FlowFormula::Kind::Lookup}}};
+    for (const auto &[name, kind] : kinds) {
+      if (SameName(name, word)) { return kind; }
+    }
+    Refuse("the calculation " + std::string(word));
+  }
+
+  void Space() {
+    while (at_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[at_])) != 0) {
+      ++at_;
+    }
+  }
+
+  bool Take(char c) {
+    Space();
+    if (at_ < text_.size() && text_[at_] == c) {
+      ++at_;
+      return true;
+    }
+    return false;
+  }
+
+  void Expect(char c) {
+    if (!Take(c)) { Refuse(std::string("no '") + c + "'"); }
+  }
+
+  std::string_view Peek() {
+    Space();
+    std::size_t end = at_;
+    while (end < text_.size() &&
+           (std::isalnum(static_cast<unsigned char>(text_[end])) != 0 || text_[end] == '_')) {
+      ++end;
+    }
+    return text_.substr(at_, end - at_);
+  }
+
+  std::string Word() {
+    const std::string_view word = Peek();
+    if (word.empty()) { Refuse("no word"); }
+    at_ += word.size();
+    return std::string(word);
+  }
+
+  std::string Name() {
+    Space();
+    if (at_ < text_.size() && text_[at_] == '"') {
+      const std::size_t close = text_.find('"', at_ + 1);
+      if (close == std::string_view::npos) { Refuse("an unclosed name"); }
+      std::string name(text_.substr(at_ + 1, close - at_ - 1));
+      at_ = close + 1;
+      return name;
+    }
+    return Word();
+  }
+
+  std::string Balanced() {
+    int depth = 1;
+    const std::size_t from = at_;
+    bool quoted = false;
+    while (at_ < text_.size()) {
+      const char c = text_[at_];
+      if (c == '"') {
+        quoted = !quoted;
+      } else if (!quoted && c == '(') {
+        ++depth;
+      } else if (!quoted && c == ')') {
+        if (--depth == 0) {
+          std::string inner(text_.substr(from, at_ - from));
+          ++at_;
+          return inner;
+        }
+      }
+      ++at_;
+    }
+    Refuse("an unclosed parenthesis");
+  }
+
+  static std::string Unquoted(std::string value) {
+    if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+      return value.substr(1, value.size() - 2);
+    }
+    return value;
+  }
+
+  std::string_view text_;
+  const FieldDef &asked_;
+  std::size_t at_ = 0;
+};
+
+std::optional<std::string> FilterOn(const detail::RecordState *state, FieldNo no) {
+  if (state == nullptr) { return std::nullopt; }
+  std::string joined;
+  for (const detail::FieldFilter &filter : state->filters) {
+    if (filter.field != no || filter.text.empty()) { continue; }
+    if (!joined.empty()) { joined += "&"; }
+    joined += "(" + filter.text + ")";
+  }
+  if (joined.empty()) { return std::nullopt; }
+  return joined;
+}
+
+std::string UpperOf(std::string_view text) {
+  const std::size_t dots = text.find("..");
+  return std::string(dots == std::string_view::npos ? text : text.substr(dots + 2));
+}
+
+struct Predicate {
+  std::string sql;
+  std::vector<std::optional<std::string>> binds;
+};
+
+void Add(Predicate &into, const detail::Clause &clause) {
+  if (clause.sql.empty()) { return; }
+  if (!into.sql.empty()) { into.sql += " AND "; }
+  into.sql += "(" + clause.sql + ")";
+  into.binds.insert(into.binds.end(), clause.binds.begin(), clause.binds.end());
+}
+
+detail::Expression Equal(std::string value) {
+  detail::Atom atom;
+  atom.compare = detail::Compare::Equal;
+  atom.value = std::move(value);
+  return detail::Expression{detail::All{atom}};
+}
+
+detail::Expression AtMost(std::string value) {
+  detail::Atom atom;
+  atom.compare = detail::Compare::LessOrEqual;
+  atom.value = std::move(value);
+  return detail::Expression{detail::All{atom}};
+}
+
+Predicate PredicateOf(const FlowFormula &formula,
+                      const TableDef &target,
+                      const void *record,
+                      const TableDef &table,
+                      const detail::RecordState *state,
+                      const FieldDef &asked) {
+  Predicate made;
+  for (const FlowTerm &term : formula.terms) {
+    const FieldDef *at = FieldNamed(target, term.target);
+    if (at == nullptr) {
+      throw Error("the CalcFormula of " + std::string(asked.name) + " filters " +
+                  std::string(target.name) + " on " + term.target + ", which it does not declare");
+    }
+    const std::size_t first = made.binds.size() + 1;
+    switch (term.how) {
+      case FlowTerm::How::Const: Add(made, detail::Where(*at, Equal(term.value), first)); break;
+      case FlowTerm::How::Filter:
+        Add(made, detail::Where(*at, detail::ParseFilter(term.value), first));
+        break;
+      default: {
+        const FieldDef *source = FieldNamed(table, term.value);
+        if (source == nullptr) {
+          throw Error("the CalcFormula of " + std::string(asked.name) + " reads " + term.value +
+                      ", which " + std::string(table.name) + " does not declare");
+        }
+        const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
+                                term.how == FlowTerm::How::FieldUpperLimitFilter ||
+                                source->fieldClass == FieldClass::FlowFilter;
+        std::optional<std::string> text = fromFilter
+                                              ? FilterOn(state, source->no)
+                                              : std::optional(detail::StorageText(record, *source));
+        if (!text.has_value()) { break; }
+        if (term.how == FlowTerm::How::FieldUpperLimit ||
+            term.how == FlowTerm::How::FieldUpperLimitFilter) {
+          const std::string upper = UpperOf(*text);
+          if (!upper.empty()) { Add(made, detail::Where(*at, AtMost(upper), first)); }
+        } else if (fromFilter) {
+          Add(made, detail::Where(*at, detail::ParseFilter(*text), first));
+        } else {
+          Add(made, detail::Where(*at, Equal(*text), first));
+        }
+      }
+    }
+  }
+  return made;
+}
+
+std::string ZeroText(const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Decimal:
+    case FieldType::Integer:
+    case FieldType::BigInteger:
+    case FieldType::Duration:
+    case FieldType::Option:
+    case FieldType::Enum: return "0";
+    case FieldType::Boolean: return "f";
+    default: return {};
+  }
+}
+
+std::string OrderByPrimaryKey(const TableDef &target) {
+  if (target.keys.empty()) { return {}; }
+  std::string out;
+  for (const FieldNo no : target.keys[0].fields) {
+    const FieldDef *def = Field(target, no);
+    if (def == nullptr) { continue; }
+    out += out.empty() ? " ORDER BY " : ", ";
+    out += detail::Quoted(def->name);
+  }
+  return out;
+}
+
+std::string Aggregate(const FlowFormula &formula, const FieldDef &def, const std::string &column) {
+  const bool whole = def.type == FieldType::Integer || def.type == FieldType::BigInteger;
+  const std::string sign = formula.reverseSign ? "-" : "";
+  switch (formula.kind) {
+    case FlowFormula::Kind::Sum: return sign + "COALESCE(SUM(" + column + "), 0)";
+    case FlowFormula::Kind::Average:
+      return whole ? sign + "ROUND(COALESCE(AVG(" + column + "), 0))"
+                   : sign + "COALESCE(AVG(" + column + "), 0)";
+    case FlowFormula::Kind::Count: return "COUNT(*)";
+    case FlowFormula::Kind::Min: return sign + "MIN(" + column + ")";
+    case FlowFormula::Kind::Max: return sign + "MAX(" + column + ")";
+    case FlowFormula::Kind::Lookup: return column;
+    case FlowFormula::Kind::Exist: return "1";
+  }
+  return "1";
+}
+
+void Store(void *record, const FieldDef &def, const std::optional<std::string_view> &value) {
+  detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : ZeroText(def));
+}
+
+}
+
+namespace detail {
+
+void CalcField(void *record, const TableDef &table, const RecordState *state, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr) { throw Error("CalcFields names a field the table lacks"); }
+  if (def->fieldClass != FieldClass::FlowField) { return; }
+  const FlowFormula formula = FormulaReader(def->calcFormula, *def).Read();
+  const TableDef &target = TableNamed(formula.table, *def);
+  std::string column;
+  if (formula.kind != FlowFormula::Kind::Count && formula.kind != FlowFormula::Kind::Exist) {
+    const FieldDef *of = FieldNamed(target, formula.field);
+    if (of == nullptr) {
+      throw Error("the CalcFormula of " + std::string(def->name) + " reads " +
+                  std::string(target.name) + "." + formula.field + ", which it does not declare");
+    }
+    column = Quoted(of->name);
+  }
+  const Predicate predicate = PredicateOf(formula, target, record, table, state, *def);
+  const std::string where = predicate.sql.empty() ? std::string{} : " WHERE " + predicate.sql;
+  std::string sql;
+  if (formula.kind == FlowFormula::Kind::Exist) {
+    sql = "SELECT EXISTS(SELECT 1 FROM " + Name(target) + where + ")";
+  } else if (formula.kind == FlowFormula::Kind::Lookup) {
+    sql = "SELECT " + column + " FROM " + Name(target) + where + OrderByPrimaryKey(target) +
+          " LIMIT 1";
+  } else {
+    sql = "SELECT " + Aggregate(formula, *def, column) + " FROM " + Name(target) + where;
+  }
+  const Result result = Session::Current().Database().Execute(sql, predicate.binds);
+  Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));
+}
+
+void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr) { throw Error("CalcSums names a field the table lacks"); }
+  if (def->fieldClass != FieldClass::Normal) {
+    throw Error("CalcSums over " + std::string(def->name) + " needs a stored field; " +
+                "a FlowField is calculated with CalcFields");
+  }
+  if (def->type != FieldType::Decimal && def->type != FieldType::Integer &&
+      def->type != FieldType::BigInteger && def->type != FieldType::Duration) {
+    throw Error("CalcSums over " + std::string(def->name) + " needs a numeric field");
+  }
+  const Selection selection = Select(state, table);
+  const std::string sql = "SELECT COALESCE(SUM(" + Quoted(def->name) + "), 0) FROM " + Name(table) +
+                          (selection.where.empty() ? std::string{} : " WHERE " + selection.where);
+  const Result result = Session::Current().Database().Execute(sql, selection.binds);
+  Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));
+}
+
 }
 
 }

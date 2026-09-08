@@ -464,6 +464,7 @@ std::size_t FieldArguments(std::string_view method) {
       {"SetAscending", 1},
       {"CalcFields", kEveryArgument},
       {"CalcSums", kEveryArgument},
+      {"SetAutoCalcFields", kEveryArgument},
       {"SetCurrentKey", kEveryArgument},
       {"SetLoadFields", kEveryArgument},
       {"AddLoadFields", kEveryArgument},

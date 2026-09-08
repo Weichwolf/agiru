@@ -179,7 +179,9 @@ std::string MemberOrdinal(const FieldDef &def, std::string_view text) {
         a, b, [](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
   };
   for (const EnumValueDef &value : def.values) {
-    if (same(value.name, text)) { return std::to_string(value.ordinal); }
+    if (same(value.name, text) || same(value.caption, text)) {
+      return std::to_string(value.ordinal);
+    }
   }
   return std::string(text);
 }

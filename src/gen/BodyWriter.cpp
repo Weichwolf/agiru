@@ -435,6 +435,7 @@ private:
         {"SetAscending", 1},
         {"CalcFields", kAll},
         {"CalcSums", kAll},
+        {"SetAutoCalcFields", kAll},
         {"SetCurrentKey", kAll},
         {"SetLoadFields", kAll},
         {"AddLoadFields", kAll},
