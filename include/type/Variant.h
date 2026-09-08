@@ -66,6 +66,14 @@ template <typename T> struct CodeunitTraits;
 struct RecordInVariant {
   const void *record; ///< The record.
   TableId table;      ///< Which table it is, so a reader can refuse the wrong one.
+
+  /// \brief What the record WAS when the Variant was built: its table, caption and primary key.
+  ///
+  /// \note THE POINTER OUTLIVES THE RECORD AND THIS DOES NOT. A Variant refers to a record and
+  ///       does not own it, which is AL's own rule and this header's own warning -- so a Variant
+  ///       that is stored and read later has an address that is no longer a record. This is
+  ///       rendered while the record is certainly alive and is what `Format` reads (board:0624).
+  ::agiru::RecordId id;
 };
 
 /// \brief Two record handles are equal when they refer to the same row of the same table.
@@ -327,7 +335,8 @@ public:
     requires requires {
       { R::kId } -> std::convertible_to<TableId>;
     }
-  Variant(const R &record) : held_(RecordInVariant{.record = &record, .table = R::kId}) {}
+  Variant(const R &record)
+      : held_(RecordInVariant{.record = &record, .table = R::kId, .id = record.RecordId()}) {}
 
   /// \brief AL puts a CODEUNIT into a Variant, and this is that.
   /// \tparam C The codeunit's class -- anything the runtime knows an object number for.

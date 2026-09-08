@@ -103,8 +103,10 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (Value.Is<RecordId>()) { return Value.Get<RecordId>().ToText(); }
   if (Value.Is<DateFormula>()) { return Value.Get<DateFormula>().ToText(); }
   if (Value.Is<OrdinalInVariant>()) { return OrdinalText(Value.Get<OrdinalInVariant>(), format); }
-  throw Error("Format: a Variant holding a record renders its primary key, which needs the record "
-              "to still be there (board:0624)");
+  if (const ::agiru::RecordInVariant *held = Value.HeldRecord(); held != nullptr) {
+    return held->id.ToText();
+  }
+  throw Error("Format: this Variant holds a value with no text form yet");
 }
 
 std::string Fitted(std::string rendered, ::agiru::Integer Length, bool numeric, char filler) {

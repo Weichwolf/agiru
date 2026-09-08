@@ -7,6 +7,7 @@
 #include "type/TransactionModel.h"
 
 #include <algorithm>
+#include <exception>
 #include <mutex>
 #include <span>
 #include <string>
@@ -41,6 +42,16 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
     scope.Discard(e.what());
     return TestResult{
         .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
+  } catch (const std::exception &e) {
+    static_cast<void>(HandlerTable::Uninstall());
+    scope.Discard(e.what());
+    return TestResult{.codeunit = codeunit.Name(),
+                      .method = method.name,
+                      .passed = false,
+                      .error = std::string("this case left a C++ exception rather than an AL "
+                                           "error, which is a defect in the runtime and not in "
+                                           "the test: ") +
+                               e.what()};
   }
   const std::vector<std::string_view> missed = HandlerTable::Uninstall();
   if (method.model.has_value() && *method.model == TransactionModel::AutoRollback) {
@@ -92,7 +103,7 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
     if (catalogue->OnRun() != nullptr) {
       try {
         catalogue->OnRun()();
-      } catch (const Error &e) {
+      } catch (const std::exception &e) {
         isolation.Discard(e.what());
         run.results.push_back(TestResult{
             .codeunit = catalogue->Name(), .method = "OnRun", .passed = false, .error = e.what()});
