@@ -5,6 +5,7 @@
 #include "runtime/test/RunnerDatabase.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -24,6 +25,8 @@ struct Options {
   std::string scratch = "agiru_test_0";
   bool fresh = false;
   bool list = false;
+  bool isolate = false;
+  std::string self;
 };
 
 constexpr int kUsage = 2;
@@ -38,6 +41,9 @@ void Usage() {
   std::println("      Run the transpiled [Test] procedures through the AL test runner.");
   std::println("      With no filter, the whole installed test population.");
   std::println("      --list says which test codeunits this binary carries.");
+  std::println("      --isolate runs every codeunit in its own process, so one that dies takes");
+  std::println("      only itself: a segmentation fault is not an exception and nothing in the");
+  std::println("      process can catch it (board:0612).");
   std::println("      --database <url> connects somewhere other than the built-in default.");
   std::println("");
   std::println("  agiru version");
@@ -70,11 +76,66 @@ Options Read(std::span<const std::string_view> arguments) {
       options.fresh = true;
     } else if (argument == "--list") {
       options.list = true;
+    } else if (argument == "--isolate") {
+      options.isolate = true;
     } else {
       throw agiru::Error("unknown option " + std::string(argument));
     }
   }
   return options;
+}
+
+std::string Quoted(std::string_view text) {
+  std::string out = "'";
+  for (const char c : text) {
+    if (c == '\'') {
+      out += "'\\''";
+      continue;
+    }
+    out += c;
+  }
+  out += "'";
+  return out;
+}
+
+int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *const> codeunits) {
+  std::size_t passed = 0;
+  std::size_t failed = 0;
+  std::size_t died = 0;
+  for (const agiru::TestCatalogue *codeunit : codeunits) {
+    std::string command = Quoted(options.self) + " run-tests --codeunit " +
+                          Quoted(codeunit->Name()) + " --scratch " + Quoted(options.scratch);
+    if (!options.database.empty()) { command += " --database " + Quoted(options.database); }
+    command += " 2>&1";
+    std::FILE *child = popen(command.c_str(), "r");
+    if (child == nullptr) {
+      std::println("FAIL  {}  <no process>", codeunit->Name());
+      failed += codeunit->Methods().size();
+      continue;
+    }
+    std::string tail;
+    std::array<char, 4096> line{};
+    while (std::fgets(line.data(), static_cast<int>(line.size()), child) != nullptr) {
+      const std::string_view read(line.data());
+      std::print("{}", read);
+      if (read.find(" passed") != std::string_view::npos) { tail = read; }
+    }
+    const int status = pclose(child);
+    std::fflush(stdout);
+    std::size_t ran = 0;
+    std::size_t of = 0;
+    if (!tail.empty() && std::sscanf(tail.c_str(), "%zu of %zu", &ran, &of) == 2) {
+      passed += ran;
+      failed += of - ran;
+      continue;
+    }
+    ++died;
+    failed += codeunit->Methods().size();
+    std::println("FAIL  {}  <the process died, status {}>", codeunit->Name(), status);
+    std::fflush(stdout);
+  }
+  std::println("{} of {} passed, {} codeunit(s) died", passed, passed + failed, died);
+  return failed == 0 ? 0 : 1;
 }
 
 int RunTests(const Options &options) {
@@ -106,6 +167,7 @@ int RunTests(const Options &options) {
                          "; `run-tests --list` says which are registered");
     }
   }
+  if (options.isolate && options.codeunit.empty()) { return RunIsolated(options, codeunits); }
   const std::string master = options.database.empty() ? std::string(kDatabase) : options.database;
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
   const agiru::Session session(runner.Dsn());
@@ -132,7 +194,8 @@ int main(int argc, char **argv) {
     std::vector<std::string_view> arguments;
     arguments.reserve(static_cast<std::size_t>(argc > 1 ? argc - 1 : 0));
     for (int i = 1; i < argc; ++i) { arguments.emplace_back(argv[i]); }
-    const Options options = Read(arguments);
+    Options options = Read(arguments);
+    options.self = argv[0] == nullptr ? "agiru" : argv[0];
     if (options.command.empty() || options.command == "help" || options.command == "--help") {
       Usage();
       return options.command.empty() ? kUsage : 0;

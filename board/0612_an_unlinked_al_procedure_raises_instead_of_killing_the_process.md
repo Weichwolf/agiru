@@ -90,12 +90,15 @@ reports each procedure as it finishes now, flushed.
 | 8 | `System.Abs(Decimal)` |
 | 6 | `System.DMY2Date(Integer, Integer, Integer)` |
 
-**WHAT IS LEFT ON THIS ITEM IS THE OTHER HARD FAILURE.** The run still ends in a SEGMENTATION FAULT
-after `Test Data Exch.Import - XML / InsertFieldRecWithLongXMLNodeValue`, and a segfault is no more
-catchable than the loader error was. The same argument applies one level up: a run over 855
-codeunits cannot be gated on every one of them being memory-safe, so the runner needs to survive a
-crashing test -- which means running each codeunit in a CHILD PROCESS and reporting the child's
-death as that codeunit's failure. That is the half that is standing.
+**THE OTHER HARD FAILURE IS CLOSED TOO (2026-09-08).** The run ended in a SEGMENTATION FAULT in
+`Import XML Gen Jnl Line`, and a segfault is no more catchable than the loader error was. The
+answer is one level up: `agiru run-tests --isolate` re-enters the same binary with `--codeunit` per
+codeunit, so the isolation is the OPERATING SYSTEM'S and needs no fork of a process already holding
+a database connection. The runner's database is made once and kept, so every child finds it rather
+than cloning it -- 855 processes, one connection each, no clone.
+
+**THE WHOLE POPULATION RAN: 360 of 19 934 passed, 3 codeunits died.** That is the first number this
+tree has for the whole installed test population, and board:0613 carries what it says.
 
 ## What proves it
 
