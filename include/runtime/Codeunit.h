@@ -74,7 +74,7 @@ public:
   ///       so `a = a` frees what `a` made and leaves it to make it again on the next use -- which
   ///       is the same answer as for any other right-hand side, because the handle copies nothing.
   Instance &operator=(const Instance &other) {
-    static_cast<void>(other);
+    if (this == &other) { return *this; }
     Release();
     return *this;
   }

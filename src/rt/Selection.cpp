@@ -9,7 +9,6 @@
 #include "Where.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>

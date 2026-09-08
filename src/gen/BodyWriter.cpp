@@ -16,6 +16,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -967,6 +968,38 @@ private:
     return out;
   }
 
+  std::string TextJoin(const al::Expr &expression) {
+    std::vector<const al::Expr *> parts;
+    const al::Expr *walk = &expression;
+    while (walk->kind == al::ExprKind::Binary && walk->text == "+" && walk->children.size() == 2) {
+      parts.push_back(&walk->children.back());
+      walk = &walk->children.front();
+    }
+    parts.push_back(walk);
+    std::ranges::reverse(parts);
+    std::string out;
+    std::string run;
+    const auto flush = [&out, &run] {
+      if (run.empty()) { return; }
+      if (!out.empty()) { out += " + "; }
+      out += "std::string(" + run + ")";
+      run.clear();
+    };
+    for (const al::Expr *part : parts) {
+      if (part->kind == al::ExprKind::StringLiteral) {
+        if (!run.empty()) { run += " "; }
+        run += Expression(*part, kPrimaryPrecedence);
+        continue;
+      }
+      flush();
+      const bool first = out.empty();
+      if (!first) { out += " + "; }
+      out += Added(*part, first ? kAdditivePrecedence : kAdditivePrecedence + 1);
+    }
+    flush();
+    return out;
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -989,36 +1022,7 @@ private:
 
     if (expression.text == "+" &&
         (IsText(expression.children.front()) || IsText(expression.children.back()))) {
-      std::vector<const al::Expr *> parts;
-      const al::Expr *walk = &expression;
-      while (walk->kind == al::ExprKind::Binary && walk->text == "+" &&
-             walk->children.size() == 2) {
-        parts.push_back(&walk->children.back());
-        walk = &walk->children.front();
-      }
-      parts.push_back(walk);
-      std::ranges::reverse(parts);
-      std::string out;
-      std::string run;
-      const auto flush = [&out, &run] {
-        if (run.empty()) { return; }
-        if (!out.empty()) { out += " + "; }
-        out += "std::string(" + run + ")";
-        run.clear();
-      };
-      for (const al::Expr *part : parts) {
-        if (part->kind == al::ExprKind::StringLiteral) {
-          if (!run.empty()) { run += " "; }
-          run += Expression(*part, kPrimaryPrecedence);
-          continue;
-        }
-        flush();
-        const bool first = out.empty();
-        if (!first) { out += " + "; }
-        out += Added(*part, first ? kAdditivePrecedence : kAdditivePrecedence + 1);
-      }
-      flush();
-      return out;
+      return TextJoin(expression);
     }
 
     const Operator *op = Find(expression.text);

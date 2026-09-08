@@ -92,7 +92,9 @@ std::string ColumnType(const FieldDef &def) {
   throw Error("ColumnType: no SQL type for this field type yet");
 }
 
-static std::string ColumnZero(const FieldDef &def) {
+namespace {
+
+std::string ColumnZero(const FieldDef &def) {
   switch (def.type) {
     case FieldType::Boolean: return "false";
     case FieldType::Option:
@@ -110,6 +112,7 @@ static std::string ColumnZero(const FieldDef &def) {
     case FieldType::Blob: return "''::bytea";
     default: return "''";
   }
+}
 }
 
 void CreateTable(const Connection &connection, const TableDef &table) {
@@ -155,11 +158,16 @@ void DropTable(const Connection &connection, const TableDef &table) {
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
 }
 
-static std::size_t StoredCount(const TableDef &table) {
+namespace {
+
+std::size_t StoredCount(const TableDef &table) {
   return static_cast<std::size_t>(std::ranges::count_if(table.fields, Stored));
 }
+}
 
-static std::string StoredColumns(const TableDef &table) {
+namespace {
+
+std::string StoredColumns(const TableDef &table) {
   std::string columns;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
@@ -168,8 +176,11 @@ static std::string StoredColumns(const TableDef &table) {
   }
   return columns;
 }
+}
 
-static std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
+namespace {
+
+std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
   std::size_t column = 0;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
@@ -177,6 +188,7 @@ static std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
     ++column;
   }
   throw Error("the key names a field the schema does not store");
+}
 }
 
 void InsertRow(const Connection &connection,

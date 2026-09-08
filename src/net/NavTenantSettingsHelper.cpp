@@ -6,6 +6,7 @@
 #include "type/Boolean.h"
 
 #include <string>
+#include <string_view>
 
 namespace agiru::dotnet {
 

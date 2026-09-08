@@ -3,13 +3,15 @@
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"
+#include "runtime/test/TestPermissions.h"
+#include "type/TransactionModel.h"
 
 #include "Check.h"
 
 #include <array>
 #include <cstddef>
+#include <optional>
 #include <string>
-#include <vector>
 
 using agiru::CodeunitId;
 using agiru::Error;
@@ -107,8 +109,9 @@ void WhatOneMethodLeavesTheNextOneSees() {
   // AND THE CODEUNIT'S OWN BOUNDARY TAKES IT ALL BACK, including a row a method committed -- the
   // property's page says so outright.
   const agiru::Result left = Db().Execute("SELECT count(*) FROM isolation_gate");
+  const std::optional<std::string_view> counted = left.Value(0, 0);
   CHECK_TRUE("and the codeunit leaves the database where it found it",
-             left.Value(0, 0).has_value() && *left.Value(0, 0) == "0");
+             counted.has_value() && *counted == "0");
   Db().Run("DROP TABLE isolation_gate");
 }
 

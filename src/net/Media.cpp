@@ -1,8 +1,10 @@
 #include "type/Media.h"
 
 #include "runtime/Error.h"
+#include "type/Boolean.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/List.h"
 #include "type/MediaSet.h"
 
 #include <string>

@@ -15,10 +15,10 @@
 #include <cstddef>
 #include <map>
 #include <optional>
-#include <regex>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -1448,8 +1448,9 @@ std::string Locals(const al::ProcedureDecl &procedure,
 
 }
 
-static std::string CodeunitDefinition(const al::CodeunitObject &unit,
-                                      const std::string &identifier) {
+namespace {
+
+std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string &identifier) {
   const auto said = [&unit](std::string_view name) {
     const al::Property *found = Find(unit.properties, name);
     return found == nullptr ? std::string{} : found->text;
@@ -1482,6 +1483,7 @@ static std::string CodeunitDefinition(const al::CodeunitObject &unit,
   text("obsoleteState", "ObsoleteState");
   out += "};\n\n";
   return out;
+}
 }
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,

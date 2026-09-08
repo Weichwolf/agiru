@@ -1,11 +1,12 @@
 #include "Where.h"
 
 #include "meta/TableDef.h"
-#include "runtime/Error.h"
 
 #include "Filter.h"
 
+#include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace agiru::detail {
 

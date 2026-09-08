@@ -715,7 +715,9 @@ std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
 }
 
-static std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
+namespace {
+
+std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
   std::vector<al::ProcedureDecl> all = page.procedures;
   const auto walk = [&all](auto &&self, const std::vector<al::PageControl> &controls) -> void {
     for (const al::PageControl &control : controls) {
@@ -726,6 +728,7 @@ static std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &
   walk(walk, page.layout);
   walk(walk, page.actions);
   return all;
+}
 }
 
 PageHeader
@@ -773,7 +776,14 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
 
   const std::string table = SourceTable(object, objects);
-  if (!table.empty()) { out += "  " + table + " Rec;\n\n"; }
+  if (!table.empty()) {
+    const al::Property *temporary = al::Find(object.properties, "SourceTableTemporary");
+    const bool held = temporary != nullptr && !temporary->value.empty() &&
+                      LowerKey(temporary->value.front().text) == "true";
+    out += "  ";
+    out += held && !table.starts_with("absent::") ? "Temporary<" + table + ">" : table;
+    out += " Rec;\n\n";
+  }
 
   {
     Controls all;
@@ -786,7 +796,11 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
       const auto found = objects.pages.find(LowerKey(PartSource(*control)));
       const std::string sub =
           found == objects.pages.end() ? std::string{"::agiru::Page<>"} : found->second.identifier;
-      out += "  ::agiru::PartRef<" + sub + "> " + member + ";\n";
+      out += "  ::agiru::PartRef<";
+      out += sub;
+      out += "> ";
+      out += member;
+      out += ";\n";
     }
     if (!written.empty()) { out += "\n"; }
   }

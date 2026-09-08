@@ -106,7 +106,9 @@ void MovingTakesTheInstance() {
 
 // A RECORD IS COPIED CONSTANTLY and a table with a `var` block holds an `Instance`, so the handle
 // must be copyable -- and the copy must hold NOTHING, because two AL variables are two instances.
-static void ACopyHoldsNothingAndFreesNothing() {
+namespace {
+
+void ACopyHoldsNothingAndFreesNothing() {
   Counted::made = 0;
   Counted::gone = 0;
   {
@@ -119,6 +121,7 @@ static void ACopyHoldsNothingAndFreesNothing() {
     CHECK_TRUE("and makes its own on first use", Counted::made == 2);
   }
   CHECK_TRUE("both are freed exactly once", Counted::gone == 2);
+}
 }
 
 int main() {

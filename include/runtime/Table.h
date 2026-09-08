@@ -2198,6 +2198,33 @@ public:
     return *this;
   }
 
+  /// \brief AL `TempRec := SomeVariant` -- the record the Variant refers to, copied in.
+  /// \param held The Variant, which must hold a record of this table.
+  /// \return This record.
+  ///
+  /// \note IT IS SPELLED OUT BECAUSE THE OTHER TWO ARE EQUALLY GOOD. A Variant reaches `T` through
+  ///       its own conversion and `T::operator=` takes one, so without this the assignment is
+  ///       ambiguous rather than wrong -- which a page whose source is temporary walks into
+  ///       (`ContractTrendLines`, measured 2026-09-08).
+  Temporary &operator=(const Variant &held) {
+    T::operator=(static_cast<const T &>(held));
+    return *this;
+  }
+
+  /// \brief AL `TempRec := GlobalRec` where the other record is held by handle.
+  /// \tparam H The handle's type.
+  /// \param held The handle, whose record is copied in.
+  /// \return This record.
+  ///
+  /// \note THE HANDLE IS AGIRU'S AND NOT AL'S, so it has to disappear here too: without this the
+  ///       assignment is ambiguous between the handle's conversion to `T` and the Variant one.
+  template <typename H>
+    requires std::convertible_to<H &, T &> && (!std::derived_from<H, T>)
+  Temporary &operator=(H &held) {
+    T::operator=(static_cast<T &>(held));
+    return *this;
+  }
+
   Temporary(const Temporary &) = default;
   Temporary(Temporary &&) noexcept = default;
   Temporary &operator=(const Temporary &) = default;

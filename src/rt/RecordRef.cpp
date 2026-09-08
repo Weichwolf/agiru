@@ -1,6 +1,7 @@
 #include "runtime/RecordRef.h"
 
 #include "meta/EnumDef.h"
+#include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Error.h"
@@ -28,6 +29,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru {

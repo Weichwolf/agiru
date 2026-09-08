@@ -1372,7 +1372,7 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h",
             .fields = {},
-            .procedures = std::move(procedures)});
+            .procedures = procedures});
   }
 }
 
@@ -1413,14 +1413,16 @@ void WriteReports(Run &run, const agiru::gen::Objects &objects) {
     out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::Report<" + identifier + "> {\npublic:\n";
     out += "  static constexpr ReportId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n";
     out += "};\n\n";
     out += "} // namespace " + space + "\n\n";
     out += "template <> struct agiru::ReportTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr ReportId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1462,14 +1464,16 @@ void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
     out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::XmlPort<" + identifier + "> {\npublic:\n";
     out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n";
     out += "};\n\n";
     out += "} // namespace " + space + "\n\n";
     out += "template <> struct agiru::XmlPortTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr XmlPortId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1511,14 +1515,16 @@ void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
     out += "namespace " + space + " {\n\n";
     out += "class " + identifier + " : public ::agiru::Query<" + identifier + "> {\npublic:\n";
     out += "  static constexpr QueryId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n";
     out += "};\n\n";
     out += "} // namespace " + space + "\n\n";
     out += "template <> struct agiru::QueryTraits<" + space + "::" + identifier + "> {\n";
     out += "  static constexpr QueryId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{" +
-           agiru::gen::Literal(ref.fields.at("name")) + "};\n};\n";
+    out += "  static constexpr std::string_view kName{";
+    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += "};\n};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -2016,7 +2022,7 @@ int Scan(const Job &job) {
     }
     if (dropped != 0) { silentProperties = dropped; }
     for (const auto &[name, found] : partial) {
-      const auto known = std::ranges::find_if(
+      const auto *const known = std::ranges::find_if(
           kPartlyTranslatedProperties, [&name](const auto &one) { return one.first == name; });
       std::println("partly    {:>7} x {} -- {}", found, name, known->second);
     }

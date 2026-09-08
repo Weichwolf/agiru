@@ -91,13 +91,11 @@ void NumberSequence::Insert(std::string_view Name,
 }
 
 BigInteger NumberSequence::Next(std::string_view Name, Boolean CompanySpecific) {
-  return Read("SELECT nextval('" + SequenceName(Name, CompanySpecific) + "')",
-              Name,
-              CompanySpecific);
+  return Read(
+      "SELECT nextval('" + SequenceName(Name, CompanySpecific) + "')", Name, CompanySpecific);
 }
 
-BigInteger
-NumberSequence::Range(std::string_view Name, Integer Count, BigInteger &Increment) {
+BigInteger NumberSequence::Range(std::string_view Name, Integer Count, BigInteger &Increment) {
   return Range(Name, Count, Increment, true);
 }
 

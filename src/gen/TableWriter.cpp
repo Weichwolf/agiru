@@ -761,7 +761,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   if (!kind.empty()) {
     static constexpr std::array kTableTypes{
         "Normal", "CRM", "CDS", "ExternalSQL", "Exchange", "MicrosoftGraph", "Temporary"};
-    const auto spelled = std::ranges::find_if(
+    const auto *const spelled = std::ranges::find_if(
         kTableTypes, [&](const char *name) { return LowerKey(name) == LowerKey(kind); });
     out += "    .tableType = TableType::" +
            (spelled == kTableTypes.end() ? kind : std::string(*spelled)) + ",\n";

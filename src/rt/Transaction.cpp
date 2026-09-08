@@ -1,8 +1,10 @@
 #include "runtime/Transaction.h"
 
 #include "runtime/Database.h"
+#include "runtime/Error.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
+#include "type/CommitBehavior.h"
 
 #include <cstddef>
 #include <optional>

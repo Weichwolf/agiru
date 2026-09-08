@@ -5,6 +5,7 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
+#include "type/TextEncoding.h"
 #include "type/Variant.h"
 
 #include <cstddef>
@@ -12,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -25,8 +27,7 @@ namespace {
 std::vector<std::uint8_t> Slurp(const std::string &name) {
   std::ifstream in(name, std::ios::binary);
   if (!in) { throw Error("the file " + name + " cannot be opened for reading"); }
-  return std::vector<std::uint8_t>(std::istreambuf_iterator<char>(in),
-                                   std::istreambuf_iterator<char>());
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
 void Spill(const std::string &name, const std::vector<std::uint8_t> &bytes) {
@@ -99,7 +100,7 @@ Integer File::Len() {
   return static_cast<Integer>(held_.Length());
 }
 
-Integer File::Pos() {
+Integer File::Pos() const {
   if (!open_) { throw Error("this File variable has nothing open"); }
   return static_cast<Integer>(position_) + 1;
 }
@@ -113,7 +114,7 @@ void File::Seek(Integer Position) {
   position_ = static_cast<std::size_t>(Position);
 }
 
-Boolean File::TextMode() {
+Boolean File::TextMode() const {
   return textMode_;
 }
 
@@ -123,7 +124,7 @@ Boolean File::TextMode(Boolean Mode) {
   return was;
 }
 
-Boolean File::WriteMode() {
+Boolean File::WriteMode() const {
   return writeMode_;
 }
 
@@ -175,7 +176,9 @@ Integer File::Read(Variant &Read) {
   std::string line;
   std::size_t at = position_;
   while (at < bytes.size() && bytes[at] != static_cast<std::uint8_t>('\n')) {
-    if (bytes[at] != static_cast<std::uint8_t>('\r')) { line.push_back(static_cast<char>(bytes[at])); }
+    if (bytes[at] != static_cast<std::uint8_t>('\r')) {
+      line.push_back(static_cast<char>(bytes[at]));
+    }
     ++at;
   }
   const std::size_t read = at - position_;

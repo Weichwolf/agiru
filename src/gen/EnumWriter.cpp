@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -51,10 +52,12 @@ std::string EnumSourcePath(const al::EnumObject &object) {
          ".cpp";
 }
 
-static std::string ImplementationDeclarations(const al::EnumObject &object,
-                                              const std::string &identifier,
-                                              const std::string &space,
-                                              const Objects &objects) {
+namespace {
+
+std::string ImplementationDeclarations(const al::EnumObject &object,
+                                       const std::string &identifier,
+                                       const std::string &space,
+                                       const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));
@@ -77,8 +80,11 @@ static std::string ImplementationDeclarations(const al::EnumObject &object,
   }
   return out;
 }
+}
 
-static std::string Unquoted(std::string_view text) {
+namespace {
+
+std::string Unquoted(std::string_view text) {
   while (!text.empty() && text.front() == ' ') { text.remove_prefix(1); }
   while (!text.empty() && text.back() == ' ') { text.remove_suffix(1); }
   if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
@@ -86,8 +92,11 @@ static std::string Unquoted(std::string_view text) {
   }
   return std::string(text);
 }
+}
 
-static std::string ImplementationFor(std::string_view text, std::string_view face) {
+namespace {
+
+std::string ImplementationFor(std::string_view text, std::string_view face) {
   std::string current;
   bool quoted = false;
   std::vector<std::string> pairs;
@@ -110,11 +119,14 @@ static std::string ImplementationFor(std::string_view text, std::string_view fac
   }
   return {};
 }
+}
 
-static std::string ImplementationBodies(const al::EnumObject &object,
-                                        const std::string &identifier,
-                                        const std::string &space,
-                                        const Objects &objects) {
+namespace {
+
+std::string ImplementationBodies(const al::EnumObject &object,
+                                 const std::string &identifier,
+                                 const std::string &space,
+                                 const Objects &objects) {
   std::string out;
   for (const std::string &face : object.implements) {
     const auto known = objects.interfaces.find(LowerKey(face));
@@ -163,6 +175,7 @@ static std::string ImplementationBodies(const al::EnumObject &object,
     out += "\");\n}\n\n}\n";
   }
   return out;
+}
 }
 
 std::string WriteEnumSource(const al::EnumObject &object,

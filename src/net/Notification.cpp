@@ -1,5 +1,6 @@
 #include "type/Notification.h"
 
+#include "type/Boolean.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 

@@ -1,5 +1,7 @@
 #include "meta/EnumDef.h"
 #include "type/Enum.h"
+#include "type/Integer.h"
+#include "type/List.h"
 
 #include "Check.h"
 

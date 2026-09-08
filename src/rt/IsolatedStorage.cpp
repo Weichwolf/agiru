@@ -1,7 +1,6 @@
 #include "type/IsolatedStorage.h"
 
 #include "runtime/Database.h"
-#include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "type/Boolean.h"
 #include "type/DataScope.h"
@@ -47,9 +46,8 @@ Binds Where(std::string_view key, const DataScope &scope) {
 
 }
 
-Boolean IsolatedStorage::Set(const TextArgument &Key,
-                             std::string_view Value,
-                             const DataScope &DataScope) {
+Boolean
+IsolatedStorage::Set(const TextArgument &Key, std::string_view Value, const DataScope &DataScope) {
   Declared();
   Binds bound = Where(std::string_view(Key), DataScope);
   bound.emplace_back(std::string(Value));
@@ -115,9 +113,8 @@ Boolean IsolatedStorage::Contains(const TextArgument &Key, const DataScope &Data
   return Get(Key, DataScope, read);
 }
 
-Boolean IsolatedStorage::Contains(const TextArgument &Key,
-                                  const DataScope &DataScope,
-                                  Boolean &isSecret) {
+Boolean
+IsolatedStorage::Contains(const TextArgument &Key, const DataScope &DataScope, Boolean &isSecret) {
   Declared();
   const Result found = Session::Current().Database().Execute(
       "SELECT secret FROM " + std::string(kTable) +

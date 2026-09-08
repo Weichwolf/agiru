@@ -101,13 +101,16 @@ namespace agiru::caption_gate {
 /// dependent lookup searches `std` and nothing else; the door's operator is found by ORDINARY
 /// lookup from an enclosing namespace, which is where every generated body sits and where the
 /// defect lived.
-static void ACaptionJoinedToACaptionIsTheTwoCaptions() {
+namespace {
+
+void ACaptionJoinedToACaptionIsTheTwoCaptions() {
   const std::string table{"Family"};
   const std::string_view field{"No."};
 
   CHECK_TEXT("a std::string joins a std::string_view", table + " " + field, "Family No.");
   CHECK_TEXT("and the other way round", field + std::string{" of "} + table, "No. of Family");
   CHECK_TEXT("and two views join", std::string_view{"No"} + std::string_view{"."}, "No.");
+}
 }
 
 }

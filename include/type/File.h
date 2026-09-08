@@ -200,7 +200,7 @@ public:
   /// file.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Pos();
+  [[nodiscard]] ::agiru::Integer Pos() const;
 
   /// \brief AL `File.Read(Any)`. Reads from an MS-DOS encoded file or binary file.
   /// \param Read The AL `Any`.
@@ -239,7 +239,7 @@ public:
   /// block brackets: `[X := ] File.TextMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean TextMode();
+  [[nodiscard]] ::agiru::Boolean TextMode() const;
 
   ::agiru::Boolean TextMode(::agiru::Boolean Mode);
 
@@ -407,7 +407,7 @@ public:
   /// block brackets: `[X := ] File.WriteMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean WriteMode();
+  [[nodiscard]] ::agiru::Boolean WriteMode() const;
 
   ::agiru::Boolean WriteMode(::agiru::Boolean Mode);
 

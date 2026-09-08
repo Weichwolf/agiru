@@ -1,11 +1,13 @@
 #include "Refused.h"
 
+#include "Ast.h"
 #include "EnumWriter.h"
 
 #include <algorithm>
 #include <array>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace agiru::gen {
 namespace {

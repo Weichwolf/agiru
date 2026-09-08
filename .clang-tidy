@@ -122,7 +122,7 @@ CheckOptions:
   # names the standard names, and `modernize-deprecated-headers` forbids writing `signal.h`. The
   # runtime needs the POSIX three so a crash can print its frames -- on an ALTERNATE STACK, because
   # a stack overflow is the crash a handler on the overflowed stack cannot report (board:0616).
-  misc-include-cleaner.IgnoreHeaders: 'stdio.h;signal.h'
+  misc-include-cleaner.IgnoreHeaders: 'stdio.h;.*signal.h;.*stack_t.h;.*sigstack.h'
 
   # `readability-identifier-length` belongs SET, not switched off. Its default asks for three
   # characters, which is wrong here: the tree carries AL vocabulary, and `i`, `n`, `no` are the

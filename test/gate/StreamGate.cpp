@@ -2,6 +2,7 @@
 #include "type/Blob.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
+#include "type/StringValue.h"
 
 #include "Check.h"
 
