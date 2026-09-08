@@ -1876,6 +1876,47 @@ public:
   /// \warning `MinValue`, `MaxValue` and `NotBlank` are INPUT bounds and are NOT checked here. The
   ///          client refuses a value outside them before it takes it; a programmatic `Validate`
   ///          does not (openerp WI, "MinValue/MaxValue sind Eingabe-Grenzen").
+  /// \brief AL `Record.Validate(Field, Value)` the way a PAGE runs it: the field by number, the
+  ///        value as the user typed it.
+  ///
+  /// \param no   The field.
+  /// \param text What was typed; it is evaluated into the field's type first.
+  /// \throws Error whatever the evaluation, the relation check or the trigger raises; the record
+  ///         is as it was before on any of them.
+  ///
+  /// \note A `TestPage.SetValue` IS A VALIDATE (board:0030): the platform assigns, then runs
+  ///       `OnValidate` with the same `xRec` a code-driven `Validate` gets. The page's own
+  ///       control trigger runs after this, in the page.
+  void ValidateText(::agiru::FieldNo no, std::string_view text) {
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
+    const detail::ValidatingField current(no);
+    try {
+      detail::EvaluateInto(Self(), TableTraits<Derived>::kTable, no, text);
+      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      ValidateEvent("OnBeforeValidateEvent", no, before);
+      RunOnValidate(no);
+      ValidateEvent("OnAfterValidateEvent", no, before);
+    } catch (...) {
+      static_cast<Derived &>(*this) = before;
+      throw;
+    }
+  }
+
+  /// \brief A field as the user READS it on a page: `Format(Field)`, by number.
+  /// \param no The field.
+  /// \return The formatted text.
+  [[nodiscard]] std::string FieldFormat(::agiru::FieldNo no) const {
+    return detail::FieldFormat(Self(), TableTraits<Derived>::kTable, no);
+  }
+
+  /// \brief AL `Record.SetFilter(Field, Text)` by number, which a page's filter pane sets.
+  /// \param no         The field.
+  /// \param expression The filter, in AL's own language.
+  void SetFilterOn(::agiru::FieldNo no, std::string_view expression) {
+    detail::Narrow(State(), no, std::string(expression));
+  }
+
   template <typename Field, typename Value> void Validate(Field &member, const Value &value) {
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);

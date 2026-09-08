@@ -50,6 +50,21 @@ template <typename E = void> class Option;
 ///       alternative was to emit `OrdinalValue`, which is correct and does not read like AL.
 template <> class Option<void> : public OrdinalValue {
 public:
+  /// \brief Lends a bare `Option` to a `var` parameter typed with members, the way AL does.
+  /// \tparam O The parameter's `Option<Members>`.
+  /// \return This, seen as that type.
+  ///
+  /// \note AN AL `Option` WITHOUT MEMBERS IS AN ORDINAL AND NOTHING MORE, and AL hands it to any
+  ///       `var Option` parameter: the callee writes the ordinal, the caller reads it back.
+  ///       `Option<Members>` adds no data to `Option<void>` -- the members are a type argument --
+  ///       so the reference is the same bytes read under the parameter's name, and the
+  ///       `static_assert` holds that to be true.
+  template <typename O> [[nodiscard]] O &Lend() {
+    static_assert(sizeof(O) == sizeof(Option<void>), "an Option with members carries no more");
+    static_assert(std::is_base_of_v<Option<void>, O>, "only an Option lends as an Option");
+    return static_cast<O &>(*this);
+  }
+
   /// \brief AL `Option.FromInteger(Integer)` on an option with no vocabulary.
   /// \param ordinal The number.
   /// \return An option standing on it.

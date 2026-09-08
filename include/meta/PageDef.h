@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <span>
 #include <string_view>
@@ -561,7 +562,7 @@ struct PageDef {
   std::size_t deepest = 0;
   for (const ControlDef &control : controls) {
     const std::size_t below = Depth(control.children);
-    if (below + 1 > deepest) { deepest = below + 1; }
+    deepest = std::max(deepest, below + 1);
   }
   return deepest;
 }

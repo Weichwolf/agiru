@@ -3,19 +3,26 @@
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/test/Handlers.h"
+#include "runtime/test/PageCore.h"
 #include "runtime/test/TestAction.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Dictionary.h"
 #include "type/Integer.h"
+#include "type/Option.h"
 #include "type/PageBackgroundTaskErrorLevel.h"
 #include "type/PageStyle.h"
 #include "type/PromptMode.h"
 #include "type/Text.h"
 #include "type/Variant.h"
 
+#include <concepts>
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief The base every generated AL page stands on, and the controls a page is made of.
@@ -30,6 +37,34 @@ namespace agiru {
 /// wrote -- its controls, its actions, its variables and its procedures. The number, the name and
 /// the page type live here, the way a table's field table does.
 template <typename T> struct PageTraits;
+
+/// \brief A call through a control whose object this build does not carry: a `usercontrol`'s
+///        add-in, or a `part` whose page is outside the translated scope.
+/// \param what The call as AL wrote it, `Part.Page().Method`.
+/// \return Never; the type exists so the call can stand in an expression.
+/// \throws Error always, naming the call -- a HOLE WITH A NAME rather than a compile error in a
+///         page every test of that table needs (board:0034).
+[[noreturn]] inline RefusedOptionValue RefusedControl(std::string_view what) {
+  throw Error("the control " + std::string(what) + " has no object behind it in this build " +
+              "(board:0034)");
+}
+
+/// \brief One control's triggers, as a page's `PageTraits` tabulates them.
+///
+/// \tparam P The generated page class.
+///
+/// \note IT IS STATIC DATA BESIDE THE PAGE, the way a table's `kOnValidate` is: the generator
+///       emits one row per control that declares a trigger, with a member pointer per trigger
+///       it declares and `nullptr` for the rest. A headless page (`TestPage`) finds the control
+///       by its AL name and calls through the pointer; nothing is looked up by string at run
+///       time beyond the one name the test wrote.
+template <typename P> struct ControlTrigger {
+  std::string_view control;          ///< The control's AL name.
+  void (P::*validate)() = nullptr;   ///< `OnValidate`.
+  void (P::*action)() = nullptr;     ///< `OnAction`.
+  void (P::*drillDown)() = nullptr;  ///< `OnDrillDown`.
+  void (P::*assistEdit)() = nullptr; ///< `OnAssistEdit`.
+};
 
 /// \brief What every AL page can do, without the generated class saying any of it.
 ///
@@ -81,8 +116,124 @@ public:
   }
 };
 
+namespace detail {
+
+/// \brief Runs the triggers a page owes after landing on a record: `OnAfterGetRecord`, then
+///        `OnAfterGetCurrRecord`.
+/// \tparam P The generated page class.
+/// \param page The page.
+template <typename P> void AfterGetRecord(P &page) {
+  if constexpr (requires { page.OnAfterGetRecord(); }) { page.OnAfterGetRecord(); }
+  if constexpr (requires { page.OnAfterGetCurrRecord(); }) { page.OnAfterGetCurrRecord(); }
+}
+
+/// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
+///        with `OnNewRecord`), `OnOpenPage`, then the after-get triggers.
+/// \tparam P The generated page class.
+/// \param page     The page.
+/// \param editable Whether it opens for editing.
+/// \param isNew    Whether it opens on a new record (`OpenNew`).
+template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
+  page.OpenedAs(editable);
+  if constexpr (requires { page.OnInit(); }) { page.OnInit(); }
+  bool found = false;
+  if constexpr (requires { page.Rec; }) {
+    if (isNew) {
+      page.Rec.Init();
+      if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(false); }
+    } else {
+      found = static_cast<bool>(page.Rec.FindFirst());
+    }
+  }
+  if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
+  if (found || isNew) { AfterGetRecord(page); }
+}
+
+/// \brief Closes a page the way the platform does: `OnQueryClosePage`, then `OnClosePage`.
+/// \tparam P The generated page class.
+/// \param page The page.
+/// \throws Error when `OnQueryClosePage` refuses.
+template <typename P> void ClosePage(P &page) {
+  if constexpr (requires(::agiru::Action action) {
+                  { page.OnQueryClosePage(action) } -> std::convertible_to<bool>;
+                }) {
+    if (!page.OnQueryClosePage(page.ClosedWith())) {
+      throw Error("the page refused to close (OnQueryClosePage)");
+    }
+  }
+  if constexpr (requires { page.OnClosePage(); }) { page.OnClosePage(); }
+}
+
+/// \brief Hands the record a `Page.Run(Rec)` names to the page: its filters, and its position.
+/// \tparam P      The generated page class.
+/// \tparam Record What was passed; only the page's own source table is taken.
+/// \param page   The page.
+/// \param record The argument.
+template <typename P, typename Record> void AdoptRecord(P &page, const Record &record) {
+  if constexpr (requires { page.Rec.Copy(record); }) {
+    page.Rec.Copy(record);
+  } else {
+    static_cast<void>(record);
+  }
+}
+
+/// \brief AL `Page.Run(Rec)` / `Page.RunModal(Rec)` on a generated page, headless.
+///
+/// \tparam P         The generated page class.
+/// \tparam Arguments The record, when one was passed.
+/// \param modal     Whether it is `RunModal`.
+/// \param arguments The record, when one was passed.
+/// \return The action the page closed with.
+/// \throws Error when no test harness answers: AL's `Unhandled UI` for a page a test did not
+///         trap or declare a handler for.
+///
+/// \note THE PAGE RUNS FOR WHOEVER CATCHES IT. A non-modal run goes to a `TestPage.Trap()` first,
+///       and the harness then owns the page and drives it; otherwise a `[PageHandler]` or
+///       `[ModalPageHandler]` for this page number is invoked with the page, already opened, and
+///       the page closes when the handler returns. There is no third case yet: a page nobody
+///       waits for is an unhandled UI, which is what AL says too (board:0030).
+template <typename P, typename... Arguments>
+::agiru::Action RunPage(bool modal, const Arguments &...arguments) {
+  auto page = std::make_unique<P>();
+  (AdoptRecord(*page, arguments), ...);
+  OpenPage(*page, true, false);
+  const std::int32_t id = PageTraits<P>::kId.Value();
+  if (!modal && ReleaseTrap(id, page.get())) {
+    static_cast<void>(page.release());
+    return ::agiru::Action::OK;
+  }
+  const TestHandler *handler =
+      HandlerTable::For(modal ? HandlerKind::ModalPage : HandlerKind::Page, id);
+  if (handler == nullptr) {
+    throw Error(std::string("Unhandled UI: ") + (modal ? "ModalPage " : "Page ") +
+                std::string(PageTraits<P>::kName));
+  }
+  handler->invoke(PageTraits<P>::kName, page.get());
+  HandlerTable::Ran(*handler);
+  ClosePage(*page);
+  return page->ClosedWith();
+}
+
+}
+
 template <typename Derived = void> class Page {
 public:
+  /// \brief Marks the page opened, in the mode a runner chose.
+  /// \param editable Whether `OpenEdit`/`OpenNew` (true) or `OpenView` (false).
+  void OpenedAs(bool editable) { editable_ = editable; }
+
+  /// \brief Whether the page was opened for editing.
+  /// \return True after `OpenEdit` or `OpenNew`.
+  [[nodiscard]] bool OpenedEditable() const { return editable_; }
+
+  /// \brief Records the action the page closed with (`OK`, `Cancel`, `Yes`, `No`, `LookupOK`).
+  /// \param action The action.
+  void CloseWith(::agiru::Action action) { closeAction_ = action; }
+
+  /// \brief What `Page.RunModal` answers: the action the page closed with.
+  /// \return The action; `OK` when nothing said otherwise.
+  [[nodiscard]] ::agiru::Action ClosedWith() const { return closeAction_; }
+
   /// \brief The page's AL number.
   /// \return The number AL declared.
   [[nodiscard]] static constexpr PageId Id() { return PageTraits<Derived>::kId; }
@@ -99,9 +250,13 @@ public:
   ///
   /// \note AL NAMES THE KIND TWICE AND THE GENERATED FORM ONCE. `Page.Run(Page::"X", Rec)` becomes
   ///       `pages::X::Run(Rec)`: the object is the receiver, which is what the call means.
-  template <typename... Arguments> static void Run(Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Page.Run needs a running UI (board:0030)");
+  template <typename... Arguments> static void Run(const Arguments &...arguments) {
+    if constexpr (std::is_void_v<Derived>) {
+      (static_cast<void>(arguments), ...);
+      throw Error("Page.Run by number needs the page catalogue (board:0030)");
+    } else {
+      static_cast<void>(detail::RunPage<Derived>(false, arguments...));
+    }
   }
 
   /// \brief AL `Page.RunModal(PageId [, Record])` -- shows the page and waits for it.
@@ -136,11 +291,13 @@ public:
   ///          `OnQueryClosePage` and then `OnClosePage`. Each is one page under `triggers-auto/`,
   ///          and naming them here is what keeps them from being a silent hole while the UI is
   ///          board:0030's work -- nothing fires until there is a page to fire it on.
-  template <typename... Arguments> static ::agiru::Action RunModal(Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Page.RunModal needs a running UI (board:0030). When it runs it owes OnInit, "
-                "OnOpenPage, OnFindRecord, OnNextRecord, OnNewRecord, OnAfterGetRecord, "
-                "OnAfterGetCurrRecord, and on close OnQueryClosePage then OnClosePage");
+  template <typename... Arguments> static ::agiru::Action RunModal(const Arguments &...arguments) {
+    if constexpr (std::is_void_v<Derived>) {
+      (static_cast<void>(arguments), ...);
+      throw Error("Page.RunModal by number needs the page catalogue (board:0030)");
+    } else {
+      return detail::RunPage<Derived>(true, arguments...);
+    }
   }
 
   /// \brief AL `Page.Activate(Boolean)`. Activates the current page on the client if possible. The
@@ -220,11 +377,13 @@ public:
   /// \param ErrorLevel The AL `PageBackgroundTaskErrorLevel`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
-  ::agiru::Boolean EnqueueBackgroundTask(::agiru::Integer &TaskId,
-                                         ::agiru::Integer CodeunitId,
-                                         ::agiru::Dictionary<std::string, std::string> &Parameters,
-                                         ::agiru::Integer Timeout,
-                                         const ::agiru::PageBackgroundTaskErrorLevel &ErrorLevel) {
+  ::agiru::Boolean
+  EnqueueBackgroundTask(::agiru::Integer &TaskId,
+                        ::agiru::Integer CodeunitId,
+                        ::agiru::Dictionary<::agiru::Text<0>, ::agiru::Text<0>> &Parameters,
+                        ::agiru::Integer Timeout = {},
+                        const ::agiru::PageBackgroundTaskErrorLevel &ErrorLevel =
+                            ::agiru::PageBackgroundTaskErrorLevel{}) {
     static_cast<void>(TaskId);
     static_cast<void>(CodeunitId);
     static_cast<void>(Parameters);
@@ -236,7 +395,7 @@ public:
 
   /// \brief AL `Page.GetBackgroundParameters()`. Gets the page background task input parameters.
   /// \throws Error until the UI runs (board:0030).
-  ::agiru::Dictionary<std::string, std::string> GetBackgroundParameters() {
+  ::agiru::Dictionary<::agiru::Text<0>, ::agiru::Text<0>> GetBackgroundParameters() {
     throw Error("Page.GetBackgroundParameters() needs a running UI (board:0030)");
   }
 
@@ -315,7 +474,8 @@ public:
   /// will be invoked on the page with this result dictionary.
   /// \param Results The AL `Dictionary of [Text, Text]`.
   /// \throws Error until the UI runs (board:0030).
-  void SetBackgroundTaskResult(const ::agiru::Dictionary<std::string, std::string> &Results) {
+  void
+  SetBackgroundTaskResult(const ::agiru::Dictionary<::agiru::Text<0>, ::agiru::Text<0>> &Results) {
     static_cast<void>(Results);
     throw Error(
         "Page.SetBackgroundTaskResult(Dictionary of [Text, Text]) needs a running UI (board:0030)");
@@ -372,6 +532,10 @@ public:
   /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
   ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate
   ///       initialisation and both of those make it fail from the caller's context.
+
+private:
+  bool editable_ = true;
+  ::agiru::Action closeAction_ = ::agiru::Action::OK;
 };
 
 /// \brief AL `Page.Run(Number, ...)` and `Page.RunModal(Number, ...)` by object NUMBER, the way

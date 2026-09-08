@@ -1,3 +1,4 @@
+#include "runtime/Codeunit.h"
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
@@ -173,10 +174,51 @@ void AFilterNarrowsATemporaryWalk() {
   buffer.Reset();
   CHECK_TRUE("Reset widens it again", buffer.Count() == kFive);
 }
+
+/// THE SHAPES THE BASEAPP SHARES WITH, which board:0620 counts at 141 UT failures: a global
+/// reached through an `Instance`, a temporary handed on BY VALUE, and a `var` parameter whose
+/// declared type is the base table and whose argument is a temporary.
+void SharedThroughAnInstanceAndByValue() {
+  agiru::Instance<Temporary<LineNumberBuffer>> global;
+  Temporary<LineNumberBuffer> &owner = global;
+  owner.OldLineNumber = 1;
+  owner.NewLineNumber = kTens;
+  owner.Insert();
+
+  Temporary<LineNumberBuffer> shared;
+  std::string said;
+  try {
+    shared.Copy(global, true);
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_SILENT("a temporary reached through an Instance shares", said);
+  CHECK_TRUE("and the copy sees its row", shared.Count() == 1);
+
+  const LineNumberBuffer byValue = owner;
+  CHECK_TRUE("a temporary copied BY VALUE is still temporary", byValue.IsTemporary());
+  Temporary<LineNumberBuffer> again;
+  said.clear();
+  try {
+    again.Copy(byValue, true);
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_SILENT("and shares", said);
+  CHECK_TRUE("with the same rows", again.Count() == 1);
+
+  const auto throughVar = [](LineNumberBuffer &viaVar, Temporary<LineNumberBuffer> &into) {
+    into.Copy(viaVar, true);
+  };
+  Temporary<LineNumberBuffer> third;
+  said.clear();
+  try {
+    throughVar(owner, third);
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_SILENT("a temporary passed as a var base-typed parameter shares", said);
+  CHECK_TRUE("with the same rows", third.Count() == 1);
+}
 }
 
 int main() {
   return gate::Run("Temporary", [] {
+    SharedThroughAnInstanceAndByValue();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
     RowsWalkInPrimaryKeyOrder();

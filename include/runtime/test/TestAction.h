@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "runtime/test/PageCore.h"
 #include "type/Boolean.h"
 
 #include <string_view>
@@ -26,6 +27,10 @@ public:
   /// \return The name.
   [[nodiscard]] constexpr std::string_view Name() const { return name_; }
 
+  /// \brief Binds the action to the page it sits on; `TestPage` does this when the page opens.
+  /// \param core The page.
+  void Bind(PageCore &core) { core_ = &core; }
+
   /// \brief AL `TestAction.Invoke()` -- runs the action's `OnAction` trigger.
   /// \throws Error until a page can be opened.
   void Invoke();
@@ -42,6 +47,7 @@ private:
   [[noreturn]] void Unbound() const;
 
   std::string_view name_;
+  PageCore *core_ = nullptr;
 };
 
 }

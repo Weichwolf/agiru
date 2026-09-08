@@ -57,6 +57,11 @@ struct Objects {
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);
 
+std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &procedures,
+                                          std::string_view name,
+                                          const Objects &objects,
+                                          const std::string &owner);
+
 void NoteObjectNames(const Objects &objects);
 
 std::string OptionTypeName(const std::string &owner,

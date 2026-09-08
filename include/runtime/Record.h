@@ -230,6 +230,24 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
 /// \throws Error when the field is a FlowField or not numeric.
 void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no);
 
+/// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`
+///        answers and an `AssertEquals` compares against.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \return The formatted text; an Option or Enum shows its caption, a Boolean `Yes`/`No`.
+/// \throws Error when the table lacks the field.
+[[nodiscard]] std::string FieldFormat(const void *record, const TableDef &table, FieldNo no);
+
+/// \brief Writes a field the way a user TYPES it: `Evaluate` for the field's type, so `100` lands
+///        in a Decimal, `Yes` in a Boolean, a member's name or caption in an Option.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \param text   What was typed.
+/// \throws Error when the text does not evaluate into the field's type, with AL's wording.
+void EvaluateInto(void *record, const TableDef &table, FieldNo no, std::string_view text);
+
 /// \brief Replaces the numbered placeholders in a pattern.
 ///
 /// \param pattern The text carrying the placeholders.
@@ -257,6 +275,8 @@ template <typename T> [[nodiscard]] std::string TextOf(const T &value, const Fie
     return MemberText(def, static_cast<std::int32_t>(value));
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
+  } else if constexpr (requires { typename T::IsAlRefusal; }) {
+    return std::to_string(value.AsInteger());
   } else if constexpr (requires { value.ToText(); }) {
     return std::string(value.ToText());
   } else if constexpr (requires { value.ToInvariantString(); }) {

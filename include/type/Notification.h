@@ -85,6 +85,18 @@ public:
   /// \brief AL `Notification.SetData(Key, Value)`.
   /// \param key   The name.
   /// \param value The value.
+  /// \brief AL `Notification.SetData(Key, Value)` with a value AL converts to `Text` on the way in.
+  /// \tparam V The value's type; anything `Format` renders.
+  /// \param key   The key.
+  /// \param value The value.
+  template <typename V>
+    requires(!std::convertible_to<V, std::string_view>) && requires(const V &v) {
+      { v.ToText() } -> std::convertible_to<std::string_view>;
+    }
+  void SetData(std::string_view key, const V &value) {
+    SetData(key, std::string_view(value.ToText()));
+  }
+
   void SetData(std::string_view key, std::string_view value) {
     data_.Set(std::string(key), std::string(value));
   }

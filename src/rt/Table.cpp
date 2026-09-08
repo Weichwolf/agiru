@@ -5,8 +5,10 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
+#include "runtime/Database.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
@@ -15,14 +17,17 @@
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Media.h"
 #include "type/MediaSet.h"
 #include "type/RecordId.h"
+#include "type/Refusal.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 
+#include "BuiltinsWritten.h"
 #include "Filter.h"
 #include "Rows.h"
 #include "Selection.h"
@@ -35,6 +40,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <expected>
 #include <format>
 #include <map>
 #include <mutex>
@@ -447,6 +453,8 @@ void RuntimeClear(void *record, const TableDef &table) {
   Defaulted(record, table, false);
 }
 
+namespace {
+
 void AutoIncrement(void *record, const TableDef &table) {
   for (const FieldDef &def : table.fields) {
     if (!def.autoIncrement || def.fieldClass != FieldClass::Normal) { continue; }
@@ -457,6 +465,8 @@ void AutoIncrement(void *record, const TableDef &table) {
     const std::optional<std::string_view> value = next.Value(0, 0);
     detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : "1");
   }
+}
+
 }
 
 void RuntimeInsert(void *record, const TableDef &table) {
@@ -628,6 +638,16 @@ public:
     if (SameName(Peek(), "where")) {
       Word();
       Expect('(');
+      ReadTerms(made);
+    }
+    Space();
+    Expect(')');
+    return made;
+  }
+
+private:
+  void ReadTerms(FlowFormula &made) {
+    {
       for (;;) {
         FlowTerm term;
         term.target = Name();
@@ -679,12 +699,8 @@ public:
         break;
       }
     }
-    Space();
-    Expect(')');
-    return made;
   }
 
-private:
   [[noreturn]] void Refuse(const std::string &what) const {
     throw Error("the CalcFormula of " + std::string(asked_.name) + " has " + what +
                 " at position " + std::to_string(at_) + ": " + std::string(text_));
@@ -955,6 +971,92 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   }
   const Result result = Session::Current().Database().Execute(sql, predicate.binds);
   Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));
+}
+
+std::string FieldFormat(const void *record, const TableDef &table, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr) { throw Error("the table lacks the field a control reads"); }
+  switch (def->type) {
+    case FieldType::Decimal:
+      return std::string(::agiru::Format(
+          *reinterpret_cast<const Decimal *>(At(const_cast<void *>(record), *def))));
+    case FieldType::Integer:
+      return std::string(::agiru::Format(
+          *reinterpret_cast<const Integer *>(At(const_cast<void *>(record), *def))));
+    case FieldType::BigInteger:
+      return std::string(::agiru::Format(
+          *reinterpret_cast<const BigInteger *>(At(const_cast<void *>(record), *def))));
+    case FieldType::Boolean:
+      return std::string(::agiru::Format(
+          *reinterpret_cast<const Boolean *>(At(const_cast<void *>(record), *def))));
+    case FieldType::Date:
+      return std::string(
+          ::agiru::Format(*reinterpret_cast<const Date *>(At(const_cast<void *>(record), *def))));
+    case FieldType::Time:
+      return std::string(
+          ::agiru::Format(*reinterpret_cast<const Time *>(At(const_cast<void *>(record), *def))));
+    case FieldType::DateTime:
+      return std::string(::agiru::Format(
+          *reinterpret_cast<const DateTime *>(At(const_cast<void *>(record), *def))));
+    case FieldType::Option:
+    case FieldType::Enum: {
+      const std::int32_t ordinal =
+          reinterpret_cast<const OrdinalValue *>(At(const_cast<void *>(record), *def))->AsInteger();
+      const EnumValueDef *value = ValueOf(def->values, ordinal);
+      if (value == nullptr) { return std::to_string(ordinal); }
+      return std::string(value->caption.empty() ? value->name : value->caption);
+    }
+    default: return FieldText(record, *def);
+  }
+}
+
+void EvaluateInto(void *record, const TableDef &table, FieldNo no, std::string_view text) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr) { throw Error("the table lacks the field a control writes"); }
+  const auto refuse = [&] {
+    throw Error("The value \"" + std::string(text) + "\" can't be evaluated into type " +
+                std::string(def->name) + ".");
+  };
+  switch (def->type) {
+    case FieldType::Decimal: {
+      Decimal value{};
+      if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
+      *reinterpret_cast<Decimal *>(At(record, *def)) = value;
+      return;
+    }
+    case FieldType::Integer: {
+      Integer value{};
+      if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
+      *reinterpret_cast<Integer *>(At(record, *def)) = value;
+      return;
+    }
+    case FieldType::BigInteger: {
+      BigInteger value{};
+      if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
+      *reinterpret_cast<BigInteger *>(At(record, *def)) = value;
+      return;
+    }
+    case FieldType::Boolean: {
+      Boolean value{};
+      if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
+      *reinterpret_cast<Boolean *>(At(record, *def)) = value;
+      return;
+    }
+    case FieldType::Date: {
+      Date value{};
+      if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
+      *reinterpret_cast<Date *>(At(record, *def)) = value;
+      return;
+    }
+    case FieldType::Option:
+    case FieldType::Enum: {
+      const std::string ordinal = MemberOrdinal(*def, text);
+      if (ordinal.find_first_not_of("-0123456789") != std::string::npos) { refuse(); }
+      SetFieldText(record, *def, ordinal);
+      return;
+    }
+    default: SetFieldText(record, *def, text); return;
+  }
 }
 
 void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no) {

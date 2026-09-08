@@ -18,6 +18,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -125,12 +126,75 @@ void WriteControls(std::string &out,
                    const std::vector<const al::PageControl *> &controls,
                    std::string_view type,
                    const std::map<std::string, std::string> &named,
-                   std::set<std::string> &taken) {
+                   std::set<std::string> &taken,
+                   std::vector<std::string> *bound = nullptr) {
   for (const al::PageControl *control : controls) {
     const std::string identifier = ControlIdentifier(named, control->name);
     if (identifier.empty() || !taken.insert(identifier).second) { continue; }
     out += "  " + std::string(type) + " " + identifier + "{" + Literal(control->name) + "};\n";
+    if (bound != nullptr) { bound->push_back(identifier); }
   }
+}
+
+struct TriggerRow {
+  std::string control;
+  std::string validate;
+  std::string action;
+  std::string drillDown;
+  std::string assistEdit;
+};
+
+void GatherTriggerRows(const std::vector<al::PageControl> &controls,
+                       const std::map<std::string, std::string> &named,
+                       const al::PageObject &page,
+                       std::vector<TriggerRow> &rows) {
+  for (const al::PageControl &control : controls) {
+    TriggerRow row;
+    row.control = control.name;
+    for (const al::ProcedureDecl &trigger : control.triggers) {
+      if (!trigger.parameters.empty() || control.name.empty()) { continue; }
+      const std::string method =
+          ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures);
+      const std::string lowered = LowerKey(trigger.name);
+      if (lowered == "onvalidate") {
+        row.validate = method;
+      } else if (lowered == "onaction") {
+        row.action = method;
+      } else if (lowered == "ondrilldown") {
+        row.drillDown = method;
+      } else if (lowered == "onassistedit") {
+        row.assistEdit = method;
+      }
+    }
+    if (!row.validate.empty() || !row.action.empty() || !row.drillDown.empty() ||
+        !row.assistEdit.empty()) {
+      rows.push_back(std::move(row));
+    }
+    GatherTriggerRows(control.children, named, page, rows);
+  }
+}
+
+std::string TriggerTable(const al::PageObject &page,
+                         const std::map<std::string, std::string> &named,
+                         const std::string &pageClass) {
+  std::vector<TriggerRow> rows;
+  GatherTriggerRows(page.layout, named, page, rows);
+  GatherTriggerRows(page.actions, named, page, rows);
+  std::string out = "  static constexpr std::array<::agiru::ControlTrigger<" + pageClass + ">, " +
+                    std::to_string(rows.size()) + "> kControlTriggers{{";
+  const auto member = [&pageClass](const std::string &method) {
+    return method.empty() ? std::string("nullptr") : "&" + pageClass + "::" + method;
+  };
+  bool first = true;
+  for (const TriggerRow &row : rows) {
+    out += first ? "\n" : ",\n";
+    first = false;
+    out += "      {.control = " + Literal(row.control) + ", .validate = " + member(row.validate) +
+           ", .action = " + member(row.action) + ", .drillDown = " + member(row.drillDown) +
+           ", .assistEdit = " + member(row.assistEdit) + "}";
+  }
+  out += rows.empty() ? "}};\n" : "\n  }};\n";
+  return out;
 }
 
 struct Reached {
@@ -769,14 +833,20 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
       controlsClass + " {\npublic:\n";
   std::set<std::string> taken{"OpenNew", "OpenEdit", "OpenView", "Close", "First", "Next", "New"};
   const std::map<std::string, std::string> named = ControlIdentifiers(object, objects);
-  WriteControls(out, all.fields, "Field_Kind", named, taken);
+  std::vector<std::string> bound;
+  WriteControls(out, all.fields, "Field_Kind", named, taken, &bound);
   if (!all.fields.empty() && !all.actions.empty()) { out += "\n"; }
-  WriteControls(out, all.actions, "Action_Kind", named, taken);
+  WriteControls(out, all.actions, "Action_Kind", named, taken, &bound);
   WriteParts(out, all.parts, objects, named, taken);
   for (const auto &[field, identifier] : named) {
     if (!taken.insert(identifier).second) { continue; }
     out += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
+    bound.push_back(identifier);
   }
+  out += "\n  template <typename Core> void BindControls(Core &core) {\n";
+  for (const std::string &identifier : bound) { out += "    " + identifier + ".Bind(core);\n"; }
+  if (bound.empty()) { out += "    static_cast<void>(core);\n"; }
+  out += "  }\n";
   out += "};\n\n";
   out += "class " + pageClass + ";\n\n";
   out += "class " + pageClass + " : public Page<" + pageClass + "> {\npublic:\n";
@@ -844,6 +914,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
          "Part_Kind>\n"
          "  using Controls = " +
          space + "::" + controlsClass + "<Field_Kind, Action_Kind, Part_Kind>;\n";
+  out += TriggerTable(object, named, space + "::" + pageClass);
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;

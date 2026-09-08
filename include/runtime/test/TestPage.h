@@ -1,7 +1,11 @@
 #pragma once
 
+#include "meta/PageDef.h"
 #include "runtime/Error.h"
 #include "runtime/Page.h"
+#include "runtime/Record.h"
+#include "runtime/Table.h"
+#include "runtime/test/PageCore.h"
 #include "runtime/test/TestAction.h"
 #include "runtime/test/TestField.h"
 #include "runtime/test/TestFilter.h"
@@ -9,6 +13,15 @@
 #include "type/Dictionary.h"
 #include "type/Integer.h"
 #include "type/Text.h"
+
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 /// \file
 /// \brief AL `TestPage` -- a page driven without a screen.
@@ -61,207 +74,544 @@ namespace agiru {
 ///       SetValue(...)` -- so the part has to carry the subform's own controls, and a `TestField`,
 ///       which has a value and no controls, cannot.
 template <typename P = UnknownPage>
-class TestPage : public PageTraits<P>::template Controls<TestField, TestAction, ::agiru::TestPage> {
+class TestPage : public PageTraits<P>::template Controls<TestField, TestAction, ::agiru::TestPage>,
+                 public PageCore {
 public:
-  /// \brief AL `TestPage.OpenNew()` -- opens the page ready to insert.
-  /// \throws Error until a page can be opened (board:0030).
-  void OpenNew() { Unopened(); }
+  /// \brief Marks the type for the handler thunk, which binds a `[PageHandler]`'s parameter.
+  using IsTestPage = void;
 
-  /// \brief AL `TestPage.OpenEdit()` -- opens the page on its source table for editing.
-  /// \throws Error until a page can be opened (board:0030).
-  void OpenEdit() { Unopened(); }
+  /// \brief Whether the page has a source table; a dialog with none has no rows to move over.
+  static constexpr bool kHasRecord =
+      requires(P &page) { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); };
 
-  /// \brief AL `TestPage.OpenView()` -- opens the page read-only.
-  /// \throws Error until a page can be opened (board:0030).
-  void OpenView() { Unopened(); }
+  TestPage() = default;
 
-  /// \brief AL `TestPage.Close()`.
-  /// \throws Error until a page can be opened (board:0030).
-  void Close() { Unopened(); }
+  /// \brief A copy is a second HANDLE on the same page, as an AL `TestPage` passed by value is.
+  /// \param o The harness copied.
+  TestPage(const TestPage &o) { Share_(o); }
 
-  /// \brief AL `TestPage.First()` -- moves to the first record.
-  /// \return Whether there was one.
-  /// \throws Error until a page can be opened (board:0030).
-  Boolean First() { Unopened(); }
+  /// \brief The same, by assignment.
+  /// \param o The harness copied.
+  /// \return This.
+  TestPage &operator=(const TestPage &o) {
+    if (this != &o) {
+      Release_();
+      Share_(o);
+    }
+    return *this;
+  }
 
-  /// \brief AL `TestPage.Next()` -- moves to the next record.
-  /// \return Whether there was one.
-  /// \throws Error until a page can be opened (board:0030).
-  Boolean Next() { Unopened(); }
+  /// \brief A move takes the page over, ownership and all; `Clear(TestPage)` is one.
+  /// \param o The harness moved from, which holds nothing afterwards.
+  TestPage(TestPage &&o) noexcept { Take_(o); }
 
-  /// \brief AL `TestPage.New()` -- starts a new record on the page.
-  /// \throws Error until a page can be opened (board:0030).
-  void New() { Unopened(); }
+  /// \brief The same, by assignment.
+  /// \param o The harness moved from.
+  /// \return This.
+  TestPage &operator=(TestPage &&o) noexcept {
+    if (this != &o) {
+      Release_();
+      Take_(o);
+    }
+    return *this;
+  }
 
-  /// \brief AL `TestPage.Last()` -- moves to the last record.
-  /// \return Whether a record was there.
-  /// \throws Error until a page runs (board:0030).
-  Boolean Last() { Unopened(); }
+  ~TestPage() override { Release_(); }
 
-  /// \brief AL `TestPage.Previous()` -- moves to the record before this one.
-  /// \return Whether a record was there.
-  /// \throws Error until a page runs (board:0030).
-  Boolean Previous() { Unopened(); }
+  /// \brief AL `TestPage.OpenNew()` -- opens the page on a new record.
+  /// \throws Error when the page is already open, as AL does.
+  void OpenNew() { Open_(true, true); }
 
-  /// \brief AL `TestPage.Prev()` -- the older spelling of `Previous`.
-  /// \return Whether a record was there.
-  /// \throws Error until a page runs (board:0030).
-  Boolean Prev() { Unopened(); }
+  /// \brief AL `TestPage.OpenEdit()` -- opens the page on its first record, for editing.
+  /// \throws Error when the page is already open, as AL does.
+  void OpenEdit() { Open_(true, false); }
 
-  /// \brief AL `TestPage.GoToRecord(Record)` -- positions the page on a record.
+  /// \brief AL `TestPage.OpenView()` -- opens the page on its first record, read-only.
+  /// \throws Error when the page is already open, as AL does.
+  void OpenView() { Open_(false, false); }
+
+  /// \brief AL `TestPage.Close()` -- runs `OnQueryClosePage` and `OnClosePage`, then lets go.
+  void Close() {
+    if (page_ == nullptr) { return; }
+    detail::ClosePage(*page_);
+    Release_();
+  }
+
+  /// \brief AL `TestPage.First()`.
+  /// \return Whether there is a first record.
+  Boolean First() {
+    return Landed_([](auto &rec) { return static_cast<bool>(rec.FindFirst()); });
+  }
+
+  /// \brief AL `TestPage.Next()`.
+  /// \return Whether there is a next record.
+  Boolean Next() {
+    return Landed_([](auto &rec) { return rec.Next() != 0; });
+  }
+
+  /// \brief AL `TestPage.Previous()`.
+  /// \return Whether there is a previous record.
+  Boolean Previous() {
+    return Landed_([](auto &rec) { return rec.Next(-1) != 0; });
+  }
+
+  /// \brief AL `TestPage.Prev()`, the older spelling of `Previous`.
+  /// \return Whether there is a previous record.
+  Boolean Prev() { return Previous(); }
+
+  /// \brief AL `TestPage.Last()`.
+  /// \return Whether there is a last record.
+  Boolean Last() {
+    return Landed_([](auto &rec) { return static_cast<bool>(rec.FindLast()); });
+  }
+
+  /// \brief AL `TestPage.New()` -- moves to a new record and runs `OnNewRecord`.
+  void New() {
+    if constexpr (kHasRecord) {
+      Record_().Init();
+      if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
+      detail::AfterGetRecord(Page_());
+    } else {
+      Unopened_();
+    }
+  }
+
+  /// \brief AL `TestPage.GoToRecord(Record)` -- positions the page on that record.
   /// \tparam R The record's type.
-  /// \param Record The record to stand on.
-  /// \return Whether the page could.
-  /// \throws Error until a page runs (board:0030).
+  /// \param Record The record.
+  /// \return Whether it was found within the page's filters.
   template <typename R> Boolean GoToRecord(const R &Record) {
-    static_cast<void>(Record);
-    Unopened();
+    if constexpr (requires { Record.RecordId(); }) {
+      return Landed_([&](auto &rec) { return rec.Get(Record.RecordId()); });
+    } else {
+      static_cast<void>(Record);
+      throw Error("TestPage.GoToRecord needs a record and not a Variant (board:0030)");
+    }
   }
 
-  /// \brief AL `TestPage.Edit()` -- switches a page opened for viewing into edit mode.
-  /// \return The action the page answered with.
-  /// \throws Error until a page runs (board:0030).
-  TestAction Edit() { Unopened(); }
-
-  /// \brief AL `TestPage.RunPageBackgroundTask(Integer [, var Dictionary of [Text, Text]]
-  ///        [, Boolean])`.
-  /// \param CodeunitId           The codeunit the task runs.
-  /// \param Parameters           What the task is handed; the task may write into it.
-  /// \param RunCompletionTriggers Whether `OnPageBackgroundTaskCompleted` fires.
-  /// \return What the task put into its result dictionary.
-  /// \throws Error until a page runs (board:0030).
-  Dictionary<std::string, std::string>
-  RunPageBackgroundTask(Integer CodeunitId,
-                        Dictionary<std::string, std::string> &Parameters,
-                        Boolean RunCompletionTriggers = {}) {
-    static_cast<void>(CodeunitId);
-    static_cast<void>(Parameters);
-    static_cast<void>(RunCompletionTriggers);
-    Unopened();
-  }
-
-  /// \brief AL `TestPage.GoToKey(...)` -- positions the page by primary key.
-  /// \tparam Values The key field types.
+  /// \brief AL `TestPage.GoToKey(Values, ...)` -- positions the page on the record with that key.
+  /// \tparam Values The key values' types.
   /// \param values The key values, in key order.
-  /// \return Whether a record carried that key.
-  /// \throws Error until a page runs (board:0030).
+  /// \return Whether it was found.
   template <typename... Values> Boolean GoToKey(const Values &...values) {
-    (static_cast<void>(values), ...);
-    Unopened();
+    return Landed_([&](auto &rec) { return rec.Get(values...); });
   }
 
-  /// \brief AL `TestPage.Trap()` -- catches the next page this one opens.
-  ///
-  /// \return This page, which the caught page is then read through.
-  /// \throws Error until a page runs (board:0030).
-  /// \note IT IS ARMED BEFORE THE ACTION, not after. A test writes `Other.Trap(); Page.Action.
-  ///       Invoke();` and reads `Other` afterwards, so `Trap` records an intention and the page
-  ///       that opens is bound to it.
-  TestPage &Trap() { Unopened(); }
-
-  /// \brief AL `TestPage.OK()` -- the OK system action.
-  /// \return The action.
-  /// \throws Error until a page runs (board:0030).
-  TestAction OK() { Unopened(); }
-
-  /// \brief AL `TestPage.Cancel()` -- the Cancel system action.
-  /// \return The action.
-  /// \throws Error until a page runs (board:0030).
-  TestAction Cancel() { Unopened(); }
-
-  /// \brief AL `TestPage.Yes()` -- the Yes system action.
-  /// \return The action.
-  /// \throws Error until a page runs (board:0030).
-  TestAction Yes() { Unopened(); }
-
-  /// \brief AL `TestPage.No()` -- the No system action.
-  /// \return The action.
-  /// \throws Error until a page runs (board:0030).
-  TestAction No() { Unopened(); }
-
-  /// \brief AL `TestPage.Caption()` -- the page's caption.
-  /// \return The caption.
-  /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Text<0> Caption() const { Unopened(); }
-
-  /// \brief AL `TestPage.Editable()` -- whether the page takes input.
-  /// \return Whether it does.
-  /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Boolean Editable() const { Unopened(); }
-
-  /// \brief AL `TestPage.Expand(Expand)` -- expands or collapses the current row.
-  /// \param Expand Whether to expand.
-  /// \throws Error until a page runs (board:0030).
-  void Expand(Boolean Expand) {
-    static_cast<void>(Expand);
-    Unopened();
+  /// \brief AL `TestPage.Trap()` -- the next non-modal run of this page lands here.
+  /// \return This.
+  TestPage &Trap() {
+    if constexpr (requires { PageTraits<P>::kId; }) {
+      detail::TrapPage(PageTraits<P>::kId.Value(), this, &TestPage::AdoptOwned_);
+      return *this;
+    } else {
+      Unopened_();
+    }
   }
 
-  /// \brief AL `TestPage.IsExpanded()` -- whether the current row is expanded.
-  /// \return Whether it is.
-  /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Boolean IsExpanded() const { Unopened(); }
+  /// \brief Takes a page another runner opened, without owning it; a `[PageHandler]` gets one.
+  /// \param page The page object, opened already.
+  void Adopt(void *page) {
+    Release_();
+    page_ = static_cast<P *>(page);
+    owned_ = false;
+    Bind_();
+  }
 
-  /// \brief AL `TestPage.GetValidationError()` -- the validation error standing on the page.
-  /// \return The message.
-  /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Text<0> GetValidationError() const { Unopened(); }
+  /// \brief AL `TestPage.OK()` -- the page's OK action.
+  /// \return The action, to `Invoke`.
+  TestAction OK() { return Bound_("OK"); }
 
-  /// \brief AL `TestPage.ValidationErrorCount()` -- how many validation errors stand.
-  /// \return The count.
-  /// \throws Error until a page runs (board:0030).
-  [[nodiscard]] Integer ValidationErrorCount() const { Unopened(); }
+  /// \brief AL `TestPage.Cancel()` -- the page's Cancel action.
+  /// \return The action, to `Invoke`.
+  TestAction Cancel() { return Bound_("Cancel"); }
 
-  /// \brief AL `TestPage.FindFirstField()` -- the first control that takes input.
-  /// \return The control.
-  /// \throws Error until a page runs (board:0030).
+  /// \brief AL `TestPage.Yes()` -- a confirmation's Yes.
+  /// \return The action, to `Invoke`.
+  TestAction Yes() { return Bound_("Yes"); }
+
+  /// \brief AL `TestPage.No()` -- a confirmation's No.
+  /// \return The action, to `Invoke`.
+  TestAction No() { return Bound_("No"); }
+
+  /// \brief AL `TestPage.Edit()` -- switches a view-mode page to editing.
+  /// \return The action, to `Invoke`.
+  TestAction Edit() { return Bound_("Edit"); }
+
+  /// \brief AL `TestPage.Caption()`.
+  /// \return The page's caption, or its name.
+  [[nodiscard]] Text<0> Caption() const {
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      return Text<0>{PageTraits<P>::kPage.caption.empty() ? PageTraits<P>::kName
+                                                          : PageTraits<P>::kPage.caption};
+    } else {
+      Unopened_();
+    }
+  }
+
+  /// \brief AL `TestPage.Editable()`.
+  /// \return Whether the page was opened for editing.
+  [[nodiscard]] Boolean Editable() const {
+    if constexpr (requires(P &page) { page.OpenedEditable(); }) {
+      return page_ != nullptr && page_->OpenedEditable();
+    } else {
+      return false;
+    }
+  }
+
+  /// \brief AL `TestPage.Expand(Boolean)` -- expands or collapses the current row of a tree.
+  /// \param Expand True to expand.
+  void Expand(Boolean Expand) { static_cast<void>(Expand); }
+
+  /// \brief AL `TestPage.IsExpanded()`.
+  /// \return False; rows do not nest here yet.
+  [[nodiscard]] Boolean IsExpanded() const { return false; }
+
+  /// \brief AL `TestPage.GetValidationError()`.
+  /// \return The last validation error's text; empty, because a validation error THROWS here.
+  [[nodiscard]] Text<0> GetValidationError() const { return Text<0>{}; }
+
+  /// \brief AL `TestPage.ValidationErrorCount()`.
+  /// \return Zero, for the same reason.
+  [[nodiscard]] Integer ValidationErrorCount() const { return 0; }
+
+  /// \brief AL `TestPage.FindFirstField(Field, Value)` -- the first row whose control shows it.
+  /// \tparam V The value's type.
+  /// \param field The control.
+  /// \param value What it must show.
+  /// \return Whether a row does.
   template <typename V> Boolean FindFirstField(const TestField &field, const V &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unopened();
+    if (!First()) { return false; }
+    return Matches_(field, value) || FindNextField(field, value);
   }
 
-  /// \brief AL `TestPage.FindNextField()` -- the control after the current one.
-  /// \return The control.
-  /// \throws Error until a page runs (board:0030).
+  /// \brief AL `TestPage.FindNextField(Field, Value)`.
+  /// \tparam V The value's type.
+  /// \param field The control.
+  /// \param value What it must show.
+  /// \return Whether a later row does.
   template <typename V> Boolean FindNextField(const TestField &field, const V &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unopened();
+    while (Next()) {
+      if (Matches_(field, value)) { return true; }
+    }
+    return false;
   }
 
-  /// \brief AL `TestPage.FindPreviousField()` -- the control before the current one.
-  /// \return The control.
-  /// \throws Error until a page runs (board:0030).
+  /// \brief AL `TestPage.FindPreviousField(Field, Value)`.
+  /// \tparam V The value's type.
+  /// \param field The control.
+  /// \param value What it must show.
+  /// \return Whether an earlier row does.
   template <typename V> Boolean FindPreviousField(const TestField &field, const V &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unopened();
+    while (Previous()) {
+      if (Matches_(field, value)) { return true; }
+    }
+    return false;
   }
 
   /// \brief AL `TestPage.GetField(No)` -- a control by its field number.
   /// \param No The field number.
-  /// \return The control.
-  /// \throws Error until a page runs (board:0030).
+  /// \return The control, bound.
   TestField GetField(Integer No) {
-    static_cast<void>(No);
-    Unopened();
+    const ControlDef *control = ControlByField_(::agiru::FieldNo{No});
+    if (control == nullptr) {
+      throw Error("no control on the page shows field " + std::to_string(No));
+    }
+    TestField field{control->name};
+    field.Bind(*this);
+    return field;
   }
 
-  /// \brief AL `TestPage.Filter` -- the page's filters.
-  ///
-  /// \note IT IS A DATA MEMBER AND A METHOD WOULD BE WRONG. AL writes
-  ///       `Page.FILTER.SETFILTER("No.", '1000')` -- no parentheses on `FILTER`, and the call after
-  ///       it carries arguments, so the rule that puts AL's missing parentheses back never reaches
-  ///       `FILTER`: it adds them to ONE link of a chain, and that link is the call. Written as a
-  ///       method it cost 82 errors over the 58 UT codeunits, measured. `methods-auto/testfilter/`
-  ///       is its own directory for the same reason it is a member here.
-  TestFilter Filter{};
+  /// \brief AL `TestPage.RunPageBackgroundTask(...)`.
+  /// \param CodeunitId            The codeunit.
+  /// \param Parameters            Its parameters.
+  /// \param RunCompletionTriggers Whether to run the completion triggers.
+  /// \return Never.
+  /// \throws Error always -- background tasks have no runner yet (board:0030).
+  Dictionary<::agiru::Text<0>, ::agiru::Text<0>>
+  RunPageBackgroundTask(Integer CodeunitId,
+                        Dictionary<::agiru::Text<0>, ::agiru::Text<0>> &Parameters,
+                        Boolean RunCompletionTriggers = {}) {
+    static_cast<void>(CodeunitId);
+    static_cast<void>(Parameters);
+    static_cast<void>(RunCompletionTriggers);
+    Unopened_();
+  }
+
+  /// \brief AL `TestPage.Filter` -- the page's filter pane, bound when the page opens.
+  TestFilter Filter{}; // NOLINT(misc-non-private-member-variables-in-classes)
+
+  void SetControlText(std::string_view control, std::string_view text) override {
+    const ControlDef *def = ControlNamed_(control);
+    if (def == nullptr || def->field.Value() == 0) {
+      throw Error("the control '" + std::string(control) + "' shows no field to set");
+    }
+    if constexpr (kHasRecord) {
+      Record_().ValidateText(def->field, text);
+      RunTrigger_(control, ControlTriggerKind::Validate, true);
+    } else {
+      static_cast<void>(text);
+      Unopened_();
+    }
+  }
+
+  [[nodiscard]] std::string ControlText(std::string_view control) const override {
+    const ControlDef *def = ControlNamed_(control);
+    if (def == nullptr || def->field.Value() == 0) {
+      throw Error("the control '" + std::string(control) + "' shows no field to read");
+    }
+    if constexpr (kHasRecord) {
+      return Record_().FieldFormat(def->field);
+    } else {
+      Unopened_();
+    }
+  }
+
+  void RunControlTrigger(std::string_view control, ControlTriggerKind kind) override {
+    if (kind == ControlTriggerKind::Action && CloseAction_(control)) { return; }
+    RunTrigger_(control, kind, kind == ControlTriggerKind::Action);
+  }
+
+  void SetControlFilter(std::string_view control, std::string_view filter) override {
+    const ControlDef *def = ControlNamed_(control);
+    if (def == nullptr || def->field.Value() == 0) {
+      throw Error("the control '" + std::string(control) + "' shows no field to filter");
+    }
+    if constexpr (kHasRecord) {
+      Record_().SetFilterOn(def->field, filter);
+      static_cast<void>(First());
+    } else {
+      static_cast<void>(filter);
+      Unopened_();
+    }
+  }
+
+  [[nodiscard]] Boolean ControlVisible(std::string_view control) const override {
+    const ControlDef *def = ControlNamed_(control);
+    return def == nullptr || !SameWord_(def->visible, "false");
+  }
+
+  [[nodiscard]] Boolean ControlEditable(std::string_view control) const override {
+    const ControlDef *def = ControlNamed_(control);
+    return Editable() && (def == nullptr || !SameWord_(def->editable, "false"));
+  }
+
+  [[nodiscard]] Boolean ControlEnabled(std::string_view control) const override {
+    const ControlDef *def = ControlNamed_(control);
+    return def == nullptr || !SameWord_(def->enabled, "false");
+  }
+
+  [[nodiscard]] std::string ControlCaption(std::string_view control) const override {
+    const ControlDef *def = ControlNamed_(control);
+    if (def == nullptr) { return std::string(control); }
+    if (!def->caption.empty()) { return std::string(def->caption); }
+    if constexpr (kHasRecord) {
+      if (def->field.Value() != 0) {
+        return std::string(::agiru::FieldCaption(RecordTraits_().kTable, def->field));
+      }
+    }
+    return std::string(def->name);
+  }
 
 private:
-  [[noreturn]] static void Unopened() {
+  [[noreturn]] static void Unopened_() {
     throw Error("a TestPage needs a running page (board:0030)");
   }
+
+  static bool SameWord_(std::string_view text, std::string_view word) {
+    return text.size() == word.size() &&
+           std::ranges::equal(text, word, [](unsigned char a, unsigned char b) {
+             return std::tolower(a) == std::tolower(b);
+           });
+  }
+
+  P &Page_() {
+    if (page_ == nullptr) { Unopened_(); }
+    return *page_;
+  }
+
+  const P &Page_() const {
+    if (page_ == nullptr) { Unopened_(); }
+    return *page_;
+  }
+
+  auto &Record_()
+    requires kHasRecord
+  {
+    return Page_().Rec;
+  }
+
+  const auto &Record_() const
+    requires kHasRecord
+  {
+    return Page_().Rec;
+  }
+
+  static auto RecordTraits_()
+    requires kHasRecord
+  {
+    return TableTraits<std::remove_cvref_t<decltype(std::declval<P &>().Rec)>>{};
+  }
+
+  void Open_(bool editable, bool isNew) {
+    if (page_ != nullptr) {
+      throw Error("The TestPage is already open and cannot be opened again.");
+    }
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      page_ = new P();
+      owned_ = true;
+      Bind_();
+      detail::OpenPage(*page_, editable, isNew);
+    } else {
+      static_cast<void>(editable);
+      static_cast<void>(isNew);
+      Unopened_();
+    }
+  }
+
+  void Take_(TestPage &o) {
+    page_ = o.page_;
+    owned_ = o.owned_;
+    o.page_ = nullptr;
+    o.owned_ = false;
+    if (page_ != nullptr) { Bind_(); }
+  }
+
+  void Share_(const TestPage &o) {
+    page_ = o.page_;
+    owned_ = false;
+    if (page_ != nullptr) { Bind_(); }
+  }
+
+  void Release_() {
+    if (page_ != nullptr && owned_) { delete page_; }
+    page_ = nullptr;
+    owned_ = false;
+  }
+
+  void Bind_() {
+    if constexpr (requires { this->BindControls(*static_cast<PageCore *>(this)); }) {
+      this->BindControls(*static_cast<PageCore *>(this));
+    }
+    Filter.Bind(*this);
+  }
+
+  static void AdoptOwned_(void *harness, void *page) {
+    auto &self = *static_cast<TestPage *>(harness);
+    self.Release_();
+    self.page_ = static_cast<P *>(page);
+    self.owned_ = true;
+    self.Bind_();
+  }
+
+  TestAction Bound_(std::string_view name) {
+    TestAction action{name};
+    action.Bind(*this);
+    return action;
+  }
+
+  template <typename Step> Boolean Landed_(Step step) {
+    if constexpr (kHasRecord) {
+      const bool found = step(Record_());
+      if (found) { detail::AfterGetRecord(Page_()); }
+      return found;
+    } else {
+      static_cast<void>(step);
+      Unopened_();
+    }
+  }
+
+  template <typename V> bool Matches_(const TestField &field, const V &value) {
+    return ControlText(field.Name()) == AsText(value);
+  }
+
+  bool CloseAction_(std::string_view control) {
+    static constexpr std::array<std::pair<std::string_view, ::agiru::Action>, 5> kSystem{
+        {{"OK", ::agiru::Action::OK},
+         {"Cancel", ::agiru::Action::Cancel},
+         {"Yes", ::agiru::Action::Yes},
+         {"No", ::agiru::Action::No},
+         {"LookupOK", ::agiru::Action::LookupOK}}};
+    for (const auto &[name, action] : kSystem) {
+      if (!SameWord_(control, name)) { continue; }
+      if (ControlNamed_(control) != nullptr) { return false; }
+      if constexpr (requires(P &page) { page.CloseWith(action); }) { Page_().CloseWith(action); }
+      if (owned_) { Close(); }
+      return true;
+    }
+    return false;
+  }
+
+  static void (P::*Trigger_(const ControlTrigger<P> &trigger, ControlTriggerKind kind))() {
+    switch (kind) {
+      case ControlTriggerKind::Validate: return trigger.validate;
+      case ControlTriggerKind::Action: return trigger.action;
+      case ControlTriggerKind::DrillDown: return trigger.drillDown;
+      case ControlTriggerKind::AssistEdit: return trigger.assistEdit;
+      case ControlTriggerKind::Lookup: return nullptr;
+    }
+    return nullptr;
+  }
+
+  void RunTrigger_(std::string_view control, ControlTriggerKind kind, bool optional) {
+    if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
+      for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
+        if (!SameWord_(trigger.control, control)) { continue; }
+        void (P::*run)() = Trigger_(trigger, kind);
+        if (run != nullptr) {
+          (Page_().*run)();
+          return;
+        }
+        break;
+      }
+    }
+    if (!optional) {
+      throw Error("the control '" + std::string(control) + "' declares no such trigger");
+    }
+  }
+
+  static const ControlDef *Within_(std::span<const ControlDef> controls, std::string_view name) {
+    for (const ControlDef &control : controls) {
+      if (SameWord_(control.name, name)) { return &control; }
+      if (const ControlDef *below = Within_(control.children, name); below != nullptr) {
+        return below;
+      }
+    }
+    return nullptr;
+  }
+
+  static const ControlDef *WithField_(std::span<const ControlDef> controls, ::agiru::FieldNo no) {
+    for (const ControlDef &control : controls) {
+      if (control.kind == ControlKind::Field && control.field == no) { return &control; }
+      if (const ControlDef *below = WithField_(control.children, no); below != nullptr) {
+        return below;
+      }
+    }
+    return nullptr;
+  }
+
+  [[nodiscard]] const ControlDef *ControlNamed_(std::string_view name) const {
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      if (const ControlDef *found = Within_(PageTraits<P>::kPage.layout, name); found != nullptr) {
+        return found;
+      }
+      return Within_(PageTraits<P>::kPage.actions, name);
+    } else {
+      static_cast<void>(name);
+      return nullptr;
+    }
+  }
+
+  [[nodiscard]] const ControlDef *ControlByField_(::agiru::FieldNo no) const {
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      return WithField_(PageTraits<P>::kPage.layout, no);
+    } else {
+      static_cast<void>(no);
+      return nullptr;
+    }
+  }
+
+  P *page_ = nullptr;
+  bool owned_ = false;
 };
 
 }

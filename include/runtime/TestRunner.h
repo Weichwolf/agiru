@@ -14,6 +14,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 /// \file
@@ -70,9 +71,28 @@ template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest() {
 /// \note THE THUNK IS THE ONLY PLACE THE SIGNATURE IS KNOWN. `TestHandler::invoke` is a `void *`
 ///       because AL's thirteen handler kinds have thirteen signatures; the caller casts it back to
 ///       the one its kind states, and this template is what it points at (board:0054).
+namespace detail {
+
+/// \brief The first parameter of a handler method, for a `[PageHandler]`'s `var TestPage`.
+/// \tparam C The codeunit.
+/// \tparam A The parameter's type.
+/// \return Never called; it exists for `decltype`.
+template <typename C, typename A> A &FirstParameterOf(void (C::*)(A &));
+
+}
+
 template <typename Codeunit, auto Method> void InvokeHandler(std::string_view text, void *reply) {
   Codeunit codeunit{};
-  if constexpr (requires { (codeunit.*Method)(); }) {
+  if constexpr (requires {
+                  typename std::remove_cvref_t<decltype(detail::FirstParameterOf(
+                      Method))>::IsTestPage;
+                }) {
+    static_cast<void>(text);
+    using Harness = std::remove_cvref_t<decltype(detail::FirstParameterOf(Method))>;
+    Harness harness;
+    harness.Adopt(reply);
+    (codeunit.*Method)(harness);
+  } else if constexpr (requires { (codeunit.*Method)(); }) {
     static_cast<void>(text);
     static_cast<void>(reply);
     (codeunit.*Method)();

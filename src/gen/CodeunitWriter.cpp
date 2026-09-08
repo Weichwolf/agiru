@@ -489,6 +489,11 @@ std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
 std::string
 TypeOf(const al::VarDecl &declared, const Objects &objects, const std::string &owner = {});
 
+bool LendsAnOption(const al::VarDecl &parameter) {
+  return parameter.byReference && SameName(TypeName(parameter.type), "Option") &&
+         !parameter.members.empty();
+}
+
 bool LendsInto(const al::VarDecl &parameter) {
   return parameter.byReference && parameter.subtype.empty() && parameter.dimensions.empty() &&
          !SameName(TypeName(parameter.type), "Variant");
@@ -1130,8 +1135,13 @@ public:
       std::vector<std::string> lent;
       lent.reserve(procedure.parameters.size());
       for (const al::VarDecl &parameter : procedure.parameters) {
-        lent.push_back(LendsInto(parameter) ? Unhidden(TypeOf(parameter, objects_))
-                                            : std::string{});
+        lent.push_back(
+            LendsInto(parameter) || LendsAnOption(parameter)
+                ? Unhidden(
+                      TypeOf(parameter,
+                             objects_,
+                             OptionNameOf(unit_.name, procedure.name, parameter, unit_.procedures)))
+                : std::string{});
       }
       return lent;
     }
@@ -1354,6 +1364,9 @@ public:
     }
     if (!procedure_.returnName.empty() && SameName(procedure_.returnName, name)) {
       return Identifier(procedure_.returnName);
+    }
+    for (const al::LabelDecl &label : procedure_.labels) {
+      if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::VarDecl &declared : unit_.variables) {
       if (SameName(declared.name, name)) { return Identifier(declared.name); }
@@ -2130,6 +2143,26 @@ void NoteObjectNames(const Objects &objects) {
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type) {
   return type == "TestRequestPage" ? objects.reports : objects.pages;
+}
+
+std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &procedures,
+                                          std::string_view name,
+                                          const Objects &objects,
+                                          const std::string &owner) {
+  for (const al::ProcedureDecl &procedure : procedures) {
+    if (!SameName(procedure.name, name)) { continue; }
+    std::vector<std::string> lent;
+    lent.reserve(procedure.parameters.size());
+    for (const al::VarDecl &parameter : procedure.parameters) {
+      lent.push_back(
+          LendsInto(parameter) || LendsAnOption(parameter)
+              ? Unhidden(TypeOf(
+                    parameter, objects, OptionNameOf(owner, procedure.name, parameter, procedures)))
+              : std::string{});
+    }
+    return lent;
+  }
+  return {};
 }
 
 }

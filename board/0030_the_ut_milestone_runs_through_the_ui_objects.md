@@ -245,3 +245,27 @@ specification for the fragments rather than a nice-to-have -- and every one of t
 a source in the `constexpr` metadata already: a column's `TITLE` is its `Caption`, a FastTab's
 heading is its `Caption`, an image's `ALT` is its `ToolTip`. Emitting them from the start costs
 nothing; retrofitting them means walking the renderer again.
+
+## Standing (2026-09-08): the harness drives a real page, headless
+
+`TestPage<P>` holds the generated page with its typed `Rec` and runs the platform's sequence:
+`OnInit`, the record positioned (or `Init` + `OnNewRecord`), `OnOpenPage`, `OnAfterGetRecord`,
+`OnAfterGetCurrRecord`; `Close` runs `OnQueryClosePage` and `OnClosePage`. A `TestField.SetValue`
+is `Record.ValidateText(FieldNo, Text)` -- evaluate into the type, the record's `OnValidate`, then
+the control's (`PageTraits<P>::kControlTriggers`, a `constexpr` table the generator emits beside
+the page). `Value` is `Format(Field)`. A control reaches its page through `PageCore`, the seam
+the generated `Controls::BindControls` binds every control to. `Page.Run`/`RunModal` on a
+generated page run through a `Trap()` or a `[PageHandler]`/`[ModalPageHandler]`, whose thunk
+binds a `TestPage` parameter to the page just opened; a page nobody waits for is `Unhandled UI`.
+
+**WHAT IT COST TO LINK.** A harness that calls the page's triggers needs the page's SOURCE in the
+slice, and 14 of the 172 pages the UT suite instantiates were not there; their compile errors were
+eight generic gaps, six of them closed in the same round: identifier CASING resolved to the
+declared spelling (labels, and a record's procedures through the page scope, which had no
+`ProcedureOf`/`HasField`/`TableOf` at all), a local Interface variable in a page trigger read as a
+handle, a bare `Option` lent to a `var Option<Members>` parameter, a call through a `usercontrol`
+or a part whose page is out of scope refusing loudly (`RefusedControl`) instead of failing to
+compile, `Notification.SetData` taking what AL converts to Text, and `EnqueueBackgroundTask`'s
+optional parameters. Still open here: `OnLookup` (its `var Text` shape), page parts as nested
+harnesses, `RunObject` actions, `SourceTableView`, and `Visible`/`Editable` EXPRESSIONS.
+

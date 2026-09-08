@@ -2,6 +2,7 @@
 
 #include "runtime/Error.h"
 #include "runtime/Record.h"
+#include "runtime/test/PageCore.h"
 #include "type/Boolean.h"
 
 #include <string_view>
@@ -35,6 +36,10 @@ public:
   /// \brief The control's AL name.
   /// \return The name.
   [[nodiscard]] constexpr std::string_view Name() const { return name_; }
+
+  /// \brief Binds the control to the page it sits on; `TestPage` does this when the page opens.
+  /// \param core The page.
+  void Bind(PageCore &core) { core_ = &core; }
 
   /// \brief AL `TestField.SetValue(Value)`.
   ///
@@ -113,7 +118,7 @@ public:
   /// type.
   /// \return The AL `Date`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Date AsDate() const { Unbound(); }
+  [[nodiscard]] ::agiru::Date AsDate() const;
 
   /// \brief AL `TestField.AsDateTime()`. Converts the value in a field on a test page to a DateTime
   /// data type.
@@ -125,12 +130,12 @@ public:
   /// type.
   /// \return The AL `Decimal`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Decimal AsDecimal() const { Unbound(); }
+  [[nodiscard]] ::agiru::Decimal AsDecimal() const;
 
   /// \brief AL `TestField.AssistEdit()`. Provides assist-edit functionality to a field on a test
   /// page.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void AssistEdit() const { Unbound(); }
+  void AssistEdit() const;
 
   /// \brief AL `TestField.AsTime()`. Converts the value in a field on a test page to a Time data
   /// type.
@@ -141,11 +146,11 @@ public:
   /// \brief AL `TestField.Caption()`. Gets the current caption of the field as a String.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] std::string Caption() const { Unbound(); }
+  [[nodiscard]] std::string Caption() const;
 
   /// \brief AL `TestField.Drilldown()`. Applies drill-down capability for a field on a test page.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Drilldown() const { Unbound(); }
+  void Drilldown() const;
 
   /// \brief AL `TestField.GetOption(Integer)`. Gets the options for a field on a test page.
   /// \param Index The AL `Integer`.
@@ -198,6 +203,7 @@ private:
   [[noreturn]] void Unbound() const;
 
   std::string_view name_;
+  PageCore *core_ = nullptr;
 };
 
 }

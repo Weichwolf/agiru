@@ -84,6 +84,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual bool AbsentControl(std::string_view name) const {
+    static_cast<void>(name);
+    return false;
+  }
+
   [[nodiscard]] virtual std::string TableOf(std::string_view variable) const {
     static_cast<void>(variable);
     return {};

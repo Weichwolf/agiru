@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "runtime/test/PageCore.h"
 #include "type/Boolean.h"
 #include "type/Text.h"
 
@@ -23,10 +24,18 @@ public:
   /// \param filter The filter expression.
   /// \throws Error until a page runs (board:0030).
   template <typename Field> void SetFilter(const Field &field, std::string_view filter) {
-    static_cast<void>(field);
-    static_cast<void>(filter);
-    Unfiltered();
+    if (core_ == nullptr) { Unfiltered(); }
+    if constexpr (requires { field.Name(); }) {
+      core_->SetControlFilter(field.Name(), filter);
+    } else {
+      static_cast<void>(filter);
+      throw Error("TestFilter.SetFilter names a page control, not a value (board:0030)");
+    }
   }
+
+  /// \brief Binds the filter pane to its page; `TestPage` does this when the page opens.
+  /// \param core The page.
+  void Bind(PageCore &core) { core_ = &core; }
 
   /// \brief AL `TestFilter.GetFilter(Field)`.
   /// \tparam Field The control the filter names.
@@ -68,6 +77,8 @@ public:
   Boolean Ascending() const { Unfiltered(); }
 
 private:
+  PageCore *core_ = nullptr;
+
   /// \note NOT STATIC, because it will name the page. A filter belongs to one, and the message a
   ///       test sees is worth more than the byte the pointer costs.
   [[noreturn]] void Unfiltered() const {

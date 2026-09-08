@@ -9,6 +9,7 @@
 #include "PageWriter.h"
 #include "Scope.h"
 #include "TableWriter.h"
+#include "Token.h"
 
 #include <algorithm>
 #include <array>
@@ -355,6 +356,21 @@ private:
     return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
   }
 
+  static constexpr std::array<std::pair<std::string_view, std::string_view>, 3> kMethodOptions{
+      {{"securityfiltering", "SecurityFilter"},
+       {"readisolation", "IsolationLevel"},
+       {"currenttransactiontype", "TransactionType"}}};
+
+  static std::string MethodOption(std::string_view method, std::string_view member) {
+    const std::string lowered = LowerKey(std::string(method));
+    for (const auto &[name, option] : kMethodOptions) {
+      if (lowered == name) {
+        return "::agiru::" + std::string(option) + "::" + AsTheDoorSpellsIt(EnumeratorName(member));
+      }
+    }
+    return {};
+  }
+
   std::string Scope(const al::Expr &expression) {
     const al::Expr &base = expression.children.front();
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
@@ -363,6 +379,10 @@ private:
       const std::string enumeration = scope_.FieldEnumeration(
           OfVariable{.variable = Indexed(base.children[0]).text, .field = base.children[1].text});
       if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
+      if (const std::string option = MethodOption(base.children[1].text, expression.text);
+          !option.empty()) {
+        return option;
+      }
       if (scope_.IsRecord(Indexed(base.children[0]).text)) {
         return "RefusedOption(\"" + Indexed(base.children[0]).text + "." + base.children[1].text +
                "::" + expression.text + "\")";
@@ -380,15 +400,8 @@ private:
         return "::agiru::" + TypeName(base.text) +
                "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
       }
-      const bool viaMember = base.kind == al::ExprKind::Binary && base.text == "." &&
-                             base.children.size() == 2 &&
-                             base.children[1].kind == al::ExprKind::Name;
-      if (scope_.Resolve(base.text).empty() || viaMember) {
-        static constexpr std::array<std::pair<std::string_view, std::string_view>, 3>
-            kMethodOptions{{{"securityfiltering", "SecurityFilter"},
-                            {"readisolation", "IsolationLevel"},
-                            {"currenttransactiontype", "TransactionType"}}};
-        const std::string lowered = LowerKey(viaMember ? base.children[1].text : base.text);
+      if (scope_.Resolve(base.text).empty()) {
+        const std::string lowered = LowerKey(base.text);
         for (const auto &[method, option] : kMethodOptions) {
           if (lowered == method) {
             return "::agiru::" + std::string(option) +
@@ -527,7 +540,7 @@ private:
   }
 
   std::string Returned(const al::Expr &expression) {
-    const std::string written = Expression(expression, 0);
+    std::string written = Expression(expression, 0);
     if (expression.kind != al::ExprKind::StringLiteral) { return written; }
     const std::string returned = scope_.ReturnedType();
     if (returned.empty() || !SameName(returned, "Guid")) { return written; }
@@ -580,8 +593,39 @@ private:
     return "::agiru::Tried([&] { return " + inner + "; })";
   }
 
+  std::string RefusedControlCall(const al::Expr &callee) const {
+    std::vector<std::string> names;
+    const al::Expr *walk = &callee;
+    while (true) {
+      if (walk->kind == al::ExprKind::Call && !walk->children.empty()) {
+        walk = &walk->children.front();
+      } else if (walk->kind == al::ExprKind::Binary && walk->text == "." &&
+                 walk->children.size() == 2 && walk->children[1].kind == al::ExprKind::Name) {
+        names.insert(names.begin(), walk->children[1].text);
+        walk = &walk->children.front();
+      } else if (walk->kind == al::ExprKind::Name) {
+        names.insert(names.begin(), walk->text);
+        break;
+      } else {
+        return {};
+      }
+    }
+    std::size_t first = 0;
+    if (!names.empty() && SameName(names.front(), "CurrPage")) { first = 1; }
+    if (names.size() < first + 2 || !scope_.AbsentControl(names[first])) { return {}; }
+    std::string whole;
+    for (std::size_t i = first; i < names.size(); ++i) {
+      if (i != first) { whole += "."; }
+      whole += names[i];
+    }
+    return "::agiru::RefusedControl(\"" + whole + "\")";
+  }
+
   std::string Call(const al::Expr &expression) {
     const al::Expr &callee = expression.children.front();
+    if (const std::string refused = RefusedControlCall(callee); !refused.empty()) {
+      return refused;
+    }
     if (const std::string tried = Tried(expression); !tried.empty()) { return tried; }
     if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&
         scope_.Resolve(callee.text).empty()) {
@@ -644,6 +688,12 @@ private:
       }
       if (i - 1 < lent.size() && !lent[i - 1].empty() && argument.kind == al::ExprKind::Name &&
           SameName(scope_.DeclaredType(argument.text), "Variant")) {
+        out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
+        continue;
+      }
+      if (i - 1 < lent.size() && lent[i - 1].find("Option<") != std::string::npos &&
+          !lent[i - 1].ends_with("Option<>") && argument.kind == al::ExprKind::Name &&
+          SameName(scope_.DeclaredType(argument.text), "Option")) {
         out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
         continue;
       }
@@ -1378,7 +1428,11 @@ public:
     if (const al::VarDecl *local = Local(name); local != nullptr) {
       return Identifier(local->name);
     }
-    if (LocalLabel(name)) { return Identifier(std::string(name)); }
+    if (running_ != nullptr) {
+      for (const al::LabelDecl &label : running_->labels) {
+        if (SameName(label.name, name)) { return Identifier(label.name); }
+      }
+    }
     for (const al::VarDecl &declared : table_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
         return "Var_Block->" + VariableIdentifier(table_, declared.name);
@@ -1390,7 +1444,7 @@ public:
       return ShadowedByALocal(spelled) ? "this->" + spelled : spelled;
     }
     for (const al::LabelDecl &label : table_.labels) {
-      if (SameName(label.name, name)) { return label.name; }
+      if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &procedure : table_.procedures) {
       if (SameName(procedure.name, name)) { return ProcedureIdentifier(table_, procedure.name); }
@@ -1603,7 +1657,7 @@ public:
     if (running_ != nullptr) {
       for (const auto *where : {&running_->variables, &running_->parameters}) {
         for (const al::VarDecl &declared : *where) {
-          if (SameName(declared.name, name)) { return false; }
+          if (SameName(declared.name, name)) { return TypeName(declared.type) == "Interface"; }
         }
       }
     }
@@ -1620,26 +1674,40 @@ public:
         page_.labels, [name](const al::LabelDecl &label) { return SameName(label.name, name); });
   }
 
-  [[nodiscard]] std::string Resolve(std::string_view name) const override {
-    if (running_ != nullptr) {
-      for (const auto *where : {&running_->variables, &running_->parameters}) {
-        for (const al::VarDecl &declared : *where) {
-          if (SameName(declared.name, name)) { return Identifier(declared.name); }
-        }
-      }
-      if (!running_->returnName.empty() && SameName(running_->returnName, name)) {
-        return Identifier(running_->returnName);
+  [[nodiscard]] std::string LocalSpelling(std::string_view name) const {
+    if (running_ == nullptr) { return {}; }
+    for (const auto *where : {&running_->variables, &running_->parameters}) {
+      for (const al::VarDecl &declared : *where) {
+        if (SameName(declared.name, name)) { return Identifier(declared.name); }
       }
     }
+    if (!running_->returnName.empty() && SameName(running_->returnName, name)) {
+      return Identifier(running_->returnName);
+    }
+    for (const al::LabelDecl &label : running_->labels) {
+      if (SameName(label.name, name)) { return Identifier(label.name); }
+    }
+    return {};
+  }
+
+  [[nodiscard]] std::string GlobalSpelling(std::string_view name) const {
     for (const al::VarDecl &declared : page_.variables) {
-      if (LowerKey(declared.name) == LowerKey(std::string(name))) { return Identifier(name); }
+      if (LowerKey(declared.name) == LowerKey(std::string(name))) {
+        return Identifier(declared.name);
+      }
     }
     for (const al::LabelDecl &label : page_.labels) {
-      if (SameName(label.name, name)) { return label.name; }
+      if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &procedure : page_.procedures) {
       if (SameName(procedure.name, name)) { return Identifier(procedure.name); }
     }
+    return {};
+  }
+
+  [[nodiscard]] std::string Resolve(std::string_view name) const override {
+    if (const std::string local = LocalSpelling(name); !local.empty()) { return local; }
+    if (const std::string global = GlobalSpelling(name); !global.empty()) { return global; }
     if (source_ != nullptr) {
       const al::FieldDecl *field = FieldNamed(*source_, name);
       if (field != nullptr) { return "Rec." + FieldIdentifier(*source_, field->name); }
@@ -1696,6 +1764,98 @@ public:
     return !DeclaresAnObject(*declared) && DoorCalls(member.field);
   }
 
+  [[nodiscard]] std::string ProcedureOf(const OfVariable &member) const override {
+    if (IsRecord(member.variable)) {
+      for (const al::ProcedureDecl &procedure : source_->procedures) {
+        if (SameName(procedure.name, member.field)) {
+          return ProcedureIdentifier(*source_, procedure.name);
+        }
+      }
+      return {};
+    }
+    const al::VarDecl *declared = DeclarationOf(member.variable);
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
+    const auto table = objects_.tables.find(LowerKey(declared->subtype));
+    if (table == objects_.tables.end()) { return {}; }
+    const auto found = table->second.procedures.find(LowerKey(std::string(member.field)));
+    return found == table->second.procedures.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    const std::string spelled = LowerKey(Identifier(member.field));
+    if (IsRecord(member.variable)) {
+      if (FieldNamed(*source_, member.field) != nullptr) { return true; }
+      return std::ranges::any_of(source_->fields, [&](const al::FieldDecl &field) {
+        return LowerKey(Identifier(field.name)) == spelled;
+      });
+    }
+    const al::VarDecl *declared = DeclarationOf(member.variable);
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return false; }
+    const auto table = objects_.tables.find(LowerKey(declared->subtype));
+    if (table == objects_.tables.end()) { return false; }
+    if (table->second.fields.contains(LowerKey(std::string(member.field)))) { return true; }
+    return std::ranges::any_of(table->second.fields, [&](const auto &field) {
+      return LowerKey(Identifier(field.second)) == spelled;
+    });
+  }
+
+  [[nodiscard]] std::string TableOf(std::string_view variable) const override {
+    std::string subtype;
+    if (IsRecord(variable)) {
+      subtype = source_->name;
+    } else if (const al::VarDecl *declared = DeclarationOf(variable);
+               declared != nullptr && TypeName(declared->type) == "Record") {
+      subtype = declared->subtype;
+    }
+    if (subtype.empty()) { return {}; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    return table == objects_.tables.end() ? std::string{} : table->second.identifier;
+  }
+
+  [[nodiscard]] std::vector<std::string> LentParameters(std::string_view name) const override {
+    return LentParametersOf(page_.procedures, name, objects_, page_.name);
+  }
+
+  [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
+    const al::VarDecl *where = DeclarationOf(variable);
+    return where == nullptr ? std::string{} : TypeName(where->type);
+  }
+
+  [[nodiscard]] std::vector<std::string> ParameterTypes(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : page_.procedures) {
+      if (!SameName(procedure.name, name)) { continue; }
+      std::vector<std::string> types;
+      types.reserve(procedure.parameters.size());
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        types.push_back(TypeName(parameter.type));
+      }
+      return types;
+    }
+    return {};
+  }
+
+  [[nodiscard]] bool AbsentControl(std::string_view name) const override {
+    return AbsentWithin(page_.layout, name);
+  }
+
+  [[nodiscard]] bool AbsentWithin(const std::vector<al::PageControl> &controls,
+                                  std::string_view name) const {
+    for (const al::PageControl &control : controls) {
+      if (SameName(control.name, name)) {
+        const std::string kind = LowerKey(control.kind);
+        if (kind == "usercontrol") { return true; }
+        if (kind == "part") {
+          std::string source;
+          for (const al::Token &token : control.source) { source += token.text; }
+          return !objects_.pages.contains(LowerKey(source));
+        }
+        return false;
+      }
+      if (AbsentWithin(control.children, name)) { return true; }
+    }
+    return false;
+  }
+
   [[nodiscard]] const al::VarDecl *DeclarationOf(std::string_view variable) const {
     if (running_ != nullptr) {
       for (const auto *where : {&running_->variables, &running_->parameters}) {
@@ -1711,6 +1871,7 @@ public:
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (const std::string procedure = ProcedureOf(member); !procedure.empty()) { return procedure; }
     if (MemberIsCall(member) && !IsRecord(member.variable) &&
         !SameName("CurrPage", member.variable) && FieldsOfRecord(member.variable) == nullptr) {
       return AsTheDoorSpellsIt(Identifier(member.field));
@@ -1771,14 +1932,12 @@ public:
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (IsRecord(field.variable)) { return Enumeration(field.field); }
-    for (const al::VarDecl &where : page_.variables) {
-      if (!SameName(where.name, field.variable) || TypeName(where.type) != "Record") { continue; }
-      const auto table = objects_.fieldEnums.find(LowerKey(where.subtype));
-      if (table == objects_.fieldEnums.end()) { break; }
-      const auto found = table->second.find(LowerKey(std::string(field.field)));
-      if (found != table->second.end()) { return found->second; }
-    }
-    return {};
+    const al::VarDecl *where = DeclarationOf(field.variable);
+    if (where == nullptr || TypeName(where->type) != "Record") { return {}; }
+    const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
+    if (table == objects_.fieldEnums.end()) { return {}; }
+    const auto found = table->second.find(LowerKey(std::string(field.field)));
+    return found == table->second.end() ? std::string{} : found->second;
   }
 
   [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
