@@ -218,7 +218,22 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       *reinterpret_cast<DateTime *>(At(record, def)) = DateTimeFromStorageText(text);
       return;
     case FieldType::Guid: *reinterpret_cast<Guid *>(At(record, def)) = Guid::FromText(text); return;
-    default: throw Error("no reader for this field type yet");
+    case FieldType::Duration:
+      *reinterpret_cast<Duration *>(At(record, def)) = Duration{std::stoll(std::string(text))};
+      return;
+    case FieldType::DateFormula:
+      *reinterpret_cast<DateFormula *>(At(record, def)) = DateFormula::FromText(text);
+      return;
+    case FieldType::Media:
+      *reinterpret_cast<Media *>(At(record, def)) = Media{Guid::FromText(text)};
+      return;
+    case FieldType::MediaSet:
+      *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{Guid::FromText(text)};
+      return;
+    case FieldType::RecordId:
+    case FieldType::TableFilter:
+    case FieldType::Blob:
+    default: throw Error("no reader for the field type of " + std::string(def.name) + " yet");
   }
 }
 

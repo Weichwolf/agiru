@@ -88,3 +88,39 @@ the compile-fix loop's own backlog and not the runtime's.
 **AND THE SETUP DATA IS ~600 OF THE 1 507 FAILURES HERE TOO** -- Purchases & Payables 140, Sales &
 Receivables 138, General Ledger 123, Inventory 89, VAT Report 70, VAT Reg. No. Srv Config 40. The
 same lever, one third the size of the whole population's, and still the second largest after `xRec`.
+
+## STANDING: ROUTE 1 IS DONE, and the setup family is off the list (2026-09-08)
+
+`make demo` (`scripts/seed_demo.py`) copies the CRONUS rows into the runner's database:
+**516 tables carrying 42 697 rows**, 744 tables that are empty in the demo data itself, 18 that
+refuse. The five "Setup does not exist" messages are GONE from the UT ranking.
+
+**IT IS THE RUNNER'S DATABASE AND NOT THE MASTER, because the master holds no schema.** The schema
+is made by the runner's own `ProvisionInstalled` at start-up, so `agiru_master` is empty and there
+was nothing to seed there. The first attempt aborted on exactly that and said so.
+
+**SQL SERVER'S BC SCHEMA SPELLS A DOT AS AN UNDERSCORE**, and the system fields with a `$`:
+`Assembly Order Nos.` is `Assembly Order Nos_` there and `SystemId` is `$systemId`. The transfer
+carried the names across ONE TO ONE, which is what makes `cronus` a reference rather than a product
+of this tree -- so the fold happens on the way IN, on the agiru side, and a fold that is not
+one-to-one is refused rather than guessed at. Before the fold: 1 019 tables matched and 11 199
+columns were dropped. After: 1 278 tables and 2 035.
+
+**AND EVERY COLUMN NOW CARRIES AL'S OWN ZERO AS ITS SQL DEFAULT**, which is a generic fix and not a
+seeding trick: an AL field is never null, so a column the 30.0 schema has and 28.4 does not must
+land on AL's zero rather than on NULL. Without it 534 of the 1 278 tables refused with
+`violates not-null constraint`; with it, 18 do -- and those 18 are columns 28.4 itself holds NULL
+in, which is the next slice of this item.
+
+## What it was worth
+
+| | |
+|---|---|
+| UT before the seed | 201 of 1 708 |
+| after the seed | 204 |
+| after the READER gained the four types the writer already stores | **233** |
+
+The seed's own gain looks small and is not: it moved 692 failures from "the Setup does not exist"
+to `no reader for this field type yet` -- the row was THERE and could not be read back. `Duration`,
+`DateFormula`, `Media` and `MediaSet` had a writer and no reader, which is the same shape as
+`ClearField`'s missing `RecordId` one round earlier: a switch with a hole in it.

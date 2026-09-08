@@ -92,6 +92,26 @@ std::string ColumnType(const FieldDef &def) {
   throw Error("ColumnType: no SQL type for this field type yet");
 }
 
+std::string ColumnZero(const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Boolean: return "false";
+    case FieldType::Option:
+    case FieldType::Enum:
+    case FieldType::Integer:
+    case FieldType::BigInteger:
+    case FieldType::Decimal:
+    case FieldType::Duration: return "0";
+    case FieldType::Date:
+    case FieldType::DateTime: return "'1753-01-01 00:00:00'";
+    case FieldType::Time: return "'00:00:00'";
+    case FieldType::Guid:
+    case FieldType::Media:
+    case FieldType::MediaSet: return "'00000000-0000-0000-0000-000000000000'";
+    case FieldType::Blob: return "''::bytea";
+    default: return "''";
+  }
+}
+
 void CreateTable(const Connection &connection, const TableDef &table) {
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
   bool written = false;
@@ -99,7 +119,7 @@ void CreateTable(const Connection &connection, const TableDef &table) {
     if (!Stored(field)) { continue; }
     if (written) { sql += ", "; }
     written = true;
-    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL";
+    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL DEFAULT " + ColumnZero(field);
   }
   if (!table.keys.empty()) {
     sql += ", PRIMARY KEY (";
