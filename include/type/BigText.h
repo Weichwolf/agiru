@@ -83,6 +83,16 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer TextPos(std::string_view String);
 
+  /// \brief What a `BigText` reads as when it reaches an `Any`.
+  /// \return Never.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ///
+  /// \note IT EXISTS SO THAT `Variant := BigText` COMPILES AND REFUSES AT RUN TIME, which is what
+  ///       board:0035 asks of every declared-and-unbuilt member. AL hands a `BigText` to a
+  ///       `var Any` -- `WorkflowRecordManagement.BackupRecord` is the shape -- and without it the
+  ///       whole translation unit stops rather than the one call.
+  [[nodiscard]] std::string ToText() const;
+
   /// \brief AL `BigText.Write(OutStream)`. Streams a BigText object to a BLOB field in a table.
   /// \param OutStream The AL `OutStream`.
   /// \return The AL `Boolean`.

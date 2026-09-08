@@ -5711,6 +5711,7 @@ tests/assembly/test/codeunit/SCMAssemblyOrder.cpp
 tests/assembly/test/codeunit/SCMAssemblyPosting.cpp
 tests/assembly/test/codeunit/SCMAssemblyReservationI.cpp
 tests/assembly/test/codeunit/SCMAssemblyReservationII.cpp
+tests/assembly/test/codeunit/SCMAssemblyUT.cpp
 tests/assembly/test/codeunit/SCMAssemblyWhseHandling.cpp
 tests/assembly/test/codeunit/SCMCalculateAssemblyCost.cpp
 tests/assembly/test/codeunit/SCMKittingAbleToMake.cpp
@@ -5728,6 +5729,12 @@ tests/assembly/test/codeunit/SCMKittingPlanning.cpp
 tests/assembly/test/codeunit/SCMKittingReservations.cpp
 tests/assembly/test/codeunit/SCMKittingUndo.cpp
 tests/assembly/test/codeunit/SCMWhseAsmToStock.cpp
+tests/core/codeunit/ERMGeneralJournalUT.cpp
+tests/core/codeunit/PhysInvtCODUT.cpp
+tests/core/codeunit/WorkflowEngineUT.cpp
+tests/core/codeunit/XMLDOMManagementUT.cpp
+tests/core/codeunit/PriceSourceListUT.cpp
+tests/core/codeunit/SuggestPriceLinesUT.cpp
 tests/core/codeunit/_60SP1VAT1To1.cpp
 tests/core/codeunit/AccountingPeriodSearchTest.cpp
 tests/core/codeunit/AccScheduleCreationTest.cpp

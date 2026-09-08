@@ -649,6 +649,8 @@ std::string WithoutLiterals(const std::string &body);
 
 bool Mentions(const std::string &body, const std::string &name);
 
+bool OnlyAssigned(const std::string &body, const std::string &name);
+
 std::string Parameters(const al::ProcedureDecl &procedure,
                        const Objects &objects,
                        bool named,
@@ -664,7 +666,9 @@ std::string Parameters(const al::ProcedureDecl &procedure,
   for (std::size_t i = 0; i < procedure.parameters.size(); ++i) {
     if (i != 0) { out += ", "; }
     if (named && body.has_value() &&
-        !Mentions(WithoutLiterals(*body), Identifier(procedure.parameters[i].name))) {
+        (!Mentions(WithoutLiterals(*body), Identifier(procedure.parameters[i].name)) ||
+         (!procedure.parameters[i].byReference &&
+          OnlyAssigned(WithoutLiterals(*body), Identifier(procedure.parameters[i].name))))) {
       out += "[[maybe_unused]] ";
     }
     out += Signature(procedure.parameters[i],
@@ -1023,6 +1027,8 @@ public:
                 const Objects &objects)
       : unit_(unit), procedure_(procedure), objects_(objects) {}
 
+  [[nodiscard]] std::string ReturnedType() const override { return procedure_.returnType; }
+
   [[nodiscard]] std::string ExitValue() const override {
     if (!procedure_.returnName.empty()) { return " " + Identifier(procedure_.returnName); }
     if (::agiru::gen::IsTryFunction(procedure_)) { return " true"; }
@@ -1092,6 +1098,19 @@ public:
   [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
     const al::VarDecl *where = Declaration(variable);
     return where == nullptr ? std::string{} : TypeName(where->type);
+  }
+
+  [[nodiscard]] std::vector<std::string> ParameterTypes(std::string_view name) const override {
+    for (const al::ProcedureDecl &procedure : unit_.procedures) {
+      if (!SameName(procedure.name, name)) { continue; }
+      std::vector<std::string> types;
+      types.reserve(procedure.parameters.size());
+      for (const al::VarDecl &parameter : procedure.parameters) {
+        types.push_back(TypeName(parameter.type));
+      }
+      return types;
+    }
+    return {};
   }
 
   [[nodiscard]] std::vector<std::string> LentParameters(std::string_view name) const override {
@@ -1372,6 +1391,26 @@ std::string WithoutLiterals(const std::string &body) {
     if (inside) { out[at] = ' '; }
   }
   return out;
+}
+
+bool OnlyAssigned(const std::string &body, const std::string &name) {
+  bool seen = false;
+  for (std::size_t at = body.find(name); at != std::string::npos; at = body.find(name, at + 1)) {
+    const bool before = at > 0 && (std::isalnum(static_cast<unsigned char>(body[at - 1])) != 0 ||
+                                   body[at - 1] == '_');
+    const std::size_t after = at + name.size();
+    const bool behind =
+        after < body.size() &&
+        (std::isalnum(static_cast<unsigned char>(body[after])) != 0 || body[after] == '_');
+    const bool member =
+        at >= 1 && (body[at - 1] == '.' || (at >= 2 && body[at - 1] == '>' && body[at - 2] == '-'));
+    if (before || behind || member) { continue; }
+    seen = true;
+    const bool assigned = after + 2 < body.size() && body[after] == ' ' && body[after + 1] == '=' &&
+                          body[after + 2] == ' ';
+    if (!assigned) { return false; }
+  }
+  return seen;
 }
 
 bool Mentions(const std::string &body, const std::string &name) {

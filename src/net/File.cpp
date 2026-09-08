@@ -154,7 +154,7 @@ void File::CreateOutStream(OutStream &OutStream, const TextEncoding &Encoding) {
   CreateOutStream(OutStream);
 }
 
-void File::Write(std::string_view Value) {
+void File::WriteLine(std::string_view Value) {
   if (!open_) { throw Error("this File variable has nothing open"); }
   std::vector<std::uint8_t> bytes = held_.Bytes();
   for (const char c : Value) { bytes.push_back(static_cast<std::uint8_t>(c)); }
@@ -164,6 +164,15 @@ void File::Write(std::string_view Value) {
   }
   held_.Set(std::move(bytes));
   position_ = held_.Length();
+}
+
+std::string File::ToText() const {
+  throw Error("a File is not a value: AL puts one in an `Any` and nothing renders it");
+}
+
+void File::RefuseTyped() {
+  throw Error("a typed File.Write puts the platform's own binary layout into the file, and this "
+              "runtime does not have it. Only the text form is here");
 }
 
 Integer File::Read(Variant &Read) {

@@ -21,9 +21,11 @@
 #include "type/Time.h"
 #include "type/Variant.h"
 
+#include <concepts>
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief AL `File` -- the surface the platform documentation declares.
@@ -208,6 +210,20 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Integer Read(::agiru::Variant &Read);
 
+  /// \brief AL `File.Read(var Text)` -- a line in text mode.
+  /// \tparam T The text's type, which must assign from a `std::string_view`.
+  /// \param Read Receives the line.
+  /// \return How many bytes were read, the line break counted.
+  template <typename T>
+    requires requires(T &into) { into = std::string_view{}; } &&
+             (!std::is_same_v<std::remove_cvref_t<T>, ::agiru::Variant>)::agiru::Integer
+  Read(T &Read) {
+    ::agiru::Variant held;
+    const ::agiru::Integer read = this->Read(held);
+    Read = std::string_view(held.Get<std::string>());
+    return read;
+  }
+
   /// \brief AL `File.Rename(Text, Text)`. Renames an ASCII or binary file.
   /// \param OldName The AL `Text`.
   /// \param NewName The AL `Text`.
@@ -313,90 +329,42 @@ public:
                                          std::string_view FileName,
                                          ::agiru::Boolean AllowDownloadAndPrint = {});
 
-  /// \brief AL `File.Write(BigInteger)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `BigInteger`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::BigInteger Value);
+  /// \brief What a `File` reads as when it reaches an `Any`.
+  /// \return Never.
+  /// \throws Error always -- a file is not a value AL renders.
+  ///
+  /// \note IT EXISTS SO THAT `Variant := File` COMPILES AND REFUSES, which is what AL's `Any`
+  ///       allows and what `WorkflowEngineUT` writes on purpose inside an `asserterror`.
+  [[nodiscard]] std::string ToText() const;
 
-  /// \brief AL `File.Write(BigText)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `BigText`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(const ::agiru::BigText &Value);
+  /// \brief AL `File.Write(Value)` for a TEXT value.
+  ///
+  /// \tparam T The value's type, which must read as a `std::string_view`.
+  /// \param Value The value.
+  ///
+  /// \note IT IS TWO CONSTRAINED TEMPLATES AND NOT SEVENTEEN OVERLOADS, and the reason is an
+  ///       ambiguity rather than brevity: `Guid` converts from a `Text`, so `File.Write(SomeText)`
+  ///       matched the text overload and the GUID one equally well and the call had no answer.
+  ///       The documented seventeen are one question -- text, or the platform's binary layout --
+  ///       and the constraint is that question.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  void Write(const T &Value) {
+    WriteLine(std::string_view(Value));
+  }
 
-  /// \brief AL `File.Write(Boolean)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Boolean Value);
-
-  /// \brief AL `File.Write(Byte)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Byte`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Byte Value);
-
-  /// \brief AL `File.Write(Char)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Char`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Char Value);
-
-  /// \brief AL `File.Write(Code)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Code`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(std::string_view Value);
-
-  /// \brief AL `File.Write(Date)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Date`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Date Value);
-
-  /// \brief AL `File.Write(DateFormula)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `DateFormula`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::DateFormula Value);
-
-  /// \brief AL `File.Write(DateTime)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `DateTime`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::DateTime Value);
-
-  /// \brief AL `File.Write(Decimal)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Decimal`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Decimal Value);
-
-  /// \brief AL `File.Write(Duration)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Duration`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Duration Value);
-
-  /// \brief AL `File.Write(Guid)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Guid`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Guid Value);
-
-  /// \brief AL `File.Write(Integer)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Integer Value);
-
-  /// \brief AL `File.Write(Any)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(const ::agiru::Variant &Value);
-
-  /// \brief AL `File.Write(RecordId)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `RecordId`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::RecordId Value);
-
-  /// \brief AL `File.Write(Record)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Record`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(const ::agiru::RecordRef &Value);
-
-  /// \brief AL `File.Write(Time)`. Writes to an MS-DOS encoded file or binary file.
-  /// \param Value The AL `Time`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Write(::agiru::Time Value);
+  /// \brief AL `File.Write(Value)` for a value that is not text.
+  /// \tparam T The value's type.
+  /// \param Value The value.
+  /// \throws Error always.
+  /// \warning REFUSED. A typed `Write` puts the platform's own BINARY layout into the file, and
+  ///          inventing one would produce a file that reads back wrong wherever BC reads it.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>)
+  void Write(const T &Value) {
+    static_cast<void>(Value);
+    RefuseTyped();
+  }
 
   /// \brief AL `File.WriteMode(Boolean)`. Use this method before you use OPEN method (File)] to set
   /// or test whether you can write to a file in later calls.
@@ -413,6 +381,10 @@ public:
 
 private:
   void Bind(std::string_view name, bool truncate);
+
+  void WriteLine(std::string_view text);
+
+  [[noreturn]] static void RefuseTyped();
 
   ::agiru::Blob held_;
   std::string name_;

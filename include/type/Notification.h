@@ -7,6 +7,7 @@
 #include "type/NotificationScope.h"
 #include "type/Text.h"
 
+#include <concepts>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -50,7 +51,9 @@ public:
   ///       property access syntax". AL writes `Notification.ID := X` for it, and 365 documented
   ///       methods work the same way -- so a `SetId` here would be a name AL never uses, and the
   ///       mechanical check against the documentation would look for it in vain.
-  const Guid &Id(const Guid &Id) {
+  template <typename G>
+    requires std::constructible_from<Guid, const G &>
+  const Guid &Id(const G &Id) {
     id_ = Id;
     return id_;
   }

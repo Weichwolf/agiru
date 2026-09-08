@@ -90,7 +90,7 @@ public:
   /// \note A SECOND CONSTRUCTOR RATHER THAN A CAST AT THE CALL SITE: a literal reaches
   ///       `std::string_view` by one user-defined conversion and `Guid` by another, and C++ allows
   ///       only one of those in an implicit conversion sequence.
-  Guid(const char *text) : Guid(std::string_view(text)) {}
+  explicit Guid(const char *text) : Guid(std::string_view(text)) {}
 
   /// \brief AL passes a `Text[N]` where a `Guid` is declared, and converts it on the way.
   ///

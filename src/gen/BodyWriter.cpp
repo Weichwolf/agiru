@@ -288,7 +288,7 @@ private:
         out = Pad(indent) + "return" +
               (statement.expression.kind == al::ExprKind::Name && statement.expression.text.empty()
                    ? scope_.ExitValue()
-                   : " " + Expression(statement.expression, 0)) +
+                   : " " + Returned(statement.expression)) +
               ";\n";
         break;
       case al::StmtKind::Break: out = Pad(indent) + "break;\n"; break;
@@ -414,6 +414,10 @@ private:
     return resolved + "::" + EnumeratorName(expression.text);
   }
 
+  static bool TakesValues(std::string_view declared) {
+    return SameName(declared, "FieldRef") || SameName(declared, "KeyRef");
+  }
+
   static std::size_t FieldArguments(std::string_view method) {
     static constexpr auto kAll = static_cast<std::size_t>(-1);
     static const std::vector<std::pair<std::string_view, std::size_t>> kTakers{
@@ -512,6 +516,20 @@ private:
     return "::agiru::" + BuiltinSpelling(member.text);
   }
 
+  static std::string_view UnaryOperator(std::string_view spelled) {
+    if (spelled == "-") { return "-"; }
+    if (spelled == "+") { return "+"; }
+    return "!";
+  }
+
+  std::string Returned(const al::Expr &expression) {
+    const std::string written = Expression(expression, 0);
+    if (expression.kind != al::ExprKind::StringLiteral) { return written; }
+    const std::string returned = scope_.ReturnedType();
+    if (returned.empty() || !SameName(returned, "Guid")) { return written; }
+    return "::agiru::Guid(" + written + ")";
+  }
+
   std::string Callee(const al::Expr &callee, std::size_t arguments) {
     if (const std::string platform = PlatformCall(callee); !platform.empty()) { return platform; }
     if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
@@ -581,6 +599,10 @@ private:
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[1].kind == al::ExprKind::Name) {
       fields = FieldArguments(callee.children[1].text);
+      if (fields != 0 && callee.children.front().kind == al::ExprKind::Name &&
+          TakesValues(scope_.DeclaredType(callee.children.front().text))) {
+        fields = 0;
+      }
       if (fields != 0) {
         const al::Expr *owner = &callee.children.front();
         if (owner->kind == al::ExprKind::Binary && owner->text == "." &&
@@ -599,6 +621,9 @@ private:
     const std::vector<std::string> lent = callee.kind == al::ExprKind::Name
                                               ? scope_.LentParameters(callee.text)
                                               : std::vector<std::string>{};
+    const std::vector<std::string> declared = callee.kind == al::ExprKind::Name
+                                                  ? scope_.ParameterTypes(callee.text)
+                                                  : std::vector<std::string>{};
     for (std::size_t i = 1; i < expression.children.size(); ++i) {
       if (i != 1) { out += ", "; }
       const al::Expr &argument = expression.children[i];
@@ -608,6 +633,11 @@ private:
            SameName(argument.text, "Rec") || SameName(argument.text, "xRec"));
       const bool lvalue = named || argument.kind == al::ExprKind::Index ||
                           (argument.kind == al::ExprKind::Binary && argument.text == ".");
+      if (i - 1 < declared.size() && argument.kind == al::ExprKind::StringLiteral &&
+          SameName(declared[i - 1], "Guid")) {
+        out += "::agiru::Guid(" + Expression(argument, 0) + ")";
+        continue;
+      }
       if (i - 1 < lent.size() && !lent[i - 1].empty() && argument.kind == al::ExprKind::Name &&
           SameName(scope_.DeclaredType(argument.text), "Variant")) {
         out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
@@ -1085,7 +1115,7 @@ private:
       case al::ExprKind::Scope: out = Scope(expression); break;
       case al::ExprKind::Call: out = Call(expression); break;
       case al::ExprKind::Unary:
-        out = (expression.text == "-" ? "-" : "!") +
+        out = std::string(UnaryOperator(expression.text)) +
               Expression(expression.children.front(), kUnaryPrecedence);
         break;
       case al::ExprKind::Set:
@@ -1158,6 +1188,10 @@ public:
       return &running_->returned;
     }
     return nullptr;
+  }
+
+  [[nodiscard]] std::string ReturnedType() const override {
+    return running_ == nullptr ? std::string{} : running_->returnType;
   }
 
   [[nodiscard]] std::string ExitValue() const override {
@@ -1523,6 +1557,10 @@ public:
             const Objects &objects,
             const al::ProcedureDecl *running = nullptr)
       : page_(page), source_(source), objects_(objects), running_(running) {}
+
+  [[nodiscard]] std::string ReturnedType() const override {
+    return running_ == nullptr ? std::string{} : running_->returnType;
+  }
 
   [[nodiscard]] std::string ExitValue() const override {
     if (running_ == nullptr) { return {}; }

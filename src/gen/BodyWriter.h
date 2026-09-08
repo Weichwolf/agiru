@@ -47,6 +47,8 @@ public:
 
   [[nodiscard]] virtual std::string ExitValue() const { return {}; }
 
+  [[nodiscard]] virtual std::string ReturnedType() const { return {}; }
+
   [[nodiscard]] virtual bool IsRecord(std::string_view variable) const {
     static_cast<void>(variable);
     return false;
@@ -129,6 +131,11 @@ public:
   }
 
   [[nodiscard]] virtual std::vector<std::string> LentParameters(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
+  [[nodiscard]] virtual std::vector<std::string> ParameterTypes(std::string_view name) const {
     static_cast<void>(name);
     return {};
   }

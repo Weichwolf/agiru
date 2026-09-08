@@ -6,6 +6,7 @@
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
+#include "type/Char.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
@@ -407,6 +408,67 @@ public:
     requires std::convertible_to<const T &, std::string_view> &&
              (!detail::InVariant<T, Held>::value)
   Variant(const T &value) : held_(std::string(std::string_view(value))) {}
+
+  /// \brief Holds a number AL's `Any` takes and this Variant has no alternative for.
+  /// \tparam T The number's type -- `Byte` and `Char` are the two.
+  /// \param value The number.
+  ///
+  /// \note IT IS HELD AS AN `Integer`, which is what AL reads it back as. `Byte` is an
+  ///       `unsigned char` and `Char` is a character; neither is an alternative here, and adding
+  ///       one for each would widen every Variant in the tree for two types nobody compares
+  ///       against their own name.
+  template <typename T>
+    requires std::is_arithmetic_v<T> && (!detail::InVariant<T, Held>::value) &&
+             (!std::is_same_v<T, bool>)
+  Variant(T value) : held_(static_cast<::agiru::Integer>(value)) {}
+
+  /// \brief Holds a `Char`, which AL's `Any` takes as its code point.
+  /// \param value The character.
+  Variant(::agiru::Char value) // NOLINT(*-explicit-constructor)
+      : held_(static_cast<::agiru::Integer>(value.AsInteger())) {}
+
+  /// \brief Takes a value AL's `Any` accepts and this Variant cannot represent, and REFUSES.
+  ///
+  /// \tparam T The value's type.
+  /// \param value The value.
+  /// \throws Error always.
+  ///
+  /// \note AL's `Any` TAKES EVERY TYPE, AND THAT IS WHAT THIS IS. `WorkflowEngineUT` hands
+  ///       thirty-odd of them to one `var Any` inside `asserterror` -- an `InStream`, an
+  ///       `OutStream`, a `File`, a `TestPage` -- and expects the CALLEE to refuse. Without this
+  ///       the translation unit stops at the first of them, so the whole codeunit is absent rather
+  ///       than the one call refusing (board:0035).
+  ///
+  /// \note THE CONSTRAINT NAMES EVERY CONSTRUCTOR ABOVE IT, because a fallback that overlapped one
+  ///       of them would be an ambiguity rather than a fallback.
+  template <typename T>
+    requires(!detail::InVariant<T, Held>::value) &&
+            (!std::convertible_to<const T &, std::string_view>) &&
+            (!requires(const T &held) { held.ToText(); }) && (!std::is_arithmetic_v<T>) &&
+            (!std::is_enum_v<T>) && (!Enumeration<T>) && (!requires { T::kId; }) &&
+            (!requires { ::agiru::CodeunitTraits<T>::kId; }) &&
+            (!std::is_same_v<T, ::agiru::Char>) && (!std::is_same_v<T, class RecordRef>) &&
+            (!requires { typename T::IsAlRefusal; }) &&
+            (!requires { typename T::IsAnAbsentType; }) && (!detail::IsEnumHolder<T>::value) &&
+            (!requires { T::Traits::kValues; }) && (!requires(const T &held) { held.AsInteger(); })
+  Variant(const T &value) { // NOLINT(*-explicit-constructor)
+    static_cast<void>(value);
+    Refuse();
+  }
+
+  /// \brief Holds a `BigText`, which AL hands to an `Any` like any other text.
+  /// \tparam T The BigText's type, recognised by the `ToText()` a `StringValue` does not have.
+  /// \param value The text.
+  ///
+  /// \note IT IS HELD AS A TEXT AND NOT AS ITSELF. `Any` is what the platform unwraps, and what
+  ///       every reader of this Variant then asks for is a text -- `WorkflowRecordManagement`
+  ///       hands a `BigText` to a `var Any` and the callee reads it as one.
+  template <typename T>
+    requires requires(const T &value) { value.ToText(); } &&
+             (!std::convertible_to<const T &, std::string_view>) &&
+             (!detail::InVariant<T, Held>::value) && (!requires { typename T::IsAlRefusal; }) &&
+             (!requires { typename T::IsAnAbsentType; })
+  Variant(const T &value) : held_(value.ToText()) {}
 
   /// \brief AL `Variant.IsEmpty()` -- whether nothing was ever assigned.
   /// \return True when the Variant holds no value.

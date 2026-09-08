@@ -325,4 +325,26 @@ private:
   return Date::FromDaysSinceFirst(left.Normal().DaysSinceFirst() - days);
 }
 
+/// \brief AL `Date += Integer` -- moves the date that many days on.
+/// \param left The date, moved in place.
+/// \param days How many days.
+/// \return The date.
+///
+/// \note AL WRITES THE COMPOUND FORM AND C++ DOES NOT SYNTHESISE IT. `AssemblyHeader."Ending
+///       Date" += ChangeInDays` is ordinary AL, and without this the generated line does not
+///       compile even though `Date + Integer` is right beside it.
+constexpr Date &operator+=(Date &left, Integer days) {
+  left = left + days;
+  return left;
+}
+
+/// \brief AL `Date -= Integer` -- moves the date that many days back.
+/// \param left The date, moved in place.
+/// \param days How many days.
+/// \return The date.
+constexpr Date &operator-=(Date &left, Integer days) {
+  left = left - days;
+  return left;
+}
+
 }

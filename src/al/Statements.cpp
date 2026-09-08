@@ -344,7 +344,7 @@ private:
   }
 
   Expr ReadUnary() {
-    if (AtKeyword("not") || AtPunctuation("-")) {
+    if (AtKeyword("not") || AtPunctuation("-") || AtPunctuation("+")) {
       const std::string op = Peek().text;
       Advance();
       Expr unary{.kind = ExprKind::Unary, .text = op, .children = {}};

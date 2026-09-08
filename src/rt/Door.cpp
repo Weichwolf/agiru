@@ -87,6 +87,10 @@ namespace {
 
 }
 
+std::string BigText::ToText() const {
+  RefuseDoor("BigText.ToText()");
+}
+
 void BigText::AddText(const ::agiru::BigText &String, ::agiru::Integer Position) {
   static_cast<void>(String);
   static_cast<void>(Position);
@@ -486,86 +490,6 @@ void File::Trunc() {
   static_cast<void>(FileName);
   static_cast<void>(AllowDownloadAndPrint);
   RefuseDoor("File.ViewFromStream(InStream, Text, Boolean)");
-}
-
-void File::Write(::agiru::BigInteger Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(BigInteger)");
-}
-
-void File::Write(const ::agiru::BigText &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(BigText)");
-}
-
-void File::Write(::agiru::Boolean Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Boolean)");
-}
-
-void File::Write(::agiru::Byte Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Byte)");
-}
-
-void File::Write(::agiru::Char Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Char)");
-}
-
-void File::Write(::agiru::Date Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Date)");
-}
-
-void File::Write(::agiru::DateFormula Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(DateFormula)");
-}
-
-void File::Write(::agiru::DateTime Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(DateTime)");
-}
-
-void File::Write(::agiru::Decimal Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Decimal)");
-}
-
-void File::Write(::agiru::Duration Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Duration)");
-}
-
-void File::Write(::agiru::Guid Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Guid)");
-}
-
-void File::Write(::agiru::Integer Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Integer)");
-}
-
-void File::Write(const ::agiru::Variant &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Any)");
-}
-
-void File::Write(::agiru::RecordId Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(RecordId)");
-}
-
-void File::Write(const ::agiru::RecordRef &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Record)");
-}
-
-void File::Write(::agiru::Time Value) {
-  static_cast<void>(Value);
-  RefuseDoor("File.Write(Time)");
 }
 
 void FileUpload::CreateInStream(const ::agiru::InStream &InStream) {

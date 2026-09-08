@@ -48,8 +48,18 @@ public:
   }
 
   /// \brief AL `List.Add(Value)`.
+  /// \tparam V What the element is written as.
   /// \param value The element to append.
-  void Add(const T &value) { values_.push_back(value); }
+  ///
+  /// \note IT TAKES WHAT MAKES A `T` AND NOT A `T`. AL declares `List of [Guid]` and hands it a
+  ///       text literal -- `DemoDataApps.Add('5a0b41e9-...')` -- and converts on the spot; a
+  ///       parameter spelled as the element type makes that a conversion the CALLER has to write,
+  ///       which is a deviation the reader would have to know about.
+  template <typename V>
+    requires std::constructible_from<T, const V &>
+  void Add(const V &value) {
+    values_.push_back(T(value));
+  }
 
   /// \brief AL `List.AddRange(List)`.
   /// \param other The list whose elements are appended.
