@@ -902,6 +902,38 @@ public:
     return *text;
   }
 
+  /// \brief Lends one of its alternatives as a REFERENCE, when that is what it holds.
+  ///
+  /// \tparam T The AL type wanted.
+  /// \return The value, in the Variant's own storage.
+  /// \throws Error when the Variant holds something else.
+  ///
+  /// \note AL HANDS AN `Any` TO A `var` TYPED PARAMETER AND THE CALLEE WRITES BACK INTO IT.
+  ///       `TypeHelper.Evaluate` asks `Variable.IsDate()` and then passes the same Variant to
+  ///       `TryEvaluateDate(..., var Result: Date)`; what that procedure writes must be what the
+  ///       caller reads afterwards. A conversion returning a VALUE cannot do that -- a value does
+  ///       not bind to `Date &` -- so this one hands out the alternative where it already lives,
+  ///       and the write lands in the Variant with no copy back (board:0614).
+  ///
+  /// \note IT IS NOT AMBIGUOUS WITH THE VALUE FORM BELOW, because that one is `const` and this one
+  ///       is not: on a non-const Variant the reference form is the better match for the implicit
+  ///       object argument, and on a const one it is not a candidate at all.
+  ///
+  /// \warning `Decimal` AND `BigInteger` ARE LEFT TO THE VALUE FORM, and that is measured rather
+  ///          than tidy. Those two are the only alternatives the value form WIDENS into -- a
+  ///          Variant holding an `Integer` reads as a `Decimal` there -- and because the reference
+  ///          form wins on a non-const Variant, taking them here refused every widening instead:
+  ///          281 UT passes became 238 in one measured run (2026-09-08). A reference cannot widen,
+  ///          so the types that need widening do not come through one.
+  template <typename T>
+    requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Decimal>) &&
+             (!std::is_same_v<T, BigInteger>)
+  operator T &() {
+    T *value = std::get_if<T>(&held_);
+    if (value == nullptr) { Refuse(); }
+    return *value;
+  }
+
   /// \brief Reads as one of its alternatives, when that is what it holds.
   ///
   /// \tparam T The AL type wanted.

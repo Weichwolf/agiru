@@ -52,8 +52,23 @@ AL unwraps the `Any` into the typed `var` and writes the result BACK into the Va
    lifetime rules and puts the write-back in the door rather than at the call site.
 3. **The parameter takes a `Variant &`**, which is what the callee's own AL declares it is NOT.
 
-**1 IS THE ONE TO MEASURE.** It is local to the call site, it matches AL's own semantics exactly,
-and a wrong write-back is visible in the generated text rather than hidden in a conversion.
+**NONE OF THE THREE WAS NEEDED. THE VARIANT LENDS THE ALTERNATIVE IT ALREADY HOLDS (2026-09-08).**
+`std::get_if<T>` gives a `T *` into the Variant's own storage, so `operator T &()` hands out the
+value where it lives and the callee's write lands in the Variant with no copy back. That is AL's
+semantics exactly, and it is four lines.
+
+**IT HAD TO BE NARROWED, AND THE NUMBER IS WHY.** Taken over every alternative it cost 281 UT passes
+-> 238 in one measured run. The reference form wins on a non-const Variant, and a REFERENCE CANNOT
+WIDEN: the value form reads a Variant holding an `Integer` as a `Decimal`, and the reference form
+refused instead. `Decimal` and `BigInteger` are the only two the value form widens into, so those
+two are left to it; with that the count is 281 again and the `var Date` class works.
+
+**WHAT IS STANDING ON `TypeHelper`:** its own `Evaluate(Variant, Text, Text, Text)` HIDES the
+2-argument builtin, so a body calling `Evaluate(x, y)` inside that codeunit does not compile. AL
+falls back to the builtin when no own overload takes that many arguments; C++ hides the free
+function outright. The generator has the unit's own procedures WITH their parameters, so it can
+qualify `::agiru::Evaluate` when no own overload fits the argument count -- what it needs is the
+argument count at `Callee`, which today only sees the callee node.
 
 ## What proves it
 
