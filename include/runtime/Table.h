@@ -449,6 +449,7 @@ public:
       }
     }
     detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    CaptureImage();
     TableEvent("OnAfterInsertEvent", RunTrigger);
     return true;
   }
@@ -465,6 +466,7 @@ public:
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
                   " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
+    CaptureImage();
     return true;
   }
 
@@ -521,7 +523,7 @@ public:
   /// \throws Error when the argument count does not match the primary key.
   template <typename... Keys> bool Get(const Keys &...keys) {
     AssignPrimaryKey(keys...);
-    return detail::RuntimeGet(Self(), TableTraits<Derived>::kTable);
+    return Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
   }
 
   /// \brief AL `Record.FieldError(Field [, Text])`, naming the field itself.
@@ -962,7 +964,7 @@ public:
   /// \return True when a row matched.
   /// \see `record-find-method.md`, which tabulates the five characters.
   detail::Found Find(std::string_view which = "=") {
-    return detail::Found{detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which),
+    return detail::Found{Read(detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which)),
                          TableTraits<Derived>::kTable.name};
   }
 
@@ -985,7 +987,7 @@ public:
   ///       of them in the session. SQL Server declares a cursor for this and BC is written against
   ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
   detail::Found FindSet() {
-    return detail::Found{detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable),
+    return detail::Found{Read(detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable)),
                          TableTraits<Derived>::kTable.name};
   }
 
@@ -1002,7 +1004,7 @@ public:
 
   /// \brief AL `Record.Next()`. Steps to the next row of the open set.
   /// \return 1 when it moved, 0 at the end -- which is what `repeat ... until Next() = 0` reads.
-  Integer Next() { return detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1); }
+  Integer Next() { return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1)); }
 
   /// \brief AL `Record.Next(Steps)`.
   /// \param Steps How far to step.
@@ -1010,7 +1012,7 @@ public:
   /// \throws Error when `Steps` is negative -- stepping back needs a scrollable cursor, which this
   ///         one is not (board:0044).
   Integer Next(Integer Steps) {
-    return detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps);
+    return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps));
   }
 
   /// \brief AL `Record.Count()`. How many rows the filters select.
@@ -1181,7 +1183,38 @@ public:
   ///       defaults or their `InitValue`. What it is for is the SECOND turn of a loop, and a record
   ///       handed in as a parameter.
   /// \see `record-init-method.md`, `properties/devenv-initvalue-property.md`
-  void Init() { detail::RuntimeInit(Self(), TableTraits<Derived>::kTable); }
+  void Init() {
+    detail::RuntimeInit(Self(), TableTraits<Derived>::kTable);
+    BlankImage();
+  }
+
+  /// \brief AL `xRec` -- the record as it was last read, inserted or modified.
+  ///
+  /// \note IT IS NOT CALLED `XRec`, AND THAT IS THE ONE DEVIATION HERE. `xRec` is an AL VARIABLE
+  ///       and not a method, and the door's callable set is SCRAPED from these headers -- a method
+  ///       of that name made every bare `xRec` in a generated body a call, which is 200+ errors in
+  ///       one build (measured 2026-09-08). The generator binds the variable AL names from it.
+  ///
+  /// \return The image; a BLANK record when nothing has read, inserted or modified this variable.
+  ///
+  /// \note A FRESH VARIABLE'S `xRec` IS BLANK AND NOT AN ERROR, because AL has no such error:
+  ///       `xRec` is defined wherever a table's body runs. `OnInsert` is the case that says so --
+  ///       the row does not exist yet, so what it was before is the blank record, and
+  ///       `Rec.F <> xRec.F` is then true for every field the caller filled. Refusing instead cost
+  ///       965 UT failures in one measured run (2026-09-08) and 131 passes.
+  ///
+  /// \warning IT IS A BLANK RECORD AND NEVER A MIRROR OF `Rec`, which is openerp WI-1078: a mirror
+  ///          makes every `Rec.F <> xRec.F` trivially false and kills the idiom outright.
+  ///
+  /// \note IT IS NOT CONST, BECAUSE AL'S `xRec` IS NOT. `Currency.Table.al` declares
+  ///       `OnAfterInitRoundingPrecision(var Currency; var xCurrency; ...)` and passes `xRec` to
+  ///       that `var` parameter. Writing to it changes nothing that is written back, which is AL's
+  ///       behaviour too.
+  [[nodiscard]] Derived &StoredImage() {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr || state->image.Get() == nullptr) { BlankImage(); }
+    return *static_cast<Derived *>(State().image.Get());
+  }
 
   /// \brief AL `Record.IsTemporary(...)`. Determines whether a record refers to a temporary table.
   /// \tparam Arguments Whatever AL's overload set takes.
@@ -1869,6 +1902,51 @@ private:
                        rec,
                        rec,
                        RunTrigger);
+  }
+
+  /// Takes the image `xRec` reads: a copy of this record with no state of its own, so an image
+  /// never carries an image (board:0042). WI-1156 is why it is taken after an INSERT as well as
+  /// after a modify: without it, a second line's OnModify read the FIRST line's image.
+  /// A read that found a row leaves the record carrying that row as its image. WI-1078: `xRec` is
+  /// the record's own STORED image and not a trigger-scoped hand-in, so a plain `Get` gives it one.
+  bool Read(bool found) {
+    if (found) { CaptureImage(); }
+    return found;
+  }
+
+  /// The same, for a step whose answer is how many rows it moved.
+  Integer Stepped(Integer moved) {
+    if (moved != 0) { CaptureImage(); }
+    return moved;
+  }
+
+  void CaptureImage() {
+    Derived *copy =
+        new Derived(*static_cast<const Derived *>(this)); // NOLINT(cppcoreguidelines-owning-memory)
+    copy->State_Block = detail::StateHandle{};
+    State().image.Hold(
+        copy,
+        [](void *held) {
+          delete static_cast<Derived *>(held);
+        }, // NOLINT(cppcoreguidelines-owning-memory)
+        [](const void *held) -> void * {
+          return new Derived(
+              *static_cast<const Derived *>(held)); // NOLINT(cppcoreguidelines-owning-memory)
+        });
+  }
+
+  /// A record that was Init'd or Cleared has a BLANK image and not a mirror of itself, which is
+  /// openerp WI-1078: a mirror makes every `Rec.F <> xRec.F` trivially false.
+  void BlankImage() {
+    State().image.Hold(
+        new Derived{}, // NOLINT(cppcoreguidelines-owning-memory)
+        [](void *held) {
+          delete static_cast<Derived *>(held);
+        }, // NOLINT(cppcoreguidelines-owning-memory)
+        [](const void *held) -> void * {
+          return new Derived(
+              *static_cast<const Derived *>(held)); // NOLINT(cppcoreguidelines-owning-memory)
+        });
   }
 
   [[nodiscard]] detail::RecordState &State() {

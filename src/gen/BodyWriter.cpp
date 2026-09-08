@@ -1740,10 +1740,10 @@ bool MentionsXRec(const std::string &body) {
   return false;
 }
 
-std::string BindsBefore(const std::string &body, const std::string &qualified) {
-  return !MentionsXRec(body)
-             ? std::string{}
-             : "  " + qualified + " &XRec = detail::Before<" + qualified + ">();\n\n";
+std::string BindsBefore(const std::string &body, const std::string &qualified, bool ownTable) {
+  if (!MentionsXRec(body)) { return {}; }
+  const std::string from = ownTable ? "this->StoredImage()" : "Rec.StoredImage()";
+  return "  " + qualified + " &XRec = " + from + ";\n\n";
 }
 
 std::string SourceOfPage(const al::TableObject *source, const Objects &objects) {
@@ -1780,7 +1780,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
       out += "void " + tableClass + "::" + trigger.name + Identifier(field.name) + "() {\n";
       out +=
           ProcedureLocals(trigger, objects, table.name, table.procedures, shadowedByFields, body);
-      out += BindsBefore(body, "::" + space + "::" + tableClass);
+      out += BindsBefore(body, "::" + space + "::" + tableClass, true);
       out += body;
       out += "}\n\n";
     }
@@ -1800,7 +1800,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
             ? std::string{}
             : ProcedureLocals(
                   procedure, objects, table.name, table.procedures, shadowedByFields, body) +
-                  BindsBefore(body, "::" + space + "::" + tableClass);
+                  BindsBefore(body, "::" + space + "::" + tableClass, true);
     out += ProcedureSignature(
                procedure,
                objects,
@@ -1860,7 +1860,7 @@ void ControlBodies(std::string &out,
                           page.procedures,
                           Shadowing(page.variables, page.procedures, page.labels),
                           body) +
-          BindsBefore(body, SourceOfPage(source, objects));
+          BindsBefore(body, SourceOfPage(source, objects), false);
       out += ProcedureSignature(trigger,
                                 objects,
                                 page.name,
@@ -1928,7 +1928,7 @@ std::string WriteSource(const al::PageObject &page,
                               page.procedures,
                               Shadowing(page.variables, page.procedures, page.labels),
                               body) +
-                  BindsBefore(body, SourceOfPage(source, objects));
+                  BindsBefore(body, SourceOfPage(source, objects), false);
     if (locals.empty() && body.empty()) {
       bodies += "}\n\n";
       continue;

@@ -177,6 +177,8 @@ FieldValues KeyOf(const void *record, const TableDef &table) {
 
 }
 
+constexpr int kHexBase = 16;
+
 void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
   switch (def.type) {
     case FieldType::Code: {
@@ -230,9 +232,19 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
     case FieldType::MediaSet:
       *reinterpret_cast<MediaSet *>(At(record, def)) = MediaSet{Guid::FromText(text)};
       return;
+    case FieldType::Blob: {
+      std::vector<std::uint8_t> bytes;
+      const std::string_view hex = text.starts_with("\\x") ? text.substr(2) : std::string_view{};
+      bytes.reserve(hex.size() / 2);
+      for (std::size_t at = 0; at + 1 < hex.size(); at += 2) {
+        bytes.push_back(static_cast<std::uint8_t>(
+            std::stoul(std::string(hex.substr(at, 2)), nullptr, kHexBase)));
+      }
+      reinterpret_cast<Blob *>(At(record, def))->Set(std::move(bytes));
+      return;
+    }
     case FieldType::RecordId:
     case FieldType::TableFilter:
-    case FieldType::Blob:
     default: throw Error("no reader for the field type of " + std::string(def.name) + " yet");
   }
 }

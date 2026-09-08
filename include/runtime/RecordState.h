@@ -16,6 +16,87 @@
 
 namespace agiru::detail {
 
+/// \brief What a record variable owns as its `xRec` -- a record of its own table, type erased.
+///
+/// \note IT OWNS AND IT CLONES. The state is copied whenever the record variable is
+///       (`Rec2 := Rec` takes the filters, and the image with them), so a shared pointer would
+///       give two variables one image and a write through one would be seen by the other. AL's
+///       `xRec` belongs to the variable.
+class HeldImage {
+public:
+  /// \brief No image, which is what a record nobody has touched carries.
+  HeldImage() = default;
+
+  /// \brief Clones the other's image.
+  /// \param o The other.
+  HeldImage(const HeldImage &o) { Take(o); }
+
+  /// \brief Takes the other's image.
+  /// \param o The other.
+  HeldImage(HeldImage &&o) noexcept : record_(o.record_), free_(o.free_), clone_(o.clone_) {
+    o.record_ = nullptr;
+  }
+
+  /// \brief Clones the other's image, letting go of this one's.
+  /// \param o The other.
+  /// \return This.
+  HeldImage &operator=(const HeldImage &o) {
+    if (this != &o) {
+      Reset();
+      Take(o);
+    }
+    return *this;
+  }
+
+  /// \brief Takes the other's image, letting go of this one's.
+  /// \param o The other.
+  /// \return This.
+  HeldImage &operator=(HeldImage &&o) noexcept {
+    if (this != &o) {
+      Reset();
+      record_ = o.record_;
+      free_ = o.free_;
+      clone_ = o.clone_;
+      o.record_ = nullptr;
+    }
+    return *this;
+  }
+
+  /// \brief Lets go of the image.
+  ~HeldImage() { Reset(); }
+
+  /// \brief Takes ownership of a record as this variable's image.
+  /// \param record The record, which this now owns.
+  /// \param free   How to unmake one.
+  /// \param clone  How to copy one.
+  void Hold(void *record, void (*free)(void *), void *(*clone)(const void *)) {
+    Reset();
+    record_ = record;
+    free_ = free;
+    clone_ = clone;
+  }
+
+  /// \return The image, or `nullptr` when there is none.
+  [[nodiscard]] void *Get() const { return record_; }
+
+private:
+  void Take(const HeldImage &o) {
+    if (o.record_ == nullptr || o.clone_ == nullptr) { return; }
+    record_ = o.clone_(o.record_);
+    free_ = o.free_;
+    clone_ = o.clone_;
+  }
+
+  void Reset() {
+    if (record_ != nullptr && free_ != nullptr) { free_(record_); }
+    record_ = nullptr;
+  }
+
+  void *record_ = nullptr;
+  void (*free_)(void *) = nullptr;
+  void *(*clone_)(const void *) = nullptr;
+};
+
 /// \brief One field's filter, as the record variable carries it.
 struct FieldFilter {
   ::agiru::FieldNo field; ///< The field it narrows.
@@ -223,6 +304,28 @@ struct RecordState {
   /// \brief The primary keys `Mark(true)` set, for this VARIABLE and no other.
   std::vector<std::string> marks;
   bool markedOnly = false; ///< `MarkedOnly(true)`.
+
+  /// \brief AL `xRec` -- the record as it was last READ, INSERTED or MODIFIED.
+  ///
+  /// \note IT IS THE RECORD'S OWN STORED IMAGE AND NOT A TRIGGER-SCOPED HAND-IN, which is what
+  ///       openerp WI-1078 settles: the BaseApp reads `xRec` in ordinary table PROCEDURES too.
+  ///       `ProdOrderComponent.UpdateBin` writes `Comp2 := Comp; Comp2.GetDefaultBin()`, and
+  ///       `GetDefaultBin` exits when quantity, item, location, variant and routing link all match
+  ///       `xRec` -- dead code unless the image belongs to the record (board:0042).
+  ///
+  /// \note IT LIVES IN THE STATE AND NOT IN THE GENERATED CLASS, which is where board:0042 put it.
+  ///       The state is already what every other per-VARIABLE fact lives in -- filters, marks, the
+  ///       cursor -- it is already copied by `Copy` and by assignment, and putting the image here
+  ///       changes no generated class's layout, so the field table's `offsetof` values stand
+  ///       untouched. The type is erased because `RecordState` knows no table; the two function
+  ///       pointers carry it back.
+  ///
+  /// \note NO `std::shared_ptr` AND THEREFORE NO `<memory>`, and that is a measurement rather than
+  ///       a preference: this header is in the door, and `<memory>` took the door's parse from
+  ///       1.19 s to 1.71 s (min of 3, measured 2026-09-08) -- half a second on every one of the
+  ///       6 939 generated translation units. CLAUDE.md names the same trap with the same header.
+  ///       Three pointers and a hand-written copy do the same job for nothing.
+  HeldImage image;
 
   /// \brief The cursor `FindSet` opened, if one is open.
   CursorHandle open;

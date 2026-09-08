@@ -21,9 +21,11 @@
 #include <compare>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace agiru {
 namespace {
@@ -70,7 +72,14 @@ std::string FieldText(const void *record, const FieldDef &def) {
     case FieldType::Enum:
       return detail::MemberText(
           def, reinterpret_cast<const OrdinalValue *>(At(record, def))->AsInteger());
-    case FieldType::Blob: return {};
+    case FieldType::Blob: {
+      const std::vector<std::uint8_t> &bytes =
+          reinterpret_cast<const Blob *>(At(record, def))->Bytes();
+      if (bytes.empty()) { return "\\x"; }
+      std::string out = "\\x";
+      for (const std::uint8_t byte : bytes) { out += std::format("{:02x}", byte); }
+      return out;
+    }
     case FieldType::Media:
       return reinterpret_cast<const Media *>(At(record, def))->MediaId().ToText();
     case FieldType::MediaSet:

@@ -86,3 +86,35 @@ defect the predecessor spent four items on (WI-781, WI-1078, WI-1137, WI-1156).
 `CurrFieldNo` being "retained for compatibility" is worth noting too: it is the field number of the
 current field during a validate, and the BaseApp still branches on it, so it is carried without being
 extended.
+
+
+## STANDING: THE IMAGE IS BUILT, AND THE COUNT DID NOT MOVE (2026-09-08)
+
+`xRec` is the record's own STORED image now, and the trigger-scoped stack is gone from the read
+path. `detail::RecordState` carries a `HeldImage`; `Table<Derived>` captures it after a successful
+`Get`, `Find`, `FindSet`, `Next`, `Insert` and `Modify`, blanks it on `Init`, and the generator
+binds AL's `xRec` from `this->StoredImage()` (or `Rec.StoredImage()` in a page) instead of the
+per-thread `detail::Before<T>()`.
+
+**568 UT FAILURES SAYING `xRec` DISAPPEARED AND THE PASS COUNT WENT 273 -> 272 -> 275.** The work
+moved the wall rather than the number: those tests now reach `no reader for the field type of
+Picture` and `RecordRef.Modify(Boolean)`. That is the honest result and it is recorded as one.
+
+**FOUR THINGS THE ROUND PAID FOR, each measured:**
+
+- **`std::shared_ptr` WOULD HAVE COST HALF A SECOND PER GENERATED TRANSLATION UNIT.** `RecordState`
+  is in the door, and `<memory>` took the door's parse from 1.19 s to 1.71 s (min of 3). `HeldImage`
+  is three pointers and a hand-written copy, and the parse is 1.20 s. CLAUDE.md names this exact
+  header; it is not a preference.
+- **THE IMAGE OWNS AND CLONES.** The state is copied whenever the variable is, so a shared pointer
+  would give two variables one image. AL's `xRec` belongs to the variable.
+- **AN IMAGE CARRIES NO IMAGE.** The copy's `State_Block` is reset, or every capture would capture
+  the last one.
+- **A FRESH VARIABLE'S `xRec` IS BLANK AND NOT AN ERROR.** Refusing instead cost 965 failures and
+  131 passes in one measured run: AL has no such error, and `OnInsert` is the case that says so --
+  the row does not exist yet, so what it was before is the blank record. It is a BLANK and never a
+  mirror of `Rec`, which is WI-1078.
+
+**WHAT IS STANDING:** `Copy` is not yet proved to carry the image (the state's copy does it, and
+nothing measures it); `Clear` does not blank it, only `Init` does; and the old
+`PushBefore`/`PopBefore`/`Before<T>` are still declared in the door with no reader left.
