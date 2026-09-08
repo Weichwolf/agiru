@@ -2,6 +2,7 @@
 
 #include "Builtins.h"
 #include "meta/EnumDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Scopes.h"
@@ -102,7 +103,8 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (Value.Is<RecordId>()) { return Value.Get<RecordId>().ToText(); }
   if (Value.Is<DateFormula>()) { return Value.Get<DateFormula>().ToText(); }
   if (Value.Is<OrdinalInVariant>()) { return OrdinalText(Value.Get<OrdinalInVariant>(), format); }
-  throw Error("Format: a Variant holding a record renders its primary key, which needs a key");
+  throw Error("Format: a Variant holding a record renders its primary key, which needs the record "
+              "to still be there (board:0624)");
 }
 
 std::string Fitted(std::string rendered, ::agiru::Integer Length, bool numeric, char filler) {

@@ -974,14 +974,27 @@ public:
     throw Error("Record.DeleteLinks is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.FieldActive(...)`. Checks whether a field is enabled.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean FieldActive(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.FieldActive is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.FieldActive(Field)`. Whether the field is enabled.
+  /// \tparam FieldType The field member's type.
+  /// \param member The field, written as AL writes it: `FieldActive(DueDateCalculation)`.
+  /// \return Whether the table's declaration marks it enabled.
+  ///
+  /// \note IT IS THE `Enabled` PROPERTY AND THE DECLARATION ALREADY CARRIES IT.
+  ///       `devenv-enabled-property.md` makes a disabled field one that is declared and not
+  ///       maintained, and `FieldDef::enabled` is that bit -- so this is a lookup in `.rodata` and
+  ///       not a question for the database.
+  template <typename FieldType>
+    requires(!std::is_same_v<std::remove_cvref_t<FieldType>, ::agiru::FieldNo>)
+  [[nodiscard]] Boolean FieldActive(const FieldType &member) const {
+    return FieldActive(NumberOf(&member));
+  }
+
+  /// \brief AL `Record.FieldActive(FieldNo)` -- the same question by number.
+  /// \param no The field number.
+  /// \return Whether the table declares it and marks it enabled.
+  [[nodiscard]] Boolean FieldActive(::agiru::FieldNo no) const {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    return def != nullptr && def->enabled;
   }
 
   /// \brief AL `Record.FieldName(Field)`. The field's AL name.

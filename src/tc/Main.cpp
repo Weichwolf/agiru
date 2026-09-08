@@ -22,10 +22,12 @@
 #include <format>
 #include <fstream>
 #include <ios>
+#include <iterator>
 #include <map>
 #include <memory>
 #include <print>
 #include <ranges>
+#include <regex>
 #include <set>
 #include <span>
 #include <sstream>
@@ -1592,11 +1594,30 @@ constexpr std::size_t kUnresolvedShown = 10;
 constexpr std::size_t kSilentShown = 60;
 
 const std::set<std::string> &Rebuilt() {
-  static const std::set<std::string> kRebuilt{"ALConfigSettings",
-                                              "GenericDictionary2",
-                                              "GenericList1",
-                                              "NavTenantSettingsHelper",
-                                              "UserInfo"};
+  static const std::set<std::string> kRebuilt = [] {
+    const std::filesystem::path where =
+        std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "dotnet";
+    if (!std::filesystem::is_directory(where)) {
+      throw std::runtime_error("the door has no dotnet/ directory at " + where.string());
+    }
+    static const std::regex declared(R"((?:^|\n)(?:class|struct) ([A-Z][A-Za-z0-9]*))");
+    std::set<std::string> found;
+    for (const auto &entry : std::filesystem::directory_iterator(where)) {
+      if (entry.path().extension() != ".h" || entry.path().filename() == "Refused.h") { continue; }
+      std::ifstream in(entry.path(), std::ios::binary);
+      const std::string text((std::istreambuf_iterator<char>(in)),
+                             std::istreambuf_iterator<char>());
+      for (auto at = std::sregex_iterator(text.begin(), text.end(), declared);
+           at != std::sregex_iterator();
+           ++at) {
+        found.insert((*at)[1].str());
+      }
+    }
+    if (found.empty()) {
+      throw std::runtime_error("include/dotnet/ declares no rebuilt .NET class -- ABORT");
+    }
+    return found;
+  }();
   return kRebuilt;
 }
 

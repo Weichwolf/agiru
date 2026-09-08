@@ -219,7 +219,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 52> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 54> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -267,6 +267,8 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 52> kElsewhe
     {"ALConfigSettings", "dotnet/ALConfigSettings.h"},
     {"NavTenantSettingsHelper", "dotnet/NavTenantSettingsHelper.h"},
     {"UserInfo", "dotnet/UserInfo.h"},
+    {"DateTimeOffset", "dotnet/DateTimeOffset.h"},
+    {"DateTime", "dotnet/DateTime.h"},
     {"StrSubstNo", "runtime/Record.h"},
     {"Format", "runtime/Record.h"},
     {"AsText", "runtime/Record.h"},
