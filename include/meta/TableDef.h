@@ -351,6 +351,9 @@ struct TableDef {
   /// \brief The `ExternalName` property: the name the OTHER database gives this table.
   std::string_view externalName{};
 
+  /// \brief The `ExternalSchema` property: the schema that name lives in, over there.
+  std::string_view externalSchema{};
+
   /// \brief The `TableType` property. `Normal` is a relation; `Temporary` is an in-memory row set
   ///        (board:0032) and gets a relation until that exists; the external kinds are refused by
   ///        the transpiler because they name a database this tree does not have (board:0364).

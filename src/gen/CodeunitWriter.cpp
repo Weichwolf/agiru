@@ -1478,6 +1478,8 @@ std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string
   text("testPermissions", "TestPermissions");
   text("testType", "TestType");
   text("testIsolation", "TestIsolation");
+  text("requiredTestIsolation", "RequiredTestIsolation");
+  text("testHttpRequestPolicy", "TestHttpRequestPolicy");
   text("description", "Description");
   text("access", "Access");
   text("obsoleteState", "ObsoleteState");

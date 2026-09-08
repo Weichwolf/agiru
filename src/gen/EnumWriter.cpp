@@ -219,6 +219,14 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "} // namespace " + space + "\n\n";
 
   out += "template <> struct agiru::EnumTraits<" + qualified + "> {\n";
+  const al::Property *unknown = al::Find(object.properties, "UnknownValueImplementation");
+  out += "  static constexpr std::string_view kUnknownValueImplementation{";
+  out += unknown == nullptr ? "\"\"" : Literal(unknown->text);
+  out += "};\n";
+  const al::Property *compatible = al::Find(object.properties, "AssignmentCompatibility");
+  out += "  static constexpr bool kAssignmentCompatibility = ";
+  out += compatible != nullptr && LowerKey(compatible->text) == "true" ? "true" : "false";
+  out += ";\n";
   if (sorted.empty()) {
     out += "  static constexpr std::array<EnumValueDef, 0> kValues{};\n";
   } else {

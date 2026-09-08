@@ -776,6 +776,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
         std::pair<std::string_view, std::string_view>{"ExternalName", "externalName"},
+        std::pair<std::string_view, std::string_view>{"ExternalSchema", "externalSchema"},
         std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"}}) {
     const std::string said = property(name);
     if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }

@@ -471,6 +471,10 @@ std::string DeclaredControl(const al::PageControl &control,
   text("drillDown", "DrillDown");
   text("assistEdit", "AssistEdit");
   text("extendedDataType", "ExtendedDataType");
+  text("multiplicity", "Multiplicity");
+  text("filters", "Filters");
+  text("orderBy", "OrderBy");
+  text("odataEdmType", "ODataEDMType");
   text("instructionalText", "InstructionalText");
   {
     const std::string lookup = ControlText(control, "LookupPageId");
@@ -618,6 +622,8 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
       ControlArrays(page.layout, prefix, prefix + "Layout", objects, source, counter, out);
   const std::string actions =
       ControlArrays(page.actions, prefix, prefix + "Actions", objects, source, counter, out);
+  const std::string views =
+      ControlArrays(page.views, prefix, prefix + "Views", objects, source, counter, out);
   out += "constexpr PageDef " + prefix + "Page{\n";
   out += "    .id = " + identifier + "::kId,\n";
   out += "    .name = " + identifier + "::kName,\n";
@@ -648,6 +654,7 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   text("sourceTableView", "SourceTableView");
   if (!layout.empty()) { out += "    .layout = " + layout + ",\n"; }
   if (!actions.empty()) { out += "    .actions = " + actions + ",\n"; }
+  if (!views.empty()) { out += "    .views = " + views + ",\n"; }
   text("editable", "Editable");
   text("insertAllowed", "InsertAllowed");
   text("modifyAllowed", "ModifyAllowed");

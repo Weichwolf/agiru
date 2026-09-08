@@ -310,6 +310,11 @@ public:
         ParseControlsInto(object.actions);
         continue;
       }
+      if (AtKeyword("views")) {
+        Advance();
+        ParseControlsInto(object.views);
+        continue;
+      }
       if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
         Advance();
         SkipBracedBlock();

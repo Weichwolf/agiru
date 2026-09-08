@@ -200,6 +200,21 @@ struct ControlDef {
   std::string_view subPageLink{};
   std::string_view subPageView{}; ///< \see subPageLink
 
+  /// \brief The `Multiplicity` property on a page part: how many of the part an API exposes.
+  std::string_view multiplicity{};
+
+  /// \brief The `Filters` property on a `view`, as AL wrote it: `where(Field = const(x))`.
+  std::string_view filters{};
+
+  /// \brief The `OrderBy` property on a `view`, as AL wrote it: `ascending(Field)`.
+  ///
+  /// \note A VIEW TAKES ONE DIRECTION AND A QUERY TAKES A LIST, which is board:0352's finding --
+  ///       so this is carried as AL wrote it and read by whoever applies it.
+  std::string_view orderBy{};
+
+  /// \brief The `ODataEDMType` property on a page field: the EDM type an API publishes it as.
+  std::string_view odataEdmType{};
+
   /// \brief The `ShowCaption` property: the control renders without its label (board:0395).
   bool showCaption = true;
 
@@ -390,7 +405,12 @@ struct PageDef {
   /// \brief The `actions` section, which is areas at the top level.
   std::span<const ControlDef> actions{};
 
-  /// \brief The `views` section, which is named filters over the source (board:0542).
+  /// \brief The `views` section: named filters over the source, each a control of kind `View`.
+  ///
+  /// \note IT WAS PARSED AS NOTHING AND SKIPPED, which is what an identifier followed by a brace
+  ///       does in the page body -- so 179 `Filters` and 113 `OrderBy` declarations went nowhere
+  ///       and nothing said so (board:0623). A view carries its `Caption`, its `Filters` and its
+  ///       `OrderBy` as properties, so it IS a control and needs no shape of its own.
   std::span<const ControlDef> views{};
 
   /// \brief The `Editable`, `InsertAllowed`, `ModifyAllowed` and `DeleteAllowed` properties, as AL

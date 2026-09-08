@@ -51,6 +51,15 @@ struct CodeunitDef {
   ///        (board:0470).
   std::string_view testIsolation{};
 
+  /// \brief The `RequiredTestIsolation` property, as AL wrote it: what the codeunit REQUIRES of
+  ///        the runner before it will run at all, rather than what the runner does after
+  ///        (board:0470).
+  std::string_view requiredTestIsolation{};
+
+  /// \brief The `TestHttpRequestPolicy` property, as AL wrote it: whether a case may reach the
+  ///        network, and `BlockOutboundRequests` is the answer that makes a test suite repeatable.
+  std::string_view testHttpRequestPolicy{};
+
   /// \brief The `Description` property, which the compiler carries and nothing reads.
   std::string_view description{};
 

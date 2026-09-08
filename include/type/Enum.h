@@ -25,6 +25,15 @@ namespace agiru {
 /// is one declaration that every field of that type shares, so the value table exists once in
 /// `.rodata` however many tables use it. In the BaseApp that is 462 declarations behind 1 351
 /// fields (measured 2026-09-01).
+/// \brief What a generated enumeration declares about itself.
+///
+/// \tparam E The generated enumeration.
+///
+/// \note `kAssignmentCompatibility` IS THE `AssignmentCompatibility` PROPERTY, and it is the one
+///       thing that lets ANOTHER enum be assigned to this one:
+///       `devenv-assignmentcompatibility-property.md` calls it "intended for backwards
+///       compatibility when splitting existing Options into multiple Enums". 573 declarations over
+///       BCApps; an enum without it takes only its own members (board:0084).
 template <typename E> struct EnumTraits;
 
 /// \brief AL `Enum`, either with a declaration in reach or without one.
