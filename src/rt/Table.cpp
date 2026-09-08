@@ -447,6 +447,18 @@ void RuntimeClear(void *record, const TableDef &table) {
   Defaulted(record, table, false);
 }
 
+void AutoIncrement(void *record, const TableDef &table) {
+  for (const FieldDef &def : table.fields) {
+    if (!def.autoIncrement || def.fieldClass != FieldClass::Normal) { continue; }
+    if (def.type != FieldType::Integer && def.type != FieldType::BigInteger) { continue; }
+    if (!IsBlank(record, def)) { continue; }
+    const Result next = Session::Current().Database().Execute(
+        "SELECT COALESCE(MAX(" + Quoted(def.name) + "), 0) + 1 FROM " + Name(table));
+    const std::optional<std::string_view> value = next.Value(0, 0);
+    detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : "1");
+  }
+}
+
 void RuntimeInsert(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) {
     TempInsert(record, table);
@@ -454,6 +466,7 @@ void RuntimeInsert(void *record, const TableDef &table) {
   }
 
   StampInserted(record, table);
+  AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
   InsertRow(Session::Current().Database(), table, values);
 }

@@ -380,12 +380,15 @@ private:
         return "::agiru::" + TypeName(base.text) +
                "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
       }
-      if (scope_.Resolve(base.text).empty()) {
+      const bool viaMember = base.kind == al::ExprKind::Binary && base.text == "." &&
+                             base.children.size() == 2 &&
+                             base.children[1].kind == al::ExprKind::Name;
+      if (scope_.Resolve(base.text).empty() || viaMember) {
         static constexpr std::array<std::pair<std::string_view, std::string_view>, 3>
             kMethodOptions{{{"securityfiltering", "SecurityFilter"},
                             {"readisolation", "IsolationLevel"},
                             {"currenttransactiontype", "TransactionType"}}};
-        const std::string lowered = LowerKey(base.text);
+        const std::string lowered = LowerKey(viaMember ? base.children[1].text : base.text);
         for (const auto &[method, option] : kMethodOptions) {
           if (lowered == method) {
             return "::agiru::" + std::string(option) +

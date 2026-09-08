@@ -37,6 +37,7 @@ constexpr int kUsage = 2;
 constexpr std::size_t kLineBytes = 4096;
 
 constexpr std::string_view kDatabase = AGIRU_DATABASE;
+constexpr std::string_view kTestCompany = "CRONUS International Ltd.";
 
 void Usage() {
   std::println("agiru -- Business Central, translated to C++");
@@ -175,7 +176,8 @@ int RunTests(const Options &options) {
   if (options.isolate && options.codeunit.empty()) { return RunIsolated(options, codeunits); }
   const std::string master = options.database.empty() ? std::string(kDatabase) : options.database;
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
-  const agiru::Session session(runner.Dsn());
+  agiru::Session session(runner.Dsn());
+  session.CompanyName(kTestCompany);
   agiru::ProvisionInstalled(session.Database());
   const agiru::TestRun run =
       agiru::RunRegisteredTests(options.codeunit, [](const agiru::TestResult &result) {
