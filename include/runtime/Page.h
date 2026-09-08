@@ -638,17 +638,13 @@ public:
   }
 
   template <typename... Arguments>
-  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Page.Run(" + std::to_string(Number) +
-                ") by number needs the page catalogue (board:0038)");
+  static void Run(::agiru::Integer Number, const Arguments &...arguments) {
+    static_cast<void>(detail::RunPageByNumber(false, Number, arguments...));
   }
 
   template <typename... Arguments>
-  static ::agiru::Action RunModal(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Page.RunModal(" + std::to_string(Number) +
-                ") by number needs the page catalogue (board:0038)");
+  static ::agiru::Action RunModal(::agiru::Integer Number, const Arguments &...arguments) {
+    return detail::RunPageByNumber(true, Number, arguments...);
   }
 };
 

@@ -56,3 +56,18 @@ gone. A second table with a `TableRelation` to the renamed key must follow.
 
 **The negative control is the related table.** A `Rename` that moves the row and leaves the relation
 pointing at a key that no longer exists passes every single-table assertion.
+
+## Standing (2026-09-08): the rename runs; the cascade does not
+
+`Record.Rename` runs `OnBeforeRenameEvent`, the table's `OnRename` (with `xRec` the row as it
+was), the row operation and `OnAfterRenameEvent`. The row operation is `RenameRow`: an UPDATE of
+every stored column addressed by the OLD primary key, so `SystemId` and the version survive; a
+temporary row is deleted under its old key and inserted under the new one.
+
+**Not done: the cascade.** BC rewrites every field related to the renamed key through
+`TableRelation` -- the customer number in every entry, line and setup that names it. Here those
+rows keep the old value. The population is the `relationTable`/`relationField` pairs the
+metadata already carries, so the cascade is a walk over the catalogue's tables for relations
+pointing at this table, one UPDATE each; it needs the relation's WHERE filters honoured, and
+that is the part with a measurement to take first.
+

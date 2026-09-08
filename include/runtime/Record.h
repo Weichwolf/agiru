@@ -230,6 +230,14 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
 /// \throws Error when the field is a FlowField or not numeric.
 void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no);
 
+/// \brief AL `Record.Rename(NewKeys...)`'s row operation: the row `before` identifies moves to
+///        the key `record` now carries.
+/// \param record The record, its key fields already holding the NEW key.
+/// \param before The same record as it was, whose key finds the row.
+/// \param table  The declaration.
+/// \return Whether a row was there to rename.
+bool RuntimeRename(void *record, const void *before, const TableDef &table);
+
 /// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`
 ///        answers and an `AssertEquals` compares against.
 /// \param record The record.

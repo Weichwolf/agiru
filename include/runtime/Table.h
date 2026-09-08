@@ -1578,24 +1578,42 @@ public:
   }
 
   /// \brief AL `Record.Rename(Value1 [, Value2,...])`. Changes the value of a primary key.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \tparam Keys The new key values' types, one per primary-key field, in key order.
+  /// \param keys The new primary key.
+  /// \return True, as AL's statement form does.
+  /// \throws Error when no row carries the old key, and whatever the trigger or an event raises;
+  ///         the record is as it was on either.
   ///
-  /// \warning IT REFUSES BEFORE IT FIRES ANYTHING, and that is the point. `Insert`, `Modify` and
-  ///          `Delete` run `OnBeforeXEvent`, then the table's own trigger, then the row operation,
-  ///          then `OnAfterXEvent`. Rename owes the same three -- `OnBeforeRenameEvent`,
-  ///          `OnRename`, `OnAfterRenameEvent` (`devenv-onrename-trigger.md`) -- and running AL
-  ///          code before an operation that cannot happen would leave the trigger's writes behind
-  ///          a rename that never occurred. So nothing runs until board:0035 gives the row
-  ///          operation, and the message names what will run then (board:0231).
-  template <typename... Arguments> Boolean Rename(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Rename is declared and not implemented yet (board:0035). When it is, it "
-                "runs OnBeforeRenameEvent, then the table's OnRename trigger, then the row "
-                "operation, then OnAfterRenameEvent -- and none of them run before that, because "
-                "a trigger's writes must not survive a rename that did not happen");
+  /// \note THE ORDER IS THE PLATFORM'S: `OnBeforeRenameEvent`, then the table's `OnRename` with
+  ///       `xRec` the row as it was and `Rec` carrying the new key, then the row operation, then
+  ///       `OnAfterRenameEvent` (`devenv-onrename-trigger.md`). The row operation is an UPDATE
+  ///       addressed by the OLD key, so the row keeps its `SystemId` and its version; a temporary
+  ///       row moves.
+  ///
+  /// \warning THE NEW KEY IS NOT CASCADED YET. BC rewrites every field that relates to the
+  ///          renamed key through its `TableRelation` (the customer number in every ledger
+  ///          entry); here those rows still carry the old value, which is a hole with a count
+  ///          (board:0231).
+  template <typename... Keys> Boolean Rename(const Keys &...keys) {
+    static_assert(sizeof...(Keys) > 0, "Rename takes the new primary key");
+    const Derived before = static_cast<const Derived &>(*this);
+    TableEvent("OnBeforeRenameEvent", true);
+    std::size_t position = 0;
+    (AssignKey(TableTraits<Derived>::kTable, position++, keys), ...);
+    {
+      detail::BeforeImage image(&before, Self());
+      if constexpr (requires(Derived &record) { record.OnRename(); }) {
+        static_cast<Derived *>(this)->OnRename();
+      }
+    }
+    if (!detail::RuntimeRename(Self(), &before, TableTraits<Derived>::kTable)) {
+      static_cast<Derived &>(*this) = before;
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+    }
+    TableEvent("OnAfterRenameEvent", true);
+    CaptureImage();
+    return true;
   }
 
   /// \brief AL `Record.Reset()` -- everything the variable held, gone.
@@ -2214,6 +2232,19 @@ private:
     if constexpr (std::convertible_to<const Key &, std::string_view>) {
       detail::SetFieldText(Self(), *def, std::string_view(value));
     } else {
+      if (def->type == FieldType::Option || def->type == FieldType::Enum ||
+          def->type == FieldType::Integer || def->type == FieldType::BigInteger) {
+        if constexpr (requires { value.AsInteger(); }) {
+          detail::SetFieldText(Self(), *def, std::to_string(value.AsInteger()));
+          return;
+        } else if constexpr (std::is_enum_v<Key>) {
+          detail::SetFieldText(Self(), *def, std::to_string(static_cast<std::int64_t>(value)));
+          return;
+        } else if constexpr (std::integral<Key> && !std::same_as<Key, bool>) {
+          detail::SetFieldText(Self(), *def, std::to_string(value));
+          return;
+        }
+      }
       if constexpr (requires { FieldTypeOf<Key>::kType; }) {
         if (def->type != FieldTypeOf<Key>::kType) {
           throw Error("Get: " + std::string(def->name) +

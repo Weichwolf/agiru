@@ -489,6 +489,17 @@ bool RuntimeModify(void *record, const TableDef &table) {
   return ModifyRow(Session::Current().Database(), table, values);
 }
 
+bool RuntimeRename(void *record, const void *before, const TableDef &table) {
+  if (TempOf(record) != nullptr) {
+    if (!TempDelete(const_cast<void *>(before), table)) { return false; }
+    return TempInsert(record, table);
+  }
+  StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
+  const FieldValues values = ValuesOf(record, table);
+  const FieldValues oldKey = KeyOf(before, table);
+  return RenameRow(Session::Current().Database(), table, values, oldKey);
+}
+
 bool RuntimeDelete(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempDelete(const_cast<void *>(record), table); }
 

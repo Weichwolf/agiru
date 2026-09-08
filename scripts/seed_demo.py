@@ -47,19 +47,38 @@ def psql(database, sql, quiet=True):
     return done.stdout.decode("utf-8", "replace"), ""
 
 
+TYPES = {}
+
+
 def columns(database, schema):
     out, why = psql(database, (
-        "select table_name || '\t' || column_name from information_schema.columns "
-        f"where table_schema = '{schema}' order by table_name, ordinal_position"))
+        "select table_name || '\t' || column_name || '\t' || data_type from "
+        f"information_schema.columns where table_schema = '{schema}' "
+        "order by table_name, ordinal_position"))
     if out is None:
         fail(f"{database} refused its column list: {why}")
     held = {}
     for line in out.splitlines():
-        if "\t" not in line:
+        if line.count("\t") < 2:
             continue
-        table, column = line.split("\t", 1)
+        table, column, kind = line.split("\t", 2)
         held.setdefault(table, []).append(column)
+        TYPES[(database, table, column)] = kind
     return held
+
+
+# A NULL IN 28.4 LANDS AS THE COLUMN'S BLANK. The transpiled schema declares every column NOT NULL
+# -- AL has no null, a blank Text is '' and an empty Blob is empty -- while SQL Server's demo rows
+# hold NULL in a blob or text nobody wrote (`Sales Header."Work Description"`). Eighteen tables
+# refused for it, `Sales Header` among them (measured 2026-09-08).
+# Dollar-quoted, because the SELECT travels inside a single-quoted `psql -c` inside `sh -c`.
+BLANKS = {"bytea": "$$$$::bytea", "text": "$$$$", "character varying": "$$$$", "character": "$$$$"}
+
+
+def blanked(database, table, column, into_kind):
+    blank = BLANKS.get(into_kind)
+    quoted_name = '"' + column.replace('"', '""') + '"'
+    return f"COALESCE({quoted_name}, {blank})" if blank else quoted_name
 
 
 def quoted(names):
@@ -78,8 +97,16 @@ SYSTEM = {"$systemid": "SystemId", "$systemcreatedat": "SystemCreatedAt",
 
 
 def folded(name):
-    """What SQL Server would have called this transpiled name."""
-    return name.replace(".", "_")
+    """What SQL Server would have called this transpiled name.
+
+    BC folds every character SQL Server will not take in an identifier to an underscore: the dot
+    of `Nos.`, the slash of `G/L Entry`, a quote, a bracket, a percent. `G/L Account` and the
+    whole general ledger were skipped as "only 28.4 has" while the fold knew only the dot
+    (measured 2026-09-08: 586 tables unmatched, `G/L Entry` among them).
+    """
+    for unsafe in './\\"\'%[]:':
+        name = name.replace(unsafe, "_")
+    return name
 
 
 def matched(theirs, ours):
@@ -135,7 +162,10 @@ def main():
         if not pairs:
             continue
         table = ours
-        reading = ('\\copy (SELECT ' + quoted(p[0] for p in pairs) +
+        selected = ", ".join(
+            blanked(SOURCE, theirs, p[0], TYPES.get((arguments.into, ours, p[1]), ""))
+            for p in pairs)
+        reading = ('\\copy (SELECT ' + selected +
                    f' FROM "{arguments.company}"."{theirs}") TO STDOUT')
         writing = '\\copy public."' + ours + '" (' + quoted(p[1] for p in pairs) + ') FROM STDIN'
         piped = (f"psql -U agiru -d {SOURCE} -c '{reading}' | "

@@ -246,6 +246,30 @@ bool ModifyRow(const Connection &connection,
   return result.Rows() != 0;
 }
 
+bool RenameRow(const Connection &connection,
+               const TableDef &table,
+               std::span<const std::optional<std::string>> values,
+               std::span<const std::optional<std::string>> oldKey) {
+  if (values.size() != StoredCount(table)) {
+    throw Error("Rename: the value count does not match the declaration");
+  }
+  std::string assignments;
+  std::size_t at = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    if (at != 0) { assignments += ", "; }
+    assignments += Quoted(field.name) + " = " + Placeholder(at + 1);
+    ++at;
+  }
+  FieldValues bound(values.begin(), values.end());
+  bound.insert(bound.end(), oldKey.begin(), oldKey.end());
+  const Result result =
+      connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
+                             KeyPredicate(table, values.size() + 1) + " RETURNING 1",
+                         bound);
+  return result.Rows() != 0;
+}
+
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> key) {

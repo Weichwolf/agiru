@@ -28,6 +28,11 @@ bool ModifyRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values);
 
+bool RenameRow(const Connection &connection,
+               const TableDef &table,
+               std::span<const std::optional<std::string>> values,
+               std::span<const std::optional<std::string>> oldKey);
+
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> key);
