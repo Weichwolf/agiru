@@ -95,6 +95,32 @@ std::string RecordRef::GetFilters() const {
   return out;
 }
 
+::agiru::Boolean RecordRef::Insert() {
+  detail::RuntimeInsert(record_, Table());
+  return true;
+}
+
+::agiru::Boolean RecordRef::Insert(::agiru::Boolean RunTrigger) {
+  static_cast<void>(RunTrigger);
+  return Insert();
+}
+
+::agiru::Boolean RecordRef::Modify(::agiru::Boolean RunTrigger) {
+  static_cast<void>(RunTrigger);
+  if (!detail::RuntimeModify(record_, Table())) {
+    throw Error("The " + std::string(Table().name) + " does not exist");
+  }
+  return true;
+}
+
+::agiru::Boolean RecordRef::Delete(::agiru::Boolean RunTrigger) {
+  static_cast<void>(RunTrigger);
+  if (!detail::RuntimeDelete(record_, Table())) {
+    throw Error("The " + std::string(Table().name) + " does not exist");
+  }
+  return true;
+}
+
 constexpr ::agiru::Integer kInvariantFormat = 9;
 
 std::string FieldRef::GetFilter() const {

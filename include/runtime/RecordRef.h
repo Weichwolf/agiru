@@ -697,10 +697,7 @@ public:
   /// \param RunTrigger The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Delete(::agiru::Boolean RunTrigger = {}) {
-    static_cast<void>(RunTrigger);
-    throw Error("RecordRef.Delete(Boolean) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean Delete(::agiru::Boolean RunTrigger = {});
 
   /// \brief AL `RecordRef.DeleteAll(Boolean)`. Deletes all records in a table that fall within a
   /// specified range.
@@ -867,9 +864,7 @@ public:
   /// the OnInsert trigger.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert() {
-    throw Error("RecordRef.Insert() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean Insert();
 
   /// \brief AL `RecordRef.Insert(Boolean, Boolean)`. Inserts a record into a table.
   /// \param RunTrigger The AL `Boolean`.
@@ -887,10 +882,7 @@ public:
   /// \param RunTrigger The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Insert(::agiru::Boolean RunTrigger) {
-    static_cast<void>(RunTrigger);
-    throw Error("RecordRef.Insert(Boolean) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean Insert(::agiru::Boolean RunTrigger);
 
   /// \brief AL `RecordRef.IsDirty()`. Gets a boolean value that indicates whether the current
   /// in-memory instance of a record or filtered set of records has changed since being retrieved
@@ -974,10 +966,7 @@ public:
   /// \param RunTrigger The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Modify(::agiru::Boolean RunTrigger = {}) {
-    static_cast<void>(RunTrigger);
-    throw Error("RecordRef.Modify(Boolean) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean Modify(::agiru::Boolean RunTrigger = {});
 
   /// \brief AL `RecordRef.Next(Integer)`. Steps through a specified number of records and retrieves
   /// a record.

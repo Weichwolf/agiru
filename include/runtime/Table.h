@@ -312,6 +312,22 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table);
 /// \return How many rows went.
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
 
+/// \brief AL `Record.TransferFields` -- copies by field NUMBER between two tables.
+///
+/// \param into                 The destination record.
+/// \param table                Its declaration.
+/// \param from                 The source record.
+/// \param source               Its declaration.
+/// \param withPrimaryKey       Whether the primary key travels too.
+/// \param skipMismatchingTypes Whether a type mismatch is skipped rather than raised.
+/// \throws Error on a type mismatch, unless it is to be skipped.
+void RuntimeTransferFields(void *into,
+                           const TableDef &table,
+                           const void *from,
+                           const TableDef &source,
+                           bool withPrimaryKey,
+                           bool skipMismatchingTypes);
+
 /// \brief Gives a record its own empty set of temporary rows (board:0583).
 /// \param record The record.
 /// \param ops    How the runtime reaches rows of its type -- `kTempOps<T>`.
@@ -1660,15 +1676,57 @@ public:
     return std::string(TableTraits<Derived>::kTable.name);
   }
 
-  /// \brief AL `Record.TransferFields(...)`. Copies all matching fields in one record to another
-  /// record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void TransferFields(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.TransferFields is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.TransferFields(FromRecord [, InitPrimaryKeyFields [, Skip]])`.
+  ///
+  /// \tparam Source The source record's class, which need not be this one's.
+  /// \param From                  The record to copy from.
+  /// \param InitPrimaryKeyFields  Whether the primary key travels too; true by default, which is
+  ///                              the page's own default.
+  /// \param SkipFieldsNotMatchingType Whether a type mismatch is skipped rather than raised.
+  ///
+  /// \note IT COPIES BY FIELD NUMBER AND NOT BY NAME, which the page states outright: "For each
+  ///       field in Record (the destination), the contents of the field that has the same field
+  ///       number in FromRecord (the source) will be copied, if such a field exists."
+  ///
+  /// \note THE TYPES MUST MATCH, WITH TWO EXCEPTIONS THE PAGE NAMES: "text and code are
+  ///       convertible, other types are not", and "Enum fields are considered being the same data
+  ///       type even on different enum types". Both are honoured here.
+  ///
+  /// \note `InitPrimaryKeyFields` DECIDES THE KEY AND NOT THE COPY. False leaves the destination's
+  ///       primary key where it was, which is what a caller writing `TransferFields(Other, false)`
+  ///       means: take the payload, keep my identity.
+  template <typename Source>
+    requires requires { TableTraits<Source>::kTable; }
+  void TransferFields(const Source &From,
+                      Boolean InitPrimaryKeyFields = true,
+                      Boolean SkipFieldsNotMatchingType = false) {
+    detail::RuntimeTransferFields(Self(),
+                                  TableTraits<Derived>::kTable,
+                                  &From,
+                                  TableTraits<Source>::kTable,
+                                  InitPrimaryKeyFields,
+                                  SkipFieldsNotMatchingType);
+  }
+
+  /// \brief AL `Record.TransferFields(FromRecord ...)` where the SOURCE is a table this run does
+  ///        not carry.
+  /// \tparam Source The absent object's stub type.
+  /// \param From The stub.
+  /// \throws Error always -- there is no field table to copy by number from (board:0034).
+  ///
+  /// \note IT REFUSES BY NAME RATHER THAN FAILING TO COMPILE. A body that transfers from a table
+  ///       outside this run is still a body this tree translates, and the refusal names the table
+  ///       instead of the call site naming a missing template.
+  template <typename Source>
+    requires(!requires { TableTraits<Source>::kTable; })
+  void TransferFields(const Source &From,
+                      Boolean InitPrimaryKeyFields = true,
+                      Boolean SkipFieldsNotMatchingType = false) {
+    static_cast<void>(From);
+    static_cast<void>(InitPrimaryKeyFields);
+    static_cast<void>(SkipFieldsNotMatchingType);
+    throw Error("Record.TransferFields: the source is a table this run does not carry "
+                "(board:0034)");
   }
 
   /// \brief AL `Record.Truncate(...)`. Deletes all records in a table that fall within a specified

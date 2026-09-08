@@ -359,6 +359,45 @@ void Defaulted(void *record, const TableDef &table, bool sparePrimaryKey) {
 
 }
 
+bool Convertible(FieldType into, FieldType from) {
+  if (into == from) { return true; }
+  const auto textLike = [](FieldType type) {
+    return type == FieldType::Text || type == FieldType::Code;
+  };
+  const auto ordinal = [](FieldType type) {
+    return type == FieldType::Option || type == FieldType::Enum;
+  };
+  return (textLike(into) && textLike(from)) || (ordinal(into) && ordinal(from));
+}
+
+bool InPrimaryKey(const TableDef &table, FieldNo no) {
+  if (table.keys.empty()) { return false; }
+  for (const FieldNo held : table.keys[0].fields) {
+    if (held == no) { return true; }
+  }
+  return false;
+}
+
+void RuntimeTransferFields(void *into,
+                           const TableDef &table,
+                           const void *from,
+                           const TableDef &source,
+                           bool withPrimaryKey,
+                           bool skipMismatchingTypes) {
+  for (const FieldDef &target : table.fields) {
+    if (!withPrimaryKey && InPrimaryKey(table, target.no)) { continue; }
+    const FieldDef *held = Field(source, target.no);
+    if (held == nullptr) { continue; }
+    if (!Convertible(target.type, held->type)) {
+      if (skipMismatchingTypes) { continue; }
+      throw Error("TransferFields: " + std::string(table.name) + "." + std::string(target.name) +
+                  " and " + std::string(source.name) + "." + std::string(held->name) +
+                  " are not the same data type");
+    }
+    SetFieldText(into, target, StorageText(from, *held));
+  }
+}
+
 void RuntimeInit(void *record, const TableDef &table) {
   Defaulted(record, table, true);
 }

@@ -3865,3 +3865,27 @@ for keeping the tree, arrived at from a fourth direction.
 
 87 items filed from this family, and every page carries a row: an item number, a routing into an item
 or one of the 78 pre-existing roots, or a one-sentence reason why it has no task.
+
+## A measurement harness that DROPS a unit is the blind gate wearing a number (2026-09-08)
+
+Measuring the UT milestone with a shell loop of `agiru run-tests --codeunit <name>` and summing the
+`N of M passed` lines reported **89 of 851** after `TransferFields` landed -- a catastrophic
+regression from 275 of 1 708. It was neither.
+
+**16 of the 62 codeunits exceeded the loop's 180 s timeout and printed no total at all**, so they
+left BOTH the numerator and the DENOMINATOR. The denominator moving is what gives it away: 1 708 to
+851 is not something a code change can do. With 400 s the same build reports **278 of 1 708 over
+all 62**.
+
+Two rules, and the tree already states both in other words:
+
+- **A UNIT THAT REPORTS NOTHING IS A FAILURE AND NEVER AN OMISSION.** `agiru run-tests --isolate`
+  gets this right -- it counts a dead child's methods as failures and says the child died -- and the
+  hand-rolled loop beside it did not. Use the door, not a loop that looks like it.
+- **WATCH THE DENOMINATOR.** CLAUDE.md's baseline rule is the same shape: "the baseline carries the
+  unit count beside the counter; a shrinking denominator is an abort." It applies to a test run as
+  much as to a lint baseline.
+
+And the reason those 16 got slower is worth keeping: they were failing FAST before and now do real
+work. A test that reaches further takes longer, so a timeout tuned to the broken state is a timeout
+that fails the fixed one.
