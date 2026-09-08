@@ -44,6 +44,16 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Get(::agiru::Integer Index, ::agiru::XmlNode &Node);
+
+  /// \brief AL `foreach XmlNode in XmlNodeList` -- the first node.
+  /// \return A pointer to the first node, so a range-for binds `XmlNode &`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::XmlNode *begin();
+
+  /// \brief AL `foreach XmlNode in XmlNodeList` -- one past the last node.
+  /// \return A pointer one past the last node.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::XmlNode *end();
 };
 
 }

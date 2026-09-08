@@ -183,6 +183,19 @@ namespace detail {
 /// \return The member name, or the ordinal as digits when it is undeclared.
 [[nodiscard]] std::string MemberText(const FieldDef &def, std::int32_t ordinal);
 
+/// \brief The member of an Option or Enum field spelled by NAME, as a filter spells it.
+///
+/// \param def  The field, which carries the member names.
+/// \param text The name, matched without regard to case, or the ordinal as digits.
+/// \return The ordinal as digits, or `text` unchanged when it names no member -- the database
+///         then refuses it loudly rather than this layer guessing.
+///
+/// \note `SetFilter(Status, '%1|%2', Status::Open, Status::Created)` reaches the filter as
+///       `Open|Created`, because `%1` of an enum renders its NAME; SQL wants the column's
+///       integer. 114 UT failures were `invalid input syntax for type integer: "Open"`
+///       (measured 2026-09-08).
+[[nodiscard]] std::string MemberOrdinal(const FieldDef &def, std::string_view text);
+
 /// \brief Replaces the numbered placeholders in a pattern.
 ///
 /// \param pattern The text carrying the placeholders.

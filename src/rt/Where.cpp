@@ -1,6 +1,7 @@
 #include "Where.h"
 
 #include "meta/TableDef.h"
+#include "runtime/Record.h"
 
 #include "Filter.h"
 
@@ -46,8 +47,9 @@ std::string LikePattern(std::string_view value) {
 
 void One(const Atom &atom, const FieldDef &def, Clause &into, std::size_t &next) {
   const std::string column = Quoted(def.name);
-  const auto bind = [&into, &next](const std::string &value) {
-    into.binds.emplace_back(value);
+  const bool byMember = def.type == FieldType::Option || def.type == FieldType::Enum;
+  const auto bind = [&into, &next, &def, byMember](const std::string &value) {
+    into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value) : value);
     return Placeholder(next++);
   };
   switch (atom.compare) {

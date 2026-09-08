@@ -411,6 +411,22 @@ std::string PlatformFieldSpelling(const PlatformField &wanted) {
   return found == declared.end() ? std::string{} : found->second;
 }
 
+const std::set<std::string> &TableMembers() {
+  static const std::set<std::string> members = [] {
+    const std::filesystem::path table =
+        std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "runtime" / "Table.h";
+    const std::string whole = TextOf(table);
+    std::set<std::string> found;
+    static const std::regex declared(R"([\w>&*:\s]\s([A-Z][A-Za-z0-9]*)\s*\()");
+    for (std::sregex_iterator at(whole.begin(), whole.end(), declared), end; at != end; ++at) {
+      found.insert((*at)[1].str());
+    }
+    if (found.empty()) { throw std::runtime_error("the door's Table.h declares no member at all"); }
+    return found;
+  }();
+  return members;
+}
+
 bool HiddenByABaseMember(std::string_view name) {
   return BaseMembers().contains(std::string(name));
 }

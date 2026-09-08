@@ -79,17 +79,19 @@ public:
   ::agiru::XmlAttributeCollection Attributes();
 
   /// \brief AL `XmlElement.Create(Text, Any)`. Creates an XmlElement node.
+  /// \note IT IS STATIC, because AL writes `XmlElement.Create(...)` on the TYPE and assigns the
+  ///       result -- no instance exists before the call.
   /// \param Name The AL `Text`.
   /// \param Content The AL `Any`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlElement Create(std::string_view Name, const ::agiru::Variant &Content);
+  static ::agiru::XmlElement Create(std::string_view Name, const ::agiru::Variant &Content);
 
   /// \brief AL `XmlElement.Create(Text)`. Creates an XmlElement node.
   /// \param Name The AL `Text`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlElement Create(std::string_view Name);
+  static ::agiru::XmlElement Create(std::string_view Name);
 
   /// \brief AL `XmlElement.Create(Text, Text, Any)`. Creates an XmlElement node.
   /// \param LocalName The AL `Text`.
@@ -97,16 +99,16 @@ public:
   /// \param Content The AL `Any`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlElement Create(std::string_view LocalName,
-                             std::string_view NamespaceUri,
-                             const ::agiru::Variant &Content);
+  static ::agiru::XmlElement Create(std::string_view LocalName,
+                                    std::string_view NamespaceUri,
+                                    const ::agiru::Variant &Content);
 
   /// \brief AL `XmlElement.Create(Text, Text)`. Creates an XmlElement node.
   /// \param LocalName The AL `Text`.
   /// \param NamespaceUri The AL `Text`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlElement Create(std::string_view LocalName, std::string_view NamespaceUri);
+  static ::agiru::XmlElement Create(std::string_view LocalName, std::string_view NamespaceUri);
 
   /// \brief AL `XmlElement.GetChildElements()`. Gets a list containing the child elements for this
   /// element, in document order.

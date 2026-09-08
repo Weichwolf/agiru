@@ -389,10 +389,20 @@ private:
         static_cast<unsigned char>(text[static_cast<std::size_t>(index_) - 1]));
   }
 
+  /// \brief AL `Text[Index] := Char`.
+  ///
+  /// \note ONE PAST THE END APPENDS. `SeparatorChar[1] := 9` on an empty `Text` and
+  ///       `t[i] := c` in a loop that builds a column id are both shipped BaseApp code
+  ///       (`DataExchDef.Table.al`, `ExcelBuffer.Table.al`), so an index of `StrLen + 1` extends
+  ///       the text by one character; anything further is outside it, as a read would be.
   void Write(char character) {
     std::string text(value_->Value());
-    Check(text.size());
-    text[static_cast<std::size_t>(index_) - 1] = character;
+    if (index_ >= 1 && static_cast<std::size_t>(index_) == text.size() + 1) {
+      text.push_back(character);
+    } else {
+      Check(text.size());
+      text[static_cast<std::size_t>(index_) - 1] = character;
+    }
     *value_ = std::string_view(text);
   }
 

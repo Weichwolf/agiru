@@ -152,7 +152,8 @@ struct DateTimeOffset {
   /// \param format The .NET format string.
   /// \param culture The culture, which this runtime does not have.
   /// \return Never.
-  /// \throws Error always -- a .NET format specification is not this runtime's `Format` (board:0007).
+  /// \throws Error always -- a .NET format specification is not this runtime's `Format`
+  /// (board:0007).
   template <typename... Rest>
   [[nodiscard]] std::string ToString(std::string_view format, const Rest &...rest) const {
     (static_cast<void>(rest), ...);

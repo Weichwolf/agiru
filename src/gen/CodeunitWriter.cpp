@@ -853,6 +853,28 @@ void Reaching(const al::VarDecl &declared, const Objects &objects, std::set<std:
   if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
 }
 
+std::string Prologue(const al::CodeunitObject &unit,
+                     const Objects &objects,
+                     const std::set<std::string> &headers,
+                     const std::map<std::string, std::set<std::string>> &forward) {
+  std::string out = std::string(kDoorMarker);
+  if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
+  if (DeclaresAnOption(unit.variables, unit.procedures)) {
+    out += "#include \"options/Types.h\"\n";
+  }
+  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+
+  if (!forward.empty()) { out += "\n"; }
+  for (const auto &[space, named] : forward) {
+    const std::string within = space.empty() ? "agiru" : "agiru::" + space;
+    out += "namespace " + within + " {\n";
+    for (const std::string &one : named) { out += "class " + one + ";\n"; }
+    out += "} // namespace " + within + "\n";
+  }
+  out += "\n";
+  return out;
+}
+
 std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
   for (const std::string &face : unit.implements) {
@@ -888,22 +910,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     both(procedure.returned);
     if (!procedure.returned.byReference) { reach(procedure.returned); }
   }
-  std::string out = std::string(kDoorMarker);
-  if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
-  if (DeclaresAnOption(unit.variables, unit.procedures)) {
-    out += "#include \"options/Types.h\"\n";
-  }
-  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
-
-  if (!forward.empty()) { out += "\n"; }
-  for (const auto &[space, named] : forward) {
-    const std::string within = space.empty() ? "agiru" : "agiru::" + space;
-    out += "namespace " + within + " {\n";
-    for (const std::string &one : named) { out += "class " + one + ";\n"; }
-    out += "} // namespace " + within + "\n";
-  }
-  out += "\n";
-  return out;
+  return Prologue(unit, objects, headers, forward);
 }
 
 using DotNetNames = std::map<std::string, std::string>;
@@ -1178,6 +1185,16 @@ public:
     const std::string spelled = Identifier(member.field);
     return std::ranges::any_of(table->second.fields,
                                [&](const auto &field) { return field.second == spelled; });
+  }
+
+  [[nodiscard]] std::string TableOf(std::string_view variable) const override {
+    const std::string subtype =
+        SubtypeOfRecord(variable).empty() && LowerKey(std::string(variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(variable);
+    if (subtype.empty()) { return {}; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    return table == objects_.tables.end() ? std::string{} : table->second.identifier;
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {

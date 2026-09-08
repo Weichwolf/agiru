@@ -2,6 +2,7 @@
 
 #include "Scope.h"
 
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -31,5 +32,7 @@ struct PlatformField {
 [[nodiscard]] std::string PlatformFieldSpelling(const PlatformField &wanted);
 
 [[nodiscard]] bool HiddenByABaseMember(std::string_view name);
+
+[[nodiscard]] const std::set<std::string> &TableMembers();
 
 }

@@ -1,5 +1,4 @@
 #include "dotnet/DateTime.h"
-
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -9,6 +8,7 @@
 #include "type/Integer.h"
 #include "type/Time.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -19,6 +19,9 @@ namespace {
 
 constexpr std::int64_t kTicksPerMillisecond = 10000;
 constexpr std::int64_t kAlEpochYear = 1753;
+constexpr int kOleEpochYear = 1899;
+constexpr unsigned kOleEpochMonth = 12;
+constexpr unsigned kOleEpochDay = 30;
 
 std::int64_t Whole(const ::agiru::Decimal &value) {
   const std::string rendered = ::agiru::Round(value).ToInvariantString();
@@ -27,7 +30,7 @@ std::int64_t Whole(const ::agiru::Decimal &value) {
 }
 
 std::int64_t OleEpochToAlEpochDays() {
-  return ::agiru::calendar::DaysFromCivil(1899, 12, 30) -
+  return ::agiru::calendar::DaysFromCivil(kOleEpochYear, kOleEpochMonth, kOleEpochDay) -
          ::agiru::calendar::DaysFromCivil(kAlEpochYear, 1, 1);
 }
 
@@ -75,15 +78,13 @@ struct DateTime DateTime::Today() const {
 }
 
 DateTime DateTime::FromParts::FromTicks(::agiru::BigInteger ticks) {
-  return ::agiru::dotnet::DateTime{
-      .at_ = ::agiru::DateTime::FromMilliseconds((ticks - TicksBeforeTheAlEpoch()) /
-                                                 kTicksPerMillisecond)};
+  return ::agiru::dotnet::DateTime{.at_ = ::agiru::DateTime::FromMilliseconds(
+                                       (ticks - TicksBeforeTheAlEpoch()) / kTicksPerMillisecond)};
 }
 
 struct DateTime DateTime::FromOADate(::agiru::Decimal days) const {
-  const ::agiru::Decimal milliseconds =
-      (days - ::agiru::Decimal{OleEpochToAlEpochDays()}) *
-      ::agiru::Decimal{::agiru::Time::kMillisecondsPerDay};
+  const ::agiru::Decimal milliseconds = (days - ::agiru::Decimal{OleEpochToAlEpochDays()}) *
+                                        ::agiru::Decimal{::agiru::Time::kMillisecondsPerDay};
   return ::agiru::dotnet::DateTime{.at_ = ::agiru::DateTime::FromMilliseconds(Whole(milliseconds))};
 }
 

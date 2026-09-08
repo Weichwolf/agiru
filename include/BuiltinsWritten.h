@@ -468,17 +468,55 @@ namespace detail {
 ///
 /// \note EVERY READER HERE IS THE ONE THE DATABASE ALREADY USES for that type, which is what
 ///       keeps `Evaluate` one function instead of a table of parsers.
+/// \brief AL `Evaluate(Boolean, Text)`: the spellings AL accepts for a Boolean.
+/// \tparam T `Boolean` or `bool`.
+/// \param into Where the value lands.
+/// \param text The text.
+/// \return Whether the text spelled a Boolean.
+template <typename T>
+[[nodiscard]] ::agiru::Boolean EvaluatedBoolean(T &into, std::string_view text) {
+  if (text == "1" || text == "true" || text == "Yes" || text == "yes") {
+    into = true;
+    return true;
+  }
+  if (text == "0" || text == "false" || text == "No" || text == "no" || text.empty()) {
+    into = false;
+    return true;
+  }
+  return false;
+}
+
+/// \brief AL `Evaluate(Date, Text)` over the ISO form the runtime renders.
+/// \param into Where the date lands.
+/// \param text The text, `yyyy-mm-dd` or empty for the undefined date.
+/// \return Whether the text spelled a date.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedDate(::agiru::Date &into, std::string_view text) {
+  if (text.empty()) {
+    into = ::agiru::Date{};
+    return true;
+  }
+  constexpr std::size_t kIso = 10;
+  constexpr std::size_t kYearAt = 0;
+  constexpr std::size_t kYearDigits = 4;
+  constexpr std::size_t kMonthAt = 5;
+  constexpr std::size_t kDayAt = 8;
+  constexpr std::size_t kPartDigits = 2;
+  constexpr std::size_t kFirstDash = 4;
+  constexpr std::size_t kSecondDash = 7;
+  if (text.size() < kIso || text[kFirstDash] != '-' || text[kSecondDash] != '-') { return false; }
+  const auto number = [text](std::size_t at, std::size_t digits) {
+    return static_cast<int>(
+        std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, kDecimal));
+  };
+  into = ::agiru::Date::FromYmd(number(kYearAt, kYearDigits),
+                                static_cast<unsigned>(number(kMonthAt, kPartDigits)),
+                                static_cast<unsigned>(number(kDayAt, kPartDigits)));
+  return !into.IsUndefined();
+}
+
 template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::string_view text) {
   if constexpr (std::is_same_v<T, ::agiru::Boolean> || std::is_same_v<T, bool>) {
-    if (text == "1" || text == "true" || text == "Yes" || text == "yes") {
-      into = true;
-      return true;
-    }
-    if (text == "0" || text == "false" || text == "No" || text == "no" || text.empty()) {
-      into = false;
-      return true;
-    }
-    return false;
+    return EvaluatedBoolean(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::Guid>) {
     const std::expected<::agiru::Guid, ::agiru::Refusal> read = ::agiru::Guid::FromText(text);
     if (!read.has_value()) { return false; }
@@ -488,27 +526,7 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
     into = ::agiru::Decimal::FromInvariantString(text);
     return true;
   } else if constexpr (std::is_same_v<T, ::agiru::Date>) {
-    if (text.empty()) {
-      into = ::agiru::Date{};
-      return true;
-    }
-    constexpr std::size_t kIso = 10;
-    constexpr std::size_t kYearAt = 0;
-    constexpr std::size_t kYearDigits = 4;
-    constexpr std::size_t kMonthAt = 5;
-    constexpr std::size_t kDayAt = 8;
-    constexpr std::size_t kPartDigits = 2;
-    constexpr std::size_t kFirstDash = 4;
-    constexpr std::size_t kSecondDash = 7;
-    if (text.size() < kIso || text[kFirstDash] != '-' || text[kSecondDash] != '-') { return false; }
-    const auto number = [text](std::size_t at, std::size_t digits) {
-      return static_cast<int>(
-          std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, kDecimal));
-    };
-    into = ::agiru::Date::FromYmd(number(kYearAt, kYearDigits),
-                                  static_cast<unsigned>(number(kMonthAt, kPartDigits)),
-                                  static_cast<unsigned>(number(kDayAt, kPartDigits)));
-    return !into.IsUndefined();
+    return EvaluatedDate(into, text);
   } else if constexpr (std::is_same_v<T, ::agiru::DateFormula>) {
     const std::expected<::agiru::DateFormula, ::agiru::Refusal> read =
         ::agiru::DateFormula::FromText(text);

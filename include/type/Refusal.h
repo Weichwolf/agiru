@@ -20,8 +20,8 @@ namespace agiru {
 ///       `std::string_view`: it names a case the reader knows about, so it outlives the call and
 ///       costs no allocation on a path AL takes constantly.
 struct Refusal {
-  std::string_view what;  ///< What was wrong, named.
-  std::size_t at = 0;     ///< Where in the input, counting from ONE; 0 when it has no position.
+  std::string_view what; ///< What was wrong, named.
+  std::size_t at = 0;    ///< Where in the input, counting from ONE; 0 when it has no position.
 };
 
 }

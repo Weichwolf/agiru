@@ -21,6 +21,8 @@
 
 #include "BuiltinsWritten.h"
 
+#include <algorithm>
+#include <cctype>
 #include <compare>
 #include <cstddef>
 #include <cstdint>
@@ -166,6 +168,20 @@ namespace detail {
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
   const EnumValueDef *value = ValueOf(def.values, ordinal);
   return value != nullptr ? std::string(value->name) : std::to_string(ordinal);
+}
+
+std::string MemberOrdinal(const FieldDef &def, std::string_view text) {
+  if (text.empty() || text.find_first_not_of("-0123456789") == std::string_view::npos) {
+    return std::string(text);
+  }
+  const auto same = [](std::string_view a, std::string_view b) {
+    return std::ranges::equal(
+        a, b, [](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
+  };
+  for (const EnumValueDef &value : def.values) {
+    if (same(value.name, text)) { return std::to_string(value.ordinal); }
+  }
+  return std::string(text);
 }
 
 void RaiseTestFieldMismatch(const void *record,

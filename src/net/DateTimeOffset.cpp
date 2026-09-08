@@ -1,6 +1,6 @@
-#include "dotnet/DateTime.h"
 #include "dotnet/DateTimeOffset.h"
 
+#include "dotnet/DateTime.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Date.h"
@@ -8,6 +8,8 @@
 #include "type/Duration.h"
 #include "type/Time.h"
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -69,7 +71,8 @@ struct DateTimeOffset DateTimeOffset::UtcNow() const {
   return ToUnixTimeMilliseconds() / kMillisecondsPerSecond;
 }
 
-struct DateTimeOffset DateTimeOffset::FromUnixTimeMilliseconds(::agiru::BigInteger milliseconds) const {
+struct DateTimeOffset
+DateTimeOffset::FromUnixTimeMilliseconds(::agiru::BigInteger milliseconds) const {
   return ::agiru::dotnet::DateTimeOffset{.at_ = Held(milliseconds + kUnixEpoch)};
 }
 
@@ -78,7 +81,9 @@ struct DateTimeOffset DateTimeOffset::FromUnixTimeSeconds(::agiru::BigInteger se
 }
 
 struct DateTimeOffset DateTimeOffset::Parse(std::string_view text) const {
-  if (text.size() < kIsoLength || text[kFractionAt - 1] != ':') { return ::agiru::dotnet::DateTimeOffset{}; }
+  if (text.size() < kIsoLength || text[kFractionAt - 1] != ':') {
+    return ::agiru::dotnet::DateTimeOffset{};
+  }
   const int year = Number(text, kYearAt, 4);
   const int month = Number(text, kMonthAt, 2);
   const int day = Number(text, kDayAt, 2);
@@ -91,13 +96,14 @@ struct DateTimeOffset DateTimeOffset::Parse(std::string_view text) const {
   int fraction = 0;
   if (text.size() > kFractionAt + 3 && text[kFractionAt] == '.') {
     fraction = Number(text, kFractionAt + 1, 3);
-    if (fraction < 0) { fraction = 0; }
+    fraction = std::max(fraction, 0);
   }
   const ::agiru::Date date =
       ::agiru::Date::FromYmd(year, static_cast<unsigned>(month), static_cast<unsigned>(day));
   if (date.IsUndefined()) { return ::agiru::dotnet::DateTimeOffset{}; }
-  return ::agiru::dotnet::DateTimeOffset{.at_ = ::agiru::DateTime::Create(
-                            date, ::agiru::Time::FromHms(hour, minute, second, fraction))};
+  return ::agiru::dotnet::DateTimeOffset{
+      .at_ =
+          ::agiru::DateTime::Create(date, ::agiru::Time::FromHms(hour, minute, second, fraction))};
 }
 
 ::agiru::dotnet::DateTime DateTimeOffset::DateTime() const {

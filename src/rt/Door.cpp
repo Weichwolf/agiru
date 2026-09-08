@@ -12,7 +12,6 @@
 #include "type/Cookie.h"
 #include "type/DataTransfer.h"
 #include "type/Date.h"
-#include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Debugger.h"
 #include "type/Decimal.h"
@@ -3897,6 +3896,16 @@ void XmlNamespaceManager::RemoveNamespace(std::string_view Prefix, std::string_v
   static_cast<void>(Index);
   static_cast<void>(Node);
   RefuseDoor("XmlNodeList.Get(Integer, XmlNode)");
+}
+
+::agiru::XmlNode *XmlNodeList::begin() {
+  throw Error("XmlNodeList cannot be walked yet: the surface is declared, the behaviour is not "
+              "(board:0035)");
+}
+
+::agiru::XmlNode *XmlNodeList::end() {
+  throw Error("XmlNodeList cannot be walked yet: the surface is declared, the behaviour is not "
+              "(board:0035)");
 }
 
 ::agiru::Boolean XmlProcessingInstruction::AddAfterSelf(const ::agiru::Variant &Content) {
