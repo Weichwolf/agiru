@@ -8,6 +8,8 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -20,6 +22,10 @@ struct TableRef {
 
   std::map<std::string, std::string> fields;
   std::map<std::string, std::string> procedures;
+
+  std::string name;
+  std::vector<std::pair<std::string, std::string>> dataItems;
+  std::vector<std::string> requestFields;
 };
 
 using TableIndex = std::map<std::string, TableRef>;
@@ -48,6 +54,8 @@ struct Objects {
   EnumIndex enums;
   FieldEnums fieldEnums;
 };
+
+const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);
 
 void NoteObjectNames(const Objects &objects);
 

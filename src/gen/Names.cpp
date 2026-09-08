@@ -7,6 +7,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -416,6 +417,36 @@ ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind) {
     declared.nameSpace = std::string(source.substr(from, end - from));
   }
   return declared;
+}
+
+ReportControls ReportControlsOf(std::string_view source) {
+  static const std::regex dataItem(
+      R"re(\bdataitem\s*\(\s*(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_]*))\s*;\s*(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_]*))\s*\))re",
+      std::regex::icase);
+  static const std::regex requestField(
+      R"re((?:^|[^.\w])field\s*\(\s*(?:"([^"]*)"|([A-Za-z_][A-Za-z0-9_]*))\s*;)re",
+      std::regex::icase);
+  constexpr std::size_t kQuotedName = 1;
+  constexpr std::size_t kBareName = 2;
+  constexpr std::size_t kQuotedTable = 3;
+  constexpr std::size_t kBareTable = 4;
+  const auto named = [](const std::smatch &match, std::size_t quoted, std::size_t bare) {
+    return match[quoted].matched ? match[quoted].str() : match[bare].str();
+  };
+  ReportControls controls;
+  const std::string text(source);
+  for (auto it = std::sregex_iterator(text.begin(), text.end(), dataItem);
+       it != std::sregex_iterator{};
+       ++it) {
+    controls.dataItems.emplace_back(named(*it, kQuotedName, kBareName),
+                                    named(*it, kQuotedTable, kBareTable));
+  }
+  for (auto it = std::sregex_iterator(text.begin(), text.end(), requestField);
+       it != std::sregex_iterator{};
+       ++it) {
+    controls.requestFields.push_back(named(*it, kQuotedName, kBareName));
+  }
+  return controls;
 }
 
 }

@@ -45,7 +45,10 @@ agiru::gen::Objects Tables() {
       agiru::gen::TableRef{.identifier = "tables::LineNumberBuffer",
                            .header = "LineNumberBuffer.h",
                            .fields = {},
-                           .procedures = {}});
+                           .procedures = {},
+                           .name = {},
+                           .dataItems = {},
+                           .requestFields = {}});
   objects.enums.insert_or_assign("sales line type",
                                  agiru::gen::EnumRef{.identifier = "SalesLineType",
                                                      .header = "SalesLineType.h",

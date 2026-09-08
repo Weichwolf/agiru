@@ -5,6 +5,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -50,5 +51,12 @@ struct ObjectDeclaration {
 };
 
 ObjectDeclaration DeclarationOf(std::string_view source, ObjectKind kind);
+
+struct ReportControls {
+  std::vector<std::pair<std::string, std::string>> dataItems;
+  std::vector<std::string> requestFields;
+};
+
+ReportControls ReportControlsOf(std::string_view source);
 
 }

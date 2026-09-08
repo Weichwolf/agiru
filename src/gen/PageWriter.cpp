@@ -159,8 +159,9 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
     return;
   }
   if (type == "TestPage" || type == "TestRequestPage") {
-    const auto found = objects.pages.find(LowerKey(declared.subtype));
-    if (found != objects.pages.end() && !found->second.header.empty()) {
+    const TableIndex &index = PageIndexFor(objects, type);
+    const auto found = index.find(LowerKey(declared.subtype));
+    if (found != index.end() && !found->second.header.empty()) {
       reached.headers.insert(found->second.header);
     }
   }

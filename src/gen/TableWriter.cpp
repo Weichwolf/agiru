@@ -514,7 +514,7 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
   for (const al::VarDecl &argument : declared.arguments) { Name(reached, argument, objects); }
   const std::string alType = TypeName(declared.type);
   if (alType == "TestPage" || alType == "TestRequestPage") {
-    Indexed(objects.pages, declared.subtype, reached.headers);
+    Indexed(PageIndexFor(objects, alType), declared.subtype, reached.headers);
     return;
   }
   if (alType == "Interface") {

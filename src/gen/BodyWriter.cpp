@@ -1316,9 +1316,10 @@ public:
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
     if (held != nullptr && (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
                             TypeName(held->type) == "TestRequestPage")) {
-      const auto page = objects_.pages.find(LowerKey(held->subtype));
-      const bool control = page != objects_.pages.end() &&
-                           page->second.fields.contains(LowerKey(std::string(member.field)));
+      const TableIndex &index = PageIndexFor(objects_, TypeName(held->type));
+      const auto page = index.find(LowerKey(held->subtype));
+      const bool control =
+          page != index.end() && page->second.fields.contains(LowerKey(std::string(member.field)));
       return !control && DoorCalls(member.field);
     }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
@@ -1463,7 +1464,8 @@ public:
         declared.subtype.empty()) {
       return {};
     }
-    const auto page = objects_.pages.find(LowerKey(declared.subtype));
+    const TableIndex &index = PageIndexFor(objects_, type);
+    const auto page = index.find(LowerKey(declared.subtype));
     if (page == objects_.pages.end()) { return {}; }
     const auto control = page->second.fields.find(LowerKey(std::string(member)));
     return control == page->second.fields.end() ? std::string{} : control->second;
@@ -1677,9 +1679,10 @@ public:
     }
     const std::string type = TypeName(declared->type);
     if (type == "Page" || type == "TestPage" || type == "TestRequestPage") {
-      const auto page = objects_.pages.find(LowerKey(declared->subtype));
-      const bool control = page != objects_.pages.end() &&
-                           page->second.fields.contains(LowerKey(std::string(member.field)));
+      const TableIndex &index = PageIndexFor(objects_, type);
+      const auto page = index.find(LowerKey(declared->subtype));
+      const bool control =
+          page != index.end() && page->second.fields.contains(LowerKey(std::string(member.field)));
       return !control && DoorCalls(member.field);
     }
     if (type == "Record" && !declared->subtype.empty()) {

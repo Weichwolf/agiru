@@ -534,8 +534,9 @@ std::string Parameterised(const al::VarDecl &declared, const Objects &objects, c
   const std::string &owner = named.owner;
   if (type == "TestPage" || type == "TestRequestPage") {
     if (declared.subtype.empty()) { return type + "<>"; }
-    const auto found = objects.pages.find(LowerKey(declared.subtype));
-    return found != objects.pages.end() ? type + "<" + found->second.identifier + ">" : type + "<>";
+    const TableIndex &index = PageIndexFor(objects, type);
+    const auto found = index.find(LowerKey(declared.subtype));
+    return found != index.end() ? type + "<" + found->second.identifier + ">" : type + "<>";
   }
   if (type == "Option") {
     return declared.members.empty() || owner.empty() ? "Option<>" : "Option<" + owner + ">";
@@ -783,7 +784,7 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
     reach(declared);
     reachInterface(declared);
     if (NamesAPage(TypeName(declared.type))) {
-      IndexedHeader(objects.pages, declared.subtype, headers);
+      IndexedHeader(PageIndexFor(objects, TypeName(declared.type)), declared.subtype, headers);
     }
   };
   for (const al::VarDecl &declared : unit.variables) { named(declared); }
@@ -804,7 +805,9 @@ void Declared(const al::VarDecl &declared,
               Enum reachEnum,
               Page reachPage,
               Element reachElement) {
-  if (NamesAPage(TypeName(declared.type))) { reachPage(declared.subtype); }
+  if (NamesAPage(TypeName(declared.type))) {
+    reachPage(PageIndexFor(objects, TypeName(declared.type)), declared.subtype);
+  }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
     if (ref != nullptr && !ref->header.empty()) { ahead(ref->identifier); }
@@ -869,8 +872,8 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
         colons == std::string::npos ? reachable : reachable.substr(colons + 2));
   };
-  const auto reachPage = [&](const std::string &subtype) {
-    IndexedHeader(objects.pages, subtype, headers);
+  const auto reachPage = [&](const TableIndex &index, const std::string &subtype) {
+    IndexedHeader(index, subtype, headers);
   };
   const auto reachElement = [&](const std::string &header) { headers.insert(header); };
   const auto both = [&](const al::VarDecl &declared) {
@@ -1256,8 +1259,9 @@ public:
   [[nodiscard]] std::string ControlNamed(const al::VarDecl &declared,
                                          std::string_view member) const {
     if (!NamesAPage(TypeName(declared.type)) || declared.subtype.empty()) { return {}; }
-    const auto page = objects_.pages.find(LowerKey(declared.subtype));
-    if (page == objects_.pages.end()) { return {}; }
+    const TableIndex &index = PageIndexFor(objects_, TypeName(declared.type));
+    const auto page = index.find(LowerKey(declared.subtype));
+    if (page == index.end()) { return {}; }
     const auto control = page->second.fields.find(LowerKey(std::string(member)));
     return control == page->second.fields.end() ? std::string{} : control->second;
   }
@@ -1853,7 +1857,10 @@ TableIndex PlatformTables() {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = {},
                        .fields = {},
-                       .procedures = {}};
+                       .procedures = {},
+                       .name = {},
+                       .dataItems = {},
+                       .requestFields = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
@@ -2101,6 +2108,10 @@ void NoteObjectNames(const Objects &objects) {
     note(ref.identifier);
     segments(ref.identifier);
   }
+}
+
+const TableIndex &PageIndexFor(const Objects &objects, std::string_view type) {
+  return type == "TestRequestPage" ? objects.reports : objects.pages;
 }
 
 }

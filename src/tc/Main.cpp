@@ -752,7 +752,10 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
                   agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) +
                   "/" + identifier + ".h",
               .fields = {},
-              .procedures = {}});
+              .procedures = {},
+              .name = {},
+              .dataItems = {},
+              .requestFields = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -893,7 +896,10 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .header = agiru::gen::PageHeaderPath(object),
                                .id = object.id,
                                .fields = std::move(controlNames),
-                               .procedures = {}});
+                               .procedures = {},
+                               .name = {},
+                               .dataItems = {},
+                               .requestFields = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -1242,7 +1248,10 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                               agiru::gen::ObjectKind::Table),
           .header = TableHeaderPath(table),
           .fields = std::move(fieldNames),
-          .procedures = std::move(procedureNames)};
+          .procedures = std::move(procedureNames),
+          .name = {},
+          .dataItems = {},
+          .requestFields = {}};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -1374,16 +1383,66 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .header = agiru::gen::OutputDirectory(nameSpace, agiru::gen::ObjectKind::Codeunit) +
                       "/" + identifier + ".h",
             .fields = {},
-            .procedures = procedures});
+            .procedures = procedures,
+            .name = {},
+            .dataItems = {},
+            .requestFields = {}});
   }
 }
 
-void IndexReports(const Run &run, agiru::gen::Objects &objects) {
+std::set<std::string> RequestPageSurface() {
+  static const std::set<std::string> surface{"OK",
+                                             "Cancel",
+                                             "Schedule",
+                                             "Preview",
+                                             "Print",
+                                             "SaveAsXml",
+                                             "SaveAsPdf",
+                                             "SaveAsExcel",
+                                             "SaveAsWord",
+                                             "Caption",
+                                             "Editable",
+                                             "Expand",
+                                             "IsExpanded",
+                                             "First",
+                                             "Last",
+                                             "Next",
+                                             "Previous",
+                                             "New",
+                                             "GoToKey",
+                                             "GoToRecord",
+                                             "FindFirstField",
+                                             "FindNextField",
+                                             "FindPreviousField",
+                                             "GetValidationError",
+                                             "ValidationErrorCount"};
+  return surface;
+}
+
+std::vector<std::string> IndexReports(const Run &run, agiru::gen::Objects &objects) {
+  std::vector<std::string> indexed;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Report.al")) {
+    const std::string text = Read(path);
     const agiru::gen::ObjectDeclaration declared =
-        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Report);
+        agiru::gen::DeclarationOf(text, agiru::gen::ObjectKind::Report);
     if (!declared.found || declared.id == 0) { continue; }
     const std::string identifier = agiru::gen::Identifier(declared.name);
+    agiru::gen::ReportControls controls = agiru::gen::ReportControlsOf(text);
+    std::map<std::string, std::string> controlNames;
+    std::set<std::string> taken = RequestPageSurface();
+    for (const auto &[name, table] : controls.dataItems) {
+      const std::string member = agiru::gen::Identifier(name);
+      if (!member.empty() && taken.insert(member).second) {
+        controlNames.emplace(agiru::gen::LowerKey(name), member);
+      }
+    }
+    for (const std::string &name : controls.requestFields) {
+      const std::string member = agiru::gen::Identifier(name);
+      if (!member.empty() && taken.insert(member).second) {
+        controlNames.emplace(agiru::gen::LowerKey(name), member);
+      }
+    }
+    indexed.push_back(agiru::gen::LowerKey(declared.name));
     objects.reports.insert_or_assign(
         agiru::gen::LowerKey(declared.name),
         agiru::gen::TableRef{
@@ -1392,39 +1451,69 @@ void IndexReports(const Run &run, agiru::gen::Objects &objects) {
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Report) +
                 "/" + identifier + ".h",
-            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
-            .procedures = {}});
+            .id = declared.id,
+            .fields = std::move(controlNames),
+            .procedures = {},
+            .name = declared.name,
+            .dataItems = std::move(controls.dataItems),
+            .requestFields = std::move(controls.requestFields)});
   }
+  return indexed;
 }
 
-void WriteReports(Run &run, const agiru::gen::Objects &objects) {
+void WriteReports(Run &run,
+                  const std::vector<std::string> &indexed,
+                  const agiru::gen::Objects &objects) {
   if (run.output.empty()) { return; }
-  for (const auto &[key, ref] : objects.reports) {
+  for (const std::string &key : indexed) {
+    const agiru::gen::TableRef &ref = objects.reports.at(key);
     const std::string reachable = agiru::gen::Unprefixed(ref.identifier);
     const std::size_t colons = reachable.rfind("::");
     const std::string space =
         colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
     const std::string identifier =
         colons == std::string::npos ? reachable : reachable.substr(colons + 2);
-    const auto number = ref.fields.find("id");
+    const std::string number = std::to_string(ref.id);
+    const std::string controlsClass = identifier + "_Controls";
+    std::set<std::string> headers{"meta/Ids.h", "runtime/Report.h"};
+    std::string controls;
+    for (const auto &[name, table] : ref.dataItems) {
+      const auto member = ref.fields.find(agiru::gen::LowerKey(name));
+      const auto found = objects.tables.find(agiru::gen::LowerKey(table));
+      if (member == ref.fields.end() || found == objects.tables.end() ||
+          found->second.header.empty()) {
+        continue;
+      }
+      headers.insert(found->second.header);
+      controls += "  Filter_Kind<" + found->second.identifier + "> " + member->second + "{};\n";
+    }
+    for (const std::string &name : ref.requestFields) {
+      const auto member = ref.fields.find(agiru::gen::LowerKey(name));
+      if (member == ref.fields.end()) { continue; }
+      controls += "  Field_Kind " + member->second + "{" + agiru::gen::Literal(name) + "};\n";
+    }
     std::string out = "// Generated from the report\'s declaration. Do not edit.\n\n";
     out += "#pragma once\n\n";
-    out += "#include \"meta/Ids.h\"\n";
-    out += "#include \"runtime/Report.h\"\n\n";
-    out += "#include <string_view>\n\n";
+    for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+    out += "\n#include <string_view>\n\n";
     out += "namespace " + space + " {\n\n";
+    out += "template <typename Field_Kind, template <typename> class Filter_Kind>\n";
+    out += "class " + controlsClass + " {\npublic:\n" + controls + "};\n\n";
     out += "class " + identifier + " : public ::agiru::Report<" + identifier + "> {\npublic:\n";
-    out += "  static constexpr ReportId kId{" + number->second + "};\n";
+    out += "  static constexpr ReportId kId{" + number + "};\n";
     out += "  static constexpr std::string_view kName{";
-    out += agiru::gen::Literal(ref.fields.at("name"));
+    out += agiru::gen::Literal(ref.name);
     out += "};\n";
     out += "};\n\n";
     out += "} // namespace " + space + "\n\n";
     out += "template <> struct agiru::ReportTraits<" + space + "::" + identifier + "> {\n";
-    out += "  static constexpr ReportId kId{" + number->second + "};\n";
+    out += "  static constexpr ReportId kId{" + number + "};\n";
     out += "  static constexpr std::string_view kName{";
-    out += agiru::gen::Literal(ref.fields.at("name"));
-    out += "};\n};\n";
+    out += agiru::gen::Literal(ref.name);
+    out += "};\n";
+    out += "  template <typename Field_Kind, template <typename> class Filter_Kind>\n";
+    out += "  using Controls = " + space + "::" + controlsClass + "<Field_Kind, Filter_Kind>;\n";
+    out += "};\n";
     Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
   }
 }
@@ -1444,7 +1533,10 @@ void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::XmlPort) +
                 "/" + identifier + ".h",
             .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
-            .procedures = {}});
+            .procedures = {},
+            .name = {},
+            .dataItems = {},
+            .requestFields = {}});
   }
 }
 
@@ -1495,7 +1587,10 @@ void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Query) +
                 "/" + identifier + ".h",
             .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
-            .procedures = {}});
+            .procedures = {},
+            .name = {},
+            .dataItems = {},
+            .requestFields = {}});
   }
 }
 
@@ -1907,10 +2002,9 @@ int Scan(const Job &job) {
     Counts extensions;
     ClaimApp(run.output);
     IndexCodeunits(run, objects);
-    IndexReports(run, objects);
+    const std::vector<std::string> indexedReports = IndexReports(run, objects);
     IndexXmlPorts(run, objects);
     IndexQueries(run, objects);
-    WriteReports(run, objects);
     WriteXmlPorts(run, objects);
     WriteQueries(run, objects);
     Enums heldEnums;
@@ -1918,6 +2012,7 @@ int Scan(const Job &job) {
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
+    WriteReports(run, indexedReports, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }

@@ -324,3 +324,14 @@ and the mechanism survives alongside `reportextension`. So **running a report is
 substitution event, then run whatever object comes back** -- which means `Report.Run(50100)` may
 execute object 50123, and any dispatch that resolves the id at translation time is wrong. The id is
 resolved at RUN time, through an event, every time.
+
+## Two predecessor findings to carry when the report runs (added 2026-09-08, from board:0628)
+
+- **WI-1345: `SetTableView` has ONE slot per DATA ITEM, not one per report.** The documentation
+  (`reportinstance-settableview-method.md`) binds the record's view to "the page, report, or data
+  item"; a single slot let the last call win and land on the wrong table. Here the data items are
+  records of their tables already (board:0628), so the view goes onto the record whose table
+  matches -- and a `SetTableView` whose table matches no data item is a refusal, not a no-op.
+- **WI-1082: the request page's OWN members outrank a control of the same name.** The generator
+  keeps the surface out of the control names (`RequestPageSurface()` in the tc), so it is decided
+  at translation time rather than at a run-time fallback.

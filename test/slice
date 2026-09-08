@@ -6954,3 +6954,12 @@ tests/core/table/AsmAvailabilityTestBuffer.cpp
 base/system/automation/table/WorkflowWebhookSubscription.cpp
 base/system/security/authentication/table/OAuth20Setup.cpp
 base/system/text/page/TableFilter.cpp
+tests/core/codeunit/CurrencyUT.cpp
+tests/core/codeunit/ERMRemittanceReportUT.cpp
+tests/core/codeunit/ERMSalesCrMemoAggrUT.cpp
+tests/core/codeunit/GLReportUT.cpp
+tests/core/codeunit/MatchBankReconciliationUT.cpp
+tests/core/codeunit/PhysInvtOrderPAGUT.cpp
+tests/core/codeunit/RemittancePurchSalesUT.cpp
+tests/core/codeunit/RemittanceREPCheckUT.cpp
+tests/core/codeunit/SCMAvailableToPickUT.cpp
