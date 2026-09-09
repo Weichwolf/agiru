@@ -318,6 +318,13 @@ constexpr ::agiru::Integer kThirdPart = 3;
   return Date.IsUndefined() || Date.IsClosing() ? Date : Date.Closing();
 }
 
+::agiru::Date NormalDate(::agiru::Date Date) {
+  if (Date.IsUndefined()) {
+    throw Error("NormalDate: the date is undefined, and the undefined date has no normal date");
+  }
+  return Date.Normal();
+}
+
 ::agiru::ClientType CurrentClientType() {
   return ::agiru::ClientType::Web;
 }

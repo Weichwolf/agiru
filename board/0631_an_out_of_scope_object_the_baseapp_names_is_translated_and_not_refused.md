@@ -88,3 +88,13 @@ call was never reached.
 namespace-less folder the scope excludes with the Graph bridge, so the binary registers 76 of the
 78 and the runner reports them as "printed no total" on every measurement. They stay in the
 denominator, which is counted from the text; they turn green only with this item's decision.
+
+## 2026-09-09: the .NET census after the widening
+
+Of the 292 sources the six namespaces generate, 220 compiled at once and 72 did not; after the
+exception hierarchy, the `Variant`-taking absent type, `NavTenantSettingsHelper.GetPlatformVersion`,
+`Duration` to `Decimal` and the refused `Message`/`InnerException`/`StrPos`, 3 more compile. The
+rest is the Dataverse bridge's own .NET surface (`CrmHelper`, `GenericDictionary2` walked with
+`foreach`, `Type` handed around as a value) and the Entra user sync (`UserInfo.AssignedPlans`,
+`Roles` with `RoleTemplateId`). `CRM Integration Management` compiles, and its 427 cases wait on
+`CDS Integration Impl.` behind it, which is the next census.

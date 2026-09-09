@@ -258,13 +258,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean IsServiceTier();
 
-/// \brief AL `System.NormalDate(Date)`. Gets the regular date (instead of the closing date) for the
-/// argument Date.
-/// \param Date The AL `Date`.
-/// \return The AL `Date`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Date NormalDate(::agiru::Date Date);
-
 /// \brief AL `System.Sleep(Integer)`. Returns control to the operating system for a specified time.
 /// \param Duration The AL `Integer`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).

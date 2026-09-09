@@ -58,7 +58,7 @@ int HexValue(char c) {
 }
 
 std::string Hyphenated(const std::array<std::uint8_t, Guid::kSize> &bytes) {
-  static constexpr std::string_view kDigits = "0123456789abcdef";
+  static constexpr std::string_view kDigits = "0123456789ABCDEF";
   std::string out;
   out.reserve((Guid::kSize * kHexPerByte) + 4);
   std::size_t at = 0;

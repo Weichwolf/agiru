@@ -145,6 +145,14 @@ std::string ApplicationArea(std::string_view ApplicationArea = {});
 /// \return Its closing twin; a closing date answers itself, the undefined date itself.
 ::agiru::Date ClosingDate(::agiru::Date Date);
 
+/// \brief AL `System.NormalDate(Date)`. The normal date of a closing date, and a normal date
+///        unchanged (`system-normaldate-method.md`).
+/// \param Date A normal or a closing date.
+/// \return The date with the closing flag off.
+/// \throws Error when the date is undefined: "A run-time error occurs if the value of Date is set
+///         to the undefined date (0D)".
+::agiru::Date NormalDate(::agiru::Date Date);
+
 /// \brief AL `Session.GetExecutionContext()`. Gets the current session's execution context.
 /// \return `Normal`; install, upgrade and background contexts have no runner yet (board:0035).
 ::agiru::ExecutionContext GetExecutionContext();

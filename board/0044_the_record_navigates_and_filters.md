@@ -213,3 +213,14 @@ buffer's filters after `TempGenJournalLine := GenJournalLine` are the source's (
 correct on paper. What settles it is an instrumented run printing the buffer's count after the
 `DeleteAll` and the filters it carried; the shape is generic (assignment copies filters into a
 temporary, `Reset` before `DeleteAll`), never this codeunit's.
+
+## 2026-09-09: "You cannot assign new numbers" on a TEMPORARY `No. Series Line` (34 cases)
+
+Traced with `AGIRU_TRACE_SQL` on `ERM General Journal UT.RenumberDocNoMultipleLines`: the batch
+implementation copies the open lines into its global temporary record and calls
+`NoSeriesImpl.GetNoSeriesLine` with it; that copies the DB record's filters onto the temporary one
+(`Starting Date` `''..<date>`, `Series Code`) and runs `FindLast` on the temporary rows, which
+answers false although the row was inserted a statement earlier. The SQL side is right (the same
+search on the DB record finds the line); the defect is in the temporary path -- `Passes` compares
+the row's `FieldText` against the filter text, and every step reads right on paper. It needs a
+probe over the temporary record with the same filters, which is the next thing to build here.

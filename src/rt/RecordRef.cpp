@@ -364,6 +364,10 @@ RecordRef FieldRef::Record() const {
   return RecordRef{record_, *table_};
 }
 
+void RecordRef::Init() {
+  detail::RuntimeInit(State().record, Table());
+}
+
 void RecordRef::Open(Integer tableNo) {
   Close();
   const TableEntry *entry = FindTable(TableId{tableNo});
@@ -388,8 +392,29 @@ std::string_view RecordRef::Name() const {
   return Table().name;
 }
 
+namespace {
+
+std::vector<const FieldDef *> IndexedFields(const TableDef &table) {
+  std::vector<const FieldDef *> indexed;
+  indexed.reserve(table.fields.size());
+  if (!table.keys.empty()) {
+    for (const FieldNo no : table.keys[0].fields) {
+      for (const FieldDef &def : table.fields) {
+        if (def.no == no) { indexed.push_back(&def); }
+      }
+    }
+  }
+  for (const FieldDef &def : table.fields) {
+    if (def.no.Value() >= kSystemFields.front().no.Value()) { continue; }
+    if (std::ranges::find(indexed, &def) == indexed.end()) { indexed.push_back(&def); }
+  }
+  return indexed;
+}
+
+}
+
 Integer RecordRef::FieldCount() const {
-  return static_cast<Integer>(Table().fields.size());
+  return static_cast<Integer>(IndexedFields(Table()).size());
 }
 
 Integer RecordRef::KeyCount() const {
@@ -404,11 +429,12 @@ FieldRef RecordRef::Field(Integer fieldNo) const {
 
 FieldRef RecordRef::FieldIndex(Integer index) const {
   const TableDef &table = Table();
-  if (index < 1 || static_cast<std::size_t>(index) > table.fields.size()) {
+  const std::vector<const FieldDef *> indexed = IndexedFields(table);
+  if (index < 1 || static_cast<std::size_t>(index) > indexed.size()) {
     throw Error("the field index " + std::to_string(index) + " is outside 1.." +
-                std::to_string(table.fields.size()));
+                std::to_string(indexed.size()));
   }
-  return FieldRef{State().record, table, table.fields[static_cast<std::size_t>(index) - 1]};
+  return FieldRef{State().record, table, *indexed[static_cast<std::size_t>(index) - 1]};
 }
 
 KeyRef RecordRef::KeyIndex(Integer Index) const {

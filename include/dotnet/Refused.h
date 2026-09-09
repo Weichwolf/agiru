@@ -4,6 +4,7 @@
 
 #include <compare>
 #include <concepts>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -157,6 +158,10 @@ public:
   static Refused ToString;
   /// \brief The chained member `GetType`, which a body reaches on the RESULT of a refused call.
   static Refused GetType;
+  /// \brief The chained member `Message`, which a body reads on a refused exception.
+  static Refused Message;
+  /// \brief The chained member `InnerException`, which a body reads on a refused exception.
+  static Refused InnerException;
   /// \brief The chained member `Equals`, which a body reaches on the RESULT of a refused call.
   static Refused Equals;
   /// \brief The chained member `Dispose`, which a body reaches on the RESULT of a refused call.
@@ -746,6 +751,21 @@ inline Refused Refused::Captures{{.type = "<result>", .member = "Captures"}};
 inline Refused Refused::Item{{.type = "<result>", .member = "Item"}};
 inline Refused Refused::Result{{.type = "<result>", .member = "Result"}};
 inline Refused Refused::Name{{.type = "<result>", .member = "Name"}};
+inline Refused Refused::Message{{.type = "<result>", .member = "Message"}};
+inline Refused Refused::InnerException{{.type = "<result>", .member = "InnerException"}};
+
+/// \brief AL `StrPos(Refused, Text)`: a refused .NET text handed to a builtin refuses there, the
+///        way it refuses when read into a variable (`CRMIntegrationManagement.GetErrorMessage`).
+/// \param haystack The refused text.
+/// \param needle The text looked for, read only to be discarded.
+/// \return Never.
+/// \throws Error always.
+[[noreturn]] inline std::int32_t StrPos(const Refused &haystack, std::string_view needle) {
+  static_cast<void>(needle);
+  static_cast<void>(static_cast<std::int32_t>(haystack));
+  throw Error("a refused .NET text was handed to StrPos");
+}
+
 inline Refused Refused::Value{{.type = "<result>", .member = "Value"}};
 inline Refused Refused::Count{{.type = "<result>", .member = "Count"}};
 inline Refused Refused::Length{{.type = "<result>", .member = "Length"}};

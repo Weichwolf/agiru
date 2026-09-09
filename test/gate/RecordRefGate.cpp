@@ -42,9 +42,13 @@ void ItReachesTheTableWithoutNamingIt() {
   constexpr agiru::Integer kResourceCost = 202;
   CHECK_TRUE("it answers the AL table number", ref.Number() == kResourceCost);
   CHECK_TEXT("and the AL name", std::string(ref.Name()), "Resource Cost");
-  CHECK_TRUE("and how many fields it carries -- the six AL declares and the five the platform "
+  // THE SYSTEM FIELDS ARE NOT IN THE INDEX: `ApplicationAreaMgmt` reads every field from the first
+  // application area to `FieldCount()` into a Boolean, and on BC that loop never meets SystemId.
+  CHECK_TRUE("and how many fields it carries -- the six AL declares, and not the five the platform "
              "adds",
-             ref.FieldCount() == 6 + agiru::kSystemFieldCount);
+             ref.FieldCount() == 6);
+  CHECK_TRUE("while the system fields stay reachable by number",
+             ref.FieldExist(agiru::kSystemFields.front().no.Value()));
   CHECK_TRUE("and how many keys", ref.KeyCount() == 2);
 }
 

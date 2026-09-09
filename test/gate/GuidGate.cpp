@@ -32,13 +32,19 @@ static_assert(Guid{}.IsNull(), "the default GUID is the empty one AL calls null"
 static_assert(!kNamed.IsNull());
 static_assert(Guid{kBytes} == kNamed);
 
+// THE HEX DIGITS ARE UPPER CASE. `guid-data-type.md` writes the representation as
+// `{aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb}`, and the letters there are placeholders for digits, not
+// a statement of case: BC renders a fresh `CreateGuid` in upper case, which the predecessor met
+// when a key written with the fresh id and read with the stored one landed in two places (openerp
+// WI-1211), and which `Match General Jnl Lines UT.GetLCSSimilarStrings` compares against an
+// upper-cased substring of its own.
 void TheTextIsTheDocumentedOneBracesIncluded() {
   CHECK_TEXT("the standard textual representation carries its braces",
              kNamed.ToText(),
-             "{aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb}");
+             "{AAAAAAAA-0000-1111-2222-BBBBBBBBBBBB}");
   CHECK_TEXT("and a uuid column takes it without them",
              kNamed.ToStorageText(),
-             "aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb");
+             "AAAAAAAA-0000-1111-2222-BBBBBBBBBBBB");
 }
 
 void TheTextGoesBothWays() {

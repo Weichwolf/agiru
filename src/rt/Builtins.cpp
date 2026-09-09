@@ -180,11 +180,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
   RefuseDoor("System.IsServiceTier()");
 }
 
-::agiru::Date NormalDate(::agiru::Date Date) {
-  static_cast<void>(Date);
-  RefuseDoor("System.NormalDate(Date)");
-}
-
 void Sleep(::agiru::Integer Duration) {
   static_cast<void>(Duration);
   RefuseDoor("System.Sleep(Integer)");

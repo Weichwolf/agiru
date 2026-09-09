@@ -583,8 +583,15 @@ public:
   [[nodiscard]] std::string_view Name() const;
 
   /// \brief AL `RecordRef.FieldCount()`.
-  /// \return How many fields the table declares.
+  /// \return How many fields the table declares -- the AL declarations, and NOT the five the
+  ///         platform adds.
   /// \throws Error when the RecordRef points at nothing.
+  ///
+  /// \warning THE SYSTEM FIELDS ARE NOT IN THE INDEX. `ApplicationAreaMgmt` walks
+  ///          `FieldIndex(First) .. FieldCount()` and reads every field into a Boolean; on BC that
+  ///          loop ends at the last declared field, and with `SystemId` in the count it reads a
+  ///          Guid into a Boolean instead (214 UT cases, 2026-09-09). `Field(2000000000)` still
+  ///          reaches a system field by number.
   [[nodiscard]] Integer FieldCount() const;
 
   /// \brief AL `RecordRef.Field(FieldNo)`.
@@ -597,6 +604,12 @@ public:
   /// \param index The ONE-BASED position in the field list.
   /// \return A FieldRef over the field there.
   /// \throws Error when the index is outside the list.
+  ///
+  /// \note THE PRIMARY KEY COMES FIRST: "The fields in the primary key are always listed first in
+  ///       the index. Therefore, the order of the fields in the index is not necessarily the same
+  ///       as the order of the fields in the table" (`recordref-fieldindex-method.md`); the rest
+  ///       follow in field-number order, and the system fields are not in the list (see
+  ///       `FieldCount`).
   [[nodiscard]] FieldRef FieldIndex(Integer index) const;
 
   /// \brief AL `RecordRef.FieldExist(FieldNo)`.
@@ -910,9 +923,10 @@ public:
     throw Error("RecordRef.HasLinks() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.Init()`. Initializes a record in a table.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Init() { throw Error("RecordRef.Init() is declared and not implemented yet (board:0035)"); }
+  /// \brief AL `RecordRef.Init()` -- every field to its default, the way `Record.Init` does it
+  ///        (`recordref-init-method.md`: the table's InitValue, else the type's zero).
+  /// \throws Error when the RecordRef is not open.
+  void Init();
 
   /// \brief AL `RecordRef.Insert()`. Inserts a record into a table without executing the code in
   /// the OnInsert trigger.
