@@ -43,11 +43,9 @@ public:
 
   /// \brief Takes the other's codeunit.
   /// \param o The other.
-  Implementation(Implementation &&o) noexcept
-      : held_(o.held_), free_(o.free_), borrowed_(o.borrowed_) {
+  Implementation(Implementation &&o) noexcept : held_(o.held_), free_(o.free_) {
     o.held_ = nullptr;
     o.free_ = nullptr;
-    o.borrowed_ = false;
   }
 
   /// \brief Takes the other's codeunit.
@@ -58,10 +56,8 @@ public:
       Forget();
       held_ = o.held_;
       free_ = o.free_;
-      borrowed_ = o.borrowed_;
       o.held_ = nullptr;
       o.free_ = nullptr;
-      o.borrowed_ = false;
     }
     return *this;
   }
@@ -112,12 +108,20 @@ public:
   Implementation(const C &codeunit)
       : held_(new C(codeunit)), free_([](I *held) { delete static_cast<C *>(held); }) {}
 
+  /// \brief AL `Impl := CodeunitVar`: the interface takes its OWN COPY of the instance.
+  ///
+  /// \warning IT WAS A BORROWED REFERENCE, and `SalesLine.GetLineWithPrice` assigns a LOCAL
+  ///          codeunit and returns: the reference outlived its frame and the next call through
+  ///          the interface read a dead vtable (SIGSEGV, API Setup UT and two more, 2026-09-09).
+  ///          BC keeps a codeunit instance alive as long as anything refers to it; a copy is the
+  ///          nearest this runtime has without shared instances, and what diverges is state the
+  ///          variable changes AFTER the assignment -- which the BaseApp does not rely on here.
   template <typename C>
     requires std::derived_from<C, I> && (!std::same_as<C, I>)
-  Implementation &operator=(C &codeunit) {
+  Implementation &operator=(const C &codeunit) {
     Forget();
-    held_ = &codeunit;
-    borrowed_ = true;
+    held_ = new C(codeunit);
+    free_ = [](I *held) { delete static_cast<C *>(held); };
     return *this;
   }
 
@@ -160,15 +164,13 @@ private:
   /// does it: a holder may see the interface only forward-declared, and `delete` on an incomplete
   /// type is what clang-19 refuses (`-Wdelete-incomplete`, Reminder Action, 2026-09-09).
   void Forget() {
-    if (!borrowed_ && held_ != nullptr && free_ != nullptr) { free_(held_); }
+    if (held_ != nullptr && free_ != nullptr) { free_(held_); }
     held_ = nullptr;
     free_ = nullptr;
-    borrowed_ = false;
   }
 
   I *held_ = nullptr;
   void (*free_)(I *) = nullptr;
-  bool borrowed_ = false;
 };
 
 }

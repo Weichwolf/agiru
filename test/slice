@@ -12448,3 +12448,4 @@ base/system/environment/codeunit/EnvironmentCleanupSubs.cpp
 base/system/integration/codeunit/AddInDeploymentHelper.cpp
 base/finance/vat/registration/codeunit/AltCustVATRegFacade.cpp
 system/system/integration/sharepoint/codeunit/SharePointClientImpl.cpp
+base/sales/customer/codeunit/CustomerMgt.cpp
