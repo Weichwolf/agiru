@@ -72,6 +72,8 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual std::string Module() const { return {}; }
+
   [[nodiscard]] virtual bool CallReturnsAHandle(std::string_view variable,
                                                 std::string_view procedure) const {
     static_cast<void>(variable);

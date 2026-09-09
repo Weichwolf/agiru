@@ -12457,3 +12457,4 @@ base/system/visualization/page/GenericChartSetup.cpp
 base/upgrade/codeunit/UpgradeRefsToRemTables.cpp
 system/system/email/page/EmailAddressLookup.cpp
 system/system/tooling/page/PerformanceProfileList.cpp
+base/manufacturing/routing/codeunit/CalculateRoutingLine.cpp

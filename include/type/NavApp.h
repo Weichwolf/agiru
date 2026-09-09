@@ -75,6 +75,13 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Boolean GetCallerModuleInfo(::agiru::ModuleInfo &Info);
 
+  /// \brief AL `NavApp.GetCallerModuleInfo(ModuleInfo)`, answered from the calling object's
+  ///        module: the transpiler passes it (`ModuleDef`, board:0638).
+  /// \param Info   Filled in.
+  /// \param module The calling object's app.
+  /// \return True.
+  static ::agiru::Boolean GetCallerModuleInfo(::agiru::ModuleInfo &Info, const ModuleDef &module);
+
   /// \brief AL `NavApp.GetCallstackModuleInfos()`. Gets application information about each method
   /// in the current callstack.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -86,6 +93,12 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   static ::agiru::Boolean GetCurrentModuleInfo(::agiru::ModuleInfo &Info);
+
+  /// \brief AL `NavApp.GetCurrentModuleInfo(ModuleInfo)`, answered from the object's own module.
+  /// \param Info   Filled in.
+  /// \param module The object's app.
+  /// \return True.
+  static ::agiru::Boolean GetCurrentModuleInfo(::agiru::ModuleInfo &Info, const ModuleDef &module);
 
   /// \brief AL `NavApp.GetModuleInfo(Guid, ModuleInfo)`. Gets information about the specified AL
   /// application.

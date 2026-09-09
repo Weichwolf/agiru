@@ -59,6 +59,9 @@ struct Objects {
   TableIndex pages;
   EnumIndex enums;
   FieldEnums fieldEnums;
+
+  std::string module;
+  std::string moduleHeader;
 };
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);

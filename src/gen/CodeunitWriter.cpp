@@ -1203,6 +1203,8 @@ public:
     return {};
   }
 
+  [[nodiscard]] std::string Module() const override { return objects_.module; }
+
   [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
                                         std::string_view procedure) const override {
     const al::VarDecl *declared = Declaration(variable);
@@ -1819,6 +1821,9 @@ DeclaredEnumMember(const Objects &objects, std::string_view enumeration, std::st
 std::string BodyIncludes(const std::string &text, const Objects &objects) {
   std::string named;
   if (text.find("options::") != std::string::npos) { named = "#include \"options/Types.h\"\n"; }
+  if (text.find("::agiru::app::") != std::string::npos && !objects.moduleHeader.empty()) {
+    named += "#include \"" + objects.moduleHeader + "\"\n";
+  }
   const HeaderIndex &known = HeadersOf(objects);
   std::set<std::string> headers;
   for (std::size_t at = 0; at < text.size();) {

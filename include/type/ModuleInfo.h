@@ -42,6 +42,21 @@ private:
   std::string publisher_;
 };
 
+/// \brief What an installed app says about itself, as the transpiler emits it from `app.json`:
+///        one `constexpr` per app, in `apps/<app>/<App>Module.h`.
+///
+/// \note THE CALLER IS THE OBJECT, NOT A FRAME. `NavApp.GetCurrentModuleInfo` is documented against
+///       the call stack; this runtime keeps no per-frame module, and the transpiler knows the app
+///       of every object it writes -- so a call site passes its own app's module. That is exact
+///       for `GetCurrentModuleInfo` and, for `GetCallerModuleInfo`, exact within one app and the
+///       CALLEE's app across a boundary (board:0638).
+struct ModuleDef {
+  std::string_view id;        ///< The app id, a Guid in text.
+  std::string_view name;      ///< The app name.
+  std::string_view publisher; ///< The publisher.
+  std::string_view version;   ///< The app version, `30.0.0.0`.
+};
+
 /// \brief AL `ModuleInfo` -- the app a piece of code belongs to.
 ///
 /// `moduleinfo-data-type.md` gives seven properties: `Id`, `Name`, `Publisher`, `AppVersion`,

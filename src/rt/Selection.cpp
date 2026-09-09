@@ -53,8 +53,9 @@ std::vector<FieldNo> OrderedBy(const RecordState *state, const TableDef &table) 
 void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
   if (state == nullptr) { return; }
   for (const FieldFilter &filter : state->filters) {
-    const Clause clause =
-        Where(FieldOf(table, filter.field), ParseFilter(filter.text), made.binds.size() + 1);
+    const FieldDef &field = FieldOf(table, filter.field);
+    if (field.fieldClass == FieldClass::FlowFilter) { continue; }
+    const Clause clause = Where(field, ParseFilter(filter.text), made.binds.size() + 1);
     if (clause.sql.empty()) { continue; }
     if (!made.where.empty()) { made.where += " AND "; }
     made.where += clause.sql;

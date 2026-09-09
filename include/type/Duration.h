@@ -145,6 +145,19 @@ public:
     return Duration{milliseconds_ / divisor};
   }
 
+  /// \brief AL `Duration * Decimal` -- the BaseApp scales a remaining duration by a ratio
+  ///        (`Change Global Dim. Log Entry`), and the answer is a Duration to the millisecond.
+  /// \param factor The ratio.
+  /// \return The product, rounded to whole milliseconds.
+  [[nodiscard]] Duration operator*(const Decimal &factor) const;
+
+  /// \brief AL `Decimal * Duration`. \param factor The ratio. \param d The duration.
+  /// \return The product.
+  friend Duration operator*(const Decimal &factor, const Duration &d) { return d * factor; }
+
+  /// \brief AL `Duration / Decimal`. \param divisor The ratio. \return The quotient in whole ms.
+  [[nodiscard]] Duration operator/(const Decimal &divisor) const;
+
   /// \brief Adds to this duration.
   /// \param o The other.
   /// \return This duration.

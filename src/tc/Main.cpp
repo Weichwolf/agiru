@@ -1468,6 +1468,49 @@ std::set<std::string> InterfaceReturns(std::string_view source) {
   return returning;
 }
 
+std::string JsonValue(std::string_view text, std::string_view key) {
+  const std::size_t at = text.find("\"" + std::string(key) + "\"");
+  if (at == std::string_view::npos) { return {}; }
+  const std::size_t open = text.find('"', text.find(':', at) + 1);
+  if (open == std::string_view::npos) { return {}; }
+  const std::size_t close = text.find('"', open + 1);
+  return close == std::string_view::npos ? std::string{}
+                                         : std::string(text.substr(open + 1, close - open - 1));
+}
+
+void WriteModule(Run &run,
+                 const agiru::gen::App &app,
+                 const std::filesystem::path &source,
+                 agiru::gen::Objects &objects) {
+  objects.module.clear();
+  objects.moduleHeader.clear();
+  const std::filesystem::path manifest = source / "app.json";
+  if (!std::filesystem::is_regular_file(manifest)) { return; }
+  const std::string text = Read(manifest);
+  const std::string identifier = agiru::gen::Identifier(app.name);
+  const auto literal = [](std::string value) {
+    std::string out = "\"";
+    for (const char c : value) {
+      if (c == '"' || c == '\\') { out += '\\'; }
+      out += c;
+    }
+    return out + "\"";
+  };
+  std::string header;
+  header += "// Generated from " + app.source + "/app.json. Do not edit.\n\n#pragma once\n\n";
+  header += "#include \"type/ModuleInfo.h\"\n\nnamespace agiru::app::" + identifier + " {\n\n";
+  header += "inline constexpr ::agiru::ModuleDef kModule{\n";
+  header += "    .id = " + literal(JsonValue(text, "id")) + ",\n";
+  header += "    .name = " + literal(JsonValue(text, "name")) + ",\n";
+  header += "    .publisher = " + literal(JsonValue(text, "publisher")) + ",\n";
+  header += "    .version = " + literal(JsonValue(text, "version")) + ",\n};\n\n}\n";
+  if (!run.output.empty()) {
+    Keep(run, Output{.directory = run.output, .relative = identifier + "Module.h"}, header);
+  }
+  objects.module = "::agiru::app::" + identifier + "::kModule";
+  objects.moduleHeader = identifier + "Module.h";
+}
+
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     const std::string source = Read(path);
@@ -2237,6 +2280,7 @@ int Scan(const Job &job) {
             .written = 0,
             .changed = 0,
             .kept = {}};
+    WriteModule(run, app, source, objects);
     Counts enums;
     Counts interfaces;
     Counts tables;

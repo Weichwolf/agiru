@@ -40,16 +40,51 @@ bool HasWildcard(std::string_view text) {
 std::vector<std::string_view> SplitOutsideQuotes(std::string_view text, char separator) {
   std::vector<std::string_view> parts;
   bool quoted = false;
+  int depth = 0;
   std::size_t start = 0;
   for (std::size_t i = 0; i < text.size(); ++i) {
     if (text[i] == '\'') { quoted = !quoted; }
-    if (!quoted && text[i] == separator) {
+    if (quoted) { continue; }
+    if (text[i] == '(') { ++depth; }
+    if (text[i] == ')' && depth > 0) { --depth; }
+    if (depth == 0 && text[i] == separator) {
       parts.push_back(text.substr(start, i - start));
       start = i + 1;
     }
   }
   parts.push_back(text.substr(start));
   return parts;
+}
+
+std::optional<std::string_view> Grouped(std::string_view text) {
+  text = Trim(text);
+  if (text.size() < 2 || text.front() != '(' || text.back() != ')') { return std::nullopt; }
+  bool quoted = false;
+  int depth = 0;
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    if (text[i] == '\'') { quoted = !quoted; }
+    if (quoted) { continue; }
+    if (text[i] == '(') { ++depth; }
+    if (text[i] == ')') {
+      --depth;
+      if (depth == 0 && i + 1 != text.size()) { return std::nullopt; }
+    }
+  }
+  return text.substr(1, text.size() - 2);
+}
+
+Expression Both(const Expression &left, const Expression &right) {
+  if (left.empty()) { return right; }
+  if (right.empty()) { return left; }
+  Expression out;
+  for (const All &a : left) {
+    for (const All &b : right) {
+      All joined = a;
+      joined.insert(joined.end(), b.begin(), b.end());
+      out.push_back(std::move(joined));
+    }
+  }
+  return out;
 }
 
 std::string Unquote(std::string_view text) {
@@ -194,19 +229,24 @@ Expression ParseFilter(std::string_view text) {
   Expression expression;
   if (Trim(text).empty()) { return expression; }
   for (const std::string_view alternative : SplitOutsideQuotes(text, '|')) {
-    All conjunction;
+    Expression conjunction{All{}};
     for (const std::string_view part : SplitOutsideQuotes(alternative, '&')) {
       if (Trim(part).empty()) {
-        conjunction.push_back(Atom{.compare = Compare::Equal,
-                                   .value = {},
-                                   .upper = {},
-                                   .openLower = false,
-                                   .openUpper = false});
+        conjunction = Both(conjunction,
+                           Expression{All{Atom{.compare = Compare::Equal,
+                                               .value = {},
+                                               .upper = {},
+                                               .openLower = false,
+                                               .openUpper = false}}});
         continue;
       }
-      conjunction.push_back(ReadAtom(part));
+      if (const std::optional<std::string_view> inner = Grouped(part); inner.has_value()) {
+        conjunction = Both(conjunction, ParseFilter(*inner));
+        continue;
+      }
+      conjunction = Both(conjunction, Expression{All{ReadAtom(part)}});
     }
-    expression.push_back(std::move(conjunction));
+    for (All &all : conjunction) { expression.push_back(std::move(all)); }
   }
   return expression;
 }

@@ -798,6 +798,11 @@ private:
       }
       out += Expression(expression.children[i], 0);
     }
+    if ((spelled.ends_with("::NavApp::GetCallerModuleInfo") ||
+         spelled.ends_with("::NavApp::GetCurrentModuleInfo")) &&
+        !scope_.Module().empty()) {
+      out += ", " + scope_.Module();
+    }
     return out + ")";
   }
 
@@ -1227,6 +1232,13 @@ private:
     const int precedence = op != nullptr ? op->precedence : 0;
     const std::string spelling = op != nullptr ? op->cpp : expression.text;
 
+    if (expression.text == "/") {
+      std::string quotient = "::agiru::Decimal{" + Expression(expression.children.front(), 0) +
+                             "} / " + Expression(expression.children.back(), precedence + 1);
+      if (precedence < outer) { quotient = "(" + quotient + ")"; }
+      return quotient;
+    }
+
     std::vector<const al::Expr *> chain;
     const al::Expr *walk = &expression;
     while (walk->kind == al::ExprKind::Binary && walk->text == expression.text &&
@@ -1576,6 +1588,8 @@ public:
     if (SameName("Rec", name)) { return "(*this)"; }
     return {};
   }
+
+  [[nodiscard]] std::string Module() const override { return objects_.module; }
 
   [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
                                         std::string_view procedure) const override {
@@ -2020,6 +2034,8 @@ public:
     }
     return nullptr;
   }
+
+  [[nodiscard]] std::string Module() const override { return objects_.module; }
 
   [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
                                         std::string_view procedure) const override {
