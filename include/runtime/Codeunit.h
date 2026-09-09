@@ -80,7 +80,13 @@ void RegisterCodeunitEntry(const CodeunitEntry *entry);
 ///       whole reason a generated header can forward declare what it holds and the include cycle
 ///       disappears with the containment cycle.
 ///
-/// \warning A COPY HOLDS NOTHING, AND THAT IS AL'S OWN ANSWER. Two codeunit variables in AL are two
+/// \warning A COPY HOLDS A COPY OF WHAT THE OTHER MADE, which is what `Rec2 := Rec` means in AL.
+///          IT HELD NOTHING UNTIL 2026-09-09: the assignment RELEASED the left side, and a
+///          codeunit instance cloned for an interface (board:0640) came back with every record
+///          global blank -- the V15 price calculation read a Purchase Line with no Document No.
+///          The clone is made through a function captured where `T` is complete, like the
+///          freeing function, so a header may still hold what it only forward-declares.
+///          The earlier reason, kept for the record: Two codeunit variables in AL are two
 ///          instances, so a copy must not share the pointer -- but it must EXIST, because a RECORD
 ///          is copied constantly (`Rec2 := Rec`, every by-value parameter) and a table with a `var`
 ///          block holds one of these. AL copies a record's FIELDS; its object variables are the
@@ -93,7 +99,12 @@ public:
 
   /// \brief A copy that has made nothing yet.
   /// \param other The handle copied from, whose instance is NOT shared.
-  Instance(const Instance &other) { static_cast<void>(other); }
+  Instance(const Instance &other)
+      : held_(other.held_ == nullptr || other.clone_ == nullptr
+                  ? nullptr
+                  : static_cast<T *>(other.clone_(other.held_))),
+        clone_(other.clone_),
+        free_(other.free_) {}
 
   /// \brief Lets go of what this one made; the other's instance is not shared.
   /// \param other The handle assigned from, whose instance is NOT shared.
@@ -104,7 +115,8 @@ public:
   ///       is the same answer as for any other right-hand side, because the handle copies nothing.
   Instance &operator=(const Instance &other) {
     if (this == &other) { return *this; }
-    Release();
+    Instance copy(other);
+    *this = std::move(copy);
     return *this;
   }
 
@@ -158,8 +170,10 @@ public:
 
   /// \brief Takes over another's instance.
   /// \param other The one to take from.
-  Instance(Instance &&other) noexcept : held_(other.held_), free_(other.free_) {
+  Instance(Instance &&other) noexcept
+      : held_(other.held_), clone_(other.clone_), free_(other.free_) {
     other.held_ = nullptr;
+    other.clone_ = nullptr;
     other.free_ = nullptr;
   }
 
@@ -170,8 +184,10 @@ public:
     if (this != &other) {
       Release();
       held_ = other.held_;
+      clone_ = other.clone_;
       free_ = other.free_;
       other.held_ = nullptr;
+      other.clone_ = nullptr;
       other.free_ = nullptr;
     }
     return *this;
@@ -206,6 +222,9 @@ private:
   T *Made() {
     if (held_ == nullptr) {
       held_ = new T();
+      if constexpr (std::is_copy_constructible_v<T>) {
+        clone_ = [](const void *held) -> void * { return new T(*static_cast<const T *>(held)); };
+      }
       free_ = [](void *held) { delete static_cast<T *>(held); };
     }
     return held_;
@@ -214,11 +233,13 @@ private:
   void Release() {
     if (free_ != nullptr) { free_(held_); }
     held_ = nullptr;
+    clone_ = nullptr;
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): see above.
     free_ = nullptr;
   }
 
   T *held_ = nullptr;
+  void *(*clone_)(const void *) = nullptr;
   void (*free_)(void *) = nullptr;
 };
 

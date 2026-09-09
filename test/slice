@@ -12450,3 +12450,5 @@ base/finance/vat/registration/codeunit/AltCustVATRegFacade.cpp
 system/system/integration/sharepoint/codeunit/SharePointClientImpl.cpp
 base/sales/customer/codeunit/CustomerMgt.cpp
 base/purchases/document/codeunit/OverReceiptMgt.cpp
+base/inventory/requisition/codeunit/CarryOutAction.cpp
+base/sales/pricing/codeunit/SalesPriceCalcMgt.cpp

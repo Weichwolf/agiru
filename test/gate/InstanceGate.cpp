@@ -105,10 +105,43 @@ void MovingTakesTheInstance() {
 } // namespace
 
 // A RECORD IS COPIED CONSTANTLY and a table with a `var` block holds an `Instance`, so the handle
-// must be copyable -- and the copy must hold NOTHING, because two AL variables are two instances.
+// must be copyable. A copy HOLDS A COPY of what the other made -- `Rec2 := Rec` copies the fields
+// -- and until 2026-09-09 it held nothing: the assignment released the left side, and a codeunit
+// instance cloned for an interface came back with every record global blank. What cannot be copied
+// (this gate's `Counted`) is the one case where the copy still holds nothing.
 namespace {
 
-void ACopyHoldsNothingAndFreesNothing() {
+struct Copyable {
+  static int made;
+  int value = 0;
+
+  Copyable() { ++made; }
+
+  Copyable(const Copyable &o) : value(o.value) { ++made; }
+
+  Copyable &operator=(const Copyable &) = default;
+  Copyable(Copyable &&) = delete;
+  Copyable &operator=(Copyable &&) = delete;
+  ~Copyable() = default;
+};
+
+int Copyable::made = 0;
+
+void ACopyHoldsACopyOfWhatTheOtherMade() {
+  Copyable::made = 0;
+  agiru::Instance<Copyable> first;
+  first->value = 7;
+  CHECK_TRUE("the first handle made one", Copyable::made == 1);
+  agiru::Instance<Copyable> second(first);
+  CHECK_TRUE("the copy holds a copy", Copyable::made == 2 && second->value == 7);
+  second->value = 8;
+  CHECK_TRUE("which is its own", first->value == 7);
+  agiru::Instance<Copyable> third;
+  third = first;
+  CHECK_TRUE("and assignment copies too", third->value == 7 && Copyable::made == 3);
+}
+
+void ACopyOfWhatCannotBeCopiedHoldsNothing() {
   Counted::made = 0;
   Counted::gone = 0;
   {
@@ -126,7 +159,8 @@ void ACopyHoldsNothingAndFreesNothing() {
 
 int main() {
   return gate::Run("Instance", [] {
-    ACopyHoldsNothingAndFreesNothing();
+    ACopyHoldsACopyOfWhatTheOtherMade();
+    ACopyOfWhatCannotBeCopiedHoldsNothing();
     AHandleIsMadeOnFirstUse();
     AnUnusedHandleFreesNothing();
     AHandleConvertsToTheObject();
