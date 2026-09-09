@@ -6,6 +6,7 @@
 #include "type/Action.h"
 
 #include <span>
+#include <string_view>
 
 /// \file
 /// \brief What lets the runtime reach an AL table by NUMBER without knowing one by name.
@@ -109,6 +110,11 @@ template <typename T> struct RegisterTable {
 /// \param id The table number.
 /// \return The entry, or `nullptr` when this binary carries no such table.
 [[nodiscard]] const TableEntry *FindTable(TableId id);
+
+/// \brief The installed table of an AL NAME, which is how a `TableRelation` names its target.
+/// \param name The AL table name, compared without regard to case.
+/// \return The entry, or nothing when this binary carries no such table.
+[[nodiscard]] const TableEntry *FindTable(std::string_view name);
 
 /// \brief Every installed table, by number.
 /// \return The entries, sorted by table number.

@@ -1,6 +1,7 @@
 #include "runtime/Database.h"
 
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <optional>
 #include <span>
@@ -99,6 +100,15 @@ Result Connection::Execute(std::string_view sql,
   values.reserve(params.size());
   for (const std::optional<std::string> &p : params) {
     values.push_back(p.has_value() ? p->c_str() : nullptr);
+  }
+  static const bool traced = std::getenv("AGIRU_TRACE_SQL") != nullptr;
+  if (traced) {
+    std::string line = "sql: " + std::string(sql);
+    for (const std::optional<std::string> &p : params) {
+      line += " | " + (p.has_value() ? *p : std::string("NULL"));
+    }
+    line += "\n";
+    std::fputs(line.c_str(), stderr);
   }
 
   PGresult *result = PQexecParams(Conn(handle_),

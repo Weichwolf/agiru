@@ -67,6 +67,33 @@ public:
     Assign(std::string_view(value));
     return *this;
   }
+
+  /// \brief AL `Text := Guid` and its kin: a value that renders itself is taken as its text.
+  /// \tparam T A type with `ToText()`, which is what AL converts on assignment.
+  /// \param value The value.
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Text(const T &value) : Text<0>(N) {
+    Assign(std::string_view(value.ToText()));
+  }
+
+  /// \copydoc Text(const T &)
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
+    return *this;
+  }
 };
 
 /// \brief AL `MaxStrLen(String)`.

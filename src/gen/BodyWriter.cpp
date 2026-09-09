@@ -1338,6 +1338,9 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    for (const al::VarDecl *where : {Local(member.variable), Global(member.variable)}) {
+      if (QueryColumnOf(objects_, where, member.field).isColumn) { return true; }
+    }
     if (IsRecord(member.variable)) {
       if (FieldNamed(table_, member.field) != nullptr) { return true; }
       const std::string spelled = LowerKey(Identifier(member.field));
@@ -1874,6 +1877,9 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    if (QueryColumnOf(objects_, DeclarationOf(member.variable), member.field).isColumn) {
+      return true;
+    }
     const std::string spelled = LowerKey(Identifier(member.field));
     if (IsRecord(member.variable)) {
       if (FieldNamed(*source_, member.field) != nullptr) { return true; }

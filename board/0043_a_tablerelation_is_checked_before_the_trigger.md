@@ -69,3 +69,13 @@ sets the shape.
 A field with a relation refuses a value no row carries and accepts one that exists; the message is
 BC's own. A conditional relation accepts under the condition and refuses outside it. The negative
 control removes the check and the first case must go red.
+
+## 2026-09-09: the bare form is CHECKED on `Validate`
+
+`detail::CheckRelation` was a stub. It now looks the field's `relationTable` up in the installed
+catalogue by name, reads the row by the relation field or the target's first primary-key field, and
+refuses a missing row with the platform's own text ("The field X of table Y contains a value (V)
+that cannot be found in the related table (Z)"). Two things it does not do yet, both counted here:
+a relation to a table this binary does not carry passes silently (a refusal would stop every
+`Validate` of that field on an out-of-scope link), and the check has no gate case, because the gate
+tree carries one table and a relation needs two -- the first two-table fixture pays for it.

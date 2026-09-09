@@ -219,6 +219,16 @@ public:
     detail::QueryNarrow(State(), IndexOf(&member), StrSubstNo(expression, arguments...));
   }
 
+  /// \brief AL `Query.SetFilter(Column, Value)` where the VALUE is the expression, the way
+  ///        `Record.SetFilter(Field, Value)` takes a Guid or a Date to match exactly.
+  /// \tparam Column The member's type. \tparam Value The value's type.
+  /// \param member The column member. \param value The value, rendered the way `Format` renders it.
+  template <typename Column, typename Value>
+    requires(!std::convertible_to<const Value &, std::string_view>)
+  void SetFilter(const Column &member, const Value &value) {
+    detail::QueryNarrow(State(), IndexOf(&member), StrSubstNo("%1", value));
+  }
+
   /// \brief AL `Query.GetFilter(Column)`.
   /// \tparam Column The member's type.
   /// \param member The column member.

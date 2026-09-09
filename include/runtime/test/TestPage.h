@@ -349,6 +349,9 @@ public:
     if constexpr (kHasRecord) {
       try {
         Record_().ValidateText(def->field, text);
+        if (text.empty() && Record_().FieldNotBlank(def->field)) {
+          Record_().TestField(def->field);
+        }
         RunTrigger_(control, ControlTriggerKind::Validate, true);
       } catch (const Error &e) { throw e.Coded("TestValidation"); }
     } else {
@@ -595,6 +598,11 @@ private:
     if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
       for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
         if (!SameWord_(trigger.control, control)) { continue; }
+        if (kind == ControlTriggerKind::Lookup && trigger.lookup != nullptr) {
+          ::agiru::Text<0> text(ControlText(control));
+          if ((Page_().*trigger.lookup)(text)) { SetControlText(control, text.Value()); }
+          return;
+        }
         void (P::*run)() = Trigger_(trigger, kind);
         if (run != nullptr) {
           (Page_().*run)();

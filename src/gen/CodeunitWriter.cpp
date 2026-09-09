@@ -1197,6 +1197,9 @@ public:
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
+    if (QueryColumnOf(objects_, Declaration(member.variable), member.field).isColumn) {
+      return true;
+    }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
             ? TableNoOf(unit_)

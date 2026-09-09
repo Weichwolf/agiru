@@ -127,6 +127,11 @@ public:
   ///          the rollback that follows frees it.
   [[nodiscard]] bool InFailedTransaction() const;
 
+  /// \note `AGIRU_TRACE_SQL` IN THE ENVIRONMENT WRITES EVERY STATEMENT AND ITS BINDS TO STDERR.
+  ///       A query's result is visible neither as a field write nor as a record, so the predecessor
+  ///       found that a statement trace was the only way to see one (openerp WI-1227); the same
+  ///       holds for a `SetRange` that quietly matches nothing.
+
 private:
   void *handle_;
 };

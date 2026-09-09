@@ -66,6 +66,10 @@ template <typename P> struct ControlTrigger {
   void (P::*action)() = nullptr;     ///< `OnAction`.
   void (P::*drillDown)() = nullptr;  ///< `OnDrillDown`.
   void (P::*assistEdit)() = nullptr; ///< `OnAssistEdit`.
+  /// \brief `OnLookup(var Text: Text): Boolean` -- the trigger takes the control's text and
+  ///        answers whether it set a new one, which the harness then validates as a `SetValue`
+  ///        (`testfield-lookup--method.md`). 552 BaseApp controls declare it (2026-09-09).
+  ::agiru::Boolean (P::*lookup)(::agiru::Text<0> &) = nullptr;
   /// \brief The `Visible` property when it is an EXPRESSION rather than a literal -- the parser
   ///        turns `Visible = AmountVisible` into a trigger that computes it, so the harness reads
   ///        what the page's variables say now and not what the property said at translation.

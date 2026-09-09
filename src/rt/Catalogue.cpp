@@ -5,6 +5,7 @@
 #include "runtime/Codeunit.h"
 
 #include <algorithm>
+#include <cctype>
 #include <mutex>
 #include <span>
 #include <vector>
@@ -45,6 +46,21 @@ const TableEntry *FindTable(TableId id) {
       });
   if (found == Entries().end() || (*found)->table->id != id) { return nullptr; }
   return *found;
+}
+
+const TableEntry *FindTable(std::string_view name) {
+  Order();
+  for (const TableEntry *entry : Entries()) {
+    const std::string_view candidate = entry->table->name;
+    if (candidate.size() != name.size()) { continue; }
+    bool same = true;
+    for (std::size_t i = 0; i < name.size() && same; ++i) {
+      same = std::tolower(static_cast<unsigned char>(candidate[i])) ==
+             std::tolower(static_cast<unsigned char>(name[i]));
+    }
+    if (same) { return entry; }
+  }
+  return nullptr;
 }
 
 std::span<const TableEntry *const> InstalledTables() {

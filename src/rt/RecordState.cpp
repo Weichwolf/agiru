@@ -157,9 +157,14 @@ void ApplyView(RecordState &state, const TableDef &table, std::string_view view)
   for (const Clause &clause : ClausesOf(view)) {
     if (SameText(clause.keyword, "VERSION")) { continue; }
     if (SameText(clause.keyword, "SORTING")) {
+      std::size_t named = 0;
       for (const std::string_view field : SplitOutsideParentheses(clause.inside, ',')) {
         if (Trimmed(field).empty()) { continue; }
         state.key.push_back(SortField{.field = FieldOfView(table, field).no, .ascending = true});
+        ++named;
+      }
+      if (named == 0) {
+        throw Error("The view clause SORTING() names no field of " + std::string(table.name));
       }
       continue;
     }

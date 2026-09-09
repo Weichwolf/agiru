@@ -56,6 +56,18 @@ public:
     Assign(std::string_view(value));
   }
 
+  /// \copydoc operator=(const T &)
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Code(const T &value) {
+    Assign(std::string_view(value.ToText()));
+  }
+
   /// \brief Copies the code and its declared length.
   /// \param o The other code.
   Code(const Code &o) = default;
@@ -75,6 +87,21 @@ public:
     requires std::convertible_to<const T &, std::string_view>
   Code &operator=(const T &value) {
     Assign(std::string_view(value));
+    return *this;
+  }
+
+  /// \brief AL `Text := Guid` and its kin: a value that renders itself is taken as its text.
+  /// \tparam T A type with `ToText()`, which is what AL converts on assignment.
+  /// \param value The value.
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Code &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
     return *this;
   }
 
@@ -161,6 +188,18 @@ public:
     Assign(std::string_view(value));
   }
 
+  /// \copydoc operator=(const T &)
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Code(const T &value) : Code<0>(N) {
+    Assign(std::string_view(value.ToText()));
+  }
+
   /// \brief Assigns anything that reads as text.
   /// \tparam T The source, which must read as a `std::string_view`.
   /// \param value The text.
@@ -170,6 +209,21 @@ public:
     requires std::convertible_to<const T &, std::string_view>
   Code &operator=(const T &value) {
     Assign(std::string_view(value));
+    return *this;
+  }
+
+  /// \brief AL `Text := Guid` and its kin: a value that renders itself is taken as its text.
+  /// \tparam T A type with `ToText()`, which is what AL converts on assignment.
+  /// \param value The value.
+  template <typename T>
+    requires(
+        !std::convertible_to<const T &, std::string_view> &&
+        !requires { typename T::IsAlRefusal; } &&
+        requires(const T &v) {
+          { v.ToText() } -> std::convertible_to<std::string_view>;
+        })
+  Code &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
     return *this;
   }
 };

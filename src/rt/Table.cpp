@@ -588,9 +588,28 @@ std::string_view FieldNameOf(const TableDef &table, FieldNo no) {
 }
 
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
-  static_cast<void>(record);
-  static_cast<void>(table);
-  static_cast<void>(no);
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr || def->relationTable.empty() || !def->validateTableRelation) { return; }
+  if (IsBlank(record, *def)) { return; }
+  const TableEntry *target = FindTable(def->relationTable);
+  if (target == nullptr) { return; }
+  const TableDef &other = *target->table;
+  const FieldDef *column = nullptr;
+  if (!def->relationField.empty()) {
+    for (const FieldDef &candidate : other.fields) {
+      if (candidate.name == def->relationField) { column = &candidate; }
+    }
+  } else if (!other.keys.empty() && !other.keys[0].fields.empty()) {
+    column = Field(other, other.keys[0].fields.front());
+  }
+  if (column == nullptr) { return; }
+  const std::string value = StorageText(record, *def);
+  if (GetRowWhere(Session::Current().Database(), other, *column, value).has_value()) { return; }
+  throw Error("The field " + std::string(def->caption.empty() ? def->name : def->caption) +
+              " of table " + std::string(table.caption.empty() ? table.name : table.caption) +
+              " contains a value (" + FieldText(record, *def) +
+              ") that cannot be found in the related table (" +
+              std::string(other.caption.empty() ? other.name : other.caption) + ").");
 }
 
 void PushBefore(const void *record, const void *owner) {

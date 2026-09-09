@@ -144,6 +144,7 @@ struct TriggerRow {
   std::string action;
   std::string drillDown;
   std::string assistEdit;
+  std::string lookup;
   std::string visible;
   std::string enabled;
   std::string editable;
@@ -157,11 +158,14 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
     TriggerRow row;
     row.control = control.name;
     for (const al::ProcedureDecl &trigger : control.triggers) {
-      if (!trigger.parameters.empty() || control.name.empty()) { continue; }
+      const std::string lowered = LowerKey(trigger.name);
+      const bool lookup = lowered == "onlookup" && trigger.parameters.size() == 1;
+      if ((!trigger.parameters.empty() && !lookup) || control.name.empty()) { continue; }
       const std::string method =
           ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures);
-      const std::string lowered = LowerKey(trigger.name);
-      if (lowered == "onvalidate") {
+      if (lookup) {
+        row.lookup = method;
+      } else if (lowered == "onvalidate") {
         row.validate = method;
       } else if (lowered == "onaction") {
         row.action = method;
@@ -203,8 +207,9 @@ std::string TriggerTable(const al::PageObject &page,
     first = false;
     out += "      {.control = " + Literal(row.control) + ", .validate = " + member(row.validate) +
            ", .action = " + member(row.action) + ", .drillDown = " + member(row.drillDown) +
-           ", .assistEdit = " + member(row.assistEdit) + ", .visible = " + member(row.visible) +
-           ", .enabled = " + member(row.enabled) + ", .editable = " + member(row.editable) + "}";
+           ", .assistEdit = " + member(row.assistEdit) + ", .lookup = " + member(row.lookup) +
+           ", .visible = " + member(row.visible) + ", .enabled = " + member(row.enabled) +
+           ", .editable = " + member(row.editable) + "}";
   }
   out += rows.empty() ? "}};\n" : "\n  }};\n";
   return out;

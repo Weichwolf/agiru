@@ -822,6 +822,16 @@ public:
     ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, no);
   }
 
+  /// \brief Whether a field declares `NotBlank`, which the UI enforces and a `Validate` does not
+  ///        (`devenv-notblank-property.md`: "If a field is updated through application code, then
+  ///        the NotBlank property is not validated").
+  /// \param no The field.
+  /// \return True when the declaration says `NotBlank = true`.
+  [[nodiscard]] static bool FieldNotBlank(::agiru::FieldNo no) {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    return def != nullptr && def->notBlank;
+  }
+
   /// \brief AL `Record.TestField(Field, Value)`.
   /// \tparam Value The field's own type.
   /// \param no       The field to test.
