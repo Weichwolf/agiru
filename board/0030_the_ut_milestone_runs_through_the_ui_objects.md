@@ -292,3 +292,11 @@ carries each page's source table for it. What is still declarative and still mis
 so the sub-page's `Rec` stands over its whole table rather than the parent's row (board:0430):
 a procedure called through the part runs, a value read through it is the first row's. 12 UT
 cases refused at the part before.
+
+## 2026-09-09: `Page.Update` headless
+
+`CurrPage.Update(SaveRecord)` refused with "needs a running UI" inside page triggers a `TestPage`
+drove, 15 cases. Headless the controls ARE the record, so the refresh is nothing; the SAVE the
+documentation names ("saves the current record and then updates the controls") is the row-leave
+this item still owes, so the parameter is carried and acted on by nothing rather than refused. The
+day the harness saves on row-leave, `Update(true)` saves too.

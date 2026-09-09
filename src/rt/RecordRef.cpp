@@ -49,38 +49,42 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
 }
 
 ::agiru::Boolean RecordRef::IsEmpty() {
-  return detail::RuntimeIsEmpty(record_, Table());
+  return detail::RuntimeIsEmpty(State().record, Table());
 }
 
 std::string RecordRef::GetView(::agiru::Boolean UseNames) const {
-  if (record_ == nullptr) { throw Error("RecordRef.GetView: the RecordRef is not open"); }
-  return detail::ViewOf(reinterpret_cast<const detail::StateHandle *>(record_)->Peek(),
+  if (State().record == nullptr) { throw Error("RecordRef.GetView: the RecordRef is not open"); }
+  return detail::ViewOf(reinterpret_cast<const detail::StateHandle *>(State().record)->Peek(),
                         Table(),
                         static_cast<bool>(UseNames));
 }
 
 void RecordRef::SetView(std::string_view String) {
-  if (record_ == nullptr) { throw Error("RecordRef.SetView: the RecordRef is not open"); }
-  detail::ApplyView(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), Table(), String);
+  if (State().record == nullptr) { throw Error("RecordRef.SetView: the RecordRef is not open"); }
+  detail::ApplyView(
+      reinterpret_cast<detail::StateHandle *>(State().record)->Ensure(), Table(), String);
 }
 
 ::agiru::SecurityFilter RecordRef::SecurityFiltering() const {
-  if (record_ == nullptr) { return ::agiru::SecurityFilter::Validated; }
-  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if (State().record == nullptr) { return ::agiru::SecurityFilter::Validated; }
+  const detail::RecordState *state =
+      reinterpret_cast<const detail::StateHandle *>(State().record)->Peek();
   return state == nullptr ? ::agiru::SecurityFilter::Validated : state->securityFiltering;
 }
 
 ::agiru::SecurityFilter
 RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering) {
-  if (record_ == nullptr) { throw Error("RecordRef.SecurityFiltering: the RecordRef is not open"); }
-  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record_)->Ensure();
+  if (State().record == nullptr) {
+    throw Error("RecordRef.SecurityFiltering: the RecordRef is not open");
+  }
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(State().record)->Ensure();
   const ::agiru::SecurityFilter was = state.securityFiltering;
   state.securityFiltering = NewSecurityFiltering;
   return was;
 }
 
 ::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
-  return detail::RuntimeFilterGroup(record_, NewGroup);
+  return detail::RuntimeFilterGroup(State().record, NewGroup);
 }
 
 void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
@@ -94,20 +98,22 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
 }
 
 ::agiru::Boolean RecordRef::IsTemporary() {
-  return detail::RuntimeIsTemporary(record_);
+  return detail::RuntimeIsTemporary(State().record);
 }
 
 ::agiru::Integer RecordRef::Count() {
-  return detail::RuntimeCount(record_, Table());
+  return detail::RuntimeCount(State().record, Table());
 }
 
 ::agiru::Boolean RecordRef::Find(std::string_view Which) {
-  return detail::RuntimeFind(record_, Table(), Which.empty() ? "=" : Which);
+  return detail::RuntimeFind(State().record, Table(), Which.empty() ? "=" : Which);
 }
 
 ::agiru::Boolean RecordRef::Get(::agiru::RecordId RecordID) {
   if (RecordID.IsEmpty()) { throw Error("RecordRef.Get: the RecordId names no record"); }
-  if (table_ == nullptr || table_->id.Value() != RecordID.TableNo()) { Open(RecordID.TableNo()); }
+  if (State().table == nullptr || State().table->id.Value() != RecordID.TableNo()) {
+    Open(RecordID.TableNo());
+  }
   const TableDef &table = Table();
   const std::span<const std::string> values = RecordID.KeyValues();
   if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
@@ -120,30 +126,30 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
     if (def == nullptr) {
       throw Error("RecordRef.Get: the primary key names a field the table lacks");
     }
-    detail::SetFieldText(record_, *def, values[at]);
+    detail::SetFieldText(State().record, *def, values[at]);
   }
-  return detail::RuntimeGet(record_, table);
+  return detail::RuntimeGet(State().record, table);
 }
 
 ::agiru::Integer RecordRef::Next(::agiru::Integer Steps) {
-  return detail::RuntimeNext(record_, Table(), Steps == 0 ? 1 : Steps);
+  return detail::RuntimeNext(State().record, Table(), Steps == 0 ? 1 : Steps);
 }
 
 ::agiru::Boolean RecordRef::FindSet() {
-  return detail::RuntimeFindSet(record_, Table());
+  return detail::RuntimeFindSet(State().record, Table());
 }
 
 void RecordRef::Reset() {
-  if (record_ == nullptr) { throw Error("RecordRef.Reset: the RecordRef is not open"); }
-  detail::RuntimeReset(record_);
+  if (State().record == nullptr) { throw Error("RecordRef.Reset: the RecordRef is not open"); }
+  detail::RuntimeReset(State().record);
 }
 
 void RecordRef::SetRecFilter() {
-  detail::RuntimeSetRecFilter(record_, Table());
+  detail::RuntimeSetRecFilter(State().record, Table());
 }
 
 ::agiru::Boolean RecordRef::FindFirst() {
-  return detail::RuntimeFind(record_, Table(), "-");
+  return detail::RuntimeFind(State().record, Table(), "-");
 }
 
 std::string FieldRef::ToText() const {
@@ -152,7 +158,7 @@ std::string FieldRef::ToText() const {
 }
 
 ::agiru::Boolean RecordRef::FindLast() {
-  return detail::RuntimeFind(record_, Table(), "+");
+  return detail::RuntimeFind(State().record, Table(), "+");
 }
 
 ::agiru::RecordId RecordRef::RecordId() const {
@@ -161,7 +167,7 @@ std::string FieldRef::ToText() const {
   if (!table.keys.empty()) {
     for (const FieldNo no : table.keys.front().fields) {
       const FieldDef *def = agiru::Field(table, no);
-      if (def != nullptr) { key.push_back(::agiru::detail::StorageText(record_, *def)); }
+      if (def != nullptr) { key.push_back(::agiru::detail::StorageText(State().record, *def)); }
     }
   }
   return ::agiru::RecordId{table.id, std::string(table.caption), std::move(key)};
@@ -176,12 +182,13 @@ void RecordRef::GetTable(Variant &rec) {
                 " is not installed in this binary");
   }
   Open(held->table.Value());
-  entry->copy(record_, held->record);
+  entry->copy(State().record, held->record);
 }
 
 std::string RecordRef::GetFilters() const {
-  if (record_ == nullptr) { return {}; }
-  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if (State().record == nullptr) { return {}; }
+  const detail::RecordState *state =
+      reinterpret_cast<const detail::StateHandle *>(State().record)->Peek();
   if (state == nullptr) { return {}; }
   std::vector<const detail::FieldFilter *> standing;
   for (const detail::FieldFilter &one : state->filters) {
@@ -203,7 +210,7 @@ std::string RecordRef::GetFilters() const {
 }
 
 ::agiru::Boolean RecordRef::Insert() {
-  if (!detail::RuntimeInsert(record_, Table())) {
+  if (!detail::RuntimeInsert(State().record, Table())) {
     throw Error("The " + std::string(Table().caption) + " already exists.");
   }
   return true;
@@ -216,7 +223,7 @@ std::string RecordRef::GetFilters() const {
 
 ::agiru::Boolean RecordRef::Modify(::agiru::Boolean RunTrigger) {
   static_cast<void>(RunTrigger);
-  if (!detail::RuntimeModify(record_, Table())) {
+  if (!detail::RuntimeModify(State().record, Table())) {
     throw Error("The " + std::string(Table().name) + " does not exist");
   }
   return true;
@@ -224,7 +231,7 @@ std::string RecordRef::GetFilters() const {
 
 ::agiru::Boolean RecordRef::Delete(::agiru::Boolean RunTrigger) {
   static_cast<void>(RunTrigger);
-  if (!detail::RuntimeDelete(record_, Table())) {
+  if (!detail::RuntimeDelete(State().record, Table())) {
     throw Error("The " + std::string(Table().name) + " does not exist");
   }
   return true;
@@ -355,14 +362,14 @@ void RecordRef::Open(Integer tableNo) {
   if (entry == nullptr) {
     throw Error("this installation carries no table " + std::to_string(tableNo));
   }
-  owned_ = detail::SharedRecord(entry->make(), entry->free);
-  record_ = owned_.Get();
-  table_ = entry->table;
+  State().owned = detail::SharedRecord(entry->make(), entry->free);
+  State().record = State().owned.Get();
+  State().table = entry->table;
 }
 
 const TableDef &RecordRef::Table() const {
-  if (table_ == nullptr) { throw Error("the RecordRef is not open"); }
-  return *table_;
+  if (State().table == nullptr) { throw Error("the RecordRef is not open"); }
+  return *State().table;
 }
 
 Integer RecordRef::Number() const {
@@ -384,7 +391,7 @@ Integer RecordRef::KeyCount() const {
 FieldRef RecordRef::Field(Integer fieldNo) const {
   const FieldDef *def = agiru::Field(Table(), FieldNo{fieldNo});
   if (def == nullptr) { throw Error("the table declares no field " + std::to_string(fieldNo)); }
-  return FieldRef{record_, Table(), *def};
+  return FieldRef{State().record, Table(), *def};
 }
 
 FieldRef RecordRef::FieldIndex(Integer index) const {
@@ -393,7 +400,7 @@ FieldRef RecordRef::FieldIndex(Integer index) const {
     throw Error("the field index " + std::to_string(index) + " is outside 1.." +
                 std::to_string(table.fields.size()));
   }
-  return FieldRef{record_, table, table.fields[static_cast<std::size_t>(index) - 1]};
+  return FieldRef{State().record, table, table.fields[static_cast<std::size_t>(index) - 1]};
 }
 
 KeyRef RecordRef::KeyIndex(Integer Index) const {
@@ -402,7 +409,7 @@ KeyRef RecordRef::KeyIndex(Integer Index) const {
     throw Error("the key index " + std::to_string(Index) + " is outside 1.." +
                 std::to_string(table.keys.size()));
   }
-  return KeyRef{record_, table, table.keys[static_cast<std::size_t>(Index) - 1]};
+  return KeyRef{State().record, table, table.keys[static_cast<std::size_t>(Index) - 1]};
 }
 
 Boolean KeyRef::Active() const {
@@ -436,7 +443,7 @@ RecordRef KeyRef::Record() const {
 }
 
 bool RecordRef::FieldExist(Integer fieldNo) const {
-  return table_ != nullptr && agiru::Field(*table_, FieldNo{fieldNo}) != nullptr;
+  return State().table != nullptr && agiru::Field(*State().table, FieldNo{fieldNo}) != nullptr;
 }
 
 }

@@ -6980,3 +6980,4 @@ tests/test/foundation/no_series/codeunit/NoSeriesCheckTests.cpp
 # whole point of naming them rather than globbing whatever happens to work.
 foundation/foundation/no_series/codeunit/NoSeriesErrorsImpl.cpp
 base/system/text/codeunit/StringConversionManagement.cpp
+base/system/utilities/codeunit/ErrorMessageManagement.cpp

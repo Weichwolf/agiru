@@ -236,6 +236,35 @@ void AnInlineOptionGetsAnEnumerationOfItsOwn() {
                  generated.find("SomeThingOptionFirstSecond"));
 }
 
+/// AL LETS A METHOD WITHOUT PARAMETERS BE CALLED WITHOUT PARENTHESES, and the BaseApp does so on a
+/// static platform type: `CallStack := SessionInformation.Callstack;` (ErrorMessageManagement,
+/// 21 UT cases blocked on 2026-09-09). The generator adds them where the door declares a static
+/// function of that name on that type -- and nowhere else, since an enumerator is spelled the same.
+void AStaticPlatformMemberWithoutParenthesesIsACall() {
+  const std::string source = R"(codeunit 50001 "Some Caller"
+{
+    procedure Trace(): Text
+    var
+        Stack: Text;
+        How: Verbosity;
+    begin
+        Stack := SessionInformation.Callstack;
+        How := Verbosity::Normal;
+        exit(Stack);
+    end;
+})";
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables()),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "SomeCaller.cpp"});
+  CHECK_TRUE("the static method gets its parentheses",
+             generated.find("SessionInformation::Callstack()") != std::string::npos);
+  // THE NEGATIVE CONTROL: an enumerator on a type name is not a call, and `Normal` IS a callable
+  // name elsewhere in the door.
+  CHECK_TRUE("an enumerator stays one", generated.find("Verbosity::Normal;") != std::string::npos);
+}
+
 /// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide
 /// the type, so the declaration has to qualify it -- and WHICH namespace it qualifies with is
 /// decided by what the type IS. An AL object becomes a class in `agiru::app`; every other AL type
@@ -308,6 +337,7 @@ int main() {
     ATableTheRunNeverSawIsReported();
     AnInlineOptionGetsAnEnumerationOfItsOwn();
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
+    AStaticPlatformMemberWithoutParenthesesIsACall();
     ACodeunitIncludesEveryObjectItNames();
   });
 }

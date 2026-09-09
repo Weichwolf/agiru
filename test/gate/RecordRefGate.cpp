@@ -65,6 +65,29 @@ void OneThatIsNotOpenRefusesRatherThanAnsweringZero() {
   CHECK_TRUE("while FieldExist simply answers false", !ref.FieldExist(1));
 }
 
+/// A RECORDREF IS A REFERENCE TYPE, so a copy is a second handle on the same object: the BaseApp
+/// passes one BY VALUE, opens it inside the callee, and reads it in the caller
+/// (`FindRecordManagement.GetRecRefAndFieldsNoByType`, 11 UT cases on 2026-09-09).
+void ACopyIsASecondHandleOnTheSameObject() {
+  ResourceCost rec;
+  RecordRef ref;
+  RecordRef copy = ref;
+  CHECK_TRUE("both start closed", !ref.IsOpen() && !copy.IsOpen());
+  copy.GetTable(rec);
+  CHECK_TRUE("opening the copy opens the original", ref.IsOpen());
+  CHECK_TRUE("and it is the same table",
+             ref.Number() == agiru::TableTraits<ResourceCost>::kTable.id.Value());
+  RecordRef assigned;
+  assigned = ref;
+  assigned.Close();
+  CHECK_TRUE("closing through an assigned handle closes them all", !ref.IsOpen() && !copy.IsOpen());
+
+  // THE NEGATIVE CONTROL: two handles made apart are two objects.
+  RecordRef other;
+  other.GetTable(rec);
+  CHECK_TRUE("a RecordRef made on its own is not touched", !ref.IsOpen());
+}
+
 constexpr agiru::Integer kNoSuchField = 999;
 
 void AFieldIsReachedByNumberAndByPosition() {
@@ -317,6 +340,7 @@ void TheFieldTypeCarriesThePlatformsOwnNumbers() {
 
 int main() {
   return gate::Run("RecordRef", [] {
+    ACopyIsASecondHandleOnTheSameObject();
     ItReachesTheTableWithoutNamingIt();
     OneThatIsNotOpenRefusesRatherThanAnsweringZero();
     AFieldIsReachedByNumberAndByPosition();

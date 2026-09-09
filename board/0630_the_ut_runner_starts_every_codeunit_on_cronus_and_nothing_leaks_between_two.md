@@ -85,6 +85,11 @@ during a build is prepared in the scratchpad and applied only when the chain has
 
 ## Standing 2026-09-09: two more shells killed themselves, and a run by type would not link
 
+A fourth shell died the same way on 2026-09-09: `pkill -f "cmake --build"` from a command line
+that spelled `cmake --build` -- the guard was applied to the chain's name and forgotten for the
+build's. EVERY pattern on the line gets the bracket, or the kill is done from a script whose text
+is not on the command line.
+
 The `pkill -f "chai[n]6\.sh"` guard holds only while NOTHING ELSE on the same command line spells
 `chain6.sh`; a `sed` on the script and its `nohup` in the same command did, and the shell died
 with 144 twice before running the edit it was meant to run. The name is spelled through a glob

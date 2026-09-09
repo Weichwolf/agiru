@@ -1,5 +1,5 @@
 Type: arc
-State: open
+State: active
 Area: al, gen, rt, db
 Tags: target
 
@@ -127,6 +127,19 @@ gate.
 `devenv-query-retrieve-date-data.md` adds one more column-level transform: a **date method** on a
 column returns only the Year, Month or Day of a date field, which is a `date_part` in the emitted
 SQL and another reason the column list is a projection rather than a field list.
+
+## Taken 2026-09-09: the first cut
+
+The parser reads `elements` with the page's control reader; the writer emits one class per query
+with a typed member per column (`decltype` of the source field, `Integer` for `Count`, `Day`,
+`Month` and `Year`) and the dataitems, links, join types, columns, `OrderBy` and
+`TopNumberOfRows` as `constexpr` data in the source; the runtime builds the statement at `Open`
+and streams it through the same cursor `FindSet` uses. A query whose dataitem names a table out
+of scope is written as a stub and counted by the transpiler. NOT in this cut: the query's own
+procedures and its `OnBeforeOpen` trigger (118 triggers and 35 procedures over the read roots,
+counted 2026-09-09; the predecessor's WI-1133 measured them at GAINED 4), `SaveAsXml`/`Csv`/
+`Json`, `SecurityFiltering`, and a `ColumnFilter` on an aggregated column, which lands in
+`HAVING` and is untested.
 
 ## Measured 2026-09-06 on the 893-case run
 

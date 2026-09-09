@@ -397,8 +397,10 @@ private:
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) { return Kinded(kind, expression.text); }
       if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
+        const bool call =
+            DoorStaticCalls(StaticMember{.type = base.text, .member = expression.text});
         return "::agiru::" + TypeName(base.text) +
-               "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
+               "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text)) + (call ? "()" : "");
       }
       if (scope_.Resolve(base.text).empty()) {
         const std::string lowered = LowerKey(base.text);
@@ -934,6 +936,11 @@ private:
     }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
     if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
+    if (last.kind == al::ExprKind::Name && !scope_.IsVariable(base.text) &&
+        IsAlTypeName(base.text) &&
+        DoorStaticCalls(StaticMember{.type = base.text, .member = last.text})) {
+      return Parens::Last;
+    }
     if (last.kind == al::ExprKind::Name &&
         scope_.MemberIsCall(OfVariable{.variable = base.text, .field = last.text})) {
       return Parens::Last;
@@ -1071,7 +1078,8 @@ private:
   std::string TypeStatic(const al::Expr &walk,
                          const std::vector<const al::Expr *> &chain,
                          std::string_view spelling,
-                         int precedence) {
+                         int precedence,
+                         bool asCallee) {
     if (spelling != "." || chain.empty() || chain.back()->kind != al::ExprKind::Name) { return {}; }
     if (walk.kind == al::ExprKind::Name && IsEnumMethod(chain.back()->text) &&
         scope_.Resolve(walk.text).empty()) {
@@ -1105,6 +1113,10 @@ private:
     const std::string holder = KindNamespace(walk.text).empty() ? "" : "<>";
     std::string out = "::agiru::" + TypeName(walk.text) + holder +
                       "::" + AsTheDoorSpellsIt(Identifier(chain.back()->text));
+    if (chain.size() == 1 && !asCallee &&
+        DoorStaticCalls(StaticMember{.type = walk.text, .member = chain.back()->text})) {
+      out += "()";
+    }
     for (std::size_t i = chain.size() - 1; i > 0; --i) {
       Link(out,
            {.spelling = spelling, .base = walk, .link = *chain[i - 1]},
@@ -1181,7 +1193,7 @@ private:
       chain.push_back(&walk->children.back());
       walk = &walk->children.front();
     }
-    if (const std::string reached = TypeStatic(*walk, chain, spelling, precedence);
+    if (const std::string reached = TypeStatic(*walk, chain, spelling, precedence, asCallee);
         !reached.empty()) {
       return reached;
     }

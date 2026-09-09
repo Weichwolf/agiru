@@ -25,11 +25,16 @@ refuses at column 11 (`the array index 11 is outside 1..10`, 11 UT cases, 2026-0
 
 ## The choice
 
-A procedure with an array parameter becomes a member TEMPLATE over the array's dimensions, so the
-callee is instantiated on the caller's `AlArray<AlArray<T, M>, N>` and `At` checks the real bounds.
-The declared dimensions stay as the default the header names. The cost is one instantiation per
-distinct argument shape, which the population makes small: 0 procedures in the UT codeunits are
-called with two different shapes.
+The parameter keeps its declared type and the ARRAY keeps the argument's length: when an
+`AlArray<T, N>` is built from a longer array, the elements live in a buffer the array owns, and
+`ArrayLen` and the bound check answer with the argument's length. The ordinary case, an argument
+no longer than the declaration, costs no heap.
+
+The first choice here was a member template over the dimensions. It was taken back before it was
+built, on the population: 601 by-value array parameters in the generated tree (2026-09-09), and a
+template puts each body in the header -- against the rule that the source carries every body, and
+at 601 procedures a measurable build cost. The spill buffer is twenty lines in the door and no
+generator change.
 
 ## Gate, and its negative control
 

@@ -95,6 +95,29 @@ std::set<std::string> &Callables() {
   return callable;
 }
 
+std::set<std::string> &StaticCallables() {
+  static std::set<std::string> callable;
+  return callable;
+}
+
+std::string Folded(std::string_view name) {
+  std::string key;
+  for (const char c : name) {
+    key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  return key;
+}
+
+void NoteStaticCalls(const std::string &line, std::string_view type) {
+  static const std::regex declared(R"(\b([A-Z][A-Za-z0-9]*)\s*\()");
+  const std::size_t first = line.find_first_not_of(" \t");
+  if (first == std::string::npos || line.compare(first, 2, "//") == 0) { return; }
+  if (line.find("static ") == std::string::npos) { return; }
+  for (std::sregex_iterator it(line.begin(), line.end(), declared), end; it != end; ++it) {
+    StaticCallables().insert(Folded(type) + "::" + Folded((*it)[1].str()));
+  }
+}
+
 void NoteEnumerators(const std::string &line,
                      bool &inside,
                      std::map<std::string, std::string> &found) {
@@ -157,9 +180,11 @@ std::map<std::string, std::string> ReadSpellings() {
     std::ifstream file(entry.path());
     std::string line;
     bool inEnum = false;
+    const std::string type = entry.path().stem().string();
     while (std::getline(file, line)) {
       NoteSpellings(line, found);
       NoteEnumerators(line, inEnum, found);
+      NoteStaticCalls(line, type);
     }
   }
   if (found.empty()) { throw std::runtime_error("the door declares no names"); }
@@ -434,6 +459,11 @@ bool HiddenByABaseMember(std::string_view name) {
 bool DoorCalls(std::string_view name) {
   const std::string spelled = AsTheDoorSpellsIt(name);
   return Callables().contains(spelled);
+}
+
+bool DoorStaticCalls(const StaticMember &wanted) {
+  DoorSpellings();
+  return StaticCallables().contains(Folded(wanted.type) + "::" + Folded(wanted.member));
 }
 
 std::string BuiltinSpelling(std::string_view name) {

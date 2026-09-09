@@ -106,9 +106,7 @@ public:
   /// \param other The array copied.
   /// \note THE BASE'S POINTER IS NOT COPIED, IT IS REMADE. A defaulted copy would leave two arrays
   ///       referring to one buffer, and the second write would land in the first array.
-  AlArray(const AlArray &other) : AlArray<T, 0>(nullptr, N), held_(other.held_) {
-    this->Refer(held_.data(), static_cast<std::size_t>(other.Length()));
-  }
+  AlArray(const AlArray &other) : AlArray<T, 0>(nullptr, N) { Take(other); }
 
   /// \brief The same conversion one dimension down: `array[10, 100]` into `array[10, 10]`
   ///        (`PaymentExportXMLPortUT`) differs in the ELEMENT type, and each row converts through
@@ -122,22 +120,12 @@ public:
   /// \note AL DECLARES A SIZE AND PASSES ONE ON WITHOUT IT. A `var array of Integer` parameter is
   ///       the unsized view here, and the procedure it is handed to declares `array[10]`; the
   ///       elements are copied, which is what passing by value means in AL too.
-  AlArray(const AlArray<T, 0> &other) : AlArray<T, 0>(nullptr, N) {
-    const auto taken = std::min(static_cast<std::size_t>(other.Length()), N);
-    for (std::size_t item = 0; item < taken; ++item) {
-      held_[item] = other[static_cast<Integer>(item) + 1];
-    }
-    this->Refer(held_.data(), taken);
-  }
+  AlArray(const AlArray<T, 0> &other) : AlArray<T, 0>(nullptr, N) { Take(other); }
 
   template <typename U, std::size_t M>
     requires(!std::same_as<U, T> && M != 0 && std::constructible_from<T, const U &>)
   AlArray(const AlArray<U, M> &other) : AlArray<T, 0>(nullptr, N) {
-    const auto taken = std::min(static_cast<std::size_t>(other.Length()), N);
-    for (std::size_t item = 0; item < taken; ++item) {
-      held_[item] = T(other[static_cast<Integer>(item) + 1]);
-    }
-    this->Refer(held_.data(), taken);
+    Take(other);
   }
 
   /// \brief Takes another array's elements, keeping its own storage.
@@ -145,10 +133,7 @@ public:
   /// \return This array.
   AlArray &operator=(const AlArray &other) {
 
-    if (this != &other) {
-      held_ = other.held_;
-      this->Refer(held_.data(), static_cast<std::size_t>(other.Length()));
-    }
+    if (this != &other) { Take(other); }
     return *this;
   }
 
@@ -161,7 +146,7 @@ public:
     return *this = static_cast<const AlArray &>(other);
   }
 
-  ~AlArray() = default;
+  ~AlArray() { delete[] spill_; }
 
   /// \brief An array of ANOTHER size, which is what AL hands a by-value parameter.
   ///
@@ -178,16 +163,38 @@ public:
   template <std::size_t M>
     requires(M != N && M != 0)
   AlArray(const AlArray<T, M> &other) : AlArray<T, 0>(nullptr, N) {
-    const auto taken =
-        static_cast<std::size_t>(other.Length()) < N ? static_cast<std::size_t>(other.Length()) : N;
-    for (std::size_t item = 0; item < taken; ++item) {
-      held_[item] = other[static_cast<Integer>(item) + 1];
-    }
-    this->Refer(held_.data(), taken);
+    Take(other);
   }
 
 private:
+  /// \brief Takes every element the other array holds, keeping the OTHER's length.
+  ///
+  /// \warning A PARAMETER TAKES THE SHAPE OF THE ARGUMENT, NOT OF ITS DECLARATION (board:0633).
+  ///          `PaymentExportXMLPortUT.CreateDataExchFieldForLine` declares `array[10, 10]`, is
+  ///          given an `array[10, 100]`, and walks the parameter to column 100 -- BC runs it. So
+  ///          when the argument is longer than the declared `N`, the surplus lives in a buffer
+  ///          this array owns, and `ArrayLen` and the bound check answer with the argument's
+  ///          length. The declared size is the storage for the ordinary case and costs no heap.
+  template <typename Source> void Take(const Source &other) {
+    const auto length = static_cast<std::size_t>(other.Length());
+    T *into = held_.data();
+    if (length > N) {
+      T *fresh = new T[length];
+      delete[] spill_;
+      spill_ = fresh;
+      into = spill_;
+    } else {
+      delete[] spill_;
+      spill_ = nullptr;
+    }
+    for (std::size_t item = 0; item < length; ++item) {
+      into[item] = T(other[static_cast<Integer>(item) + 1]);
+    }
+    this->Refer(into, length);
+  }
+
   std::array<T, N> held_{};
+  T *spill_ = nullptr;
 };
 
 /// \brief AL `ArrayLen(A)` -- how many elements the declaration gave it.

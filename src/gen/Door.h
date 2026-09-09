@@ -22,6 +22,13 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] bool DoorCalls(std::string_view name);
 
+struct StaticMember {
+  std::string_view type;
+  std::string_view member;
+};
+
+[[nodiscard]] bool DoorStaticCalls(const StaticMember &wanted);
+
 struct PlatformField {
   std::string_view table;
   std::string_view field;

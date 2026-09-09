@@ -456,10 +456,64 @@ private:
 ///       fields. `Open(TableNo)` -- which makes a record out of a number alone -- needs a registry
 ///       from table number to declaration that this runtime does not have yet, and refuses rather
 ///       than handing back something empty.
+namespace detail {
+
+/// \brief What every copy of one AL `RecordRef` variable shares: the table it is open on, the
+///        record it points at, and the ownership of that record.
+///
+/// \warning A `RecordRef` IS A REFERENCE TYPE IN AL, so a copy is a second handle on the SAME
+///          object and not a second object. `GetRecRefAndFieldsNoByType(RecRef: RecordRef; ...)`
+///          in the BaseApp takes the RecordRef BY VALUE, calls `RecRef.Open(...)` inside, and the
+///          caller then runs `RecRef.SetView` on what the callee opened -- 658 by-value RecordRef
+///          parameters are declared in the generated tree (counted 2026-09-09), and each relies on
+///          the handle being shared. `Open`, `Close`, `GetTable` and `SetTable` therefore act on
+///          this box, and `RecordRef.Copy(RecordRef)` is the one way to a second object.
+struct RecordRefState {
+  /// \brief The record, or nothing when the reference is closed.
+  void *record = nullptr;
+  /// \brief The table it is open on, or nothing.
+  const TableDef *table = nullptr;
+  /// \brief The record when this reference made it; empty when it was given one.
+  SharedRecord owned;
+  /// \brief How many handles share this box.
+  long uses = 1;
+};
+
+}
+
 class RecordRef {
 public:
   /// \brief A RecordRef pointing at nothing.
   RecordRef() = default;
+
+  /// \brief A second handle on the same object, which is what passing one by value gives AL.
+  RecordRef(const RecordRef &o) : state_(o.Shared()) {}
+
+  /// \brief Takes over the handle.
+  RecordRef(RecordRef &&o) noexcept : state_(o.state_) { o.state_ = nullptr; }
+
+  /// \brief Points this handle at the other's object, the way `RecRef2 := RecRef1` does in AL.
+  RecordRef &operator=(const RecordRef &o) {
+    if (this != &o) {
+      detail::RecordRefState *next = o.Shared();
+      Release();
+      state_ = next;
+    }
+    return *this;
+  }
+
+  /// \brief Takes over the handle.
+  RecordRef &operator=(RecordRef &&o) noexcept {
+    if (this != &o) {
+      Release();
+      state_ = o.state_;
+      o.state_ = nullptr;
+    }
+    return *this;
+  }
+
+  /// \brief Lets go of the handle, freeing the box with the last one.
+  ~RecordRef() { Release(); }
 
   /// \brief AL `RecordRef.GetTable(Record)` -- when what AL held was an `Any`.
   ///
@@ -477,7 +531,7 @@ public:
   /// \param rec The record.
   template <typename T> void GetTable(T &rec) {
     Open(TableTraits<T>::kTable.id.Value());
-    *static_cast<std::remove_cvref_t<T> *>(record_) = rec;
+    *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
   }
 
   /// \brief AL `RecordRef.Open(TableNo, Temporary [, Company])`.
@@ -501,7 +555,7 @@ public:
   void Open(Integer tableNo);
 
   /// \return True when this RecordRef points at a record.
-  [[nodiscard]] bool IsOpen() const { return record_ != nullptr; }
+  [[nodiscard]] bool IsOpen() const { return State().record != nullptr; }
 
   /// \brief The record this reference stands for, when it is the type the caller expects.
   /// \tparam T The record's class.
@@ -511,8 +565,8 @@ public:
   ///       lookup trigger -- `OnAfterLookup(Selected: RecordRef)` is 30-odd call sites -- and what
   ///       AL copies is the ROW, which is this record's fields.
   template <typename T> [[nodiscard]] const T *As() const {
-    if (record_ == nullptr || table_ != &TableTraits<T>::kTable) { return nullptr; }
-    return static_cast<const T *>(record_);
+    if (State().record == nullptr || State().table != &TableTraits<T>::kTable) { return nullptr; }
+    return static_cast<const T *>(State().record);
   }
 
   /// \brief AL `RecordRef.Number()`.
@@ -1119,14 +1173,15 @@ public:
       { R::kId } -> std::convertible_to<TableId>;
     }
   void SetTable(R &Rec) {
-    if (record_ == nullptr || table_ == nullptr) {
+    if (State().record == nullptr || State().table == nullptr) {
       throw Error("RecordRef.SetTable: the RecordRef is not open");
     }
-    if (table_->id != TableTraits<R>::kTable.id) {
-      throw Error("RecordRef.SetTable: the RecordRef refers to " + std::string(table_->name) +
-                  " and the record is a " + std::string(TableTraits<R>::kTable.name));
+    if (State().table->id != TableTraits<R>::kTable.id) {
+      throw Error("RecordRef.SetTable: the RecordRef refers to " +
+                  std::string(State().table->name) + " and the record is a " +
+                  std::string(TableTraits<R>::kTable.name));
     }
-    Rec = *static_cast<R *>(record_);
+    Rec = *static_cast<R *>(State().record);
   }
 
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.
@@ -1213,9 +1268,10 @@ public:
   /// \note IT LETS GO OF A RECORD IT MADE AND OF ONE IT WAS GIVEN, and only the first is freed:
   ///       `GetTable(Rec)` points a RecordRef at somebody else's record and `Open(18)` makes one.
   void Close() {
-    record_ = nullptr;
-    table_ = nullptr;
-    owned_.Reset();
+    detail::RecordRefState &box = State();
+    box.record = nullptr;
+    box.table = nullptr;
+    box.owned.Reset();
   }
 
   /// \brief AL `RecordRef.KeyCount()`.
@@ -1226,14 +1282,30 @@ public:
 private:
   friend class KeyRef;
 
-  RecordRef(void *record, const TableDef &table) : record_(record), table_(&table) {}
+  RecordRef(void *record, const TableDef &table) : state_(new detail::RecordRefState{}) {
+    state_->record = record;
+    state_->table = &table;
+  }
 
   [[nodiscard]] const TableDef &Table() const;
 
-  void *record_ = nullptr;
-  const TableDef *table_ = nullptr;
+  [[nodiscard]] detail::RecordRefState &State() const {
+    if (state_ == nullptr) { state_ = new detail::RecordRefState{}; }
+    return *state_;
+  }
 
-  detail::SharedRecord owned_;
+  [[nodiscard]] detail::RecordRefState *Shared() const {
+    detail::RecordRefState &box = State();
+    ++box.uses;
+    return &box;
+  }
+
+  void Release() noexcept {
+    if (state_ != nullptr && --state_->uses == 0) { delete state_; }
+    state_ = nullptr;
+  }
+
+  mutable detail::RecordRefState *state_ = nullptr;
 };
 
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard,performance-unnecessary-value-param)

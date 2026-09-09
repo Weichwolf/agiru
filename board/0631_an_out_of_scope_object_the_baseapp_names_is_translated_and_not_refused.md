@@ -1,5 +1,5 @@
 Type:     decision
-Status:   open
+Status:   active
 Parent:   0034
 Area:     scope
 Source:   scope.json; ~/Git/openerp WI-990, WI-1033; devenv-integration-dataverse.md
@@ -59,6 +59,14 @@ OBJECT, and `Refused.h` is the proof that a name without a translation is a hole
 **The `Feature Key` row is a different item**: table 2000000211 is a platform table with no AL
 source, like `Field` and `AllObj`, and belongs to the virtual-table census (board:0004's `platform`
 schema), not to the scope.
+
+## Taken 2026-09-09
+
+The six namespaces go into `scope.json`'s whitelist: the five above and `System.Telemetry`, which
+the table did not carry -- `Feature Telemetry.LogUptake` is called on the price-list paths and
+24 cases die on it (build 35). `System.Azure` and `Microsoft.Integration` stay in the exclude
+list; the longer include wins on the dot boundary, which is what the whitelist's own rule says.
+The generated sources that compile join the slice; the ones that do not are the next census.
 
 ## The measurement to take
 
