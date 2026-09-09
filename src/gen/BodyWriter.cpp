@@ -1979,6 +1979,10 @@ public:
         }
       }
     }
+    if (running_ != nullptr && !running_->returnName.empty() &&
+        SameName(running_->returnName, variable)) {
+      return &running_->returned;
+    }
     for (const al::VarDecl &declared : page_.variables) {
       if (SameName(declared.name, variable)) { return &declared; }
     }
@@ -2202,8 +2206,6 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     out += body + "}\n\n";
   }
 
-  out += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterTable<" + tableClass +
-         "> kInCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   out += "} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);
@@ -2219,6 +2221,12 @@ std::string WriteDefinitions(const al::TableObject &table,
   out += kDoorMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + TableDefinitions(table, objects);
+  const std::string space = NamespaceOf(table.nameSpace);
+  const std::string identifier = Identifier(table.name);
+  out += "namespace " + space + " {\n\nnamespace {\nnamespace " + identifier +
+         "_unit {\nconst RegisterTable<" + ClassName(identifier, ObjectKind::Table) +
+         "> kInCatalogue;\n} // namespace " + identifier +
+         "_unit\n} // namespace\n\n} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);
 }
@@ -2367,8 +2375,6 @@ std::string WriteSource(const al::PageObject &page,
     if (!locals.empty() && !body.empty()) { bodies += "\n"; }
     bodies += body + "}\n\n";
   }
-  bodies += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterPage<" + pageClass +
-            "> kInPageCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   bodies += "} // namespace " + space + "\n";
   out += SourceIncludesOf(page.variables, page.procedures, objects);
   out += BodyIncludes(bodies, objects);
@@ -2387,6 +2393,12 @@ std::string WriteDefinitions(const al::PageObject &page,
   out += kDoorMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + PageDefinition(page, objects, source);
+  const std::string space = NamespaceOf(page.nameSpace);
+  const std::string identifier = Identifier(page.name);
+  out += "namespace " + space + " {\n\nnamespace {\nnamespace " + identifier +
+         "_unit {\nconst RegisterPage<" + ClassName(identifier, ObjectKind::Page) +
+         "> kInPageCatalogue;\n} // namespace " + identifier +
+         "_unit\n} // namespace\n\n} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Page);
 }

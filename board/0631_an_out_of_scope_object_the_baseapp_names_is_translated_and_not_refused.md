@@ -98,3 +98,10 @@ rest is the Dataverse bridge's own .NET surface (`CrmHelper`, `GenericDictionary
 `foreach`, `Type` handed around as a value) and the Entra user sync (`UserInfo.AssignedPlans`,
 `Roles` with `RoleTemplateId`). `CRM Integration Management` compiles, and its 427 cases wait on
 `CDS Integration Impl.` behind it, which is the next census.
+
+## 2026-09-09, second widening
+
+`Microsoft.CRM.Outlook` joins for the same reason: `Office Management` is asked by the document
+pages whether the add-in is running (24 UT cases on `OfficeManagement.GetContact`). The first
+attempt edited `src/gen/scope.json`, which is the scope GATE's fixture; the transpiler reads the
+root `scope.json`, and only that one decides.

@@ -340,8 +340,7 @@ Variant FieldRef::Value() const {
     case FieldType::DateFormula: return Variant{As<DateFormula>(record_, *def_)};
     case FieldType::Option:
     case FieldType::Enum: return Variant{Integer{As<OrdinalValue>(record_, *def_).AsInteger()}};
-    case FieldType::Blob:
-      throw Error("a Blob is not read with its record, so it has no value here (board:0017)");
+    case FieldType::Blob: return Variant{As<Blob>(record_, *def_)};
     case FieldType::Media:
     case FieldType::MediaSet:
       throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
@@ -362,6 +361,15 @@ void FieldRef::TestField() const {
 RecordRef FieldRef::Record() const {
   if (record_ == nullptr || table_ == nullptr) { throw Error("this FieldRef names no field"); }
   return RecordRef{record_, *table_};
+}
+
+::agiru::IsolationLevel RecordRef::ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation) {
+  if (State().record == nullptr) {
+    throw Error("RecordRef.ReadIsolation: the RecordRef is not open");
+  }
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(State().record)->Ensure();
+  if (ReadIsolation != IsolationLevel::Default) { state.isolation = ReadIsolation; }
+  return state.isolation;
 }
 
 void RecordRef::Init() {

@@ -1049,11 +1049,7 @@ public:
   /// \param ReadIsolation The AL `IsolationLevel`.
   /// \return The AL `IsolationLevel`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::IsolationLevel ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation = {}) {
-    static_cast<void>(ReadIsolation);
-    throw Error(
-        "RecordRef.ReadIsolation(IsolationLevel) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::IsolationLevel ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation = {});
 
   /// \brief AL `RecordRef.ReadPermission()`. Determines if you can read from a table.
   /// \return The AL `Boolean`.

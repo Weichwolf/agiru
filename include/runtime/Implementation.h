@@ -43,7 +43,12 @@ public:
 
   /// \brief Takes the other's codeunit.
   /// \param o The other.
-  Implementation(Implementation &&o) noexcept : held_(o.held_) { o.held_ = nullptr; }
+  Implementation(Implementation &&o) noexcept
+      : held_(o.held_), free_(o.free_), borrowed_(o.borrowed_) {
+    o.held_ = nullptr;
+    o.free_ = nullptr;
+    o.borrowed_ = false;
+  }
 
   /// \brief Takes the other's codeunit.
   /// \param o The other.
@@ -52,7 +57,11 @@ public:
     if (this != &o) {
       Forget();
       held_ = o.held_;
+      free_ = o.free_;
+      borrowed_ = o.borrowed_;
       o.held_ = nullptr;
+      o.free_ = nullptr;
+      o.borrowed_ = false;
     }
     return *this;
   }
@@ -70,6 +79,7 @@ public:
   Implementation &operator=(E value) {
     Forget();
     held_ = ImplementationOf(value, static_cast<I *>(nullptr));
+    free_ = [](I *held) { delete held; };
     return *this;
   }
 
@@ -92,6 +102,16 @@ public:
   ///        implements the interface refers to THAT instance from now on, and does not own it.
   /// \tparam C The codeunit, derived from the interface.
   /// \param codeunit The instance the caller holds.
+  /// \brief AL returns a CODEUNIT where an Interface is declared: `exit(Result)` from a procedure
+  ///        returning `Interface "ISFTP File"`. The local dies with the frame, so the interface
+  ///        takes its own copy of the instance, state and all.
+  /// \tparam C The codeunit's class, an implementation of `I`.
+  /// \param codeunit The instance copied.
+  template <typename C>
+    requires std::derived_from<C, I> && (!std::same_as<C, I>)
+  Implementation(const C &codeunit)
+      : held_(new C(codeunit)), free_([](I *held) { delete static_cast<C *>(held); }) {}
+
   template <typename C>
     requires std::derived_from<C, I> && (!std::same_as<C, I>)
   Implementation &operator=(C &codeunit) {
@@ -136,13 +156,18 @@ public:
   I &operator*() const { return *operator->(); }
 
 private:
+  /// THE FREEING FUNCTION IS CAPTURED WHERE THE IMPLEMENTATION IS MADE, the way `Instance<T>`
+  /// does it: a holder may see the interface only forward-declared, and `delete` on an incomplete
+  /// type is what clang-19 refuses (`-Wdelete-incomplete`, Reminder Action, 2026-09-09).
   void Forget() {
-    if (!borrowed_) { delete held_; }
+    if (!borrowed_ && held_ != nullptr && free_ != nullptr) { free_(held_); }
     held_ = nullptr;
+    free_ = nullptr;
     borrowed_ = false;
   }
 
   I *held_ = nullptr;
+  void (*free_)(I *) = nullptr;
   bool borrowed_ = false;
 };
 

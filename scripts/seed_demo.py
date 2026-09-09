@@ -25,6 +25,7 @@ seeds NOTHING is an abort and not a pass.
 """
 
 import argparse
+import shlex
 import subprocess
 import sys
 
@@ -186,8 +187,10 @@ def main():
         reading = ('\\copy (SELECT ' + selected +
                    f' FROM "{arguments.company}"."{theirs}" b{joined}) TO STDOUT')
         writing = '\\copy public."' + ours + '" (' + quoted(p[1] for p in pairs) + ') FROM STDIN'
-        piped = (f"psql -U agiru -d {SOURCE} -c '{reading}' | "
-                 f"psql -U agiru -d {arguments.into} -c '{writing}'")
+        # A COLUMN MAY CARRY AN APOSTROPHE (`Relative's Employee No.`), and the command runs
+        # through `sh -c`: the statements are quoted the way the shell wants them.
+        piped = (f"psql -U agiru -d {SOURCE} -c {shlex.quote(reading)} | "
+                 f"psql -U agiru -d {arguments.into} -c {shlex.quote(writing)}")
         done = subprocess.run(["podman", "exec", CTR, "sh", "-c", piped],
                               capture_output=True, check=False)
         note = done.stdout.decode("utf-8", "replace") + done.stderr.decode("utf-8", "replace")
