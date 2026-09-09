@@ -60,6 +60,11 @@ elseif(AGIRU_FAST_LOOP)
 else()
   set(AGIRU_GENERATED_FLAGS "")
 endif()
+# THE AL IS ALLOWED TO RECURSE INTO ITSELF, AND THE TRANSLATION KEEPS IT. `Sales Price Calc. Mgt.`
+# (BCApps, 2026-09-09) declares `ServLineLineDiscExists` as `exit(ServLineLineDiscExists(...))`
+# under a CLEAN directive: dead by design, and clang's `-Winfinite-recursion` is the compiler
+# arguing with AL rather than with us. Generated code only; `src/` keeps the warning.
+list(APPEND AGIRU_GENERATED_FLAGS -Wno-infinite-recursion)
 
 find_program(LLD ld.lld-19 ld.lld)
 if(LLD)

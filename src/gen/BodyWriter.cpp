@@ -1043,7 +1043,11 @@ private:
                ? scope_.MemberSpelling(member)
            : andUnderOr ? "(" + Expression(reach.link, how.precedence + 1) + ")"
                         : Expression(reach.link, how.precedence + 1);
-    if (how.parens && !IsSystemFieldName(reach.link.text)) { out += "()"; }
+    const bool systemFieldOfARecord =
+        IsSystemFieldName(reach.link.text) &&
+        (reach.base.kind != al::ExprKind::Name || scope_.IsRecord(reach.base.text) ||
+         scope_.Resolve(reach.base.text).empty());
+    if (how.parens && !systemFieldOfARecord) { out += "()"; }
   }
 
   static std::string Number(std::string_view text) {
