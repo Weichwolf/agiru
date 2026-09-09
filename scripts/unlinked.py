@@ -70,6 +70,17 @@ def main():
 
     names = sorted(wanted)
     readable = demangled(names)
+    # A DATA SYMBOL CANNOT BE STOOD IN FOR. A table's or a page's definition -- `kSalesHeaderTable`,
+    # `kCurrenciesPage` -- is read as an OBJECT, and a function body under that name is read as
+    # the object's bytes: `Get` walked the primary key of a function and 32 codeunits died of
+    # SIGSEGV on 2026-09-09 (board:0634). The definition has its own unit, `<Object>.def.cpp`,
+    # which compiles whenever the header does, so an undefined one is a slice that lacks the unit.
+    data = [name for name in names if "(" not in readable.get(name, name)]
+    if data:
+        for name in data:
+            print(f"unlinked: {readable.get(name, name)} is DATA and the slice does not define it",
+                  file=sys.stderr)
+        fail(f"{len(data)} data symbol(s) undefined -- add their .def.cpp units to test/slice")
     text = ["// Generated from the slice's undefined symbols. Do not edit.",
             "// One definition per AL procedure the slice calls and no linked source defines.",
             "",

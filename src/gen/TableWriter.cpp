@@ -811,6 +811,12 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     const al::Property *found = Find(table.properties, name);
     return found == nullptr ? std::string{} : found->text;
   };
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"ExternalName", "externalName"},
+        std::pair<std::string_view, std::string_view>{"ExternalSchema", "externalSchema"}}) {
+    const std::string said = property(name);
+    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
+  }
   const std::string kind = property("TableType");
   if (!kind.empty()) {
     static constexpr std::array kTableTypes{
@@ -826,8 +832,6 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   if (LowerKey(replicate) == "false") { out += "    .replicateData = false,\n"; }
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
-        std::pair<std::string_view, std::string_view>{"ExternalName", "externalName"},
-        std::pair<std::string_view, std::string_view>{"ExternalSchema", "externalSchema"},
         std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"}}) {
     const std::string said = property(name);
     if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }

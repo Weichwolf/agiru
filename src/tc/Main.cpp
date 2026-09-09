@@ -1083,7 +1083,13 @@ void WritePages(Run &run,
          Output{.directory = run.output, .relative = body},
          agiru::gen::WriteSource(
              pages.objects[i], pages.paths[i], objects, SourceOf(pages.objects[i], tables)));
-    ++run.written;
+    std::filesystem::path definitions = header;
+    definitions.replace_extension(".def.cpp");
+    Keep(run,
+         Output{.directory = run.output, .relative = definitions},
+         agiru::gen::WriteDefinitions(
+             pages.objects[i], pages.paths[i], objects, SourceOf(pages.objects[i], tables)));
+    run.written += 2;
   }
 }
 
@@ -1186,7 +1192,10 @@ void WriteTable(Run &run,
   Keep(run,
        Output{.directory = run.output, .relative = stem + ".cpp"},
        agiru::gen::WriteSource(table, relative, objects));
-  ++run.written;
+  Keep(run,
+       Output{.directory = run.output, .relative = stem + ".def.cpp"},
+       agiru::gen::WriteDefinitions(table, relative, objects));
+  run.written += 2;
 }
 
 struct Tables {

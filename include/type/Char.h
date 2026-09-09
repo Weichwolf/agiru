@@ -112,6 +112,15 @@ public:
   /// \return How they order.
   [[nodiscard]] constexpr auto operator<=>(const Char &o) const = default;
 
+  /// \brief Compares two characters for equality.
+  /// \param o The other.
+  /// \return Whether they are the same code point.
+  /// \note SPELLED OUT, although the defaulted `<=>` implies one: with the conversion to
+  ///       `std::int32_t` and the `==(std::int32_t)` overload beside it, clang-19 found
+  ///       `Char == Char` ambiguous between the implied operator and the reversed integer one
+  ///       (`-Wambiguous-reversed-operator`, TypeHelper, 2026-09-09).
+  [[nodiscard]] constexpr bool operator==(const Char &o) const = default;
+
   /// \brief AL `C > 57` -- a character against a code point.
   /// \param code The code point.
   /// \return The ordering.

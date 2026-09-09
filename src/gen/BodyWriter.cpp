@@ -2150,7 +2150,6 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::ProcedureDecl &trigger : field.triggers) { reaching.push_back(trigger); }
   }
   out += SourceIncludesOf(table.variables, reaching, objects);
-  out += "\n" + TableDefinitions(table, objects);
   const std::size_t bodyAt = out.size();
   const std::set<std::string> shadowedByFields = Shadowed(table);
   const std::string space = NamespaceOf(table.nameSpace);
@@ -2206,6 +2205,20 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterTable<" + tableClass +
          "> kInCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   out += "} // namespace " + space + "\n";
+  out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
+  return WithDoor(out, ObjectKind::Table);
+}
+
+std::string WriteDefinitions(const al::TableObject &table,
+                             const std::string &sourcePath,
+                             const Objects &objects) {
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#include \"" + Identifier(table.name) + ".h\"\n\n";
+  out += kDoorMarker;
+  const std::size_t bodyAt = out.size();
+  out += "\n" + TableDefinitions(table, objects);
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);
 }
@@ -2354,11 +2367,27 @@ std::string WriteSource(const al::PageObject &page,
     if (!locals.empty() && !body.empty()) { bodies += "\n"; }
     bodies += body + "}\n\n";
   }
-  bodies += "} // namespace " + space + "\n\n";
-  bodies += PageDefinition(page, objects, source);
+  bodies += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterPage<" + pageClass +
+            "> kInPageCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
+  bodies += "} // namespace " + space + "\n";
   out += SourceIncludesOf(page.variables, page.procedures, objects);
   out += BodyIncludes(bodies, objects);
   out += bodies;
+  return WithDoor(out, ObjectKind::Page);
+}
+
+std::string WriteDefinitions(const al::PageObject &page,
+                             const std::string &sourcePath,
+                             const Objects &objects,
+                             const al::TableObject *source) {
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n";
+  out += "\n";
+  out += "#include \"" + Identifier(page.name) + ".h\"\n\n";
+  out += kDoorMarker;
+  const std::size_t bodyAt = out.size();
+  out += "\n" + PageDefinition(page, objects, source);
+  out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Page);
 }
 

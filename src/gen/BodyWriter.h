@@ -157,6 +157,10 @@ std::string WriteStatements(const Names &scope, const std::vector<al::Stmt> &bod
 std::string
 WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects);
 
+[[nodiscard]] std::string WriteDefinitions(const al::TableObject &table,
+                                           const std::string &sourcePath,
+                                           const Objects &objects);
+
 [[nodiscard]] std::string FallsOffEnd(const al::ProcedureDecl &procedure, const Names &names);
 
 [[nodiscard]] std::string QueryProcedureBodies(const al::TableObject &facade,
@@ -167,6 +171,11 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
                                       const std::string &sourcePath,
                                       const Objects &objects,
                                       const al::TableObject *source);
+
+[[nodiscard]] std::string WriteDefinitions(const al::PageObject &page,
+                                           const std::string &sourcePath,
+                                           const Objects &objects,
+                                           const al::TableObject *source);
 
 [[nodiscard]] std::string ControlTrigger(std::string_view trigger,
                                          std::string_view control,

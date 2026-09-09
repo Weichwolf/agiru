@@ -115,6 +115,47 @@ void TheGeneratorReproducesTheTriggerBodies() {
              left.size() == right.size());
 }
 
+/// THE DEFINITION IS A UNIT OF ITS OWN. The field and key tables are READ as an object by every
+/// page and codeunit that names the table, so they have to exist whenever the header does -- and a
+/// body that does not compile yet must not take them down with it (board:0634).
+void TheGeneratorReproducesTheDefinitionsUnit() {
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteDefinitions(
+          agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
+          std::string(kAlPath),
+          {}),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "ResourceCost.def.cpp"});
+  const std::string target =
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.def.cpp");
+
+  {
+    std::ofstream dump("/tmp/agiru-generated-ResourceCost.def.cpp");
+    dump << generated;
+  }
+
+  const std::vector<std::string> left = Lines(generated);
+  const std::vector<std::string> right = Lines(target);
+  const std::size_t shared = left.size() < right.size() ? left.size() : right.size();
+  for (std::size_t i = 0; i < shared; ++i) {
+    if (left[i] != right[i]) {
+      CHECK_TEXT("the generated definitions unit matches the target image, line " +
+                     std::to_string(i + 1),
+                 left[i],
+                 right[i]);
+      return;
+    }
+  }
+  CHECK_TRUE("the generated definitions unit has as many lines as the target image",
+             left.size() == right.size());
+  CHECK_TRUE("and the bodies' unit no longer carries the field table",
+             agiru::gen::WriteSource(
+                 agiru::al::ParseTable(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath)),
+                 std::string(kAlPath),
+                 {})
+                     .find("kResourceCostFields") == std::string::npos);
+}
+
 /// THE NEGATIVE CONTROL. A comparison that only ever passes proves nothing: what makes the identity
 /// above meaningful is that a changed `.al` produces a correspondingly changed header. The source
 /// is altered in memory -- the repository under ~/Git/BCApps is never written to.
@@ -272,6 +313,7 @@ int main() {
   return gate::Run("GenTable", [] {
     TheGeneratorReproducesTheTargetImage();
     TheGeneratorReproducesTheTriggerBodies();
+    TheGeneratorReproducesTheDefinitionsUnit();
     AChangedSourceChangesTheOutput();
     AChangedStatementChangesTheBody();
     AFieldThatShadowsARuntimeTypeStillCompiles();
