@@ -35,6 +35,7 @@ private:
 
   const Connection *connection_;
   std::string name_;
+  std::size_t depth_;
   Result block_;
   std::size_t row_ = 0;
   bool spent_ = false;

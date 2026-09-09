@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/Catalogue.h"
+#include "runtime/Codeunit.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/test/Handlers.h"
@@ -97,30 +98,50 @@ template <typename P> struct ControlTrigger {
 ///       `.PAGE`. The part itself carries what the platform offers on a control (`Visible`,
 ///       `Editable`); everything on the other side of `.PAGE` is the sub-page's own surface, and
 ///       reaching it needs a running UI (board:0030).
+namespace detail {
+template <typename P> void OpenPage(P &page, bool editable, bool isNew);
+}
+
 template <typename P> class PartRef {
 public:
-  /// \brief AL `CurrPage.<Part>.PAGE` -- the sub-page behind the part.
-  /// \return Never.
-  /// \throws Error always -- a part's page needs a running UI (board:0030).
-  [[nodiscard]] P &Page() const { throw Error("A part's PAGE needs a running UI (board:0030)"); }
+  /// \brief AL `CurrPage.<Part>.PAGE` -- the sub-page behind the part, made and opened headless the
+  ///        first time it is asked for.
+  /// \return The sub-page.
+  /// \note THE LINK IS NOT WIRED YET: `SubPageLink` narrows the sub-page's `Rec` to the parent's
+  ///       row in BC, and here the sub-page opens over its whole table (board:0430). A procedure
+  ///       called through the part runs; a value read through it is the first row's until then.
+  [[nodiscard]] P &Page() const {
+    P &page = *page_.operator->();
+    if (!opened_) {
+      opened_ = true;
+      detail::OpenPage(page, true, false);
+    }
+    return page;
+  }
 
-  /// \brief AL `CurrPage.<Part>.Visible(Boolean)`.
+  /// \brief AL `CurrPage.<Part>.Visible(Boolean)` -- sets whether the part shows.
   /// \param NewVisible Whether it shows.
-  /// \return Never.
-  /// \throws Error always -- a part needs a running UI (board:0030).
+  /// \return The value that stood before.
   ::agiru::Boolean Visible(::agiru::Boolean NewVisible) const {
-    static_cast<void>(NewVisible);
-    throw Error("A part's Visible needs a running UI (board:0030)");
+    const ::agiru::Boolean was = visible_;
+    visible_ = NewVisible;
+    return was;
   }
 
-  /// \brief AL `CurrPage.<Part>.Editable(Boolean)`.
+  /// \brief AL `CurrPage.<Part>.Editable(Boolean)` -- sets whether the part takes input.
   /// \param NewEditable Whether it takes input.
-  /// \return Never.
-  /// \throws Error always -- a part needs a running UI (board:0030).
+  /// \return The value that stood before.
   ::agiru::Boolean Editable(::agiru::Boolean NewEditable) const {
-    static_cast<void>(NewEditable);
-    throw Error("A part's Editable needs a running UI (board:0030)");
+    const ::agiru::Boolean was = editable_;
+    editable_ = NewEditable;
+    return was;
   }
+
+private:
+  mutable Instance<P> page_;
+  mutable bool opened_ = false;
+  mutable ::agiru::Boolean visible_ = true;
+  mutable ::agiru::Boolean editable_ = true;
 };
 
 namespace detail {

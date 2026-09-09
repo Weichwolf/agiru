@@ -284,3 +284,11 @@ transpiler now synthesises it the way it synthesises `Visible = <expression>`: a
 source table, `SetRange` per `RunPageLink` pair, `PAGE.Run(PAGE::X, record)`. The page index
 carries each page's source table for it. What is still declarative and still missing: `RunObject
 = Codeunit/Report`, `RunPageView`, `RunPageMode`, and a part's page (`PartRef::Page` refuses).
+
+## Standing 2026-09-09: a part's page exists, and its link is the next step
+
+`CurrPage.<Part>.PAGE` makes the sub-page the first time it is asked for and opens it headless;
+`Visible` and `Editable` on a part are values the page keeps. What is not wired is `SubPageLink`,
+so the sub-page's `Rec` stands over its whole table rather than the parent's row (board:0430):
+a procedure called through the part runs, a value read through it is the first row's. 12 UT
+cases refused at the part before.

@@ -199,3 +199,17 @@ rather than a syntax error, a blank binds per column type, and a member name in 
 to its ordinal. `RecordRef.GetTable(Record)` copies into a record the RecordRef owns and
 `SetTable` copies back -- the reference form handed a procedure's local out with the RecordRef, a
 stack-use-after-return the address sanitizer named in `ERM VAT VIES Lookup UT`.
+
+## Open 2026-09-09: a temp buffer filled from a cursor walk holds its row twice
+
+`Match General Jnl Lines UT`, 30 cases, `The Gen. Journal Line already exists ... 10000`: the
+statement log shows ONE row inserted into the batch, two identical cursor declarations over it
+(`FillTempGenJournalLine` runs for the batch twice, with `Reset` and `DeleteAll` on the temporary
+buffer between), no second `INSERT` reaching the database, and no `"Line No." >` query -- so the
+refusal is `TempInsert`'s, the buffer already holds the key when the second walk inserts it, and
+the `DeleteAll` between did not empty it. `TempDeleteAll` erases what `Passes(filters)`; the
+buffer's filters after `TempGenJournalLine := GenJournalLine` are the source's (`Account No. = ''`,
+`Applied Automatically = false`, the document type), and `Reset` clears them -- read, and both
+correct on paper. What settles it is an instrumented run printing the buffer's count after the
+`DeleteAll` and the filters it carried; the shape is generic (assignment copies filters into a
+temporary, `Reset` before `DeleteAll`), never this codeunit's.

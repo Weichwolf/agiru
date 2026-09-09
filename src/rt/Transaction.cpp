@@ -32,7 +32,14 @@ std::size_t Boundaries::Open(const Connection &connection) {
 
 void Boundaries::Release(const Connection &connection, std::size_t depth) {
   if (depth == 0 || depth > names_.size()) { return; }
-  connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
+  try {
+    connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
+  } catch (const DatabaseError &refused) {
+    Rollback(connection, depth);
+    throw Error(std::string("the transaction cannot be kept, a statement inside it failed and "
+                            "the failure was swallowed: ") +
+                refused.what());
+  }
   names_.resize(depth - 1);
 }
 

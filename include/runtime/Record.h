@@ -252,6 +252,10 @@ Integer RuntimeFilterGroup(void *record, Integer group);
 /// \throws Error when the filter is not a single range -- `A|B`, `<>A`, a wildcard -- which is
 ///         what `devenv-setcurrentkey-setrange-setfilter-getrangemin-and-getrangemax-methods.md`
 ///         documents as a runtime error (board:0508).
+/// \note THE RANGE IS READ ACROSS FILTER GROUPS when the current group holds none: the BaseApp
+///       sets a journal's template in group 2 and reads it back with `GetRangeMax` in group 0
+///       (`GenJnlManagement.OpenJnl`), which is what BC does and what 16 `ERM General Journal UT`
+///       cases opened the wrong template over (2026-09-09).
 [[nodiscard]] std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper);
 
 /// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`

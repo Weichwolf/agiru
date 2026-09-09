@@ -323,6 +323,11 @@ std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper) {
     for (const FieldFilter &one : state->filters) {
       if (one.field == no && one.group == state->group) { text = one.text; }
     }
+    if (text.empty()) {
+      for (const FieldFilter &one : state->filters) {
+        if (one.field == no && !one.text.empty()) { text = one.text; }
+      }
+    }
   }
   return RangeBoundOf(text, upper);
 }

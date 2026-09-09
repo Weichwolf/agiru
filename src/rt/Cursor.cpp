@@ -26,12 +26,16 @@ std::string NextName() {
 Cursor::Cursor(const Connection &connection,
                const std::string &select,
                std::vector<std::optional<std::string>> binds)
-    : connection_(&connection), name_(NextName()), block_(nullptr) {
+    : connection_(&connection),
+      name_(NextName()),
+      depth_(Session::HasCurrent() ? Session::Current().Transaction().Depth() : 0),
+      block_(nullptr) {
   connection_->Run("DECLARE " + name_ + " NO SCROLL CURSOR FOR " + select, binds);
 }
 
 Cursor::~Cursor() {
   if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
+  if (Session::Current().Transaction().Depth() < depth_) { return; }
   try {
     connection_->Run("CLOSE " + name_);
   } catch (const Error &e) {
