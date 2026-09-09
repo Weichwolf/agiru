@@ -640,17 +640,18 @@ struct AbsentObject : AbsentType {
   Refused Get{{.type = "<absent object>", .member = "Get"}};                     ///< The AL member.
   Refused GetBySystemId{{.type = "<absent object>", .member = "GetBySystemId"}}; ///< The AL member.
   Refused Insert{{.type = "<absent object>", .member = "Insert"}};               ///< The AL member.
-  Refused Modify{{.type = "<absent object>", .member = "Modify"}};               ///< The AL member.
-  Refused Delete{{.type = "<absent object>", .member = "Delete"}};               ///< The AL member.
-  Refused DeleteAll{{.type = "<absent object>", .member = "DeleteAll"}};         ///< The AL member.
-  Refused ModifyAll{{.type = "<absent object>", .member = "ModifyAll"}};         ///< The AL member.
-  Refused Rename{{.type = "<absent object>", .member = "Rename"}};               ///< The AL member.
-  Refused Init{{.type = "<absent object>", .member = "Init"}};                   ///< The AL member.
-  Refused Reset{{.type = "<absent object>", .member = "Reset"}};                 ///< The AL member.
-  Refused SetRange{{.type = "<absent object>", .member = "SetRange"}};           ///< The AL member.
-  Refused SetFilter{{.type = "<absent object>", .member = "SetFilter"}};         ///< The AL member.
-  Refused GetFilter{{.type = "<absent object>", .member = "GetFilter"}};         ///< The AL member.
-  Refused GetFilters{{.type = "<absent object>", .member = "GetFilters"}};       ///< The AL member.
+  Refused Ok_Insert{{.type = "<absent object>", .member = "Insert"}};      ///< The value form.
+  Refused Modify{{.type = "<absent object>", .member = "Modify"}};         ///< The AL member.
+  Refused Delete{{.type = "<absent object>", .member = "Delete"}};         ///< The AL member.
+  Refused DeleteAll{{.type = "<absent object>", .member = "DeleteAll"}};   ///< The AL member.
+  Refused ModifyAll{{.type = "<absent object>", .member = "ModifyAll"}};   ///< The AL member.
+  Refused Rename{{.type = "<absent object>", .member = "Rename"}};         ///< The AL member.
+  Refused Init{{.type = "<absent object>", .member = "Init"}};             ///< The AL member.
+  Refused Reset{{.type = "<absent object>", .member = "Reset"}};           ///< The AL member.
+  Refused SetRange{{.type = "<absent object>", .member = "SetRange"}};     ///< The AL member.
+  Refused SetFilter{{.type = "<absent object>", .member = "SetFilter"}};   ///< The AL member.
+  Refused GetFilter{{.type = "<absent object>", .member = "GetFilter"}};   ///< The AL member.
+  Refused GetFilters{{.type = "<absent object>", .member = "GetFilters"}}; ///< The AL member.
   Refused SetCurrentKey{{.type = "<absent object>", .member = "SetCurrentKey"}}; ///< The AL member.
   Refused SetView{{.type = "<absent object>", .member = "SetView"}};             ///< The AL member.
   Refused GetView{{.type = "<absent object>", .member = "GetView"}};             ///< The AL member.

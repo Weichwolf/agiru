@@ -407,7 +407,11 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
   out += identifier;
   out += ">::kId,\n                                  CodeunitTraits<";
   out += identifier;
-  out += ">::kName,\n";
+  out += ">::kName,\n                                  &MakeTestCodeunit<";
+  out += identifier;
+  out += ">,\n                                  &FreeTestCodeunit<";
+  out += identifier;
+  out += ">,\n";
   out += DeclaresOnRun(unit) ? "                                  &InvokeTest<" + identifier +
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
@@ -1579,6 +1583,8 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   const std::string space = NamespaceOf(unit.nameSpace);
   const std::string unitClass = ClassName(identifier, ObjectKind::Codeunit);
   out += "\nnamespace " + space + " {\n\n";
+  out += "namespace {\nnamespace " + identifier + "_unit {\nconst RegisterCodeunit<" + unitClass +
+         "> kInCodeunitCatalogue;\n} // namespace " + identifier + "_unit\n} // namespace\n\n";
   const std::size_t bodyAt = out.size();
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
@@ -1909,6 +1915,7 @@ FieldEnums PlatformFieldEnums() {
   enums["field"]["type"] = "::agiru::FieldType";
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
+  enums["field"]["obsoletestate"] = "::agiru::platform::ObsoleteState";
   enums["2000000041"] = enums["field"];
   enums["user"]["state"] = "::agiru::platform::UserState";
   enums["user"]["license type"] = "::agiru::platform::UserLicenseType";

@@ -7,6 +7,7 @@
 
 #include <concepts>
 #include <map>
+#include <type_traits>
 
 /// \file
 /// \brief AL `Dictionary of [TKey, TValue]`.
@@ -64,6 +65,18 @@ public:
   /// \return True when the dictionary holds it.
   [[nodiscard]] Boolean ContainsKey(const TKey &key) const { return entries_.contains(key); }
 
+  /// \brief AL `Dictionary.ContainsKey(Key)` with a key that converts to the key type, the way
+  ///        Get(const K &) takes one.
+  /// \tparam K The key's type.
+  /// \param key The key.
+  /// \return Whether the dictionary holds it.
+  template <typename K>
+    requires(!std::same_as<std::remove_cvref_t<K>, TKey> &&
+             std::constructible_from<TKey, const K &>)
+  [[nodiscard]] Boolean ContainsKey(const K &key) const {
+    return ContainsKey(TKey(key));
+  }
+
   /// \brief AL `Dictionary.Count()`.
   /// \return How many entries the dictionary holds.
   [[nodiscard]] Integer Count() const { return static_cast<Integer>(entries_.size()); }
@@ -76,6 +89,20 @@ public:
     const auto at = entries_.find(key);
     if (at == entries_.end()) { throw Error("the dictionary holds no such key"); }
     return at->second;
+  }
+
+  /// \brief AL `Dictionary.Get(Key)` with a key of a type that converts to the key type -- a
+  ///        Label (`string_view`) into a `Dictionary of [Text, Text]`, which is how
+  ///        `ErrorInfo.CustomDimensions().Get(Tok)` is written.
+  /// \tparam K The key's type.
+  /// \param key The key.
+  /// \return The value.
+  /// \throws Error when the dictionary does not hold the key.
+  template <typename K>
+    requires(!std::same_as<std::remove_cvref_t<K>, TKey> &&
+             std::constructible_from<TKey, const K &>)
+  [[nodiscard]] const TValue &Get(const K &key) const {
+    return Get(TKey(key));
   }
 
   /// \brief AL `Ok := Dictionary.Get(Key, Value)`.
@@ -99,6 +126,17 @@ public:
   ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
   ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
   Boolean Remove(const TKey &key) { return entries_.erase(key) != 0; }
+
+  /// \brief AL `Dictionary.Remove(Key)` with a key that converts to the key type.
+  /// \tparam K The key's type.
+  /// \param key The key.
+  /// \return Whether an entry was removed.
+  template <typename K>
+    requires(!std::same_as<std::remove_cvref_t<K>, TKey> &&
+             std::constructible_from<TKey, const K &>)
+  Boolean Remove(const K &key) {
+    return Remove(TKey(key));
+  }
 
   /// \brief AL `Dictionary.Keys()`.
   /// \return The keys, in key order.

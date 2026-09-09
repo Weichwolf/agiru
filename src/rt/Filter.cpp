@@ -2,6 +2,8 @@
 
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/Record.h"
+#include "runtime/RecordState.h"
 
 #include <algorithm>
 #include <cctype>
@@ -194,7 +196,14 @@ Expression ParseFilter(std::string_view text) {
   for (const std::string_view alternative : SplitOutsideQuotes(text, '|')) {
     All conjunction;
     for (const std::string_view part : SplitOutsideQuotes(alternative, '&')) {
-      if (Trim(part).empty()) { throw Error("a filter has an empty term: " + std::string(text)); }
+      if (Trim(part).empty()) {
+        conjunction.push_back(Atom{.compare = Compare::Equal,
+                                   .value = {},
+                                   .upper = {},
+                                   .openLower = false,
+                                   .openUpper = false});
+        continue;
+      }
       conjunction.push_back(ReadAtom(part));
     }
     expression.push_back(std::move(conjunction));
@@ -306,6 +315,39 @@ std::int64_t CountOf(const Intervals &intervals) {
   std::int64_t count = 0;
   for (const Interval &one : intervals) { count += one.high - one.low + 1; }
   return count;
+}
+
+std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper) {
+  std::string_view text;
+  if (state != nullptr) {
+    for (const FieldFilter &one : state->filters) {
+      if (one.field == no && one.group == state->group) { text = one.text; }
+    }
+  }
+  return RangeBoundOf(text, upper);
+}
+
+std::string RangeBoundOf(std::string_view filter, bool upper) {
+  const Expression expression = ParseFilter(filter);
+  if (expression.empty()) { return {}; }
+  const auto refuse = [&] { throw Error("The filter " + std::string(filter) + " is not a range"); };
+  if (expression.size() != 1 || expression.front().size() != 1) { refuse(); }
+  const Atom &atom = expression.front().front();
+  switch (atom.compare) {
+    case Compare::Equal: return atom.value;
+    case Compare::Between:
+      if (upper) { return atom.openUpper ? std::string{} : atom.upper; }
+      return atom.openLower ? std::string{} : atom.value;
+    case Compare::Less:
+    case Compare::LessOrEqual: return upper ? atom.value : std::string{};
+    case Compare::Greater:
+    case Compare::GreaterEqual: return upper ? std::string{} : atom.value;
+    case Compare::NotEqual:
+    case Compare::Like:
+    case Compare::NotLike: break;
+  }
+  refuse();
+  return {};
 }
 
 }

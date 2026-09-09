@@ -238,6 +238,22 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
 /// \return Whether a row was there to rename.
 bool RuntimeRename(void *record, const void *before, const TableDef &table);
 
+/// \brief AL `Record.FilterGroup(NewGroup)` on any record: sets the group later filters land in.
+/// \param record The record.
+/// \param group  The group.
+/// \return The group that was current.
+Integer RuntimeFilterGroup(void *record, Integer group);
+
+/// \brief AL `Record.GetRangeMax` / `GetRangeMin`: the bound of the filter standing on a field.
+/// \param state The record's filters, or `nullptr`.
+/// \param no    The field.
+/// \param upper True for the maximum, false for the minimum.
+/// \return The bound as filter text; empty when no filter bounds the field on that side.
+/// \throws Error when the filter is not a single range -- `A|B`, `<>A`, a wildcard -- which is
+///         what `devenv-setcurrentkey-setrange-setfilter-getrangemin-and-getrangemax-methods.md`
+///         documents as a runtime error (board:0508).
+[[nodiscard]] std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper);
+
 /// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`
 ///        answers and an `AssertEquals` compares against.
 /// \param record The record.
@@ -361,8 +377,14 @@ template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
 ///       made `StrSubstNo(Msg, Amount)` -- a Decimal in a message, which the BaseApp writes
 ///       constantly -- fail to compile. What reads as text is used as it is; everything else goes
 ///       through `Format`, which is what AL does with it.
+/// \warning A `Variant` IS TESTED FIRST, because it converts to `string_view` implicitly and that
+///          conversion REFUSES when it holds an Integer -- `Assert.AreEqual(1, Count, Msg)` renders
+///          its message through here and read `the Variant does not hold Text` instead of the
+///          number (26 UT cases, 2026-09-09).
 template <typename T> [[nodiscard]] std::string AsText(const T &value) {
-  if constexpr (std::convertible_to<const T &, std::string_view>) {
+  if constexpr (std::same_as<std::remove_cvref_t<T>, Variant>) {
+    return detail::VariantText(value);
+  } else if constexpr (std::convertible_to<const T &, std::string_view>) {
     return std::string(std::string_view(value));
   } else if constexpr (requires { value.ToText(); }) {
     return value.ToText();

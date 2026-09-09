@@ -25,7 +25,7 @@ namespace agiru {
 /// \brief One `[Test]` procedure.
 struct TestMethod {
   std::string_view name;                 ///< The procedure's AL name.
-  void (*invoke)();                      ///< Makes the codeunit and calls the procedure.
+  void (*invoke)(void *instance);        ///< Calls the procedure on the codeunit run's instance.
   std::optional<TransactionModel> model; ///< Its `[TransactionModel]`, empty when it declares none.
   std::span<const std::string_view> handlers; ///< The names its `[HandlerFunctions]` listed, in
                                               ///< the order AL wrote them. A named handler that
@@ -48,17 +48,43 @@ struct TestMethod {
   ///< passing method's writes reach the next one.
 };
 
-/// \brief Calls one `[Test]` procedure on a freshly made codeunit.
+/// \brief The test codeunit instance the runner is driving, for the handler thunks.
+/// \return The instance, or `nullptr` outside a codeunit run.
+[[nodiscard]] void *CurrentTestInstance();
+
+/// \brief Sets the instance `CurrentTestInstance` answers.
+/// \param instance The instance, or `nullptr` when the run is over.
+void SetCurrentTestInstance(void *instance);
+
+/// \brief Makes a test codeunit for one codeunit run.
+/// \tparam Codeunit The generated codeunit class.
+/// \return The instance, owned by the caller.
+template <typename Codeunit> void *MakeTestCodeunit() {
+  return new Codeunit{};
+}
+
+/// \brief Unmakes what `MakeTestCodeunit` made.
+/// \tparam Codeunit The generated codeunit class.
+/// \param instance The instance.
+template <typename Codeunit> void FreeTestCodeunit(void *instance) {
+  delete static_cast<Codeunit *>(instance);
+}
+
+/// \brief Calls one `[Test]` procedure, or `OnRun`, on the codeunit run's instance.
 ///
 /// \tparam Codeunit The generated codeunit class.
 /// \tparam Method   The procedure.
+/// \param instance The instance `MakeTestCodeunit` made for this codeunit run.
 ///
-/// \note A TEST GETS ITS OWN OBJECT, which is what "each test method runs in a separate database
-///       transaction" means for the object beside the transaction: a global left over from the
-///       previous test would make the outcome depend on the order.
-template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest() {
-  Codeunit codeunit{};
-  (codeunit.*Method)();
+/// \note ONE INSTANCE PER CODEUNIT RUN, which is what `devenv-test-codeunits-and-test-methods.md`
+///       describes: "When a test codeunit runs, it runs the OnRun trigger, and then runs each
+///       test method in the codeunit." The globals live for the run -- 40 of the 78 UT
+///       codeunits keep an `IsInitialized` there and bind a `Manual` subscriber once under it --
+///       while each method still has its own TRANSACTION. A fresh object per method bound that
+///       subscriber once per test and left the earlier bindings dangling (measured 2026-09-09:
+///       24 cases reading "multiple subscribers competing").
+template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest(void *instance) {
+  (static_cast<Codeunit *>(instance)->*Method)();
 }
 
 /// \brief Calls one HANDLER procedure on a freshly made codeunit, with whatever the dialog hands
@@ -82,7 +108,9 @@ template <typename C, typename A> A &FirstParameterOf(void (C::*)(A &));
 }
 
 template <typename Codeunit, auto Method> void InvokeHandler(std::string_view text, void *reply) {
-  Codeunit codeunit{};
+  std::optional<Codeunit> own;
+  if (CurrentTestInstance() == nullptr) { own.emplace(); }
+  Codeunit &codeunit = own.has_value() ? *own : *static_cast<Codeunit *>(CurrentTestInstance());
   if constexpr (requires {
                   typename std::remove_cvref_t<decltype(detail::FirstParameterOf(
                       Method))>::IsTestPage;
@@ -126,11 +154,16 @@ public:
   ///
   /// \param id      The codeunit's AL number.
   /// \param name    Its AL name.
+  /// \param make    Makes the instance one codeunit run drives (`MakeTestCodeunit`).
+  /// \param free    Unmakes it.
   /// \param onRun   Its `OnRun` trigger, which AL runs before the test procedures.
   /// \param methods Its `[Test]` procedures, in declaration order.
+  /// \param handlers Its handler procedures.
   TestCatalogue(CodeunitId id,
                 std::string_view name,
-                void (*onRun)(),
+                void *(*make)(),
+                void (*free)(void *),
+                void (*onRun)(void *),
                 std::span<const TestMethod> methods,
                 std::span<const TestHandler> handlers = {});
 
@@ -152,6 +185,14 @@ public:
   /// \return What calls it.
   [[nodiscard]] auto OnRun() const { return onRun_; }
 
+  /// \brief Makes the instance for one codeunit run.
+  /// \return The instance; `Free` unmakes it.
+  [[nodiscard]] void *Make() const { return make_(); }
+
+  /// \brief Unmakes what `Make` made.
+  /// \param instance The instance.
+  void Free(void *instance) const { free_(instance); }
+
   /// \brief The `[Test]` procedures.
   /// \return Them, in declaration order.
   [[nodiscard]] std::span<const TestMethod> Methods() const { return methods_; }
@@ -163,7 +204,9 @@ public:
 private:
   CodeunitId id_;
   std::string_view name_;
-  void (*onRun_)();
+  void *(*make_)();
+  void (*free_)(void *);
+  void (*onRun_)(void *);
   std::span<const TestMethod> methods_;
   std::span<const TestHandler> handlers_;
 };

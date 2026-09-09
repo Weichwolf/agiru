@@ -36,6 +36,8 @@ using Expression = std::vector<All>;
 
 [[nodiscard]] Expression ParseFilter(std::string_view text);
 
+[[nodiscard]] std::string RangeBoundOf(std::string_view filter, bool upper);
+
 [[nodiscard]] bool
 Matches(const Expression &expression, std::string_view value, const FieldDef &def);
 

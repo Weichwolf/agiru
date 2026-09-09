@@ -322,6 +322,13 @@ constexpr ::agiru::Integer kThirdPart = 3;
   return ::agiru::ClientType::Web;
 }
 
+std::string ApplicationArea(std::string_view ApplicationArea) {
+  thread_local std::string current;
+  const std::string was = current;
+  if (!ApplicationArea.empty()) { current = std::string(ApplicationArea); }
+  return was;
+}
+
 ::agiru::ExecutionContext GetExecutionContext() {
   return ::agiru::ExecutionContext::Normal;
 }
@@ -418,7 +425,6 @@ void LogMessage(std::string_view EventId,
   static_cast<void>(Value1);
   static_cast<void>(Dimension2);
   static_cast<void>(Value2);
-  throw Error("Session.LogMessage is declared and not implemented yet (board:0035)");
 }
 
 ::agiru::Text<0> ConvertStr(std::string_view String,

@@ -100,3 +100,13 @@ intersection with `A..Z`; `SetRange(F)` returns all rows; `GetRangeMin` after
 too, because it is a subset. The gate must therefore assert a case where the second range is NOT
 inside the first: `SetRange(F,'A','C')` then `SetRange(F,'X','Z')` must return the `X..Z` rows and an
 accumulating implementation returns none.
+
+## Standing 2026-09-09
+
+`GetRangeMin`/`GetRangeMax` are written on `Record` (per member, returning the field's own type) and
+on `FieldRef` (returning the value as `Variant`): the filter on the field in the CURRENT group is
+parsed, a single atom yields its bound, an open end yields the field's blank, and `A|B`, `<>A` and a
+wildcard refuse with `is not a range` -- `RangeBoundOf` in `src/rt/Filter.cpp`, gated in
+`test/gate/FilterGate.cpp` with the documentation's own `10000|20000|30000` as the negative
+control. 34 red UT cases named `GetRangeMax` before the change. The `SetRange` replacement rule
+remains unmeasured here.

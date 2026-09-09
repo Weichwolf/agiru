@@ -45,11 +45,34 @@ std::string LikePattern(std::string_view value) {
   return out;
 }
 
+std::string BlankOf(const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Boolean: return "false";
+    case FieldType::Option:
+    case FieldType::Enum: return detail::MemberOrdinal(def, "");
+    case FieldType::Integer:
+    case FieldType::BigInteger:
+    case FieldType::Decimal:
+    case FieldType::Duration: return "0";
+    case FieldType::Date:
+    case FieldType::DateTime: return "1753-01-01 00:00:00";
+    case FieldType::Time: return "00:00:00";
+    case FieldType::Guid:
+    case FieldType::Media:
+    case FieldType::MediaSet: return "00000000-0000-0000-0000-000000000000";
+    default: return {};
+  }
+}
+
 void One(const Atom &atom, const FieldDef &def, Clause &into, std::size_t &next) {
   const std::string column = Quoted(def.name);
   const bool byMember = def.type == FieldType::Option || def.type == FieldType::Enum;
   const auto bind = [&into, &next, &def, byMember](const std::string &value) {
-    into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value) : value);
+    if (value.empty()) {
+      into.binds.emplace_back(BlankOf(def));
+    } else {
+      into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value) : value);
+    }
     return Placeholder(next++);
   };
   switch (atom.compare) {

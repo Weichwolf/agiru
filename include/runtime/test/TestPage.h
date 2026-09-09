@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -392,18 +393,44 @@ public:
   }
 
   [[nodiscard]] Boolean ControlVisible(std::string_view control) const override {
+    if (const auto computed = Computed_(control, &ControlTrigger<P>::visible); computed) {
+      return *computed;
+    }
     const ControlDef *def = ControlNamed_(control);
     return def == nullptr || !SameWord_(def->visible, "false");
   }
 
   [[nodiscard]] Boolean ControlEditable(std::string_view control) const override {
+    if (const auto computed = Computed_(control, &ControlTrigger<P>::editable); computed) {
+      return Editable() && *computed;
+    }
     const ControlDef *def = ControlNamed_(control);
     return Editable() && (def == nullptr || !SameWord_(def->editable, "false"));
   }
 
   [[nodiscard]] Boolean ControlEnabled(std::string_view control) const override {
+    if (const auto computed = Computed_(control, &ControlTrigger<P>::enabled); computed) {
+      return *computed;
+    }
     const ControlDef *def = ControlNamed_(control);
     return def == nullptr || !SameWord_(def->enabled, "false");
+  }
+
+  [[nodiscard]] std::optional<Boolean>
+  Computed_(std::string_view control, ::agiru::Boolean (P::*ControlTrigger<P>::*state)()) const {
+    if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
+      if (page_ == nullptr) { return std::nullopt; }
+      for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
+        if (!SameWord_(trigger.control, control)) { continue; }
+        ::agiru::Boolean (P::*compute)() = trigger.*state;
+        if (compute == nullptr) { return std::nullopt; }
+        return (page_->*compute)();
+      }
+    } else {
+      static_cast<void>(control);
+      static_cast<void>(state);
+    }
+    return std::nullopt;
   }
 
   [[nodiscard]] std::string ControlCaption(std::string_view control) const override {

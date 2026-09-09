@@ -7,12 +7,19 @@
 #include "type/Integer.h"
 
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <type_traits>
+#include <utility>
 
 /// \file
 /// \brief The base every generated AL codeunit stands on.
 
 namespace agiru {
+
+namespace detail {
+bool UnbindSubscriptions(CodeunitId id, void *instance);
+}
 
 /// \brief WHY AN EVENT PUBLISHER'S BODY IS EMPTY, AND WHY ITS PARAMETERS HAVE NO NAMES.
 ///
@@ -34,6 +41,27 @@ namespace agiru {
 /// what AL wrote: its procedures and its variables. The number and the name live here, the same way
 /// a table's field and key tables do.
 template <typename T> struct CodeunitTraits;
+
+/// \brief One codeunit in the catalogue, by number: what `Codeunit.Run(Number [, Record])`
+///        reaches when the number is a VALUE rather than a name the generator resolved.
+struct CodeunitEntry {
+  CodeunitId id; ///< The codeunit's AL number.
+  /// \brief Runs the codeunit: `Run`/`Ok_Run` on a fresh instance, with the record in its `Rec`.
+  /// \param record The record passed, or `nullptr`; written back, since AL declares it `var`.
+  /// \param table  Its table's number, meaningful only with a record.
+  /// \param value  Whether it is the value form (`Ok :=`), which reports rather than raises.
+  /// \return What `Run`/`Ok_Run` returned.
+  bool (*run)(void *record, TableId table, bool value);
+};
+
+/// \brief Puts a codeunit in the catalogue, once per generated codeunit, at load time.
+/// \param entry The entry, which lives for the program.
+void RegisterCodeunitEntry(const CodeunitEntry *entry);
+
+/// \brief Finds a codeunit by its number.
+/// \param id The number.
+/// \return The entry, or `nullptr` when this build carries no codeunit of that number.
+[[nodiscard]] const CodeunitEntry *FindCodeunit(CodeunitId id);
 
 /// \brief One codeunit held by another, created the first time it is used.
 ///
@@ -251,24 +279,48 @@ public:
   /// \return The number AL declared.
   [[nodiscard]] static constexpr CodeunitId Id() { return CodeunitTraits<Derived>::kId; }
 
+  Codeunit() = default;
+  Codeunit(const Codeunit &) = default;
+  Codeunit(Codeunit &&) noexcept = default;
+  Codeunit &operator=(const Codeunit &) = default;
+  Codeunit &operator=(Codeunit &&) noexcept = default;
+
+  /// \brief A `Manual` subscriber that goes out of scope is unbound, the way AL's is.
+  /// \note `devenv-eventsubscriberinstance-property.md`: a manually bound instance subscribes
+  ///       until `UnbindSubscription` or until the instance is gone. A binding that outlived its
+  ///       object was a dangling pointer the next event dispatched into.
+  ~Codeunit() {
+    static_cast<void>(detail::UnbindSubscriptions(Id(), static_cast<Derived *>(this)));
+  }
+
   /// \brief The codeunit's AL name.
   /// \return The name AL declared, spaces and punctuation included.
   [[nodiscard]] static constexpr std::string_view Name() { return CodeunitTraits<Derived>::kName; }
 
-  /// \brief AL `Codeunit.Run()` -- calls `OnRun` inside a transaction boundary.
+  /// \brief AL `Codeunit.Run()` as a STATEMENT -- calls `OnRun` inside a transaction boundary,
+  ///        and an error inside propagates after the boundary rolled back.
   ///
-  /// \return True when `OnRun` completed; false when it raised.
+  /// \return True, always: the statement form has no false to report.
+  /// \throws Error what `OnRun` raised.
   ///
-  /// \warning THE RETURN VALUE IS THE ERROR HANDLING. `Codeunit.Run` does not propagate: an error
-  ///          inside rolls the database back to the point the run began and reports `false`, which
-  ///          is why `if not Codeunit.Run(...) then` is AL's idiom for "try this". The text is left
-  ///          where `GetLastErrorText()` reads it.
-  /// \note NOT `[[nodiscard]]`, BECAUSE AL DISCARDS IT. `CODEUNIT.RUN(CODEUNIT::X, Rec)` is a
-  ///       STATEMENT in the BaseApp far more often than it is a condition -- the return says
-  ///       whether the codeunit committed, and a caller that does not ask still wants it run.
-  ///       Marking it would make `-Werror` reject ordinary AL, and wrapping every statement in a
-  ///       cast to get past that buried the AL line the reader is looking for.
+  /// \note TWO SPELLINGS FOR ONE AL METHOD, decided by the generator from the context it already
+  ///       knows. `codeunitinstance-run-method.md`: "If you omit this optional return value and
+  ///       the operation does not execute successfully, a runtime error will occur." So
+  ///       `Codeunit.Run(...)` as a statement raises -- 179 of 179 `Run` calls in the UT
+  ///       codeunits are statements, nine of them under `asserterror` -- and `if Codeunit.Run()`
+  ///       is `Ok_Run()`, which rolls back and reports `false`, AL's idiom for "try this".
   bool Run() {
+    detail::Scope scope;
+    static_cast<Derived *>(this)->OnRun();
+    scope.Keep();
+    return true;
+  }
+
+  /// \brief AL `Ok := Codeunit.Run()` -- the value form: an error inside rolls the database back
+  ///        to the point the run began and reports `false`, with the text left where
+  ///        `GetLastErrorText()` reads it.
+  /// \return True when `OnRun` completed; false when it raised.
+  bool Ok_Run() {
     detail::Scope scope;
     try {
       static_cast<Derived *>(this)->OnRun();
@@ -295,6 +347,23 @@ public:
   ///       made every `Codeunit.Run(Rec)` in the tree a compile error.
   template <typename Record> bool Run(Record &rec) {
     detail::Scope scope;
+    if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
+      static_cast<Derived *>(this)->Rec = rec;
+    }
+    static_cast<Derived *>(this)->OnRun();
+    if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
+      rec = static_cast<Derived *>(this)->Rec;
+    }
+    scope.Keep();
+    return true;
+  }
+
+  /// \brief AL `Ok := Codeunit.Run(Record)` -- the value form of Run(Record&).
+  /// \tparam Record The record's type.
+  /// \param rec The record, which goes into `Rec` and comes back out.
+  /// \return True when `OnRun` completed; false when it raised, with the writes rolled back.
+  template <typename Record> bool Ok_Run(Record &rec) {
+    detail::Scope scope;
     try {
       if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
         static_cast<Derived *>(this)->Rec = rec;
@@ -320,19 +389,124 @@ private:
 /// \note THE `<>` IS THE SAME VISIBLE DEVIATION `Option<>` AND `Enum<>` CARRY: C++ cannot spell a
 ///       class template with no arguments as a type. What it names is the platform half of the
 ///       type -- running a codeunit BY NUMBER, which needs the catalogue (board:0038).
+/// \brief Runs a generated codeunit for its catalogue entry.
+/// \tparam T The generated codeunit class.
+/// \param record The record passed, or `nullptr`.
+/// \param table  Its table's number.
+/// \param value  Whether it is the value form.
+/// \return What `Run`/`Ok_Run` returned.
+/// \throws Error when the record is not from the table the codeunit's `TableNo` names --
+///         `codeunit-run-integer-table-method.md`: "If you run the codeunit with a record from a
+///         table other than the one it is associated with, a run-time error occurs."
+template <typename T> bool RunCodeunitEntry(void *record, TableId table, bool value) {
+  T unit{};
+  if constexpr (!requires { unit.OnRun(); }) {
+    static_cast<void>(record);
+    static_cast<void>(table);
+    static_cast<void>(value);
+    throw Error("Codeunit.Run(" + std::to_string(CodeunitTraits<T>::kId.Value()) +
+                "): the codeunit declares no OnRun");
+  } else if constexpr (requires(T &held) { held.Rec; }) {
+    using Source = std::remove_cvref_t<decltype(unit.Rec)>;
+    if (record != nullptr && table == Source::kId) {
+      Source &rec = *static_cast<Source *>(record);
+      return value ? unit.Ok_Run(rec) : unit.Run(rec);
+    }
+  }
+  if constexpr (requires { unit.OnRun(); }) {
+    if (record != nullptr) {
+      throw Error("Codeunit.Run(" + std::to_string(CodeunitTraits<T>::kId.Value()) +
+                  "): the record is not from the table the codeunit is associated with");
+    }
+    return value ? unit.Ok_Run() : unit.Run();
+  }
+}
+
+/// \brief The catalogue entry of a generated codeunit.
+/// \tparam T The generated codeunit class.
+template <typename T>
+inline const CodeunitEntry kCodeunitEntry{.id = CodeunitTraits<T>::kId,
+                                          .run = &RunCodeunitEntry<T>};
+
+/// \brief Puts a generated codeunit in the catalogue by existing, the way `RegisterPage` does.
+/// \tparam T The generated codeunit class.
+template <typename T> struct RegisterCodeunit {
+  RegisterCodeunit() { RegisterCodeunitEntry(&kCodeunitEntry<T>); }
+
+  RegisterCodeunit(const RegisterCodeunit &) = delete;
+  RegisterCodeunit(RegisterCodeunit &&) = delete;
+  RegisterCodeunit &operator=(const RegisterCodeunit &) = delete;
+  RegisterCodeunit &operator=(RegisterCodeunit &&) = delete;
+  ~RegisterCodeunit() = default;
+};
+
+namespace detail {
+
+/// \brief `Codeunit.Run(Number [, Record])` through the catalogue.
+/// \tparam Arguments The record, when one is passed.
+/// \param value  Whether it is the value form.
+/// \param Number The codeunit's number.
+/// \param arguments The record.
+/// \return What the codeunit's `Run`/`Ok_Run` returned.
+/// \throws Error when this build carries no codeunit of that number, or the record is `const`.
+template <typename... Arguments>
+bool RunCodeunitByNumber(bool value, ::agiru::Integer Number, Arguments &&...arguments) {
+  const CodeunitEntry *entry = FindCodeunit(CodeunitId{Number});
+  if (entry == nullptr) {
+    throw Error("Codeunit.Run(" + std::to_string(Number) +
+                "): this build carries no codeunit of that number");
+  }
+  void *record = nullptr;
+  TableId table{};
+  const auto take = [&](auto &argument) {
+    using A = std::remove_cvref_t<decltype(argument)>;
+    if constexpr (requires { argument.operator->(); }) {
+      using Held = std::remove_cvref_t<decltype(*argument.operator->())>;
+      if constexpr (requires {
+                      { Held::kId } -> std::convertible_to<TableId>;
+                    }) {
+        record = argument.operator->();
+        table = Held::kId;
+      }
+    } else if constexpr (requires {
+                           { A::kId } -> std::convertible_to<TableId>;
+                         }) {
+      if constexpr (std::is_const_v<std::remove_reference_t<decltype(argument)>>) {
+        throw Error("Codeunit.Run(" + std::to_string(Number) + "): the record must be a var");
+      } else {
+        record = &argument;
+        table = A::kId;
+      }
+    }
+  };
+  (take(arguments), ...);
+  return entry->run(record, table, value);
+}
+
+}
+
 template <> class Codeunit<void> {
 public:
   /// \brief AL `Codeunit.Run(Integer [, Record])` -- runs a codeunit by its number.
   /// \tparam Arguments The record handed to `OnRun`, if any.
   /// \param Number The codeunit's AL number.
   /// \param arguments The record.
-  /// \return Never.
-  /// \throws Error always -- reaching a codeunit by number needs the catalogue (board:0038).
+  /// \return What the codeunit's `Run` returned.
+  /// \throws Error when this build carries no codeunit of that number.
   template <typename... Arguments>
   static bool Run(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Codeunit.Run(" + std::to_string(Number) +
-                ") by number needs the codeunit catalogue (board:0038)");
+    return detail::RunCodeunitByNumber(false, Number, std::forward<Arguments>(arguments)...);
+  }
+
+  /// \brief AL `Ok := Codeunit.Run(Number, ...)`, the value form by number.
+  /// \tparam Arguments The record, when one is passed.
+  /// \param Number The codeunit's number.
+  /// \param arguments The record.
+  /// \return What the codeunit's `Ok_Run` returned.
+  /// \throws Error when this build carries no codeunit of that number.
+  template <typename... Arguments>
+  static bool Ok_Run(::agiru::Integer Number, Arguments &&...arguments) {
+    return detail::RunCodeunitByNumber(true, Number, std::forward<Arguments>(arguments)...);
   }
 };
 

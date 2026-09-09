@@ -9,6 +9,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -271,6 +272,9 @@ public:
     object.id = ExpectInteger();
     object.name = ExpectName();
     ParsePageBody(object);
+    std::set<std::string> seen;
+    DropRepeatedComputedStates(object.layout, seen);
+    DropRepeatedComputedStates(object.actions, seen);
     return object;
   }
 
@@ -365,6 +369,37 @@ public:
     Expect(")");
   }
 
+  static bool SameWord(std::string_view a, std::string_view b) {
+    if (a.size() != b.size()) { return false; }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (Lower(a[i]) != Lower(b[i])) { return false; }
+    }
+    return true;
+  }
+
+  static void DropRepeatedComputedStates(std::vector<PageControl> &controls,
+                                         std::set<std::string> &seen) {
+    for (PageControl &control : controls) {
+      std::string key;
+      for (const char c : control.name) {
+        if (std::isalnum(static_cast<unsigned char>(c)) != 0) { key += Lower(c); }
+      }
+      if (!control.name.empty() && !seen.insert(key).second) {
+        std::erase_if(control.triggers, [](const ProcedureDecl &trigger) {
+          return trigger.isTrigger && trigger.returnType == "Boolean" &&
+                 (trigger.name == "OnVisible" || trigger.name == "OnEnabled" ||
+                  trigger.name == "OnEditable");
+        });
+      }
+      DropRepeatedComputedStates(control.children, seen);
+    }
+  }
+
+  static bool IsALiteralBoolean(const std::vector<Token> &value) {
+    return value.size() == 1 && value.front().kind == TokenKind::Identifier &&
+           (SameWord(value.front().text, "true") || SameWord(value.front().text, "false"));
+  }
+
   PageControl ParseControl() {
     PageControl control;
     control.kind = Peek().text;
@@ -387,6 +422,23 @@ public:
         continue;
       }
       control.properties.push_back(ParseProperty());
+    }
+    for (const Property &property : control.properties) {
+      for (const std::string_view state : {"Visible", "Enabled", "Editable"}) {
+        if (!SameWord(property.name, state) || IsALiteralBoolean(property.value)) { continue; }
+        ProcedureDecl computed;
+        computed.isTrigger = true;
+        computed.name = "On" + std::string(state);
+        computed.returnType = "Boolean";
+        computed.returned.type = "Boolean";
+        computed.tokens.push_back(Token{.kind = TokenKind::Identifier, .text = "exit"});
+        computed.tokens.push_back(Token{.kind = TokenKind::Punctuation, .text = "("});
+        computed.tokens.insert(computed.tokens.end(), property.value.begin(), property.value.end());
+        computed.tokens.push_back(Token{.kind = TokenKind::Punctuation, .text = ")"});
+        computed.tokens.push_back(Token{.kind = TokenKind::Punctuation, .text = ";"});
+        computed.body = ParseStatements(computed.tokens);
+        control.triggers.push_back(std::move(computed));
+      }
     }
     Expect("}");
     return control;

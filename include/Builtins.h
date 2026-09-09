@@ -520,13 +520,6 @@ std::string TenantId();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::string_view Name);
 
-/// \brief AL `Session.ApplicationArea(Text)`. Gets or sets the application areas for the current
-/// session.
-/// \param ApplicationArea The AL `Text`.
-/// \return The AL `Text`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-std::string ApplicationArea(std::string_view ApplicationArea = {});
-
 /// \brief AL `Session.ApplicationIdentifier()`. Gets the application ID associated with the current
 /// thread.
 /// \return The AL `Text`.

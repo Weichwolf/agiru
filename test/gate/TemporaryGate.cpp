@@ -60,6 +60,12 @@ void ADuplicateKeyIsRefused() {
   } catch (const Error &e) { said = e.what(); }
   CHECK_TRUE("inserting the same key twice refuses", !said.empty());
   CHECK_TRUE("and the store still holds one row", buffer.Count() == 1);
+  CHECK_TRUE("with BC's own wording",
+             said.find("already exists. Identification fields") != std::string::npos);
+  // THE VALUE FORM ANSWERS FALSE INSTEAD, `record-insert--method.md`: "No run-time error occurs
+  // if customer 1120 already exists."
+  CHECK_TRUE("the value form answers false", !buffer.Ok_Insert());
+  CHECK_TRUE("and writes nothing", buffer.Count() == 1);
 
   // THE NEGATIVE CONTROL. A store that refused every insert would pass the check above.
   buffer.OldLineNumber = 2;

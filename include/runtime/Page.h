@@ -65,6 +65,12 @@ template <typename P> struct ControlTrigger {
   void (P::*action)() = nullptr;     ///< `OnAction`.
   void (P::*drillDown)() = nullptr;  ///< `OnDrillDown`.
   void (P::*assistEdit)() = nullptr; ///< `OnAssistEdit`.
+  /// \brief The `Visible` property when it is an EXPRESSION rather than a literal -- the parser
+  ///        turns `Visible = AmountVisible` into a trigger that computes it, so the harness reads
+  ///        what the page's variables say now and not what the property said at translation.
+  ::agiru::Boolean (P::*visible)() = nullptr;
+  ::agiru::Boolean (P::*enabled)() = nullptr;  ///< \see visible
+  ::agiru::Boolean (P::*editable)() = nullptr; ///< \see visible
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.
@@ -130,6 +136,12 @@ template <typename P> void AfterGetRecord(P &page) {
 
 /// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
 ///        with `OnNewRecord`), `OnOpenPage`, then the after-get triggers.
+/// \note THE RECORD `Page.Run(Rec)` PASSED IS THE ONE SHOWN, when it exists in the set:
+///       `page-run-integer-table-joker-method.md` -- "Use this optional parameter to select a
+///       specific record to display on the page. When the record is displayed, the key and
+///       filters attached to the record are used." So the page finds THAT row first and falls
+///       back to the first of the filtered set only when it is not there -- a list opened on
+///       the third period drilled down into the first one before (24 UT cases, 2026-09-09).
 /// \tparam P The generated page class.
 /// \param page     The page.
 /// \param editable Whether it opens for editing.
@@ -145,7 +157,7 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
       platform.Init();
       if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(false); }
     } else {
-      found = static_cast<bool>(platform.FindFirst());
+      found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
     }
   }
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
@@ -172,11 +184,17 @@ template <typename P> void ClosePage(P &page) {
 /// \tparam Record What was passed; only the page's own source table is taken.
 /// \param page   The page.
 /// \param record The argument.
+/// \warning AN `Instance<T>` IS A HANDLE AND NOT THE RECORD: a codeunit's global record reaches
+///          `Page.Run` as one, and taking the handle's own address as the record put a page's
+///          `Rec.Copy` onto garbage (SIGSEGV in three UT codeunits, found under the address
+///          sanitizer 2026-09-09). Every taker here dereferences a handle first.
 template <typename P, typename Record> void AdoptRecord(P &page, const Record &record) {
-  if constexpr (requires {
-                  page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
-                  page.Rec.Copy(record);
-                }) {
+  if constexpr (requires { record.operator->(); }) {
+    AdoptRecord(page, *record.operator->());
+  } else if constexpr (requires {
+                         page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
+                         page.Rec.Copy(record);
+                       }) {
     using Source = std::remove_cvref_t<decltype(page.Rec)>;
     static_cast<typename Source::Platform_Half &>(page.Rec).Copy(record);
   } else {
@@ -270,22 +288,43 @@ namespace detail {
 /// \param arguments The record, when one was passed.
 /// \return The action the page closed with.
 /// \throws Error when this build carries no page of that number.
+/// \note NUMBER 0 IS THE TABLE'S OWN LOOKUP PAGE: `page-run-integer-table-joker-method.md` --
+///       "If you enter zero (0), the system displays the default lookup window for the current
+///       page" -- so `PAGE.RunModal(0, Rec)` opens the record's `LookupPageId`, and the
+///       `DrillDownPageId` where a table declares only that (16 UT cases, 2026-09-09).
 template <typename... Arguments>
 ::agiru::Action RunPageByNumber(bool modal, ::agiru::Integer id, const Arguments &...arguments) {
-  const PageEntry *entry = FindPage(PageId{id});
-  if (entry == nullptr) {
-    throw Error("Page.Run(" + std::to_string(id) + "): this build carries no page of that number");
-  }
   const void *record = nullptr;
   const TableDef *table = nullptr;
   const auto take = [&](const auto &argument) {
     using A = std::remove_cvref_t<decltype(argument)>;
-    if constexpr (requires { TableTraits<A>::kTable; }) {
+    if constexpr (requires {
+                    argument.operator->();
+                    TableTraits<A>::kTable;
+                  }) {
+      record = argument.operator->();
+      table = &TableTraits<A>::kTable;
+    } else if constexpr (requires { TableTraits<A>::kTable; }) {
       record = &argument;
       table = &TableTraits<A>::kTable;
     }
   };
   (take(arguments), ...);
+  if (id == 0) {
+    if (table == nullptr) {
+      throw Error("Page.Run(0) needs a record, whose table names the default lookup page");
+    }
+    id = table->lookupPageId.Value() != 0 ? table->lookupPageId.Value()
+                                          : table->drillDownPageId.Value();
+    if (id == 0) {
+      throw Error("Page.Run(0): " + std::string(table->name) +
+                  " declares no LookupPageId and no DrillDownPageId");
+    }
+  }
+  const PageEntry *entry = FindPage(PageId{id});
+  if (entry == nullptr) {
+    throw Error("Page.Run(" + std::to_string(id) + "): this build carries no page of that number");
+  }
   return entry->run(modal, record, table);
 }
 

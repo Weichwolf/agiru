@@ -30,7 +30,11 @@ public:
 
   /// \brief The character with a given code point.
   /// \param code The code point.
-  constexpr explicit Char(std::int32_t code) : code_(code) {}
+  /// \note IMPLICIT, BECAUSE AL'S IS: `C := 65` and `exit(C)` from an Integer into a `Char`
+  ///       return are ordinary AL (`char-data-type.md`: "You can assign a numeric value to a Char
+  ///       variable"), and `StringConversionManagement` returned an Integer from a procedure
+  ///       declared `Char`.
+  constexpr explicit(false) Char(std::int32_t code) : code_(code) {}
 
   /// \brief AL passes `'+'` where a `Char` is declared -- a one-character text IS a character.
   /// \param text The text, whose single character is taken.
@@ -107,6 +111,18 @@ public:
   /// \param o The other.
   /// \return How they order.
   [[nodiscard]] constexpr auto operator<=>(const Char &o) const = default;
+
+  /// \brief AL `C > 57` -- a character against a code point.
+  /// \param code The code point.
+  /// \return The ordering.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(std::int32_t code) const {
+    return code_ <=> code;
+  }
+
+  /// \brief AL `C = 57`.
+  /// \param code The code point.
+  /// \return Whether this is that code point.
+  [[nodiscard]] constexpr bool operator==(std::int32_t code) const { return code_ == code; }
 
   /// \brief AL `Char >= '0'`: a Char against a one-character text literal, which AL reads as a
   ///        Char. A longer text refuses, the way AL's conversion does.

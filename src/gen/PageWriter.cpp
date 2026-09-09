@@ -142,6 +142,9 @@ struct TriggerRow {
   std::string action;
   std::string drillDown;
   std::string assistEdit;
+  std::string visible;
+  std::string enabled;
+  std::string editable;
 };
 
 void GatherTriggerRows(const std::vector<al::PageControl> &controls,
@@ -164,10 +167,17 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
         row.drillDown = method;
       } else if (lowered == "onassistedit") {
         row.assistEdit = method;
+      } else if (lowered == "onvisible") {
+        row.visible = method;
+      } else if (lowered == "onenabled") {
+        row.enabled = method;
+      } else if (lowered == "oneditable") {
+        row.editable = method;
       }
     }
     if (!row.validate.empty() || !row.action.empty() || !row.drillDown.empty() ||
-        !row.assistEdit.empty()) {
+        !row.assistEdit.empty() || !row.visible.empty() || !row.enabled.empty() ||
+        !row.editable.empty()) {
       rows.push_back(std::move(row));
     }
     GatherTriggerRows(control.children, named, page, rows);
@@ -191,7 +201,8 @@ std::string TriggerTable(const al::PageObject &page,
     first = false;
     out += "      {.control = " + Literal(row.control) + ", .validate = " + member(row.validate) +
            ", .action = " + member(row.action) + ", .drillDown = " + member(row.drillDown) +
-           ", .assistEdit = " + member(row.assistEdit) + "}";
+           ", .assistEdit = " + member(row.assistEdit) + ", .visible = " + member(row.visible) +
+           ", .enabled = " + member(row.enabled) + ", .editable = " + member(row.editable) + "}";
   }
   out += rows.empty() ? "}};\n" : "\n  }};\n";
   return out;

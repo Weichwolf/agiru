@@ -55,3 +55,20 @@ Relative`, on a column name with a quote in it -- the shell quoting of the copy 
 `agiru_seeded` is that database as a template; the harness runs `--database .../agiru_seeded
 --fresh` per codeunit.
 
+## Standing 2026-09-09: the measurement after one instance per run and the two-spelling forms
+
+Chain 22 measured 603 of 2 249 over 75 codeunits against 674 of 2 296 over 78 before it, and the
+number is read as three things and not one: 416 of the new reds are ONE site --
+`ContBusRel.SetFilter("Link to Table", '<>''''')`, the blank Option member spelled as an empty
+string, bound as `''` into an integer column -- which the `API Setup UT` tests reached for the
+first time because their `Manual` subscriber is bound once now; three codeunits (`Phys. Invt. COD
+UT`, `Phys. Invt. Order Line TAB UT`, `Phys. Invt. Order Subform UT`) die with SIGSEGV in
+`StateHandle::operator=` while `AdoptRecord` copies a marked record into a page, a path the
+statement form of `Codeunit.Run` now reaches; and the two codeunits that print no total were
+never registered (`Graph Collect Mgt Item UT`, `O365 Integration Record UT` are not in the
+slice). The blank member binds as its ordinal now; the crash is under an address-sanitizer build
+in `build-asan/`, configured by hand from the Makefile's own invocation with `-fsanitize=address`.
+
+The sanitizer named the crash: `RunPageByNumber`'s taker accepted an `Instance<Record>` handle as
+a record because `TableTraits<Instance<T>>` is specialised, and took the handle's own address.
+Every by-number run and `AdoptRecord` dereference a handle first now (board:0030's page runner).

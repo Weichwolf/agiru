@@ -450,6 +450,30 @@ void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text)
 ///       from a variable and AL never re-reads it as an expression. Quoting is what says so.
 [[nodiscard]] std::string Literally(std::string_view value);
 
+/// \brief AL `Record.GetView(UseNames)`: the sort order, direction and the current group's
+///        filters as one view string, `VERSION(1) SORTING(...) ORDER(...) WHERE(...)`.
+/// \param state    The record's state, or `nullptr` for one that never filtered.
+/// \param table    The declaration.
+/// \param useNames Captions (the name where a field has none) when true, `Field<no>` when false.
+/// \return The view, which `ApplyView` reads back.
+[[nodiscard]] std::string ViewOf(const RecordState *state, const TableDef &table, bool useNames);
+
+/// \brief AL `Record.CopyFilter(From, Other.To)`: every group's filter on one field, copied onto
+///        a field of another record in the same group.
+/// \param from        The source record's state, or `nullptr` when it never filtered.
+/// \param source      The source field.
+/// \param target      The record whose field receives the filters.
+/// \param destination That record's field.
+void RuntimeCopyFilter(const RecordState *from, FieldNo source, void *target, FieldNo destination);
+
+/// \brief AL `Record.SetView(String)`: the sort order, direction and filters a view string sets.
+/// \param state The record's state.
+/// \param table The declaration.
+/// \param view  The view, in the `SourceTableView` form; empty clears every filter and returns
+///              to the primary key (`record-setview-method.md`).
+/// \throws Error when a field is not the table's, or a clause is not one of the four.
+void ApplyView(RecordState &state, const TableDef &table, std::string_view view);
+
 /// \brief Whether the table declares a key those fields select.
 ///
 /// \param table The table.

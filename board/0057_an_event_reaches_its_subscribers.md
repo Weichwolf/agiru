@@ -289,3 +289,13 @@ The property this item is about now reaches `constexpr` metadata -- `ControlDef`
 `meta/CodeunitDef.h` -- emitted per object into the `.cpp` and reached through the object's traits.
 What is open here is what READS it, not what carries it: the property census over the whole BaseApp
 went from 46 203 declarations dropped in silence to 813 in the same round.
+
+## Standing 2026-09-09: a bound instance that goes out of scope is unbound
+
+`Codeunit<Derived>::~Codeunit` unbinds the instance, which is what
+`devenv-eventsubscriberinstance-property.md` says: "letting the previously bound instance go out of
+scope ... All bindings on the instance are automatically unbound." The runner also drives ONE
+instance per test codeunit run now (`TestCatalogue::Make`/`Free`, `InvokeTest(instance)`), so the
+`IsInitialized` guard 40 of the 78 UT codeunits keep in a global holds and a `Manual` subscriber is
+bound once and not once per test -- 24 `API Setup UT` cases read `multiple subscribers competing`
+because the earlier instances' bindings were still dispatched into.

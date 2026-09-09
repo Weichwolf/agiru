@@ -9,6 +9,7 @@
 #include "runtime/RecordState.h"
 #include "type/Boolean.h"
 #include "type/ErrorInfo.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/IsolationLevel.h"
 #include "type/Option.h"
@@ -187,7 +188,12 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no);
 /// \throws Error when the table carries no such field.
 [[nodiscard]] std::string_view FieldNameOf(const TableDef &table, FieldNo no);
 
-void RuntimeInsert(void *record, const TableDef &table);
+/// \brief Writes the record as a new row.
+/// \param record The record.
+/// \param table  The declaration.
+/// \return False when a row with this primary key already exists; the transaction stays usable,
+///         because the write is `ON CONFLICT DO NOTHING` and never a failed statement.
+[[nodiscard]] bool RuntimeInsert(void *record, const TableDef &table);
 
 /// \brief Overwrites the row this record's primary key selects.
 /// \param record The record.
@@ -375,6 +381,25 @@ void RuntimeShareTemporary(void *record, const void *from);
 ///          visible half (measured 2026-09-08).
 void RuntimeReset(void *record);
 
+/// \brief AL `Record.SetRecFilter()`: a range on every primary key field, at the record's values.
+/// \param record The record.
+/// \param table  The declaration.
+void RuntimeSetRecFilter(void *record, const TableDef &table);
+
+/// \brief AL `Record.GetFilters()`: the current group's filters as `Caption: filter`, joined
+///        by `, `.
+/// \param state The record's state, or `nullptr`.
+/// \param table The declaration.
+/// \return The text; empty when nothing is filtered.
+[[nodiscard]] std::string FiltersText(const RecordState *state, const TableDef &table);
+
+/// \brief AL `Record.GetBySystemId(SystemId)`: the row whose `SystemId` this is, filters ignored.
+/// \param record   The record, which receives the row.
+/// \param table    The declaration.
+/// \param systemId The id.
+/// \return Whether a row carries it.
+[[nodiscard]] bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &systemId);
+
 /// \brief Writes one field from the text a column returned.
 /// \param record The record.
 /// \param def    The field.
@@ -436,6 +461,19 @@ public:
   ///       `static_cast<T::Platform_Half &>(rec).FindFirst()`.
   using Platform_Half = Table<Derived>;
 
+private:
+  template <typename Field> [[nodiscard]] Field RangeBound_(const Field &member, bool upper) const {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    const std::string text = detail::RangeBoundText(Filtered(), no, upper);
+    if (text.empty()) { return Field{}; }
+    Derived bound{};
+    detail::EvaluateInto(&bound, TableTraits<Derived>::kTable, no, text);
+    const std::ptrdiff_t offset =
+        reinterpret_cast<const char *>(&member) - reinterpret_cast<const char *>(Self());
+    return *reinterpret_cast<const Field *>(reinterpret_cast<const char *>(&bound) + offset);
+  }
+
+public:
   /// \brief AL `Record.Insert()`.
   ///
   /// \throws Error when the row cannot be written, a duplicate key included.
@@ -464,6 +502,30 @@ public:
   ///       `[Ok := ] Record.X(...)`, and AL writes `exit(Modify())` -- 226 sites under Layers/W1.
   ///       A `void` here made every one of them a compile error.
   Boolean Insert() { return Insert(false); }
+
+  /// \brief AL `Ok := Record.Insert()` -- THE VALUE FORM, which the generator spells when the
+  ///        result is consumed (`if Rec.Insert() then`).
+  /// \return False when a row with this primary key exists; true when the row was written.
+  /// \note `record-insert--method.md`: "No run-time error occurs if customer 1120 already
+  ///       exists" in the value form, against a run-time error in the statement form. The two are
+  ///       ONE method in AL, decided by whether the result is read, so the generator decides and
+  ///       the door carries both spellings -- `Insert` for the statement it is written as far more
+  ///       often, `Ok_Insert` for the value.
+  Boolean Ok_Insert() { return Ok_Insert(false); }
+
+  /// \brief AL `Ok := Record.Insert(RunTrigger)`, the value form.
+  /// \param RunTrigger Whether `OnInsert` runs.
+  /// \return False when the row exists.
+  Boolean Ok_Insert(Boolean RunTrigger) { return Insert_(RunTrigger); }
+
+  /// \brief AL `Ok := Record.Insert(RunTrigger, InsertWithSystemId)`, the value form.
+  /// \param RunTrigger Whether `OnInsert` runs.
+  /// \param InsertWithSystemId Read only to be discarded (board:0029).
+  /// \return False when the row exists.
+  Boolean Ok_Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    static_cast<void>(InsertWithSystemId);
+    return Insert_(RunTrigger);
+  }
 
   /// \brief AL `Record.Insert(RunTrigger)`.
   ///
@@ -497,18 +559,28 @@ public:
   }
 
   Boolean Insert(Boolean RunTrigger) {
+    if (!Insert_(RunTrigger)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.caption) +
+                  " already exists. Identification fields and values: " + PrimaryKeyText());
+    }
+    return true;
+  }
+
+private:
+  Boolean Insert_(Boolean RunTrigger) {
     TableEvent("OnBeforeInsertEvent", RunTrigger);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnInsert(); }) {
         static_cast<Derived *>(this)->OnInsert();
       }
     }
-    detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable);
+    if (!detail::RuntimeInsert(Self(), TableTraits<Derived>::kTable)) { return false; }
     CaptureImage();
     TableEvent("OnAfterInsertEvent", RunTrigger);
     return true;
   }
 
+public:
   /// \brief AL `Record.Modify()`.
   /// \return True. The FALSE answer is board:0055: it wants the duplicate-key and not-found cases
   ///         told apart from a real database failure, and the SQL layer does not do that yet.
@@ -935,15 +1007,30 @@ public:
     if (ShareTable) { detail::RuntimeShareTemporary(Self(), &from); }
   }
 
-  /// \brief AL `Record.CopyFilter(...)`. Copies the filter that has been set for one field and
-  /// applies it to another field.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void CopyFilter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CopyFilter is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.CopyFilter(FromField, Record.ToField)`. Copies the filter that has been
+  ///        set for one field and applies it to another field, on another record.
+  /// \tparam From   The source field member's type.
+  /// \tparam Target The record that owns the target field.
+  /// \tparam To     The target field member's type.
+  /// \param from   The field the filter is copied from, this record's.
+  /// \param target The record whose field receives it.
+  /// \param to     That record's field.
+  /// \throws Error when `to` is not a field of `target`.
+  /// \note THE TARGET RECORD IS NAMED, which AL's `Rec.CopyFilter(F, Other.G)` does not: a member
+  ///       reference alone cannot say which record it belongs to, so the generator writes the
+  ///       owner beside it. `record-copyfilter-method.md`: the filter "remains in the assigned
+  ///       group number", so every group's filter on `from` lands in the same group on `to`.
+  template <typename From, typename Target, typename To>
+  void CopyFilter(const From &from, Target &target, const To &to) const {
+    using Declared = std::remove_cvref_t<Target>;
+    const auto offset = static_cast<std::size_t>(reinterpret_cast<const std::byte *>(&to) -
+                                                 reinterpret_cast<const std::byte *>(&target));
+    const FieldDef *def = FieldAtOffset(TableTraits<Declared>::kTable, offset);
+    if (def == nullptr) {
+      throw Error("CopyFilter: the target field is not a field of " +
+                  std::string(TableTraits<Declared>::kTable.name));
+    }
+    detail::RuntimeCopyFilter(Filtered(), NumberOf(&from), &target, def->no);
   }
 
   /// \brief AL `Record.CopyFilters(...)`. Copies all the filters set by the SETFILTER method
@@ -1201,13 +1288,10 @@ public:
   }
 
   /// \brief AL `Record.GetBySystemId(...)`. Gets a record by its SystemId.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean GetBySystemId(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetBySystemId is declared and not implemented yet (board:0035)");
+  /// \param SystemId The id.
+  /// \return True when a row carries it; `record-getbysystemid-method.md`: filters do not apply.
+  Boolean GetBySystemId(const Guid &SystemId) {
+    return Read(detail::RuntimeGetBySystemId(Self(), TableTraits<Derived>::kTable, SystemId));
   }
 
   /// \brief AL `Record.GetFilter(Field)`. The filter standing on one field.
@@ -1233,13 +1317,9 @@ public:
   /// \brief AL `Record.GetFilters(...)`. Gets a string that contains a list of the filters within
   /// the current filter group for all fields in a record. In addition, this method also returns the
   /// state of the MARKEDONLY method (Record).
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string GetFilters(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetFilters is declared and not implemented yet (board:0035)");
+  /// \return `Caption: filter, Caption: filter` over the current group; empty when unfiltered.
+  [[nodiscard]] std::string GetFilters() const {
+    return detail::FiltersText(Filtered(), TableTraits<Derived>::kTable);
   }
 
   /// \brief AL `Record.GetPosition(...)`. Gets a string that contains the primary key of the
@@ -1253,35 +1333,31 @@ public:
     throw Error("Record.GetPosition is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.GetRangeMax(...)`. Gets the maximum value in a range for a field.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments>::agiru::Variant GetRangeMax(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetRangeMax is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.GetRangeMax(Field)`. The upper bound of the range standing on a field.
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it.
+  /// \return The bound as the field's own type; the field's blank when no filter bounds it above.
+  /// \note `record-getrangemax-method.md`: it reads the CURRENT filter group, the way `GetFilter`
+  ///       does.
+  /// \throws Error when the filter is not a single range (board:0508).
+  template <typename Field> [[nodiscard]] Field GetRangeMax(const Field &member) const {
+    return RangeBound_(member, true);
   }
 
-  /// \brief AL `Record.GetRangeMin(...)`. Gets the minimum value in a range for a field.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments>::agiru::Variant GetRangeMin(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetRangeMin is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.GetRangeMin(Field)`. The lower bound of the range standing on a field.
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it.
+  /// \return The bound as the field's own type; the field's blank when no filter bounds it below.
+  template <typename Field> [[nodiscard]] Field GetRangeMin(const Field &member) const {
+    return RangeBound_(member, false);
   }
 
   /// \brief AL `Record.GetView(...)`. Gets a string that describes the current sort order, key, and
   /// filters on a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string GetView(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetView is declared and not implemented yet (board:0035)");
+  /// \param UseNames Captions when true (AL's default), `Field<no>` when false.
+  /// \return `VERSION(1) SORTING(...) ORDER(...) WHERE(...)`, what `SetView` reads back.
+  [[nodiscard]] std::string GetView(Boolean UseNames = true) const {
+    return detail::ViewOf(Filtered(), TableTraits<Derived>::kTable, static_cast<bool>(UseNames));
   }
 
   /// \brief AL `Record.HasFilter(...)`. Determines whether a filter is attached to a record within
@@ -1798,23 +1874,16 @@ public:
 
   /// \brief AL `Record.SetRecFilter(...)`. Sets the values in the current key of the current record
   /// as a record filter.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void SetRecFilter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetRecFilter is declared and not implemented yet (board:0035)");
-  }
+  /// \note `record-setrecfilter-method.md`: a filter on each primary key field at the record's
+  ///       current value, so a later `Find` selects this one row and `Count` answers one.
+  void SetRecFilter() { detail::RuntimeSetRecFilter(Self(), TableTraits<Derived>::kTable); }
 
   /// \brief AL `Record.SetView(...)`. Sets the current sort order, key, and filters on a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void SetView(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetView is declared and not implemented yet (board:0035)");
+  /// \param String The view, in the `SourceTableView` form; empty clears the filters and
+  ///               returns to the primary key.
+  /// \throws Error when the view names a field the table does not have.
+  void SetView(std::string_view String) {
+    detail::ApplyView(State(), TableTraits<Derived>::kTable, String);
   }
 
   /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.

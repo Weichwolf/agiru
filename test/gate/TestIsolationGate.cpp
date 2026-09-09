@@ -39,20 +39,20 @@ void Wrote(const char *who) {
   Db().Run(std::string("INSERT INTO isolation_gate (who) VALUES ('") + who + "')");
 }
 
-void DefaultLeaves() {
+void DefaultLeaves(void *) {
   Wrote("default");
 }
 
-void RollbackLeavesNothing() {
+void RollbackLeavesNothing(void *) {
   Wrote("rollback");
 }
 
-void Fails() {
+void Fails(void *) {
   Wrote("failed");
   throw Error("this method fails on purpose");
 }
 
-void Reads() {
+void Reads(void *) {
   const agiru::Result rows = Db().Execute("SELECT who FROM isolation_gate ORDER BY who");
   g_saw.clear();
   for (std::size_t row = 0; row < rows.Rows(); ++row) {
@@ -60,6 +60,12 @@ void Reads() {
     g_saw += rows.Value(row, 0).value_or("");
   }
 }
+
+void *MakeNothing() {
+  return nullptr;
+}
+
+void FreeNothing(void *) {}
 
 constexpr std::array<TestMethod, 4> kOrdered{{
     {.name = "DefaultLeaves",
@@ -98,7 +104,8 @@ constexpr std::array<TestMethod, 4> kOrdered{{
 void WhatOneMethodLeavesTheNextOneSees() {
   Db().Run("DROP TABLE IF EXISTS isolation_gate");
   Db().Run("CREATE TABLE isolation_gate (who text NOT NULL)");
-  const TestCatalogue registered{CodeunitId{999999}, "Gate - Ordered UT", nullptr, kOrdered};
+  const TestCatalogue registered{
+      CodeunitId{999999}, "Gate - Ordered UT", &MakeNothing, &FreeNothing, nullptr, kOrdered};
   g_saw.clear();
   const agiru::TestRun run = agiru::RunRegisteredTests("Gate - Ordered UT");
   CHECK_TRUE("all four methods ran", run.passed + run.failed == 4);

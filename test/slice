@@ -6978,3 +6978,5 @@ tests/system/test/tooling/codeunit/BCPTWarehouseTasks.cpp
 tests/test/foundation/no_series/codeunit/NoSeriesCheckTests.cpp
 # THE SLICE: the generated sources that compile and are LINKED INTO `agiru`, so that
 # whole point of naming them rather than globbing whatever happens to work.
+foundation/foundation/no_series/codeunit/NoSeriesErrorsImpl.cpp
+base/system/text/codeunit/StringConversionManagement.cpp

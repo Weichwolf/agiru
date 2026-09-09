@@ -32,11 +32,33 @@ std::string Missed(const std::vector<std::string_view> &names) {
   return out;
 }
 
-TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
+void *&CurrentInstance() {
+  thread_local void *instance = nullptr;
+  return instance;
+}
+
+struct Driven {
+  explicit Driven(const TestCatalogue &of) : owner(of), instance(of.Make()) {
+    SetCurrentTestInstance(instance);
+  }
+
+  Driven(const Driven &) = delete;
+  Driven &operator=(const Driven &) = delete;
+
+  ~Driven() {
+    SetCurrentTestInstance(nullptr);
+    owner.Free(instance);
+  }
+
+  const TestCatalogue &owner;
+  void *instance;
+};
+
+TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void *instance) {
   detail::Scope scope;
   HandlerTable::Install(codeunit.Handlers(), method.handlers);
   try {
-    method.invoke();
+    method.invoke(instance);
   } catch (const Error &e) {
     static_cast<void>(HandlerTable::Uninstall());
     scope.Discard(e.what());
@@ -72,12 +94,28 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method) {
 
 }
 
+void *CurrentTestInstance() {
+  return CurrentInstance();
+}
+
+void SetCurrentTestInstance(void *instance) {
+  CurrentInstance() = instance;
+}
+
 TestCatalogue::TestCatalogue(CodeunitId id,
                              std::string_view name,
-                             void (*onRun)(),
+                             void *(*make)(),
+                             void (*free)(void *),
+                             void (*onRun)(void *),
                              std::span<const TestMethod> methods,
                              std::span<const TestHandler> handlers)
-    : id_(id), name_(name), onRun_(onRun), methods_(methods), handlers_(handlers) {
+    : id_(id),
+      name_(name),
+      make_(make),
+      free_(free),
+      onRun_(onRun),
+      methods_(methods),
+      handlers_(handlers) {
   Registered().push_back(this);
 }
 
@@ -100,9 +138,10 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
     detail::Scope isolation;
+    const Driven driven(*catalogue);
     if (catalogue->OnRun() != nullptr) {
       try {
-        catalogue->OnRun()();
+        catalogue->OnRun()(driven.instance);
       } catch (const std::exception &e) {
         isolation.Discard(e.what());
         run.results.push_back(TestResult{
@@ -113,7 +152,7 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
       }
     }
     for (const TestMethod &method : catalogue->Methods()) {
-      run.results.push_back(RunOne(*catalogue, method));
+      run.results.push_back(RunOne(*catalogue, method, driven.instance));
       if (run.results.back().passed) {
         ++run.passed;
       } else {

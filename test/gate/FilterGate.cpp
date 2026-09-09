@@ -1,10 +1,12 @@
 #include "meta/TableDef.h"
+#include "runtime/Error.h"
 
 #include "Check.h"
 #include "Filter.h"
 
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 
 using agiru::FieldDef;
@@ -132,6 +134,14 @@ void AQuotedOperandIsNotSplitOnItsOperators() {
   CHECK_TRUE("and an unquoted star is a wildcard", Passes("A*B", "AxxB", TextField()));
 }
 
+/// AN EMPTY TERM IS THE BLANK VALUE, not a syntax error: `SetFilter(F, '%1|%2', Blank, Payment)`
+/// renders the blank option member as nothing, and BC reads `|Payment` as "blank or Payment".
+void AnEmptyTermMeansBlank() {
+  CHECK_TRUE("the blank passes the empty term", Passes(" |Payment", "", TextField()));
+  CHECK_TRUE("and the named alternative passes", Passes(" |Payment", "Payment", TextField()));
+  CHECK_TRUE("and another value does not", !Passes(" |Payment", "Refund", TextField()));
+}
+
 void AnEmptyFilterPassesEverything() {
   CHECK_TRUE("no filter is not a filter that matches nothing", Passes("", "anything", TextField()));
   CHECK_TRUE("and the blank value is a filter of its own", Passes("''", "", TextField()));
@@ -211,6 +221,29 @@ void ASetCountsItselfWithoutCountingRows() {
              agiru::detail::CountOf({{.low = -kBillion, .high = kBillion}}) == 2000000001);
 }
 
+/// `GetRangeMin` READS A RANGE AND REFUSES ANYTHING ELSE, which the concept page for the four
+/// filter methods states outright: "A runtime error occurs if the filter that is currently applied
+/// is not a range" (board:0508).
+void ARangeHasTwoEndsAndAnythingElseIsNotARange() {
+  CHECK_TEXT("the lower end of a range", agiru::detail::RangeBoundOf("10..20", false), "10");
+  CHECK_TEXT("and the upper end", agiru::detail::RangeBoundOf("10..20", true), "20");
+  CHECK_TEXT("a single value is both ends", agiru::detail::RangeBoundOf("7", true), "7");
+  CHECK_TEXT("an open end is blank", agiru::detail::RangeBoundOf("10..", true), "");
+  CHECK_TEXT("`>=` bounds below", agiru::detail::RangeBoundOf(">=3", false), "3");
+  CHECK_TEXT("and not above", agiru::detail::RangeBoundOf(">=3", true), "");
+  CHECK_TEXT("no filter has no bound", agiru::detail::RangeBoundOf("", false), "");
+  std::string said;
+  try {
+    static_cast<void>(agiru::detail::RangeBoundOf("10000|20000|30000", false));
+  } catch (const agiru::Error &e) { said = e.what(); }
+  CHECK_TRUE("the documented example refuses", said.find("is not a range") != std::string::npos);
+  said.clear();
+  try {
+    static_cast<void>(agiru::detail::RangeBoundOf("<>5", true));
+  } catch (const agiru::Error &e) { said = e.what(); }
+  CHECK_TRUE("and so does an exclusion", said.find("is not a range") != std::string::npos);
+}
+
 } // namespace
 
 int main() {
@@ -226,5 +259,7 @@ int main() {
     NumbersCompareAsNumbers();
     AQuotedOperandIsNotSplitOnItsOperators();
     AnEmptyFilterPassesEverything();
+    AnEmptyTermMeansBlank();
+    ARangeHasTwoEndsAndAnythingElseIsNotARange();
   });
 }

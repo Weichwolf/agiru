@@ -181,6 +181,13 @@ void RuntimeReset(void *record) {
   if (keep != nullptr) { StateOf(record)->temporary = std::move(keep); }
 }
 
+Integer RuntimeFilterGroup(void *record, Integer group) {
+  RecordState &state = *StateOf(record);
+  const Integer was = state.group;
+  state.group = group;
+  return was;
+}
+
 bool RuntimeIsTemporary(const void *record) {
   return TempOf(record) != nullptr;
 }
@@ -205,9 +212,7 @@ void RuntimeShareTemporary(void *record, const void *from) {
 bool TempInsert(void *record, const TableDef &table) {
   const Held held = Reach(record);
   const std::size_t at = LowerBound(*held.temp, table, record);
-  if (SameKeyAt(*held.temp, table, at, record)) {
-    throw Error("The " + std::string(table.caption) + " already exists.");
-  }
+  if (SameKeyAt(*held.temp, table, at, record)) { return false; }
   held.temp->ops->insert(held.temp->rows, at, record);
   ++held.temp->version;
   return true;

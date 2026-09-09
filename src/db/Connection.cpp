@@ -1,6 +1,7 @@
 #include "runtime/Database.h"
 
 #include <cstddef>
+#include <cstdlib>
 #include <optional>
 #include <span>
 #include <string>
@@ -42,6 +43,13 @@ Result &Result::operator=(Result &&o) noexcept {
 
 std::size_t Result::Rows() const {
   return handle_ == nullptr ? 0 : static_cast<std::size_t>(PQntuples(Handle(handle_)));
+}
+
+std::size_t Result::Affected() const {
+  if (handle_ == nullptr) { return 0; }
+  const char *count = PQcmdTuples(Handle(handle_));
+  if (count == nullptr || *count == '\0') { return 0; }
+  return static_cast<std::size_t>(std::strtoull(count, nullptr, 10));
 }
 
 std::size_t Result::Columns() const {

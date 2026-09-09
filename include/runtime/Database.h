@@ -47,6 +47,10 @@ public:
   /// \return How many rows came back.
   [[nodiscard]] std::size_t Rows() const;
 
+  /// \brief The rows a command wrote, changed or removed -- `PQcmdTuples`.
+  /// \return The count; 0 for a statement that returns rows rather than changing them.
+  [[nodiscard]] std::size_t Affected() const;
+
   /// \return How many columns came back.
   [[nodiscard]] std::size_t Columns() const;
 

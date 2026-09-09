@@ -203,3 +203,13 @@ A label appears in four places: as the value of a PROPERTY (`Caption`, `ToolTip`
 a `Label` VARIABLE, as a REPORT label, and as a PAGE label. All four are declarations, all four end
 up in `.rodata`, and the first list is seven of board:0067's properties whose values are not plain
 strings but this small grammar.
+
+## Standing 2026-09-09: the duplicate key is told apart, and the value form answers false
+
+`Record.Insert` is two spellings now, decided by the generator from the context it already knows:
+`Insert()` for the statement, which raises BC's own `The <Caption> already exists. Identification
+fields and values: ...`, and `Ok_Insert()` for `if Rec.Insert() then`, which answers false. The
+database layer writes `INSERT ... ON CONFLICT DO NOTHING` and reads the affected count, so the
+transaction stays usable after a refused insert -- a failed statement would have aborted it.
+`Modify`, `Delete`, `Get` and `Rename` still carry one spelling each; `Get` in statement form is
+silent where AL raises `does not exist`, which is the next row of this table.

@@ -493,7 +493,10 @@ private:
 
   std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
     const al::Expr &named = expression.children[1];
-    const std::string member = Identifier(callee.children[1].text);
+    std::string member = Identifier(callee.children[1].text);
+    if (!discarded_ && member == "Run" && SameName(callee.children[0].text, "Codeunit")) {
+      member = "Ok_Run";
+    }
     std::string subject = Expression(named, kPrimaryPrecedence);
     const std::size_t first = 2;
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
@@ -593,6 +596,33 @@ private:
     return "::agiru::Tried([&] { return " + inner + "; })";
   }
 
+  [[nodiscard]] bool IsRecordInsert(const al::Expr &callee) const {
+    if (callee.kind == al::ExprKind::Name) {
+      return SameName(callee.text, "Insert") && scope_.Resolve(callee.text).empty() &&
+             scope_.IsRecord("Rec");
+    }
+    return callee.kind == al::ExprKind::Binary && callee.text == "." &&
+           callee.children.size() == 2 && callee.children[1].kind == al::ExprKind::Name &&
+           SameName(callee.children[1].text, "Insert") &&
+           callee.children[0].kind == al::ExprKind::Name &&
+           scope_.IsRecord(callee.children[0].text);
+  }
+
+  [[nodiscard]] static bool IsMemberCall(const al::Expr &callee, std::string_view member) {
+    if (callee.kind == al::ExprKind::Name) { return SameName(callee.text, member); }
+    return callee.kind == al::ExprKind::Binary && callee.text == "." &&
+           callee.children.size() == 2 && callee.children[1].kind == al::ExprKind::Name &&
+           SameName(callee.children[1].text, member);
+  }
+
+  [[nodiscard]] bool IsCodeunitRun(const al::Expr &callee) const {
+    return callee.kind == al::ExprKind::Binary && callee.text == "." &&
+           callee.children.size() == 2 && callee.children[1].kind == al::ExprKind::Name &&
+           SameName(callee.children[1].text, "Run") &&
+           callee.children[0].kind == al::ExprKind::Name &&
+           SameName(scope_.DeclaredType(callee.children[0].text), "Codeunit");
+  }
+
   std::string RefusedControlCall(const al::Expr &callee) const {
     std::vector<std::string> names;
     const al::Expr *walk = &callee;
@@ -637,8 +667,14 @@ private:
         !scope_.IsVariable(callee.children[0].text)) {
       return RunObject(expression, callee);
     }
-    const std::string spelled =
+    std::string spelled =
         Callee(callee, expression.children.empty() ? 0 : expression.children.size() - 1);
+    if (!discarded_ && IsRecordInsert(callee) && spelled.ends_with("Insert")) {
+      spelled.replace(spelled.size() - 6, 6, "Ok_Insert");
+    }
+    if (!discarded_ && IsCodeunitRun(callee) && spelled.ends_with("Run")) {
+      spelled.replace(spelled.size() - 3, 3, "Ok_Run");
+    }
     std::string out = spelled + "(";
     std::string receiver;
     std::string reach = ".";
@@ -699,6 +735,25 @@ private:
       }
       if (i - 1 < publisherVars.size() && publisherVars[i - 1] && !lvalue) {
         out += "::agiru::Materialised(" + Expression(argument, 0) + ")";
+        continue;
+      }
+      if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Name &&
+          !scope_.IsVariable(argument.text) && !scope_.Resolve("Rec").empty() &&
+          scope_.HasField(OfVariable{.variable = "Rec", .field = argument.text})) {
+        const std::string rec = scope_.Resolve("Rec");
+        out += rec + ", " + rec + "." +
+               scope_.MemberSpelling(OfVariable{.variable = "Rec", .field = argument.text});
+        continue;
+      }
+      if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Binary &&
+          argument.text == "." && argument.children.size() == 2 &&
+          argument.children[0].kind == al::ExprKind::Name &&
+          (scope_.IsRecord(argument.children[0].text) ||
+           SameName(scope_.DeclaredType(argument.children[0].text), "Record") ||
+           !scope_.TableOf(argument.children[0].text).empty())) {
+        out += (scope_.IsHandle(argument.children[0].text) ? "*" : "") +
+               Expression(argument.children[0], kPrimaryPrecedence) + ", " +
+               Expression(argument, 0);
         continue;
       }
       const bool isField =
@@ -1949,6 +2004,10 @@ public:
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
+    if (const al::VarDecl *where = DeclarationOf(name);
+        where != nullptr && TypeName(where->type) == "Option" && !where->members.empty()) {
+      return OptionContentName(where->members);
+    }
     if (source_ == nullptr) { return {}; }
     const al::FieldDecl *field = FieldNamed(*source_, name);
     if (field == nullptr) { return {}; }

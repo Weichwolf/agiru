@@ -334,6 +334,21 @@ public:
   /// \return Whether they are the same.
   [[nodiscard]] bool operator==(Char other) const { return Read() == other; }
 
+  /// \brief AL `Text[Index] > 57` -- a position against a code point, which an Integer now
+  ///        converts to `Char` implicitly and would otherwise make ambiguous.
+  /// \param code The code point.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(std::int32_t code) const {
+    return static_cast<std::int32_t>(Read()) <=> code;
+  }
+
+  /// \brief AL `Text[Index] = 57`.
+  /// \param code The code point.
+  /// \return Whether the character has that code point.
+  [[nodiscard]] bool operator==(std::int32_t code) const {
+    return static_cast<std::int32_t>(Read()) == code;
+  }
+
   /// \brief Compares one text position with another.
   /// \tparam O The other text's type.
   /// \param other The other position.

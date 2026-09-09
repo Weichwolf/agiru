@@ -469,16 +469,13 @@ void AutoIncrement(void *record, const TableDef &table) {
 
 }
 
-void RuntimeInsert(void *record, const TableDef &table) {
-  if (TempOf(record) != nullptr) {
-    TempInsert(record, table);
-    return;
-  }
+bool RuntimeInsert(void *record, const TableDef &table) {
+  if (TempOf(record) != nullptr) { return TempInsert(record, table); }
 
   StampInserted(record, table);
   AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
-  InsertRow(Session::Current().Database(), table, values);
+  return InsertRow(Session::Current().Database(), table, values);
 }
 
 bool RuntimeModify(void *record, const TableDef &table) {
@@ -507,19 +504,68 @@ bool RuntimeDelete(const void *record, const TableDef &table) {
   return DeleteRow(Session::Current().Database(), table, key);
 }
 
+namespace {
+
+void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def)) { continue; }
+    SetFieldText(record, def, Required(row[column], def));
+    ++column;
+  }
+}
+
+}
+
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
 
   const FieldValues key = KeyOf(record, table);
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
   if (!row.has_value()) { return false; }
-  std::size_t column = 0;
-  for (const FieldDef &def : table.fields) {
-    if (!Stored(def)) { continue; }
-    SetFieldText(record, def, Required((*row)[column], def));
-    ++column;
-  }
+  LoadRow(record, table, *row);
   return true;
+}
+
+bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &systemId) {
+  const FieldDef *column = nullptr;
+  for (const FieldDef &def : table.fields) {
+    if (def.name == "SystemId") { column = &def; }
+  }
+  if (column == nullptr) {
+    throw Error("GetBySystemId: " + std::string(table.name) + " carries no SystemId");
+  }
+  if (TempOf(record) != nullptr) {
+    throw Error("GetBySystemId on a temporary record is not written yet (board:0035)");
+  }
+  const std::optional<FieldValues> row =
+      GetRowWhere(Session::Current().Database(), table, *column, systemId.ToText());
+  if (!row.has_value()) { return false; }
+  LoadRow(record, table, *row);
+  return true;
+}
+
+void RuntimeSetRecFilter(void *record, const TableDef &table) {
+  RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+  if (table.keys.empty()) { return; }
+  for (const FieldNo no : table.keys.front().fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    Narrow(state, no, Literally(FieldText(record, *def)));
+  }
+}
+
+std::string FiltersText(const RecordState *state, const TableDef &table) {
+  if (state == nullptr) { return {}; }
+  std::string out;
+  for (const FieldFilter &one : state->filters) {
+    if (one.group != state->group) { continue; }
+    const FieldDef *def = Field(table, one.field);
+    const std::string_view shown =
+        def == nullptr ? std::string_view{} : (def->caption.empty() ? def->name : def->caption);
+    out += (out.empty() ? "" : ", ") + std::string(shown) + ": " + one.text;
+  }
+  return out;
 }
 
 namespace {

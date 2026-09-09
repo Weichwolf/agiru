@@ -130,6 +130,15 @@ namespace agiru {
 ///       is one (board:0035).
 ::agiru::ClientType CurrentClientType();
 
+/// \brief AL `Session.ApplicationArea(Text)`. Gets or sets the application areas for the current
+///        session.
+/// \param ApplicationArea The areas to set, `#Basic,#Suite` style; empty reads without setting.
+/// \return The areas that were current before the call.
+/// \note PER SESSION, held with the session's other per-thread state; a test that sets
+///       `ApplicationArea('#Basic')` and reads it back sees its own value (12 UT cases,
+///       2026-09-09). Nothing here decides what an area SHOWS -- that is the page renderer's.
+std::string ApplicationArea(std::string_view ApplicationArea = {});
+
 /// \brief AL `System.ClosingDate(Date)`. The closing date of a normal date: after every posting
 ///        of that day and before the next day (`date-data-type.md`).
 /// \param Date The normal date.

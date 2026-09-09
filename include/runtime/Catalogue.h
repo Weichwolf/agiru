@@ -24,6 +24,8 @@ struct TableEntry {
   const TableDef *table; ///< The declaration, which is `constexpr` data in `.rodata`.
   void *(*make)();       ///< Makes an empty record of that table.
   void (*free)(void *);  ///< Unmakes one.
+  /// \brief `Record.Validate(Field, Text)` by number, for a `FieldRef` that holds no type.
+  void (*validate)(void *record, FieldNo no, std::string_view text);
 };
 
 /// \brief Makes an empty record.
@@ -49,7 +51,12 @@ template <typename T> void FreeRecord(void *record) {
 ///       metadata is emitted by the transpiler and never assembled at startup.
 template <typename T>
 inline constexpr TableEntry kTableEntry{
-    .table = &TableTraits<T>::kTable, .make = &MakeRecord<T>, .free = &FreeRecord<T>};
+    .table = &TableTraits<T>::kTable,
+    .make = &MakeRecord<T>,
+    .free = &FreeRecord<T>,
+    .validate = [](void *record, FieldNo no, std::string_view text) {
+      static_cast<T *>(record)->ValidateText(no, text);
+    }};
 
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.

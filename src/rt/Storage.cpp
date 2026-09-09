@@ -191,7 +191,7 @@ std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
 }
 }
 
-void InsertRow(const Connection &connection,
+bool InsertRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values) {
   if (values.size() != StoredCount(table)) {
@@ -203,9 +203,11 @@ void InsertRow(const Connection &connection,
     if (i != 0) { placeholders += ", "; }
     placeholders += Placeholder(i + 1);
   }
-  connection.Run("INSERT INTO " + Quoted(table.name) + " (" + columns + ") VALUES (" +
-                     placeholders + ")",
-                 values);
+  const Result written =
+      connection.Execute("INSERT INTO " + Quoted(table.name) + " (" + columns + ") VALUES (" +
+                             placeholders + ") ON CONFLICT DO NOTHING",
+                         values);
+  return written.Affected() == 1;
 }
 
 std::optional<FieldValues> GetRow(const Connection &connection,
@@ -215,6 +217,20 @@ std::optional<FieldValues> GetRow(const Connection &connection,
   const Result result = connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) +
                                                " WHERE " + KeyPredicate(table, 1),
                                            key);
+  if (result.Rows() == 0) { return std::nullopt; }
+  return RowOf(result, 0);
+}
+
+std::optional<FieldValues> GetRowWhere(const Connection &connection,
+                                       const TableDef &table,
+                                       const FieldDef &column,
+                                       std::string_view value) {
+  const std::string columns = StoredColumns(table);
+  const std::optional<std::string> bound{std::string(value)};
+  const Result result =
+      connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) + " WHERE " +
+                             Quoted(column.name) + " = " + Placeholder(1),
+                         std::span<const std::optional<std::string>>(&bound, 1));
   if (result.Rows() == 0) { return std::nullopt; }
   return RowOf(result, 0);
 }

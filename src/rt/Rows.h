@@ -16,13 +16,18 @@ using FieldValues = std::vector<std::optional<std::string>>;
 [[nodiscard]] std::string_view Required(const std::optional<std::string> &value,
                                         const FieldDef &def);
 
-void InsertRow(const Connection &connection,
-               const TableDef &table,
-               std::span<const std::optional<std::string>> values);
+[[nodiscard]] bool InsertRow(const Connection &connection,
+                             const TableDef &table,
+                             std::span<const std::optional<std::string>> values);
 
 [[nodiscard]] std::optional<FieldValues> GetRow(const Connection &connection,
                                                 const TableDef &table,
                                                 std::span<const std::optional<std::string>> key);
+
+[[nodiscard]] std::optional<FieldValues> GetRowWhere(const Connection &connection,
+                                                     const TableDef &table,
+                                                     const FieldDef &column,
+                                                     std::string_view value);
 
 bool ModifyRow(const Connection &connection,
                const TableDef &table,

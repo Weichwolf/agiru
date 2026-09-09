@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/Codeunit.h"
 
 #include <algorithm>
 #include <mutex>
@@ -63,6 +64,39 @@ std::once_flag &PagesOnce() {
   return once;
 }
 
+}
+
+namespace {
+
+std::vector<const CodeunitEntry *> &CodeunitEntries() {
+  static std::vector<const CodeunitEntry *> entries;
+  return entries;
+}
+
+std::once_flag &CodeunitsOnce() {
+  static std::once_flag once;
+  return once;
+}
+
+}
+
+void RegisterCodeunitEntry(const CodeunitEntry *entry) {
+  CodeunitEntries().push_back(entry);
+}
+
+const CodeunitEntry *FindCodeunit(CodeunitId id) {
+  std::call_once(CodeunitsOnce(), [] {
+    std::ranges::sort(CodeunitEntries(), [](const CodeunitEntry *a, const CodeunitEntry *b) {
+      return a->id.Value() < b->id.Value();
+    });
+  });
+  const auto found = std::lower_bound(
+      CodeunitEntries().begin(),
+      CodeunitEntries().end(),
+      id.Value(),
+      [](const CodeunitEntry *entry, auto number) { return entry->id.Value() < number; });
+  if (found == CodeunitEntries().end() || (*found)->id != id) { return nullptr; }
+  return *found;
 }
 
 void RegisterPageEntry(const PageEntry *entry) {

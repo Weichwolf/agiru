@@ -27,6 +27,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -50,6 +52,32 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
   return detail::RuntimeIsEmpty(record_, Table());
 }
 
+std::string RecordRef::GetView(::agiru::Boolean UseNames) const {
+  if (record_ == nullptr) { throw Error("RecordRef.GetView: the RecordRef is not open"); }
+  return detail::ViewOf(reinterpret_cast<const detail::StateHandle *>(record_)->Peek(),
+                        Table(),
+                        static_cast<bool>(UseNames));
+}
+
+void RecordRef::SetView(std::string_view String) {
+  if (record_ == nullptr) { throw Error("RecordRef.SetView: the RecordRef is not open"); }
+  detail::ApplyView(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), Table(), String);
+}
+
+::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
+  return detail::RuntimeFilterGroup(record_, NewGroup);
+}
+
+void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
+  const TableEntry *entry = FindTable(table_->id);
+  if (entry == nullptr || entry->validate == nullptr) {
+    throw Error("FieldRef.Validate: this build carries no table " + std::string(table_->name));
+  }
+  const std::string text =
+      NewValue.IsEmpty() ? FieldText(record_, *def_) : ::agiru::AsText(NewValue);
+  entry->validate(record_, def_->no, text);
+}
+
 ::agiru::Boolean RecordRef::IsTemporary() {
   return detail::RuntimeIsTemporary(record_);
 }
@@ -60,6 +88,39 @@ template <typename T> const T &As(const void *record, const FieldDef &def) {
 
 ::agiru::Boolean RecordRef::Find(std::string_view Which) {
   return detail::RuntimeFind(record_, Table(), Which.empty() ? "=" : Which);
+}
+
+::agiru::Boolean RecordRef::Get(::agiru::RecordId RecordID) {
+  if (RecordID.IsEmpty()) { throw Error("RecordRef.Get: the RecordId names no record"); }
+  if (table_ == nullptr || table_->id.Value() != RecordID.TableNo()) { Open(RecordID.TableNo()); }
+  const TableDef &table = Table();
+  const std::span<const std::string> values = RecordID.KeyValues();
+  if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
+    throw Error("RecordRef.Get: the RecordId carries " + std::to_string(values.size()) +
+                " key value(s) and the primary key has " +
+                std::to_string(table.keys.empty() ? 0 : table.keys[0].fields.size()));
+  }
+  for (std::size_t at = 0; at < values.size(); ++at) {
+    const FieldDef *def = agiru::Field(table, table.keys[0].fields[at]);
+    if (def == nullptr) {
+      throw Error("RecordRef.Get: the primary key names a field the table lacks");
+    }
+    detail::SetFieldText(record_, *def, values[at]);
+  }
+  return detail::RuntimeGet(record_, table);
+}
+
+::agiru::Boolean RecordRef::FindSet() {
+  return detail::RuntimeFindSet(record_, Table());
+}
+
+void RecordRef::Reset() {
+  if (record_ == nullptr) { throw Error("RecordRef.Reset: the RecordRef is not open"); }
+  detail::RuntimeReset(record_);
+}
+
+void RecordRef::SetRecFilter() {
+  detail::RuntimeSetRecFilter(record_, Table());
 }
 
 ::agiru::Boolean RecordRef::FindFirst() {
@@ -123,7 +184,9 @@ std::string RecordRef::GetFilters() const {
 }
 
 ::agiru::Boolean RecordRef::Insert() {
-  detail::RuntimeInsert(record_, Table());
+  if (!detail::RuntimeInsert(record_, Table())) {
+    throw Error("The " + std::string(Table().caption) + " already exists.");
+  }
   return true;
 }
 
@@ -158,6 +221,17 @@ std::string FieldRef::GetFilter() const {
     if (one.field == def_->no && one.group == state->group) { return one.text; }
   }
   return {};
+}
+
+::agiru::Variant FieldRef::RangeBound_(bool upper) const {
+  if (record_ == nullptr || def_ == nullptr) { return {}; }
+  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  const std::string text = detail::RangeBoundText(state, def_->no, upper);
+  const TableEntry *entry = FindTable(table_->id);
+  if (entry == nullptr) { return {}; }
+  const std::unique_ptr<void, void (*)(void *)> bound(entry->make(), entry->free);
+  if (!text.empty()) { detail::EvaluateInto(bound.get(), *table_, def_->no, text); }
+  return FieldRef(bound.get(), *table_, *def_).Value();
 }
 
 void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Variant &ToValue) const {

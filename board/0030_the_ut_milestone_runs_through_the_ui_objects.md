@@ -269,3 +269,10 @@ compile, `Notification.SetData` taking what AL converts to Text, and `EnqueueBac
 optional parameters. Still open here: `OnLookup` (its `var Text` shape), page parts as nested
 harnesses, `RunObject` actions, `SourceTableView`, and `Visible`/`Editable` EXPRESSIONS.
 
+## Standing 2026-09-09: `Page.Run(Rec)` shows the record it was handed
+
+`OpenPage` finds the passed record first (`Find('=')`) and falls back to the first of the filtered
+set only when it is not there -- `page-run-integer-table-joker-method.md`: "Use this optional
+parameter to select a specific record to display on the page." A list opened on the third VAT
+return period drilled down into the first one before; 24 `VAT Return Period UT` cases read
+`Queue underflow` from the handler that never ran.

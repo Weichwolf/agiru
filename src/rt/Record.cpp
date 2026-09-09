@@ -11,11 +11,13 @@
 #include "type/DateFormula.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
+#include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Media.h"
 #include "type/MediaSet.h"
 #include "type/RecordId.h"
+#include "type/TableFilter.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
@@ -93,6 +95,10 @@ std::string FieldText(const void *record, const FieldDef &def) {
       for (const std::uint8_t byte : bytes) { out += std::format("{:02x}", byte); }
       return out;
     }
+    case FieldType::Duration:
+      return reinterpret_cast<const Duration *>(At(record, def))->ToInvariantString();
+    case FieldType::TableFilter:
+      return std::string(reinterpret_cast<const TableFilter *>(At(record, def))->Value());
     case FieldType::Media:
       return reinterpret_cast<const Media *>(At(record, def))->MediaId().ToText();
     case FieldType::MediaSet:
@@ -171,9 +177,15 @@ std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
 }
 
 std::string MemberOrdinal(const FieldDef &def, std::string_view text) {
-  if (text.empty() || text.find_first_not_of("-0123456789") == std::string_view::npos) {
-    return std::string(text);
+  if (text.find_first_not_of(' ') == std::string_view::npos) {
+    for (const EnumValueDef &value : def.values) {
+      if (value.name.find_first_not_of(' ') == std::string_view::npos) {
+        return std::to_string(value.ordinal);
+      }
+    }
+    return "0";
   }
+  if (text.find_first_not_of("-0123456789") == std::string_view::npos) { return std::string(text); }
   const auto same = [](std::string_view a, std::string_view b) {
     return std::ranges::equal(
         a, b, [](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });

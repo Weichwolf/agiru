@@ -307,19 +307,17 @@ public:
   ///       by number instead of by member.
   [[nodiscard]] std::string GetFilter() const;
 
-  /// \brief AL `FieldRef.GetRangeMax()`. Gets the maximum value in a range for a field.
-  /// \return The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Variant GetRangeMax() const {
-    throw Error("FieldRef.GetRangeMax() is declared and not implemented yet (board:0035)");
-  }
+private:
+  [[nodiscard]] ::agiru::Variant RangeBound_(bool upper) const;
 
-  /// \brief AL `FieldRef.GetRangeMin()`. Gets the minimum value in a range for a field.
-  /// \return The AL `Any`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Variant GetRangeMin() const {
-    throw Error("FieldRef.GetRangeMin() is declared and not implemented yet (board:0035)");
-  }
+public:
+  /// \brief AL `FieldRef.GetRangeMax()`. The upper bound of the range standing on the field.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it above.
+  [[nodiscard]] ::agiru::Variant GetRangeMax() const { return RangeBound_(true); }
+
+  /// \brief AL `FieldRef.GetRangeMin()`. The lower bound of the range standing on the field.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it below.
+  [[nodiscard]] ::agiru::Variant GetRangeMin() const { return RangeBound_(false); }
 
   /// \brief AL `FieldRef.IsOptimizedForTextSearch()`. Gets if the field is optimized for textual
   /// search.
@@ -428,10 +426,7 @@ public:
   /// the new value validated by the properties and code that have been defined for that field.
   /// \param NewValue The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Validate(const ::agiru::Variant &NewValue = {}) const {
-    static_cast<void>(NewValue);
-    throw Error("FieldRef.Validate(Any) is declared and not implemented yet (board:0035)");
-  }
+  void Validate(const ::agiru::Variant &NewValue = {}) const;
 
   /// \brief AL `FieldRef.TestField()` -- raises when the field is blank.
   /// \throws Error with the platform's own wording when the field holds its zero.
@@ -745,10 +740,7 @@ public:
   /// \param NewGroup The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup = {}) {
-    static_cast<void>(NewGroup);
-    throw Error("RecordRef.FilterGroup(Integer) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup = {});
 
   /// \brief AL `RecordRef.Find(Text)`. Finds a record in a table based on the values stored in the
   /// key fields.
@@ -777,8 +769,7 @@ public:
   ::agiru::Boolean FindSet(::agiru::Boolean ForUpdate, ::agiru::Boolean UpdateKey) {
     static_cast<void>(ForUpdate);
     static_cast<void>(UpdateKey);
-    throw Error(
-        "RecordRef.FindSet(Boolean, Boolean) is declared and not implemented yet (board:0035)");
+    return FindSet();
   }
 
   /// \brief AL `RecordRef.FindSet(Boolean)`. Finds a set of records in a table based on the current
@@ -786,10 +777,14 @@ public:
   /// \param ForUpdate The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindSet(::agiru::Boolean ForUpdate = {}) {
+  ::agiru::Boolean FindSet(::agiru::Boolean ForUpdate) {
     static_cast<void>(ForUpdate);
-    throw Error("RecordRef.FindSet(Boolean) is declared and not implemented yet (board:0035)");
+    return FindSet();
   }
+
+  /// \brief AL `RecordRef.FindSet()`. Finds a set of rows, the way `Record.FindSet` does.
+  /// \return Whether a row was found.
+  ::agiru::Boolean FindSet();
 
   /// \brief AL `RecordRef.FullyQualifiedName()`. Identifies the fully qualified name of the table.
   /// \return The AL `Text`.
@@ -801,11 +796,10 @@ public:
   /// \brief AL `RecordRef.Get(RecordId)`. Gets a record based on the ID of the record.
   /// \param RecordID The AL `RecordId`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Get(::agiru::RecordId RecordID) {
-    static_cast<void>(RecordID);
-    throw Error("RecordRef.Get(RecordId) is declared and not implemented yet (board:0035)");
-  }
+  /// \throws Error when the id is blank, or names a table this build does not carry.
+  /// \note IT OPENS THE RECORDREF ON THE ID'S TABLE when it is not open there already, which
+  ///       is what `recordref-get-method.md` describes: the id carries the table and the key.
+  ::agiru::Boolean Get(::agiru::RecordId RecordID);
 
   /// \brief AL `RecordRef.GetBySystemId(Guid)`. Gets a record based on the ID of the record. The
   /// RecordRef must already be opened.
@@ -839,13 +833,10 @@ public:
 
   /// \brief AL `RecordRef.GetView(Boolean)`. Returns a string that describes the current sort
   /// order, key, and filters on a table.
-  /// \param UseNames The AL `Boolean`.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetView(::agiru::Boolean UseNames = {}) {
-    static_cast<void>(UseNames);
-    throw Error("RecordRef.GetView(Boolean) is declared and not implemented yet (board:0035)");
-  }
+  /// \param UseNames Captions when true (AL's default), `Field<no>` when false.
+  /// \return `VERSION(1) SORTING(...) ORDER(...) WHERE(...)`, what `SetView` reads back.
+  /// \throws Error when the RecordRef is not open.
+  [[nodiscard]] std::string GetView(::agiru::Boolean UseNames = true) const;
 
   /// \brief AL `RecordRef.HasFilter()`. Determines whether a filter has been applied to the table
   /// that the RecordRef refers to.
@@ -1038,10 +1029,9 @@ public:
   /// MarkedOnly method (Record), changes fields select for loading back to all, sets the read
   /// isolation level to the default value, and changes the current key to the primary key. Also
   /// removes any marks on the record and clears any AL variables defined on its table definition.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Reset() {
-    throw Error("RecordRef.Reset() is declared and not implemented yet (board:0035)");
-  }
+  /// \note What `record-reset-method.md` lists, and nothing else: a temporary RecordRef stays
+  ///       temporary (board:0035's `RuntimeReset`).
+  void Reset();
 
   /// \brief AL `RecordRef.SecurityFiltering(SecurityFilter)`. Gets or sets how security filters are
   /// applied to the RecordRef.
@@ -1100,10 +1090,8 @@ public:
 
   /// \brief AL `RecordRef.SetRecFilter()`. Sets a filter on a record that is referred to by a
   /// RecordRef.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetRecFilter() {
-    throw Error("RecordRef.SetRecFilter() is declared and not implemented yet (board:0035)");
-  }
+  /// \note A range on each primary key field at the record's value, as `Record.SetRecFilter`.
+  void SetRecFilter();
 
   /// \brief AL `RecordRef.SetTable(Record, Boolean)`. Sets the table to which a Record variable
   /// refers as the same table as a RecordRef variable.
@@ -1129,9 +1117,10 @@ public:
     requires requires {
       { R::kId } -> std::convertible_to<TableId>;
     }
-  void SetTable(const R &Rec) {
-    static_cast<void>(Rec);
-    throw Error("RecordRef.SetTable(Record) is declared and not implemented yet (board:0035)");
+  void SetTable(R &Rec) {
+    Close();
+    record_ = &Rec;
+    table_ = &TableTraits<R>::kTable;
   }
 
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.
@@ -1145,10 +1134,11 @@ public:
     throw Error("RecordRef.SetTable(Variant) is declared and not implemented yet (board:0035)");
   }
 
-  void SetView(std::string_view String) {
-    static_cast<void>(String);
-    throw Error("RecordRef.SetView(Text) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.SetView(Text)`. Sets the sort order, direction and filters a view
+  ///        string names, the `SourceTableView` form `GetView` writes.
+  /// \param String The view; empty clears the filters and returns to the primary key.
+  /// \throws Error when the RecordRef is not open, or the view names a field the table lacks.
+  void SetView(std::string_view String);
 
   /// \brief AL `RecordRef.SystemCreatedAtNo()`. Gets the field number that is used by the
   /// SystemCreatedAt field. The SystemCreatedAt field is a system field that the platform adds to
