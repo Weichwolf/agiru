@@ -2,18 +2,23 @@
 #include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
+#include "type/Decimal.h"
 #include "type/Integer.h"
 
 #include "Check.h"
 #include "LineNumberBuffer.h"
+#include "ResourceCost.h"
 
 #include <exception>
 #include <string>
 #include <vector>
 
+using agiru::Decimal;
 using agiru::Error;
 using agiru::Temporary;
 using agiru::app::tables::LineNumberBuffer;
+using agiru::app::tables::ResourceCost;
+using agiru::app::tables::ResourceCostType;
 
 namespace {
 
@@ -174,6 +179,31 @@ void ABaseReferenceKeepsATemporaryTemporary() {
 /// did (board:0583 names that as the activation this carries).
 namespace {
 
+/// THE SHAPE SALES-POST WALKED INTO: `TempSalesLine := SalesLine` carries the source's filters
+/// across, `"Document Type" = 2` among them, and the temporary rows render that field as
+/// `Invoice`. The count must see the rows through an option filter, and a decimal filter must
+/// compare the value and not its spelling.
+void AnOptionAndADecimalFilterATemporaryRowByValue() {
+  constexpr agiru::Integer kThree = 3;
+  Temporary<ResourceCost> costs;
+  for (int i = 0; i < kThree; ++i) {
+    costs.Init();
+    costs.Type = i == 1 ? ResourceCostType::GroupResource : ResourceCostType::Resource;
+    costs.Code = std::string("R0") + std::to_string(i);
+    costs.UnitCost = Decimal{i};
+    costs.Insert();
+  }
+  costs.SetRange(costs.Type, ResourceCostType::Resource);
+  CHECK_TRUE("an option SetRange sees its rows", costs.Count() == 2);
+  costs.SetFilter(costs.Type, "Group(Resource)");
+  CHECK_TRUE("and a member named in a SetFilter does too", costs.Count() == 1);
+  costs.Reset();
+  costs.SetFilter(costs.UnitCost, "<>0");
+  CHECK_TRUE("a decimal <>0 keeps the non-zero rows", costs.Count() == 2);
+  costs.SetRange(costs.UnitCost, Decimal{2});
+  CHECK_TRUE("and a decimal SetRange finds its row", costs.FindFirst() && costs.Code == "R02");
+}
+
 void AFilterNarrowsATemporaryWalk() {
   constexpr agiru::Integer kFive = 5;
   Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
@@ -271,6 +301,7 @@ int main() {
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
+    AnOptionAndADecimalFilterATemporaryRowByValue();
     RowsWalkInPrimaryKeyOrder();
     ADuplicateKeyIsRefused();
     GetsRowFinds();

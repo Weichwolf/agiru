@@ -784,6 +784,16 @@ private:
       }
       const bool isField =
           !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
+      if (isField && holder != nullptr && holder->kind == al::ExprKind::Index &&
+          !holder->children.empty() && holder->children.front().kind == al::ExprKind::Name &&
+          expression.children[i].kind == al::ExprKind::Name &&
+          scope_.HasField(OfVariable{.variable = holder->children.front().text,
+                                     .field = expression.children[i].text})) {
+        out += receiver + reach +
+               scope_.MemberSpelling(OfVariable{.variable = holder->children.front().text,
+                                                .field = expression.children[i].text});
+        continue;
+      }
       if (isField && expression.children[i].kind == al::ExprKind::Name &&
           (scope_.Resolve(expression.children[i].text).empty() ||
            (holder != nullptr && holder->kind == al::ExprKind::Name &&

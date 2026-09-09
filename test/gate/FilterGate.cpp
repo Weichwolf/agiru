@@ -1,3 +1,4 @@
+#include "meta/EnumDef.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/RecordState.h"
@@ -5,6 +6,7 @@
 #include "Check.h"
 #include "Filter.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -39,6 +41,34 @@ const FieldDef &NumberField() {
                             .no = agiru::FieldNo{2},
                             .length = 0,
                             .type = FieldType::Integer};
+  return def;
+}
+
+const FieldDef &OptionField() {
+  static constexpr std::array<agiru::EnumValueDef, 3> kMembers{
+      agiru::EnumValueDef{.ordinal = 0, .name = "Quote", .caption = "Quote"},
+      agiru::EnumValueDef{.ordinal = 1, .name = "Order", .caption = "Order"},
+      agiru::EnumValueDef{.ordinal = 2, .name = "Invoice", .caption = "Invoice"}};
+  static const FieldDef def{.offset = 0,
+                            .name = "Document Type",
+                            .caption = "Document Type",
+                            .values = kMembers,
+                            .initValue = {},
+                            .no = agiru::FieldNo{3},
+                            .length = 0,
+                            .type = FieldType::Option};
+  return def;
+}
+
+const FieldDef &DecimalField() {
+  static const FieldDef def{.offset = 0,
+                            .name = "Quantity",
+                            .caption = "Quantity",
+                            .values = {},
+                            .initValue = {},
+                            .no = agiru::FieldNo{4},
+                            .length = 0,
+                            .type = FieldType::Decimal};
   return def;
 }
 
@@ -113,6 +143,34 @@ void RangesIncludeBothEndsAndMayBeOpen() {
 
 /// A NUMBER IS NOT COMPARED AS TEXT. `"10" < "9"` lexically, so a filter `>=9` over an entry number
 /// would drop every row from ten upward -- and look like a correct empty result.
+/// A TEMPORARY ROW RENDERS AN OPTION AS ITS MEMBER NAME AND `SetRange` WRITES THE ORDINAL, and
+/// the two met as text: `SetRange("Document Type", Invoice)` over a temporary Sales Line matched
+/// nothing, and Sales-Post found nothing to post in 42 UT cases (measured 2026-09-09). The column
+/// compares ordinals, so the filter does too, whichever spelling either side arrived in.
+void AnOptionIsComparedByOrdinalWhicheverWayItIsSpelled() {
+  CHECK_TRUE("the ordinal in the filter meets the name in the row",
+             Passes("2", "Invoice", OptionField()));
+  CHECK_TRUE("and the name in the filter meets the name in the row",
+             Passes("Invoice", "Invoice", OptionField()));
+  CHECK_TRUE("and the name in the filter meets the ordinal in the row",
+             Passes("Invoice", "2", OptionField()));
+  CHECK_TRUE("while another member does not", !Passes("2", "Order", OptionField()));
+  CHECK_TRUE("<> is the same comparison the other way", Passes("<>2", "Order", OptionField()));
+  CHECK_TRUE("and a set of names is a set of ordinals",
+             Passes("Order|Invoice", "2", OptionField()));
+  CHECK_TRUE("and a range over names orders by ordinal",
+             Passes("Order..Invoice", "Order", OptionField()));
+}
+
+/// A DECIMAL IN A ROW CARRIES ITS SCALE (`3.00000`) AND A FILTER CARRIES NONE (`3`), so equality is
+/// numeric and never textual.
+void ADecimalIsComparedByValueAndNotByItsSpelling() {
+  CHECK_TRUE("3 is 3.00000", Passes("3", "3.00000", DecimalField()));
+  CHECK_TRUE("and <>0 does not pass a zero written long",
+             !Passes("<>0", "0.00000000000000000000", DecimalField()));
+  CHECK_TRUE("while it passes a quantity", Passes("<>0", "3.00000000000000000000", DecimalField()));
+}
+
 void NumbersCompareAsNumbers() {
   CHECK_TRUE("ten is not less than nine", Passes(">=9", "10", NumberField()));
   CHECK_TRUE("and a hundred is above two", Passes(">2", "100", NumberField()));
@@ -266,6 +324,8 @@ int main() {
     TheAtSignIsAModifier();
     RangesIncludeBothEndsAndMayBeOpen();
     NumbersCompareAsNumbers();
+    AnOptionIsComparedByOrdinalWhicheverWayItIsSpelled();
+    ADecimalIsComparedByValueAndNotByItsSpelling();
     AQuotedOperandIsNotSplitOnItsOperators();
     AnEmptyFilterPassesEverything();
     AnEmptyTermMeansBlank();

@@ -139,6 +139,19 @@ public:
   /// \return The quotient.
   friend Decimal operator/(Decimal a, const Decimal &b) { return a /= b; }
 
+  /// \brief AL `a mod b` over decimals: the remainder of the truncated quotient, with the sign of
+  ///        `a`, the way .NET `decimal` computes it -- `10.5 mod 3` is `1.5`.
+  /// \param o The divisor.
+  /// \return This value, now the remainder.
+  /// \throws DecimalError on a zero divisor, the way `/` does.
+  /// \warning WITHOUT THIS OPERATOR THE CALL STILL COMPILED, through the `Integer` conversion
+  /// below:
+  ///          `Qty mod 0.00001` became `int % 0` and the process died of SIGFPE (SCM Whse. UOM
+  ///          Rnding. UT lost whole, 2026-09-09).
+  Decimal &operator%=(const Decimal &o);
+
+  friend Decimal operator%(Decimal a, const Decimal &b) { return a %= b; }
+
   /// \brief AL `Integer := Decimal` -- rounds to the nearest whole number, 5 away from zero, the
   ///        way `Round(Value, 1)` does (`system-round-method.md`, board:0582).
   /// \return The rounded value as an Integer.
@@ -157,6 +170,8 @@ public:
 
   template <std::integral I> friend Decimal operator/(Decimal a, I b) { return a /= Decimal{b}; }
 
+  template <std::integral I> friend Decimal operator%(Decimal a, I b) { return a %= Decimal{b}; }
+
   template <std::integral I> friend Decimal operator+(I a, const Decimal &b) {
     return Decimal{a} + b;
   }
@@ -171,6 +186,10 @@ public:
 
   template <std::integral I> friend Decimal operator/(I a, const Decimal &b) {
     return Decimal{a} / b;
+  }
+
+  template <std::integral I> friend Decimal operator%(I a, const Decimal &b) {
+    return Decimal{a} % b;
   }
 
   template <std::integral I> Decimal &operator+=(I o) { return *this += Decimal{o}; }

@@ -267,6 +267,40 @@ void AStaticPlatformMemberWithoutParenthesesIsACall() {
   CHECK_TRUE("an enumerator stays one", generated.find("Verbosity::Normal;") != std::string::npos);
 }
 
+/// A FIELD NAMED ON AN ARRAY ELEMENT BELONGS TO THAT ELEMENT. `CurrencyExchRate2[CacheNo].SetRange(
+/// "Currency Code", CurrencyCode)` in table 330 named its field once through `this` (the parameter
+/// `CurrencyCode` shadowed the field) and once bare, and the runtime then measured the member's
+/// offset from the wrong record: "declares no field at byte 18446744073709281496" in every case
+/// that reached an exchange rate (measured 2026-09-09, 19 such sites in the tree).
+void AFieldNamedOnAnArrayElementIsTheElementsField() {
+  const std::string source = R"(codeunit 50002 "Array Caller"
+{
+    var
+        Buffers: array[2] of Record "Line Number Buffer";
+
+    procedure Narrow(OldLineNumber: Integer)
+    begin
+        Buffers[1].SetRange("Old Line Number", OldLineNumber);
+        Buffers[2].SetRange("New Line Number", 0);
+    end;
+})";
+  agiru::gen::Objects objects = Tables();
+  objects.tables.at("line number buffer").fields = {{"old line number", "OldLineNumber"},
+                                                    {"new line number", "NewLineNumber"}};
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(source), std::string(kAlPath), objects),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "ArrayCaller.cpp"});
+  CHECK_TRUE(
+      "the shadowed field is the element's",
+      generated.find("At(Buffers, 1).SetRange(At(Buffers, 1).OldLineNumber, OldLineNumber)") !=
+          std::string::npos);
+  CHECK_TRUE("and so is the bare one",
+             generated.find("At(Buffers, 2).SetRange(At(Buffers, 2).NewLineNumber, 0)") !=
+                 std::string::npos);
+}
+
 /// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide
 /// the type, so the declaration has to qualify it -- and WHICH namespace it qualifies with is
 /// decided by what the type IS. An AL object becomes a class in `agiru::app`; every other AL type
@@ -339,6 +373,7 @@ int main() {
     ATableTheRunNeverSawIsReported();
     AnInlineOptionGetsAnEnumerationOfItsOwn();
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
+    AFieldNamedOnAnArrayElementIsTheElementsField();
     AStaticPlatformMemberWithoutParenthesesIsACall();
     ACodeunitIncludesEveryObjectItNames();
   });

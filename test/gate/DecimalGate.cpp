@@ -43,6 +43,15 @@ void Arithmetic() {
              T(D("1") / D("3")),
              "0.3333333333333333333333333333");
   CHECK_TEXT("division by a fraction", T(D("1") / D("0.25")), "4");
+  // AL `mod` OVER DECIMALS, which `Item Unit of Measure` uses to check a quantity against a
+  // rounding precision. Without a decimal operator the call went through the Integer conversion,
+  // `0.00001` became `0`, and the process died of SIGFPE (measured 2026-09-09).
+  CHECK_TEXT("mod keeps the fractional remainder", T(D("10.5") % D("3")), "1.5");
+  CHECK_TEXT(
+      "mod against a fine precision that divides evenly", T(D("7") % D("0.00001")), "0.00000");
+  CHECK_TEXT("mod against a precision that does not", T(D("7.000015") % D("0.00001")), "0.000005");
+  CHECK_TEXT("mod carries the dividend's sign", T(D("-10.5") % D("3")), "-1.5");
+  CHECK_TRUE("mod by an integer", (D("10.5") % 3) == D("1.5"));
 
   // WHAT A BINARY FLOAT GETS WRONG HERE, and the reason for the whole invariant: as a double,
   // 0.1 + 0.2 is not 0.3.

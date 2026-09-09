@@ -331,6 +331,17 @@ Decimal &Decimal::operator*=(const Decimal &o) {
   return *this;
 }
 
+Decimal &Decimal::operator%=(const Decimal &o) {
+  if (o.units_ == 0) { throw DecimalError("Decimal: modulo by zero"); }
+  if (units_ == 0) { return *this; }
+  const bool negative = IsNegative();
+  const Decimal quotient = Round(Abs() / o.Abs(), Decimal{1}, RoundDirection::Down);
+  Decimal remainder = Abs() - (quotient * o.Abs());
+  if (negative && remainder.units_ != 0) { remainder = Decimal{} - remainder; }
+  *this = remainder;
+  return *this;
+}
+
 Decimal &Decimal::operator/=(const Decimal &o) {
   if (o.units_ == 0) { throw DecimalError("Decimal: division by zero"); }
   if (units_ == 0) { return *this; }

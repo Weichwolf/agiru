@@ -205,10 +205,38 @@ std::strong_ordering Order(std::string_view value, std::string_view against, con
                      : std::strong_ordering::equal;
 }
 
-bool Satisfies(const Atom &atom, std::string_view value, const FieldDef &def) {
+bool Numeric(const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Integer:
+    case FieldType::BigInteger:
+    case FieldType::Option:
+    case FieldType::Enum:
+    case FieldType::Decimal: return true;
+    default: return false;
+  }
+}
+
+std::string Canonical(std::string_view text, const FieldDef &def) {
+  switch (def.type) {
+    case FieldType::Option:
+    case FieldType::Enum: return detail::MemberOrdinal(def, text);
+    case FieldType::Boolean: {
+      const std::string_view trimmed = Trim(text);
+      return SameText(trimmed, "yes") || SameText(trimmed, "true") || trimmed == "1" ? "1" : "0";
+    }
+    default: return std::string(text);
+  }
+}
+
+bool SameValue(std::string_view value, std::string_view against, const FieldDef &def) {
+  if (Numeric(def)) { return Order(value, against, def) == std::strong_ordering::equal; }
+  return SameText(value, against);
+}
+
+bool SatisfiesCanonical(const Atom &atom, std::string_view value, const FieldDef &def) {
   switch (atom.compare) {
-    case Compare::Equal: return SameText(value, atom.value);
-    case Compare::NotEqual: return !SameText(value, atom.value);
+    case Compare::Equal: return SameValue(value, atom.value, def);
+    case Compare::NotEqual: return !SameValue(value, atom.value, def);
     case Compare::Like: return WildcardMatch(atom.value, value);
     case Compare::NotLike: return !WildcardMatch(atom.value, value);
     case Compare::Less: return Order(value, atom.value, def) == std::strong_ordering::less;
@@ -221,6 +249,18 @@ bool Satisfies(const Atom &atom, std::string_view value, const FieldDef &def) {
              (atom.openUpper || Order(value, atom.upper, def) != std::strong_ordering::greater);
   }
   return false;
+}
+
+bool Satisfies(const Atom &atom, std::string_view value, const FieldDef &def) {
+  const bool byName = def.type == FieldType::Option || def.type == FieldType::Enum ||
+                      def.type == FieldType::Boolean;
+  if (!byName || atom.compare == Compare::Like || atom.compare == Compare::NotLike) {
+    return SatisfiesCanonical(atom, value, def);
+  }
+  Atom canonical = atom;
+  canonical.value = Canonical(atom.value, def);
+  canonical.upper = Canonical(atom.upper, def);
+  return SatisfiesCanonical(canonical, Canonical(value, def), def);
 }
 
 }
