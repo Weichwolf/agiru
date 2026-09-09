@@ -75,9 +75,9 @@ def columns(database, schema):
 BLANKS = {"bytea": "$$$$::bytea", "text": "$$$$", "character varying": "$$$$", "character": "$$$$"}
 
 
-def blanked(database, table, column, into_kind):
+def blanked(database, table, column, into_kind, alias=""):
     blank = BLANKS.get(into_kind)
-    quoted_name = '"' + column.replace('"', '""') + '"'
+    quoted_name = alias + '"' + column.replace('"', '""') + '"'
     return f"COALESCE({quoted_name}, {blank})" if blank else quoted_name
 
 
@@ -156,17 +156,35 @@ def main():
     dropped = 0
     defaulted = 0
     for theirs, ours in shared:
-        pairs = matched(source[theirs], target[ours])
-        dropped += len(source[theirs]) - len(pairs)
+        # A TABLE'S COMPANION CARRIES ITS OTHER HALF. 28.4 stores the fields an app adds to another
+        # app's table in `<Table>$ext`, keyed like the table -- and after the BaseApp split that is
+        # where `Source Code Setup."General Journal"` lives (148 companions, 1 329 columns, measured
+        # 2026-09-09). Without the join every such column seeded as blank, and the test library's
+        # `FindGeneralJournalSourceCode` found no template (board:0635).
+        companion = theirs + "$ext"
+        base_columns = source[theirs]
+        extra = [c for c in source.get(companion, []) if c not in base_columns]
+        pairs = matched(base_columns + extra, target[ours])
+        dropped += len(base_columns) + len(extra) - len(pairs)
         defaulted += len(target[ours]) - len(pairs)
         if not pairs:
             continue
         table = ours
         selected = ", ".join(
-            blanked(SOURCE, theirs, p[0], TYPES.get((arguments.into, ours, p[1]), ""))
+            blanked(SOURCE, theirs, p[0], TYPES.get((arguments.into, ours, p[1]), ""),
+                    "e." if p[0] in extra else "b.")
             for p in pairs)
+        joined = ""
+        if any(p[0] in extra for p in pairs):
+            key = [c for c in base_columns
+                   if c in source[companion] and c != "timestamp" and not c.startswith("$")]
+            if not key:
+                refused.append((table, "the companion shares no key column"))
+                continue
+            joined = (f' LEFT JOIN "{arguments.company}"."{companion}" e ON ' +
+                      " AND ".join(f'b."{c}" = e."{c}"' for c in key))
         reading = ('\\copy (SELECT ' + selected +
-                   f' FROM "{arguments.company}"."{theirs}") TO STDOUT')
+                   f' FROM "{arguments.company}"."{theirs}" b{joined}) TO STDOUT')
         writing = '\\copy public."' + ours + '" (' + quoted(p[1] for p in pairs) + ') FROM STDIN'
         piped = (f"psql -U agiru -d {SOURCE} -c '{reading}' | "
                  f"psql -U agiru -d {arguments.into} -c '{writing}'")
