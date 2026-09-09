@@ -8,6 +8,7 @@
 #include "Names.h"
 #include "PageWriter.h"
 #include "Parser.h"
+#include "QueryWriter.h"
 #include "Refused.h"
 #include "Scope.h"
 #include "TableWriter.h"
@@ -25,6 +26,7 @@
 #include <iterator>
 #include <map>
 #include <memory>
+#include <optional>
 #include <print>
 #include <ranges>
 #include <regex>
@@ -183,7 +185,6 @@ std::vector<std::filesystem::path> SourcesEndingIn(const Run &run, std::string_v
 std::map<std::string, std::size_t> DeclaredOnlyKinds(const Run &run) {
   static constexpr std::array kDeclarationOnly{
       std::string_view{"report"},
-      std::string_view{"query"},
       std::string_view{"xmlport"},
   };
   std::map<std::string, std::size_t> counted;
@@ -1190,6 +1191,19 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
+void RefreshFieldIndex(const Tables &tables, agiru::gen::Objects &objects) {
+  for (const agiru::al::TableObject &table : tables.objects) {
+    const auto found = objects.tables.find(agiru::gen::LowerKey(table.name));
+    if (found == objects.tables.end()) { continue; }
+    for (const agiru::al::FieldDecl &field : table.fields) {
+      found->second.fields.emplace(agiru::gen::LowerKey(field.name),
+                                   agiru::gen::FieldIdentifier(table, field.name));
+    }
+    const auto byId = objects.tables.find(std::to_string(table.id));
+    if (byId != objects.tables.end()) { byId->second.fields = found->second.fields; }
+  }
+}
+
 using OptionsInScope = std::map<std::string, std::vector<std::string>>;
 
 void NoteOption(const agiru::al::VarDecl &declared, OptionsInScope &into) {
@@ -1585,10 +1599,21 @@ void WriteXmlPorts(Run &run, const agiru::gen::Objects &objects) {
   }
 }
 
-void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
+struct Queries {
+  std::vector<agiru::al::QueryObject> objects;
+  std::vector<std::string> paths;
+};
+
+Queries IndexQueries(Run &run, agiru::gen::Objects &objects) {
+  Queries kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Query.al")) {
+    const std::string text = Read(path);
+    std::optional<agiru::al::QueryObject> parsed;
+    try {
+      parsed = agiru::al::ParseQuery(text);
+    } catch (const std::exception &e) { static_cast<void>(Note(run, path, e)); }
     const agiru::gen::ObjectDeclaration declared =
-        agiru::gen::DeclarationOf(Read(path), agiru::gen::ObjectKind::Query);
+        agiru::gen::DeclarationOf(text, agiru::gen::ObjectKind::Query);
     if (!declared.found || declared.id == 0) { continue; }
     const std::string identifier = agiru::gen::Identifier(declared.name);
     objects.queries.insert_or_assign(
@@ -1599,43 +1624,59 @@ void IndexQueries(const Run &run, agiru::gen::Objects &objects) {
             .header =
                 agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::Query) +
                 "/" + identifier + ".h",
-            .fields = {{"id", std::to_string(declared.id)}, {"name", declared.name}},
+            .id = declared.id,
+            .fields = parsed.has_value() ? agiru::gen::QueryColumns(*parsed)
+                                         : std::map<std::string, std::string>{},
             .procedures = {},
-            .name = {},
+            .name = declared.name,
             .dataItems = {},
             .requestFields = {}});
+    if (parsed.has_value()) {
+      kept.paths.push_back(std::filesystem::relative(path, run.root).string());
+      kept.objects.push_back(std::move(*parsed));
+    }
   }
+  return kept;
 }
 
-void WriteQueries(Run &run, const agiru::gen::Objects &objects) {
+struct QueryCounts {
+  std::size_t written = 0;
+  std::size_t stubs = 0;
+  std::size_t triggers = 0;
+  std::map<std::string, std::size_t> missing;
+};
+
+void WriteQueries(Run &run,
+                  const Queries &queries,
+                  agiru::gen::Objects &objects,
+                  QueryCounts &counts) {
   if (run.output.empty()) { return; }
-  for (const auto &[key, ref] : objects.queries) {
-    const std::string reachable = agiru::gen::Unprefixed(ref.identifier);
-    const std::size_t colons = reachable.rfind("::");
-    const std::string space =
-        colons == std::string::npos ? "agiru" : "agiru::" + reachable.substr(0, colons);
-    const std::string identifier =
-        colons == std::string::npos ? reachable : reachable.substr(colons + 2);
-    const auto number = ref.fields.find("id");
-    std::string out = "// Generated from the query\'s declaration. Do not edit.\n\n";
-    out += "#pragma once\n\n";
-    out += "#include \"meta/Ids.h\"\n";
-    out += "#include \"runtime/Report.h\"\n\n";
-    out += "#include <string_view>\n\n";
-    out += "namespace " + space + " {\n\n";
-    out += "class " + identifier + " : public ::agiru::Query<" + identifier + "> {\npublic:\n";
-    out += "  static constexpr QueryId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{";
-    out += agiru::gen::Literal(ref.fields.at("name"));
-    out += "};\n";
-    out += "};\n\n";
-    out += "} // namespace " + space + "\n\n";
-    out += "template <> struct agiru::QueryTraits<" + space + "::" + identifier + "> {\n";
-    out += "  static constexpr QueryId kId{" + number->second + "};\n";
-    out += "  static constexpr std::string_view kName{";
-    out += agiru::gen::Literal(ref.fields.at("name"));
-    out += "};\n};\n";
-    Keep(run, Output{.directory = run.output, .relative = ref.header}, out);
+  std::set<std::string> written;
+  for (std::size_t i = 0; i < queries.objects.size(); ++i) {
+    const agiru::al::QueryObject &query = queries.objects[i];
+    const auto ref = objects.queries.find(agiru::gen::LowerKey(query.name));
+    if (ref == objects.queries.end()) { continue; }
+    agiru::gen::QueryWritten made;
+    try {
+      made = agiru::gen::WriteQuery(query, queries.paths[i], objects);
+    } catch (const std::exception &e) {
+      static_cast<void>(Note(run, run.root / queries.paths[i], e));
+      continue;
+    }
+    counts.triggers += made.triggers;
+    if (!made.missing.empty()) {
+      for (const std::string &name : made.missing) { ++counts.missing[name]; }
+      ++counts.stubs;
+      objects.queries.erase(ref);
+      continue;
+    }
+    Keep(run, Output{.directory = run.output, .relative = ref->second.header}, made.header);
+    std::filesystem::path body = ref->second.header;
+    body.replace_extension(".cpp");
+    Keep(run, Output{.directory = run.output, .relative = body}, made.source);
+    run.written += 2;
+    ++counts.written;
+    written.insert(ref->first);
   }
 }
 
@@ -1986,6 +2027,7 @@ int Scan(const Job &job) {
   TableByName everyTable;
   std::map<std::string, std::size_t> untranslated;
   std::map<std::string, std::size_t> declaredOnly;
+  QueryCounts queryCounts;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -2017,14 +2059,14 @@ int Scan(const Job &job) {
     IndexCodeunits(run, objects);
     const std::vector<std::string> indexedReports = IndexReports(run, objects);
     IndexXmlPorts(run, objects);
-    IndexQueries(run, objects);
+    const Queries parsedQueries = IndexQueries(run, objects);
     WriteXmlPorts(run, objects);
-    WriteQueries(run, objects);
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
+    RefreshFieldIndex(parsedTables, objects);
     WriteReports(run, indexedReports, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -2042,6 +2084,7 @@ int Scan(const Job &job) {
       }
     }
     agiru::gen::NoteObjectNames(objects);
+    WriteQueries(run, parsedQueries, objects, queryCounts);
     ScanCodeunits(run, codeunits, gathered, objects, unresolvedTables);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteOptions(table.variables, table.procedures, gathered.options);
@@ -2175,6 +2218,17 @@ int Scan(const Job &job) {
                                                             declaredOnly.end());
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
     for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
+  }
+  std::println("queries   {} translated, {} stubbed because a dataitem's table is out of scope, "
+               "{} trigger(s) not translated (board:0064)",
+               queryCounts.written,
+               queryCounts.stubs,
+               queryCounts.triggers);
+  {
+    std::vector<std::pair<std::string, std::size_t>> ranked(queryCounts.missing.begin(),
+                                                            queryCounts.missing.end());
+    std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
+    for (const auto &[name, count] : ranked) { std::println("          {:>5} x {}", count, name); }
   }
   if (!untranslated.empty()) {
     std::size_t total = 0;

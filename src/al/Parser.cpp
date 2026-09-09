@@ -278,6 +278,57 @@ public:
     return object;
   }
 
+  QueryObject ParseQuery() {
+    for (Token &token : tokens_) {
+      if (token.kind == TokenKind::Identifier && IsKeyword(token, "CurrQuery")) {
+        token.text = "Rec";
+      }
+    }
+    QueryObject object;
+    object.nameSpace = ReadHeaderNamespace("query");
+    Expect("query");
+    object.id = ExpectInteger();
+    object.name = ExpectName();
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("elements")) {
+        Advance();
+        ParseControlsInto(object.elements);
+        continue;
+      }
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        object.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
   PageExtensionObject ParsePageExtension() {
     PageExtensionObject extension;
     extension.nameSpace = ReadHeaderNamespace("pageextension");
@@ -1004,6 +1055,10 @@ InterfaceObject ParseInterface(std::string_view source) {
 
 PageObject ParsePage(std::string_view source) {
   return Parser(Tokenize(source)).ParsePage();
+}
+
+QueryObject ParseQuery(std::string_view source) {
+  return Parser(Tokenize(source)).ParseQuery();
 }
 
 TableExtensionObject ParseTableExtension(std::string_view source) {

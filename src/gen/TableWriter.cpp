@@ -91,18 +91,47 @@ namespace {
 struct FieldIdentifiers {
   const al::TableObject *table = nullptr;
   std::size_t fields = 0;
+  int id = 0;
+  std::string name;
   std::unordered_map<std::string, std::string> byName;
   std::unordered_map<std::string, std::string> byBare;
 };
 
 const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
   static FieldIdentifiers cached;
-  if (cached.table == &table && cached.fields == table.fields.size()) { return cached; }
-  cached =
-      FieldIdentifiers{.table = &table, .fields = table.fields.size(), .byName = {}, .byBare = {}};
+  if (cached.table == &table && cached.fields == table.fields.size() && cached.id == table.id &&
+      cached.name == table.name) {
+    return cached;
+  }
+  cached = FieldIdentifiers{.table = &table,
+                            .fields = table.fields.size(),
+                            .id = table.id,
+                            .name = table.name,
+                            .byName = {},
+                            .byBare = {}};
   std::set<std::string> taken;
   for (const SystemFieldDecl &system : kSystemFields) {
     taken.insert(LowerKey(std::string(system.name)));
+  }
+  if (al::Find(table.properties, "QueryColumns") != nullptr) {
+    static constexpr std::array kQueryMembers{std::string_view{"open"},
+                                              std::string_view{"read"},
+                                              std::string_view{"close"},
+                                              std::string_view{"setrange"},
+                                              std::string_view{"setfilter"},
+                                              std::string_view{"getfilter"},
+                                              std::string_view{"getfilters"},
+                                              std::string_view{"topnumberofrows"},
+                                              std::string_view{"columnname"},
+                                              std::string_view{"columncaption"},
+                                              std::string_view{"columnno"},
+                                              std::string_view{"saveascsv"},
+                                              std::string_view{"saveasjson"},
+                                              std::string_view{"saveasxml"},
+                                              std::string_view{"securityfiltering"},
+                                              std::string_view{"id"},
+                                              std::string_view{"state_block"}};
+    for (const std::string_view member : kQueryMembers) { taken.insert(std::string(member)); }
   }
   for (const al::FieldDecl &field : table.fields) {
     const std::string bare = Identifier(field.name);

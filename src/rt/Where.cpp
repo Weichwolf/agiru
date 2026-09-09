@@ -45,7 +45,9 @@ std::string LikePattern(std::string_view value) {
   return out;
 }
 
-std::string BlankOf(const FieldDef &def) {
+}
+
+std::string BlankValueOf(const FieldDef &def) {
   switch (def.type) {
     case FieldType::Boolean: return "false";
     case FieldType::Option:
@@ -64,12 +66,17 @@ std::string BlankOf(const FieldDef &def) {
   }
 }
 
-void One(const Atom &atom, const FieldDef &def, Clause &into, std::size_t &next) {
-  const std::string column = Quoted(def.name);
+namespace {
+
+void One(const Atom &atom,
+         const FieldDef &def,
+         Clause &into,
+         std::size_t &next,
+         const std::string &column) {
   const bool byMember = def.type == FieldType::Option || def.type == FieldType::Enum;
   const auto bind = [&into, &next, &def, byMember](const std::string &value) {
     if (value.empty()) {
-      into.binds.emplace_back(BlankOf(def));
+      into.binds.emplace_back(BlankValueOf(def));
     } else {
       into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value) : value);
     }
@@ -109,6 +116,12 @@ void One(const Atom &atom, const FieldDef &def, Clause &into, std::size_t &next)
 }
 
 Clause Where(const FieldDef &def, const Expression &expr, std::size_t first) {
+  return Where(def, expr, first, Quoted(def.name));
+}
+
+Clause
+Where(const FieldDef &def, const Expression &expr, std::size_t first, std::string_view column) {
+  const std::string named(column);
   Clause clause;
   if (expr.empty()) { return clause; }
   std::size_t next = first;
@@ -122,7 +135,7 @@ Clause Where(const FieldDef &def, const Expression &expr, std::size_t first) {
     for (const Atom &atom : conjunction) {
       if (!firstAtom) { clause.sql += " AND "; }
       firstAtom = false;
-      One(atom, def, clause, next);
+      One(atom, def, clause, next, named);
     }
     clause.sql += ")";
   }

@@ -2161,15 +2161,15 @@ void NavApp::LoadPackageData(::agiru::Integer TableNo) {
 }
 
 std::string ProductName::Full() {
-  RefuseDoor("ProductName.Full()");
+  return "Dynamics 365 Business Central";
 }
 
 std::string ProductName::Marketing() {
-  RefuseDoor("ProductName.Marketing()");
+  return "Microsoft Dynamics 365 Business Central";
 }
 
 std::string ProductName::Short() {
-  RefuseDoor("ProductName.Short()");
+  return "Business Central";
 }
 
 ::agiru::BigInteger SessionInformation::AITokensUsed() {

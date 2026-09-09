@@ -16,8 +16,10 @@
 #include "type/Time.h"
 #include "type/Variant.h"
 
+#include <concepts>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief AL `TextBuilder` -- the surface the platform documentation declares.
@@ -36,6 +38,15 @@ public:
   /// \param Text The AL `Text`.
   /// \return The AL `Boolean`.
   ::agiru::Boolean Append(std::string_view Text);
+
+  /// \brief AL `TextBuilder.Append(Text)` given a Guid, which AL converts to its text on the way.
+  /// \param Text The Guid, appended as `Format(Guid)` renders it.
+  /// \return True.
+  template <typename G>
+    requires(std::same_as<std::remove_cvref_t<G>, ::agiru::Guid>)::agiru::Boolean
+  Append(const G &Text) {
+    return Append(std::string_view(Text.ToText()));
+  }
 
   /// \brief AL `TextBuilder.AppendLine(Text)`. Appends a copy of the specified string followed by
   /// the default line terminator to the end of the current TextBuilder object. If this parameter is

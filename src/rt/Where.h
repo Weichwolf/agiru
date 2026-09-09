@@ -17,4 +17,9 @@ struct Clause {
 
 [[nodiscard]] Clause Where(const FieldDef &def, const Expression &expr, std::size_t first);
 
+[[nodiscard]] Clause
+Where(const FieldDef &def, const Expression &expr, std::size_t first, std::string_view column);
+
+[[nodiscard]] std::string BlankValueOf(const FieldDef &def);
+
 }

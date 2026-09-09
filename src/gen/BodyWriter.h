@@ -159,6 +159,10 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
 
 [[nodiscard]] std::string FallsOffEnd(const al::ProcedureDecl &procedure, const Names &names);
 
+[[nodiscard]] std::string QueryProcedureBodies(const al::TableObject &facade,
+                                               const std::string &className,
+                                               const Objects &objects);
+
 [[nodiscard]] std::string WriteSource(const al::PageObject &page,
                                       const std::string &sourcePath,
                                       const Objects &objects,

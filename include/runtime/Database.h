@@ -117,6 +117,16 @@ public:
   /// look exactly like one that worked.
   [[nodiscard]] bool InTransaction() const;
 
+  /// \return True when the open transaction block has FAILED and takes no statement until it is
+  ///         rolled back.
+  ///
+  /// \warning A `CLOSE` INTO A FAILED TRANSACTION IS ONE MORE REFUSAL. A cursor's destructor runs
+  ///          while an error is unwinding; sending `CLOSE` then is refused with "current
+  ///          transaction is aborted" and turns the AL error the test expected into a database
+  ///          error it did not (12 cases, 2026-09-09). The cursor died with the transaction and
+  ///          the rollback that follows frees it.
+  [[nodiscard]] bool InFailedTransaction() const;
+
 private:
   void *handle_;
 };

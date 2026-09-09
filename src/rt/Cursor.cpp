@@ -36,6 +36,7 @@ Cursor::Cursor(const Connection &connection,
 Cursor::~Cursor() {
   if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
   if (Session::Current().Transaction().Depth() < depth_) { return; }
+  if (connection_->InFailedTransaction()) { return; }
   try {
     connection_->Run("CLOSE " + name_);
   } catch (const Error &e) {

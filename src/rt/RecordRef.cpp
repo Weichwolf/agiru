@@ -278,6 +278,13 @@ void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Varian
       state, def_->no, from + ".." + detail::Literally(Format(ToValue, 0, kInvariantFormat)));
 }
 
+void FieldRef::SetFilterText(const std::string &text) const {
+  if (record_ == nullptr || def_ == nullptr) {
+    throw Error("FieldRef.SetFilter: the FieldRef names no field yet");
+  }
+  detail::Narrow(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), def_->no, text);
+}
+
 FieldType FieldRef::Type() const {
   return def_->type == FieldType::Enum ? FieldType::Option : def_->type;
 }

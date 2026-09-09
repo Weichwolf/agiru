@@ -133,4 +133,8 @@ bool Connection::InTransaction() const {
   return status == PQTRANS_INTRANS || status == PQTRANS_INERROR;
 }
 
+bool Connection::InFailedTransaction() const {
+  return PQtransactionStatus(static_cast<PGconn *>(handle_)) == PQTRANS_INERROR;
+}
+
 }

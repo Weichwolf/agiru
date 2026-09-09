@@ -657,10 +657,15 @@ public:
   /// before the page is updated.
   /// \param SaveRecord The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
-  void Update(::agiru::Boolean SaveRecord = true) {
-    static_cast<void>(SaveRecord);
-    throw Error("Page.Update(Boolean) needs a running UI (board:0030)");
-  }
+  /// \brief AL `Page.Update([SaveRecord])`: "Saves the current record and then updates the
+  ///        controls on the page" (`page-update-method.md`).
+  /// \param SaveRecord Whether the current record is saved first.
+  ///
+  /// \note HEADLESS, THE CONTROLS ARE THE RECORD, so refreshing them is nothing to do; and the
+  ///       SAVE is the harness's row-leave, which board:0030 still owes -- until it exists,
+  ///       `SaveRecord` is carried and acted on by nothing rather than refused (15 cases stopped
+  ///       here on 2026-09-09, each in a page trigger the test drove through a `TestPage`).
+  void Update(::agiru::Boolean SaveRecord = true) { static_cast<void>(SaveRecord); }
 
   /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
   ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate

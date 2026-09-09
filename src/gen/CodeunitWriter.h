@@ -64,6 +64,14 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
 
 void NoteObjectNames(const Objects &objects);
 
+struct QueryColumn {
+  bool isColumn = false;
+  std::string spelling;
+};
+
+[[nodiscard]] QueryColumn
+QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_view member);
+
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,
                            const al::VarDecl &declared,

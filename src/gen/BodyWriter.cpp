@@ -447,6 +447,8 @@ private:
         {"TestField", 1},
         {"FieldError", 1},
         {"FieldCaption", 1},
+        {"ColumnCaption", 1},
+        {"ColumnName", 1},
         {"FieldName", 1},
         {"FieldNo", 1},
         {"Validate", 1},
@@ -1013,6 +1015,13 @@ private:
         }
       }
     }
+    const bool calledOnAQuery =
+        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
+        reach.base.kind == al::ExprKind::Name &&
+        SameName(scope_.DeclaredType(reach.base.text), "Query") && DoorCalls(reach.link.text);
+    if (calledOnAQuery && besideAField.empty()) {
+      besideAField = AsTheDoorSpellsIt(Identifier(reach.link.text));
+    }
     out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(member)
@@ -1441,6 +1450,12 @@ public:
       }
     }
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
+    if (held != nullptr && TypeName(held->type) == "Query" && !held->subtype.empty()) {
+      const auto query = objects_.queries.find(LowerKey(held->subtype));
+      const bool column = query != objects_.queries.end() &&
+                          query->second.fields.contains(LowerKey(std::string(member.field)));
+      return !column && DoorCalls(member.field);
+    }
     if (held != nullptr && (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
                             TypeName(held->type) == "TestRequestPage")) {
       const TableIndex &index = PageIndexFor(objects_, TypeName(held->type));
@@ -1591,13 +1606,13 @@ public:
   [[nodiscard]] std::string ControlNamed(const al::VarDecl &declared,
                                          std::string_view member) const {
     const std::string type = TypeName(declared.type);
-    if ((type != "TestPage" && type != "TestRequestPage" && type != "Page") ||
+    if ((type != "TestPage" && type != "TestRequestPage" && type != "Page" && type != "Query") ||
         declared.subtype.empty()) {
       return {};
     }
-    const TableIndex &index = PageIndexFor(objects_, type);
+    const TableIndex &index = type == "Query" ? objects_.queries : PageIndexFor(objects_, type);
     const auto page = index.find(LowerKey(declared.subtype));
-    if (page == objects_.pages.end()) { return {}; }
+    if (page == index.end()) { return {}; }
     const auto control = page->second.fields.find(LowerKey(std::string(member)));
     return control == page->second.fields.end() ? std::string{} : control->second;
   }
@@ -1809,6 +1824,10 @@ public:
   }
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
+    if (const al::VarDecl *query = DeclarationOf(member.variable);
+        query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
+      return !QueryColumnOf(objects_, query, member.field).isColumn && DoorCalls(member.field);
+    }
     if (IsRecord(member.variable)) {
       return DoorCalls(member.field) && FieldNamed(*source_, member.field) == nullptr;
     }
@@ -1944,6 +1963,11 @@ public:
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
+    if (const QueryColumn column =
+            QueryColumnOf(objects_, DeclarationOf(member.variable), member.field);
+        column.isColumn) {
+      return column.spelling;
+    }
     if (const std::string procedure = ProcedureOf(member); !procedure.empty()) { return procedure; }
     if (SameName("this", member.variable) || SameName("CurrPage", member.variable)) {
       for (const al::VarDecl &declared : page_.variables) {
@@ -2157,6 +2181,40 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
   return WithDoor(out, ObjectKind::Table);
+}
+
+std::string QueryProcedureBodies(const al::TableObject &facade,
+                                 const std::string &className,
+                                 const Objects &objects) {
+  std::string out;
+  const std::set<std::string> shadowedByColumns = Shadowed(facade);
+  const std::string space = NamespaceOf(facade.nameSpace);
+  for (const al::ProcedureDecl &procedure : facade.procedures) {
+    const std::string body =
+        WriteStatements(TableNames(facade, objects, &procedure), procedure.body, 2) +
+        FallsOffEnd(procedure, TableNames(facade, objects, &procedure));
+    const std::string locals =
+        ProcedureLocals(
+            procedure, objects, facade.name, facade.procedures, shadowedByColumns, body) +
+        BindsBefore(body, InNamespace(space, className), false);
+    out += ProcedureSignature(procedure,
+                              objects,
+                              facade.name,
+                              className,
+                              !(locals.empty() && body.empty()),
+                              shadowedByColumns,
+                              facade.procedures,
+                              Spelling{.spelled = Identifier(procedure.name), .body = body}) +
+           " {";
+    if (locals.empty() && body.empty()) {
+      out += "}\n\n";
+      continue;
+    }
+    out += "\n" + locals;
+    if (!locals.empty() && !body.empty()) { out += "\n"; }
+    out += body + "}\n\n";
+  }
+  return out;
 }
 
 std::string ControlTrigger(std::string_view trigger,

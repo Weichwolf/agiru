@@ -434,10 +434,11 @@ bool NamesAnObject(const al::VarDecl &declared) {
 
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
-  if (type == "Report" || type == "Query" || type == "XmlPort") { return nullptr; }
+  if (type == "Report" || type == "XmlPort") { return nullptr; }
   const TableIndex &index = type == "Codeunit"    ? objects.codeunits
                             : type == "Page"      ? objects.pages
                             : type == "Interface" ? objects.interfaces
+                            : type == "Query"     ? objects.queries
                                                   : objects.tables;
   const auto found = index.find(LowerKey(declared.subtype));
   return found != index.end() ? &found->second : nullptr;
@@ -463,6 +464,8 @@ std::size_t FieldArguments(std::string_view method) {
       {"TestField", 1},
       {"FieldError", 1},
       {"FieldCaption", 1},
+      {"ColumnCaption", 1},
+      {"ColumnName", 1},
       {"FieldName", 1},
       {"FieldNo", 1},
       {"Validate", 1},
@@ -1088,6 +1091,10 @@ public:
 
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (MembersAreCalls(member.variable)) { return true; }
+    if (const al::VarDecl *query = Declaration(member.variable);
+        query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
+      return !QueryColumnOf(objects_, query, member.field).isColumn && DoorCalls(member.field);
+    }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
             ? TableNoOf(unit_)
@@ -1215,6 +1222,10 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     const al::VarDecl *declared = Declaration(member.variable);
+    if (const QueryColumn column = QueryColumnOf(objects_, declared, member.field);
+        column.isColumn) {
+      return column.spelling;
+    }
     if (declared != nullptr && TypeName(declared->type) == "DotNet") {
       return Identifier(member.field);
     }
@@ -2115,6 +2126,18 @@ std::string OptionTypeName(const std::string &owner,
                            const al::VarDecl &declared,
                            const std::vector<al::ProcedureDecl> &procedures) {
   return OptionNameOf(owner, within, declared, procedures);
+}
+
+QueryColumn
+QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_view member) {
+  if (declared == nullptr || TypeName(declared->type) != "Query" || declared->subtype.empty()) {
+    return {};
+  }
+  const auto query = objects.queries.find(LowerKey(declared->subtype));
+  if (query == objects.queries.end()) { return {}; }
+  const auto column = query->second.fields.find(LowerKey(std::string(member)));
+  if (column == query->second.fields.end()) { return {}; }
+  return QueryColumn{.isColumn = true, .spelling = column->second};
 }
 
 void NoteObjectNames(const Objects &objects) {

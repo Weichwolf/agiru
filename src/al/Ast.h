@@ -125,6 +125,17 @@ struct PageObject {
   std::vector<LabelDecl> labels;
 };
 
+struct QueryObject {
+  int id = 0;
+  std::string name;
+  std::string nameSpace;
+  std::vector<Property> properties;
+  std::vector<PageControl> elements;
+  std::vector<ProcedureDecl> procedures;
+  std::vector<VarDecl> variables;
+  std::vector<LabelDecl> labels;
+};
+
 struct PageExtensionObject {
   int id = 0;
   std::string name;

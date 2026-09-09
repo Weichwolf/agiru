@@ -134,12 +134,14 @@ The parser reads `elements` with the page's control reader; the writer emits one
 with a typed member per column (`decltype` of the source field, `Integer` for `Count`, `Day`,
 `Month` and `Year`) and the dataitems, links, join types, columns, `OrderBy` and
 `TopNumberOfRows` as `constexpr` data in the source; the runtime builds the statement at `Open`
-and streams it through the same cursor `FindSet` uses. A query whose dataitem names a table out
-of scope is written as a stub and counted by the transpiler. NOT in this cut: the query's own
-procedures and its `OnBeforeOpen` trigger (118 triggers and 35 procedures over the read roots,
-counted 2026-09-09; the predecessor's WI-1133 measured them at GAINED 4), `SaveAsXml`/`Csv`/
-`Json`, `SecurityFiltering`, and a `ColumnFilter` on an aggregated column, which lands in
-`HAVING` and is untested.
+and streams it through the same cursor `FindSet` uses. The query's own procedures and its
+`OnBeforeOpen` are translated too (`CurrQuery` is the query's `Rec`, and the bodies go through the
+table scope with the columns as its fields); a column named like a method of the object is renamed
+`<Name>_<n>` the way a colliding table field is, and the body writer tells `Q.Open` from
+`Q.Open()` by the parentheses. A query whose dataitem names a table out of scope leaves the index
+and stays an absent type (2, both over platform tables). NOT in this cut: `SaveAsXml`/`Csv`/`Json`,
+`SecurityFiltering`, and a `ColumnFilter` on an aggregated column, which lands in `HAVING` and is
+untested.
 
 ## Measured 2026-09-06 on the 893-case run
 
@@ -148,3 +150,12 @@ transpiler stubs the absent kind as a .NET type, and 44 cases fail on `RoleCente
 -- every test that opens a role centre goes through it. The first query a generator has to carry
 is that one.
 
+## Measured 2026-09-09 in the gate: a lower dataitem's table filter belongs in `ON`
+
+The first cut put every `DataItemTableFilter` into `WHERE`. For the root dataitem that is right;
+for a lower one it turns the LEFT OUTER join into an inner one, because the filtered-away rows
+carry NULL columns that `WHERE` then rejects -- the gate's ten upper rows came back as one. BC's
+own words are that the filter narrows the DATAITEM ("limit the records in the resulting dataset
+of the query" -- of the dataitem's table), so it joins the `ON` condition of that dataitem and the
+`WHERE` holds only the root's filter and the column filters. Caught by the gate's negative control
+before any AL test saw it.

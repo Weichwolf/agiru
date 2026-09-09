@@ -382,10 +382,13 @@ public:
   /// \param String The AL `Text`.
   /// \param Value The AL `Any`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetFilter(std::string_view String, const ::agiru::Variant &Value = {}) const {
-    static_cast<void>(String);
-    static_cast<void>(Value);
-    throw Error("FieldRef.SetFilter(Text, Any) is declared and not implemented yet (board:0035)");
+  void SetFilter(std::string_view String) const { SetFilterText(std::string(String)); }
+
+  /// \brief AL `FieldRef.SetFilter(Text, Any)`: the one placeholder substituted.
+  /// \param String The filter, with `%1`.
+  /// \param Value  What `%1` stands for.
+  void SetFilter(std::string_view String, const ::agiru::Variant &Value) const {
+    SetFilterText(StrSubstNo(String, Value));
   }
 
   /// \brief AL `FieldRef.SetFilter(Text, Any, Any, ...)` -- the filter text with its `%1`
@@ -400,13 +403,13 @@ public:
                  const ::agiru::Variant &Value1,
                  const ::agiru::Variant &Value2,
                  const Values &...rest) const {
-    static_cast<void>(Value1);
-    static_cast<void>(Value2);
-    (static_cast<void>(rest), ...);
-    throw Error("FieldRef.SetFilter(Text, Any, Any, ...) is declared and not implemented yet "
-                "(board:0035): " +
-                std::string(String));
+    SetFilterText(StrSubstNo(String, Value1, Value2, rest...));
   }
+
+  /// \brief The filter, already rendered, put on the field the way `Record.SetFilter` puts it.
+  /// \param text The filter in AL's own language.
+  /// \throws Error when the FieldRef names no field yet.
+  void SetFilterText(const std::string &text) const;
 
   /// \brief AL `FieldRef.SetRange([From] [, To])`. Narrows the field to a value or a range.
   ///
