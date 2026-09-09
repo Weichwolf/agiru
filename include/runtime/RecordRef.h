@@ -645,12 +645,11 @@ public:
   /// loaded when the record is retrieved from its data source. Subsequent calls to AddLoadFields
   /// will not overwrite fields already selected for the initial load.
   /// \param Fields The AL `Integer`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \return True, the way the platform answers: a partial record is a LOAD optimisation, and a
+  ///         record that loads every field satisfies every read the partial one would.
   ::agiru::Boolean AddLoadFields(::agiru::Integer Fields = {}) {
     static_cast<void>(Fields);
-    throw Error(
-        "RecordRef.AddLoadFields(Integer) is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `RecordRef.AreFieldsLoaded(Integer)`. Checks whether the specified fields are all
@@ -998,11 +997,11 @@ public:
   /// \brief AL `RecordRef.LoadFields(Integer)`. Accesses the table's corresponding data source and
   /// loads the values of the specified fields on the record.
   /// \param Fields The AL `Integer`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \return True, the way the platform answers: a partial record is a LOAD optimisation, and a
+  ///         record that loads every field satisfies every read the partial one would.
   ::agiru::Boolean LoadFields(::agiru::Integer Fields) {
     static_cast<void>(Fields);
-    throw Error("RecordRef.LoadFields(Integer) is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `RecordRef.LockTable(Boolean, Boolean)`. Starts locking on a table to protect it

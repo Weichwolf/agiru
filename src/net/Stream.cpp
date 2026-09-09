@@ -65,6 +65,23 @@ Integer OutStream::WriteText(std::string_view text) {
   return static_cast<Integer>(text.size());
 }
 
+Integer OutStream::WriteBytes(std::string_view bytes) {
+  std::vector<std::uint8_t> held = Bound().Bytes();
+  for (const char c : bytes) { held.push_back(static_cast<std::uint8_t>(c)); }
+  Bound().Set(std::move(held));
+  return static_cast<Integer>(bytes.size());
+}
+
+std::string InStream::ReadBytes(Integer count) {
+  const std::vector<std::uint8_t> &bytes = Bound().Bytes();
+  const std::size_t want = count < 0 ? 0 : static_cast<std::size_t>(count);
+  const std::size_t end = position_ + want < bytes.size() ? position_ + want : bytes.size();
+  std::string out;
+  for (std::size_t at = position_; at < end; ++at) { out.push_back(static_cast<char>(bytes[at])); }
+  position_ = end;
+  return out;
+}
+
 Integer OutStream::WriteText() {
   return WriteText(kLineBreak);
 }

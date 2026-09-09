@@ -50,6 +50,12 @@ public:
   ///          generated file on one line, and nothing would raise.
   Integer WriteText();
 
+  /// \brief Raw bytes, no terminator and no encoding: what a rebuilt .NET writer puts into the
+  ///        stream in the layout .NET defines (`BinaryWriter`).
+  /// \param bytes The bytes.
+  /// \return How many were written.
+  Integer WriteBytes(std::string_view bytes);
+
   /// \brief AL `OutStream.Write(Value)` for a TEXT value.
   ///
   /// \tparam T The value's type, which must read as a `std::string_view`.
@@ -168,6 +174,11 @@ public:
   /// \param text Receives what was read.
   /// \return How many characters were read.
   Integer ReadText(::agiru::Text<0> &text);
+
+  /// \brief Raw bytes from the position on, at most `count`: the reverse of `WriteBytes`.
+  /// \param count How many to take.
+  /// \return The bytes taken, fewer at the end of the stream.
+  std::string ReadBytes(Integer count);
 
   /// \brief AL `InStream.Read(var Value [, Length])` for a TEXT value.
   ///

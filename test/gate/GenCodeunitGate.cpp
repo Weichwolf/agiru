@@ -301,6 +301,29 @@ void AFieldNamedOnAnArrayElementIsTheElementsField() {
                  std::string::npos);
 }
 
+/// A VARIABLE NAMED AFTER ITS ENUMERATION TYPE STILL SCOPES THROUGH THE TYPE. `TelemetryScope::All`
+/// beside a parameter `TelemetryScope: TelemetryScope` is legal AL, and the platform lets a
+/// variable of an enumeration type scope its members (`devenv-enum-type.md`); the generator refused
+/// it as an enumeration this run does not have, in the telemetry module every posting reaches (17
+/// UT cases, measured 2026-09-09).
+void AVariableNamedAfterItsTypeScopesThroughTheType() {
+  const std::string source = R"(codeunit 50003 "Scoped Caller"
+{
+    procedure Log(TelemetryScope: TelemetryScope): Boolean
+    begin
+        exit(TelemetryScope = TelemetryScope::All);
+    end;
+})";
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables()),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "ScopedCaller.cpp"});
+  CHECK_TRUE("the member is the type's",
+             generated.find("::agiru::TelemetryScope::All") != std::string::npos);
+  CHECK_TRUE("and nothing is refused", generated.find("RefusedOption") == std::string::npos);
+}
+
 /// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide
 /// the type, so the declaration has to qualify it -- and WHICH namespace it qualifies with is
 /// decided by what the type IS. An AL object becomes a class in `agiru::app`; every other AL type
@@ -374,6 +397,7 @@ int main() {
     AnInlineOptionGetsAnEnumerationOfItsOwn();
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
     AFieldNamedOnAnArrayElementIsTheElementsField();
+    AVariableNamedAfterItsTypeScopesThroughTheType();
     AStaticPlatformMemberWithoutParenthesesIsACall();
     ACodeunitIncludesEveryObjectItNames();
   });

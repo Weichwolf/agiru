@@ -396,10 +396,11 @@ private:
       const std::string_view kind =
           scope_.Resolve(base.text).empty() ? KindNamespace(base.text) : std::string_view{};
       if (!kind.empty()) { return Kinded(kind, expression.text); }
-      if (scope_.Resolve(base.text).empty() && IsAlTypeName(base.text)) {
-        const bool call =
-            DoorStaticCalls(StaticMember{.type = base.text, .member = expression.text});
-        return "::agiru::" + TypeName(base.text) +
+      const std::string scoped =
+          scope_.Resolve(base.text).empty() ? base.text : scope_.DeclaredType(base.text);
+      if (IsAlTypeName(scoped) && !ScopesThroughItsSubtype(scoped)) {
+        const bool call = DoorStaticCalls(StaticMember{.type = scoped, .member = expression.text});
+        return "::agiru::" + TypeName(scoped) +
                "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text)) + (call ? "()" : "");
       }
       if (scope_.Resolve(base.text).empty()) {
@@ -670,6 +671,23 @@ private:
       whole += names[i];
     }
     return "::agiru::RefusedControl(\"" + whole + "\")";
+  }
+
+  static bool ScopesThroughItsSubtype(std::string_view type) {
+    static constexpr std::array<std::string_view, 12> kParameterised{"Enum",
+                                                                     "Option",
+                                                                     "Record",
+                                                                     "Codeunit",
+                                                                     "Page",
+                                                                     "Report",
+                                                                     "Query",
+                                                                     "XmlPort",
+                                                                     "Interface",
+                                                                     "DotNet",
+                                                                     "List",
+                                                                     "Dictionary"};
+    return std::ranges::any_of(kParameterised,
+                               [type](std::string_view kind) { return SameName(kind, type); });
   }
 
   std::string Call(const al::Expr &expression) {

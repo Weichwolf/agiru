@@ -177,12 +177,13 @@ std::map<std::string, std::string> ReadSpellings() {
   }
   for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
     if (entry.path().extension() != ".h") { continue; }
+    const bool platformTable = entry.path().parent_path().filename() == "platform";
     std::ifstream file(entry.path());
     std::string line;
     bool inEnum = false;
     const std::string type = entry.path().stem().string();
     while (std::getline(file, line)) {
-      NoteSpellings(line, found);
+      if (!platformTable) { NoteSpellings(line, found); }
       NoteEnumerators(line, inEnum, found);
       NoteStaticCalls(line, type);
     }
@@ -244,7 +245,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 69> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 74> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -297,6 +298,8 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 69> kElsewhe
     {"platform::Integer", "platform/Integer.h"},
     {"platform::PrivacyNotice", "platform/PrivacyNotice.h"},
     {"platform::PrivacyNoticeApproval", "platform/PrivacyNoticeApproval.h"},
+    {"platform::RecordLink", "platform/RecordLink.h"},
+    {"platform::RecordLinkType", "platform/RecordLink.h"},
     {"platform::Tenant", "platform/Tenant.h"},
     {"platform::User", "platform/User.h"},
     {"platform::UserPersonalization", "platform/UserPersonalization.h"},
@@ -307,6 +310,9 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 69> kElsewhe
     {"UserInfo", "dotnet/UserInfo.h"},
     {"dotnet::Path", "dotnet/Path.h"},
     {"dotnet::Math", "dotnet/Math.h"},
+    {"dotnet::NavTestExecution", "dotnet/NavTestExecution.h"},
+    {"dotnet::BinaryReader", "dotnet/BinaryReader.h"},
+    {"dotnet::BinaryWriter", "dotnet/BinaryWriter.h"},
     {"DateTimeOffset", "dotnet/DateTimeOffset.h"},
     {"DateTime", "dotnet/DateTime.h"},
     {"StrSubstNo", "runtime/Record.h"},

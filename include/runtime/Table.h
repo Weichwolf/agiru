@@ -2412,6 +2412,17 @@ template <typename T> struct TempRows {
 
 /// \brief The `TempOps` for one table, one instance per type in `.rodata`.
 ///
+/// \brief Whether a generated table carries a block of AL global variables (`Var_Block`, which
+///        412 tables declare).
+///
+/// \note A ROW CARRIES NO VARIABLES EITHER. A table's globals belong to the record VARIABLE and
+///       not to a row: `Sales Line` initialises its global `Currency` and then walks its own rows,
+///       and a load that assigned the whole object handed it the row's empty block -- every VAT
+///       amount was then rounded to a precision of zero (44 UT cases, measured 2026-09-09). The
+///       load keeps the variable's block the way it keeps its state, and a stored row holds none.
+template <typename T>
+concept HasVariableBlock = requires(T &t) { t.Var_Block = {}; };
+
 /// \tparam T The generated table class.
 ///
 /// \note A ROW CARRIES NO STATE. What goes into the store is the record's fields; its filters,
@@ -2430,12 +2441,14 @@ constexpr detail::TempOps kTempOps{
           std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          if constexpr (HasVariableBlock<T>) { copy.Var_Block = {}; }
           held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
         },
     .replace =
         [](void *rows, std::size_t at, const void *record) {
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          if constexpr (HasVariableBlock<T>) { copy.Var_Block = {}; }
           static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
         },
     .erase =
@@ -2448,7 +2461,14 @@ constexpr detail::TempOps kTempOps{
         [](void *record, const void *row) {
           auto *state = reinterpret_cast<detail::StateHandle *>(record);
           detail::StateHandle keep = std::move(*state);
-          *static_cast<T *>(record) = *static_cast<const T *>(row);
+          if constexpr (HasVariableBlock<T>) {
+            T &into = *static_cast<T *>(record);
+            auto block = std::move(into.Var_Block);
+            into = *static_cast<const T *>(row);
+            into.Var_Block = std::move(block);
+          } else {
+            *static_cast<T *>(record) = *static_cast<const T *>(row);
+          }
           *state = std::move(keep);
         },
 };

@@ -1,3 +1,5 @@
+#include "dotnet/BinaryReader.h"
+#include "dotnet/BinaryWriter.h"
 #include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Integer.h"
@@ -7,6 +9,7 @@
 #include "Check.h"
 
 #include <string>
+#include <string_view>
 
 using agiru::Blob;
 using agiru::Error;
@@ -92,11 +95,52 @@ void ATypedReadOrWriteRefuses() {
 
 } // namespace
 
+/// A NOTE ON A RECORD LINK IS A .NET STRING: `BinaryWriter.Write(string)` puts a 7-bit length
+/// prefix before the UTF-8 bytes and `BinaryReader.ReadString` takes it off again, which is how
+/// `Record Link Management` writes and reads a note (board:0645). The constructor is spelled the
+/// way AL spells it, `X := X.X(stream)`, and an empty stream answers `Position = Length` before any
+/// read, which is the module's own emptiness test.
+void ABinaryWriterAndReaderRoundTripANote() {
+  Blob blob;
+  OutStream out;
+  blob.CreateOutStream(out);
+  agiru::dotnet::BinaryWriter BinWriter{};
+  BinWriter = BinWriter.BinaryWriter(out);
+  BinWriter.Write(std::string_view("h\xc3\xa4llo"));
+  CHECK_TRUE("the prefix is one byte for a short string", blob.Length() == 7);
+  InStream in;
+  blob.CreateInStream(in);
+  agiru::dotnet::BinaryReader BinReader{};
+  BinReader = BinReader.BinaryReader(in);
+  CHECK_TRUE("Position is zero-based", BinReader.BaseStream().Position() == 0);
+  CHECK_TRUE("and Length is the blob's", BinReader.BaseStream().Length() == 7);
+  CHECK_TEXT(
+      "what was written comes back", std::string(BinReader.ReadString().Value()), "h\xc3\xa4llo");
+  Blob empty;
+  InStream none;
+  empty.CreateInStream(none);
+  BinReader = BinReader.BinaryReader(none);
+  CHECK_TRUE("an empty stream is at its end before any read",
+             BinReader.BaseStream().Position() == BinReader.BaseStream().Length());
+  bool threw = false;
+  try {
+    static_cast<void>(BinReader.ReadString());
+  } catch (const Error &) { threw = true; }
+  CHECK_TRUE("and reading it is refused", threw);
+  agiru::dotnet::BinaryWriter unbound{};
+  threw = false;
+  try {
+    unbound.Write(std::string_view("x"));
+  } catch (const Error &) { threw = true; }
+  CHECK_TRUE("a writer never bound refuses", threw);
+}
+
 int main() {
   return gate::Run("Stream", [] {
     WhatIsWrittenLandsInTheBlob();
     WriteTextWithNoArgumentWritesALineBreak();
     ReadingWalksTheStreamAndStopsAtItsEnd();
     ATypedReadOrWriteRefuses();
+    ABinaryWriterAndReaderRoundTripANote();
   });
 }

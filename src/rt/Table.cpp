@@ -234,7 +234,8 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       *reinterpret_cast<Decimal *>(At(record, def)) = Decimal::FromInvariantString(text);
       return;
     case FieldType::Boolean:
-      *reinterpret_cast<Boolean *>(At(record, def)) = text == "t" || text == "true";
+      *reinterpret_cast<Boolean *>(At(record, def)) =
+          text == "t" || text == "true" || text == "1" || text == "Yes" || text == "yes";
       return;
     case FieldType::Integer:
       *reinterpret_cast<Integer *>(At(record, def)) =
@@ -246,7 +247,7 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
     case FieldType::Option:
     case FieldType::Enum:
       ValueAccess::Store(*reinterpret_cast<OrdinalValue *>(At(record, def)),
-                         std::stoi(std::string(text)));
+                         std::stoi(detail::MemberOrdinal(def, text)));
       return;
     case FieldType::Date:
       *reinterpret_cast<Date *>(At(record, def)) = DateFromStorageText(text);
