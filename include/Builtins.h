@@ -8,7 +8,6 @@
 #include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
-#include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
@@ -565,23 +564,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean IsSessionActive(::agiru::Integer SessionID);
-
-/// \brief AL `Session.LogAuditMessage(Text, SecurityOperationResult, AuditCategory, Integer,
-/// Integer, Dictionary of [Text, Text])`. Logs a message to an audit account. Note, these logs are
-/// accessible to customers and will also be logged to a security audit account.
-/// \param SecurityAuditDescription The AL `Text`.
-/// \param SecurityAuditOperationResult The AL `SecurityOperationResult`.
-/// \param SecurityAuditCategory The AL `AuditCategory`.
-/// \param AuditMessageOperation The AL `Integer`.
-/// \param AuditMessageOperationResult The AL `Integer`.
-/// \param CustomDimensions The AL `Dictionary of [Text, Text]`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void LogAuditMessage(std::string_view SecurityAuditDescription,
-                     const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
-                     const ::agiru::AuditCategory &SecurityAuditCategory,
-                     ::agiru::Integer AuditMessageOperation,
-                     ::agiru::Integer AuditMessageOperationResult,
-                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
 
 /// \brief AL `Session.LogSecurityAudit(Text, SecurityOperationResult, Text, AuditCategory, Array of
 /// [Text], Array of [Text])`. Logs an IfX audit message to a telemetry account.

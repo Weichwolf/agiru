@@ -29,22 +29,31 @@ public:
   /// \brief A variable nothing has been assigned to.
   Implementation() = default;
 
-  /// \brief A copy holds nothing of its own.
-  /// \param o The other, whose codeunit is not shared.
-  Implementation(const Implementation &o) { static_cast<void>(o); }
+  /// \brief A by-value interface PARAMETER refers to the instance the caller holds, so the copy
+  ///        carries the instance: `PriceCalculationMgt.GetHandler(LineWithPrice, ...)` takes the
+  ///        interface by value and calls through it. A copy that held nothing answered "no
+  ///        implementation assigned" on every V15 price line (ERM Document Totals UT,
+  ///        2026-09-09). It is a clone until board:0640 shares the instance.
+  /// \param o The other, whose instance is cloned.
+  Implementation(const Implementation &o)
+      : held_(o.held_ == nullptr ? nullptr : o.clone_(o.held_)), clone_(o.clone_), free_(o.free_) {}
 
-  /// \brief Lets go of this one's codeunit.
-  /// \param o The other, whose codeunit is not shared.
+  /// \brief Replaces this one's instance with a clone of the other's.
+  /// \param o The other.
   /// \return This variable.
   Implementation &operator=(const Implementation &o) {
-    if (this != &o) { Forget(); }
+    if (this != &o) {
+      Implementation copy(o);
+      *this = std::move(copy);
+    }
     return *this;
   }
 
   /// \brief Takes the other's codeunit.
   /// \param o The other.
-  Implementation(Implementation &&o) noexcept : held_(o.held_), free_(o.free_) {
+  Implementation(Implementation &&o) noexcept : held_(o.held_), clone_(o.clone_), free_(o.free_) {
     o.held_ = nullptr;
+    o.clone_ = nullptr;
     o.free_ = nullptr;
   }
 
@@ -55,8 +64,10 @@ public:
     if (this != &o) {
       Forget();
       held_ = o.held_;
+      clone_ = o.clone_;
       free_ = o.free_;
       o.held_ = nullptr;
+      o.clone_ = nullptr;
       o.free_ = nullptr;
     }
     return *this;
@@ -75,6 +86,7 @@ public:
   Implementation &operator=(E value) {
     Forget();
     held_ = ImplementationOf(value, static_cast<I *>(nullptr));
+    clone_ = CloneOf(value, static_cast<I *>(nullptr));
     free_ = [](I *held) { delete held; };
     return *this;
   }
@@ -106,7 +118,9 @@ public:
   template <typename C>
     requires std::derived_from<C, I> && (!std::same_as<C, I>)
   Implementation(const C &codeunit)
-      : held_(new C(codeunit)), free_([](I *held) { delete static_cast<C *>(held); }) {}
+      : held_(new C(codeunit)),
+        clone_([](const I *held) -> I * { return new C(*static_cast<const C *>(held)); }),
+        free_([](I *held) { delete static_cast<C *>(held); }) {}
 
   /// \brief AL `Impl := CodeunitVar`: the interface takes its OWN COPY of the instance.
   ///
@@ -121,6 +135,7 @@ public:
   Implementation &operator=(const C &codeunit) {
     Forget();
     held_ = new C(codeunit);
+    clone_ = [](const I *held) -> I * { return new C(*static_cast<const C *>(held)); };
     free_ = [](I *held) { delete static_cast<C *>(held); };
     return *this;
   }
@@ -166,10 +181,12 @@ private:
   void Forget() {
     if (held_ != nullptr && free_ != nullptr) { free_(held_); }
     held_ = nullptr;
+    clone_ = nullptr;
     free_ = nullptr;
   }
 
   I *held_ = nullptr;
+  I *(*clone_)(const I *) = nullptr;
   void (*free_)(I *) = nullptr;
 };
 

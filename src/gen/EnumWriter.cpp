@@ -76,7 +76,9 @@ std::string ImplementationDeclarations(const al::EnumObject &object,
     out += identifier;
     out += " value, ";
     out += known->second.identifier;
-    out += " *);\n\n}\n";
+    out += " *);\n\n";
+    out += "auto CloneOf(" + identifier + " value, " + known->second.identifier + " *) -> " +
+           known->second.identifier + " *(*)(const " + known->second.identifier + " *);\n\n}\n";
   }
   return out;
 }
@@ -139,6 +141,7 @@ std::string ImplementationBodies(const al::EnumObject &object,
     out += " value, ";
     out += faceType;
     out += " *) {\n  switch (value) {\n";
+    std::vector<std::pair<std::string, std::string>> cloneable;
     for (const al::EnumValueDecl &value : object.values) {
       const al::Property *bound = al::Find(value.properties, "Implementation");
       if (bound == nullptr) { continue; }
@@ -153,6 +156,7 @@ std::string ImplementationBodies(const al::EnumObject &object,
       out += ":\n      return new ";
       out += unit->second.identifier;
       out += "{};\n";
+      cloneable.emplace_back(EnumeratorName(value.name), unit->second.identifier);
     }
     std::string fallback;
     if (const al::Property *given = al::Find(object.properties, "DefaultImplementation");
@@ -172,7 +176,19 @@ std::string ImplementationBodies(const al::EnumObject &object,
     out += object.name;
     out += " names no implementation of ";
     out += face;
-    out += "\");\n}\n\n}\n";
+    out += "\");\n}\n\n";
+    const auto cloner = [&faceType](const std::string &unit) {
+      return "[](const " + faceType + " *held) -> " + faceType + " * { return new " + unit +
+             "(*static_cast<const " + unit + " *>(held)); }";
+    };
+    out += "auto CloneOf(" + identifier + " value, " + faceType + " *) -> " + faceType +
+           " *(*)(const " + faceType + " *) {\n  switch (value) {\n";
+    for (const auto &[enumerator, unit] : cloneable) {
+      out += "    case " + identifier + "::" + enumerator + ": return " + cloner(unit) + ";\n";
+    }
+    out += fallback.empty() ? "    default: return nullptr;\n"
+                            : "    default: return " + cloner(fallback) + ";\n";
+    out += "  }\n}\n\n}\n";
   }
   return out;
 }

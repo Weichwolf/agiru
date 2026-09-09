@@ -5,6 +5,7 @@
 #include "runtime/Events.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
+#include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
@@ -19,6 +20,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
+#include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
 #include "type/TelemetryScope.h"
@@ -144,6 +146,25 @@ std::string ApplicationArea(std::string_view ApplicationArea = {});
 /// \param Date The normal date.
 /// \return Its closing twin; a closing date answers itself, the undefined date itself.
 ::agiru::Date ClosingDate(::agiru::Date Date);
+
+/// \brief AL `Session.LogAuditMessage(Text, SecurityOperationResult, AuditCategory, Integer,
+///        Integer, Dictionary of [Text, Text])`. Writes an audit entry to the platform's telemetry.
+/// \param SecurityAuditDescription   What happened.
+/// \param SecurityAuditOperationResult Whether it succeeded.
+/// \param SecurityAuditCategory      The category.
+/// \param AuditMessageOperation      The operation code.
+/// \param AuditMessageOperationResult The result code.
+/// \param CustomDimensions           Further dimensions.
+/// \note THERE IS NO TELEMETRY SINK HERE, the same as `Session.LogMessage`: the call is accepted
+///       and the message goes nowhere. `Price Calculation - V16` logs feature uptake on every
+///       price line, so a refusal here stopped the whole V16 path (ERM Document Totals UT,
+///       2026-09-09).
+void LogAuditMessage(std::string_view SecurityAuditDescription,
+                     const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
+                     const ::agiru::AuditCategory &SecurityAuditCategory,
+                     ::agiru::Integer AuditMessageOperation,
+                     ::agiru::Integer AuditMessageOperationResult,
+                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
 
 /// \brief AL `System.NormalDate(Date)`. The normal date of a closing date, and a normal date
 ///        unchanged (`system-normaldate-method.md`).

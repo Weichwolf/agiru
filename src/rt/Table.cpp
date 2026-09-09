@@ -883,6 +883,14 @@ private:
     if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
       return value.substr(1, value.size() - 2);
     }
+    if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') {
+      std::string inner;
+      for (std::size_t i = 1; i + 1 < value.size(); ++i) {
+        if (value[i] == '\'' && i + 2 < value.size() && value[i + 1] == '\'') { ++i; }
+        inner += value[i];
+      }
+      return inner;
+    }
     return value;
   }
 

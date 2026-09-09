@@ -9,7 +9,6 @@
 #include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
-#include "type/Dictionary.h"
 #include "type/Duration.h"
 #include "type/ExecutionContext.h"
 #include "type/ExecutionMode.h"
@@ -413,22 +412,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 ::agiru::Boolean IsSessionActive(::agiru::Integer SessionID) {
   static_cast<void>(SessionID);
   RefuseDoor("Session.IsSessionActive(Integer)");
-}
-
-void LogAuditMessage(std::string_view SecurityAuditDescription,
-                     const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
-                     const ::agiru::AuditCategory &SecurityAuditCategory,
-                     ::agiru::Integer AuditMessageOperation,
-                     ::agiru::Integer AuditMessageOperationResult,
-                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
-  static_cast<void>(SecurityAuditDescription);
-  static_cast<void>(SecurityAuditOperationResult);
-  static_cast<void>(SecurityAuditCategory);
-  static_cast<void>(AuditMessageOperation);
-  static_cast<void>(AuditMessageOperationResult);
-  static_cast<void>(CustomDimensions);
-  RefuseDoor("Session.LogAuditMessage(Text, SecurityOperationResult, AuditCategory, Integer, "
-             "Integer, Dictionary of [Text, Text])");
 }
 
 void LogSecurityAudit(std::string_view Description,

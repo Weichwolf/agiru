@@ -318,6 +318,20 @@ constexpr ::agiru::Integer kThirdPart = 3;
   return Date.IsUndefined() || Date.IsClosing() ? Date : Date.Closing();
 }
 
+void LogAuditMessage(std::string_view SecurityAuditDescription,
+                     const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
+                     const ::agiru::AuditCategory &SecurityAuditCategory,
+                     ::agiru::Integer AuditMessageOperation,
+                     ::agiru::Integer AuditMessageOperationResult,
+                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+  static_cast<void>(SecurityAuditDescription);
+  static_cast<void>(SecurityAuditOperationResult);
+  static_cast<void>(SecurityAuditCategory);
+  static_cast<void>(AuditMessageOperation);
+  static_cast<void>(AuditMessageOperationResult);
+  static_cast<void>(CustomDimensions);
+}
+
 ::agiru::Date NormalDate(::agiru::Date Date) {
   if (Date.IsUndefined()) {
     throw Error("NormalDate: the date is undefined, and the undefined date has no normal date");
