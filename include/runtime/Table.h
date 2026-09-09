@@ -1531,7 +1531,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  [[nodiscard]] Boolean MarkedOnly() const {
+  Boolean MarkedOnly() const {
     const detail::RecordState *state = Filtered();
     return state != nullptr && state->markedOnly;
   }

@@ -199,7 +199,6 @@ std::map<std::string, std::size_t> UntranslatedKinds(const Run &run) {
   static constexpr std::array kWithoutAGenerator{
       std::string_view{"permissionset"},
       std::string_view{"permissionsetext"},
-      std::string_view{"profile"},
       std::string_view{"controladdin"},
       std::string_view{"entitlement"},
       std::string_view{"pagecustomization"},
@@ -758,7 +757,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
               .procedures = {},
               .name = {},
               .dataItems = {},
-              .requestFields = {}});
+              .requestFields = {},
+              .columnSources = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -915,7 +915,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .procedures = {},
                                .name = SourceTableNameOf(object),
                                .dataItems = {},
-                               .requestFields = {}});
+                               .requestFields = {},
+                               .columnSources = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -1280,7 +1281,8 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           .procedures = std::move(procedureNames),
           .name = {},
           .dataItems = {},
-          .requestFields = {}};
+          .requestFields = {},
+          .columnSources = {}};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -1415,7 +1417,8 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .procedures = procedures,
             .name = {},
             .dataItems = {},
-            .requestFields = {}});
+            .requestFields = {},
+            .columnSources = {}});
   }
 }
 
@@ -1485,7 +1488,8 @@ std::vector<std::string> IndexReports(const Run &run, agiru::gen::Objects &objec
             .procedures = {},
             .name = declared.name,
             .dataItems = std::move(controls.dataItems),
-            .requestFields = std::move(controls.requestFields)});
+            .requestFields = std::move(controls.requestFields),
+            .columnSources = {}});
   }
   return indexed;
 }
@@ -1565,7 +1569,8 @@ void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
             .procedures = {},
             .name = {},
             .dataItems = {},
-            .requestFields = {}});
+            .requestFields = {},
+            .columnSources = {}});
   }
 }
 
@@ -1632,7 +1637,10 @@ Queries IndexQueries(Run &run, agiru::gen::Objects &objects) {
             .procedures = {},
             .name = declared.name,
             .dataItems = {},
-            .requestFields = {}});
+            .requestFields = {},
+            .columnSources = parsed.has_value()
+                                 ? agiru::gen::QueryColumnSources(*parsed)
+                                 : std::map<std::string, std::pair<std::string, std::string>>{}});
     if (parsed.has_value()) {
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(*parsed));
@@ -1679,6 +1687,81 @@ void WriteQueries(Run &run,
     run.written += 2;
     ++counts.written;
     written.insert(ref->first);
+  }
+}
+
+std::string ProfileSource(const agiru::al::ProfileObject &profile,
+                          const std::string &sourcePath,
+                          const agiru::gen::Objects &objects,
+                          std::size_t &unresolved) {
+  const auto text = [&profile](std::string_view name) {
+    const agiru::al::Property *found = agiru::al::Find(profile.properties, name);
+    return found == nullptr ? std::string{} : found->text;
+  };
+  const auto flag = [&profile](std::string_view name, bool fallback) {
+    const agiru::al::Property *found = agiru::al::Find(profile.properties, name);
+    if (found == nullptr) { return fallback; }
+    return agiru::gen::LowerKey(found->text) == "true";
+  };
+  std::string roleCenter = "0";
+  if (const agiru::al::Property *page = agiru::al::Find(profile.properties, "RoleCenter");
+      page != nullptr) {
+    const std::string value = page->text;
+    if (!value.empty() && std::isdigit(static_cast<unsigned char>(value.front())) != 0) {
+      roleCenter = value;
+    } else {
+      const auto found = objects.pages.find(agiru::gen::LowerKey(value));
+      if (found != objects.pages.end() && found->second.id != 0) {
+        roleCenter = std::to_string(found->second.id);
+      } else {
+        ++unresolved;
+      }
+    }
+  }
+  const std::string identifier = agiru::gen::Identifier(profile.name);
+  std::string out = "// Generated from " + sourcePath + ". Do not edit.\n\n";
+  out += "#include \"meta/Ids.h\"\n#include \"meta/ProfileDef.h\"\n#include "
+         "\"runtime/Catalogue.h\"\n\n";
+  out += "namespace agiru {\n\nnamespace {\n\n";
+  out += "constexpr ProfileDef k" + identifier + "Profile{\n";
+  out += "    .profileId = " + agiru::gen::Literal(profile.name) + ",\n";
+  out += "    .caption = " + agiru::gen::Literal(text("Caption")) + ",\n";
+  out += "    .description = " + agiru::gen::Literal(text("ProfileDescription")) + ",\n";
+  out += "    .roleCenter = ::agiru::PageId{" + roleCenter + "},\n";
+  out += "    .enabled = " + std::string(flag("Enabled", true) ? "true" : "false") + ",\n";
+  out += "    .promoted = " + std::string(flag("Promoted", false) ? "true" : "false") + ",\n";
+  out += "};\n\n";
+  out += "const RegisterProfile k" + identifier + "InCatalogue{&k" + identifier + "Profile};\n\n";
+  out += "}\n\n}\n";
+  return out;
+}
+
+struct ProfileCounts {
+  std::size_t written = 0;
+  std::size_t unresolved = 0;
+};
+
+void WriteProfiles(Run &run, const agiru::gen::Objects &objects, ProfileCounts &counts) {
+  for (const std::filesystem::path &path : SourcesEndingIn(run, ".Profile.al")) {
+    std::optional<agiru::al::ProfileObject> parsed;
+    try {
+      parsed = agiru::al::ParseProfile(Read(path));
+    } catch (const std::exception &e) {
+      static_cast<void>(Note(run, path, e));
+      continue;
+    }
+    if (run.output.empty()) { continue; }
+    const std::string relative =
+        agiru::gen::OutputDirectory(parsed->nameSpace, agiru::gen::ObjectKind::Profile) + "/" +
+        agiru::gen::Identifier(parsed->name) + ".cpp";
+    Keep(run,
+         Output{.directory = run.output, .relative = relative},
+         ProfileSource(*parsed,
+                       std::filesystem::relative(path, run.root).string(),
+                       objects,
+                       counts.unresolved));
+    ++run.written;
+    ++counts.written;
   }
 }
 
@@ -1793,6 +1876,20 @@ const std::map<std::string, std::string> &DotNetBase() {
       {"XmlDictionaryReader", "XmlReader"},
       {"XmlTextWriter", "XmlWriter"},
       {"XmlDictionaryWriter", "XmlWriter"},
+      {"SystemException", "Exception"},
+      {"ArgumentException", "SystemException"},
+      {"ArgumentNullException", "ArgumentException"},
+      {"ArgumentOutOfRangeException", "ArgumentException"},
+      {"InvalidOperationException", "SystemException"},
+      {"NotSupportedException", "SystemException"},
+      {"IOException", "SystemException"},
+      {"FileNotFoundException", "IOException"},
+      {"CommunicationException", "SystemException"},
+      {"FaultException", "CommunicationException"},
+      {"WebException", "InvalidOperationException"},
+      {"SecurityException", "SystemException"},
+      {"TimeoutException", "SystemException"},
+      {"NavCrmException", "Exception"},
   };
   return kBase;
 }
@@ -1850,9 +1947,20 @@ Counted Stubs(std::string &text,
     ++counted.types;
     text += "\nstruct ";
     text += type;
+    const std::string base = StubBase(type, use, alObjects);
     text += " : ::agiru::dotnet::";
-    text += StubBase(type, use, alObjects);
+    text += base;
     text += " {\n";
+    if (!named.contains(type)) {
+      text += "  using ::agiru::dotnet::";
+      text += base;
+      text += "::";
+      text += base;
+      text += ";\n";
+      text += "  ";
+      text += type;
+      text += "() = default;\n";
+    }
     for (const std::string &member : named) {
       ++counted.members;
       text += "  ::agiru::dotnet::Refused ";
@@ -2030,6 +2138,7 @@ int Scan(const Job &job) {
   std::map<std::string, std::size_t> untranslated;
   std::map<std::string, std::size_t> declaredOnly;
   QueryCounts queryCounts;
+  ProfileCounts profileCounts;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -2107,6 +2216,7 @@ int Scan(const Job &job) {
       agiru::gen::SynthesizeRunObjectActions(page, objects);
     }
     WritePages(run, parsed, objects, gathered, everyTable);
+    WriteProfiles(run, objects, profileCounts);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",
                  app.name,
@@ -2221,6 +2331,9 @@ int Scan(const Job &job) {
     std::ranges::sort(ranked, [](const auto &a, const auto &b) { return a.second > b.second; });
     for (const auto &[kind, found] : ranked) { std::println("          {:>5} x {}", found, kind); }
   }
+  std::println("profiles  {} translated, {} naming a role centre page this run does not have",
+               profileCounts.written,
+               profileCounts.unresolved);
   std::println("queries   {} translated, {} stubbed because a dataitem's table is out of scope, "
                "{} trigger(s) not translated (board:0064)",
                queryCounts.written,

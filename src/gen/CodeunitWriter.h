@@ -26,6 +26,8 @@ struct TableRef {
   std::string name;
   std::vector<std::pair<std::string, std::string>> dataItems;
   std::vector<std::string> requestFields;
+
+  std::map<std::string, std::pair<std::string, std::string>> columnSources;
 };
 
 using TableIndex = std::map<std::string, TableRef>;
@@ -71,6 +73,10 @@ struct QueryColumn {
 
 [[nodiscard]] QueryColumn
 QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_view member);
+
+[[nodiscard]] std::string QueryColumnEnumeration(const Objects &objects,
+                                                 const al::VarDecl *declared,
+                                                 std::string_view member);
 
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,

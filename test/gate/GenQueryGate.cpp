@@ -1,9 +1,8 @@
 #include "Ast.h"
+#include "Check.h"
 #include "CodeunitWriter.h"
 #include "Parser.h"
 #include "QueryWriter.h"
-
-#include "Check.h"
 
 #include <map>
 #include <string>
@@ -20,7 +19,8 @@ agiru::gen::Objects Tables() {
                            .procedures = {},
                            .name = {},
                            .dataItems = {},
-                           .requestFields = {}});
+                           .requestFields = {},
+                           .columnSources = {}});
   objects.tables.insert_or_assign(
       "workflow step",
       agiru::gen::TableRef{.identifier = "::agiru::System::Automation::WorkflowStep_Table",
@@ -31,7 +31,8 @@ agiru::gen::Objects Tables() {
                            .procedures = {},
                            .name = {},
                            .dataItems = {},
-                           .requestFields = {}});
+                           .requestFields = {},
+                           .columnSources = {}});
   return objects;
 }
 
@@ -81,9 +82,10 @@ void TheGeneratorWritesTheQueryAsConstexprData() {
   const agiru::gen::QueryWritten written =
       agiru::gen::WriteQuery(query, "System/Workflow/SomeSteps.Query.al", Tables());
   CHECK_TRUE("nothing is missing", written.missing.empty());
-  CHECK_TRUE("a column is a member typed from its field",
-             written.header.find("decltype(::agiru::System::Automation::Workflow_Table::Code) Code{};") !=
-                 std::string::npos);
+  CHECK_TRUE(
+      "a column is a member typed from its field",
+      written.header.find("decltype(::agiru::System::Automation::Workflow_Table::Code) Code{};") !=
+          std::string::npos);
   CHECK_TRUE("a Count column is an Integer",
              written.header.find("::agiru::Integer Steps{};") != std::string::npos);
   CHECK_TRUE("the state comes first",
@@ -93,11 +95,16 @@ void TheGeneratorWritesTheQueryAsConstexprData() {
   // THE DEFAULT IS LEFT OUTER, and it is written out rather than implied (openerp WI-1227).
   CHECK_TRUE("the root dataitem is written as LEFT OUTER",
              written.source.find(".join = QueryJoin::LeftOuter") != std::string::npos);
-  CHECK_TRUE("the link names both fields by number",
-             written.source.find("QueryLink{.field = ::agiru::System::Automation::WorkflowStep_Table::Field_No::WorkflowCode, .dataItem = 0, .reference = ::agiru::System::Automation::Workflow_Table::Field_No::Code}") !=
-                 std::string::npos);
+  CHECK_TRUE(
+      "the link names both fields by number",
+      written.source.find(
+          "QueryLink{.field = "
+          "::agiru::System::Automation::WorkflowStep_Table::Field_No::WorkflowCode, .dataItem = 0, "
+          ".reference = ::agiru::System::Automation::Workflow_Table::Field_No::Code}") !=
+          std::string::npos);
   CHECK_TRUE("the table filter travels as AL wrote it",
-             written.source.find(".tableFilter = \"\\\"Code\\\"=filter(<>'')\"") != std::string::npos);
+             written.source.find(".tableFilter = \"\\\"Code\\\"=filter(<>'')\"") !=
+                 std::string::npos);
   CHECK_TRUE("a filter row is not returned",
              written.source.find(".returned = false") != std::string::npos);
   CHECK_TRUE("and its ColumnFilter keeps only the expression",
@@ -105,7 +112,8 @@ void TheGeneratorWritesTheQueryAsConstexprData() {
   CHECK_TRUE("OrderBy names the column",
              written.source.find("QueryOrder{.column = \"Sequence_No\", .descending = false}") !=
                  std::string::npos);
-  CHECK_TRUE("TopNumberOfRows is carried", written.source.find(".topNumberOfRows = 5") != std::string::npos);
+  CHECK_TRUE("TopNumberOfRows is carried",
+             written.source.find(".topNumberOfRows = 5") != std::string::npos);
 
   // THE NEGATIVE CONTROL: a dataitem over a table this run does not have is reported, not stubbed
   // silently.
@@ -113,7 +121,8 @@ void TheGeneratorWritesTheQueryAsConstexprData() {
   less.tables.erase("workflow step");
   const agiru::gen::QueryWritten partial =
       agiru::gen::WriteQuery(query, "System/Workflow/SomeSteps.Query.al", less);
-  CHECK_TRUE("a missing table is named", partial.missing.size() == 1 && partial.missing.front() == "Workflow Step");
+  CHECK_TRUE("a missing table is named",
+             partial.missing.size() == 1 && partial.missing.front() == "Workflow Step");
   CHECK_TRUE("and nothing is written for it", partial.header.empty());
 }
 
@@ -157,7 +166,8 @@ query 50001 "Open Steps"
                            .procedures = {},
                            .name = "Open Steps",
                            .dataItems = {},
-                           .requestFields = {}});
+                           .requestFields = {},
+                           .columnSources = {}});
   const std::string unit = R"(codeunit 50002 "Some Walker"
 {
     procedure Walk()

@@ -122,6 +122,7 @@ std::string_view DirectoryOf(ObjectKind kind) {
     case ObjectKind::Enum: return "enum";
     case ObjectKind::Interface: return "interface";
     case ObjectKind::PermissionSet: return "permissionset";
+    case ObjectKind::Profile: return "profile";
   }
   return "core";
 }

@@ -506,6 +506,17 @@ private:
     if (named.kind == al::ExprKind::Scope && !named.children.empty() &&
         named.children.front().kind == al::ExprKind::Name) {
       const std::string_view kind = KindNamespace(named.children.front().text);
+      if (kind == "codeunits" && (member == "Run" || member == "Ok_Run")) {
+        const std::string unit = scope_.ObjectNamed(kind, named.text);
+        std::string out =
+            "::agiru::Codeunit<>::" + member + "(" +
+            (unit.starts_with("absent::") ? "::agiru::AbsentObjectId(\"" + named.text + "\")"
+                                          : "::agiru::CodeunitTraits<" + unit + ">::kId.Value()");
+        for (std::size_t i = first; i < expression.children.size(); ++i) {
+          out += ", " + Expression(expression.children[i], 0);
+        }
+        return out + ")";
+      }
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
                !platform.empty()) {
@@ -1670,6 +1681,12 @@ public:
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (IsRecord(field.variable)) { return Enumeration(field.field); }
     for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
+      if (const std::string column = QueryColumnEnumeration(objects_, where, field.field);
+          !column.empty()) {
+        return column;
+      }
+    }
+    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
       if (where == nullptr || TypeName(where->type) != "Record") { continue; }
       const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
       if (table == objects_.fieldEnums.end()) { break; }
@@ -2043,6 +2060,10 @@ public:
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (IsRecord(field.variable)) { return Enumeration(field.field); }
     const al::VarDecl *where = DeclarationOf(field.variable);
+    if (const std::string column = QueryColumnEnumeration(objects_, where, field.field);
+        !column.empty()) {
+      return column;
+    }
     if (where == nullptr || TypeName(where->type) != "Record") { return {}; }
     const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
     if (table == objects_.fieldEnums.end()) { return {}; }

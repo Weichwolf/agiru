@@ -38,6 +38,23 @@ void RegisterTableEntry(const TableEntry *entry) {
   Entries().push_back(entry);
 }
 
+namespace {
+
+std::vector<const ProfileDef *> &Profiles() {
+  static std::vector<const ProfileDef *> profiles;
+  return profiles;
+}
+
+}
+
+void RegisterProfileEntry(const ProfileDef *profile) {
+  Profiles().push_back(profile);
+}
+
+std::span<const ProfileDef *const> InstalledProfiles() {
+  return Profiles();
+}
+
 const TableEntry *FindTable(TableId id) {
   Order();
   const auto found = std::lower_bound(
@@ -132,6 +149,14 @@ const PageEntry *FindPage(PageId id) {
       [](const PageEntry *entry, auto number) { return entry->page->id.Value() < number; });
   if (found == PageEntries().end() || (*found)->page->id != id) { return nullptr; }
   return *found;
+}
+
+std::span<const CodeunitEntry *const> InstalledCodeunits() {
+  return CodeunitEntries();
+}
+
+std::span<const PageEntry *const> InstalledPages() {
+  return PageEntries();
 }
 
 }

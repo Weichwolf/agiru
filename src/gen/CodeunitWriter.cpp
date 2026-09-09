@@ -1293,6 +1293,11 @@ public:
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
+    if (const std::string column =
+            QueryColumnEnumeration(objects_, Declaration(field.variable), field.field);
+        !column.empty()) {
+      return column;
+    }
     const std::string subtype = LowerKey(std::string(field.variable)) == "rec"
                                     ? TableNoOf(unit_)
                                     : SubtypeOfRecord(field.variable);
@@ -1912,10 +1917,14 @@ TableIndex PlatformTables() {
                        .procedures = {},
                        .name = {},
                        .dataItems = {},
-                       .requestFields = {}};
+                       .requestFields = {},
+                       .columnSources = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
+  add("AllObj", "2000000038");
+  add("AllObjWithCaption", "2000000058");
+  add("All Profile", "2000000178");
   add("Company", "2000000006");
   add("Field", "2000000041");
   add("Integer", "2000000026");
@@ -1937,6 +1946,12 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000120"] = enums["user"];
   enums["user personalization"]["scope"] = "::agiru::platform::PersonalizationScope";
   enums["2000000073"] = enums["user personalization"];
+  enums["all profile"]["scope"] = "::agiru::platform::PersonalizationScope";
+  enums["2000000178"] = enums["all profile"];
+  enums["allobj"]["object type"] = "::agiru::platform::AllObjType";
+  enums["2000000038"] = enums["allobj"];
+  enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";
+  enums["2000000058"] = enums["allobjwithcaption"];
   return enums;
 }
 
@@ -2141,6 +2156,22 @@ QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_v
   const auto column = query->second.fields.find(LowerKey(std::string(member)));
   if (column == query->second.fields.end()) { return {}; }
   return QueryColumn{.isColumn = true, .spelling = column->second};
+}
+
+std::string QueryColumnEnumeration(const Objects &objects,
+                                   const al::VarDecl *declared,
+                                   std::string_view member) {
+  if (declared == nullptr || TypeName(declared->type) != "Query" || declared->subtype.empty()) {
+    return {};
+  }
+  const auto query = objects.queries.find(LowerKey(declared->subtype));
+  if (query == objects.queries.end()) { return {}; }
+  const auto source = query->second.columnSources.find(LowerKey(std::string(member)));
+  if (source == query->second.columnSources.end()) { return {}; }
+  const auto table = objects.fieldEnums.find(LowerKey(source->second.first));
+  if (table == objects.fieldEnums.end()) { return {}; }
+  const auto found = table->second.find(LowerKey(source->second.second));
+  return found == table->second.end() ? std::string{} : found->second;
 }
 
 void NoteObjectNames(const Objects &objects) {

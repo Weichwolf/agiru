@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/Decimal.h"
+
 #include <compare>
 #include <concepts>
 #include <cstdint>
@@ -58,6 +60,10 @@ public:
   /// \note `DurationAsInt := CurrentDateTime - StartTime` in `Config. Package Management`; the
   ///       duration IS a number of milliseconds in AL (`duration-data-type.md`).
   constexpr explicit(false) operator std::int64_t() const { return milliseconds_; }
+
+  /// \brief AL `DecimalVar := Duration`: the milliseconds as a Decimal, which AL converts on
+  ///        assignment and a procedure argument (`TelemetryLogMetrics.LogMeasure`).
+  explicit(false) operator Decimal() const { return Decimal(milliseconds_); }
 
   /// \return The count of milliseconds, which is what the page says a Duration IS.
   [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }

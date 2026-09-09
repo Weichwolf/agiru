@@ -2,9 +2,15 @@
 
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/AllObj.h"
+#include "platform/AllObjWithCaption.h"
+#include "platform/AllProfile.h"
+#include "platform/Company.h"
 #include "runtime/Catalogue.h"
+#include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/Session.h"
 
 #include "Rows.h"
 
@@ -302,6 +308,17 @@ std::string_view Required(const std::optional<std::string> &value, const FieldDe
   return *value;
 }
 
+namespace {
+
+std::string_view Fitted(std::string_view text, std::size_t length) {
+  if (text.size() <= length) { return text; }
+  std::size_t end = length;
+  while (end > 0 && (static_cast<unsigned char>(text[end]) & 0xC0U) == 0x80U) { --end; }
+  return text.substr(0, end);
+}
+
+}
+
 void ProvisionInstalled(const Connection &into) {
   const Result standing =
       into.Execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
@@ -317,6 +334,72 @@ void ProvisionInstalled(const Connection &into) {
     ++made;
   }
   if (made != 0) { std::println("{} table(s) created in the runner's database", made); }
+  if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
+  const std::string_view company = Session::Current().CompanyName();
+  if (!company.empty()) {
+    platform::Company standing;
+    standing.SetRange(standing.Name, company);
+    if (!standing.FindFirst()) {
+      platform::Company row;
+      row.Name = company;
+      row.DisplayName = company;
+      row.Insert();
+      std::println("the company {} is written into Company", company);
+    }
+  }
+  std::size_t profiles = 0;
+  for (const ProfileDef *profile : InstalledProfiles()) {
+    platform::AllProfile standing;
+    standing.SetRange(standing.ProfileID, std::string_view(profile->profileId));
+    if (standing.FindFirst()) { continue; }
+    platform::AllProfile row;
+    row.Scope = platform::PersonalizationScope::System;
+    row.ProfileID = std::string_view(profile->profileId);
+    row.Description = Fitted(profile->description, platform::AllProfile::kDescriptionLength);
+    row.RoleCenterID = profile->roleCenter.Value();
+    row.Caption = Fitted(profile->caption, platform::AllProfile::kCaptionLength);
+    row.Enabled = profile->enabled;
+    row.Promoted = profile->promoted;
+    row.Insert();
+    ++profiles;
+  }
+  if (profiles != 0) { std::println("{} profile(s) written into All Profile", profiles); }
+  platform::AllObj anyObject;
+  if (anyObject.FindFirst()) { return; }
+  std::size_t objects = 0;
+  const auto object = [&objects](platform::AllObjType type,
+                                 std::int32_t id,
+                                 std::string_view name,
+                                 std::string_view caption) {
+    platform::AllObj bare;
+    bare.ObjectType = type;
+    bare.ObjectID = id;
+    bare.ObjectName = name;
+    bare.Insert();
+    platform::AllObjWithCaption captioned;
+    captioned.ObjectType = type;
+    captioned.ObjectID = id;
+    captioned.ObjectName = name;
+    captioned.ObjectCaption = caption.empty() ? name : caption;
+    captioned.Insert();
+    ++objects;
+  };
+  for (const TableEntry *entry : InstalledTables()) {
+    object(platform::AllObjType::Table,
+           entry->table->id.Value(),
+           entry->table->name,
+           entry->table->caption);
+  }
+  for (const CodeunitEntry *entry : InstalledCodeunits()) {
+    object(platform::AllObjType::Codeunit, entry->id.Value(), entry->name, entry->name);
+  }
+  for (const PageEntry *entry : InstalledPages()) {
+    object(platform::AllObjType::Page,
+           entry->page->id.Value(),
+           entry->page->name,
+           entry->page->caption);
+  }
+  if (objects != 0) { std::println("{} object(s) written into AllObj", objects); }
 }
 
 }

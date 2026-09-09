@@ -305,6 +305,9 @@ struct Declared {
   std::string_view obsoleteState{};         ///< `ObsoleteState`.
   std::string_view obsoleteReason{};        ///< `ObsoleteReason`.
   std::string_view obsoleteTag{};           ///< `ObsoleteTag`.
+  std::string_view externalName{};          ///< `ExternalName`, on a field of an external table.
+  std::string_view optionOrdinalValues{};   ///< `OptionOrdinalValues`, a member's foreign number.
+  bool sqlTimestamp = false;                ///< `SqlTimestamp`.
 };
 
 template <auto Member>
@@ -344,6 +347,8 @@ constexpr FieldDef Declare(FieldNo no,
       .obsoleteState = declared.obsoleteState,
       .obsoleteReason = declared.obsoleteReason,
       .obsoleteTag = declared.obsoleteTag,
+      .externalName = declared.externalName,
+      .optionOrdinalValues = declared.optionOrdinalValues,
       .initValue = declared.initValue,
       .no = no,
       .fieldClass = declared.fieldClass,
@@ -361,6 +366,7 @@ constexpr FieldDef Declare(FieldNo no,
       .numeric = declared.numeric,
       .closingDates = declared.closingDates,
       .optimizeForTextSearch = declared.optimizeForTextSearch,
+      .sqlTimestamp = declared.sqlTimestamp,
       .enabled = declared.enabled,
   };
 }

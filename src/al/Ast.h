@@ -136,6 +136,12 @@ struct QueryObject {
   std::vector<LabelDecl> labels;
 };
 
+struct ProfileObject {
+  std::string name;
+  std::string nameSpace;
+  std::vector<Property> properties;
+};
+
 struct PageExtensionObject {
   int id = 0;
   std::string name;

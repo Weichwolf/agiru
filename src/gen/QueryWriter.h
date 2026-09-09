@@ -5,6 +5,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -22,5 +23,8 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
 std::string QueryHeaderPath(const al::QueryObject &query);
 
 std::map<std::string, std::string> QueryColumns(const al::QueryObject &query);
+
+std::map<std::string, std::pair<std::string, std::string>>
+QueryColumnSources(const al::QueryObject &query);
 
 }

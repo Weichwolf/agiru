@@ -99,8 +99,8 @@ std::string FilterPart(const std::vector<al::Token> &value) {
     }
   }
   if (equals == value.size()) { return Rendered(value); }
-  return Rendered(std::vector<al::Token>(value.begin() + static_cast<std::ptrdiff_t>(equals) + 1,
-                                         value.end()));
+  return Rendered(
+      std::vector<al::Token>(value.begin() + static_cast<std::ptrdiff_t>(equals) + 1, value.end()));
 }
 
 std::string ColumnFilterOf(const std::vector<al::Property> &properties) {
@@ -161,12 +161,12 @@ void Gather(const std::vector<al::PageControl> &controls, Elements &into, std::s
   for (const al::PageControl &control : controls) {
     const std::string kind = LowerKey(control.kind);
     if (kind == "dataitem") {
-      into.dataItems.push_back(DataItem{.name = control.name,
-                                        .table = SourceName(control.source),
-                                        .join = PropertyText(control.properties, "SqlJoinType"),
-                                        .links = LinksOf(control.properties),
-                                        .tableFilter =
-                                            PropertyText(control.properties, "DataItemTableFilter")});
+      into.dataItems.push_back(
+          DataItem{.name = control.name,
+                   .table = SourceName(control.source),
+                   .join = PropertyText(control.properties, "SqlJoinType"),
+                   .links = LinksOf(control.properties),
+                   .tableFilter = PropertyText(control.properties, "DataItemTableFilter")});
       Gather(control.children, into, into.dataItems.size() - 1);
       continue;
     }
@@ -201,8 +201,14 @@ std::string JoinOf(const std::string &join) {
 std::string MethodOf(const std::string &method) {
   if (method.empty()) { return "None"; }
   static const std::map<std::string, std::string> kMethods{
-      {"sum", "Sum"},     {"average", "Average"}, {"min", "Min"},   {"max", "Max"},
-      {"count", "Count"}, {"day", "Day"},         {"month", "Month"}, {"year", "Year"},
+      {"sum", "Sum"},
+      {"average", "Average"},
+      {"min", "Min"},
+      {"max", "Max"},
+      {"count", "Count"},
+      {"day", "Day"},
+      {"month", "Month"},
+      {"year", "Year"},
   };
   const auto found = kMethods.find(method);
   if (found == kMethods.end()) {
@@ -289,6 +295,19 @@ std::map<std::string, std::string> QueryColumns(const al::QueryObject &query) {
   return named;
 }
 
+std::map<std::string, std::pair<std::string, std::string>>
+QueryColumnSources(const al::QueryObject &query) {
+  Elements elements;
+  Gather(query.elements, elements, 0);
+  std::map<std::string, std::pair<std::string, std::string>> sources;
+  for (const Column &column : elements.columns) {
+    if (column.field.empty()) { continue; }
+    sources.emplace(LowerKey(column.name),
+                    std::make_pair(elements.dataItems[column.dataItem].table, column.field));
+  }
+  return sources;
+}
+
 QueryWritten
 WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Objects &objects) {
   QueryWritten written;
@@ -358,18 +377,20 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
     std::string member;
     static_cast<void>(memberOf(column, member));
     const std::string method = MethodOf(column.method);
-    const std::string type = IntegerValued(method)
-                                 ? "::agiru::Integer"
-                                 : "decltype(" + tables[column.dataItem]->identifier +
-                                       "::" + member + ")";
+    const std::string type =
+        IntegerValued(method)
+            ? "::agiru::Integer"
+            : "decltype(" + tables[column.dataItem]->identifier + "::" + member + ")";
     h += "  " + type + " " + FieldIdentifier(facade, column.name) + "{};\n";
   }
-  const std::string members = MemberDeclarations(
-      query.name, facade.variables, facade.labels, facade.procedures, objects);
+  const std::string members =
+      MemberDeclarations(query.name, facade.variables, facade.labels, facade.procedures, objects);
   if (!members.empty()) { h += "\n" + members; }
   if (!facade.procedures.empty()) { h += "\n"; }
   for (const al::ProcedureDecl &procedure : facade.procedures) {
-    h += "  " + ProcedureDeclaration(procedure, objects, query.name, Shadowed(facade), facade.procedures) + "\n";
+    h += "  " +
+         ProcedureDeclaration(procedure, objects, query.name, Shadowed(facade), facade.procedures) +
+         "\n";
   }
   h += "};\n\n";
   h += "} // namespace " + space + "\n\n";
@@ -390,8 +411,8 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   for (std::size_t i = 0; i < elements.dataItems.size(); ++i) {
     const DataItem &item = elements.dataItems[i];
     if (item.links.empty()) { continue; }
-    s += "constexpr std::array<QueryLink, " + std::to_string(item.links.size()) + "> k" + identifier + "Links" +
-         std::to_string(i) + "{{\n";
+    s += "constexpr std::array<QueryLink, " + std::to_string(item.links.size()) + "> k" +
+         identifier + "Links" + std::to_string(i) + "{{\n";
     for (const Link &link : item.links) {
       std::size_t upper = elements.dataItems.size();
       for (std::size_t j = 0; j < i; ++j) {
@@ -409,44 +430,47 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
                                  ", and one of them is not a field of its table");
       }
       s += "    QueryLink{.field = " + tables[i]->identifier + "::Field_No::" + field->second +
-           ", .dataItem = " + std::to_string(upper) + ", .reference = " +
-           tables[upper]->identifier + "::Field_No::" + reference->second + "},\n";
+           ", .dataItem = " + std::to_string(upper) +
+           ", .reference = " + tables[upper]->identifier + "::Field_No::" + reference->second +
+           "},\n";
     }
     s += "}};\n\n";
   }
-  s += "constexpr std::array<QueryDataItem, " + std::to_string(elements.dataItems.size()) +
-       "> k" + identifier + "DataItems{{\n";
+  s += "constexpr std::array<QueryDataItem, " + std::to_string(elements.dataItems.size()) + "> k" +
+       identifier + "DataItems{{\n";
   for (std::size_t i = 0; i < elements.dataItems.size(); ++i) {
     const DataItem &item = elements.dataItems[i];
     s += "    QueryDataItem{.name = " + Literal(item.name) + ", .table = &" +
          TableSymbol(tables[i]->identifier) + ", .join = QueryJoin::" + JoinOf(item.join) +
-         ", .links = " + (item.links.empty() ? std::string("{}") : "k" + identifier + "Links" + std::to_string(i)) +
+         ", .links = " +
+         (item.links.empty() ? std::string("{}") : "k" + identifier + "Links" + std::to_string(i)) +
          ", .tableFilter = " + Literal(item.tableFilter) + "},\n";
   }
   s += "}};\n\n";
-  s += "constexpr std::array<QueryColumn, " + std::to_string(elements.columns.size()) +
-       "> k" + identifier + "Columns{{\n";
+  s += "constexpr std::array<QueryColumn, " + std::to_string(elements.columns.size()) + "> k" +
+       identifier + "Columns{{\n";
   for (const Column &column : elements.columns) {
     std::string member;
     static_cast<void>(memberOf(column, member));
-    s += "    QueryColumn{.name = " + Literal(column.name) + ", .caption = " +
-         Literal(column.caption) + ", .offset = offsetof(" + className + ", " +
-         FieldIdentifier(facade, column.name) + "), .dataItem = " + std::to_string(column.dataItem) +
-         ", .field = " +
+    s += "    QueryColumn{.name = " + Literal(column.name) +
+         ", .caption = " + Literal(column.caption) + ", .offset = offsetof(" + className + ", " +
+         FieldIdentifier(facade, column.name) +
+         "), .dataItem = " + std::to_string(column.dataItem) + ", .field = " +
          (member.empty() ? std::string("::agiru::FieldNo{}")
                          : tables[column.dataItem]->identifier + "::Field_No::" + member) +
-         ", .method = QueryMethod::" + MethodOf(column.method) + ", .returned = " +
-         (column.returned ? "true" : "false") + ", .reverseSign = " +
-         (column.reverseSign ? "true" : "false") + ", .columnFilter = " +
-         Literal(column.columnFilter) + "},\n";
+         ", .method = QueryMethod::" + MethodOf(column.method) +
+         ", .returned = " + (column.returned ? "true" : "false") +
+         ", .reverseSign = " + (column.reverseSign ? "true" : "false") +
+         ", .columnFilter = " + Literal(column.columnFilter) + "},\n";
   }
   s += "}};\n\n";
   const Orders orders = OrderOf(query.properties);
   if (!orders.terms.empty()) {
-    s += "constexpr std::array<QueryOrder, " + std::to_string(orders.terms.size()) + "> k" + identifier + "Order{{\n";
+    s += "constexpr std::array<QueryOrder, " + std::to_string(orders.terms.size()) + "> k" +
+         identifier + "Order{{\n";
     for (const auto &[column, descending] : orders.terms) {
-      s += "    QueryOrder{.column = " + Literal(column) + ", .descending = " +
-           (descending ? "true" : "false") + "},\n";
+      s += "    QueryOrder{.column = " + Literal(column) +
+           ", .descending = " + (descending ? "true" : "false") + "},\n";
     }
     s += "}};\n\n";
   }
@@ -457,14 +481,15 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   s += "    .caption = " + Literal(captionText) + ",\n";
   s += "    .dataItems = k" + identifier + "DataItems,\n";
   s += "    .columns = k" + identifier + "Columns,\n";
-  s += "    .orderBy = " + (orders.terms.empty() ? std::string("{}") : "k" + identifier + "Order") + ",\n";
+  s += "    .orderBy = " + (orders.terms.empty() ? std::string("{}") : "k" + identifier + "Order") +
+       ",\n";
   s += "    .topNumberOfRows = " + (top.empty() ? std::string("0") : top) + ",\n";
   s += "};\n\n";
   s += QueryProcedureBodies(facade, className, objects);
   s += "static_assert(offsetof(" + className + ", State_Block) == 0, \"the state comes first\");\n";
-  s += "static_assert(k" + identifier + "Columns.size() == " + std::to_string(elements.columns.size()) +
-       ", \"query " + number + " declares " + std::to_string(elements.columns.size()) +
-       " columns and filters\");\n\n";
+  s += "static_assert(k" + identifier +
+       "Columns.size() == " + std::to_string(elements.columns.size()) + ", \"query " + number +
+       " declares " + std::to_string(elements.columns.size()) + " columns and filters\");\n\n";
   s += "} // namespace " + space + "\n";
   written.source = WithDoor(s, ObjectKind::Query);
   return written;

@@ -80,6 +80,7 @@ std::string_view KindSuffix(ObjectKind kind) {
     case ObjectKind::Enum: return "Enum";
     case ObjectKind::Interface: return "Interface";
     case ObjectKind::PermissionSet: return "PermissionSet";
+    case ObjectKind::Profile: return "Profile";
   }
   return "Object";
 }
@@ -372,6 +373,7 @@ std::string_view KeywordOf(ObjectKind kind) {
     case ObjectKind::Enum: return "enum";
     case ObjectKind::Interface: return "interface";
     case ObjectKind::PermissionSet: return "permissionset";
+    case ObjectKind::Profile: return "profile";
   }
   return {};
 }

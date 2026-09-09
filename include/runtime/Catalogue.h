@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/PageDef.h"
+#include "meta/ProfileDef.h"
 #include "meta/TableDef.h"
 #include "type/Action.h"
 
@@ -119,5 +120,36 @@ template <typename T> struct RegisterTable {
 /// \brief Every installed table, by number.
 /// \return The entries, sorted by table number.
 [[nodiscard]] std::span<const TableEntry *const> InstalledTables();
+
+/// \brief Registers a translated `profile` object; the generated source does this once, at load.
+/// \param profile The declaration, `constexpr` data in `.rodata`.
+void RegisterProfileEntry(const ProfileDef *profile);
+
+/// \brief The static registration a generated profile source makes.
+struct RegisterProfile {
+  /// \brief Registers the profile.
+  /// \param profile The declaration.
+  explicit RegisterProfile(const ProfileDef *profile) { RegisterProfileEntry(profile); }
+
+  RegisterProfile(const RegisterProfile &) = delete;
+  RegisterProfile(RegisterProfile &&) = delete;
+  RegisterProfile &operator=(const RegisterProfile &) = delete;
+  RegisterProfile &operator=(RegisterProfile &&) = delete;
+  ~RegisterProfile() = default;
+};
+
+/// \brief Every installed profile, in the order the sources registered them.
+/// \return The declarations.
+[[nodiscard]] std::span<const ProfileDef *const> InstalledProfiles();
+
+struct CodeunitEntry;
+
+/// \brief Every installed codeunit, in the order the sources registered them.
+/// \return The entries.
+[[nodiscard]] std::span<const CodeunitEntry *const> InstalledCodeunits();
+
+/// \brief Every installed page, in the order the sources registered them.
+/// \return The entries.
+[[nodiscard]] std::span<const PageEntry *const> InstalledPages();
 
 }

@@ -45,7 +45,8 @@ template <typename T> struct CodeunitTraits;
 /// \brief One codeunit in the catalogue, by number: what `Codeunit.Run(Number [, Record])`
 ///        reaches when the number is a VALUE rather than a name the generator resolved.
 struct CodeunitEntry {
-  CodeunitId id; ///< The codeunit's AL number.
+  CodeunitId id;         ///< The codeunit's AL number.
+  std::string_view name; ///< The codeunit's AL name.
   /// \brief Runs the codeunit: `Run`/`Ok_Run` on a fresh instance, with the record in its `Rec`.
   /// \param record The record passed, or `nullptr`; written back, since AL declares it `var`.
   /// \param table  Its table's number, meaningful only with a record.
@@ -425,8 +426,8 @@ template <typename T> bool RunCodeunitEntry(void *record, TableId table, bool va
 /// \brief The catalogue entry of a generated codeunit.
 /// \tparam T The generated codeunit class.
 template <typename T>
-inline const CodeunitEntry kCodeunitEntry{.id = CodeunitTraits<T>::kId,
-                                          .run = &RunCodeunitEntry<T>};
+inline const CodeunitEntry kCodeunitEntry{
+    .id = CodeunitTraits<T>::kId, .name = CodeunitTraits<T>::kName, .run = &RunCodeunitEntry<T>};
 
 /// \brief Puts a generated codeunit in the catalogue by existing, the way `RegisterPage` does.
 /// \tparam T The generated codeunit class.

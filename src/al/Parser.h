@@ -24,6 +24,8 @@ PageObject ParsePage(std::string_view source);
 
 QueryObject ParseQuery(std::string_view source);
 
+ProfileObject ParseProfile(std::string_view source);
+
 TableExtensionObject ParseTableExtension(std::string_view source);
 
 EnumExtensionObject ParseEnumExtension(std::string_view source);

@@ -351,8 +351,8 @@ public:
 
   /// \brief AL `FieldRef.Record()`. Gets the RecordRef of the field that is currently selected.
   /// This method returns an error if no field is selected.
-  /// \return The AL `RecordRef`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \return A RecordRef on the record this field belongs to.
+  /// \throws Error when the FieldRef names no field.
   ::agiru::RecordRef Record() const;
 
   /// \brief AL `FieldRef.Relation()`. Finds the table relationship of a given field.
@@ -1284,6 +1284,7 @@ public:
 
 private:
   friend class KeyRef;
+  friend class FieldRef;
 
   RecordRef(void *record, const TableDef &table) : state_(new detail::RecordRefState{}) {
     state_->record = record;

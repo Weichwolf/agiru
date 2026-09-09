@@ -18,6 +18,7 @@ enum class ObjectKind : std::uint8_t {
   Enum,
   Interface,
   PermissionSet,
+  Profile,
 };
 
 std::string_view DirectoryOf(ObjectKind kind);

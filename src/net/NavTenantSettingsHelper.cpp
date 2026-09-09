@@ -27,6 +27,11 @@ Boolean NavTenantSettingsHelper::IsSandbox() {
   return Tenant().sandbox;
 }
 
+std::string NavTenantSettingsHelper::GetPlatformVersion() {
+  throw Error("NavTenantSettingsHelper.GetPlatformVersion() is named by AL and this tree has no "
+              "platform version to answer with yet (board:0631)");
+}
+
 std::string NavTenantSettingsHelper::GetEnvironmentName() {
   return Tenant().environmentName;
 }

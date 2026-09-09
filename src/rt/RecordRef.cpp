@@ -360,7 +360,8 @@ void FieldRef::TestField() const {
 }
 
 RecordRef FieldRef::Record() const {
-  throw Error("FieldRef.Record() is declared and not implemented yet (board:0035)");
+  if (record_ == nullptr || table_ == nullptr) { throw Error("this FieldRef names no field"); }
+  return RecordRef{record_, *table_};
 }
 
 void RecordRef::Open(Integer tableNo) {

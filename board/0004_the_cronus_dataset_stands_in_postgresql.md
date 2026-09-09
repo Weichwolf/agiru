@@ -129,3 +129,21 @@ recorded rather than corrected in silence: the company's own schema is where a c
 **What this closes and what it does not.** The first three boxes of the list above are answered by
 the transfer having happened; the ROW-COUNT PROOF and the negative control are not, because nothing
 has compared the two sides since. The item stays open for the proof and not for the transfer.
+
+## 2026-09-09: the platform tables the UT suite reaches, and where their rows come from
+
+| table | rows | state |
+|---|---|---|
+| `All Profile` 2000000178 | one per translated `profile` object, written by `ProvisionInstalled` | done; 246 cases stopped on it |
+| `AllObj` / `AllObjWithCaption` | one per installed table, codeunit, page, query, report -- the catalogues have them | open, 29 cases |
+| `Feature Key` 2000000211 | the platform's feature registry; no AL source names the keys | open, 20 cases |
+| `Privacy Notice` | stored in the `system` schema of the demo database, with two FlowFields over `Privacy Notice Approval` | open, 27 cases |
+
+The demo database stores `system."Profile"` and `system."Tenant Profile"` EMPTY: on BC the
+profiles a user sees are the installed apps' `profile` objects, unioned with the tenant's own, and
+`All Profile` is that union. So the rows are the catalogue's and not the backup's.
+
+`Company` in the seeded template holds no row, so the first `TableRelation` check against it
+(`Application Area Setup."Company Name"`, `Country/Region UT.T120`) refused the test company. The
+provisioning step now writes the session's company into `Company` when it is missing, which is what
+a BC install does when a company is created; the row is the platform's and not the backup's.

@@ -596,6 +596,15 @@ concept ReadableAsAValue = !IsAbsent<T> && !std::is_same_v<T, ::agiru::Variant> 
 ///       refusal everything else about them is. A conversion between two refusals is as refused as
 ///       either, and the error still arrives at the first member touched.
 struct AbsentType {
+  /// \brief Holds nothing.
+  AbsentType() = default;
+
+  /// \brief AL `DotNetVar := Variant` -- `GetDotNetType(X)` hands back an `Any` the code then
+  ///        passes where a .NET type is declared. The value is not kept; the first member read
+  ///        refuses like every other read of an absent type.
+  /// \param value The Variant, read only to be discarded.
+  explicit(false) AbsentType(const ::agiru::Variant &value) { static_cast<void>(value); }
+
   /// \brief Marks this as a stub, so one stub converts to another and to nothing else.
   using IsAnAbsentType = void;
 
@@ -632,6 +641,7 @@ struct AbsentType {
 };
 
 struct AbsentObject : AbsentType {
+  using AbsentType::AbsentType;
   Refused Find{{.type = "<absent object>", .member = "Find"}};                   ///< The AL member.
   Refused FindFirst{{.type = "<absent object>", .member = "FindFirst"}};         ///< The AL member.
   Refused FindLast{{.type = "<absent object>", .member = "FindLast"}};           ///< The AL member.

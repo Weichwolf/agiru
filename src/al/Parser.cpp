@@ -329,6 +329,24 @@ public:
     return object;
   }
 
+  ProfileObject ParseProfile() {
+    ProfileObject object;
+    object.nameSpace = ReadHeaderNamespace("profile");
+    Expect("profile");
+    object.name = ExpectName();
+    Expect("{");
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
   PageExtensionObject ParsePageExtension() {
     PageExtensionObject extension;
     extension.nameSpace = ReadHeaderNamespace("pageextension");
@@ -1059,6 +1077,10 @@ PageObject ParsePage(std::string_view source) {
 
 QueryObject ParseQuery(std::string_view source) {
   return Parser(Tokenize(source)).ParseQuery();
+}
+
+ProfileObject ParseProfile(std::string_view source) {
+  return Parser(Tokenize(source)).ParseProfile();
 }
 
 TableExtensionObject ParseTableExtension(std::string_view source) {

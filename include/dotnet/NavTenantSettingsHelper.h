@@ -33,6 +33,12 @@ public:
   /// \return What the tenant says.
   [[nodiscard]] static Boolean IsSandbox();
 
+  /// \brief .NET `NavTenantSettingsHelper.GetPlatformVersion()`: the platform's version.
+  /// \return Never.
+  /// \throws Error always -- the Dataverse solution check reads it and this tree has no platform
+  ///         version to answer with yet (board:0631).
+  [[nodiscard]] static std::string GetPlatformVersion();
+
   /// \brief .NET `NavTenantSettingsHelper.GetLinkedPowerPlatformEnvironmentId()`.
   /// \return Never.
   /// \throws Error always -- there is no linked Power Platform environment here (board:0035).

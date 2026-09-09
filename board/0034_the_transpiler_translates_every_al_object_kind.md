@@ -114,3 +114,11 @@ reads 4 029 codeunits and no page is not 4 029 objects along; it is three kinds 
   invented kind and require the run summary to name it.
 - The body emitter translates the statement and expression grammar the BaseApp uses, measured
   against the same corpus rather than against the cases that happen to be written.
+
+## 2026-09-09: the profile kind
+
+`profile` has a generator: one `constexpr ProfileDef` per object, registered in the catalogue, and
+the platform's `All Profile` (2000000178) is filled from it at provisioning (board:0004). The
+transpiler prints `profiles N translated, M naming a role centre page this run does not have`; the
+count of kinds without a generator drops by one. `profileextension`, `permissionset`,
+`entitlement`, `controladdin` and `reportextension` remain.
