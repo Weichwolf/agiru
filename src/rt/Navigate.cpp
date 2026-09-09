@@ -70,12 +70,13 @@ const FieldDef &Sorted(const TableDef &table, FieldNo no) {
   throw Error("the sort path names a field the table lacks");
 }
 
-std::string Reversed(const Selection &made, const TableDef &table, bool descending) {
+std::string
+Reversed(const Selection &made, const RecordState *state, const TableDef &table, bool descending) {
   std::string order;
   for (const FieldNo no : made.sorted) {
     if (!order.empty()) { order += ", "; }
     order += Quoted(Sorted(table, no).name);
-    if (descending) { order += " DESC"; }
+    if (descending == Ascends(state, no)) { order += " DESC"; }
   }
   return order;
 }
@@ -145,7 +146,7 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
                     "' is not one of the characters record-find-method.md declares");
     }
     const bool backwards = step == '+' || step == '<';
-    if (ReadOne(record, table, made, Reversed(made, table, backwards))) { return true; }
+    if (ReadOne(record, table, made, Reversed(made, state, table, backwards))) { return true; }
   }
   return false;
 }

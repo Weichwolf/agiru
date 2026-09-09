@@ -244,7 +244,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 63> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 69> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -289,10 +289,14 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 63> kElsewhe
     {"platform::AllObjWithCaption", "platform/AllObjWithCaption.h"},
     {"platform::AllObjType", "platform/AllObjType.h"},
     {"platform::AllProfile", "platform/AllProfile.h"},
+    {"platform::FeatureKey", "platform/FeatureKey.h"},
+    {"platform::FeatureKeyEnabled", "platform/FeatureKey.h"},
     {"platform::Company", "platform/Company.h"},
     {"platform::Date", "platform/Date.h"},
     {"platform::Field", "platform/Field.h"},
     {"platform::Integer", "platform/Integer.h"},
+    {"platform::PrivacyNotice", "platform/PrivacyNotice.h"},
+    {"platform::PrivacyNoticeApproval", "platform/PrivacyNoticeApproval.h"},
     {"platform::Tenant", "platform/Tenant.h"},
     {"platform::User", "platform/User.h"},
     {"platform::UserPersonalization", "platform/UserPersonalization.h"},
@@ -301,6 +305,8 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 63> kElsewhe
     {"ALConfigSettings", "dotnet/ALConfigSettings.h"},
     {"NavTenantSettingsHelper", "dotnet/NavTenantSettingsHelper.h"},
     {"UserInfo", "dotnet/UserInfo.h"},
+    {"dotnet::Path", "dotnet/Path.h"},
+    {"dotnet::Math", "dotnet/Math.h"},
     {"DateTimeOffset", "dotnet/DateTimeOffset.h"},
     {"DateTime", "dotnet/DateTime.h"},
     {"StrSubstNo", "runtime/Record.h"},

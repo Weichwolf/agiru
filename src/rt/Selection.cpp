@@ -78,15 +78,23 @@ std::string Columns(const TableDef &table) {
   return columns;
 }
 
+bool Ascends(const RecordState *state, FieldNo no) {
+  if (state == nullptr) { return true; }
+  bool field = true;
+  for (const SortField &one : state->key) {
+    if (one.field == no) { field = one.ascending; }
+  }
+  return state->ascending == field;
+}
+
 Selection Select(const RecordState *state, const TableDef &table) {
   Selection made;
   Narrow(made, state, table);
-  const bool ascending = state == nullptr || state->ascending;
   made.sorted = OrderedBy(state, table);
   for (const FieldNo no : made.sorted) {
     if (!made.order.empty()) { made.order += ", "; }
     made.order += Quoted(FieldOf(table, no).name);
-    if (!ascending) { made.order += " DESC"; }
+    if (!Ascends(state, no)) { made.order += " DESC"; }
   }
   return made;
 }

@@ -69,6 +69,15 @@ public:
   /// \param found Whether the row was there. \param table The table's AL name.
   Found(bool found, std::string_view table) : found_(found), table_(table) {}
 
+  /// \brief A `Get` that missed: the statement form raises `DB:RecordNotFound` with the KEY it
+  ///        looked for, not the filter message (`webservices/dynamics-error-codes.md`;
+  ///        openerp WI-1403, board:0636).
+  /// \param found Whether the row was there.
+  /// \param table The table's AL name.
+  /// \param key   The primary key text, empty when found.
+  Found(bool found, std::string_view table, std::string key)
+      : found_(found), table_(table), key_(std::move(key)) {}
+
   Found(const Found &) = delete;
   Found &operator=(const Found &) = delete;
   Found &operator=(Found &&) = delete;
@@ -93,6 +102,7 @@ public:
 private:
   bool found_;
   std::string_view table_;
+  std::string key_;
   bool read_ = false;
 };
 
@@ -647,10 +657,18 @@ public:
   /// \tparam Keys The key field types, in key order.
   /// \param keys  The primary key values.
   /// \return True when the record was found; the record is unchanged otherwise beyond the key.
+  ///         AS A STATEMENT IT RAISES when the record is not there (`record-get-method.md`:
+  ///         "If you omit this optional return value and the operation does not execute
+  ///         successfully, a runtime error will occur"), the way Find does -- the consumption
+  ///         tells a question from an assertion. Only `Record.Get` does: `Get` on a List,
+  ///         Dictionary or JsonObject is not a record read (openerp WI-1386 lost 45 cases keying
+  ///         on the name; WI-1403 keyed on the receiver).
   /// \throws Error when the argument count does not match the primary key.
-  template <typename... Keys> bool Get(const Keys &...keys) {
+  template <typename... Keys> detail::Found Get(const Keys &...keys) {
     AssignPrimaryKey(keys...);
-    return Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
+    const bool found = Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
+    return detail::Found{
+        found, TableTraits<Derived>::kTable.name, found ? std::string{} : PrimaryKeyText()};
   }
 
   /// \brief AL `Record.Get(RecordId)` -- the row that id names.
@@ -671,7 +689,7 @@ public:
   ///          segmentation fault three frames later (measured 2026-09-08, `ERM VAT Tool - UT`).
   ///          `AssignKey` now refuses a value whose type is not the field's, so the same mistake
   ///          elsewhere is an error rather than a corrupted record.
-  bool Get(const ::agiru::RecordId &id) {
+  detail::Found Get(const ::agiru::RecordId &id) {
     const TableDef &table = TableTraits<Derived>::kTable;
     if (id.IsEmpty()) { throw Error("Get: the RecordId names no record"); }
     if (id.TableNo() != table.id.Value()) {
@@ -689,7 +707,8 @@ public:
       if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
       detail::SetFieldText(Self(), *def, values[at]);
     }
-    return Read(detail::RuntimeGet(Self(), table));
+    const bool found = Read(detail::RuntimeGet(Self(), table));
+    return detail::Found{found, table.name, found ? std::string{} : PrimaryKeyText()};
   }
 
   /// \brief AL `Record.FieldError(Field [, Text])`, naming the field itself.
@@ -1742,9 +1761,20 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void SetAscending(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetAscending is declared and not implemented yet (board:0035)");
+  template <typename Member> void SetAscending(const Member &member, Boolean ascending) {
+    detail::RecordState &state = State();
+    if (state.key.empty()) {
+      const TableDef &table = TableTraits<Derived>::kTable;
+      if (!table.keys.empty()) {
+        for (const ::agiru::FieldNo no : table.keys[0].fields) {
+          state.key.push_back(detail::SortField{.field = no, .ascending = true});
+        }
+      }
+    }
+    const ::agiru::FieldNo no = NumberOf(&member);
+    for (detail::SortField &one : state.key) {
+      if (one.field == no) { one.ascending = static_cast<bool>(ascending); }
+    }
   }
 
   /// \brief AL `Record.SetAutoCalcFields(Field, ...)` -- the FlowFields every later read

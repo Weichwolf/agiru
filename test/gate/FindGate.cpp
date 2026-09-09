@@ -108,6 +108,36 @@ void EqualGreaterAndLessComparePositionsOnTheSortPath() {
       "and it is the LAST smaller one and not the first", std::string(before.Code.Value()), "R02");
 }
 
+/// `record-get-method.md`: a `Get` whose result is discarded raises when the row is not there,
+/// and the message names the KEY it looked for -- `DB:RecordNotFound`, not the filter message
+/// (openerp WI-1403, board:0636). The negative control is the consumed form, which answers.
+void ABareGetRaisesNamingTheKeyAndAConsumedOneAnswers() {
+  Fill();
+  ResourceCost asked;
+  bool raised = false;
+  std::string said;
+  try {
+    asked.Get(ResourceCostType::Resource, CodeValue("R99"), "hours");
+  } catch (const Error &e) {
+    raised = true;
+    said = e.what();
+  }
+  CHECK_TRUE("a discarded Get on a missing row raises", raised);
+  CHECK_TRUE("and names the table and the key it looked for",
+             said.find("Resource Cost does not exist") != std::string::npos &&
+                 said.find("R99") != std::string::npos);
+  ResourceCost consumed;
+  CHECK_TRUE(
+      "a consumed Get on a missing row answers false",
+      !static_cast<bool>(consumed.Get(ResourceCostType::Resource, CodeValue("R99"), "hours")));
+  ResourceCost there;
+  CHECK_TRUE("and true on a row that is there",
+             static_cast<bool>(there.Get(ResourceCostType::Resource, CodeValue("R04"), "hours")));
+  there.Get(ResourceCostType::Resource, CodeValue("R06"), "hours");
+  CHECK_TEXT(
+      "a discarded Get on a row that is there reads it", std::string(there.Code.Value()), "R06");
+}
+
 // The combined form the BaseApp writes 81 times: try equal, then greater, then less.
 void ACombinationIsTriedInTheWrittenOrder() {
   ResourceCost missing;
@@ -199,6 +229,7 @@ int main() {
       MinusIsTheFirstRowInKeyOrderAndPlusIsTheLast();
       TheFirstRowOpensTheSetAndTheLastOneEndsIt();
       EqualGreaterAndLessComparePositionsOnTheSortPath();
+      ABareGetRaisesNamingTheKeyAndAConsumedOneAnswers();
       ACombinationIsTriedInTheWrittenOrder();
       MinusAndPlusRefuseToBeCombined();
       TheCurrentKeyDecidesWhichRowIsFirst();

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "dotnet/Refused.h"
 #include "type/Boolean.h"
 #include "type/List.h"
 
@@ -10,6 +11,23 @@
 /// \brief The .NET type `UserInfo` -- a directory user as the Graph returns it.
 
 namespace agiru::dotnet {
+
+/// \brief .NET `AssignedPlan`: one licence plan on a directory user. AL reads it in
+///        `Azure AD Plan Impl.` when it syncs plans from Entra; a self-hosted install has no
+///        directory and no plans, so a user's list is empty and the members refuse on the read
+///        that never comes.
+struct AssignedPlan {
+  Refused ServicePlanId{{.type = "AssignedPlan", .member = "ServicePlanId"}}; ///< The plan's id.
+  Refused ServicePlanName{{.type = "AssignedPlan", .member = "ServicePlanName"}};   ///< Its name.
+  Refused CapabilityStatus{{.type = "AssignedPlan", .member = "CapabilityStatus"}}; ///< Its state.
+};
+
+/// \brief .NET `DirectoryRole`: one directory role on a user, empty here for the same reason.
+struct DirectoryRole {
+  Refused DisplayName{{.type = "DirectoryRole", .member = "DisplayName"}}; ///< The role's name.
+  Refused RoleTemplateId{
+      {.type = "DirectoryRole", .member = "RoleTemplateId"}}; ///< Its template id.
+};
 
 /// \brief One user in the directory.
 ///
@@ -61,7 +79,11 @@ public:
 
   /// \brief The directory roles the user holds.
   /// \return The roles.
-  [[nodiscard]] const List<std::string> &Roles() const { return roles_; }
+  [[nodiscard]] const List<DirectoryRole> &Roles() const { return roles_; }
+
+  /// \brief .NET `UserInfo.AssignedPlans`: the licence plans, none on a self-hosted install.
+  /// \return The plans.
+  [[nodiscard]] const List<AssignedPlan> &AssignedPlans() const { return plans_; }
 
   /// \brief The groups the user belongs to.
   /// \return The groups.
@@ -91,8 +113,9 @@ private:
   std::string mail_;
   std::string preferredLanguage_;
   Boolean accountEnabled_ = false;
-  List<std::string> roles_;
+  List<DirectoryRole> roles_;
   List<std::string> groups_;
+  List<AssignedPlan> plans_;
 };
 
 }

@@ -20,6 +20,8 @@ struct Selection {
 
 [[nodiscard]] Selection Select(const RecordState *state, const TableDef &table);
 
+[[nodiscard]] bool Ascends(const RecordState *state, ::agiru::FieldNo no);
+
 [[nodiscard]] std::string Columns(const TableDef &table);
 
 [[nodiscard]] std::string Name(const TableDef &table);

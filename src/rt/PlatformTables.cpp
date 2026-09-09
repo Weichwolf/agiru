@@ -3,8 +3,11 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
+#include "platform/FeatureKey.h"
 #include "platform/Field.h"
 #include "platform/Integer.h"
+#include "platform/PrivacyNotice.h"
+#include "platform/PrivacyNoticeApproval.h"
 #include "platform/User.h"
 #include "platform/UserPersonalization.h"
 #include "runtime/Catalogue.h"
@@ -15,10 +18,13 @@ namespace {
 const RegisterTable<platform::AllObj> kAllObj;
 const RegisterTable<platform::AllObjWithCaption> kAllObjWithCaption;
 const RegisterTable<platform::AllProfile> kAllProfile;
+const RegisterTable<platform::FeatureKey> kFeatureKey;
 const RegisterTable<platform::Company> kCompany;
 const RegisterTable<platform::Date> kDate;
 const RegisterTable<platform::Field> kField;
 const RegisterTable<platform::Integer> kInteger;
+const RegisterTable<platform::PrivacyNotice> kPrivacyNotice;
+const RegisterTable<platform::PrivacyNoticeApproval> kPrivacyNoticeApproval;
 const RegisterTable<platform::User> kUser;
 const RegisterTable<platform::UserPersonalization> kUserPersonalization;
 

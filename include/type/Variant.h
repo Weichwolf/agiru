@@ -26,6 +26,7 @@
 #include <string_view>
 #include <type_traits>
 #include <typeinfo>
+#include <utility>
 #include <variant>
 
 /// \file
@@ -54,28 +55,86 @@ namespace agiru {
 /// \tparam T The codeunit's class.
 template <typename T> struct CodeunitTraits;
 
-/// \brief What a Variant holding a RECORD holds.
+/// \brief What a Variant holding a RECORD holds: its own copy of the record.
 ///
-/// \note A HANDLE AND NOT A COPY, which is what AL does. A Variant alternative that stored the
-///       record by value would need 1 609 alternatives and would copy a 240-field row every time a
-///       message was assembled; AL's Variant refers to the record and reads it back through
-///       `RecordRef.GetTable`. The table number travels with the pointer so the reader can refuse
-///       the wrong table by NUMBER rather than by a cast that cannot fail.
+/// \note A COPY AND NOT A HANDLE, because that is what AL does: `Variant := Rec` snapshots the
+///       record, and the BaseApp relies on it -- `CreateInventoryPickMovement.GetSourceDocHeader`
+///       puts a LOCAL `SalesHeader` into a GLOBAL Variant and every later step reads it back.
+///       The handle this was before read a dead frame there (SIGSEGV, SCM - Warehouse UT,
+///       2026-09-09). The predecessor paid the same lesson: a shared box in two slots cost 12
+///       cases (openerp WI-1095), and a snapshot that skipped the table variables a silent
+///       miscount (WI-1241). The copy is made through the class the record was built from, so
+///       the Variant needs no list of tables: the constructor that sees `R` hands over how to
+///       clone and free one.
 ///
-/// \warning IT DOES NOT OWN THE RECORD. The Variant is valid while the record it was made from is,
-///          which is AL's own lifetime and is why `LibraryVariableStorage.Enqueue(Rec)` inside a
-///          procedure whose record is local is a defect in the AL and not here.
-struct RecordInVariant {
-  const void *record; ///< The record.
+/// \note THE COST IS A ROW COPY PER VARIANT, which is AL's own cost. `StrSubstNo('%1', Rec)`
+///       copies the row it formats; that is microseconds against the query it describes.
+class RecordInVariant {
+public:
+  /// \brief Takes a copy of the record.
+  /// \tparam R The generated table class.
+  /// \param from The record.
+  template <typename R>
+  explicit RecordInVariant(const R &from)
+      : record(new R(from)),
+        table(R::kId),
+        id(from.RecordId()),
+        clone_([](const void *held) -> void * { return new R(*static_cast<const R *>(held)); }),
+        free_([](void *held) { delete static_cast<R *>(held); }) {}
+
+  /// \brief A second copy.
+  RecordInVariant(const RecordInVariant &o)
+      : record(o.clone_(o.record)), table(o.table), id(o.id), clone_(o.clone_), free_(o.free_) {}
+
+  /// \brief Takes over the copy.
+  RecordInVariant(RecordInVariant &&o) noexcept
+      : record(o.record), table(o.table), id(std::move(o.id)), clone_(o.clone_), free_(o.free_) {
+    o.record = nullptr;
+  }
+
+  /// \brief Replaces this copy with a copy of the other's.
+  RecordInVariant &operator=(const RecordInVariant &o) {
+    if (this != &o) {
+      RecordInVariant copy(o);
+      *this = std::move(copy);
+    }
+    return *this;
+  }
+
+  /// \brief Takes over the other's copy.
+  RecordInVariant &operator=(RecordInVariant &&o) noexcept {
+    if (this != &o) {
+      Free_();
+      record = o.record;
+      table = o.table;
+      id = std::move(o.id);
+      clone_ = o.clone_;
+      free_ = o.free_;
+      o.record = nullptr;
+    }
+    return *this;
+  }
+
+  /// \brief Frees the copy.
+  ~RecordInVariant() { Free_(); }
+
+  const void *record; ///< The copy.
   TableId table;      ///< Which table it is, so a reader can refuse the wrong one.
 
-  /// \brief What the record WAS when the Variant was built: its table, caption and primary key.
-  ///
-  /// \note THE POINTER OUTLIVES THE RECORD AND THIS DOES NOT. A Variant refers to a record and
-  ///       does not own it, which is AL's own rule and this header's own warning -- so a Variant
-  ///       that is stored and read later has an address that is no longer a record. This is
-  ///       rendered while the record is certainly alive and is what `Format` reads (board:0624).
+  /// \brief What the record was when the Variant was built: its table, caption and primary key,
+  ///        which is what `Format` reads (board:0624).
   ::agiru::RecordId id;
+
+private:
+  void Free_() {
+    if (record != nullptr) {
+      free_(const_cast<void *>(record));
+    } // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    record = nullptr;
+  }
+
+  void *(*clone_)(const void *);
+  void (*free_)(void *);
 };
 
 /// \brief Two record handles are equal when they refer to the same row of the same table.
@@ -332,13 +391,12 @@ public:
   /// \brief Holds a record.
   ///
   /// \tparam R The generated table class, recognised by the `kId` every one of them declares.
-  /// \param record The record, which the Variant refers to and does not copy.
+  /// \param record The record, which the Variant copies.
   template <typename R>
     requires requires {
       { R::kId } -> std::convertible_to<TableId>;
     }
-  Variant(const R &record)
-      : held_(RecordInVariant{.record = &record, .table = R::kId, .id = record.RecordId()}) {}
+  Variant(const R &record) : held_(RecordInVariant(record)) {}
 
   /// \brief AL puts a CODEUNIT into a Variant, and this is that.
   /// \tparam C The codeunit's class -- anything the runtime knows an object number for.

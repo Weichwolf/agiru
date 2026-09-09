@@ -1644,7 +1644,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "}\n\n";
   }
 
-  if (!unit.variables.empty() && !DeclaresClearAll(unit)) {
+  if (!DeclaresClearAll(unit)) {
     out += "void " + unitClass + "::ClearAll() {\n";
     for (const al::VarDecl &declared : unit.variables) {
       const std::string named = Identifier(declared.name);
@@ -1926,8 +1926,11 @@ TableIndex PlatformTables() {
   add("AllObjWithCaption", "2000000058");
   add("All Profile", "2000000178");
   add("Company", "2000000006");
+  add("Feature Key", "2000000211");
   add("Field", "2000000041");
   add("Integer", "2000000026");
+  add("Privacy Notice", "1560");
+  add("Privacy Notice Approval", "1561");
   add("Date", "2000000007");
   add("User", "2000000120");
   add("User Personalization", "2000000073");
@@ -1948,6 +1951,8 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000073"] = enums["user personalization"];
   enums["all profile"]["scope"] = "::agiru::platform::PersonalizationScope";
   enums["2000000178"] = enums["all profile"];
+  enums["feature key"]["enabled"] = "::agiru::platform::FeatureKeyEnabled";
+  enums["2000000211"] = enums["feature key"];
   enums["allobj"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";
@@ -2105,7 +2110,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     first = false;
   }
 
-  if (!unit.variables.empty() && !DeclaresClearAll(unit)) { out += "\n  void ClearAll();\n"; }
+  if (!DeclaresClearAll(unit)) { out += "\n  void ClearAll();\n"; }
 
   const std::string hidden = HiddenMembers(unit, objects, shadowed);
   std::string locals;

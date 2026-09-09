@@ -348,11 +348,14 @@ public:
     }
     if constexpr (kHasRecord) {
       try {
+        auto before = Record_();
+        PageValidateEvent_("OnBeforeValidateEvent", def->name, before);
         Record_().ValidateText(def->field, text);
         if (text.empty() && Record_().FieldNotBlank(def->field)) {
           Record_().TestField(def->field);
         }
         RunTrigger_(control, ControlTriggerKind::Validate, true);
+        PageValidateEvent_("OnAfterValidateEvent", def->name, before);
       } catch (const Error &e) { throw e.Coded("TestValidation"); }
     } else {
       static_cast<void>(text);
@@ -564,6 +567,24 @@ private:
 
   template <typename V> bool Matches_(const TestField &field, const V &value) {
     return ControlText(field.Name()) == AsText(value);
+  }
+
+  /// `OnBeforeValidateEvent` and `OnAfterValidateEvent` EXIST FOR PAGES (`devenv-event-types.md`
+  /// lists the field events for pages as for tables): the topic is the PAGE's name and the element
+  /// the control, and a subscriber hangs on exactly one of the two. Only the table's form was
+  /// raised, so subscribers on 14 pages never ran (openerp WI-1402, board:0636).
+  template <typename Before>
+  void PageValidateEvent_(std::string_view event, std::string_view control, Before &before) {
+    static constexpr std::array<std::string_view, 2> kNames{"Rec", "xRec"};
+    auto &rec = Record_();
+    ::agiru::detail::RaiseEventOn(EventObject::Page,
+                                  PageTraits<P>::kId.Value(),
+                                  PageTraits<P>::kName,
+                                  event,
+                                  control,
+                                  kNames,
+                                  rec,
+                                  before);
   }
 
   bool CloseAction_(std::string_view control) {

@@ -55,6 +55,10 @@ namespace agiru::detail {
 
 Found::~Found() noexcept(false) {
   if (read_ || found_ || std::uncaught_exceptions() != 0) { return; }
+  if (!key_.empty()) {
+    throw Error("The " + std::string(table_) +
+                " does not exist. Identification fields and values: " + key_);
+  }
   throw Error("There is no " + std::string(table_) + " within the filter.");
 }
 
