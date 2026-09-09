@@ -340,7 +340,19 @@ std::vector<std::string> HandlersNamedBy(const al::ProcedureDecl &procedure) {
   return named;
 }
 
-std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &identifier) {
+std::string HandlerObjectOf(const al::ProcedureDecl &handler, const Objects &objects) {
+  if (handler.parameters.empty()) { return "0"; }
+  const al::VarDecl &page = handler.parameters.front();
+  const std::string type = TypeName(page.type);
+  if (type != "TestPage" || page.subtype.empty()) { return "0"; }
+  const auto found = objects.pages.find(LowerKey(page.subtype));
+  if (found == objects.pages.end() || found->second.id == 0) { return "0"; }
+  return std::to_string(found->second.id);
+}
+
+std::string HandlerTableOf(const al::CodeunitObject &unit,
+                           const std::string &identifier,
+                           const Objects &objects) {
   std::vector<const al::ProcedureDecl *> handlers;
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     if (!HandlerKindOf(procedure).empty()) { handlers.push_back(&procedure); }
@@ -353,7 +365,9 @@ std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &id
     out += handler->name;
     out += "\", ";
     out += HandlerKindOf(*handler);
-    out += ", 0, &InvokeHandler<";
+    out += ", ";
+    out += HandlerObjectOf(*handler, objects);
+    out += ", &InvokeHandler<";
     out += identifier;
     out += ", &";
     out += identifier;
@@ -367,11 +381,13 @@ std::string HandlerTableOf(const al::CodeunitObject &unit, const std::string &id
   return out;
 }
 
-std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &identifier) {
+std::string TestCatalogueOf(const al::CodeunitObject &unit,
+                            const std::string &identifier,
+                            const Objects &objects) {
   const std::vector<const al::ProcedureDecl *> tests = TestsOf(unit);
   if (tests.empty()) { return {}; }
   std::string out = "\nnamespace {\nnamespace " + identifier + "_tests {\n\n";
-  out += HandlerTableOf(unit, identifier);
+  out += HandlerTableOf(unit, identifier, objects);
   for (const al::ProcedureDecl *test : tests) {
     const std::vector<std::string> named = HandlersNamedBy(*test);
     if (named.empty()) { continue; }
@@ -417,7 +433,7 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit, const std::string &i
                                    ", &" + identifier + "::OnRun>,\n"
                              : "                                  nullptr,\n";
   out += "                                  kTestMethods";
-  out += HandlerTableOf(unit, identifier).empty()
+  out += HandlerTableOf(unit, identifier, objects).empty()
              ? std::string{}
              : std::string(",\n") + "                          "
                                     "        kHandlers";
@@ -1608,7 +1624,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += kDoorMarker;
   const std::size_t includeAt = out.size();
   const std::string catalogue =
-      TestCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit)) +
+      TestCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit), objects) +
       SubscriptionCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit));
   if (!catalogue.empty()) { out += "\n#include <array>\n#include <string_view>\n"; }
   const std::string space = NamespaceOf(unit.nameSpace);
