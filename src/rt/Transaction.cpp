@@ -6,12 +6,23 @@
 #include "runtime/Session.h"
 #include "type/CommitBehavior.h"
 
+#include <algorithm>
+#include <array>
 #include <cstddef>
+#include <cstdlib>
 #include <optional>
+#include <print>
 #include <string>
 #include <utility>
 
+#include <execinfo.h>
+#include <unistd.h>
+
 namespace agiru {
+
+namespace {
+constexpr int kTraceFrames = 24;
+}
 
 namespace {
 
@@ -48,9 +59,23 @@ void Boundaries::Rollback(const Connection &connection, std::size_t depth) {
   connection.Run("ROLLBACK TO SAVEPOINT " + names_[depth - 1]);
   connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
   names_.resize(depth - 1);
+  inconsistent_.clear();
+}
+
+void Boundaries::MarkConsistent(std::string_view table, bool consistent) {
+  const auto held = std::ranges::find(inconsistent_, table);
+  if (consistent && held != inconsistent_.end()) { inconsistent_.erase(held); }
+  if (!consistent && held == inconsistent_.end()) { inconsistent_.emplace_back(table); }
 }
 
 void Boundaries::Commit(const Connection &connection) {
+  if (!inconsistent_.empty()) {
+    throw Error(
+        "The transaction cannot be completed because it will cause inconsistencies in the " +
+        inconsistent_.front() +
+        " table. Check where and how the CONSISTENT function is used in the transaction "
+        "to find the error.");
+  }
   for (std::size_t i = names_.size(); i > 0; --i) {
     connection.Run("RELEASE SAVEPOINT " + names_[i - 1]);
   }
@@ -102,6 +127,13 @@ void RememberError(std::string_view text) {
 }
 
 void RememberError(const Error &error) {
+  static const bool traced = std::getenv("AGIRU_TRACE_ERRORS") != nullptr;
+  if (traced) {
+    std::println(stderr, "caught: {}", error.what());
+    std::array<void *, kTraceFrames> frames{};
+    const int depth = backtrace(frames.data(), static_cast<int>(frames.size()));
+    backtrace_symbols_fd(frames.data(), depth, STDERR_FILENO);
+  }
   Session::Current().Transaction().SetLastError(error.what(), std::string(error.Code()));
 }
 

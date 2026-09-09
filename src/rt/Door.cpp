@@ -2331,78 +2331,6 @@ std::string TestHttpResponseMessage::ReasonPhrase(std::string_view SetReasonPhra
   RefuseDoor("TestHttpResponseMessage.ReasonPhrase(Text)");
 }
 
-::agiru::Boolean TextBuilder::Append(std::string_view Text) {
-  static_cast<void>(Text);
-  RefuseDoor("TextBuilder.Append(Text)");
-}
-
-::agiru::Boolean TextBuilder::AppendLine(std::string_view Text) {
-  static_cast<void>(Text);
-  RefuseDoor("TextBuilder.AppendLine(Text)");
-}
-
-::agiru::Integer TextBuilder::Capacity(::agiru::Integer NewCapacity) {
-  static_cast<void>(NewCapacity);
-  RefuseDoor("TextBuilder.Capacity(Integer)");
-}
-
-void TextBuilder::Clear() {
-  RefuseDoor("TextBuilder.Clear()");
-}
-
-::agiru::Boolean TextBuilder::EnsureCapacity(::agiru::Integer NewCapacity) {
-  static_cast<void>(NewCapacity);
-  RefuseDoor("TextBuilder.EnsureCapacity(Integer)");
-}
-
-::agiru::Boolean TextBuilder::Insert(::agiru::Integer Position, std::string_view Text) {
-  static_cast<void>(Position);
-  static_cast<void>(Text);
-  RefuseDoor("TextBuilder.Insert(Integer, Text)");
-}
-
-::agiru::Integer TextBuilder::Length(::agiru::Integer NewLength) {
-  static_cast<void>(NewLength);
-  RefuseDoor("TextBuilder.Length(Integer)");
-}
-
-::agiru::Integer TextBuilder::MaxCapacity() {
-  RefuseDoor("TextBuilder.MaxCapacity()");
-}
-
-::agiru::Boolean TextBuilder::Remove(::agiru::Integer StartIndex, ::agiru::Integer Count) {
-  static_cast<void>(StartIndex);
-  static_cast<void>(Count);
-  RefuseDoor("TextBuilder.Remove(Integer, Integer)");
-}
-
-::agiru::Boolean TextBuilder::Replace(std::string_view OldText,
-                                      std::string_view NewText,
-                                      ::agiru::Integer StartIndex,
-                                      ::agiru::Integer Count) {
-  static_cast<void>(OldText);
-  static_cast<void>(NewText);
-  static_cast<void>(StartIndex);
-  static_cast<void>(Count);
-  RefuseDoor("TextBuilder.Replace(Text, Text, Integer, Integer)");
-}
-
-::agiru::Boolean TextBuilder::Replace(std::string_view OldText, std::string_view NewText) {
-  static_cast<void>(OldText);
-  static_cast<void>(NewText);
-  RefuseDoor("TextBuilder.Replace(Text, Text)");
-}
-
-std::string TextBuilder::ToText() {
-  RefuseDoor("TextBuilder.ToText()");
-}
-
-std::string TextBuilder::ToText(::agiru::Integer StartIndex, ::agiru::Integer Count) {
-  static_cast<void>(StartIndex);
-  static_cast<void>(Count);
-  RefuseDoor("TextBuilder.ToText(Integer, Integer)");
-}
-
 ::agiru::Boolean TextConst::Contains(std::string_view Value) {
   static_cast<void>(Value);
   RefuseDoor("TextConst.Contains(Text)");
@@ -4170,14 +4098,6 @@ std::string XmlDeclaration::Version() {
 
 ::agiru::Boolean NavApp::IsUnlicensed() {
   RefuseDoor("NavApp.IsUnlicensed()");
-}
-
-::agiru::Boolean TextBuilder::AppendLine() {
-  RefuseDoor("TextBuilder.AppendLine()");
-}
-
-::agiru::Integer TextBuilder::Capacity() {
-  RefuseDoor("TextBuilder.Capacity()");
 }
 
 ::agiru::Boolean DataTransfer::UpdateAuditFields() {

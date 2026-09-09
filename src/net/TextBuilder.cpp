@@ -102,11 +102,11 @@ void TextBuilder::Clear() {
   return Replace(OldText, NewText, 1, static_cast<Integer>(text_.size()));
 }
 
-std::string TextBuilder::ToText() {
+std::string TextBuilder::ToText() const {
   return text_;
 }
 
-std::string TextBuilder::ToText(::agiru::Integer StartIndex, ::agiru::Integer Count) {
+std::string TextBuilder::ToText(::agiru::Integer StartIndex, ::agiru::Integer Count) const {
   const std::size_t from = At(StartIndex, text_.size());
   return text_.substr(from, Span(Count, from, text_.size()));
 }

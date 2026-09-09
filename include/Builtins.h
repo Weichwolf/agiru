@@ -461,11 +461,6 @@ std::string SerialNumber();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer ServiceInstanceId();
 
-/// \brief AL `Database.SessionId()`. Gets the ID of the current session.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer SessionId();
-
 /// \brief AL `Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)`. Establishes
 /// a connection to an external database based on a previously registered connection of the
 /// specified type.

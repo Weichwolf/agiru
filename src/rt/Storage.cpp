@@ -6,6 +6,7 @@
 #include "platform/AllObjWithCaption.h"
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
+#include "platform/Date.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
@@ -15,6 +16,7 @@
 #include "Rows.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <print>
@@ -364,6 +366,88 @@ void ProvisionInstalled(const Connection &into) {
     ++profiles;
   }
   if (profiles != 0) { std::println("{} profile(s) written into All Profile", profiles); }
+  platform::Date anyPeriod;
+  if (!anyPeriod.FindFirst()) {
+    static constexpr int kFirstYear = 1980;
+    static constexpr int kLastYear = 2079;
+    static constexpr std::array<std::string_view, 7> kDays{
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+    static constexpr std::array<std::string_view, 12> kMonths{"January",
+                                                              "February",
+                                                              "March",
+                                                              "April",
+                                                              "May",
+                                                              "June",
+                                                              "July",
+                                                              "August",
+                                                              "September",
+                                                              "October",
+                                                              "November",
+                                                              "December"};
+    std::size_t periods = 0;
+    const auto period = [&periods](platform::PeriodType type,
+                                   ::agiru::Date start,
+                                   ::agiru::Date end,
+                                   ::agiru::Integer no,
+                                   std::string_view name) {
+      platform::Date row;
+      row.PeriodType_ = type;
+      row.PeriodStart = start;
+      row.PeriodEnd = end.Closing();
+      row.PeriodNo = no;
+      row.PeriodName = name;
+      row.PeriodInvariantName = name;
+      row.Insert();
+      ++periods;
+    };
+    const std::int32_t first = calendar::DaysFromCivil(kFirstYear, 1, 1);
+    const std::int32_t last = calendar::DaysFromCivil(kLastYear, 12, 31);
+    for (std::int32_t days = first; days <= last; ++days) {
+      const calendar::Civil civil = calendar::CivilFromDays(days);
+      const ::agiru::Date day = ::agiru::Date::FromYmd(civil.year, civil.month, civil.day);
+      period(platform::PeriodType::Date, day, day, day.DayOfWeek(), kDays[day.DayOfWeek() - 1]);
+      if (day.DayOfWeek() == 1) {
+        const calendar::Civil sunday = calendar::CivilFromDays(days + 6);
+        period(platform::PeriodType::Week,
+               day,
+               ::agiru::Date::FromYmd(sunday.year, sunday.month, sunday.day),
+               day.WeekNo(),
+               "Week " + std::to_string(day.WeekNo()));
+      }
+      if (civil.day == 1) {
+        const std::int32_t next =
+            calendar::DaysFromCivil(civil.month == 12 ? civil.year + 1 : civil.year,
+                                    civil.month == 12 ? 1 : civil.month + 1,
+                                    1);
+        const calendar::Civil monthEnd = calendar::CivilFromDays(next - 1);
+        period(platform::PeriodType::Month,
+               day,
+               ::agiru::Date::FromYmd(monthEnd.year, monthEnd.month, monthEnd.day),
+               static_cast<::agiru::Integer>(civil.month),
+               kMonths[civil.month - 1]);
+        if (civil.month % 3 == 1) {
+          const unsigned quarter = (civil.month - 1) / 3 + 1;
+          const std::int32_t after = quarter == 4
+                                         ? calendar::DaysFromCivil(civil.year + 1, 1, 1)
+                                         : calendar::DaysFromCivil(civil.year, quarter * 3 + 1, 1);
+          const calendar::Civil quarterEnd = calendar::CivilFromDays(after - 1);
+          period(platform::PeriodType::Quarter,
+                 day,
+                 ::agiru::Date::FromYmd(quarterEnd.year, quarterEnd.month, quarterEnd.day),
+                 static_cast<::agiru::Integer>(quarter),
+                 "Quarter " + std::to_string(quarter));
+        }
+        if (civil.month == 1) {
+          period(platform::PeriodType::Year,
+                 day,
+                 ::agiru::Date::FromYmd(civil.year, 12, 31),
+                 civil.year,
+                 std::to_string(civil.year));
+        }
+      }
+    }
+    std::println("{} period(s) written into Date", periods);
+  }
   platform::AllObj anyObject;
   if (anyObject.FindFirst()) { return; }
   std::size_t objects = 0;

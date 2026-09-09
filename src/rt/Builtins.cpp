@@ -342,10 +342,6 @@ std::string SerialNumber() {
   RefuseDoor("Database.ServiceInstanceId()");
 }
 
-::agiru::Integer SessionId() {
-  RefuseDoor("Database.SessionId()");
-}
-
 void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
                                std::string_view Name,
                                ::agiru::Boolean Scoped) {

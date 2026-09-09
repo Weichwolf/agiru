@@ -12452,3 +12452,8 @@ base/sales/customer/codeunit/CustomerMgt.cpp
 base/purchases/document/codeunit/OverReceiptMgt.cpp
 base/inventory/requisition/codeunit/CarryOutAction.cpp
 base/sales/pricing/codeunit/SalesPriceCalcMgt.cpp
+base/system/text/codeunit/SelectionFilterManagement.cpp
+base/system/visualization/page/GenericChartSetup.cpp
+base/upgrade/codeunit/UpgradeRefsToRemTables.cpp
+system/system/email/page/EmailAddressLookup.cpp
+system/system/tooling/page/PerformanceProfileList.cpp

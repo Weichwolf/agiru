@@ -27,5 +27,6 @@ done
 # asserts is about FILES: that running the generator leaves them as they are.
 n=$((n + 1))
 if ! sh "$(dirname "$0")/door-reproduces.sh"; then red=$((red + 1)); fi
+if ! sh "$(dirname "$0")/one-definition.sh"; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]

@@ -1,5 +1,6 @@
 #include "runtime/RecordRef.h"
 
+#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
@@ -361,6 +362,10 @@ void FieldRef::TestField() const {
 RecordRef FieldRef::Record() const {
   if (record_ == nullptr || table_ == nullptr) { throw Error("this FieldRef names no field"); }
   return RecordRef{record_, *table_};
+}
+
+::agiru::Integer RecordRef::SystemIdNo() {
+  return SystemFieldNumbers::SystemId.Value();
 }
 
 ::agiru::IsolationLevel RecordRef::ReadIsolation(const ::agiru::IsolationLevel &ReadIsolation) {

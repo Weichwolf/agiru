@@ -73,6 +73,14 @@ public:
   /// \brief Records the message a boundary is rolling back, and the code it carried.
   /// \param text The error's text.
   /// \param code The error's code, empty for an AL `Error(...)`.
+  /// \brief AL `Record.Consistent(false)` on a table, and `Consistent(true)` to lift it.
+  /// \param table      The table's AL name.
+  /// \param consistent Whether it is consistent.
+  void MarkConsistent(std::string_view table, bool consistent);
+
+  /// \return The tables marked inconsistent, for the commit that refuses.
+  [[nodiscard]] const std::vector<std::string> &Inconsistent() const { return inconsistent_; }
+
   void SetLastError(std::string text, std::string code = {}) {
     lastError_ = std::move(text);
     lastErrorCode_ = std::move(code);
@@ -86,6 +94,7 @@ public:
 
 private:
   std::vector<std::string> names_;
+  std::vector<std::string> inconsistent_;
   std::string lastError_;
   std::string lastErrorCode_;
   std::size_t issued_ = 0;

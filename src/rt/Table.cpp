@@ -449,6 +449,10 @@ void RuntimeTransferFields(void *into,
   }
 }
 
+void MarkConsistent(const TableDef &table, bool consistent) {
+  Session::Current().Transaction().MarkConsistent(table.name, consistent);
+}
+
 void RuntimeInit(void *record, const TableDef &table) {
   Defaulted(record, table, true);
 }
@@ -1023,8 +1027,12 @@ std::string Aggregate(const FlowFormula &formula, const FieldDef &def, const std
       return whole ? sign + "ROUND(COALESCE(AVG(" + column + "), 0))"
                    : sign + "COALESCE(AVG(" + column + "), 0)";
     case FlowFormula::Kind::Count: return "COUNT(*)";
-    case FlowFormula::Kind::Min: return sign + "MIN(" + column + ")";
-    case FlowFormula::Kind::Max: return sign + "MAX(" + column + ")";
+    case FlowFormula::Kind::Min:
+      if (def.type == FieldType::Boolean) { return "(MIN(" + column + "::int) = 1)"; }
+      return sign + "MIN(" + column + ")";
+    case FlowFormula::Kind::Max:
+      if (def.type == FieldType::Boolean) { return "(MAX(" + column + "::int) = 1)"; }
+      return sign + "MAX(" + column + ")";
     case FlowFormula::Kind::Lookup: return column;
     case FlowFormula::Kind::Exist: return "1";
   }

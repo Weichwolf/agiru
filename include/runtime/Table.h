@@ -267,6 +267,14 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 ///       says of `SystemId`.
 void RuntimeInit(void *record, const TableDef &table);
 
+/// \brief AL `Record.Consistent(Boolean)`: marks the TABLE consistent or not for the running
+///        transaction, and a commit while any table is marked inconsistent is refused with BC's
+///        own message (`record-consistent-method.md`). `Gen. Jnl.-Post Line` marks `G/L Entry`
+///        inconsistent until the entries balance.
+/// \param table      The table.
+/// \param consistent Whether it is consistent now.
+void MarkConsistent(const TableDef &table, bool consistent);
+
 /// \brief AL `Clear(Record)` -- every field to its `InitValue` or its type's default, key and all.
 ///
 /// \param record The record.
@@ -1015,9 +1023,8 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void Consistent(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.Consistent is declared and not implemented yet (board:0035)");
+  void Consistent(Boolean consistent) const {
+    detail::MarkConsistent(TableTraits<Derived>::kTable, static_cast<bool>(consistent));
   }
 
   /// \brief AL `Record.Copy(...)`. Makes this record refer to another's rows, or copies its

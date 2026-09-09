@@ -45,6 +45,8 @@
 #include <utility>
 #include <vector>
 
+#include <unistd.h>
+
 namespace agiru {
 
 constexpr ::agiru::Integer kDefaultChecksumModulus = 10;
@@ -330,6 +332,10 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
   static_cast<void>(AuditMessageOperation);
   static_cast<void>(AuditMessageOperationResult);
   static_cast<void>(CustomDimensions);
+}
+
+::agiru::Integer SessionId() {
+  return static_cast<::agiru::Integer>(::getpid());
 }
 
 ::agiru::Date NormalDate(::agiru::Date Date) {

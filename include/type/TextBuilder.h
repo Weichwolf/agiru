@@ -125,14 +125,14 @@ public:
 
   /// \brief AL `TextBuilder.ToText()`. Converts the value of this TextBuilder instance to a Text.
   /// \return The AL `Text`.
-  std::string ToText();
+  std::string ToText() const;
 
   /// \brief AL `TextBuilder.ToText(Integer, Integer)`. Converts the value of a substring of this
   /// TextBuilder instance to a Text.
   /// \param StartIndex The AL `Integer`.
   /// \param Count The AL `Integer`.
   /// \return The AL `Text`.
-  std::string ToText(::agiru::Integer StartIndex, ::agiru::Integer Count);
+  std::string ToText(::agiru::Integer StartIndex, ::agiru::Integer Count) const;
 
 private:
   std::string text_;

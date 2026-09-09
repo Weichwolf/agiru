@@ -166,6 +166,11 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
                      ::agiru::Integer AuditMessageOperationResult,
                      const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
 
+/// \brief AL `Database.SessionId()`. The number of the current session.
+/// \return The operating system's id of this process: one process is one session here, and the
+///         number is what `Session.LogMessage` and the job queue compare, never a key.
+::agiru::Integer SessionId();
+
 /// \brief AL `System.NormalDate(Date)`. The normal date of a closing date, and a normal date
 ///        unchanged (`system-normaldate-method.md`).
 /// \param Date A normal or a closing date.

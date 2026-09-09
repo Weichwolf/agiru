@@ -532,9 +532,22 @@ public:
   /// \brief AL `RecordRef.GetTable(Record)` -- points at an existing record.
   /// \tparam T The generated table class.
   /// \param rec The record.
-  template <typename T> void GetTable(T &rec) {
+  template <typename T>
+    requires requires { T::kId; }
+  void GetTable(T &rec) {
     Open(TableTraits<T>::kTable.id.Value());
     *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
+  }
+
+  /// \brief AL `RecordRef.GetTable(Record)` on a record whose table this build does not carry.
+  /// \tparam T The stand-in for the absent table.
+  /// \param rec The stand-in.
+  /// \throws Error always, naming the gap rather than instantiating traits the table lacks.
+  template <typename T>
+    requires(!requires { T::kId; })
+  void GetTable(T &rec) {
+    static_cast<void>(rec);
+    throw Error("RecordRef.GetTable: the record's table is not translated in this build");
   }
 
   /// \brief AL `RecordRef.Open(TableNo, Temporary [, Company])`.
@@ -1236,9 +1249,7 @@ public:
   /// The SystemId field is a system field that the platform adds to all table objects.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer SystemIdNo() {
-    throw Error("RecordRef.SystemIdNo() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Integer SystemIdNo();
 
   /// \brief AL `RecordRef.SystemModifiedAtNo()`. Gets the field number that is used by the
   /// SystemModifiedAt field. The SystemModifiedAt field is a system field that the platform adds to
