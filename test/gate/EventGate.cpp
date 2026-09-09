@@ -31,6 +31,8 @@ class Publisher_Codeunit;
 class Listener_Codeunit;
 class Misnamed_Codeunit;
 class Watcher_Codeunit;
+class Told_Codeunit;
+class Unsent_Codeunit;
 } // namespace
 
 template <> struct agiru::CodeunitTraits<Publisher_Codeunit> {
@@ -46,6 +48,16 @@ template <> struct agiru::CodeunitTraits<Listener_Codeunit> {
 template <> struct agiru::CodeunitTraits<Watcher_Codeunit> {
   static constexpr CodeunitId kId{50103};
   static constexpr std::string_view kName{"Event Gate Watcher"};
+};
+
+template <> struct agiru::CodeunitTraits<Told_Codeunit> {
+  static constexpr CodeunitId kId{50104};
+  static constexpr std::string_view kName{"Event Gate Told"};
+};
+
+template <> struct agiru::CodeunitTraits<Unsent_Codeunit> {
+  static constexpr CodeunitId kId{50105};
+  static constexpr std::string_view kName{"Event Gate Unsent"};
 };
 
 template <> struct agiru::CodeunitTraits<Misnamed_Codeunit> {
@@ -99,6 +111,28 @@ public:
   Boolean sawRunTrigger = false;
 };
 
+// A SUBSCRIBER MAY NAME ITS FIRST PARAMETER `Sender` AND RECEIVE THE RAISING OBJECT, which the
+// publisher never lists: AL's own rule for table and codeunit events, and the BaseApp's
+// `RecordRestrictionMgt.CustomerCheckSalesPostRestrictions(var Sender: Record "Sales Header")`.
+class Told_Codeunit : public Codeunit<Told_Codeunit> {
+public:
+  void Heard(agiru::app::tables::LineNumberBuffer &Sender, Boolean RunTrigger) {
+    Sender.NewLineNumber = Sender.OldLineNumber + 10;
+    static_cast<void>(RunTrigger);
+    ++told;
+  }
+
+  int told = 0;
+};
+
+class Unsent_Codeunit : public Codeunit<Unsent_Codeunit> {
+public:
+  void Wants(Publisher_Codeunit &Sender, Integer &Amount) {
+    static_cast<void>(Sender);
+    Amount = 0;
+  }
+};
+
 class Misnamed_Codeunit : public Codeunit<Misnamed_Codeunit> {
 public:
   void Wrong(Integer &Total) { Total = 0; }
@@ -144,6 +178,40 @@ const SubscriptionCatalogue kMisnamedCatalogue{
     []() -> void * { return new Misnamed_Codeunit(); },
     [](void *instance) { delete static_cast<Misnamed_Codeunit *>(instance); }};
 
+constexpr std::array<std::string_view, 2> kHeardNames{"Sender", "RunTrigger"};
+constexpr std::array<Subscription, 1> kToldSubscriptions{{
+    {.kind = EventObject::Table,
+     .objectId = 0,
+     .objectName = "Line Number Buffer",
+     .event = "OnBeforeInsertEvent",
+     .element = "",
+     .parameters = kHeardNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Told_Codeunit, &Told_Codeunit::Heard>},
+}};
+const SubscriptionCatalogue kToldCatalogue{
+    CodeunitTraits<Told_Codeunit>::kId,
+    CodeunitTraits<Told_Codeunit>::kName,
+    kToldSubscriptions,
+    true,
+    []() -> void * { return new Told_Codeunit(); },
+    [](void *instance) { delete static_cast<Told_Codeunit *>(instance); }};
+constexpr std::array<std::string_view, 2> kWantsNames{"Sender", "Amount"};
+constexpr std::array<Subscription, 1> kUnsentSubscriptions{{
+    {.kind = EventObject::Codeunit,
+     .objectId = 0,
+     .objectName = "Event Gate Publisher",
+     .event = "OnBeforePost",
+     .element = "",
+     .parameters = kWantsNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Unsent_Codeunit, &Unsent_Codeunit::Wants>},
+}};
+const SubscriptionCatalogue kUnsentCatalogue{
+    CodeunitTraits<Unsent_Codeunit>::kId,
+    CodeunitTraits<Unsent_Codeunit>::kName,
+    kUnsentSubscriptions,
+    true,
+    []() -> void * { return new Unsent_Codeunit(); },
+    [](void *instance) { delete static_cast<Unsent_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
 constexpr std::array<Subscription, 1> kWatcherSubscriptions{{
     {.kind = EventObject::Table,
@@ -164,6 +232,34 @@ const SubscriptionCatalogue kWatcherCatalogue{
 
 /// The platform raises `OnBeforeInsertEvent` from `Insert`, with `Rec` the record itself, so a
 /// subscriber writing a field writes what gets inserted (`devenv-event-types.md:109`).
+void ASubscriberNamedSenderReceivesTheRaisingRecord() {
+  Told_Codeunit told;
+  static_cast<void>(agiru::BindSubscription(told));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  constexpr agiru::Integer kOldLine = 3;
+  buffer.OldLineNumber = kOldLine;
+  buffer.Insert(true);
+  CHECK_TRUE("the subscriber was told once", told.told == 1);
+  CHECK_TRUE("and what it wrote through Sender is the inserted row",
+             buffer.Get(kOldLine) && buffer.NewLineNumber == kOldLine + 10);
+  static_cast<void>(agiru::UnbindSubscription(told));
+
+  // THE NEGATIVE CONTROL: a raise that carries no sender still refuses a `Sender` it cannot fill,
+  // so the slot is filled only from a raise that names its object and never from thin air.
+  Unsent_Codeunit unsent;
+  static_cast<void>(agiru::BindSubscription(unsent));
+  Publisher_Codeunit publisher;
+  Integer amount = 1;
+  Boolean handled = false;
+  std::string said;
+  try {
+    publisher.OnBeforePost(amount, Text<0>{"x"}, handled);
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_TRUE("a Sender on a raise without one refuses",
+             said.find("names a parameter Sender") != std::string::npos);
+  static_cast<void>(agiru::UnbindSubscription(unsent));
+}
+
 void ATableTriggerEventReachesASubscriber() {
   Watcher_Codeunit watcher;
   static_cast<void>(agiru::BindSubscription(watcher));
@@ -220,5 +316,6 @@ int main() {
     AManualSubscriberHearsOnlyWhileBound();
     ASubscriberNamingAnUnpublishedParameterIsRefused();
     ATableTriggerEventReachesASubscriber();
+    ASubscriberNamedSenderReceivesTheRaisingRecord();
   });
 }

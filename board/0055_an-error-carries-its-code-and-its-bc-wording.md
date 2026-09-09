@@ -213,3 +213,14 @@ database layer writes `INSERT ... ON CONFLICT DO NOTHING` and reads the affected
 transaction stays usable after a refused insert -- a failed statement would have aborted it.
 `Modify`, `Delete`, `Get` and `Rename` still carry one spelling each; `Get` in statement form is
 silent where AL raises `does not exist`, which is the next row of this table.
+
+## Standing 2026-09-09: the code is the raising site
+
+`Error` carries a code beside its text and the transaction keeps both where `GetLastErrorText()`
+and `GetLastErrorCode()` read them. The code names the SITE, which is how `Assert.ExpectedErrorCode`
+reads it and what the UT suite expects 53 times: `TestField` from `TestField`, `TableErrorStr`
+from a `FieldError` or from any error raised inside a table trigger (`RunOnValidate` wraps it),
+`TestValidation` from an error under a `TestPage.SetValue` (the harness wraps it), and `Dialog`
+for an AL `Error(...)` that carries none. A coded error keeps its own code under a wrap. Gated in
+`RecordErrorGate`. Not yet coded: `DB:RecordNotFound` for a failed `Get`, `DB:PrimKeyExists` for a
+duplicate insert -- the two the suite does not ask for.

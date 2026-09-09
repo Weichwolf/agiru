@@ -77,6 +77,13 @@ void Scope::Discard(std::string_view why) {
   Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
 }
 
+void Scope::Discard(const Error &error) {
+  if (!open_) { return; }
+  open_ = false;
+  Session::Current().Transaction().SetLastError(error.what(), std::string(error.Code()));
+  Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
+}
+
 }
 
 namespace agiru {
@@ -85,6 +92,10 @@ namespace detail {
 
 void RememberError(std::string_view text) {
   Session::Current().Transaction().SetLastError(std::string(text));
+}
+
+void RememberError(const Error &error) {
+  Session::Current().Transaction().SetLastError(error.what(), std::string(error.Code()));
 }
 
 }

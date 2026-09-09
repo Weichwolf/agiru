@@ -7,6 +7,8 @@
 #include "type/Boolean.h"
 #include "type/Integer.h"
 
+#include <format>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -28,6 +30,8 @@ std::string Quoted(std::string_view name) {
   return out;
 }
 
+constexpr std::size_t kIdentifierLimit = 63;
+
 std::string SequenceName(std::string_view name, Boolean companySpecific) {
   std::string built(kPrefix);
   if (companySpecific) {
@@ -35,7 +39,10 @@ std::string SequenceName(std::string_view name, Boolean companySpecific) {
     built += '$';
   }
   built += name;
-  return built;
+  if (built.size() <= kIdentifierLimit) { return built; }
+  const std::size_t digest = std::hash<std::string>{}(built);
+  const std::string tail = std::format("${:016x}", digest);
+  return built.substr(0, kIdentifierLimit - tail.size()) + tail;
 }
 
 std::string Named(std::string_view name, Boolean companySpecific) {

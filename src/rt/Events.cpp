@@ -80,6 +80,10 @@ std::vector<std::size_t> Bind(const Subscription &subscription,
   for (const std::string_view name : subscription.parameters) {
     const auto at = std::ranges::find_if(
         args.names, [&](std::string_view published) { return SameName(published, name); });
+    if (at == args.names.end() && SameName(name, "Sender") && args.sender != nullptr) {
+      bound.push_back(kSenderSlot);
+      continue;
+    }
     if (at == args.names.end()) {
       throw Error("the subscriber " + std::string(catalogue.Name()) + " names a parameter " +
                   std::string(name) + " that the event " + std::string(subscription.event) +

@@ -284,7 +284,19 @@ public:
   /// \param character The character.
   /// \return This position.
   CharAt &operator=(Char character) {
-    Write(static_cast<char>(static_cast<std::int32_t>(character)));
+    const std::string encoded = Encoded(character);
+    if (encoded.size() == 1) {
+      Write(encoded.front());
+      return *this;
+    }
+    std::string text(value_->Value());
+    if (index_ >= 1 && static_cast<std::size_t>(index_) == text.size() + 1) {
+      text += encoded;
+    } else {
+      Check(text.size());
+      text.replace(static_cast<std::size_t>(index_) - 1, 1, encoded);
+    }
+    *value_ = std::string_view(text);
     return *this;
   }
 

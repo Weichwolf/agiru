@@ -72,3 +72,32 @@ in `build-asan/`, configured by hand from the Makefile's own invocation with `-f
 The sanitizer named the crash: `RunPageByNumber`'s taker accepted an `Instance<Record>` handle as
 a record because `TableTraits<Instance<T>>` is specialised, and took the handle's own address.
 Every by-number run and `AdoptRecord` dereference a handle first now (board:0030's page runner).
+
+## Standing 2026-09-09: two builds lost to a door edit under the build
+
+Build 24 died on `Catalogue.h` and build 26 on `JsonObject.h`, each edited in `include/` while the
+chain's `ninja` was compiling against the precompiled header, each reported as "file has been
+modified since the precompiled header was built" and followed by a page of artefact errors in
+files byte-identical to the committed tree. CLAUDE.md names this trap; the guard that holds is
+mechanical -- `ps` shows no `ninja` before any edit under `include/` -- and every door edit
+during a build is prepared in the scratchpad and applied only when the chain has printed its
+`make exit`.
+
+## Standing 2026-09-09: two more shells killed themselves, and a run by type would not link
+
+The `pkill -f "chai[n]6\.sh"` guard holds only while NOTHING ELSE on the same command line spells
+`chain6.sh`; a `sed` on the script and its `nohup` in the same command did, and the shell died
+with 144 twice before running the edit it was meant to run. The name is spelled through a glob
+(`ls $S/chai*6.sh`) or a split string (`"chai""n6"`) now, and the kill and the start never share a
+command. The other finding: a synthesised action that ran its page BY TYPE
+(`X_Page{}.Run(rec)`) made every page carrying one link against X's source, and most X are not in
+the slice; the run goes BY NUMBER through the page catalogue (`Page<>::Run(5897, rec)`), which is
+what the AL does too and refuses honestly at run time when the binary carries no such page.
+
+## Standing 2026-09-09: a probe during a measurement costs a codeunit
+
+`--fresh` clones the seeded template per codeunit, and PostgreSQL refuses a `CREATE DATABASE ...
+TEMPLATE` while another session holds the template: a probe run started beside the measurement
+made the measurement's next clone fail and `ERM Purch. Cr. Memo Aggr. UT` printed no total. A
+measurement OWNS the template while it runs, the way a build owns the tree; a probe waits for the
+milestone line, or clones from its own copy of the template.

@@ -101,6 +101,9 @@ public:
   /// \brief Reads back what `ToStorageText` wrote.
   /// \param text The stored form.
   /// \return The id, or WHY the text is not one.
+  /// \note SQL SERVER'S BLANK IS SIX ZERO BYTES, and the demo database carries it as the hex text
+  ///       `\x000000000000` in every RecordId column no row ever set; that is the empty id and
+  ///       not a refusal (`Bank Account."Bank Stmt. Service Record ID"`, 9 UT cases, 2026-09-09).
   [[nodiscard]] static std::expected<RecordId, Refusal> FromStorageText(std::string_view text);
 
   /// \brief AL `Format(RecordId)`.

@@ -61,7 +61,7 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void 
     method.invoke(instance);
   } catch (const Error &e) {
     static_cast<void>(HandlerTable::Uninstall());
-    scope.Discard(e.what());
+    scope.Discard(e);
     return TestResult{
         .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
   } catch (const std::exception &e) {

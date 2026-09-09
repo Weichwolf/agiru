@@ -82,6 +82,26 @@ void TestFieldMismatchCarriesBothValues() {
                Raised([&] { withWorkType.OnValidateCostType(); }));
 }
 
+/// `GetLastErrorCode()` NAMES THE RAISING SITE: `TestField` for a `TestField`, `Dialog` for an AL
+/// `Error(...)`, which is what `Assert.ExpectedErrorCode` compares against.
+std::string RaisedCode(auto &&f) {
+  try {
+    f();
+  } catch (const Error &e) { return std::string(e.Code().empty() ? "Dialog" : e.Code()); }
+  return {};
+}
+
+void TheCodeNamesTheRaisingSite() {
+  ResourceCost rec;
+  CHECK_TEXT("TestField carries its code",
+             RaisedCode([&] { rec.TestField(ResourceCost::Field_No::Code); }),
+             "TestField");
+  CHECK_TEXT("and a plain Error is a Dialog", RaisedCode([] { throw Error("x"); }), "Dialog");
+  CHECK_TEXT("while a coded error keeps its own under a wrap",
+             std::string(Error("x", "TestField").Coded("TableErrorStr").Code()),
+             "TestField");
+}
+
 void TestFieldOnABlankFieldSaysSo() {
   ResourceCost rec;
   CHECK_TEXT("TestField on a blank field",
@@ -137,6 +157,7 @@ int main() {
     TheTriggerStaysSilentWhenAlWouldStaySilent();
     TestFieldMismatchCarriesBothValues();
     TestFieldOnABlankFieldSaysSo();
+    TheCodeNamesTheRaisingSite();
     ThePrimaryKeySeparatorsDiffferBetweenTheTwo();
     StrSubstNoReplacesWhatItIsGiven();
     FieldCaptionIsTheAlCaption();

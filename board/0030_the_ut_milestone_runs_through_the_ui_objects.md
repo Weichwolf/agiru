@@ -276,3 +276,11 @@ set only when it is not there -- `page-run-integer-table-joker-method.md`: "Use 
 parameter to select a specific record to display on the page." A list opened on the third VAT
 return period drilled down into the first one before; 24 `VAT Return Period UT` cases read
 `Queue underflow` from the handler that never ran.
+
+## Standing 2026-09-09: a declarative action runs its page
+
+An action with `RunObject = Page X` and no `OnAction` is a trigger the platform supplies, and the
+transpiler now synthesises it the way it synthesises `Visible = <expression>`: a record of X's
+source table, `SetRange` per `RunPageLink` pair, `PAGE.Run(PAGE::X, record)`. The page index
+carries each page's source table for it. What is still declarative and still missing: `RunObject
+= Codeunit/Report`, `RunPageView`, `RunPageMode`, and a part's page (`PartRef::Page` refuses).

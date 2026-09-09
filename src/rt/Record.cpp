@@ -154,7 +154,8 @@ void FieldError(const void *record, const TableDef &table, FieldNo no, std::stri
   if (IsBlank(record, *def)) {
     throw Error("You must specify " + std::string(def->caption) + where + ".");
   }
-  throw Error(std::string(def->caption) + " must not be " + FieldText(record, *def) + where + ".");
+  throw Error(std::string(def->caption) + " must not be " + FieldText(record, *def) + where + ".",
+              "TableErrorStr");
 }
 
 namespace detail {
@@ -165,7 +166,8 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
   if (!IsBlank(record, *def)) { return; }
   const std::string key = PrimaryKeyText(record, table, ", ");
   throw Error(std::string(def->caption) + " must have a value in " + std::string(table.caption) +
-              (key.empty() ? std::string{} : ": " + key) + ". It cannot be zero or empty.");
+                  (key.empty() ? std::string{} : ": " + key) + ". It cannot be zero or empty.",
+              "TestField");
 }
 
 }
@@ -186,6 +188,9 @@ std::string MemberOrdinal(const FieldDef &def, std::string_view text) {
     return "0";
   }
   if (text.find_first_not_of("-0123456789") == std::string_view::npos) { return std::string(text); }
+  if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
+    text = text.substr(1, text.size() - 2);
+  }
   const auto same = [](std::string_view a, std::string_view b) {
     return std::ranges::equal(
         a, b, [](unsigned char x, unsigned char y) { return std::tolower(x) == std::tolower(y); });
@@ -205,8 +210,9 @@ void RaiseTestFieldMismatch(const void *record,
                             std::string_view actual) {
   const std::string key = PrimaryKeyText(record, table, ", ");
   throw Error(std::string(def.caption) + " must be equal to '" + std::string(expected) + "'  in " +
-              std::string(table.caption) + (key.empty() ? std::string{} : ": " + key) +
-              ". Current value is '" + std::string(actual) + "'.");
+                  std::string(table.caption) + (key.empty() ? std::string{} : ": " + key) +
+                  ". Current value is '" + std::string(actual) + "'.",
+              "TestField");
 }
 
 std::string SubstituteInto(std::string_view pattern, std::span<const std::string_view> values) {

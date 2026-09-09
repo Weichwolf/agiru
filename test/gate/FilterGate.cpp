@@ -1,5 +1,6 @@
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/RecordState.h"
 
 #include "Check.h"
 #include "Filter.h"
@@ -136,6 +137,14 @@ void AQuotedOperandIsNotSplitOnItsOperators() {
 
 /// AN EMPTY TERM IS THE BLANK VALUE, not a syntax error: `SetFilter(F, '%1|%2', Blank, Payment)`
 /// renders the blank option member as nothing, and BC reads `|Payment` as "blank or Payment".
+/// A BLANK VALUE FILTERS TO BLANK: `Literally('')` spells the filter `''`, which selects the empty
+/// string and not every row.
+void ABlankValueIsAFilter() {
+  CHECK_TEXT("the blank spells itself quoted", agiru::detail::Literally(""), "''");
+  CHECK_TRUE("and the quoted blank passes the blank", Passes("''", "", TextField()));
+  CHECK_TRUE("and not a value", !Passes("''", "A", TextField()));
+}
+
 void AnEmptyTermMeansBlank() {
   CHECK_TRUE("the blank passes the empty term", Passes(" |Payment", "", TextField()));
   CHECK_TRUE("and the named alternative passes", Passes(" |Payment", "Payment", TextField()));
@@ -260,6 +269,7 @@ int main() {
     AQuotedOperandIsNotSplitOnItsOperators();
     AnEmptyFilterPassesEverything();
     AnEmptyTermMeansBlank();
+    ABlankValueIsAFilter();
     ARangeHasTwoEndsAndAnythingElseIsNotARange();
   });
 }

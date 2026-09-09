@@ -10,6 +10,8 @@
 
 namespace agiru {
 
+class Error;
+
 class Connection;
 
 /// \brief The nested boundaries a session is inside, innermost last.
@@ -60,16 +62,32 @@ public:
   /// \return The text, or empty when nothing has failed in this session.
   [[nodiscard]] std::string_view LastError() const { return lastError_; }
 
-  /// \brief Records the message a boundary is rolling back.
+  /// \brief The last error's code, `Dialog` when the error carried none.
+  /// \return The code, empty when no error stands.
+  [[nodiscard]] std::string_view LastErrorCode() const {
+    return lastError_.empty() ? std::string_view{}
+                              : (lastErrorCode_.empty() ? std::string_view{"Dialog"}
+                                                        : std::string_view(lastErrorCode_));
+  }
+
+  /// \brief Records the message a boundary is rolling back, and the code it carried.
   /// \param text The error's text.
-  void SetLastError(std::string text) { lastError_ = std::move(text); }
+  /// \param code The error's code, empty for an AL `Error(...)`.
+  void SetLastError(std::string text, std::string code = {}) {
+    lastError_ = std::move(text);
+    lastErrorCode_ = std::move(code);
+  }
 
   /// \brief AL `ClearLastError()`.
-  void ClearLastError() { lastError_.clear(); }
+  void ClearLastError() {
+    lastError_.clear();
+    lastErrorCode_.clear();
+  }
 
 private:
   std::vector<std::string> names_;
   std::string lastError_;
+  std::string lastErrorCode_;
   std::size_t issued_ = 0;
 };
 
@@ -100,6 +118,10 @@ public:
   /// \brief Discards everything written inside, and remembers why.
   /// \param why The error's text, which AL `GetLastErrorText()` returns afterwards.
   void Discard(std::string_view why);
+
+  /// \brief Discards everything written inside, and remembers the error with its code.
+  /// \param error The error.
+  void Discard(const Error &error);
 
 private:
   std::size_t depth_;

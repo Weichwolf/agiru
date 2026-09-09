@@ -127,11 +127,12 @@ void DeleteAllTakesTheFilteredRows() {
   ResourceCost rest;
   CHECK_TRUE("and only those", static_cast<int>(rest.Count()) == kRows / 2);
 
-  bool refused = false;
-  try {
-    rest.DeleteAll(true);
-  } catch (const Error &) { refused = true; }
-  CHECK_TRUE("DeleteAll(true) refuses rather than skipping OnDelete", refused);
+  // `DeleteAll(true)` RUNS `OnDelete` FOR EVERY ROW, `record-deleteall-method.md`: "If RunTrigger
+  // is true, the OnDelete trigger runs" -- so it walks the rows through `Delete(true)` and ends
+  // empty.
+  rest.DeleteAll(true);
+  CHECK_TRUE("DeleteAll(true) deletes every remaining row through its trigger",
+             static_cast<bool>(rest.IsEmpty()));
   DropTable(Session::Current().Database(), agiru::TableTraits<ResourceCost>::kTable);
 }
 

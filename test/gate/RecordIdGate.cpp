@@ -46,6 +46,20 @@ void ABlankRecordIdFormatsToTheEmptyString() {
   CHECK_TRUE("and renders", !SalesOrder().ToText().empty());
 }
 
+/// SQL SERVER'S BLANK RECORDID IS SIX ZERO BYTES, and the demo database carries it as the hex
+/// text `\x000000000000` in every RecordId column no row ever set. It reads as the empty id.
+void AStoredBlankReadsAsTheEmptyId() {
+  const auto blank = RecordId::FromStorageText("\\x000000000000");
+  CHECK_TRUE("the six zero bytes parse", blank.has_value());
+  CHECK_TRUE("and are the empty id", blank.has_value() && blank->IsEmpty());
+  const auto empty = RecordId::FromStorageText("");
+  CHECK_TRUE("as the empty text does", empty.has_value() && empty->IsEmpty());
+
+  // THE NEGATIVE CONTROL: a byte string that is not all zero is still not an id.
+  const auto other = RecordId::FromStorageText("\\x000000000001");
+  CHECK_TRUE("while a non-zero byte string still refuses", !other.has_value());
+}
+
 /// `recordid-tableno-method.md`: "This function returns an error if the record is blank."
 void TableNoRefusesOnABlankRecordId() {
   constexpr int kSalesHeader = 36;
@@ -75,5 +89,6 @@ int main() {
     ABlankRecordIdFormatsToTheEmptyString();
     TableNoRefusesOnABlankRecordId();
     TwoRecordIdsCompareByTableAndKey();
+    AStoredBlankReadsAsTheEmptyId();
   });
 }

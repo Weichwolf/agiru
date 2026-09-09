@@ -26,7 +26,18 @@ enum class EventObject : std::uint8_t { Codeunit, Table, Page, Report, XmlPort, 
 struct EventArgs {
   std::span<const std::string_view> names; ///< The publisher's parameter names.
   std::span<void *const> values;           ///< The arguments, one address per name.
+  /// \brief The object raising the event, for a subscriber whose first parameter is `Sender`.
+  /// \note AL'S RULE, NOT A CONVENTION: a subscriber to a table or codeunit event may declare a
+  ///       first parameter named `Sender` of the publisher's type and receives the raising
+  ///       instance, which the publisher never lists among its parameters. 13 subscribers in
+  ///       `Layers/W1` do (`RecordRestrictionMgt.CustomerCheckSalesPostRestrictions(var Sender:
+  ///       Record "Sales Header")`), and the dispatch refused every one as naming an unpublished
+  ///       parameter (13 UT cases, 2026-09-09).
+  void *sender = nullptr;
 };
+
+/// \brief The bound index that means "the sender", which no argument list is long enough to hold.
+inline constexpr std::size_t kSenderSlot = static_cast<std::size_t>(-1);
 
 /// \brief One `[EventSubscriber]` procedure, as `constexpr` data beside its codeunit.
 struct Subscription {
@@ -140,7 +151,8 @@ void CallBound(T &unit,
                std::span<const std::size_t> bound,
                [[maybe_unused]] void (T::*signature)(P...)) {
   [&]<std::size_t... I>(std::index_sequence<I...>) {
-    (unit.*Method)(*static_cast<std::remove_cvref_t<P> *>(args.values[bound[I]])...); // NOLINT
+    (unit.*Method)(*static_cast<std::remove_cvref_t<P> *>(
+        bound[I] == kSenderSlot ? args.sender : args.values[bound[I]])...); // NOLINT
   }(std::index_sequence_for<P...>{});
 }
 
@@ -161,6 +173,35 @@ void InvokeSubscriber(void *instance, const EventArgs &args, std::span<const std
 /// \param element    The field, for a table trigger event; empty otherwise.
 /// \param names      The publisher's parameter names.
 /// \param values     The arguments, one per name.
+/// \brief Raises an event from the object raising it, so a `Sender` parameter can receive it.
+/// \tparam Values The arguments' types.
+/// \param sender The raising object, or `nullptr` when the raise has none.
+/// \param kind What kind of object publishes.
+/// \param objectId Its number.
+/// \param objectName Its name.
+/// \param event The event's name.
+/// \param element The element, for a trigger event.
+/// \param names The publisher's parameter names.
+/// \param values The arguments.
+template <typename... Values>
+void RaiseEventFrom(void *sender,
+                    EventObject kind,
+                    std::int32_t objectId,
+                    std::string_view objectName,
+                    std::string_view event,
+                    std::string_view element,
+                    std::span<const std::string_view> names,
+                    Values &...values) {
+  std::array<void *, sizeof...(Values)> addresses{
+      const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
+  Raise(kind,
+        objectId,
+        objectName,
+        event,
+        element,
+        EventArgs{.names = names, .values = addresses, .sender = sender});
+}
+
 template <typename... Values>
 void RaiseEventOn(EventObject kind,
                   std::int32_t objectId,
@@ -169,9 +210,7 @@ void RaiseEventOn(EventObject kind,
                   std::string_view element,
                   std::span<const std::string_view> names,
                   Values &...values) {
-  std::array<void *, sizeof...(Values)> addresses{
-      const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
-  Raise(kind, objectId, objectName, event, element, EventArgs{.names = names, .values = addresses});
+  RaiseEventFrom(nullptr, kind, objectId, objectName, event, element, names, values...);
 }
 
 /// \brief `RaiseEventOn` with no element -- what a codeunit's publisher emits.

@@ -64,6 +64,21 @@ void RecordRef::SetView(std::string_view String) {
   detail::ApplyView(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), Table(), String);
 }
 
+::agiru::SecurityFilter RecordRef::SecurityFiltering() const {
+  if (record_ == nullptr) { return ::agiru::SecurityFilter::Validated; }
+  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  return state == nullptr ? ::agiru::SecurityFilter::Validated : state->securityFiltering;
+}
+
+::agiru::SecurityFilter
+RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering) {
+  if (record_ == nullptr) { throw Error("RecordRef.SecurityFiltering: the RecordRef is not open"); }
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record_)->Ensure();
+  const ::agiru::SecurityFilter was = state.securityFiltering;
+  state.securityFiltering = NewSecurityFiltering;
+  return was;
+}
+
 ::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
   return detail::RuntimeFilterGroup(record_, NewGroup);
 }
@@ -108,6 +123,10 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
     detail::SetFieldText(record_, *def, values[at]);
   }
   return detail::RuntimeGet(record_, table);
+}
+
+::agiru::Integer RecordRef::Next(::agiru::Integer Steps) {
+  return detail::RuntimeNext(record_, Table(), Steps == 0 ? 1 : Steps);
 }
 
 ::agiru::Boolean RecordRef::FindSet() {
@@ -156,8 +175,8 @@ void RecordRef::GetTable(Variant &rec) {
     throw Error("RecordRef.GetTable: table " + std::to_string(held->table.Value()) +
                 " is not installed in this binary");
   }
-  record_ = const_cast<void *>(held->record); // NOLINT(cppcoreguidelines-pro-type-const-cast)
-  table_ = entry->table;
+  Open(held->table.Value());
+  entry->copy(record_, held->record);
 }
 
 std::string RecordRef::GetFilters() const {

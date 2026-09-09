@@ -34,6 +34,16 @@ public:
   ///       shape a test writes to re-raise -- does not compile.
   explicit Error(std::string_view text) : std::runtime_error(std::string(text)) {}
 
+  /// \brief An error with the CODE `GetLastErrorCode()` reports beside its text.
+  /// \param text The text.
+  /// \param code The code: `TestField`, `TableErrorStr`, `TestValidation`; empty reads `Dialog`.
+  /// \note THE CODE IS THE RAISING SITE, which is how `Assert.ExpectedErrorCode` reads it: an
+  ///       `Error(...)` in AL is `Dialog`, `TestField` is `TestField`, an error raised INSIDE a
+  ///       table trigger is `TableErrorStr`, and one raised under a `TestPage.SetValue` is
+  ///       `TestValidation` -- the UT suite expects those four, 53 times (measured 2026-09-09).
+  Error(std::string_view text, std::string_view code)
+      : std::runtime_error(std::string(text)), code_(code) {}
+
   /// \brief AL `Error(ErrorInfo)` -- the error an `ErrorInfo` describes.
   ///
   /// \tparam Info Anything that carries a `Message()`, which is what `ErrorInfo` is here.
@@ -45,6 +55,20 @@ public:
   template <typename Info>
     requires requires(Info &info) { std::string_view{info.Message()}; }
   explicit Error(Info info) : std::runtime_error(std::string(info.Message())) {}
+
+  /// \brief The code, empty for an AL `Error(...)`.
+  /// \return The code.
+  [[nodiscard]] std::string_view Code() const { return code_; }
+
+  /// \brief The same error with a code, when it has none yet -- what a wrapping site gives it.
+  /// \param code The code the site stands for.
+  /// \return This error, coded.
+  [[nodiscard]] Error Coded(std::string_view code) const {
+    return Error(what(), code_.empty() ? code : std::string_view(code_));
+  }
+
+private:
+  std::string code_;
 };
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.
@@ -84,13 +108,18 @@ namespace detail {
 /// \param text The message.
 void RememberError(std::string_view text);
 
+/// \brief Keeps an error's text AND CODE where `GetLastErrorText()` and `GetLastErrorCode()` read
+///        them.
+/// \param error The error.
+void RememberError(const Error &error);
+
 }
 
 template <typename Body> [[nodiscard]] bool Tried(Body body) {
   try {
     body();
   } catch (const Error &e) {
-    detail::RememberError(e.what());
+    detail::RememberError(e);
     return false;
   }
   return true;
@@ -101,7 +130,7 @@ template <typename Body> void AssertError(Body body) {
   try {
     body();
   } catch (const Error &e) {
-    scope.Discard(e.what());
+    scope.Discard(e);
     return;
   }
   scope.Keep();

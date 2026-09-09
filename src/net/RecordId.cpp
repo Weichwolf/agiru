@@ -37,8 +37,18 @@ std::string RecordId::ToStorageText() const {
   return out;
 }
 
+namespace {
+
+bool IsSqlServersBlank(std::string_view text) {
+  if (!text.starts_with("\\x")) { return false; }
+  const std::string_view digits = text.substr(2);
+  return !digits.empty() && digits.find_first_not_of('0') == std::string_view::npos;
+}
+
+}
+
 std::expected<RecordId, Refusal> RecordId::FromStorageText(std::string_view text) {
-  if (text.empty()) { return RecordId{}; }
+  if (text.empty() || IsSqlServersBlank(text)) { return RecordId{}; }
   std::vector<std::string> parts;
   std::size_t at = 0;
   while (at <= text.size()) {

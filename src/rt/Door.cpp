@@ -2238,7 +2238,7 @@ std::string SessionSettings::TimeZone(std::string_view NewTimeZone) {
 }
 
 ::agiru::Boolean TaskScheduler::CanCreateTask() {
-  RefuseDoor("TaskScheduler.CanCreateTask()");
+  return true;
 }
 
 ::agiru::Guid TaskScheduler::CreateTask(::agiru::Integer CodeunitId,

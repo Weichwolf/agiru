@@ -476,8 +476,8 @@ public:
   /// \tparam T The generated table class.
   /// \param rec The record.
   template <typename T> void GetTable(T &rec) {
-    record_ = &rec;
-    table_ = &TableTraits<T>::kTable;
+    Open(TableTraits<T>::kTable.id.Value());
+    *static_cast<std::remove_cvref_t<T> *>(record_) = rec;
   }
 
   /// \brief AL `RecordRef.Open(TableNo, Temporary [, Company])`.
@@ -964,10 +964,7 @@ public:
   /// \param Steps The AL `Integer`.
   /// \return The AL `Integer`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Next(::agiru::Integer Steps = {}) {
-    static_cast<void>(Steps);
-    throw Error("RecordRef.Next(Integer) is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Integer Next(::agiru::Integer Steps = {});
 
   /// \brief AL `RecordRef.ReadConsistency()`. Gets a value indicating whether read consistency is
   /// enabled.
@@ -1038,12 +1035,15 @@ public:
   /// \param NewSecurityFiltering The AL `SecurityFilter`.
   /// \return The AL `SecurityFilter`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::SecurityFilter
-  SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering = {}) {
-    static_cast<void>(NewSecurityFiltering);
-    throw Error("RecordRef.SecurityFiltering(SecurityFilter) is declared and not implemented yet "
-                "(board:0035)");
-  }
+  /// \brief AL `RecordRef.SecurityFiltering()` -- how security filters apply to this record.
+  /// \return The mode, `Validated` for a RecordRef that never set one.
+  ::agiru::SecurityFilter SecurityFiltering() const;
+
+  /// \brief AL `RecordRef.SecurityFiltering(SecurityFilter)` -- sets how security filters apply,
+  ///        carried on the record's state the way `Record.SecurityFiltering` carries it.
+  /// \param NewSecurityFiltering The mode.
+  /// \return The mode that was set before.
+  ::agiru::SecurityFilter SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering);
 
   /// \brief AL `RecordRef.SetAutoCalcFields(Integer)`. Sets the FlowFields that you specify to be
   /// automatically calculated when the RecordRef is retrieved from the database.
@@ -1061,11 +1061,12 @@ public:
   /// initial load.
   /// \param Fields The AL `Integer`.
   /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \note A HINT AND NOT A CONTRACT: `recordref-setloadfields-method.md` says the fields are
+  ///       loaded "initially" and any other on access, so a runtime that loads every column is
+  ///       correct and only slower; the answer is true.
   ::agiru::Boolean SetLoadFields(::agiru::Integer Fields = {}) {
     static_cast<void>(Fields);
-    throw Error(
-        "RecordRef.SetLoadFields(Integer) is declared and not implemented yet (board:0035)");
+    return true;
   }
 
   /// \brief AL `RecordRef.SetPermissionFilter()`. Applies the user's security filter to the
@@ -1118,9 +1119,14 @@ public:
       { R::kId } -> std::convertible_to<TableId>;
     }
   void SetTable(R &Rec) {
-    Close();
-    record_ = &Rec;
-    table_ = &TableTraits<R>::kTable;
+    if (record_ == nullptr || table_ == nullptr) {
+      throw Error("RecordRef.SetTable: the RecordRef is not open");
+    }
+    if (table_->id != TableTraits<R>::kTable.id) {
+      throw Error("RecordRef.SetTable: the RecordRef refers to " + std::string(table_->name) +
+                  " and the record is a " + std::string(TableTraits<R>::kTable.name));
+    }
+    Rec = *static_cast<R *>(record_);
   }
 
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.

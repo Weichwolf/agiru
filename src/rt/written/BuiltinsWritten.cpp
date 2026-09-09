@@ -714,7 +714,7 @@ void Randomize(::agiru::Integer Seed) {
 }
 
 ::agiru::Text<0> GetLastErrorCode() {
-  return ::agiru::Text<0>{};
+  return ::agiru::Text<0>{Session::Current().Transaction().LastErrorCode()};
 }
 
 ::agiru::Time CurrentTime() {

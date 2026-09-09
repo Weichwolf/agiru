@@ -347,8 +347,10 @@ public:
       throw Error("the control '" + std::string(control) + "' shows no field to set");
     }
     if constexpr (kHasRecord) {
-      Record_().ValidateText(def->field, text);
-      RunTrigger_(control, ControlTriggerKind::Validate, true);
+      try {
+        Record_().ValidateText(def->field, text);
+        RunTrigger_(control, ControlTriggerKind::Validate, true);
+      } catch (const Error &e) { throw e.Coded("TestValidation"); }
     } else {
       static_cast<void>(text);
       Unopened_();

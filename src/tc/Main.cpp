@@ -877,6 +877,19 @@ struct Pages {
   std::vector<std::string> paths;
 };
 
+std::string SourceTableNameOf(const agiru::al::PageObject &object) {
+  const agiru::al::Property *source = agiru::al::Find(object.properties, "SourceTable");
+  if (source == nullptr) { return {}; }
+  std::string named = source->text;
+  for (const agiru::al::Token &token : source->value) {
+    if (token.kind == agiru::al::TokenKind::QuotedIdentifier ||
+        token.kind == agiru::al::TokenKind::Identifier) {
+      named = token.text;
+    }
+  }
+  return named;
+}
+
 Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Pages pages;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Page.al")) {
@@ -897,7 +910,7 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .id = object.id,
                                .fields = std::move(controlNames),
                                .procedures = {},
-                               .name = {},
+                               .name = SourceTableNameOf(object),
                                .dataItems = {},
                                .requestFields = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
@@ -2045,6 +2058,9 @@ int Scan(const Job &job) {
     WriteEnums(run, heldEnums, objects);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
+    for (agiru::al::PageObject &page : parsed.objects) {
+      agiru::gen::SynthesizeRunObjectActions(page, objects);
+    }
     WritePages(run, parsed, objects, gathered, everyTable);
 
     std::println("{:<{}}{} table(s), {} codeunit(s), {} page(s), {} enum(s), {} [Test] method(s){}",

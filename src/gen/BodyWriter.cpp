@@ -528,9 +528,15 @@ private:
     }
     const al::Expr &qualifier = callee.children[0];
     const al::Expr &member = callee.children[1];
-    if (qualifier.kind != al::ExprKind::Name || member.kind != al::ExprKind::Name ||
-        !SameName(qualifier.text, "System") || scope_.IsVariable(qualifier.text) ||
-        !DoorCalls(member.text)) {
+    static constexpr std::array kQualifiers{std::string_view{"System"},
+                                            std::string_view{"Session"},
+                                            std::string_view{"Database"},
+                                            std::string_view{"Dialog"}};
+    const bool qualifies = std::ranges::any_of(kQualifiers, [&qualifier](std::string_view name) {
+      return SameName(qualifier.text, name);
+    });
+    if (qualifier.kind != al::ExprKind::Name || member.kind != al::ExprKind::Name || !qualifies ||
+        scope_.IsVariable(qualifier.text) || !DoorCalls(member.text)) {
       return {};
     }
     return "::agiru::" + BuiltinSpelling(member.text);
@@ -1748,7 +1754,7 @@ public:
   [[nodiscard]] std::string GlobalSpelling(std::string_view name) const {
     for (const al::VarDecl &declared : page_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return Identifier(declared.name);
+        return PageVariableIdentifier(page_, declared.name);
       }
     }
     for (const al::LabelDecl &label : page_.labels) {
@@ -1927,6 +1933,13 @@ public:
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
     if (const std::string procedure = ProcedureOf(member); !procedure.empty()) { return procedure; }
+    if (SameName("this", member.variable) || SameName("CurrPage", member.variable)) {
+      for (const al::VarDecl &declared : page_.variables) {
+        if (SameName(declared.name, member.field)) {
+          return PageVariableIdentifier(page_, declared.name);
+        }
+      }
+    }
     if (MemberIsCall(member) && !IsRecord(member.variable) &&
         !SameName("CurrPage", member.variable) && FieldsOfRecord(member.variable) == nullptr) {
       return AsTheDoorSpellsIt(Identifier(member.field));
@@ -2004,9 +2017,13 @@ public:
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
-    if (const al::VarDecl *where = DeclarationOf(name);
-        where != nullptr && TypeName(where->type) == "Option" && !where->members.empty()) {
-      return OptionContentName(where->members);
+    if (const al::VarDecl *where = DeclarationOf(name); where != nullptr) {
+      if (TypeName(where->type) == "Option" && !where->members.empty()) {
+        return OptionContentName(where->members);
+      }
+      if (TypeName(where->type) == "Enum" && !where->subtype.empty()) {
+        return NamedEnum(objects_, where->subtype);
+      }
     }
     if (source_ == nullptr) { return {}; }
     const al::FieldDecl *field = FieldNamed(*source_, name);

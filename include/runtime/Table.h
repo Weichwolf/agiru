@@ -2095,7 +2095,9 @@ private:
     if constexpr (requires { TableTraits<Derived>::kOnValidate; }) {
       for (const auto &[field, run] : TableTraits<Derived>::kOnValidate) {
         if (field == no) {
-          run(static_cast<Derived &>(*this));
+          try {
+            run(static_cast<Derived &>(*this));
+          } catch (const Error &e) { throw e.Coded("TableErrorStr"); }
           return;
         }
       }
@@ -2107,7 +2109,11 @@ private:
     const auto offset = static_cast<std::size_t>(static_cast<const std::byte *>(member) -
                                                  static_cast<const std::byte *>(Self()));
     const FieldDef *def = FieldAtOffset(TableTraits<Derived>::kTable, offset);
-    if (def == nullptr) { throw Error("this record declares no field at that position"); }
+    if (def == nullptr) {
+      throw Error("this record, a " + std::string(TableTraits<Derived>::kTable.name) +
+                  ", declares no field at byte " + std::to_string(offset) +
+                  ": the member belongs to another record");
+    }
     return def->no;
   }
 
@@ -2215,14 +2221,16 @@ private:
   void TableEvent(std::string_view event, Boolean RunTrigger) {
     static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
     auto &rec = static_cast<Derived &>(*this);
-    detail::RaiseEvent(EventObject::Table,
-                       TableTraits<Derived>::kTable.id.Value(),
-                       TableTraits<Derived>::kTable.name,
-                       event,
-                       kNames,
-                       rec,
-                       rec,
-                       RunTrigger);
+    detail::RaiseEventFrom(static_cast<void *>(&rec),
+                           EventObject::Table,
+                           TableTraits<Derived>::kTable.id.Value(),
+                           TableTraits<Derived>::kTable.name,
+                           event,
+                           {},
+                           kNames,
+                           rec,
+                           rec,
+                           RunTrigger);
   }
 
   /// Takes the image `xRec` reads: a copy of this record with no state of its own, so an image

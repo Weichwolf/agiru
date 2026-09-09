@@ -325,7 +325,7 @@ public:
     try {
       static_cast<Derived *>(this)->OnRun();
     } catch (const Error &e) {
-      scope.Discard(e.what());
+      scope.Discard(e);
       return false;
     }
     scope.Keep();
@@ -373,7 +373,7 @@ public:
         rec = static_cast<Derived *>(this)->Rec;
       }
     } catch (const Error &e) {
-      scope.Discard(e.what());
+      scope.Discard(e);
       return false;
     }
     scope.Keep();

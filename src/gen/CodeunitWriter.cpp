@@ -167,8 +167,9 @@ std::string RaisingBody(const al::ProcedureDecl &procedure,
     if (i != 0) { out += ", "; }
     out += Literal(procedure.parameters[i].name);
   }
-  out += "};\n  ::agiru::detail::RaiseEvent(::agiru::" + std::string(kind) + ", " + objectId +
-         ", " + objectName + ", " + Literal(procedure.name) + ", kNames";
+  out += "};\n  ::agiru::detail::RaiseEventFrom(static_cast<void *>(this), ::agiru::" +
+         std::string(kind) + ", " + objectId + ", " + objectName + ", " + Literal(procedure.name) +
+         ", {}, kNames";
   for (const al::VarDecl &parameter : procedure.parameters) {
     out += ", " + Identifier(parameter.name);
   }

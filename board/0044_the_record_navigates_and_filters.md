@@ -189,3 +189,13 @@ The same page settles three smaller things:
 - **`Insert` may be given a `SystemId`, and "after the `SystemId` is set on a record, it can't be
   changed"** -- an immutability rule board:0013 owes, and the reason
   `record-insert-boolean-boolean-method.md` is the page CLAUDE.md names as the overload that matters.
+
+## Standing 2026-09-09: a blank is a filter, an empty term is the blank, a RecordRef owns its record
+
+`SetRange(F, blank)` spelled the blank as an empty filter text and `Narrow` read that as "clear the
+field": `SetRange("Starting Date", 0D)` widened where AL narrows, and the number-series line search
+walked past its own line. `Literally('')` is `''` now, an empty term in a filter is the blank value
+rather than a syntax error, a blank binds per column type, and a member name in double quotes folds
+to its ordinal. `RecordRef.GetTable(Record)` copies into a record the RecordRef owns and
+`SetTable` copies back -- the reference form handed a procedure's local out with the RecordRef, a
+stack-use-after-return the address sanitizer named in `ERM VAT VIES Lookup UT`.

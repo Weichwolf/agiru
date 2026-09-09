@@ -103,6 +103,19 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Add(std::string_view Key, ::agiru::Integer Value);
 
+  /// \brief AL `JsonObject.Add(Key, Option)` -- `jsonvalue-setvalue-option-method.md`: "When Value
+  ///        is a Char, Byte, Option, Integer type, the integral value will be stored and serialized
+  ///        as a JSON Number."
+  /// \tparam O An Option or Enum, anything that answers `AsInteger()`.
+  /// \param Key The key.
+  /// \param Value The member, whose ordinal is stored.
+  /// \return Whether the key was added.
+  template <typename O>
+    requires requires(const O &value) { value.AsInteger(); } ::agiru::Boolean
+  Add(std::string_view Key, const O &Value) {
+    return Add(Key, ::agiru::Integer{Value.AsInteger()});
+  }
+
   /// \brief AL `JsonObject.Add(Text, JsonArray)`. Adds a new property to a JsonObject.
   /// \param Key The AL `Text`.
   /// \param Value The AL `JsonArray`.

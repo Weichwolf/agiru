@@ -212,6 +212,7 @@ void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text)
 }
 
 std::string Literally(std::string_view value) {
+  if (value.empty()) { return "''"; }
   if (value.find_first_of("..|&<>=*?@'()") == std::string_view::npos) { return std::string(value); }
   std::string out = "'";
   for (const char c : value) {

@@ -448,6 +448,10 @@ void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text)
 ///
 /// \note `SetRange(No, 'A..B')` FILTERS FOR THAT LITERAL CODE and not for a range: the value came
 ///       from a variable and AL never re-reads it as an expression. Quoting is what says so.
+/// \note A BLANK VALUE IS THE FILTER `''` AND NOT NO FILTER. `SetRange(Code, '')` selects the
+///       rows whose Code is empty and `SetRange("Starting Date", 0D)` the blank dates; rendering
+///       the blank as an empty filter text made `Narrow` CLEAR the field instead, and the
+///       number-series line search walked past its own line (20 UT cases, 2026-09-09).
 [[nodiscard]] std::string Literally(std::string_view value);
 
 /// \brief AL `Record.GetView(UseNames)`: the sort order, direction and the current group's

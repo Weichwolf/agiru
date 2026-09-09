@@ -123,11 +123,11 @@ std::vector<std::string> Distinct(const std::vector<std::string> &alNames,
   std::vector<std::string> made;
   made.reserve(alNames.size());
   for (const std::string &alName : alNames) {
-    const std::string plain = Identifier(alName);
+    const std::string plain = Identifier(alName).empty()
+                                  ? "Control_" + std::to_string(made.size() + 1)
+                                  : Identifier(alName);
     std::string unique = plain;
-    for (int n = 2; !plain.empty() && !taken.insert(unique).second; ++n) {
-      unique = plain + "_" + std::to_string(n);
-    }
+    for (int n = 2; !taken.insert(unique).second; ++n) { unique = plain + "_" + std::to_string(n); }
     made.push_back(std::move(unique));
   }
   return made;

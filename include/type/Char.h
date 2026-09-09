@@ -178,9 +178,32 @@ private:
 /// \note WITHOUT IT THE `+` WAS POINTER ARITHMETIC. A `Char` converts to its code point, so
 ///       `std::string + Char` read as "advance a pointer" and the diagnostic named the operands
 ///       rather than the AL line that concatenated them.
+/// \brief The character as UTF-8, which is what every text in this runtime holds.
+/// \param character The character.
+/// \return One to three bytes.
+/// \note A CODE POINT ABOVE 127 IS NOT ONE BYTE. Appending it as one put a lone 0x85 into a
+///       `Payment Export Data` row and PostgreSQL refused the whole insert as invalid UTF-8
+///       (`Data Exch. Exp. Latin Char UT`, 2026-09-09); AL's `Char` is a UTF-16 code unit and its
+///       text form is that code point encoded, never its low byte.
+[[nodiscard]] inline std::string Encoded(Char character) {
+  const auto code = static_cast<std::uint32_t>(static_cast<std::int32_t>(character));
+  std::string out;
+  if (code < 0x80U) {
+    out += static_cast<char>(code);
+  } else if (code < 0x800U) {
+    out += static_cast<char>(0xC0U | (code >> 6U));
+    out += static_cast<char>(0x80U | (code & 0x3FU));
+  } else {
+    out += static_cast<char>(0xE0U | (code >> 12U));
+    out += static_cast<char>(0x80U | ((code >> 6U) & 0x3FU));
+    out += static_cast<char>(0x80U | (code & 0x3FU));
+  }
+  return out;
+}
+
 [[nodiscard]] inline std::string operator+(std::string_view text, Char character) {
   std::string out(text);
-  out += static_cast<char>(static_cast<std::int32_t>(character));
+  out += Encoded(character);
   return out;
 }
 
@@ -189,7 +212,7 @@ private:
 /// \param text The text.
 /// \return The character with the text after it.
 [[nodiscard]] inline std::string operator+(Char character, std::string_view text) {
-  std::string out(1, static_cast<char>(static_cast<std::int32_t>(character)));
+  std::string out = Encoded(character);
   out += text;
   return out;
 }

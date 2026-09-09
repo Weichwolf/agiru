@@ -7,6 +7,7 @@
 #include "EnumWriter.h"
 #include "Names.h"
 #include "Scope.h"
+#include "Statements.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -16,6 +17,7 @@
 #include <map>
 #include <set>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -797,8 +799,172 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
   return out;
 }
 
+std::string SourceTableNameOf(const al::PageObject &object) {
+  const al::Property *source = al::Find(object.properties, "SourceTable");
+  if (source == nullptr) { return {}; }
+  std::string named = source->text;
+  for (const al::Token &token : source->value) {
+    if (token.kind == al::TokenKind::QuotedIdentifier || token.kind == al::TokenKind::Identifier) {
+      named = token.text;
+    }
+  }
+  return named;
+}
+
+std::string PageVariableIdentifier(const al::PageObject &page, std::string_view name) {
+  const std::string plain = Identifier(name);
+  for (const auto &[key, identifier] : ControlIdentifiers(page)) {
+    if (identifier == plain) { return plain + "_Var"; }
+  }
+  return plain;
+}
+
+std::vector<al::VarDecl> VariablesAside(const al::PageObject &page) {
+  std::vector<al::VarDecl> aside = page.variables;
+  for (al::VarDecl &declared : aside) {
+    const std::string spelled = PageVariableIdentifier(page, declared.name);
+    if (spelled != Identifier(declared.name)) { declared.name = spelled; }
+  }
+  return aside;
+}
+
 std::string PageHeaderPath(const al::PageObject &object) {
   return OutputDirectory(object.nameSpace, ObjectKind::Page) + "/" + Identifier(object.name) + ".h";
+}
+
+namespace {
+
+al::Token Word(al::TokenKind kind, std::string text) {
+  return al::Token{.kind = kind, .text = std::move(text), .line = 0, .column = 0};
+}
+
+al::Token Mark(std::string text) {
+  return Word(al::TokenKind::Punctuation, std::move(text));
+}
+
+bool DeclaresTrigger(const al::PageControl &control, std::string_view name) {
+  return std::ranges::any_of(control.triggers, [name](const al::ProcedureDecl &trigger) {
+    return LowerKey(trigger.name) == LowerKey(std::string(name));
+  });
+}
+
+void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Objects &objects) {
+  for (al::PageControl &control : controls) {
+    SynthesizeRunObjectActions(control.children, objects);
+    if (!IsAction(control.kind) || DeclaresTrigger(control, "OnAction")) { continue; }
+    const al::Property *run = al::Find(control.properties, "RunObject");
+    if (run == nullptr || run->value.size() < 2 || LowerKey(run->value.front().text) != "page") {
+      continue;
+    }
+    const al::Token &named = run->value[1];
+    const auto page =
+        named.kind == al::TokenKind::Integer
+            ? std::ranges::find_if(
+                  objects.pages,
+                  [&](const auto &entry) { return std::to_string(entry.second.id) == named.text; })
+            : objects.pages.find(LowerKey(named.text));
+    if (page == objects.pages.end()) { continue; }
+    if (page->second.name.empty() ||
+        objects.tables.find(LowerKey(page->second.name)) == objects.tables.end() ||
+        objects.tables.find(LowerKey(page->second.name))
+            ->second.identifier.starts_with("::agiru::platform::") ||
+        objects.tables.find(LowerKey(page->second.name))
+            ->second.identifier.starts_with("absent::")) {
+      continue;
+    }
+    const al::Property *link = al::Find(control.properties, "RunPageLink");
+    al::ProcedureDecl action;
+    action.isTrigger = true;
+    action.name = "OnAction";
+    std::vector<al::Token> &tokens = action.tokens;
+    bool linked = false;
+    if (link != nullptr && !page->second.name.empty()) {
+      al::VarDecl target;
+      target.name = "RunObjectRec";
+      target.type = "Record";
+      target.subtype = page->second.name;
+      action.variables.push_back(target);
+      const std::vector<al::Token> &value = link->value;
+      std::size_t at = 0;
+      while (at + 4 < value.size()) {
+        const al::Token &field = value[at];
+        if (value[at + 1].text != "=" || LowerKey(value[at + 2].text) != "field" ||
+            value[at + 3].text != "(") {
+          linked = false;
+          break;
+        }
+        std::size_t close = at + 4;
+        int depth = 0;
+        while (close < value.size() && !(depth == 0 && value[close].text == ")")) {
+          if (value[close].text == "(") { ++depth; }
+          if (value[close].text == ")") { --depth; }
+          ++close;
+        }
+        if (close >= value.size()) {
+          linked = false;
+          break;
+        }
+        const bool copiesAFilter = close > at + 6 && LowerKey(value[at + 4].text) == "filter" &&
+                                   value[at + 5].text == "(" && value[close - 1].text == ")";
+        tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
+        tokens.push_back(Mark("."));
+        tokens.push_back(Word(al::TokenKind::Identifier, copiesAFilter ? "SetFilter" : "SetRange"));
+        tokens.push_back(Mark("("));
+        tokens.push_back(field);
+        tokens.push_back(Mark(","));
+        tokens.push_back(Word(al::TokenKind::Identifier, "Rec"));
+        tokens.push_back(Mark("."));
+        if (copiesAFilter) {
+          tokens.push_back(Word(al::TokenKind::Identifier, "GetFilter"));
+          tokens.push_back(Mark("("));
+          for (std::size_t i = at + 6; i + 1 < close; ++i) { tokens.push_back(value[i]); }
+          tokens.push_back(Mark(")"));
+        } else {
+          for (std::size_t i = at + 4; i < close; ++i) { tokens.push_back(value[i]); }
+        }
+        tokens.push_back(Mark(")"));
+        tokens.push_back(Mark(";"));
+        linked = true;
+        at = close + 1;
+        if (at < value.size() && value[at].text == ",") { ++at; }
+        if (at >= value.size()) { break; }
+      }
+      if (!linked) {
+        tokens.clear();
+        action.variables.clear();
+      }
+    }
+    if (!linked && link != nullptr) { continue; }
+    tokens.push_back(Word(al::TokenKind::Identifier, "PAGE"));
+    tokens.push_back(Mark("."));
+    tokens.push_back(Word(al::TokenKind::Identifier, "Run"));
+    tokens.push_back(Mark("("));
+    tokens.push_back(Word(al::TokenKind::Integer, std::to_string(page->second.id)));
+    if (linked) {
+      tokens.push_back(Mark(","));
+      tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
+    }
+    tokens.push_back(Mark(")"));
+    tokens.push_back(Mark(";"));
+    try {
+      action.body = al::ParseStatements(tokens);
+    } catch (const std::exception &e) {
+      std::string spelled;
+      for (const al::Token &token : tokens) { spelled += token.text + " "; }
+      throw std::runtime_error("the OnAction synthesised for " + control.name + " (RunObject " +
+                               run->text + ", RunPageLink " +
+                               (link == nullptr ? std::string{} : link->text) + ") reads `" +
+                               spelled + "` and does not parse: " + e.what());
+    }
+    control.triggers.push_back(std::move(action));
+  }
+}
+
+}
+
+void SynthesizeRunObjectActions(al::PageObject &page, const Objects &objects) {
+  SynthesizeRunObjectActions(page.actions, objects);
+  SynthesizeRunObjectActions(page.layout, objects);
 }
 
 namespace {
@@ -899,8 +1065,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   const std::set<std::string> shadowed =
       Shadowing(object.variables, object.procedures, object.labels);
-  const std::string members =
-      MemberDeclarations(object.name, object.variables, object.labels, object.procedures, objects);
+  const std::string members = MemberDeclarations(
+      object.name, VariablesAside(object), object.labels, object.procedures, objects);
   if (!members.empty()) { out += members + "\n"; }
 
   std::string triggers;
@@ -932,7 +1098,15 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "};\n";
   DotNetUse dotnet;
   DotNetUse absent;
-  GatherAbsentIn(object.variables, bodies, objects, dotnet, absent);
+  std::vector<al::VarDecl> withRec = object.variables;
+  if (SourceTable(object, objects).starts_with("absent::")) {
+    al::VarDecl rec;
+    rec.name = "Rec";
+    rec.type = "Record";
+    rec.subtype = SourceTableNameOf(object);
+    withRec.push_back(std::move(rec));
+  }
+  GatherAbsentIn(withRec, bodies, objects, dotnet, absent);
   return PageHeader{.text = WithDoor(out, ObjectKind::Page), .dotnet = dotnet, .absent = absent};
 }
 

@@ -26,6 +26,9 @@ struct TableEntry {
   void (*free)(void *);  ///< Unmakes one.
   /// \brief `Record.Validate(Field, Text)` by number, for a `FieldRef` that holds no type.
   void (*validate)(void *record, FieldNo no, std::string_view text);
+  /// \brief Copies one record of this table into another, fields and filters, for a `RecordRef`
+  ///        that takes a record it does not know the type of and must OWN it.
+  void (*copy)(void *to, const void *from);
 };
 
 /// \brief Makes an empty record.
@@ -54,9 +57,11 @@ inline constexpr TableEntry kTableEntry{
     .table = &TableTraits<T>::kTable,
     .make = &MakeRecord<T>,
     .free = &FreeRecord<T>,
-    .validate = [](void *record, FieldNo no, std::string_view text) {
-      static_cast<T *>(record)->ValidateText(no, text);
-    }};
+    .validate = [](void *record,
+                   FieldNo no,
+                   std::string_view text) { static_cast<T *>(record)->ValidateText(no, text); },
+    .copy = [](void *to,
+               const void *from) { *static_cast<T *>(to) = *static_cast<const T *>(from); }};
 
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.
