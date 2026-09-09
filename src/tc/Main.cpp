@@ -736,6 +736,16 @@ struct Interfaces {
   std::vector<std::string> paths;
 };
 
+std::set<std::string> InterfaceReturnsOf(const agiru::al::InterfaceObject &object) {
+  std::set<std::string> returning;
+  for (const agiru::al::ProcedureDecl &procedure : object.procedures) {
+    if (agiru::gen::TypeName(procedure.returned.type) == "Interface") {
+      returning.insert(agiru::gen::LowerKey(procedure.name));
+    }
+  }
+  return returning;
+}
+
 Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Interfaces kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Interface.al")) {
@@ -758,7 +768,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
               .name = {},
               .dataItems = {},
               .requestFields = {},
-              .columnSources = {}});
+              .columnSources = {},
+              .interfaceReturns = InterfaceReturnsOf(object)});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -916,7 +927,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .name = SourceTableNameOf(object),
                                .dataItems = {},
                                .requestFields = {},
-                               .columnSources = {}});
+                               .columnSources = {},
+                               .interfaceReturns = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -1291,7 +1303,8 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           .name = {},
           .dataItems = {},
           .requestFields = {},
-          .columnSources = {}};
+          .columnSources = {},
+          .interfaceReturns = {}};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -1404,6 +1417,57 @@ std::map<std::string, std::string> DeclaredProcedures(std::string_view source) {
   return procedures;
 }
 
+std::set<std::string> InterfaceReturns(std::string_view source) {
+  std::set<std::string> returning;
+  static constexpr std::string_view kKeyword = "procedure";
+  for (std::size_t at = source.find(kKeyword); at != std::string_view::npos;
+       at = source.find(kKeyword, at + kKeyword.size())) {
+    const bool wordStart = at == 0 || std::isalnum(static_cast<unsigned char>(source[at - 1])) == 0;
+    std::size_t cursor = at + kKeyword.size();
+    if (!wordStart || cursor >= source.size() ||
+        std::isspace(static_cast<unsigned char>(source[cursor])) == 0) {
+      continue;
+    }
+    while (cursor < source.size() &&
+           std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
+      ++cursor;
+    }
+    std::string named;
+    if (cursor < source.size() && source[cursor] == '"') {
+      const std::size_t close = source.find('"', cursor + 1);
+      if (close == std::string_view::npos) { continue; }
+      named = std::string(source.substr(cursor + 1, close - cursor - 1));
+      cursor = close + 1;
+    } else {
+      std::size_t end = cursor;
+      while (end < source.size() &&
+             (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
+        ++end;
+      }
+      named = std::string(source.substr(cursor, end - cursor));
+      cursor = end;
+    }
+    if (named.empty()) { continue; }
+    const std::size_t open = source.find('(', cursor);
+    if (open == std::string_view::npos) { continue; }
+    int depth = 0;
+    std::size_t close = open;
+    for (; close < source.size(); ++close) {
+      if (source[close] == '(') { ++depth; }
+      if (source[close] == ')' && --depth == 0) { break; }
+    }
+    if (close >= source.size()) { continue; }
+    const std::size_t eol = source.find('\n', close);
+    const std::string_view after =
+        source.substr(close + 1, eol == std::string_view::npos ? eol : eol - close - 1);
+    static const std::regex kInterface(R"(:\s*Interface\b)", std::regex::icase);
+    if (std::regex_search(after.begin(), after.end(), kInterface)) {
+      returning.insert(agiru::gen::LowerKey(named));
+    }
+  }
+  return returning;
+}
+
 void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     const std::string source = Read(path);
@@ -1427,7 +1491,8 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .name = {},
             .dataItems = {},
             .requestFields = {},
-            .columnSources = {}});
+            .columnSources = {},
+            .interfaceReturns = InterfaceReturns(source)});
   }
 }
 
@@ -1498,7 +1563,8 @@ std::vector<std::string> IndexReports(const Run &run, agiru::gen::Objects &objec
             .name = declared.name,
             .dataItems = std::move(controls.dataItems),
             .requestFields = std::move(controls.requestFields),
-            .columnSources = {}});
+            .columnSources = {},
+            .interfaceReturns = {}});
   }
   return indexed;
 }
@@ -1579,7 +1645,8 @@ void IndexXmlPorts(const Run &run, agiru::gen::Objects &objects) {
             .name = {},
             .dataItems = {},
             .requestFields = {},
-            .columnSources = {}});
+            .columnSources = {},
+            .interfaceReturns = {}});
   }
 }
 
@@ -1649,7 +1716,8 @@ Queries IndexQueries(Run &run, agiru::gen::Objects &objects) {
             .requestFields = {},
             .columnSources = parsed.has_value()
                                  ? agiru::gen::QueryColumnSources(*parsed)
-                                 : std::map<std::string, std::pair<std::string, std::string>>{}});
+                                 : std::map<std::string, std::pair<std::string, std::string>>{},
+            .interfaceReturns = {}});
     if (parsed.has_value()) {
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(*parsed));

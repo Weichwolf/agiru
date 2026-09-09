@@ -72,6 +72,13 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual bool CallReturnsAHandle(std::string_view variable,
+                                                std::string_view procedure) const {
+    static_cast<void>(variable);
+    static_cast<void>(procedure);
+    return false;
+  }
+
   [[nodiscard]] virtual bool ReturnsAHandle(std::string_view procedure) const {
     static_cast<void>(procedure);
     return false;

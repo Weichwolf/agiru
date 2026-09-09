@@ -1187,6 +1187,16 @@ public:
     return {};
   }
 
+  [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
+                                        std::string_view procedure) const override {
+    const al::VarDecl *declared = Declaration(variable);
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    if (type != "Codeunit" && type != "Interface") { return false; }
+    const TableRef *ref = ReachOf(*declared, objects_);
+    return ref != nullptr && ref->interfaceReturns.contains(LowerKey(std::string(procedure)));
+  }
+
   [[nodiscard]] bool ReturnsAHandle(std::string_view procedure) const override {
     for (const al::ProcedureDecl &declared : unit_.procedures) {
       if (LowerKey(declared.name) == LowerKey(std::string(procedure))) {
@@ -1298,9 +1308,10 @@ public:
         !column.empty()) {
       return column;
     }
-    const std::string subtype = LowerKey(std::string(field.variable)) == "rec"
-                                    ? TableNoOf(unit_)
-                                    : SubtypeOfRecord(field.variable);
+    const std::string subtype =
+        SubtypeOfRecord(field.variable).empty() && LowerKey(std::string(field.variable)) == "rec"
+            ? TableNoOf(unit_)
+            : SubtypeOfRecord(field.variable);
     if (subtype.empty()) { return {}; }
     const auto table = objects_.fieldEnums.find(LowerKey(subtype));
     if (table == objects_.fieldEnums.end()) { return {}; }
@@ -1918,7 +1929,8 @@ TableIndex PlatformTables() {
                        .name = {},
                        .dataItems = {},
                        .requestFields = {},
-                       .columnSources = {}};
+                       .columnSources = {},
+                       .interfaceReturns = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
@@ -1951,6 +1963,8 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000073"] = enums["user personalization"];
   enums["all profile"]["scope"] = "::agiru::platform::PersonalizationScope";
   enums["2000000178"] = enums["all profile"];
+  enums["date"]["period type"] = "::agiru::platform::PeriodType";
+  enums["2000000007"] = enums["date"];
   enums["feature key"]["enabled"] = "::agiru::platform::FeatureKeyEnabled";
   enums["2000000211"] = enums["feature key"];
   enums["allobj"]["object type"] = "::agiru::platform::AllObjType";
@@ -2233,6 +2247,10 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
     return lent;
   }
   return {};
+}
+
+const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects) {
+  return Reach(declared, objects);
 }
 
 }

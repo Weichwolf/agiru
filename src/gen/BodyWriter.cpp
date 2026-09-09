@@ -683,6 +683,11 @@ private:
       return Raise(expression);
     }
     if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
+        callee.children.back().kind == al::ExprKind::Name &&
+        SameName(callee.children.back().text, "ToText") && expression.children.size() == 1) {
+      return "::agiru::AsText(" + Expression(callee.children.front(), kPrimaryPrecedence) + ")";
+    }
+    if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
         callee.children[0].kind == al::ExprKind::Name &&
         !KindNamespace(callee.children[0].text).empty() && expression.children.size() > 1 &&
         !scope_.IsVariable(callee.children[0].text)) {
@@ -1177,6 +1182,18 @@ private:
     return out;
   }
 
+  [[nodiscard]] bool MemberCallReturnsAHandle(const al::Expr &call) const {
+    if (call.kind != al::ExprKind::Call || call.children.empty()) { return false; }
+    const al::Expr &callee = call.children.front();
+    if (callee.kind != al::ExprKind::Binary || callee.text != "." || callee.children.size() != 2) {
+      return false;
+    }
+    const al::Expr &owner = callee.children.front();
+    const al::Expr &procedure = callee.children.back();
+    return owner.kind == al::ExprKind::Name && procedure.kind == al::ExprKind::Name &&
+           scope_.CallReturnsAHandle(owner.text, procedure.text);
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -1222,7 +1239,8 @@ private:
         spelling == "." && ((walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text)) ||
                             (walk->kind == al::ExprKind::Call && !walk->children.empty() &&
                              walk->children.front().kind == al::ExprKind::Name &&
-                             scope_.ReturnsAHandle(walk->children.front().text)));
+                             scope_.ReturnsAHandle(walk->children.front().text)) ||
+                            MemberCallReturnsAHandle(*walk));
     const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
     if (spelling == "||" && walk->kind == al::ExprKind::Binary && walk->text == "and") {
@@ -1553,6 +1571,16 @@ public:
     }
     if (SameName("Rec", name)) { return "(*this)"; }
     return {};
+  }
+
+  [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
+                                        std::string_view procedure) const override {
+    const al::VarDecl *declared = Local(variable) != nullptr ? Local(variable) : Global(variable);
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    if (type != "Codeunit" && type != "Interface") { return false; }
+    const TableRef *ref = ReachOf(*declared, objects_);
+    return ref != nullptr && ref->interfaceReturns.contains(LowerKey(std::string(procedure)));
   }
 
   [[nodiscard]] const al::VarDecl *Global(std::string_view name) const {
@@ -1987,6 +2015,16 @@ public:
       if (SameName(declared.name, variable)) { return &declared; }
     }
     return nullptr;
+  }
+
+  [[nodiscard]] bool CallReturnsAHandle(std::string_view variable,
+                                        std::string_view procedure) const override {
+    const al::VarDecl *declared = DeclarationOf(variable);
+    if (declared == nullptr) { return false; }
+    const std::string type = TypeName(declared->type);
+    if (type != "Codeunit" && type != "Interface") { return false; }
+    const TableRef *ref = ReachOf(*declared, objects_);
+    return ref != nullptr && ref->interfaceReturns.contains(LowerKey(std::string(procedure)));
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {

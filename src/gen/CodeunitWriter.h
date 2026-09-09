@@ -28,7 +28,11 @@ struct TableRef {
   std::vector<std::string> requestFields;
 
   std::map<std::string, std::pair<std::string, std::string>> columnSources;
+
+  std::set<std::string> interfaceReturns;
 };
+
+const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
 
 using TableIndex = std::map<std::string, TableRef>;
 
