@@ -98,6 +98,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual std::string AbsentDotNet(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
   [[nodiscard]] virtual bool AbsentControl(std::string_view name) const {
     static_cast<void>(name);
     return false;

@@ -92,6 +92,10 @@ std::string OptionTypeName(const std::string &owner,
 
 [[nodiscard]] TableIndex PlatformTables();
 
+[[nodiscard]] bool NamesAbsentType(const al::VarDecl &declared);
+
+[[nodiscard]] std::string AbsentDotNetOf(const al::VarDecl &declared);
+
 [[nodiscard]] FieldEnums PlatformFieldEnums();
 
 struct InterfaceHeader {

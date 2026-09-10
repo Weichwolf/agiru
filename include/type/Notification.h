@@ -148,7 +148,7 @@ private:
   Guid id_;
   std::string message_;
   NotificationScope scope_ = NotificationScope::LocalScope;
-  Dictionary<std::string, std::string> data_;
+  Dictionary<::agiru::Text<0>, std::string> data_;
   Integer actions_ = 0;
 };
 

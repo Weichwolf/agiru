@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 /// \file
@@ -48,7 +49,7 @@ public:
   /// \warning DISCOURAGED, AND THE PLATFORM SAYS SO: it "exists for compatibility reasons and its
   ///          use is discouraged as it can lead to secret exposure". It is also on-premises only.
   ///          Every call is a place where a secret leaves the type that was protecting it.
-  [[nodiscard]] std::string Unwrap() const { return text_; }
+  [[nodiscard]] ::agiru::Text<0> Unwrap() const { return ::agiru::Text<0>{text_}; }
 
   /// \brief AL `SecretText.SecretStrSubstNo(Text, SecretText...)`.
   ///
@@ -78,8 +79,11 @@ private:
     Replace(pattern, "%" + std::to_string(placeholder), value.text_);
   }
 
-  static void Substitute(std::string &pattern, int placeholder, std::string_view value) {
-    Replace(pattern, "%" + std::to_string(placeholder), std::string(value));
+  template <typename T>
+    requires(!std::same_as<std::remove_cvref_t<T>, SecretText> &&
+             std::convertible_to<const T &, std::string_view>)
+  static void Substitute(std::string &pattern, int placeholder, const T &value) {
+    Replace(pattern, "%" + std::to_string(placeholder), std::string(std::string_view(value)));
   }
 
   static void Replace(std::string &pattern, const std::string &mark, const std::string &value) {

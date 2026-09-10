@@ -2,6 +2,7 @@
 
 #include "Scope.h"
 
+#include <map>
 #include <set>
 #include <string>
 #include <string_view>
@@ -19,6 +20,12 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 [[nodiscard]] std::string BuiltinSpelling(std::string_view name);
 
 [[nodiscard]] bool DoorDeclares(std::string_view name);
+
+[[nodiscard]] const std::set<std::string> &RebuiltDotNet();
+
+[[nodiscard]] const std::map<std::string, std::string> &PlatformMembers(std::string_view table);
+
+[[nodiscard]] const std::map<std::string, std::string> &PlatformMembers(std::string_view table);
 
 [[nodiscard]] bool DoorCalls(std::string_view name);
 

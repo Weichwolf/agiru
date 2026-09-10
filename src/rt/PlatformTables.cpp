@@ -6,6 +6,8 @@
 #include "platform/FeatureKey.h"
 #include "platform/Field.h"
 #include "platform/Integer.h"
+#include "platform/ODataEdmType.h"
+#include "platform/ObjectOptions.h"
 #include "platform/PageMetadata.h"
 #include "platform/PrivacyNotice.h"
 #include "platform/PrivacyNoticeApproval.h"
@@ -27,6 +29,8 @@ const RegisterTable<platform::Company> kCompany;
 const RegisterTable<platform::Date> kDate;
 const RegisterTable<platform::Field> kField;
 const RegisterTable<platform::Integer> kInteger;
+const RegisterTable<platform::ODataEdmType> kODataEdmType;
+const RegisterTable<platform::ObjectOptions> kObjectOptions;
 const RegisterTable<platform::PageMetadata> kPageMetadata;
 const RegisterTable<platform::PrivacyNotice> kPrivacyNotice;
 const RegisterTable<platform::PrivacyNoticeApproval> kPrivacyNoticeApproval;

@@ -5,6 +5,9 @@
 #include "type/Boolean.h"
 #include "type/Text.h"
 
+#include <concepts>
+#include <string_view>
+
 /// \file
 /// \brief AL `TestFilter` -- the filters a test sets on a page.
 
@@ -27,6 +30,8 @@ public:
     if (core_ == nullptr) { Unfiltered(); }
     if constexpr (requires { field.Name(); }) {
       core_->SetControlFilter(field.Name(), filter);
+    } else if constexpr (std::convertible_to<const Field &, std::string_view>) {
+      core_->SetControlFilter(std::string_view(field), filter);
     } else {
       static_cast<void>(filter);
       throw Error("TestFilter.SetFilter names a page control, not a value (board:0030)");

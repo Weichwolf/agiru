@@ -165,7 +165,7 @@ public:
          std::string_view ControlName,
          const ::agiru::Verbosity &Verbosity,
          ::agiru::DataClassification DataClassification,
-         const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+         const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions);
 
   /// \brief AL `ErrorInfo.CustomDimensions(Dictionary of [Text, Text])`. Set of additional
   /// dimensions, specified as a dictionary that relates to the error.
@@ -173,9 +173,9 @@ public:
   /// \brief AL `ErrorInfo.CustomDimensions()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] ErrorInfo.CustomDimensions([NewX])`.
   /// \return The value it holds.
-  ::agiru::Dictionary<std::string, std::string> CustomDimensions();
+  ::agiru::Dictionary<::agiru::Text<0>, std::string> CustomDimensions();
 
-  void CustomDimensions(const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+  void CustomDimensions(const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions);
 
   /// \brief AL `ErrorInfo.DataClassification(DataClassification)`. Specifies the classification of
   /// the error. Values include 'CustomerContent', 'EndUserIdentifiableInformation',
@@ -315,7 +315,7 @@ private:
   ::agiru::ErrorType errorType_{};
   ::agiru::Verbosity verbosity_{};
   ::agiru::DataClassification dataClassification_{};
-  ::agiru::Dictionary<std::string, std::string> customDimensions_;
+  ::agiru::Dictionary<::agiru::Text<0>, std::string> customDimensions_;
   std::vector<Action> actions_;
 };
 

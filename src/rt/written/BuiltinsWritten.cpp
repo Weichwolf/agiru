@@ -358,7 +358,7 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
                      const ::agiru::AuditCategory &SecurityAuditCategory,
                      ::agiru::Integer AuditMessageOperation,
                      ::agiru::Integer AuditMessageOperationResult,
-                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+                     const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions) {
   static_cast<void>(SecurityAuditDescription);
   static_cast<void>(SecurityAuditOperationResult);
   static_cast<void>(SecurityAuditCategory);
@@ -833,7 +833,15 @@ void ClearCollectedErrors() {
 
 void CodeCoverageInclude(::agiru::RecordRef &ObjectRecord) {
   static_cast<void>(ObjectRecord);
-  throw Error("System.CodeCoverageInclude(Record): the surface is declared, the behaviour is not (board:0035)");
+  throw Error("System.CodeCoverageInclude(Record): the surface is declared, the behaviour is not "
+              "(board:0035)");
+}
+
+::agiru::Boolean
+StartSession(::agiru::Integer &SessionId, ::agiru::Integer CodeunitId, std::string_view Company) {
+  SessionId = ::agiru::detail::NextStartedSession();
+  static_cast<void>(Company);
+  return ::agiru::detail::RunCodeunitByNumber(true, CodeunitId);
 }
 
 ::agiru::Integer ServiceInstanceId() {

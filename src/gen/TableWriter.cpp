@@ -626,6 +626,7 @@ void Name(Reached &reached, const al::VarDecl &declared, const Objects &objects)
   }
   const std::string reachable = Unprefixed(ref->identifier);
   const std::size_t colons = reachable.rfind("::");
+  if (reachable.starts_with("platform::")) { return; }
   reached.ahead[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
       colons == std::string::npos ? reachable : reachable.substr(colons + 2));
 }

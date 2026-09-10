@@ -47,7 +47,7 @@ public:
   /// \brief AL `TestHttpRequestMessage.QueryParameters()`. Gets the query parameters of the HTTP
   /// request if the request does not have a secret URI, otherwise an empty Dictionary.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  [[nodiscard]] ::agiru::Dictionary<std::string, std::string> QueryParameters();
+  [[nodiscard]] ::agiru::Dictionary<::agiru::Text<0>, std::string> QueryParameters();
 
   /// \brief AL `TestHttpRequestMessage.RequestType()`. Gets the HTTP method type.
   /// \return The AL `HttpRequestType`.

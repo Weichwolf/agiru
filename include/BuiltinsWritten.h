@@ -20,6 +20,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
+#include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
@@ -160,12 +161,13 @@ std::string ApplicationArea(std::string_view ApplicationArea = {});
 ///       and the message goes nowhere. `Price Calculation - V16` logs feature uptake on every
 ///       price line, so a refusal here stopped the whole V16 path (ERM Document Totals UT,
 ///       2026-09-09).
-void LogAuditMessage(std::string_view SecurityAuditDescription,
-                     const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
-                     const ::agiru::AuditCategory &SecurityAuditCategory,
-                     ::agiru::Integer AuditMessageOperation,
-                     ::agiru::Integer AuditMessageOperationResult,
-                     const ::agiru::Dictionary<std::string, std::string> &CustomDimensions = {});
+void LogAuditMessage(
+    std::string_view SecurityAuditDescription,
+    const ::agiru::SecurityOperationResult &SecurityAuditOperationResult,
+    const ::agiru::AuditCategory &SecurityAuditCategory,
+    ::agiru::Integer AuditMessageOperation,
+    ::agiru::Integer AuditMessageOperationResult,
+    const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions = {});
 
 /// \brief AL `Database.SessionId()`. The number of the current session.
 /// \return The operating system's id of this process: one process is one session here, and the
@@ -271,15 +273,25 @@ template <typename T>::agiru::Boolean CanLoadType(const T &DotNet) {
 
 /// \brief AL `System.CompressArray(Array of [Text])`. Moves every non-empty string to the front.
 /// \tparam A The array's class, which AL knows and the door does not.
-/// \param StringArray The AL `Array of [Text]`.
-/// \return Never.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+/// \param StringArray The AL `Array of [Text]`, rearranged in place.
+/// \return How many entries are not empty, which is where the empty ones begin.
+/// \note THE LENGTH DOES NOT CHANGE. `system-compressarray-method.md`: "The resulting
+///       StringArray has the same number of elements as the input array, but empty entries
+///       appear at the end of the array" -- so this fills the tail with blanks rather than
+///       shortening anything, and the order of the non-empty entries is kept.
 template <typename A>
   requires requires(const A &array) { array.Length(); } ::agiru::Integer
 CompressArray(A &StringArray) {
-  static_cast<void>(StringArray);
-  throw ::agiru::Error("System.CompressArray(Array of [Text]) is declared and not implemented yet "
-                       "(board:0035)");
+  ::agiru::Integer kept = 0;
+  for (::agiru::Integer at = 1; at <= StringArray.Length(); ++at) {
+    if (std::string_view(StringArray[at]).empty()) { continue; }
+    ++kept;
+    if (kept != at) {
+      StringArray[kept] = StringArray[at];
+      StringArray[at] = {};
+    }
+  }
+  return kept;
 }
 
 /// \brief AL `System.CopyArray(Array of [Any], Array of [Any], Integer [, Integer])`.
@@ -329,6 +341,18 @@ namespace detail {
 [[nodiscard]] ::agiru::Integer NextStartedSession();
 
 }
+
+/// \brief AL `StartSession(SessionId, CodeunitId)` and `StartSession(SessionId, CodeunitId,
+///        Company)`: `session-startsession-integer-integer-string-table-method.md` writes both
+///        the company and the record in brackets, so both are optional.
+/// \param SessionId  Where the new session's id goes.
+/// \param CodeunitId Which codeunit runs.
+/// \param Company    Which company it runs in; this one when omitted.
+/// \return True, the way the platform answers when the session started.
+/// \note THE CODEUNIT RUNS IN THIS SESSION, as the record-carrying overloads below explain.
+::agiru::Boolean StartSession(::agiru::Integer &SessionId,
+                              ::agiru::Integer CodeunitId,
+                              std::string_view Company = {});
 
 /// \brief AL `StartSession(SessionId, CodeunitId, Timeout, Company, Record)` -- the record travels
 ///        as its OWN table.
@@ -975,6 +999,21 @@ std::string GetUrl(const ::agiru::ClientType &ClientType,
 ///       PAGE beside the `recordref` one, so a record and a `RecordRef` are two overloads and not
 ///       one with a conversion -- which is the overload-filename rule, and the reason a body that
 ///       passes `Rec` did not compile.
+template <typename Handle>
+  requires requires(Handle &held) {
+    { *held } -> std::convertible_to<const typename std::remove_reference_t<decltype(*held)> &>;
+    { std::remove_cvref_t<decltype(*held)>::kId };
+  } && (!requires { Handle::kId; })
+std::string GetUrl(const ::agiru::ClientType &ClientType,
+                   std::string_view Company,
+                   const ::agiru::ObjectType &ObjectType,
+                   ::agiru::Integer ObjectId,
+                   Handle &Record,
+                   ::agiru::Boolean UseFilters = {},
+                   std::string_view Layout = {}) {
+  return GetUrl(ClientType, Company, ObjectType, ObjectId, *Record, UseFilters, Layout);
+}
+
 template <typename Record>
   requires requires {
     { Record::kId } -> std::convertible_to<::agiru::TableId>;
@@ -1015,7 +1054,7 @@ void LogMessage(std::string_view EventId,
                 const ::agiru::Verbosity &Verbosity,
                 const ::agiru::DataClassification &DataClassification,
                 const ::agiru::TelemetryScope &TelemetryScope,
-                const ::agiru::Dictionary<std::string, std::string> &CustomDimensions);
+                const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions);
 
 /// \brief AL `Session.LogMessage(Text, Text, Verbosity, DataClassification, TelemetryScope, Text,
 /// Text [, Text, Text])`. Logs a trace message to a telemetry account.
@@ -1189,6 +1228,18 @@ template <typename T> void CodeCoverageInclude(::agiru::Instance<T> &ObjectRecor
   ::agiru::RecordRef reference;
   reference.GetTable(ObjectRecord);
   CodeCoverageInclude(reference);
+}
+
+/// \brief AL `SecretText.SecretStrSubstNo(Text, [SecretText, ...])`: `%1`, `%2` ... stand for the
+///        values, and the result stays a secret.
+/// \tparam Values Whatever AL passed -- `SecretText`, `Text` and the rest render as themselves.
+/// \param String The pattern.
+/// \param values The values.
+/// \return The substituted secret.
+template <typename... Values>
+[[nodiscard]] ::agiru::SecretText SecretStrSubstNo(std::string_view String,
+                                                   const Values &...values) {
+  return ::agiru::SecretText::SecretStrSubstNo(String, values...);
 }
 
 /// \brief AL `Database.ServiceInstanceId()`. \return 1: one service tier per process here.

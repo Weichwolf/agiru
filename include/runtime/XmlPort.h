@@ -57,18 +57,18 @@ enum class XmlPortDirection : std::uint8_t {
 
 /// \brief What an xmlport declares, `constexpr` in the generated definitions unit.
 struct XmlPortDef {
-  XmlPortId id{};                                 ///< The AL number.
-  std::string_view name{};                        ///< The AL name.
-  XmlPortFormat format = XmlPortFormat::Xml;      ///< `Format`.
-  XmlPortDirection direction = XmlPortDirection::Both; ///< `Direction`.
-  TextEncoding encoding = TextEncoding::MSDos;    ///< `TextEncoding`, MSDOS by default.
-  std::string_view fieldSeparator = "<TAB>";      ///< `FieldSeparator`.
-  std::string_view recordSeparator = "<NewLine>"; ///< `RecordSeparator`.
-  std::string_view fieldDelimiter = "<None>";     ///< `FieldDelimiter`.
+  XmlPortId id{};                                         ///< The AL number.
+  std::string_view name{};                                ///< The AL name.
+  XmlPortFormat format = XmlPortFormat::Xml;              ///< `Format`.
+  XmlPortDirection direction = XmlPortDirection::Both;    ///< `Direction`.
+  TextEncoding encoding = TextEncoding::MSDos;            ///< `TextEncoding`, MSDOS by default.
+  std::string_view fieldSeparator = "<TAB>";              ///< `FieldSeparator`.
+  std::string_view recordSeparator = "<NewLine>";         ///< `RecordSeparator`.
+  std::string_view fieldDelimiter = "<None>";             ///< `FieldDelimiter`.
   std::string_view tableSeparator = "<NewLine><NewLine>"; ///< `TableSeparator`.
-  bool useRequestPage = true;                     ///< `UseRequestPage`.
-  bool formatEvaluateXml = false;                 ///< `FormatEvaluate = Xml`.
-  std::string_view rootName{};                    ///< The root element's `XmlName`.
+  bool useRequestPage = true;                             ///< `UseRequestPage`.
+  bool formatEvaluateXml = false;                         ///< `FormatEvaluate = Xml`.
+  std::string_view rootName{};                            ///< The root element's `XmlName`.
 };
 
 /// \brief `currXMLport.Break()` in flight: ends the current table element's loop.
@@ -123,6 +123,7 @@ private:
     std::vector<std::pair<std::string, std::string>> attributes;
     std::vector<Node> children;
   };
+
   void Serialize(const Node &node, std::string &into, int depth) const;
   Node *Open_();
   XmlPortDef def_{};
@@ -173,10 +174,12 @@ private:
     std::vector<std::pair<std::string, std::string>> attributes;
     std::vector<Node> children;
   };
+
   struct Level {
     const Node *node;
     std::size_t next;
   };
+
   void ParseXml(std::string_view text);
   void ParseLines(std::string_view text);
   XmlPortDef def_{};
@@ -298,7 +301,9 @@ public:
     void operator()(std::string_view text) { name_ = std::string(text); }
 
     /// \brief `Filename` read as a text. \return The name.
-    operator ::agiru::Text<0>() const { return ::agiru::Text<0>{name_}; } // NOLINT(*-explicit-constructor)
+    operator ::agiru::Text<0>() const {
+      return ::agiru::Text<0>{name_};
+    } // NOLINT(*-explicit-constructor)
 
     /// \brief `Filename` read as a string view. \return The name.
     operator std::string_view() const { return name_; } // NOLINT(*-explicit-constructor)
@@ -348,15 +353,19 @@ public:
   void TextEncoding(::agiru::TextEncoding Encoding) { encoding_ = Encoding; }
 
   /// \brief `Xmlport.FieldSeparator()`. \return The separator, as declared or set.
-  [[nodiscard]] ::agiru::Text<0> FieldSeparator() const { return ::agiru::Text<0>{fieldSeparator_}; }
+  [[nodiscard]] ::agiru::Text<0> FieldSeparator() const {
+    return ::agiru::Text<0>{fieldSeparator_};
+  }
 
   /// \brief `Xmlport.FieldSeparator(Text)`. \param Separator The separator for this run.
   void FieldSeparator(std::string_view Separator) { fieldSeparator_ = std::string(Separator); }
 
-  /// \brief `Xmlport.FieldSeparator(Text)` with one character, as `CRLF[1]` arrives. \param Separator The character.
+  /// \brief `Xmlport.FieldSeparator(Text)` with one character, as `CRLF[1]` arrives. \param
+  /// Separator The character.
   void FieldSeparator(Char Separator) { fieldSeparator_ = Encoded(Separator); }
 
-  /// \brief `Xmlport.FieldSeparator(Text)` from a literal, which is neither a `Char` nor a view yet.
+  /// \brief `Xmlport.FieldSeparator(Text)` from a literal, which is neither a `Char` nor a view
+  /// yet.
   /// \param Separator The text.
   void FieldSeparator(const char *Separator) { fieldSeparator_ = std::string(Separator); }
 
@@ -368,29 +377,37 @@ public:
   /// \brief `Xmlport.RecordSeparator(Text)`. \param Separator The separator for this run.
   void RecordSeparator(std::string_view Separator) { recordSeparator_ = std::string(Separator); }
 
-  /// \brief `Xmlport.RecordSeparator(Text)` with one character, as `CRLF[1]` arrives. \param Separator The character.
+  /// \brief `Xmlport.RecordSeparator(Text)` with one character, as `CRLF[1]` arrives. \param
+  /// Separator The character.
   void RecordSeparator(Char Separator) { recordSeparator_ = Encoded(Separator); }
 
-  /// \brief `Xmlport.RecordSeparator(Text)` from a literal, which is neither a `Char` nor a view yet.
+  /// \brief `Xmlport.RecordSeparator(Text)` from a literal, which is neither a `Char` nor a view
+  /// yet.
   /// \param Separator The text.
   void RecordSeparator(const char *Separator) { recordSeparator_ = std::string(Separator); }
 
   /// \brief `Xmlport.FieldDelimiter()`. \return The delimiter.
-  [[nodiscard]] ::agiru::Text<0> FieldDelimiter() const { return ::agiru::Text<0>{fieldDelimiter_}; }
+  [[nodiscard]] ::agiru::Text<0> FieldDelimiter() const {
+    return ::agiru::Text<0>{fieldDelimiter_};
+  }
 
   /// \brief `Xmlport.FieldDelimiter(Text)`. \param Delimiter The delimiter for this run.
   void FieldDelimiter(std::string_view Delimiter) { fieldDelimiter_ = std::string(Delimiter); }
 
   /// \brief `Xmlport.TableSeparator()`. \return The separator.
-  [[nodiscard]] ::agiru::Text<0> TableSeparator() const { return ::agiru::Text<0>{tableSeparator_}; }
+  [[nodiscard]] ::agiru::Text<0> TableSeparator() const {
+    return ::agiru::Text<0>{tableSeparator_};
+  }
 
   /// \brief `Xmlport.TableSeparator(Text)`. \param Separator The separator for this run.
   void TableSeparator(std::string_view Separator) { tableSeparator_ = std::string(Separator); }
 
-  /// \brief `Xmlport.TableSeparator(Text)` with one character, as `CRLF[1]` arrives. \param Separator The character.
+  /// \brief `Xmlport.TableSeparator(Text)` with one character, as `CRLF[1]` arrives. \param
+  /// Separator The character.
   void TableSeparator(Char Separator) { tableSeparator_ = Encoded(Separator); }
 
-  /// \brief `Xmlport.TableSeparator(Text)` from a literal, which is neither a `Char` nor a view yet.
+  /// \brief `Xmlport.TableSeparator(Text)` from a literal, which is neither a `Char` nor a view
+  /// yet.
   /// \param Separator The text.
   void TableSeparator(const char *Separator) { tableSeparator_ = std::string(Separator); }
 
@@ -411,9 +428,43 @@ public:
   /// \brief `Xmlport.Run()`: the request page when declared, then `Export` or `Import` as the
   ///        `Direction` says.
   void Run() {
-    Execute_(XmlPortRequest{.import = XmlPortTraits<Derived>::kPort.direction ==
-                                      XmlPortDirection::Import,
+    Execute_(XmlPortRequest{.import =
+                                XmlPortTraits<Derived>::kPort.direction == XmlPortDirection::Import,
                             .requestPage = UseRequestPage_()});
+  }
+
+  /// \brief `Xmlport.Run(ReqWindow, Import [, var Record])` -- what the static form takes, on the
+  ///        instance the caller named.
+  /// \tparam Arguments The record, when AL passed one.
+  /// \param RequestWindow Whether the request page runs.
+  /// \param Import Whether it imports rather than exports.
+  /// \param arguments The record the table element walks.
+  template <typename... Arguments>
+  void Run(Boolean RequestWindow, Boolean Import, Arguments &...arguments) {
+    (SetTableView(arguments), ...);
+    Execute_(XmlPortRequest{.import = Import, .requestPage = RequestWindow});
+  }
+
+  /// \brief `Xmlport.Export(var OutStream [, var Record])`.
+  /// \tparam Arguments The record, when AL passed one.
+  /// \param Stream Where the export goes.
+  /// \param arguments The record the table element walks.
+  /// \return `true`.
+  template <typename... Arguments> Boolean Export(OutStream &Stream, Arguments &...arguments) {
+    SetDestination(Stream);
+    (SetTableView(arguments), ...);
+    return Export();
+  }
+
+  /// \brief `Xmlport.Import(var InStream [, var Record])`.
+  /// \tparam Arguments The record, when AL passed one.
+  /// \param Stream Where the import reads.
+  /// \param arguments The record the table element fills.
+  /// \return `true`.
+  template <typename... Arguments> Boolean Import(InStream &Stream, Arguments &...arguments) {
+    SetSource(Stream);
+    (SetTableView(arguments), ...);
+    return Import();
   }
 
   /// \brief `currXMLport.ImportFile`, which AL assigns (`ImportFile := false`) and tests (`if
@@ -481,11 +532,8 @@ public:
       if constexpr (requires { self.OnInitXmlPort(); }) { self.OnInitXmlPort(); }
       if (request.requestPage) {
         detail::OpenPage(self, true, false);
-        const TestHandler *handler =
-            HandlerTable::For(HandlerKind::RequestPage, Id().Value());
-        if (handler == nullptr) {
-          throw Error("Unhandled UI: RequestPage " + std::string(Name()));
-        }
+        const TestHandler *handler = HandlerTable::For(HandlerKind::RequestPage, Id().Value());
+        if (handler == nullptr) { throw Error("Unhandled UI: RequestPage " + std::string(Name())); }
         this->CloseWith(::agiru::Action::None);
         handler->invoke(Name(), &self);
         HandlerTable::Ran(*handler);
@@ -592,7 +640,8 @@ template <typename A> void TakeXmlPortArgument(XmlPortRequest &request, const A 
 
 /// \brief Runs an xmlport by number or refuses. \param what The AL method. \param id The number.
 /// \param request The request. \throws Error when the build carries no such xmlport.
-inline void RunXmlPortByNumber(std::string_view what, ::agiru::Integer id, XmlPortRequest &request) {
+inline void
+RunXmlPortByNumber(std::string_view what, ::agiru::Integer id, XmlPortRequest &request) {
   const XmlPortEntry *entry = FindXmlPort(XmlPortId{id});
   if (entry == nullptr) {
     throw Error("Xmlport." + std::string(what) + "(" + std::to_string(id) +

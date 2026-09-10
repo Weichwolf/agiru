@@ -515,7 +515,7 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean
-  WriteWithSecretsTo(const ::agiru::Dictionary<std::string, ::agiru::SecretText> &Secrets,
+  WriteWithSecretsTo(const ::agiru::Dictionary<::agiru::Text<0>, ::agiru::SecretText> &Secrets,
                      ::agiru::SecretText &Result);
 
   /// \brief AL `JsonObject.WriteWithSecretsTo(Text, SecretText, SecretText)`. Replaces the

@@ -1,7 +1,11 @@
 #include "meta/EnumDef.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "type/Code.h"
+#include "type/Integer.h"
+#include "type/Text.h"
 
 #include "Check.h"
 #include "Filter.h"
@@ -411,8 +415,81 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                  refusal.find("No Such Table") != std::string::npos);
 }
 
+/// A NEW ROW TAKES THE KEY ITS FILTERS FIX (board:0681): a document page's lines part narrows the
+/// sub-record by `SubPageLink`, and `devenv-populateallfields-property.md` says the values then
+/// land in the FIELDS -- "where a currently active filter expression evaluates to exactly one
+/// value", and "Key fields are always populated" whatever `PopulateAllFields` says. Without it a
+/// line inserted through the part carries a blank Document No.
+void ANewRowTakesTheKeyItsFiltersFix() {
+  struct Row {
+    agiru::detail::StateHandle State_Block;
+    agiru::Code<20> DocumentNo;
+    agiru::Integer LineNo;
+    agiru::Text<50> Description;
+  };
+
+  static constexpr std::array<agiru::FieldDef, 3> kFields{{
+      agiru::FieldDef{.offset = offsetof(Row, DocumentNo),
+                      .name = "Document No.",
+                      .caption = "Document No.",
+                      .no = agiru::FieldNo{1},
+                      .length = 20,
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = offsetof(Row, LineNo),
+                      .name = "Line No.",
+                      .caption = "Line No.",
+                      .no = agiru::FieldNo{2},
+                      .type = agiru::FieldType::Integer},
+      agiru::FieldDef{.offset = offsetof(Row, Description),
+                      .name = "Description",
+                      .caption = "Description",
+                      .no = agiru::FieldNo{3},
+                      .length = 50,
+                      .type = agiru::FieldType::Text},
+  }};
+  static constexpr std::array<agiru::FieldNo, 2> kKey{{agiru::FieldNo{1}, agiru::FieldNo{2}}};
+  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
+      agiru::KeyDef{.name = "Key1", .fields = kKey, .clustered = true},
+  }};
+  static constexpr agiru::TableDef kLine{.id = agiru::TableId{50002},
+                                         .name = "Seeded Line",
+                                         .caption = "Seeded Line",
+                                         .fields = kFields,
+                                         .keys = kKeys};
+  Row row;
+  agiru::detail::RecordState &state = row.State_Block.Ensure();
+  state.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{1}, .group = 4, .text = "SO-001"});
+  state.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{3}, .group = 0, .text = "A"});
+  agiru::detail::SeedFromFilters(static_cast<void *>(&row), kLine, false);
+  CHECK_TRUE("the key field takes the value its filter fixes",
+             std::string_view(row.DocumentNo.Value()) == "SO-001");
+  CHECK_TRUE("a field outside the key does not, PopulateAllFields being false",
+             std::string_view(row.Description.Value()).empty());
+  Row all;
+  agiru::detail::RecordState &wide = all.State_Block.Ensure();
+  wide.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{3}, .group = 0, .text = "A"});
+  agiru::detail::SeedFromFilters(static_cast<void *>(&all), kLine, true);
+  CHECK_TRUE("and takes it when the page says PopulateAllFields",
+             std::string_view(all.Description.Value()) == "A");
+  // THE NEGATIVE CONTROL: anything wider than one value seeds nothing -- a range, a set, a
+  // wildcard -- because the property says exactly one value and not the first of several.
+  for (const std::string_view wider : {"SO-001..SO-009", "SO-001|SO-002", "SO-*", "<>SO-001"}) {
+    Row wide_row;
+    agiru::detail::RecordState &widest = wide_row.State_Block.Ensure();
+    widest.filters.push_back(agiru::detail::FieldFilter{
+        .field = agiru::FieldNo{1}, .group = 4, .text = std::string(wider)});
+    agiru::detail::SeedFromFilters(static_cast<void *>(&wide_row), kLine, true);
+    CHECK_TRUE("a filter wider than one value seeds nothing",
+               std::string_view(wide_row.DocumentNo.Value()).empty());
+  }
+}
+
 int main() {
   return gate::Run("Filter", [] {
+    ANewRowTakesTheKeyItsFiltersFix();
     AFlowFieldFilterBecomesACorrelatedSubquery();
     AFilterOverIntegersIsASetOfIntervals();
     ASetCountsItselfWithoutCountingRows();

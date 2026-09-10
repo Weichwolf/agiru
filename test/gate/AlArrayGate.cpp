@@ -1,7 +1,9 @@
 #include "runtime/Error.h"
 #include "type/AlArray.h"
 #include "type/Integer.h"
+#include "type/Text.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <string>
@@ -13,7 +15,8 @@ using agiru::Integer;
 namespace {
 
 /// A PARAMETER TAKES THE SHAPE OF ITS ARGUMENT AND NOT OF ITS DECLARATION (board:0633):
-/// `array[10, 10]` given an `array[10, 100]` is walked to column 100 in the BaseApp, and BC runs it.
+/// `array[10, 10]` given an `array[10, 100]` is walked to column 100 in the BaseApp, and BC runs
+/// it.
 Integer FourthOf(AlArray<Integer, 2> narrow) {
   return narrow[4];
 }
@@ -49,10 +52,39 @@ void TwoDimensionsConvertRowByRow() {
   CHECK_TRUE("while the copy is its own storage", copied[2][3] == 23);
 }
 
+/// COMPRESSARRAY KEEPS THE LENGTH AND THE ORDER: `system-compressarray-method.md` says the
+/// result "has the same number of elements as the input array, but empty entries appear at the
+/// end", and the count it returns is where those begin.
+void CompressArrayMovesTheFullEntriesForward() {
+  AlArray<agiru::Text<30>, 5> spread;
+  spread[1] = "one";
+  spread[3] = "three";
+  spread[5] = "five";
+  const Integer kept = agiru::CompressArray(spread);
+  CHECK_TRUE("the count is how many were not empty", kept == 3);
+  CHECK_TRUE("and they keep their order at the front",
+             std::string_view(spread[1]) == "one" && std::string_view(spread[2]) == "three" &&
+                 std::string_view(spread[3]) == "five");
+  CHECK_TRUE("the empty ones are at the end and the length is unchanged",
+             std::string_view(spread[4]).empty() && std::string_view(spread[5]).empty() &&
+                 spread.Length() == 5);
+  // THE NEGATIVE CONTROL: an array with nothing empty is returned untouched, and one with
+  // nothing full answers zero rather than moving anything.
+  AlArray<agiru::Text<30>, 2> full;
+  full[1] = "a";
+  full[2] = "b";
+  CHECK_TRUE("a full array is unchanged",
+             agiru::CompressArray(full) == 2 && std::string_view(full[1]) == "a" &&
+                 std::string_view(full[2]) == "b");
+  AlArray<agiru::Text<30>, 2> empty;
+  CHECK_TRUE("an empty one answers zero", agiru::CompressArray(empty) == 0);
+}
+
 } // namespace
 
 int main() {
   return gate::Run("AlArray", [] {
+    CompressArrayMovesTheFullEntriesForward();
     AParameterKeepsTheArgumentsLength();
     TwoDimensionsConvertRowByRow();
   });

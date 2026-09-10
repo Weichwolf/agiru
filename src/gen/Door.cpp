@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 120> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 126> kElsewhere{{
     {"dotnet::Encoding", "dotnet/Encoding.h"},
     {"dotnet::UTF8Encoding", "dotnet/Encoding.h"},
     {"dotnet::UnicodeEncoding", "dotnet/Encoding.h"},
@@ -259,6 +259,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 120> kElsewh
     {"TestRequestPage", "runtime/test/TestRequestPage.h"},
     {"TempStore", "runtime/Table.h"},
     {"Instance", "runtime/Codeunit.h"},
+    {"Globals", "runtime/Codeunit.h"},
     {"CodeunitTraits", "runtime/Codeunit.h"},
     {"TableTraits", "runtime/Table.h"},
     {"PageTraits", "runtime/Page.h"},
@@ -307,6 +308,11 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 120> kElsewh
     {"platform::PrivacyNoticeApproval", "platform/PrivacyNoticeApproval.h"},
     {"platform::RecordLink", "platform/RecordLink.h"},
     {"platform::RecordLinkType", "platform/RecordLink.h"},
+    {"dotnet::CameraOptions", "dotnet/CameraProvider.h"},
+    {"dotnet::CameraProvider", "dotnet/CameraProvider.h"},
+    {"platform::ODataEdmType", "platform/ODataEdmType.h"},
+    {"platform::ObjectOptions", "platform/ObjectOptions.h"},
+    {"platform::ObjectOptionsObjectType", "platform/ObjectOptions.h"},
     {"platform::PageMetadata", "platform/PageMetadata.h"},
     {"platform::PageMetadataPageType", "platform/PageMetadata.h"},
     {"platform::TableMetadata", "platform/TableMetadata.h"},
@@ -401,6 +407,32 @@ std::string WithoutEmptyNamespaces(std::string text) {
 
 }
 
+const std::set<std::string> &RebuiltDotNet() {
+  static const std::set<std::string> kRebuilt = [] {
+    const std::filesystem::path where =
+        std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "dotnet";
+    if (!std::filesystem::is_directory(where)) {
+      throw std::runtime_error("the door has no dotnet/ directory at " + where.string());
+    }
+    static const std::regex declared(R"((?:^|\n)(?:class|struct) ([A-Z][A-Za-z0-9]*))");
+    std::set<std::string> found;
+    for (const auto &entry : std::filesystem::directory_iterator(where)) {
+      if (entry.path().extension() != ".h" || entry.path().filename() == "Refused.h") { continue; }
+      const std::string text = TextOf(entry.path());
+      for (auto at = std::sregex_iterator(text.begin(), text.end(), declared);
+           at != std::sregex_iterator();
+           ++at) {
+        found.insert((*at)[1].str());
+      }
+    }
+    if (found.empty()) {
+      throw std::runtime_error("include/dotnet/ declares no rebuilt .NET class -- ABORT");
+    }
+    return found;
+  }();
+  return kRebuilt;
+}
+
 std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   std::set<std::string> headers;
   headers.insert("meta/Ids.h");
@@ -478,8 +510,6 @@ bool DoorDeclares(std::string_view name) {
   return DoorSpellings().contains(key);
 }
 
-namespace {
-
 const std::map<std::string, std::string> &PlatformMembers(std::string_view table) {
   static std::map<std::string, std::map<std::string, std::string>> members;
   const std::string key = LowerKey(std::string(table));
@@ -502,7 +532,6 @@ const std::map<std::string, std::string> &PlatformMembers(std::string_view table
     }
   }
   return members.emplace(key, std::move(declared)).first->second;
-}
 }
 
 bool PlatformFieldNamed(const PlatformField &wanted) {

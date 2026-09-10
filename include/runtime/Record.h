@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -257,6 +258,26 @@ Integer RuntimeFilterGroup(void *record, Integer group);
 ///       (`GenJnlManagement.OpenJnl`), which is what BC does and what 16 `ERM General Journal UT`
 ///       cases opened the wrong template over (2026-09-09).
 [[nodiscard]] std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper);
+
+/// \brief The one value a field's filters allow, when every active filter on it is the SAME single
+///        equality and nothing else -- what `PopulateAllFields` calls "a filter expression that
+///        evaluates to exactly one value" (`devenv-populateallfields-property.md`).
+/// \param state The filters, or nothing.
+/// \param no The field.
+/// \return The value, or nothing where the field is unfiltered or filtered by anything wider.
+[[nodiscard]] std::optional<std::string> SingleFilterValue(const RecordState *state, FieldNo no);
+
+/// \brief Fills a NEW record's fields from the single-value filters standing on it, which is what
+///        a page does when it creates a row: `devenv-populateallfields-property.md` -- "Values are
+///        inserted in those fields where a currently active filter expression evaluates to exactly
+///        one value", and "Key fields are always populated", whatever the property says.
+/// \param record The record.
+/// \param table Its table.
+/// \param state Its filters.
+/// \param populateAllFields The page's `PopulateAllFields`; the primary key is seeded either way.
+/// \note IT ASSIGNS AND DOES NOT VALIDATE. The property page names no trigger, and `Init` -- the
+///       other place the platform fills a field it was not asked to -- assigns as well.
+void SeedFromFilters(void *record, const TableDef &table, bool populateAllFields);
 
 /// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`
 ///        answers and an `AssertEquals` compares against.

@@ -128,6 +128,8 @@ void Cluster(const std::vector<Failure> &failures) {
 
 struct Run {
   const agiru::gen::TranspileScope *scope = nullptr;
+  std::map<std::string, std::string> *symbols = nullptr;
+  std::vector<std::string> *collisions = nullptr;
   std::filesystem::path root;
   std::filesystem::path output;
   std::vector<Failure> failures;
@@ -232,6 +234,17 @@ struct Job {
 };
 
 void Keep(Run &run, const Output &where, const std::string &text) {
+  if (run.symbols != nullptr) {
+    const std::string mine = where.directory.filename().string();
+    const auto [held, isNew] = run.symbols->try_emplace(where.relative, mine);
+    if (!isNew && held->second != mine) {
+      if (run.collisions != nullptr && where.relative.ends_with(".h")) {
+        run.collisions->push_back(where.relative + " is declared by " + held->second + " and by " +
+                                  mine);
+      }
+      return;
+    }
+  }
   if (WriteFile(where, text)) { ++run.changed; }
   run.kept.insert(where.directory / where.relative);
 }
@@ -642,30 +655,40 @@ constexpr std::array kDroppedProperties{
               std::string_view{"the UI's date-formula entry on a field (board:0030)"}},
     std::pair{std::string_view{"tooltip"},
               std::string_view{"an object's Tell Me description, which the UI shows (board:0030)"}},
-    std::pair{std::string_view{"namespaceprefix"},
-              std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
-    std::pair{std::string_view{"occurrence"},
-              std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
-    std::pair{std::string_view{"minoccurs"},
-              std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
-    std::pair{std::string_view{"maxoccurs"},
-              std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
-    std::pair{std::string_view{"encoding"},
-              std::string_view{"the XML declaration's encoding; the walk writes UTF-8 (board:0065)"}},
-    std::pair{std::string_view{"usedefaultnamespace"},
-              std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
-    std::pair{std::string_view{"defaultnamespace"},
-              std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
+    std::pair{
+        std::string_view{"namespaceprefix"},
+        std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
+    std::pair{
+        std::string_view{"occurrence"},
+        std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
+    std::pair{
+        std::string_view{"minoccurs"},
+        std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
+    std::pair{
+        std::string_view{"maxoccurs"},
+        std::string_view{"schema validation, which this runtime does not perform (board:0065)"}},
+    std::pair{
+        std::string_view{"encoding"},
+        std::string_view{"the XML declaration's encoding; the walk writes UTF-8 (board:0065)"}},
+    std::pair{
+        std::string_view{"usedefaultnamespace"},
+        std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
+    std::pair{
+        std::string_view{"defaultnamespace"},
+        std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
     std::pair{std::string_view{"xmlversionno"},
               std::string_view{"the XML declaration's version, always 1.0 here (board:0065)"}},
-    std::pair{std::string_view{"preservewhitespace"},
-              std::string_view{"whitespace handling on XML import, not distinguished yet (board:0065)"}},
-    std::pair{std::string_view{"texttype"},
-              std::string_view{"the element's XML type, which the walk writes as text (board:0065)"}},
+    std::pair{
+        std::string_view{"preservewhitespace"},
+        std::string_view{"whitespace handling on XML import, not distinguished yet (board:0065)"}},
+    std::pair{
+        std::string_view{"texttype"},
+        std::string_view{"the element's XML type, which the walk writes as text (board:0065)"}},
     std::pair{std::string_view{"description"},
               std::string_view{"documentation on the object (board:0069)"}},
-    std::pair{std::string_view{"namespaces"},
-              std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
+    std::pair{
+        std::string_view{"namespaces"},
+        std::string_view{"an XML namespace, which the schema walk writes without (board:0065)"}},
     std::pair{std::string_view{"linktableforceinsert"},
               std::string_view{"an import linking rule not distinguished yet (board:0065)"}},
     std::pair{std::string_view{"promoted"}, std::string_view{"the UI's action bar (board:0030)"}},
@@ -2342,6 +2365,8 @@ int Scan(const Job &job) {
   objects.tables = agiru::gen::PlatformTables();
   objects.fieldEnums = agiru::gen::PlatformFieldEnums();
 
+  std::map<std::string, std::string> symbols;
+  std::vector<std::string> collisions;
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
     if (!std::filesystem::is_directory(source)) {
@@ -2349,6 +2374,8 @@ int Scan(const Job &job) {
       continue;
     }
     Run run{.scope = &scope,
+            .symbols = &symbols,
+            .collisions = &collisions,
             .root = source,
             .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
             .failures = {},
@@ -2544,8 +2571,9 @@ int Scan(const Job &job) {
   std::println("reports   {} translated: the dataset walk and the request page, no renderer yet "
                "(board:0063)",
                allReports);
-  std::println("xmlports  {} translated: the schema walked out and in over three formats (board:0065)",
-               allXmlPorts);
+  std::println(
+      "xmlports  {} translated: the schema walked out and in over three formats (board:0065)",
+      allXmlPorts);
   std::println("profiles  {} translated, {} naming a role centre page this run does not have",
                profileCounts.written,
                profileCounts.unresolved);
@@ -2641,6 +2669,12 @@ int Scan(const Job &job) {
                  "or in");
     std::println("          `kAcknowledgedAttributes` with the reason it is a no-op here.");
     return 1;
+  }
+  if (!collisions.empty()) {
+    std::println("declared  {} object name(s) are declared by two apps and translated once, since "
+                 "every app is linked into one image here (board:0686)",
+                 collisions.size());
+    for (const std::string &one : collisions) { std::println("          {}", one); }
   }
   if (silentProperties != 0) {
     std::println("");

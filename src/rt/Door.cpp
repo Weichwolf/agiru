@@ -1716,9 +1716,9 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.WriteToYaml(Text)");
 }
 
-::agiru::Boolean
-JsonObject::WriteWithSecretsTo(const ::agiru::Dictionary<std::string, ::agiru::SecretText> &Secrets,
-                               ::agiru::SecretText &Result) {
+::agiru::Boolean JsonObject::WriteWithSecretsTo(
+    const ::agiru::Dictionary<::agiru::Text<0>, ::agiru::SecretText> &Secrets,
+    ::agiru::SecretText &Result) {
   static_cast<void>(Secrets);
   static_cast<void>(Result);
   RefuseDoor("JsonObject.WriteWithSecretsTo(Dictionary of [Text, SecretText], SecretText)");
@@ -2293,7 +2293,7 @@ std::string TestHttpRequestMessage::Path() {
   RefuseDoor("TestHttpRequestMessage.Path()");
 }
 
-::agiru::Dictionary<std::string, std::string> TestHttpRequestMessage::QueryParameters() {
+::agiru::Dictionary<::agiru::Text<0>, std::string> TestHttpRequestMessage::QueryParameters() {
   RefuseDoor("TestHttpRequestMessage.QueryParameters()");
 }
 

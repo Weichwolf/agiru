@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <exception>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -417,6 +418,35 @@ std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper) {
     }
   }
   return RangeBoundOf(text, upper);
+}
+
+std::optional<std::string> SingleFilterValue(const RecordState *state, FieldNo no) {
+  if (state == nullptr) { return std::nullopt; }
+  std::optional<std::string> value;
+  for (const FieldFilter &one : state->filters) {
+    if (one.field != no || one.text.empty()) { continue; }
+    const Expression expression = ParseFilter(one.text);
+    if (expression.size() != 1 || expression.front().size() != 1) { return std::nullopt; }
+    const Atom &atom = expression.front().front();
+    if (atom.compare != Compare::Equal || HasWildcard(atom.value)) { return std::nullopt; }
+    if (value.has_value() && *value != atom.value) { return std::nullopt; }
+    value = atom.value;
+  }
+  return value;
+}
+
+void SeedFromFilters(void *record, const TableDef &table, bool populateAllFields) {
+  const RecordState *state = reinterpret_cast<const StateHandle *>(record)->Peek();
+  const std::span<const FieldNo> key =
+      table.keys.empty() ? std::span<const FieldNo>{} : table.keys.front().fields;
+  for (const FieldDef &field : table.fields) {
+    const bool inKey = std::ranges::find(key, field.no) != key.end();
+    if (!inKey && !populateAllFields) { continue; }
+    if (const std::optional<std::string> value = SingleFilterValue(state, field.no);
+        value.has_value()) {
+      EvaluateInto(record, table, field.no, *value);
+    }
+  }
 }
 
 std::string RangeBoundOf(std::string_view filter, bool upper) {

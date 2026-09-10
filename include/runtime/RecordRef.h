@@ -156,19 +156,19 @@ public:
 
   /// \brief AL `FieldRef.Number()`.
   /// \return The AL field number.
-  [[nodiscard]] Integer Number() const { return def_->no.Value(); }
+  [[nodiscard]] Integer Number() const { return Def_().no.Value(); }
 
   /// \brief AL `FieldRef.Name()`.
   /// \return The AL name, spaces and all.
-  [[nodiscard]] std::string_view Name() const { return def_->name; }
+  [[nodiscard]] std::string_view Name() const { return Def_().name; }
 
   /// \brief AL `FieldRef.Caption()`.
   /// \return The caption an error message quotes.
-  [[nodiscard]] std::string_view Caption() const { return def_->caption; }
+  [[nodiscard]] std::string_view Caption() const { return Def_().caption; }
 
   /// \brief AL `FieldRef.Length()`.
   /// \return The declared length for Code and Text, 0 otherwise.
-  [[nodiscard]] Integer Length() const { return def_->length; }
+  [[nodiscard]] Integer Length() const { return Def_().length; }
 
   /// \brief AL `FieldRef.Type()`.
   ///
@@ -186,11 +186,13 @@ public:
 
   /// \brief AL `FieldRef.IsEnum()`.
   /// \return True when the field is an enum rather than an option or anything else.
-  [[nodiscard]] bool IsEnum() const { return def_->type == FieldType::Enum; }
+  [[nodiscard]] bool IsEnum() const { return Def_().type == FieldType::Enum; }
 
   /// \brief AL `FieldRef.EnumValueCount()`.
   /// \return How many values the enumeration declares; 0 when the field is not one.
-  [[nodiscard]] Integer EnumValueCount() const { return static_cast<Integer>(def_->values.size()); }
+  [[nodiscard]] Integer EnumValueCount() const {
+    return static_cast<Integer>(Def_().values.size());
+  }
 
   /// \brief AL `FieldRef.GetEnumValueName(Index)`.
   ///
@@ -274,7 +276,7 @@ public:
   /// \brief AL `FieldRef.Class()`. Gets the value of the FieldClass Property of the field that is
   /// currently selected.
   /// \return The AL `FieldClass` the table declared for this field.
-  [[nodiscard]] ::agiru::FieldClass Class() const { return def_->fieldClass; }
+  [[nodiscard]] ::agiru::FieldClass Class() const { return Def_().fieldClass; }
 
   /// \brief AL `FieldRef.FieldError(ErrorInfo)`. Stops the execution of the code, causing a
   /// run-time error, and creates an error message for a field.
@@ -352,7 +354,7 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   std::string OptionCaption() const {
     std::string out;
-    for (const EnumValueDef &value : def_->values) {
+    for (const EnumValueDef &value : Def_().values) {
       if (!out.empty()) { out += ','; }
       out += value.name;
     }
@@ -462,6 +464,20 @@ public:
   }
 
 private:
+  [[nodiscard]] const FieldDef &Def_() const {
+    if (def_ == nullptr) {
+      throw Error("FieldRef: it names no field yet -- nothing has been assigned to it");
+    }
+    return *def_;
+  }
+
+  [[nodiscard]] const TableDef &Table_() const {
+    if (table_ == nullptr) {
+      throw Error("FieldRef: it names no field yet -- nothing has been assigned to it");
+    }
+    return *table_;
+  }
+
   void *record_ = nullptr;
   const TableDef *table_ = nullptr;
   const FieldDef *def_ = nullptr;

@@ -89,7 +89,7 @@ ErrorInfo::Create(std::string_view Message,
                   std::string_view ControlName,
                   const ::agiru::Verbosity &Verbosity,
                   ::agiru::DataClassification DataClassification,
-                  const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+                  const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions) {
   ::agiru::ErrorInfo info = Create(Message, Collectible);
   info.tableId_ = Record.Number();
   info.fieldNo_ = FieldNo;
@@ -101,12 +101,12 @@ ErrorInfo::Create(std::string_view Message,
   return info;
 }
 
-::agiru::Dictionary<std::string, std::string> ErrorInfo::CustomDimensions() {
+::agiru::Dictionary<::agiru::Text<0>, std::string> ErrorInfo::CustomDimensions() {
   return customDimensions_;
 }
 
 void ErrorInfo::CustomDimensions(
-    const ::agiru::Dictionary<std::string, std::string> &CustomDimensions) {
+    const ::agiru::Dictionary<::agiru::Text<0>, std::string> &CustomDimensions) {
   customDimensions_ = CustomDimensions;
 }
 

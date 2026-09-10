@@ -273,6 +273,7 @@ struct Reached {
 void Ahead(Reached &reached, const std::string &qualified) {
   const std::string reachable = Unprefixed(qualified);
   const std::size_t colons = reachable.rfind("::");
+  if (reachable.starts_with("platform::")) { return; }
   reached.forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
       colons == std::string::npos ? reachable : reachable.substr(colons + 2));
 }
@@ -748,8 +749,10 @@ std::string
 PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source) {
   const std::string identifier = ClassName(Identifier(page.name), PageKind(page));
   const std::string space = NamespaceOf(page.nameSpace);
-  const std::string prefix =
-      "k" + Identifier(page.name) + (page.xmlport ? "XmlPort" : page.report ? "Report" : "");
+  const std::string prefix = "k" + Identifier(page.name) +
+                             (page.xmlport  ? "XmlPort"
+                              : page.report ? "Report"
+                                            : "");
   std::string out = "namespace " + space + " {\n\n";
   int counter = 0;
   const std::string layout =
@@ -864,6 +867,17 @@ std::string SourceTableNameOf(const al::PageObject &object) {
   return named;
 }
 
+std::string WithoutTheNamespace(const std::string &table) {
+  std::string bare = table;
+  for (std::size_t dot = bare.find('.'); dot != std::string::npos; dot = bare.find('.')) {
+    if (dot + 1 >= bare.size() || bare[dot + 1] == ' ') { break; }
+    const std::string_view head = std::string_view(bare).substr(0, dot);
+    if (head.empty() || head.find(' ') != std::string_view::npos) { break; }
+    bare = bare.substr(dot + 1);
+  }
+  return bare;
+}
+
 std::string PageVariableIdentifier(const al::PageObject &page, std::string_view name) {
   std::string plain = Identifier(name);
   std::size_t alike = 0;
@@ -875,6 +889,7 @@ std::string PageVariableIdentifier(const al::PageObject &page, std::string_view 
   for (const auto &[key, identifier] : ControlIdentifiers(page)) {
     if (identifier == plain) { return plain + "_Var"; }
   }
+  if (IsAlTypeName(plain) || HiddenByABaseMember(plain)) { return plain + "_Var"; }
   return plain;
 }
 
@@ -952,7 +967,7 @@ void PrepareElements(std::vector<al::PageControl> &controls, al::PageObject &por
         declared.type = "Record";
         std::string table;
         for (const al::Token &token : control.source) { table += token.text; }
-        declared.subtype = table;
+        declared.subtype = WithoutTheNamespace(table);
         if (const al::Property *temporary = al::Find(control.properties, "UseTemporary");
             temporary != nullptr && LowerKey(temporary->text) == "true") {
           declared.temporary = true;
@@ -963,9 +978,7 @@ void PrepareElements(std::vector<al::PageControl> &controls, al::PageObject &por
       const bool known = std::ranges::any_of(port.variables, [&control](const al::VarDecl &one) {
         return LowerKey(one.name) == LowerKey(control.name);
       });
-      const bool container = std::ranges::any_of(control.children, [](const al::PageControl &child) {
-        return IsElementKind(child.kind);
-      });
+      const bool container = false;
       if (!known && !container) {
         al::VarDecl declared;
         declared.name = control.name;
@@ -1010,7 +1023,7 @@ void PrepareDataItems(std::vector<al::PageControl> &controls, al::PageObject &re
       declared.type = "Record";
       std::string table;
       for (const al::Token &token : control.source) { table += token.text; }
-      declared.subtype = table;
+      declared.subtype = WithoutTheNamespace(table);
       if (const al::Property *temporary = al::Find(control.properties, "UseTemporary");
           temporary != nullptr && LowerKey(temporary->text) == "true") {
         declared.temporary = true;
@@ -1266,9 +1279,9 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   const std::string identifier = Identifier(object.name);
   const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object);
   const std::string pageClass = ClassName(identifier, PageKind(object));
-  const std::string controlsClass =
-      identifier +
-      (object.xmlport ? "_XmlPort_Controls" : object.report ? "_Report_Controls" : "_Controls");
+  const std::string controlsClass = identifier + (object.xmlport  ? "_XmlPort_Controls"
+                                                  : object.report ? "_Report_Controls"
+                                                                  : "_Controls");
   const std::vector<const al::PageControl *> dataItems = DataItemsOf(object);
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
@@ -1363,8 +1376,10 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "};\n\n";
   out += "class " + pageClass + ";\n\n";
   out += "class " + pageClass + " : public " +
-         (object.xmlport ? "XmlPort<" : object.report ? "Report<" : "Page<") + pageClass +
-         "> {\npublic:\n";
+         (object.xmlport  ? "XmlPort<"
+          : object.report ? "Report<"
+                          : "Page<") +
+         pageClass + "> {\npublic:\n";
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
 
@@ -1452,7 +1467,9 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   out += "};\n\n";
   out += "extern const PageDef k" + identifier +
-         (object.xmlport ? "XmlPortPage;\n" : object.report ? "ReportPage;\n" : "Page;\n");
+         (object.xmlport  ? "XmlPortPage;\n"
+          : object.report ? "ReportPage;\n"
+                          : "Page;\n");
   if (object.xmlport) { out += "extern const XmlPortDef k" + identifier + "XmlPort;\n"; }
   out += "\n";
   out += "} // namespace " + space + "\n\n";
@@ -1460,7 +1477,9 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
   out += "  static constexpr const PageDef &kPage = " + space + "::k" + identifier +
-         (object.xmlport ? "XmlPortPage;\n" : object.report ? "ReportPage;\n" : "Page;\n");
+         (object.xmlport  ? "XmlPortPage;\n"
+          : object.report ? "ReportPage;\n"
+                          : "Page;\n");
   out += "  template <typename Field_Kind, typename Action_Kind, template <typename> class "
          "Part_Kind>\n"
          "  using Controls = " +
@@ -1477,8 +1496,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     out += "\ntemplate <> struct agiru::XmlPortTraits<" + space + "::" + pageClass + "> {\n";
     out += "  static constexpr XmlPortId kId{" + std::to_string(object.id) + "};\n";
     out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
-    out += "  static constexpr const XmlPortDef &kPort = " + space + "::k" + identifier +
-           "XmlPort;\n";
+    out +=
+        "  static constexpr const XmlPortDef &kPort = " + space + "::k" + identifier + "XmlPort;\n";
     out += "};\n";
   }
   DotNetUse dotnet;

@@ -102,13 +102,13 @@ RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering
 }
 
 void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
-  const TableEntry *entry = FindTable(table_->id);
+  const TableEntry *entry = FindTable(Table_().id);
   if (entry == nullptr || entry->validate == nullptr) {
-    throw Error("FieldRef.Validate: this build carries no table " + std::string(table_->name));
+    throw Error("FieldRef.Validate: this build carries no table " + std::string(Table_().name));
   }
   const std::string text =
-      NewValue.IsEmpty() ? FieldText(record_, *def_) : ::agiru::AsText(NewValue);
-  entry->validate(record_, def_->no, text);
+      NewValue.IsEmpty() ? FieldText(record_, Def_()) : ::agiru::AsText(NewValue);
+  entry->validate(record_, Def_().no, text);
 }
 
 ::agiru::Boolean RecordRef::IsTemporary() {
@@ -168,7 +168,7 @@ void RecordRef::SetRecFilter() {
 
 std::string FieldRef::ToText() const {
   if (def_ == nullptr) { throw Error("this FieldRef names no field"); }
-  return ::agiru::FieldText(record_, *def_);
+  return ::agiru::FieldText(record_, Def_());
 }
 
 ::agiru::Boolean RecordRef::FindLast() {
@@ -250,7 +250,7 @@ std::string FieldRef::GetFilter() const {
   const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
   if (state == nullptr) { return {}; }
   for (const detail::FieldFilter &one : state->filters) {
-    if (one.field == def_->no && one.group == state->group) { return one.text; }
+    if (one.field == Def_().no && one.group == state->group) { return one.text; }
   }
   return {};
 }
@@ -258,12 +258,12 @@ std::string FieldRef::GetFilter() const {
 ::agiru::Variant FieldRef::RangeBound_(bool upper) const {
   if (record_ == nullptr || def_ == nullptr) { return {}; }
   const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
-  const std::string text = detail::RangeBoundText(state, def_->no, upper);
-  const TableEntry *entry = FindTable(table_->id);
+  const std::string text = detail::RangeBoundText(state, Def_().no, upper);
+  const TableEntry *entry = FindTable(Table_().id);
   if (entry == nullptr) { return {}; }
   const std::unique_ptr<void, void (*)(void *)> bound(entry->make(), entry->free);
-  if (!text.empty()) { detail::EvaluateInto(bound.get(), *table_, def_->no, text); }
-  return FieldRef(bound.get(), *table_, *def_).Value();
+  if (!text.empty()) { detail::EvaluateInto(bound.get(), Table_(), Def_().no, text); }
+  return FieldRef(bound.get(), Table_(), Def_()).Value();
 }
 
 void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Variant &ToValue) const {
@@ -272,7 +272,7 @@ void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Varian
   }
   detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record_)->Ensure();
   if (FromValue.IsEmpty()) {
-    detail::Narrow(state, def_->no, {});
+    detail::Narrow(state, Def_().no, {});
     return;
   }
   const auto asFilter = [](const ::agiru::Variant &held) {
@@ -281,51 +281,51 @@ void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Varian
   };
   const std::string from = detail::Literally(asFilter(FromValue));
   if (ToValue.IsEmpty()) {
-    detail::Narrow(state, def_->no, from);
+    detail::Narrow(state, Def_().no, from);
     return;
   }
-  detail::Narrow(state, def_->no, from + ".." + detail::Literally(asFilter(ToValue)));
+  detail::Narrow(state, Def_().no, from + ".." + detail::Literally(asFilter(ToValue)));
 }
 
 void FieldRef::SetFilterText(const std::string &text) const {
   if (record_ == nullptr || def_ == nullptr) {
     throw Error("FieldRef.SetFilter: the FieldRef names no field yet");
   }
-  detail::Narrow(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), def_->no, text);
+  detail::Narrow(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), Def_().no, text);
 }
 
 FieldType FieldRef::Type() const {
-  return def_->type == FieldType::Enum ? FieldType::Option : def_->type;
+  return Def_().type == FieldType::Enum ? FieldType::Option : Def_().type;
 }
 
 std::string_view FieldRef::GetEnumValueName(Integer index) const {
-  if (index < 1 || static_cast<std::size_t>(index) > def_->values.size()) { return {}; }
-  return def_->values[static_cast<std::size_t>(index) - 1].name;
+  if (index < 1 || static_cast<std::size_t>(index) > Def_().values.size()) { return {}; }
+  return Def_().values[static_cast<std::size_t>(index) - 1].name;
 }
 
 Integer FieldRef::GetEnumValueOrdinal(Integer index) const {
-  if (index < 1 || static_cast<std::size_t>(index) > def_->values.size()) { return 0; }
-  return def_->values[static_cast<std::size_t>(index) - 1].ordinal;
+  if (index < 1 || static_cast<std::size_t>(index) > Def_().values.size()) { return 0; }
+  return Def_().values[static_cast<std::size_t>(index) - 1].ordinal;
 }
 
 std::string_view FieldRef::GetEnumValueNameFromOrdinalValue(Integer ordinal) const {
-  const EnumValueDef *value = ValueOf(def_->values, ordinal);
+  const EnumValueDef *value = ValueOf(Def_().values, ordinal);
   return value != nullptr ? value->name : std::string_view{};
 }
 
 std::string_view FieldRef::GetEnumValueCaption(Integer index) const {
-  if (index < 1 || static_cast<std::size_t>(index) > def_->values.size()) { return {}; }
-  return def_->values[static_cast<std::size_t>(index) - 1].caption;
+  if (index < 1 || static_cast<std::size_t>(index) > Def_().values.size()) { return {}; }
+  return Def_().values[static_cast<std::size_t>(index) - 1].caption;
 }
 
 std::string_view FieldRef::GetEnumValueCaptionFromOrdinalValue(Integer ordinal) const {
-  const EnumValueDef *value = ValueOf(def_->values, ordinal);
+  const EnumValueDef *value = ValueOf(Def_().values, ordinal);
   return value != nullptr ? value->caption : std::string_view{};
 }
 
 std::string FieldRef::OptionMembers() const {
   std::string members;
-  for (const EnumValueDef &value : def_->values) {
+  for (const EnumValueDef &value : Def_().values) {
     if (!members.empty()) { members += ','; }
     members += value.name;
   }
@@ -333,25 +333,25 @@ std::string FieldRef::OptionMembers() const {
 }
 
 Variant FieldRef::Value() const {
-  switch (def_->type) {
-    case FieldType::Boolean: return Variant{As<Boolean>(record_, *def_)};
-    case FieldType::Integer: return Variant{As<Integer>(record_, *def_)};
-    case FieldType::BigInteger: return Variant{As<BigInteger>(record_, *def_)};
-    case FieldType::Decimal: return Variant{As<Decimal>(record_, *def_)};
+  switch (Def_().type) {
+    case FieldType::Boolean: return Variant{As<Boolean>(record_, Def_())};
+    case FieldType::Integer: return Variant{As<Integer>(record_, Def_())};
+    case FieldType::BigInteger: return Variant{As<BigInteger>(record_, Def_())};
+    case FieldType::Decimal: return Variant{As<Decimal>(record_, Def_())};
     case FieldType::Code:
-    case FieldType::Text: return Variant{std::string(As<StringValue>(record_, *def_).Value())};
-    case FieldType::Date: return Variant{As<Date>(record_, *def_)};
-    case FieldType::Time: return Variant{As<Time>(record_, *def_)};
-    case FieldType::DateTime: return Variant{As<DateTime>(record_, *def_)};
-    case FieldType::Duration: return Variant{As<Duration>(record_, *def_)};
-    case FieldType::Guid: return Variant{As<Guid>(record_, *def_)};
-    case FieldType::RecordId: return Variant{As<RecordId>(record_, *def_)};
-    case FieldType::DateFormula: return Variant{As<DateFormula>(record_, *def_)};
+    case FieldType::Text: return Variant{std::string(As<StringValue>(record_, Def_()).Value())};
+    case FieldType::Date: return Variant{As<Date>(record_, Def_())};
+    case FieldType::Time: return Variant{As<Time>(record_, Def_())};
+    case FieldType::DateTime: return Variant{As<DateTime>(record_, Def_())};
+    case FieldType::Duration: return Variant{As<Duration>(record_, Def_())};
+    case FieldType::Guid: return Variant{As<Guid>(record_, Def_())};
+    case FieldType::RecordId: return Variant{As<RecordId>(record_, Def_())};
+    case FieldType::DateFormula: return Variant{As<DateFormula>(record_, Def_())};
     case FieldType::Option:
     case FieldType::Enum:
-      return Variant{OrdinalInVariant{.ordinal = As<OrdinalValue>(record_, *def_).AsInteger(),
-                                      .values = def_->values}};
-    case FieldType::Blob: return Variant{As<Blob>(record_, *def_)};
+      return Variant{OrdinalInVariant{.ordinal = As<OrdinalValue>(record_, Def_()).AsInteger(),
+                                      .values = Def_().values}};
+    case FieldType::Blob: return Variant{As<Blob>(record_, Def_())};
     case FieldType::Media:
     case FieldType::MediaSet:
       throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
@@ -362,16 +362,16 @@ Variant FieldRef::Value() const {
 }
 
 void FieldRef::SetValue(std::string_view text) {
-  detail::SetFieldText(record_, *def_, text);
+  detail::SetFieldText(record_, Def_(), text);
 }
 
 void FieldRef::TestField() const {
-  agiru::detail::TestField(record_, *table_, def_->no);
+  agiru::detail::TestField(record_, Table_(), Def_().no);
 }
 
 RecordRef FieldRef::Record() const {
   if (record_ == nullptr || table_ == nullptr) { throw Error("this FieldRef names no field"); }
-  return RecordRef{record_, *table_};
+  return RecordRef{record_, Table_()};
 }
 
 ::agiru::Integer RecordRef::SystemIdNo() {

@@ -508,11 +508,6 @@ std::size_t FieldArguments(std::string_view method) {
   return 0;
 }
 
-bool NamesAbsentType(const al::VarDecl &declared) {
-  return !declared.type.empty() && !IsAlTypeName(declared.type) && declared.subtype.empty() &&
-         declared.members.empty() && declared.arguments.empty();
-}
-
 std::string ObjectType(const al::VarDecl &declared, const Objects &objects) {
   const TableRef *ref = Reach(declared, objects);
   if (ref == nullptr) { return "absent::" + Identifier(declared.subtype); }
@@ -929,6 +924,7 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   std::map<std::string, std::set<std::string>> forward;
   const auto ahead = [&forward](const std::string &qualified) {
     const std::string reachable = Unprefixed(qualified);
+    if (reachable.starts_with("platform::")) { return; }
     const std::size_t colons = reachable.rfind("::");
     forward[colons == std::string::npos ? std::string{} : reachable.substr(0, colons)].insert(
         colons == std::string::npos ? reachable : reachable.substr(colons + 2));
@@ -1142,6 +1138,11 @@ public:
 
   [[nodiscard]] bool IsVariable(std::string_view name) const override {
     return Declaration(name) != nullptr;
+  }
+
+  [[nodiscard]] std::string AbsentDotNet(std::string_view name) const override {
+    const al::VarDecl *declared = Declaration(name);
+    return declared == nullptr ? std::string{} : AbsentDotNetOf(*declared);
   }
 
   [[nodiscard]] bool TakesArguments(std::string_view name, std::size_t count) const override {
@@ -1953,11 +1954,22 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
   return OutputDirectory(unit.nameSpace, ObjectKind::Codeunit) + "/" + Identifier(unit.name) + ".h";
 }
 
+std::string AbsentDotNetOf(const al::VarDecl &declared) {
+  if (NamesAbsentType(declared)) { return declared.type; }
+  if (TypeName(declared.type) != "DotNet" || declared.subtype.empty()) { return {}; }
+  return RebuiltDotNet().contains(Identifier(declared.subtype)) ? std::string{} : declared.subtype;
+}
+
+bool NamesAbsentType(const al::VarDecl &declared) {
+  return !declared.type.empty() && !IsAlTypeName(declared.type) && declared.subtype.empty() &&
+         declared.members.empty() && declared.arguments.empty();
+}
+
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
-                       .header = {},
+                       .header = "platform/" + Identifier(name) + ".h",
                        .fields = {},
                        .procedures = {},
                        .name = {},
@@ -1979,6 +1991,8 @@ TableIndex PlatformTables() {
   add("Privacy Notice Approval", "1561");
   add("Record Link", "2000000068");
   add("Table Metadata", "2000000136");
+  add("Object Options", "2000000225");
+  add("OData Edm Type", "2000000203");
   add("Page Metadata", "2000000138");
   add("Tenant License State", "2000000189");
   add("Date", "2000000007");
@@ -2007,6 +2021,9 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000211"] = enums["feature key"];
   enums["record link"]["type"] = "::agiru::platform::RecordLinkType";
   enums["table metadata"]["tabletype"] = "::agiru::platform::TableMetadataTableType";
+  enums["object options"]["object type"] = "::agiru::platform::ObjectOptionsObjectType";
+  enums["object options"]["objecttype"] = "::agiru::platform::ObjectOptionsObjectType";
+  enums["2000000225"] = enums["object options"];
   enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
   enums["2000000136"] = enums["table metadata"];

@@ -177,6 +177,8 @@ public:
       static_cast<void>(Page_());
       Relink_();
       Platform_(Record_()).Init();
+      detail::SeedFromFilters(
+          static_cast<void *>(&Record_()), RecordTraits_().kTable, PopulateAllFields_());
       newRecord_ = true;
       if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
       detail::AfterGetRecord(Page_());
@@ -602,6 +604,14 @@ private:
     requires kHasRecord
   {
     return Page_().Rec;
+  }
+
+  [[nodiscard]] static bool PopulateAllFields_() {
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      return PageTraits<P>::kPage.populateAllFields;
+    } else {
+      return false;
+    }
   }
 
   static auto RecordTraits_()
