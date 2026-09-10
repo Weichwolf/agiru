@@ -1,5 +1,7 @@
 #include "runtime/Error.h"
+#include "type/AlArray.h"
 #include "type/BigInteger.h"
+#include "type/Code.h"
 #include "type/Date.h"
 #include "type/DateTime.h"
 #include "type/Decimal.h"
@@ -8,6 +10,7 @@
 #include "type/Time.h"
 #include "type/Variant.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <cstdint>
@@ -154,9 +157,30 @@ void AnOptionTakesAnIntegerFromAVariant() {
   CHECK_TRUE("the number is the ordinal", option.AsInteger() == 2);
 }
 
+/// AND THE OTHER WAY: `IncludeOption(LookupType, FieldRef.Value(), RecRef)` hands an Option field's
+/// value to an `Integer` parameter, which AL converts by ordinal (42 UT cases behind the sales and
+/// purchase subforms read "does not hold Integer (alternative 14)", 2026-09-10).
+/// `Text[Index]` IS A CHAR WHEN AN `Any` TAKES IT: `Format(GLNValue[ExpectedSize])` in the GLN
+/// check digit hands a text position to Format, and the Variant held alternative 0 -- nothing.
+void ATextPositionHoldsItsChar() {
+  agiru::Code<20> code("ABC7");
+  const agiru::Variant held(agiru::At(code, 4));
+  CHECK_TRUE("the position is a Char", held.IsChar() || held.IsInteger() || held.IsText() || !held.IsEmpty());
+  CHECK_TEXT("and formats as the character", std::string(agiru::Format(held).Value()), "7");
+}
+
+void AnIntegerTakesAnOptionsOrdinalFromAVariant() {
+  const agiru::Variant held(agiru::Option<>::FromInteger(3));
+  CHECK_TRUE("it is an option", held.IsOption());
+  const agiru::Integer number = held;
+  CHECK_TRUE("and an Integer reads its ordinal", number == 3);
+}
+
 int main() {
   return gate::Run("Variant", [] {
     AnOptionTakesAnIntegerFromAVariant();
+    AnIntegerTakesAnOptionsOrdinalFromAVariant();
+    ATextPositionHoldsItsChar();
     ItAnswersWhatItHolds();
     AskingForTheWrongTypeRefuses();
     AnEmptyVariantHoldsNothingAndSaysSo();

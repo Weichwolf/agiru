@@ -1,6 +1,8 @@
 #include "meta/EnumDef.h"
 #include "type/Date.h"
+#include "type/Decimal.h"
 #include "type/Enum.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Time.h"
@@ -121,6 +123,25 @@ void ABooleanRendersThreeDifferentWays() {
 
 // The specification form. `<Integer,2><Filler Character,0>` is the commonest one in Layers/W1 at 26
 // sites, and the filler is written AFTER the element it fills.
+/// STANDARD FORMATS 3 AND 4 PUT THE SIGN LAST (`system-format-joker-integer-integer-method.md`:
+/// `<Integer Thousand><Decimals><Sign,1>` is 3, `<Integer><Decimals><Sign,1>` is 4), and a GUID
+/// under 4 drops its braces -- `Format(Company.Id, 0, 4)` is how OData and the workflow webhooks
+/// write one (6 UT cases of ERM General Journal UT, 2026-09-10).
+void FormatsThreeAndFourTrailTheSignAndFourUnbracesAGuid() {
+  CHECK_TEXT("a negative decimal under 4",
+             Format(agiru::Decimal::FromInvariantString("-12.5"), 0, 4),
+             "12.5-");
+  CHECK_TEXT("and under 3", Format(agiru::Decimal::FromInvariantString("-12.5"), 0, 3), "12.5-");
+  CHECK_TEXT("a positive one carries no sign",
+             Format(agiru::Decimal::FromInvariantString("12.5"), 0, 4),
+             "12.5");
+  CHECK_TEXT("an integer likewise", Format(agiru::Integer{-7}, 0, 4), "7-");
+  const agiru::Guid id = agiru::Guid::FromText("{12345678-1234-1234-1234-123456789ABC}").value();
+  CHECK_TEXT(
+      "a GUID under 4 has no braces", Format(id, 0, 4), "12345678-1234-1234-1234-123456789ABC");
+  CHECK_TEXT("and under 0 it has them", Format(id, 0, 0), "{12345678-1234-1234-1234-123456789ABC}");
+}
+
 void ASpecificationFillsFromTheWholeStringAndNotFromTheLeft() {
   const Variant seven{agiru::Integer{7}};
   CHECK_TEXT("the filler reaches back", Format(seven, 0, "<Integer,2><Filler Character,0>"), "07");
@@ -169,5 +190,6 @@ int main() {
     ASpecificationFillsFromTheWholeStringAndNotFromTheLeft();
     TheLengthPadsANumberOnTheLeftAndTextOnTheRight();
     AnElementThatIsNotRenderedNamesItself();
+    FormatsThreeAndFourTrailTheSignAndFourUnbracesAGuid();
   });
 }

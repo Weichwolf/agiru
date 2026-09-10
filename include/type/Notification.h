@@ -134,7 +134,17 @@ public:
   /// \note It withdraws what `Send` recorded, so a test sees the same sequence a client would.
   ::agiru::Boolean Recall();
 
+  /// \brief What a sent notification is handed to: the test runner installs the
+  ///        `[SendNotificationHandler]` dispatch here, since this value type reaches no runtime.
+  using Sink = void (*)(Notification &sent);
+
+  /// \brief Installs the sink `Send` hands every notification to; null uninstalls it.
+  /// \param sink The sink, or null.
+  static void OnSend(Sink sink);
+
 private:
+  [[nodiscard]] static Sink &Sink_();
+
   Guid id_;
   std::string message_;
   NotificationScope scope_ = NotificationScope::LocalScope;

@@ -413,15 +413,19 @@ public:
   ///       the codeunit reads it as `Rec`, writes into `Rec`, and the caller sees the result.
   ///       `OnRun` itself takes NO argument -- an `OnRun(Rec)` was a shape AL does not have, and it
   ///       made every `Codeunit.Run(Rec)` in the tree a compile error.
+  /// \brief AL `Codeunit.Run(Rec)`: the caller's record IS the codeunit's `Rec` for the run --
+  ///        fields, filters and position go in and come back (`codeunit-run-method.md`: passed by
+  ///        reference). `Export Payment File (Yes/No)` opens with `Rec.FindSet()` on the filters
+  ///        its caller set, and an assignment that carried only the fields walked every line
+  ///        (`Payment Export Validation UT`, chain 87, 2026-09-10).
+  /// \tparam Record The caller's record type, or a handle to one.
+  /// \param rec The record.
+  /// \return True, once `OnRun` returned.
   template <typename Record> bool Run(Record &rec) {
     detail::Scope scope;
-    if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
-      static_cast<Derived *>(this)->Rec = rec;
-    }
+    TakeIn_(rec);
     static_cast<Derived *>(this)->OnRun();
-    if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
-      rec = static_cast<Derived *>(this)->Rec;
-    }
+    GiveBack_(rec);
     scope.Keep();
     return true;
   }
@@ -433,13 +437,9 @@ public:
   template <typename Record> bool Ok_Run(Record &rec) {
     detail::Scope scope;
     try {
-      if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
-        static_cast<Derived *>(this)->Rec = rec;
-      }
+      TakeIn_(rec);
       static_cast<Derived *>(this)->OnRun();
-      if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
-        rec = static_cast<Derived *>(this)->Rec;
-      }
+      GiveBack_(rec);
     } catch (const Error &e) {
       scope.Discard(e);
       return false;
@@ -450,6 +450,26 @@ public:
 
 private:
   friend Derived;
+
+  template <typename Record> void TakeIn_(Record &rec) {
+    if constexpr (requires(Derived &unit) { unit.Rec.Copy(rec); }) {
+      static_cast<Derived *>(this)->Rec.Copy(rec);
+    } else if constexpr (requires(Derived &unit) { unit.Rec.Copy(*rec.operator->()); }) {
+      static_cast<Derived *>(this)->Rec.Copy(*rec.operator->());
+    } else if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
+      static_cast<Derived *>(this)->Rec = rec;
+    }
+  }
+
+  template <typename Record> void GiveBack_(Record &rec) {
+    if constexpr (requires(Derived &unit) { rec.Copy(unit.Rec); }) {
+      rec.Copy(static_cast<Derived *>(this)->Rec);
+    } else if constexpr (requires(Derived &unit) { rec.operator->()->Copy(unit.Rec); }) {
+      rec.operator->()->Copy(static_cast<Derived *>(this)->Rec);
+    } else if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
+      rec = static_cast<Derived *>(this)->Rec;
+    }
+  }
 };
 
 /// \brief AL `Codeunit` with no object in reach -- the platform's `Codeunit.Run(Id, Rec)`.

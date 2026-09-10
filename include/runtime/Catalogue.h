@@ -63,7 +63,7 @@ inline constexpr TableEntry kTableEntry{
                    FieldNo no,
                    std::string_view text) { static_cast<T *>(record)->ValidateText(no, text); },
     .copy = [](void *to,
-               const void *from) { *static_cast<T *>(to) = *static_cast<const T *>(from); }};
+               const void *from) { static_cast<T *>(to)->Copy(*static_cast<const T *>(from)); }};
 
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.
@@ -73,11 +73,13 @@ void RegisterTableEntry(const TableEntry *entry);
 struct PageEntry {
   const PageDef *page; ///< The declaration, `constexpr` data in `.rodata`.
   /// \brief Runs the page headless, the way `Page.Run`/`Page.RunModal` do on the generated class.
-  /// \param modal  Whether it is `RunModal`.
-  /// \param record The record passed, or `nullptr`.
-  /// \param table  Its declaration, or `nullptr`.
+  /// \param modal    Whether it is `RunModal`.
+  /// \param record   The record passed, or `nullptr`.
+  /// \param table    Its declaration, or `nullptr`.
+  /// \param writable Whether the caller's record takes the page's record back when it closes --
+  ///                 true for a `var` record, false for a const one.
   /// \return The action the page closed with.
-  ::agiru::Action (*run)(bool modal, const void *record, const TableDef *table);
+  ::agiru::Action (*run)(bool modal, void *record, const TableDef *table, bool writable);
 };
 
 /// \brief Puts a page in the catalogue, once per generated page, at load time.
@@ -88,6 +90,12 @@ void RegisterPageEntry(const PageEntry *entry);
 /// \param id The number.
 /// \return The entry, or `nullptr` when this build carries no such page.
 [[nodiscard]] const PageEntry *FindPage(PageId id);
+
+/// \brief The page a lookup on a table opens: its `LookupPageId`, else the first `List` page whose
+///        `SourceTable` it is, else any page on it (`devenv-lookuppageid-property.md`).
+/// \param table The related table.
+/// \return The entry, or `nullptr` when this build carries no page on the table.
+[[nodiscard]] const PageEntry *FindLookupPage(const TableDef &table);
 
 /// \brief Puts a generated table in the catalogue by existing.
 ///

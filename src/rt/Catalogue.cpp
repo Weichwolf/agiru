@@ -159,4 +159,19 @@ std::span<const PageEntry *const> InstalledPages() {
   return PageEntries();
 }
 
+const PageEntry *FindLookupPage(const TableDef &table) {
+  if (table.lookupPageId.Value() != 0) {
+    if (const PageEntry *declared = FindPage(table.lookupPageId); declared != nullptr) {
+      return declared;
+    }
+  }
+  const PageEntry *any = nullptr;
+  for (const PageEntry *entry : PageEntries()) {
+    if (entry->page->source != table.id) { continue; }
+    if (entry->page->type == PageType::List) { return entry; }
+    if (any == nullptr) { any = entry; }
+  }
+  return any;
+}
+
 }

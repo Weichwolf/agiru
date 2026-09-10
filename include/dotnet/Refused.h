@@ -340,6 +340,30 @@ public:
     left.Throw();
   }
 
+  /// \brief Text concatenated with a refused value is TEXT that refuses: the result keeps the
+  ///        text's type, so `Caption(' ' + Chart.ID)` on an absent table resolves its overload
+  ///        and refuses when it runs, instead of failing to compile on a `Refused` that never
+  ///        converts to a `std::string_view` (`Copy Generic Chart`, 2026-09-10).
+  /// \param left  The text.
+  /// \param right The refused value.
+  /// \return Never.
+  /// \throws Error always.
+  [[noreturn]] friend std::string operator+(const std::string &left, const Refused &right) {
+    static_cast<void>(left);
+    right.Throw();
+  }
+
+  /// \brief The other order of the same concatenation. \see operator+(const std::string &, const
+  /// Refused &)
+  /// \param left  The refused value.
+  /// \param right The text.
+  /// \return Never.
+  /// \throws Error always.
+  [[noreturn]] friend std::string operator+(const Refused &left, const std::string &right) {
+    static_cast<void>(right);
+    left.Throw();
+  }
+
   /// \brief Refuses to stand on either side of `a - b`.
   /// \tparam T The other operand's type.
   /// \param left  The left operand.

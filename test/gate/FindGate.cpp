@@ -178,6 +178,17 @@ void MinusAndPlusRefuseToBeCombined() {
 // THE NEGATIVE CONTROL. A reader that ordered by the primary key whatever the current key says
 // passes every case above, because the primary key is what they all use. This is the one that
 // catches it: over the second key, `Cost Type` puts R00 LAST and R01 first.
+/// `CurrentKey` NAMES THE KEY'S FIELDS, comma-separated and by AL name: the primary key until a
+/// `SetCurrentKey`, then that one (`record-currentkey-method.md`). `Type Helper.GetKeyAsString`
+/// hands it straight to `SortRecordRef`, which reads it back as `SORTING(...)` -- 31 UT cases,
+/// `Payment Export Validation UT` most of them (2026-09-10).
+void CurrentKeyNamesTheKeysFields() {
+  ResourceCost rec;
+  CHECK_TEXT("the primary key by default", rec.CurrentKey(), "Type,Code,Work Type Code");
+  rec.SetCurrentKey(rec.CostType, rec.Code);
+  CHECK_TEXT("and SetCurrentKey's fields after one", rec.CurrentKey(), "Cost Type,Code");
+}
+
 void TheCurrentKeyDecidesWhichRowIsFirst() {
   // THE RECORDS ARE SCOPED AND THE DROP IS OUTSIDE, because `-` opens a cursor and an open cursor
   // holds the table. That is AL's own lifetime -- a record variable closes its set when it goes --
@@ -231,6 +242,7 @@ int main() {
       EqualGreaterAndLessComparePositionsOnTheSortPath();
       ABareGetRaisesNamingTheKeyAndAConsumedOneAnswers();
       ACombinationIsTriedInTheWrittenOrder();
+      CurrentKeyNamesTheKeysFields();
       MinusAndPlusRefuseToBeCombined();
       TheCurrentKeyDecidesWhichRowIsFirst();
       AKeyThatSeparatesNothingStillOrdersByThePrimaryKey();

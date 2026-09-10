@@ -199,6 +199,10 @@ bool IsTryFunction(const al::ProcedureDecl &procedure) {
   });
 }
 
+bool DefaultsToTrue(const al::ProcedureDecl &procedure) {
+  return LowerKey(procedure.name) == "onqueryclosepage";
+}
+
 bool IsPublisher(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "IntegrationEvent") ||
          al::HasAttribute(procedure, "BusinessEvent") ||
@@ -1553,7 +1557,7 @@ std::string Locals(const al::ProcedureDecl &procedure,
         "  " + unused(Identifier(procedure.returnName)) +
         (Hidden(Returns(procedure, objects), names) ? Qualified(Returns(procedure, objects), names)
                                                     : Returns(procedure, objects)) +
-        " " + Identifier(procedure.returnName) + "{};\n";
+        " " + Identifier(procedure.returnName) + (DefaultsToTrue(procedure) ? "{true};\n" : "{};\n");
   }
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));

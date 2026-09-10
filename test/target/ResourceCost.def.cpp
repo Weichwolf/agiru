@@ -12,7 +12,12 @@ constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::array<F
     Declare<&ResourceCost::Type>(
         ResourceCost::Field_No::Type, "Type", "Type", offsetof(ResourceCost, Type)),
     Declare<&ResourceCost::Code>(
-        ResourceCost::Field_No::Code, "Code", "Code", offsetof(ResourceCost, Code)),
+        ResourceCost::Field_No::Code,
+        "Code",
+        "Code",
+        offsetof(ResourceCost, Code),
+        Declared{.relation = "if (Type = const(Resource)) Resource else if (Type = "
+                             "const(\"Group(Resource)\")) \"Resource Group\""}),
     Declare<&ResourceCost::WorkTypeCode>(ResourceCost::Field_No::WorkTypeCode,
                                          "Work Type Code",
                                          "Work Type Code",

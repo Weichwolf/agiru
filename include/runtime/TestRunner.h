@@ -6,6 +6,7 @@
 #include "runtime/test/TestPermissions.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/Notification.h"
 #include "type/Text.h"
 #include "type/TransactionModel.h"
 
@@ -135,6 +136,9 @@ template <typename Codeunit, auto Method> void InvokeHandler(std::string_view te
                          (codeunit.*Method)(::agiru::Text<0>{}, answer);
                        }) {
     (codeunit.*Method)(::agiru::Text<0>{text}, *static_cast<::agiru::Integer *>(reply));
+  } else if constexpr (requires(::agiru::Notification &sent) { (codeunit.*Method)(sent); }) {
+    static_cast<void>(text);
+    static_cast<void>((codeunit.*Method)(*static_cast<::agiru::Notification *>(reply)));
   } else {
     static_cast<void>(text);
     static_cast<void>(reply);

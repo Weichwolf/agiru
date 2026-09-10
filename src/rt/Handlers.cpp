@@ -1,5 +1,7 @@
 #include "runtime/test/Handlers.h"
 
+#include "type/Notification.h"
+
 #include <algorithm>
 #include <cstdint>
 #include <set>
@@ -37,6 +39,12 @@ void HandlerTable::Install(std::span<const TestHandler> handlers,
   held.declared.assign(declared.begin(), declared.end());
   held.ran.clear();
   held.installed = true;
+  Notification::OnSend(+[](Notification &sent) {
+    const TestHandler *handler = For(HandlerKind::SendNotification);
+    if (handler == nullptr) { return; }
+    Ran(*handler);
+    handler->invoke(sent.Message(), &sent);
+  });
 }
 
 std::vector<std::string_view> HandlerTable::Uninstall() {

@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <string_view>
 
 namespace agiru::dotnet {
 
@@ -23,10 +24,24 @@ Boolean GenericList1::Contains(const Variant &item) const {
   return std::ranges::find(items_, item) != items_.end();
 }
 
-const Variant &GenericDictionary2::Item(const std::string &key) const {
-  const auto found = entries_.find(key);
-  if (found == entries_.end()) { throw Error("the dictionary holds nothing under '" + key + "'"); }
+const Variant &GenericDictionary2::Item(std::string_view key) const {
+  const auto found = entries_.find(std::string(key));
+  if (found == entries_.end()) {
+    throw Error("the dictionary holds nothing under '" + std::string(key) + "'");
+  }
   return found->second;
+}
+
+const Variant &ArrayList::Item(Integer index) const {
+  if (index < 0 || static_cast<std::size_t>(index) >= items_.size()) {
+    throw Error("the index " + std::to_string(index) + " is outside a list of " +
+                std::to_string(items_.size()) + ", which .NET counts from zero");
+  }
+  return items_[static_cast<std::size_t>(index)];
+}
+
+Boolean ArrayList::Contains(const Variant &item) const {
+  return std::ranges::find(items_, item) != items_.end();
 }
 
 }

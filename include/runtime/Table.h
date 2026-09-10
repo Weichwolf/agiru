@@ -289,6 +289,13 @@ void RuntimeInit(void *record, const TableDef &table);
 /// \param table Its declaration.
 void RuntimeInitValues(void *record, const TableDef &table);
 
+/// \brief The current key's fields by AL name, comma-separated: `SetCurrentKey`'s fields when one
+///        ran, the primary key otherwise (`record-currentkey-method.md`).
+/// \param record The record.
+/// \param table Its declaration.
+/// \return The text, e.g. `Document Type,Document No.,Line No.`.
+[[nodiscard]] std::string RuntimeCurrentKey(const void *record, const TableDef &table);
+
 /// \brief A user's entry checked against a `MinValue` / `MaxValue` declaration.
 ///
 /// `devenv-minvalue-property.md`: "Validation occurs only if the field or control value is
@@ -1140,6 +1147,8 @@ public:
   /// \param ShareTable Whether to share the temporary rows rather than keep this record's own.
   void Copy(const Derived &from, Boolean ShareTable = false) {
     static_cast<Derived &>(*this) = from;
+    reinterpret_cast<detail::StateHandle *>(Self())->CopyStateFrom(
+        *reinterpret_cast<const detail::StateHandle *>(&from));
     if (ShareTable) { detail::RuntimeShareTemporary(Self(), &from); }
   }
 
@@ -1219,9 +1228,13 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string CurrentKey(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CurrentKey is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.CurrentKey()`: the fields of the current key, by AL name, comma-separated
+  ///        -- `Document Type,Document No.,Line No.` -- the primary key when no `SetCurrentKey`
+  ///        has run (`record-currentkey-method.md`). `Type Helper.GetKeyAsString` hands this to
+  ///        `SortRecordRef`, which reads it back as a `SORTING(...)` view.
+  /// \return The key's text.
+  [[nodiscard]] std::string CurrentKey() const {
+    return detail::RuntimeCurrentKey(Self(), TableTraits<Derived>::kTable);
   }
 
   /// \brief AL `Record.DeleteLink(...)`. Deletes a specified link from a record in a table.

@@ -24,7 +24,17 @@ void Notification::AddAction(std::string_view caption,
 
 ::agiru::Boolean Notification::Send() {
   if (id_.IsNull()) { id_ = Guid::Create(); }
+  if (Sink_() != nullptr) { Sink_()(*this); }
   return true;
+}
+
+Notification::Sink &Notification::Sink_() {
+  static Sink sink = nullptr;
+  return sink;
+}
+
+void Notification::OnSend(Sink sink) {
+  Sink_() = sink;
 }
 
 ::agiru::Boolean Notification::Recall() {

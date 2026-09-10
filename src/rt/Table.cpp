@@ -9,6 +9,7 @@
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "runtime/Relation.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
@@ -499,6 +500,25 @@ void CheckEntryRange(std::string_view text, std::string_view minValue, std::stri
   }
 }
 
+std::string RuntimeCurrentKey(const void *record, const TableDef &table) {
+  std::string out;
+  const auto add = [&out, &table](FieldNo no) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { return; }
+    if (!out.empty()) { out += ','; }
+    out += def->name;
+  };
+  const RecordState *state = reinterpret_cast<const StateHandle *>(record)->Peek();
+  if (state != nullptr && !state->key.empty()) {
+    for (const SortField &sorted : state->key) { add(sorted.field); }
+    return out;
+  }
+  if (!table.keys.empty()) {
+    for (const FieldNo no : table.keys.front().fields) { add(no); }
+  }
+  return out;
+}
+
 void RuntimeInitValues(void *record, const TableDef &table) {
   InitValuesOnly(record, table);
 }
@@ -647,22 +667,58 @@ std::string_view FieldNameOf(const TableDef &table, FieldNo no) {
 
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
   const FieldDef *def = Field(table, no);
-  if (def == nullptr || def->relationTable.empty() || !def->validateTableRelation) { return; }
+  if (def == nullptr || !def->validateTableRelation) { return; }
+  if (def->relationTable.empty() && def->relation.empty()) { return; }
   if (IsBlank(record, *def)) { return; }
-  const TableEntry *target = FindTable(def->relationTable);
+  const std::optional<ResolvedRelation> resolved = ResolveRelation(record, table, *def);
+  if (!resolved.has_value()) { return; }
+  const TableEntry *target = FindTable(resolved->table);
   if (target == nullptr) { return; }
   const TableDef &other = *target->table;
-  const FieldDef *column = nullptr;
-  if (!def->relationField.empty()) {
+  if (other.tableType == TableType::Temporary || IsPlatformTable(other.id)) { return; }
+  const auto named = [&other](std::string_view name) -> const FieldDef * {
     for (const FieldDef &candidate : other.fields) {
-      if (candidate.name == def->relationField) { column = &candidate; }
+      if (candidate.name.size() == name.size() &&
+          std::ranges::equal(candidate.name, name, [](unsigned char x, unsigned char y) {
+            return std::tolower(x) == std::tolower(y);
+          })) {
+        return &candidate;
+      }
     }
+    return nullptr;
+  };
+  const FieldDef *column = nullptr;
+  if (!resolved->field.empty()) {
+    column = named(resolved->field);
   } else if (!other.keys.empty() && !other.keys[0].fields.empty()) {
     column = Field(other, other.keys[0].fields.front());
   }
   if (column == nullptr) { return; }
-  const std::string value = StorageText(record, *def);
-  if (GetRowWhere(Session::Current().Database(), other, *column, value).has_value()) { return; }
+  bool found = false;
+  if (resolved->filters.empty()) {
+    found = GetRowWhere(Session::Current().Database(), other, *column, StorageText(record, *def))
+                .has_value();
+  } else {
+    void *probe = target->make();
+    if (TempOf(probe) != nullptr) {
+      target->free(probe);
+      return;
+    }
+    RecordState &state = reinterpret_cast<StateHandle *>(probe)->Ensure();
+    Narrow(state, column->no, Literally(FieldText(record, *def)));
+    bool applicable = true;
+    for (const RelationFilter &filter : resolved->filters) {
+      const FieldDef *narrowed = named(filter.field);
+      if (narrowed == nullptr) {
+        applicable = false;
+        break;
+      }
+      Narrow(state, narrowed->no, filter.text);
+    }
+    found = !applicable || !RuntimeIsEmpty(probe, other);
+    target->free(probe);
+  }
+  if (found) { return; }
   throw Error("The field " + std::string(def->caption.empty() ? def->name : def->caption) +
               " of table " + std::string(table.caption.empty() ? table.name : table.caption) +
               " contains a value (" + FieldText(record, *def) +

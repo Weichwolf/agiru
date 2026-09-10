@@ -114,6 +114,33 @@ void AnInnerBoundaryRollsBackAloneable() {
   CHECK_TRUE("but an inner rollback leaves the outer row standing", Rows() == 1);
 }
 
+/// A CURSOR OPENED INSIDE A BOUNDARY THAT ROLLED BACK IS GONE, and closing it later must not
+/// abort the transaction: `ROLLBACK TO SAVEPOINT` destroys every cursor declared after the
+/// savepoint, the next boundary opens at the same depth, and a `CLOSE` of the dead cursor there
+/// put PostgreSQL into "current transaction is aborted" for the rest of that boundary (11 cases
+/// of Incoming Doc. To Data Exch.UT, 2026-09-10). The cursor remembers the rollback count.
+void ACursorFromARolledBackBoundaryIsNotClosedLater() {
+  Fresh();
+  Row("A").Insert();
+  agiru::detail::Scope outer;
+  auto *rec = new ResourceCost;
+  agiru::AssertError([&] {
+    static_cast<void>(rec->FindSet());
+    throw Error("inside, with the cursor open");
+  });
+  std::string said;
+  agiru::AssertError([&] {
+    delete rec;
+    rec = nullptr;
+    try {
+      static_cast<void>(Rows());
+    } catch (const Error &e) { said = e.what(); }
+    throw Error("after");
+  });
+  CHECK_TEXT("the boundary after it still runs statements", said, "");
+  CHECK_TRUE("and the row is still there", Rows() == 1);
+}
+
 } // namespace
 
 int main() {
@@ -123,5 +150,6 @@ int main() {
     ABoundaryThatDoesNotRaiseKeepsWhatItWrote();
     ACommitSurvivesALaterRollbackAndWhatFollowsItDoesNot();
     AnInnerBoundaryRollsBackAloneable();
+    ACursorFromARolledBackBoundaryIsNotClosedLater();
   });
 }

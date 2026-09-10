@@ -60,6 +60,7 @@ void Boundaries::Rollback(const Connection &connection, std::size_t depth) {
   connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
   names_.resize(depth - 1);
   inconsistent_.clear();
+  ++rollbacks_;
 }
 
 void Boundaries::MarkConsistent(std::string_view table, bool consistent) {

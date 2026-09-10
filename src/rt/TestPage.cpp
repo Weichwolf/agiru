@@ -147,7 +147,7 @@ namespace {
 struct PageTrap {
   std::int32_t page;
   void *harness;
-  void (*adopt)(void *harness, void *page);
+  void (*adopt)(void *harness, void *page, bool owned);
 };
 
 std::vector<PageTrap> &Traps() {
@@ -157,21 +157,27 @@ std::vector<PageTrap> &Traps() {
 
 }
 
-void TrapPage(std::int32_t page, void *harness, void (*adopt)(void *harness, void *page)) {
+void TrapPage(std::int32_t page,
+              void *harness,
+              void (*adopt)(void *harness, void *page, bool owned)) {
   std::erase_if(Traps(), [harness](const PageTrap &trap) { return trap.harness == harness; });
   Traps().push_back({.page = page, .harness = harness, .adopt = adopt});
 }
 
-bool ReleaseTrap(std::int32_t page, void *object) {
+bool ReleaseTrap(std::int32_t page, void *object, bool owned) {
   auto &traps = Traps();
   for (auto it = traps.rbegin(); it != traps.rend(); ++it) {
     if (it->page != page) { continue; }
     const PageTrap trap = *it;
     traps.erase(std::next(it).base());
-    trap.adopt(trap.harness, object);
+    trap.adopt(trap.harness, object, owned);
     return true;
   }
   return false;
+}
+
+bool TrapPending(std::int32_t page) {
+  return std::ranges::any_of(Traps(), [page](const PageTrap &trap) { return trap.page == page; });
 }
 
 void ClearTraps() {

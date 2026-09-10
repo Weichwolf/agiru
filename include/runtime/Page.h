@@ -268,26 +268,89 @@ template <typename P, typename Record> void AdoptRecord(P &page, const Record &r
 ///       `[ModalPageHandler]` for this page number is invoked with the page, already opened, and
 ///       the page closes when the handler returns. There is no third case yet: a page nobody
 ///       waits for is an unhandled UI, which is what AL says too (board:0030).
-template <typename P, typename... Arguments>
-::agiru::Action RunPage(bool modal, const Arguments &...arguments) {
-  auto page = std::make_unique<P>();
-  (AdoptRecord(*page, arguments), ...);
-  OpenPage(*page, true, false);
-  const std::int32_t id = PageTraits<P>::kId.Value();
-  if (!modal && ReleaseTrap(id, page.get())) {
-    static_cast<void>(page.release());
-    return ::agiru::Action::OK;
+/// \brief AL's caller sees the page's record when the page closes: `if Page.RunModal(0, Item) =
+///        Action::LookupOK then ... Item."No."` reads what the user picked, because the record
+///        went in by `var`. A handle (`Instance<T>`) reaches through; a const argument stays as it
+///        was; a record of another table is left alone.
+/// \tparam P      The generated page class.
+/// \tparam Record What was handed to `Run`.
+/// \param page   The page that ran.
+/// \param record The caller's record.
+template <typename P, typename Record> void GiveBackRecord(P &page, Record &record) {
+  if constexpr (std::is_const_v<Record>) {
+    static_cast<void>(page);
+  } else if constexpr (requires { record.operator->(); }) {
+    GiveBackRecord(page, *record.operator->());
+  } else if constexpr (requires {
+                         page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
+                         record = page.Rec;
+                       }) {
+    record = page.Rec;
+  } else {
+    static_cast<void>(page);
   }
+}
+
+/// \brief Runs an OPENED page through the test handler for it, and closes it.
+/// \tparam P The generated page class.
+/// \param page  The page, already opened.
+/// \param modal Whether it is `RunModal`.
+/// \return The action the page closed with.
+/// \throws Error "Unhandled UI: ModalPage X" when no handler is installed, which is BC's wording.
+template <typename P>::agiru::Action RunHandled(P &page, bool modal) {
+  const std::int32_t id = PageTraits<P>::kId.Value();
   const TestHandler *handler =
       HandlerTable::For(modal ? HandlerKind::ModalPage : HandlerKind::Page, id);
   if (handler == nullptr) {
     throw Error(std::string("Unhandled UI: ") + (modal ? "ModalPage " : "Page ") +
                 std::string(PageTraits<P>::kName));
   }
-  handler->invoke(PageTraits<P>::kName, page.get());
+  handler->invoke(PageTraits<P>::kName, &page);
   HandlerTable::Ran(*handler);
-  ClosePage(*page);
-  return page->ClosedWith();
+  ClosePage(page);
+  return page.ClosedWith();
+}
+
+template <typename P, typename... Arguments>
+::agiru::Action RunPage(bool modal, Arguments &&...arguments) {
+  auto page = std::make_unique<P>();
+  (AdoptRecord(*page, arguments), ...);
+  OpenPage(*page, true, false);
+  const std::int32_t id = PageTraits<P>::kId.Value();
+  if (!modal && ReleaseTrap(id, page.get(), true)) {
+    static_cast<void>(page.release());
+    return ::agiru::Action::OK;
+  }
+  const ::agiru::Action action = RunHandled(*page, modal);
+  (GiveBackRecord(*page, arguments), ...);
+  return action;
+}
+
+/// \brief AL `PageVariable.Run()` / `PageVariable.RunModal()`: the variable's OWN page object runs,
+///        with the record, filters and lookup mode the caller put on it first
+///        (`ItemList.SetTableView(Item); ItemList.LookupMode(true); if ItemList.RunModal() =
+///        Action::LookupOK then ItemList.GetRecord(Item)` -- 1 216 such calls in the BaseApp).
+/// \tparam P The generated page class.
+/// \param page  The variable's page object.
+/// \param modal Whether it is `RunModal`.
+/// \return The action the page closed with; `OK` when a `Trap` took a non-modal run.
+/// \warning A TRAPPED PAGE OUTLIVES THE VARIABLE THAT RAN IT. `WorkflowPage.Trap();
+///          WorkflowsPage.NewAction.Invoke()` runs a page variable LOCAL to the action, and the
+///          harness drove a freed object once the action returned (`WF Buffer Table/Page UT`
+///          crashed with SIGSEGV in chain 86, 2026-09-10). So a pending trap takes a COPY the
+///          harness owns, and only a page that cannot be copied is handed over unowned.
+template <typename P>::agiru::Action RunInstance(P &page, bool modal) {
+  OpenPage(page, true, false);
+  if (!modal && TrapPending(PageTraits<P>::kId.Value())) {
+    if constexpr (std::is_copy_constructible_v<P>) {
+      auto *held = new P(page);
+      if (ReleaseTrap(PageTraits<P>::kId.Value(), held, true)) { return ::agiru::Action::OK; }
+      delete held;
+    } else {
+      if (ReleaseTrap(PageTraits<P>::kId.Value(), &page, false)) { return ::agiru::Action::OK; }
+    }
+  }
+  return RunHandled(page, modal);
 }
 
 }
@@ -299,17 +362,20 @@ template <typename P, typename... Arguments>
 /// \param table  Its declaration, or `nullptr`.
 /// \return The action the page closed with.
 template <typename P>
-::agiru::Action RunPageEntry(bool modal, const void *record, const TableDef *table) {
+::agiru::Action RunPageEntry(bool modal, void *record, const TableDef *table, bool writable) {
   if constexpr (requires(P &page) {
                   page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
                 }) {
     using Source = std::remove_cvref_t<decltype(std::declval<P &>().Rec)>;
     if (record != nullptr && table != nullptr && table->id == TableTraits<Source>::kTable.id) {
-      return detail::RunPage<P>(modal, *static_cast<const Source *>(record));
+      Source &source = *static_cast<Source *>(record);
+      if (writable) { return detail::RunPage<P>(modal, source); }
+      return detail::RunPage<P>(modal, std::as_const(source));
     }
   }
   static_cast<void>(record);
   static_cast<void>(table);
+  static_cast<void>(writable);
   return detail::RunPage<P>(modal);
 }
 
@@ -344,20 +410,24 @@ namespace detail {
 ///       page" -- so `PAGE.RunModal(0, Rec)` opens the record's `LookupPageId`, and the
 ///       `DrillDownPageId` where a table declares only that (16 UT cases, 2026-09-09).
 template <typename... Arguments>
-::agiru::Action RunPageByNumber(bool modal, ::agiru::Integer id, const Arguments &...arguments) {
-  const void *record = nullptr;
+::agiru::Action RunPageByNumber(bool modal, ::agiru::Integer id, Arguments &&...arguments) {
+  void *record = nullptr;
   const TableDef *table = nullptr;
-  const auto take = [&](const auto &argument) {
+  bool writable = false;
+  const auto take = [&](auto &argument) {
     using A = std::remove_cvref_t<decltype(argument)>;
+    constexpr bool kConst = std::is_const_v<std::remove_reference_t<decltype(argument)>>;
     if constexpr (requires {
                     argument.operator->();
                     TableTraits<A>::kTable;
                   }) {
-      record = argument.operator->();
+      record = const_cast<void *>(static_cast<const void *>(argument.operator->()));
       table = &TableTraits<A>::kTable;
+      writable = !kConst;
     } else if constexpr (requires { TableTraits<A>::kTable; }) {
-      record = &argument;
+      record = const_cast<void *>(static_cast<const void *>(&argument));
       table = &TableTraits<A>::kTable;
+      writable = !kConst;
     }
   };
   (take(arguments), ...);
@@ -376,7 +446,7 @@ template <typename... Arguments>
   if (entry == nullptr) {
     throw Error("Page.Run(" + std::to_string(id) + "): this build carries no page of that number");
   }
-  return entry->run(modal, record, table);
+  return entry->run(modal, record, table, writable);
 }
 
 }
@@ -415,12 +485,32 @@ public:
   ///
   /// \note AL NAMES THE KIND TWICE AND THE GENERATED FORM ONCE. `Page.Run(Page::"X", Rec)` becomes
   ///       `pages::X::Run(Rec)`: the object is the receiver, which is what the call means.
-  template <typename... Arguments> static void Run(const Arguments &...arguments) {
+  template <typename... Arguments>
+    requires(sizeof...(Arguments) > 0)
+  static void Run(Arguments &&...arguments) {
     if constexpr (std::is_void_v<Derived>) {
       static_cast<void>(detail::RunPageByNumber(false, arguments...));
     } else {
       static_cast<void>(detail::RunPage<Derived>(false, arguments...));
     }
+  }
+
+  /// \brief AL `PageVariable.Run()`: this variable's own page object runs, non-modally, with what
+  ///        `SetRecord`, `SetTableView` and `LookupMode` put on it. A `TestPage.Trap()` takes it
+  ///        without owning it -- the variable still does.
+  void Run()
+    requires(!std::is_void_v<Derived>)
+  {
+    static_cast<void>(detail::RunInstance(static_cast<Derived &>(*this), false));
+  }
+
+  /// \brief AL `PageVariable.RunModal()`: this variable's own page object runs modally, through
+  ///        the test's ModalPageHandler, and `GetRecord` afterwards reads what it stands on.
+  /// \return The action it closed with.
+  ::agiru::Action RunModal()
+    requires(!std::is_void_v<Derived>)
+  {
+    return detail::RunInstance(static_cast<Derived &>(*this), true);
   }
 
   /// \brief AL `Page.RunModal(PageId [, Record])` -- shows the page and waits for it.
@@ -455,7 +545,9 @@ public:
   ///          `OnQueryClosePage` and then `OnClosePage`. Each is one page under `triggers-auto/`,
   ///          and naming them here is what keeps them from being a silent hole while the UI is
   ///          board:0030's work -- nothing fires until there is a page to fire it on.
-  template <typename... Arguments> static ::agiru::Action RunModal(const Arguments &...arguments) {
+  template <typename... Arguments>
+    requires(sizeof...(Arguments) > 0)
+  static ::agiru::Action RunModal(Arguments &&...arguments) {
     if constexpr (std::is_void_v<Derived>) {
       return detail::RunPageByNumber(true, arguments...);
     } else {
@@ -518,13 +610,12 @@ public:
   ///        `[X := ] Page.Editable([NewX])`.
   /// \return Never.
   /// \throws Error always -- a page property needs a running UI (board:0030).
-  [[nodiscard]] ::agiru::Boolean Editable() const {
-    throw Error("Page.Editable() needs a running UI (board:0030)");
-  }
+  [[nodiscard]] ::agiru::Boolean Editable() const { return editable_; }
 
   ::agiru::Boolean Editable(::agiru::Boolean NewEditable) {
-    static_cast<void>(NewEditable);
-    throw Error("Page.Editable(Boolean) needs a running UI (board:0030)");
+    const ::agiru::Boolean was = editable_;
+    editable_ = NewEditable;
+    return was;
   }
 
   /// \brief AL `Page.EnqueueBackgroundTask(Integer, Integer, Dictionary of [Text, Text], Integer,
@@ -570,25 +661,29 @@ public:
   ///       `RecordRef` is a different AL type -- a record reached by NUMBER -- and using it
   ///       would refuse every call that hands over a record it has.
   template <typename Record> void GetRecord(Record &record) {
-    static_cast<void>(record);
-    throw Error("Page.GetRecord(Record) needs a running UI (board:0030)");
+    if constexpr (requires { record.operator->(); }) {
+      GetRecord(*record.operator->());
+    } else if constexpr (requires { record = static_cast<Derived &>(*this).Rec; }) {
+      record = static_cast<Derived &>(*this).Rec;
+    } else {
+      static_cast<void>(record);
+      throw Error("Page.GetRecord(Record): the record is not of the page's source table");
+    }
   }
 
   /// \brief AL `Page.LookupMode()` -- the READING form, which the documentation's syntax
   /// block brackets: `[X := ] Page.LookupMode([NewX])`.
   /// \return The value it holds.
   /// \throws Error until the UI runs (board:0030).
-  ::agiru::Boolean LookupMode() const {
-    throw Error("Page.LookupMode() needs a running UI (board:0030)");
-  }
+  ::agiru::Boolean LookupMode() const { return lookupMode_; }
 
   /// \brief AL `Page.LookupMode(Boolean)`. Gets or sets the default lookup mode for the page.
   /// \param NewLookupMode The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error until the UI runs (board:0030).
   ::agiru::Boolean LookupMode(::agiru::Boolean NewLookupMode) {
-    static_cast<void>(NewLookupMode);
-    throw Error("Page.LookupMode(Boolean) needs a running UI (board:0030)");
+    lookupMode_ = NewLookupMode;
+    return lookupMode_;
   }
 
   /// \brief AL `Page.ObjectId()` -- the READING form, which the documentation's syntax
@@ -630,7 +725,24 @@ public:
   /// \brief AL `Page.SaveRecord()`. Saves the current record as if performed by the client. If the
   /// record does not exist it is inserted, otherwise it is modified.
   /// \throws Error until the UI runs (board:0030).
-  void SaveRecord() { throw Error("Page.SaveRecord() needs a running UI (board:0030)"); }
+  void SaveRecord() {
+    if constexpr (requires {
+                    static_cast<Derived &>(*this).Rec.Insert(true);
+                    typename std::remove_cvref_t<
+                        decltype(static_cast<Derived &>(*this).Rec)>::Platform_Half;
+                  }) {
+      auto &rec = static_cast<Derived &>(*this).Rec;
+      using Source = std::remove_cvref_t<decltype(rec)>;
+      Source probe = rec;
+      if (static_cast<typename Source::Platform_Half &>(probe).Find("=")) {
+        rec.Modify(true);
+      } else {
+        rec.Insert(true);
+      }
+    } else {
+      throw Error("Page.SaveRecord(): the page has no source table");
+    }
+  }
 
   /// \brief AL `Page.SetBackgroundTaskResult(Dictionary of [Text, Text])`. Sets the page background
   /// task result as a dictionary. When the task is completed, the OnPageBackgroundCompleted trigger
@@ -669,8 +781,18 @@ public:
   ///       `RecordRef` is a different AL type -- a record reached by NUMBER -- and using it
   ///       would refuse every call that hands over a record it has.
   template <typename Record> void SetSelectionFilter(Record &record) {
-    static_cast<void>(record);
-    throw Error("Page.SetSelectionFilter(Record) needs a running UI (board:0030)");
+    if constexpr (requires { record.operator->(); }) {
+      SetSelectionFilter(*record.operator->());
+    } else if constexpr (requires {
+                           record = static_cast<Derived &>(*this).Rec;
+                           record.SetRecFilter();
+                         }) {
+      record = static_cast<Derived &>(*this).Rec;
+      record.SetRecFilter();
+    } else {
+      static_cast<void>(record);
+      throw Error("Page.SetSelectionFilter(Record): the record is not of the page's source table");
+    }
   }
 
   /// \brief AL `Page.SetTableView(Record)`. Applies the table view on the current record as the
@@ -682,8 +804,14 @@ public:
   ///       `RecordRef` is a different AL type -- a record reached by NUMBER -- and using it
   ///       would refuse every call that hands over a record it has.
   template <typename Record> void SetTableView(Record &record) {
-    static_cast<void>(record);
-    throw Error("Page.SetTableView(Record) needs a running UI (board:0030)");
+    if constexpr (requires { record.operator->(); }) {
+      SetTableView(*record.operator->());
+    } else if constexpr (requires { static_cast<Derived &>(*this).Rec.CopyFilters(record); }) {
+      static_cast<Derived &>(*this).Rec.CopyFilters(record);
+    } else {
+      static_cast<void>(record);
+      throw Error("Page.SetTableView(Record): the record is not of the page's source table");
+    }
   }
 
   /// \brief AL `Page.Update(Boolean)`. Saves the current record and then updates the controls on
@@ -708,6 +836,7 @@ public:
 private:
   bool editable_ = true;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
+  ::agiru::Boolean lookupMode_ = false;
 };
 
 /// \brief AL `Page.Run(Number, ...)` and `Page.RunModal(Number, ...)` by object NUMBER, the way
@@ -737,12 +866,12 @@ public:
   }
 
   template <typename... Arguments>
-  static void Run(::agiru::Integer Number, const Arguments &...arguments) {
+  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
     static_cast<void>(detail::RunPageByNumber(false, Number, arguments...));
   }
 
   template <typename... Arguments>
-  static ::agiru::Action RunModal(::agiru::Integer Number, const Arguments &...arguments) {
+  static ::agiru::Action RunModal(::agiru::Integer Number, Arguments &&...arguments) {
     return detail::RunPageByNumber(true, Number, arguments...);
   }
 };

@@ -114,6 +114,26 @@ void TestFieldOnABlankFieldSaysSo() {
                Raised([&] { rec.TestField(ResourceCost::Field_No::Code); }));
 }
 
+/// A BLANK OPTION OR ENUM IS ITS FIRST MEMBER, and the platform names it: `Price List
+/// Line.TestField
+/// ("Asset Type")` on a line whose type is still `(All)` says "Product Type must not be (All)",
+/// which `Price List Line UT` asserts six times -- while a blank number stays "must have a value"
+/// (openerp WI-1131 drew the same line: integral with named members, and nothing else).
+void TestFieldOnABlankOptionNamesTheMember() {
+  ResourceCost rec;
+  CHECK_TEXT(
+      "TestField on an option standing on its first member",
+      Raised([&] { rec.TestField(ResourceCost::Field_No::Type); }),
+      "Type must not be Resource in Resource Cost: Type='Resource', Code='', Work Type Code=''.");
+  CHECK_TEXT("the code is still TestField's",
+             RaisedCode([&] { rec.TestField(ResourceCost::Field_No::Type); }),
+             "TestField");
+  CHECK_TEXT("and a blank number is still a missing value",
+             Raised([&] { rec.TestField(ResourceCost::Field_No::DirectUnitCost); }),
+             "Direct Unit Cost must have a value in Resource Cost: "
+             "Type='Resource', Code='', Work Type Code=''. It cannot be zero or empty.");
+}
+
 void ThePrimaryKeySeparatorsDiffferBetweenTheTwo() {
   // NOT A SLIP. FieldError joins the key with a bare comma after a space; TestField prefixes a
   // colon and joins with a comma AND a space. The first is the documentation's own examples, the
@@ -157,6 +177,7 @@ int main() {
     TheTriggerStaysSilentWhenAlWouldStaySilent();
     TestFieldMismatchCarriesBothValues();
     TestFieldOnABlankFieldSaysSo();
+    TestFieldOnABlankOptionNamesTheMember();
     TheCodeNamesTheRaisingSite();
     ThePrimaryKeySeparatorsDiffferBetweenTheTwo();
     StrSubstNoReplacesWhatItIsGiven();

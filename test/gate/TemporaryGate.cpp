@@ -181,8 +181,29 @@ void ABaseReferenceKeepsATemporaryTemporary() {
 /// did (board:0583 names that as the activation this carries).
 namespace {
 
-/// THE SHAPE SALES-POST WALKED INTO: `TempSalesLine := SalesLine` carries the source's filters
-/// across, `"Document Type" = 2` among them, and the temporary rows render that field as
+/// ASSIGNMENT COPIES FIELDS AND `Copy` COPIES FILTERS TOO (`record-copy-method.md` lists the
+/// filters under `Copy`; openerp's `:=` was fields-only at 2 260 green). `Record Set Management`
+/// does `TempFound := RecordSetTree; TempFound.Insert()` in a loop over a filtered database record,
+/// and a `:=` that carried the filters left the buffer's `FindFirst` one node of ten (27 cases of
+/// Record Set UT, 2026-09-10).
+void AssignmentCopiesFieldsAndCopyCopiesFilters() {
+  Temporary<LineNumberBuffer> source = With({1, 2, 3});
+  source.SetRange(source.OldLineNumber, 2);
+  CHECK_TRUE("the source is filtered", source.FindFirst() && source.Count() == 1);
+  Temporary<LineNumberBuffer> assigned = With({7, 8});
+  assigned = source;
+  CHECK_TRUE("assignment brings the fields", assigned.OldLineNumber == 2);
+  CHECK_TEXT("and none of the filters", assigned.GetFilters(), "");
+  CHECK_TRUE("so the target still walks its own rows", assigned.Count() == 2);
+  Temporary<LineNumberBuffer> copied = With({7, 8});
+  copied.Copy(source);
+  CHECK_TRUE("Copy brings the fields", copied.OldLineNumber == 2);
+  CHECK_TEXT("and the filters", copied.GetFilters(), source.GetFilters());
+  CHECK_TRUE("over the target's own rows, which the filter now narrows", copied.Count() == 0);
+}
+
+/// THE SHAPE SALES-POST WALKED INTO: `TempSalesLine := SalesLine` used to carry the source's
+/// filters across, `"Document Type" = 2` among them, and the temporary rows render that field as
 /// `Invoice`. The count must see the rows through an option filter, and a decimal filter must
 /// compare the value and not its spelling.
 void AnOptionAndADecimalFilterATemporaryRowByValue() {
@@ -344,6 +365,7 @@ int main() {
     ADuplicateKeyIsRefused();
     GetsRowFinds();
     CopyingWithShareGivesOneStoreAndWithoutGivesTwo();
+    AssignmentCopiesFieldsAndCopyCopiesFilters();
     ATemporaryRecordNeedsNoSession();
   });
 }

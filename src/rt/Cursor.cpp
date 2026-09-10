@@ -29,6 +29,7 @@ Cursor::Cursor(const Connection &connection,
     : connection_(&connection),
       name_(NextName()),
       depth_(Session::HasCurrent() ? Session::Current().Transaction().Depth() : 0),
+      rollbacks_(Session::HasCurrent() ? Session::Current().Transaction().Rollbacks() : 0),
       block_(nullptr) {
   connection_->Run("DECLARE " + name_ + " NO SCROLL CURSOR FOR " + select, binds);
 }
@@ -36,6 +37,7 @@ Cursor::Cursor(const Connection &connection,
 Cursor::~Cursor() {
   if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
   if (Session::Current().Transaction().Depth() < depth_) { return; }
+  if (Session::Current().Transaction().Rollbacks() != rollbacks_ && depth_ > 0) { return; }
   if (connection_->InFailedTransaction()) { return; }
   try {
     connection_->Run("CLOSE " + name_);

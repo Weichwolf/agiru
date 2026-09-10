@@ -165,8 +165,16 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
   if (def == nullptr) { throw Error("TestField: the table declares no such field"); }
   if (!IsBlank(record, *def)) { return; }
   const std::string key = PrimaryKeyText(record, table, ", ");
-  throw Error(std::string(def->caption) + " must have a value in " + std::string(table.caption) +
-                  (key.empty() ? std::string{} : ": " + key) + ". It cannot be zero or empty.",
+  const std::string where =
+      " in " + std::string(table.caption) + (key.empty() ? std::string{} : ": " + key);
+  if (def->type == FieldType::Option || def->type == FieldType::Enum) {
+    const std::string member = FieldText(record, *def);
+    if (!member.empty()) {
+      throw Error(std::string(def->caption) + " must not be " + member + where + ".", "TestField");
+    }
+  }
+  throw Error(std::string(def->caption) + " must have a value" + where +
+                  ". It cannot be zero or empty.",
               "TestField");
 }
 

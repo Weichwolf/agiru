@@ -547,7 +547,7 @@ public:
   /// \brief Holds a `Char`, which AL's `Any` takes as its code point.
   /// \param value The character.
   Variant(::agiru::Char value) // NOLINT(*-explicit-constructor)
-      : held_(static_cast<::agiru::Integer>(value.AsInteger())) {}
+      : held_(::agiru::Encoded(value)) {}
 
   /// \brief Takes a value AL's `Any` accepts and this Variant cannot represent, and REFUSES.
   ///
@@ -573,11 +573,21 @@ public:
             (!requires { typename T::IsAlRefusal; }) &&
             (!requires { typename T::IsAnAbsentType; }) && (!detail::IsEnumHolder<T>::value) &&
             (!requires { T::Traits::kValues; }) &&
-            (!requires(const T &held) { held.AsInteger(); }) && (!requires { T::kKind; })
+            (!requires(const T &held) { held.AsInteger(); }) && (!requires { T::kKind; }) &&
+            (!requires { typename T::IsATextPosition; })
   Variant(const T &value) { // NOLINT(*-explicit-constructor)
     static_cast<void>(value);
     Refuse("that type");
   }
+
+  /// \brief Holds one character of a text, `Text[Index]`, as the `Char` it reads: `Format(GLN[13])`
+  ///        compares a check digit, and a position that fell through to the refusing constructor
+  ///        held nothing (18 UT cases of Incoming Doc. To Data Exch.UT, 2026-09-10).
+  /// \tparam T The `CharAt` position, recognised by its `IsATextPosition` tag.
+  /// \param at The position.
+  template <typename T>
+    requires requires { typename T::IsATextPosition; }
+  Variant(const T &at) : Variant(static_cast<::agiru::Char>(at)) {} // NOLINT(*-explicit-constructor)
 
   /// \brief Holds a `BigText`, which AL hands to an `Any` like any other text.
   /// \tparam T The BigText's type, recognised by the `ToText()` a `StringValue` does not have.
@@ -1181,6 +1191,11 @@ public:
     if constexpr (std::is_same_v<T, BigInteger>) {
       if (const Integer *narrow = std::get_if<Integer>(&held_); narrow != nullptr) {
         return BigInteger{*narrow};
+      }
+    }
+    if constexpr (std::is_same_v<T, Integer>) {
+      if (const auto *ordinal = std::get_if<OrdinalInVariant>(&held_); ordinal != nullptr) {
+        return Integer{ordinal->ordinal};
       }
     }
     Refuse("that type");

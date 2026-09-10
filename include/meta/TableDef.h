@@ -105,6 +105,15 @@ struct FieldDef {
   /// \brief The `TableRelation`'s target field, empty where it names the table's own primary key.
   std::string_view relationField{};
 
+  /// \brief The whole `TableRelation` as AL wrote it, whitespace collapsed -- `if (Type =
+  ///        const(Resource)) Resource else if (...) "Resource Group"`, `"Item Unit of Measure".Code
+  ///        where("Item No." = field("Asset No."))` -- for the 736 conditional and 2 502 filtered
+  ///        declarations the two fields above cannot carry (measured 2026-09-10). The runtime's
+  ///        `ResolveRelation` reads it against the record (board:0658; board:0043 asked for a
+  ///        `constexpr` parsed form, and this is the string it would parse -- the filter language
+  ///        inside it is parsed at run time everywhere else in this tree too).
+  std::string_view relation{};
+
   /// \brief The `MinValue` and `MaxValue` properties, as AL wrote them.
   ///
   /// \warning THEY ARE INPUT BOUNDS AND NOT WRITE BOUNDS. The client refuses a value outside them
@@ -341,6 +350,22 @@ struct KeyDef {
 inline constexpr std::size_t kSystemFieldCount = 5;
 
 /// \brief One table's declaration.
+/// \brief The first table number the platform reserves for its own tables
+/// (`devenv-object-ranges.md`:
+///        2 000 000 000 and above are system objects). What lives there here is the translated
+///        SUBSET of the platform's virtual tables -- `AllObj` carries the objects this build has,
+///        `Field` the fields of the tables it has -- so a `TableRelation` into that range is not
+///        a data-integrity question this runtime can answer: `Data Exch. Def."Reading/Writing
+///        XMLport"` names an XMLport that exists in BC and not here (29 UT cases refused,
+///        chain 87, 2026-09-10).
+inline constexpr std::int32_t kPlatformTableFloor = 2000000000;
+
+/// \brief Whether a table number is in the platform's own range. \param id The number.
+/// \return True at and above `kPlatformTableFloor`.
+[[nodiscard]] constexpr bool IsPlatformTable(TableId id) {
+  return id.Value() >= kPlatformTableFloor;
+}
+
 struct TableDef {
   TableId id{};                       ///< The AL table number.
   std::string_view name{};            ///< The AL name: `"Resource Cost"`.

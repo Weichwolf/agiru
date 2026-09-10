@@ -274,6 +274,8 @@ struct Declared {
                                     ///< is conditional or filtered (board:0043).
   std::string_view relationField{}; ///< Its target field, empty when the relation names the table's
                                     ///< own primary key.
+  std::string_view relation{};      ///< The whole `TableRelation`, for the conditional and filtered
+                                    ///< forms (board:0658).
   bool blankZero = false;           ///< `BlankZero`.
   std::string_view minValue{};      ///< `MinValue`, as AL wrote it.
   std::string_view maxValue{};      ///< `MaxValue`, as AL wrote it.
@@ -325,6 +327,7 @@ constexpr FieldDef Declare(FieldNo no,
       .calcFormula = declared.calcFormula,
       .relationTable = declared.relationTable,
       .relationField = declared.relationField,
+      .relation = declared.relation,
       .minValue = declared.minValue,
       .maxValue = declared.maxValue,
       .decimalPlaces = declared.decimalPlaces,

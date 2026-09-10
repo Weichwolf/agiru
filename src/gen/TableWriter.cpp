@@ -425,6 +425,23 @@ std::string DeclaredBlock(const al::FieldDecl &field,
       text("relationTable", unquote(target));
       text("relationField", unquote(named));
     }
+    if (const al::Property *whole = Find(field.properties, "TableRelation"); whole != nullptr) {
+      std::string collapsed;
+      bool space = false;
+      for (const char c : whole->text) {
+        if (std::isspace(static_cast<unsigned char>(c)) != 0) {
+          space = true;
+          continue;
+        }
+        if (space && !collapsed.empty()) { collapsed += ' '; }
+        space = false;
+        collapsed += c;
+      }
+      while (!collapsed.empty() && (collapsed.back() == ';' || collapsed.back() == ' ')) {
+        collapsed.pop_back();
+      }
+      text("relation", collapsed);
+    }
   }
   flag("blankZero", PropertyIs(field, "BlankZero", false), false);
   text("minValue", PropertyText(field, "MinValue"));

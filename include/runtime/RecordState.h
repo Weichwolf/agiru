@@ -375,23 +375,40 @@ public:
   /// \brief Copies the state, letting go of this one's.
   /// \param o The other.
   /// \return This handle.
-  /// \brief AL `Rec := Other`: the filters and the position come across, the ROWS do not. A
-  ///        temporary record assigned from another keeps its own rows, and a database record
-  ///        assigned from a temporary one stays a database record; only `Copy(From, true)`
-  ///        shares (`record-copy-method.md`).
+  /// \brief AL `Rec := Other`: the FIELDS come across and nothing of the state does -- not the
+  ///        filters, not the key, not the position, not the rows.
+  ///
+  /// \warning ASSIGNMENT COPIES THE RECORD BUFFER AND `Copy` COPIES THE FILTERS TOO.
+  ///          `record-copy-method.md` lists "filters, views, marks, fields, and keys" as what
+  ///          `Copy` brings, and the predecessor's `:=` was "full field-value copy (fields only)"
+  ///          at 2 260 green. Here the filters used to come across, and `Record Set Management`
+  ///          walked into it: `TempFoundRecordSetTree := RecordSetTree; TempFound.Insert()` in a
+  ///          loop gave the temporary buffer the database record's `FindNode` filters, so the
+  ///          `FindFirst` over the buffer saw one node of ten (Record Set UT, 27 cases,
+  ///          2026-09-10). The state that a `Copy` transports is `CopyStateFrom`.
+  /// \param o The other, which is left alone.
+  /// \return This handle, unchanged.
   StateHandle &operator=(const StateHandle &o) {
-    if (this != &o) {
-      TempHandle keep = state_ == nullptr ? TempHandle{} : state_->temporary;
-      StateHandle copy(o);
-      Swap(copy);
-      if (state_ != nullptr || keep != nullptr) {
-        RecordState &mine = Ensure();
-        mine.temporary = std::move(keep);
-        mine.view.clear();
-        mine.positioned = false;
-      }
-    }
+    static_cast<void>(o);
     return *this;
+  }
+
+  /// \brief AL `Rec.Copy(Other)`: the filters, the key and the position come across, the ROWS
+  ///        do not. A temporary record keeps its own rows, and a database record copied from a
+  ///        temporary one stays a database record; only `Copy(From, true)` shares
+  ///        (`record-copy-method.md`).
+  /// \param o The other.
+  void CopyStateFrom(const StateHandle &o) {
+    if (this == &o) { return; }
+    TempHandle keep = state_ == nullptr ? TempHandle{} : state_->temporary;
+    StateHandle copy(o);
+    Swap(copy);
+    if (state_ != nullptr || keep != nullptr) {
+      RecordState &mine = Ensure();
+      mine.temporary = std::move(keep);
+      mine.view.clear();
+      mine.positioned = false;
+    }
   }
 
   /// \brief Takes the other's state, letting go of this one's.

@@ -12477,3 +12477,7 @@ base/purchases/document/page/PurchaseOrderSubform.cpp
 base/purchases/document/page/PurchInvoiceSubform.cpp
 base/sales/document/page/SalesCrMemoSubform.cpp
 base/service/document/page/ServiceCreditMemoSubform.cpp
+base/system/visualization/page/CopyGenericChart.cpp
+base/system/automation/codeunit/RequestPageParametersHelper.cpp
+system/system/environment/configuration/codeunit/ChecklistBannerImpl.cpp
+system/system/environment/configuration/codeunit/SpotlightTourImpl.cpp

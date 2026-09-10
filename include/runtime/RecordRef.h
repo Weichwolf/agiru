@@ -551,7 +551,7 @@ public:
     requires requires { T::kId; }
   void GetTable(T &rec) {
     Open(TableTraits<T>::kTable.id.Value());
-    *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
+    static_cast<std::remove_cvref_t<T> *>(State().record)->Copy(rec);
     if (detail::RuntimeIsTemporary(&rec)) { detail::RuntimeAdoptTemporary(State().record, &rec); }
   }
 
@@ -1250,7 +1250,7 @@ public:
                   std::string(State().table->name) + " and the record is a " +
                   std::string(TableTraits<R>::kTable.name));
     }
-    Rec = *static_cast<R *>(State().record);
+    Rec.Copy(*static_cast<R *>(State().record));
   }
 
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.

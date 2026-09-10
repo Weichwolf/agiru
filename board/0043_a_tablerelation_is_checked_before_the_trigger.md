@@ -79,3 +79,11 @@ that cannot be found in the related table (Z)"). Two things it does not do yet, 
 a relation to a table this binary does not carry passes silently (a refusal would stop every
 `Validate` of that field on an out-of-scope link), and the check has no gate case, because the gate
 tree carries one table and a relation needs two -- the first two-table fixture pays for it.
+
+## 2026-09-10: the conditional and filtered forms are checked too
+
+board:0658 carries the whole declaration on the `FieldDef` and resolves it at run time; the
+`constexpr` parsed form this item asked for is not built, and the reason is recorded there. What
+stays open here: a relation to a table this build does not carry passes silently, and the
+`Validate`-time check has no two-table gate fixture yet (`RelationGate` proves the resolver, not
+the refusal).

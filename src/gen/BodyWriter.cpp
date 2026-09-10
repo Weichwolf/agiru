@@ -1407,6 +1407,7 @@ public:
     if (running_ == nullptr) { return {}; }
     if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
     if (::agiru::gen::IsTryFunction(*running_)) { return " true"; }
+    if (::agiru::gen::DefaultsToTrue(*running_)) { return " true"; }
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 
@@ -1808,6 +1809,7 @@ public:
     if (running_ == nullptr) { return {}; }
     if (!running_->returnName.empty()) { return " " + Identifier(running_->returnName); }
     if (::agiru::gen::IsTryFunction(*running_)) { return " true"; }
+    if (::agiru::gen::DefaultsToTrue(*running_)) { return " true"; }
     return running_->returnType.empty() ? std::string{} : std::string(" {}");
   }
 

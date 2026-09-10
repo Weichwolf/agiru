@@ -56,7 +56,20 @@ namespace {
 constexpr ::agiru::Integer kDisplayFormat = 0;
 constexpr ::agiru::Integer kEditFormat = 1;
 constexpr ::agiru::Integer kCodeFormat = 2;
+constexpr ::agiru::Integer kTrailingSignThousandFormat = 3;
+constexpr ::agiru::Integer kTrailingSignFormat = 4;
 constexpr ::agiru::Integer kXmlFormat = 9;
+
+bool TrailingSign(::agiru::Integer format) {
+  return format == kTrailingSignThousandFormat || format == kTrailingSignFormat;
+}
+
+std::string WithTrailingSign(std::string rendered) {
+  if (rendered.empty() || rendered.front() != '-') { return rendered; }
+  rendered.erase(0, 1);
+  rendered += '-';
+  return rendered;
+}
 
 constexpr int kTwoDigitYear = 100;
 
@@ -94,15 +107,31 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
     if (format == kXmlFormat) { return Value.Get<Boolean>() ? "true" : "false"; }
     return Value.Get<Boolean>() ? "1" : "0";
   }
-  if (Value.Is<::agiru::Integer>()) { return ToText(Value.Get<::agiru::Integer>()); }
-  if (Value.Is<BigInteger>()) { return ToText(Value.Get<BigInteger>()); }
-  if (Value.Is<Decimal>()) { return Value.Get<Decimal>().ToInvariantString(); }
+  if (Value.Is<::agiru::Integer>()) {
+    const std::string text = ToText(Value.Get<::agiru::Integer>());
+    return TrailingSign(format) ? WithTrailingSign(text) : text;
+  }
+  if (Value.Is<BigInteger>()) {
+    const std::string text = ToText(Value.Get<BigInteger>());
+    return TrailingSign(format) ? WithTrailingSign(text) : text;
+  }
+  if (Value.Is<Decimal>()) {
+    const std::string text = Value.Get<Decimal>().ToInvariantString();
+    return TrailingSign(format) ? WithTrailingSign(text) : text;
+  }
   if (Value.Is<std::string>()) { return Value.Get<std::string>(); }
   if (Value.Is<Date>()) { return DateText(Value.Get<Date>(), format); }
   if (Value.Is<Time>()) { return TimeText(Value.Get<Time>(), format); }
   if (Value.Is<DateTime>()) { return Value.Get<DateTime>().ToInvariantString(); }
   if (Value.Is<Duration>()) { return Value.Get<Duration>().ToInvariantString(); }
-  if (Value.Is<Guid>()) { return Value.Get<Guid>().ToText(); }
+  if (Value.Is<Guid>()) {
+    std::string text = Value.Get<Guid>().ToText();
+    if (format == kTrailingSignFormat && text.size() >= 2 && text.front() == '{' &&
+        text.back() == '}') {
+      text = text.substr(1, text.size() - 2);
+    }
+    return text;
+  }
   if (Value.Is<RecordId>()) { return Value.Get<RecordId>().ToText(); }
   if (Value.Is<DateFormula>()) { return Value.Get<DateFormula>().ToText(); }
   if (Value.Is<OrdinalInVariant>()) { return OrdinalText(Value.Get<OrdinalInVariant>(), format); }
@@ -387,7 +416,7 @@ std::string ApplicationArea(std::string_view ApplicationArea) {
 ::agiru::Text<0>
 Format(const ::agiru::Variant &Value, ::agiru::Integer Length, ::agiru::Integer FormatNumber) {
   if (FormatNumber != kDisplayFormat && FormatNumber != kEditFormat &&
-      FormatNumber != kCodeFormat && FormatNumber != kXmlFormat) {
+      FormatNumber != kCodeFormat && !TrailingSign(FormatNumber) && FormatNumber != kXmlFormat) {
     throw Error("Format: standard format " + std::to_string(FormatNumber) +
                 " is not one devenv-format-property.md tabulates");
   }

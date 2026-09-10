@@ -58,6 +58,18 @@ public:
   /// \return How many boundaries are open.
   [[nodiscard]] std::size_t Depth() const { return names_.size(); }
 
+  /// \brief How many boundaries have been rolled back in this session, which is what a cursor
+  ///        remembers beside the depth it was opened at.
+  ///
+  /// \warning `ROLLBACK TO SAVEPOINT` DESTROYS EVERY CURSOR DECLARED AFTER THE SAVEPOINT, and the
+  ///          depth alone cannot tell: the next boundary opens at the SAME depth, so a cursor
+  ///          from the rolled-back one looked alive, its `CLOSE` failed with "cursor does not
+  ///          exist", and PostgreSQL aborted the transaction the next test was running in
+  ///          (`Incoming Doc. To Data Exch.UT`, 11 cases, 2026-09-10). A cursor opened under a
+  ///          different count is gone and is not closed.
+  /// \return The count.
+  [[nodiscard]] std::size_t Rollbacks() const { return rollbacks_; }
+
   /// \brief The message of the last error a boundary rolled back, for AL `GetLastErrorText()`.
   /// \return The text, or empty when nothing has failed in this session.
   [[nodiscard]] std::string_view LastError() const { return lastError_; }
@@ -96,6 +108,7 @@ private:
   std::vector<std::string> names_;
   std::vector<std::string> inconsistent_;
   std::string lastError_;
+  std::size_t rollbacks_ = 0;
   std::string lastErrorCode_;
   std::size_t issued_ = 0;
 };

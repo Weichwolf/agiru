@@ -4,6 +4,8 @@
 #include "runtime/Error.h"
 #include "runtime/Page.h"
 #include "runtime/Record.h"
+#include "runtime/RecordState.h"
+#include "runtime/Relation.h"
 #include "runtime/Table.h"
 #include "runtime/test/PageCore.h"
 #include "runtime/test/TestAction.h"
@@ -380,7 +382,17 @@ public:
     }
   }
 
+  /// A part read through a `const` path attaches on first use like any other use of it, and
+  /// follows the parent before it answers.
+  void AttachedForReading_() const {
+    if (parent_ == nullptr) { return; }
+    auto &self = *const_cast<TestPage *>(this);
+    if (page_ == nullptr) { self.Attach_(); }
+    self.Relink_();
+  }
+
   [[nodiscard]] std::string ControlText(std::string_view control) const override {
+    AttachedForReading_();
     const ControlDef *def = ControlNamed_(control);
     if (def != nullptr && def->field.Value() == 0 && page_ != nullptr) {
       if (const ControlTrigger<P> *row = TriggerRow_(control);
@@ -424,6 +436,7 @@ public:
   }
 
   [[nodiscard]] Boolean ControlVisible(std::string_view control) const override {
+    AttachedForReading_();
     if (const auto computed = Computed_(control, &ControlTrigger<P>::visible); computed) {
       return *computed;
     }
@@ -432,6 +445,7 @@ public:
   }
 
   [[nodiscard]] Boolean ControlEditable(std::string_view control) const override {
+    AttachedForReading_();
     if (const auto computed = Computed_(control, &ControlTrigger<P>::editable); computed) {
       return Editable() && *computed;
     }
@@ -440,6 +454,7 @@ public:
   }
 
   [[nodiscard]] Boolean ControlEnabled(std::string_view control) const override {
+    AttachedForReading_();
     if (const auto computed = Computed_(control, &ControlTrigger<P>::enabled); computed) {
       return *computed;
     }
@@ -546,10 +561,20 @@ private:
     }
   }
 
+  /// A PART FOLLOWS ITS PARENT, and following means the part's current record moves with the
+  /// link and `OnAfterGetRecord` runs for it: `Whse. Pick Subform` sets `BinCodeEditable` there,
+  /// and `WarehousePick.WhseActivityLines."Bin Code".Editable()` read a stale one after the
+  /// parent's filter moved (3 cases of SCM - Warehouse UT, 2026-09-10). A relink that only set
+  /// the filters left the part on the row it opened on.
   void Relink_() {
     if constexpr (kHasRecord) {
       if (parent_ != nullptr && page_ != nullptr) {
         parent_->LinkPart(partName_, static_cast<void *>(&page_->Rec), RecordTraits_().kTable);
+        using Source = std::remove_cvref_t<decltype(page_->Rec)>;
+        auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
+        if (static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst())) {
+          detail::AfterGetRecord(*page_);
+        }
       }
     }
   }
@@ -620,11 +645,11 @@ private:
     Filter.Bind(*this);
   }
 
-  static void AdoptOwned_(void *harness, void *page) {
+  static void AdoptOwned_(void *harness, void *page, bool owned) {
     auto &self = *static_cast<TestPage *>(harness);
     self.Release_();
     self.page_ = static_cast<P *>(page);
-    self.owned_ = true;
+    self.owned_ = owned;
     self.Bind_();
   }
 
@@ -706,6 +731,60 @@ private:
     return nullptr;
   }
 
+  /// AL `TestField.Lookup()` on a control with no `OnLookup` of its own opens the RELATED table's
+  /// lookup page through the test's ModalPageHandler, and `LookupOK` puts the picked record's
+  /// related field into the control (`devenv-tablerelation-property.md`, `FindLookupPage`).
+  bool LookupThroughRelation_(std::string_view control) {
+    if constexpr (kHasRecord) {
+      const ControlDef *def = ControlNamed_(control);
+      if (def == nullptr || def->field.Value() == 0) { return false; }
+      if (Record_().RunOnLookup(def->field)) { return true; }
+      const FieldDef *field = Field(RecordTraits_().kTable, def->field);
+      if (field == nullptr) { return false; }
+      const std::optional<detail::ResolvedRelation> resolved =
+          detail::ResolveRelation(&Record_(), RecordTraits_().kTable, *field);
+      if (!resolved.has_value()) { return false; }
+      const TableEntry *target = FindTable(resolved->table);
+      if (target == nullptr) { return false; }
+      const PageEntry *lookup = FindLookupPage(*target->table);
+      if (lookup == nullptr) { return false; }
+      const FieldDef *column = nullptr;
+      for (const FieldDef &candidate : target->table->fields) {
+        if (resolved->field.empty()
+                ? (!target->table->keys.empty() && !target->table->keys[0].fields.empty() &&
+                   candidate.no == target->table->keys[0].fields[0])
+                : SameWord_(candidate.name, resolved->field)) {
+          column = &candidate;
+        }
+      }
+      void *related = target->make();
+      {
+        detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(related)->Ensure();
+        for (const detail::RelationFilter &filter : resolved->filters) {
+          for (const FieldDef &candidate : target->table->fields) {
+            if (SameWord_(candidate.name, filter.field)) {
+              detail::Narrow(state, candidate.no, filter.text);
+            }
+          }
+        }
+      }
+      try {
+        if (lookup->run(true, related, target->table, true) == ::agiru::Action::LookupOK &&
+            column != nullptr) {
+          SetControlText(control, ::agiru::FieldText(related, *column));
+        }
+      } catch (...) {
+        target->free(related);
+        throw;
+      }
+      target->free(related);
+      return true;
+    } else {
+      static_cast<void>(control);
+      return false;
+    }
+  }
+
   void RunTrigger_(std::string_view control, ControlTriggerKind kind, bool optional) {
     if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
       for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
@@ -723,6 +802,7 @@ private:
         break;
       }
     }
+    if (kind == ControlTriggerKind::Lookup && LookupThroughRelation_(control)) { return; }
     if (!optional) {
       throw Error("the control '" + std::string(control) + "' declares no such trigger");
     }
