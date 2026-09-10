@@ -278,6 +278,188 @@ public:
     return object;
   }
 
+  PageObject ParseReport() {
+    for (Token &token : tokens_) {
+      if (token.kind == TokenKind::Identifier &&
+          (IsKeyword(token, "CurrReport") || IsKeyword(token, "RequestOptionsPage"))) {
+        token.text = "CurrPage";
+      }
+    }
+    PageObject object;
+    object.report = true;
+    object.nameSpace = ReadHeaderNamespace("report");
+    Expect("report");
+    object.id = ExpectInteger();
+    object.name = ExpectName();
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("dataset")) {
+        Advance();
+        ParseControlsInto(object.dataset);
+        continue;
+      }
+      if (AtKeyword("requestpage")) {
+        Advance();
+        ParsePageBody(object);
+        continue;
+      }
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        object.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
+  PageObject ParseXmlPort() {
+    for (Token &token : tokens_) {
+      if (token.kind == TokenKind::Identifier && IsKeyword(token, "currXMLport")) {
+        token.text = "CurrPage";
+      }
+    }
+    PageObject object;
+    object.xmlport = true;
+    object.nameSpace = ReadHeaderNamespace("xmlport");
+    Expect("xmlport");
+    object.id = ExpectInteger();
+    object.name = ExpectName();
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("schema")) {
+        Advance();
+        ParseControlsInto(object.dataset);
+        continue;
+      }
+      if (AtKeyword("requestpage")) {
+        Advance();
+        ParsePageBody(object);
+        continue;
+      }
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(object.labels, object.variables);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        object.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+    return object;
+  }
+
+  PageExtensionObject ParseReportExtension() {
+    for (Token &token : tokens_) {
+      if (token.kind == TokenKind::Identifier &&
+          (IsKeyword(token, "CurrReport") || IsKeyword(token, "RequestOptionsPage"))) {
+        token.text = "CurrPage";
+      }
+    }
+    PageExtensionObject extension;
+    extension.nameSpace = ReadHeaderNamespace("reportextension");
+    Expect("reportextension");
+    extension.id = ExpectInteger();
+    extension.name = ExpectName();
+    Expect("extends");
+    extension.extends = ExpectName();
+    Expect("{");
+    std::vector<std::string> attributes;
+    while (!AtPunctuation("}") && !AtEnd()) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
+      if (AtKeyword("dataset")) {
+        Advance();
+        ParseControlsInto(extension.dataset);
+        continue;
+      }
+      if (AtKeyword("requestpage")) {
+        Advance();
+        PageObject body;
+        ParsePageBody(body);
+        extension.layout.insert(extension.layout.end(), body.layout.begin(), body.layout.end());
+        extension.actions.insert(extension.actions.end(), body.actions.begin(), body.actions.end());
+        extension.procedures.insert(
+            extension.procedures.end(), body.procedures.begin(), body.procedures.end());
+        extension.variables.insert(
+            extension.variables.end(), body.variables.begin(), body.variables.end());
+        extension.labels.insert(extension.labels.end(), body.labels.begin(), body.labels.end());
+        continue;
+      }
+      if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
+        Advance();
+        SkipBracedBlock();
+        continue;
+      }
+      if (AtProtectedVar()) {
+        Advance();
+        Advance();
+        ParseVarsInto(extension.labels, extension.variables);
+        continue;
+      }
+      if (AtKeyword("var")) {
+        Advance();
+        ParseVarsInto(extension.labels, extension.variables);
+        continue;
+      }
+      if (AtKeyword("trigger") || AtKeyword("procedure") || AtKeyword("local") ||
+          AtKeyword("internal") || AtKeyword("protected")) {
+        extension.procedures.push_back(ParseProcedure(attributes));
+        attributes.clear();
+        continue;
+      }
+      static_cast<void>(ParseProperty());
+    }
+    Expect("}");
+    return extension;
+  }
+
   QueryObject ParseQuery() {
     for (Token &token : tokens_) {
       if (token.kind == TokenKind::Identifier && IsKeyword(token, "CurrQuery")) {
@@ -1077,6 +1259,18 @@ PageObject ParsePage(std::string_view source) {
 
 QueryObject ParseQuery(std::string_view source) {
   return Parser(Tokenize(source)).ParseQuery();
+}
+
+PageObject ParseReport(std::string_view source) {
+  return Parser(Tokenize(source)).ParseReport();
+}
+
+PageObject ParseXmlPort(std::string_view source) {
+  return Parser(Tokenize(source)).ParseXmlPort();
+}
+
+PageExtensionObject ParseReportExtension(std::string_view source) {
+  return Parser(Tokenize(source)).ParseReportExtension();
 }
 
 ProfileObject ParseProfile(std::string_view source) {

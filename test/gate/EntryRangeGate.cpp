@@ -1,5 +1,6 @@
 #include "runtime/Error.h"
 #include "runtime/Table.h"
+#include "type/Decimal.h"
 
 #include "Check.h"
 
@@ -27,25 +28,61 @@ void AnEntryOutsideTheDeclaredRangeIsRefusedWithThePlatformsWording() {
   CHECK_TEXT("above the maximum",
              Refusal("150.5", "0", "100"),
              "The value must be less than or equal to 100. Value: 150.5.");
-  CHECK_TEXT("the bounds themselves pass", Refusal("0", "0", "100") + Refusal("100", "0", "100"), "");
+  CHECK_TEXT(
+      "the bounds themselves pass", Refusal("0", "0", "100") + Refusal("100", "0", "100"), "");
   CHECK_TEXT("and so does anything between", Refusal("42.25", "0", "100"), "");
   CHECK_TEXT("a lone minimum bounds one side only", Refusal("1000000", "0", ""), "");
   CHECK_TEXT("a lone maximum the other", Refusal("-5", "", "100"), "");
   CHECK_TEXT("no declaration checks nothing", Refusal("-5", "", ""), "");
   CHECK_TEXT("an entry that is not a number is the field's parse to refuse, not this",
-             Refusal("abc", "0", "100"), "");
-  CHECK_TEXT("the code is the page's validation code",
-             [] {
-               try {
-                 agiru::detail::CheckEntryRange("-1", "0", "");
-               } catch (const agiru::Error &e) { return std::string(e.Code()); }
-               return std::string{};
-             }(),
-             "TestValidation");
+             Refusal("abc", "0", "100"),
+             "");
+  CHECK_TEXT(
+      "the code is the page's validation code",
+      [] {
+        try {
+          agiru::detail::CheckEntryRange("-1", "0", "");
+        } catch (const agiru::Error &e) { return std::string(e.Code()); }
+        return std::string{};
+      }(),
+      "TestValidation");
+}
+
+/// `DecimalPlaces` "sets display AND STORAGE requirements" and "is evaluated on text boxes and
+/// fields during validation" (`devenv-decimalplaces-property.md`): a `Validate` rounds a Decimal
+/// to the declared maximum, an assignment does not. `Item Unit of Measure."Qty. Rounding
+/// Precision"` declares `0 : 5`, and `SCM Whse. UOM Rnding. UT` divides one by a random integer
+/// into it and then expects `Qty. per Unit of Measure mod Precision = 0` -- which only holds once
+/// the precision was stored with five places (openerp WI-1320 left it open).
+void AValidatedDecimalKeepsTheDeclaredPlaces() {
+  const agiru::Decimal seventh = agiru::Decimal{1} / agiru::Decimal{7};
+  CHECK_TEXT("0 : 5 keeps five",
+             agiru::detail::DeclaredPlaces(seventh, "0 : 5").ToInvariantString(),
+             "0.14286");
+  CHECK_TEXT("2:5 keeps five",
+             agiru::detail::DeclaredPlaces(seventh, "2:5").ToInvariantString(),
+             "0.14286");
+  CHECK_TEXT("a lone number is the maximum",
+             agiru::detail::DeclaredPlaces(seventh, "2").ToInvariantString(),
+             "0.14");
+  CHECK_TEXT(
+      ":3 keeps three", agiru::detail::DeclaredPlaces(seventh, ":3").ToInvariantString(), "0.143");
+  CHECK_TEXT("2: names no maximum",
+             agiru::detail::DeclaredPlaces(seventh, "2:").ToInvariantString(),
+             seventh.ToInvariantString());
+  CHECK_TEXT("no declaration rounds nothing",
+             agiru::detail::DeclaredPlaces(seventh, "").ToInvariantString(),
+             seventh.ToInvariantString());
+  CHECK_TEXT("0 rounds to the integer",
+             agiru::detail::DeclaredPlaces(seventh, "0:0").ToInvariantString(),
+             "0");
 }
 
 } // namespace
 
 int main() {
-  return gate::Run("EntryRange", [] { AnEntryOutsideTheDeclaredRangeIsRefusedWithThePlatformsWording(); });
+  return gate::Run("EntryRange", [] {
+    AnEntryOutsideTheDeclaredRangeIsRefusedWithThePlatformsWording();
+    AValidatedDecimalKeepsTheDeclaredPlaces();
+  });
 }

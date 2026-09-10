@@ -348,9 +348,13 @@ std::string HandlerObjectOf(const al::ProcedureDecl &handler, const Objects &obj
   if (handler.parameters.empty()) { return "0"; }
   const al::VarDecl &page = handler.parameters.front();
   const std::string type = TypeName(page.type);
-  if (type != "TestPage" || page.subtype.empty()) { return "0"; }
-  const auto found = objects.pages.find(LowerKey(page.subtype));
-  if (found == objects.pages.end() || found->second.id == 0) { return "0"; }
+  if (page.subtype.empty()) { return "0"; }
+  const TableIndex *index = nullptr;
+  if (type == "TestPage") { index = &objects.pages; }
+  if (type == "TestRequestPage" || type == "Report") { index = &objects.reports; }
+  if (index == nullptr) { return "0"; }
+  const auto found = index->find(LowerKey(page.subtype));
+  if (found == index->end() || found->second.id == 0) { return "0"; }
   return std::to_string(found->second.id);
 }
 
@@ -454,9 +458,10 @@ bool NamesAnObject(const al::VarDecl &declared) {
 
 const TableRef *Reach(const al::VarDecl &declared, const Objects &objects) {
   const std::string type = TypeName(declared.type);
-  if (type == "Report" || type == "XmlPort") { return nullptr; }
   const TableIndex &index = type == "Codeunit"    ? objects.codeunits
                             : type == "Page"      ? objects.pages
+                            : type == "Report"    ? objects.reports
+                            : type == "XmlPort"   ? objects.xmlports
                             : type == "Interface" ? objects.interfaces
                             : type == "Query"     ? objects.queries
                                                   : objects.tables;
@@ -1239,6 +1244,9 @@ public:
     if (subtype.empty()) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end()) { return false; }
+    if (table->second.fields.empty()) {
+      return PlatformFieldNamed(PlatformField{.table = subtype, .field = member.field});
+    }
     if (table->second.fields.contains(LowerKey(std::string(member.field)))) { return true; }
     const std::string spelled = Identifier(member.field);
     return std::ranges::any_of(table->second.fields,
@@ -1971,6 +1979,7 @@ TableIndex PlatformTables() {
   add("Privacy Notice Approval", "1561");
   add("Record Link", "2000000068");
   add("Table Metadata", "2000000136");
+  add("Page Metadata", "2000000138");
   add("Tenant License State", "2000000189");
   add("Date", "2000000007");
   add("User", "2000000120");
@@ -1998,6 +2007,7 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000211"] = enums["feature key"];
   enums["record link"]["type"] = "::agiru::platform::RecordLinkType";
   enums["table metadata"]["tabletype"] = "::agiru::platform::TableMetadataTableType";
+  enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
   enums["2000000136"] = enums["table metadata"];
   enums["2000000068"] = enums["record link"];

@@ -246,7 +246,11 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 112> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 120> kElsewhere{{
+    {"dotnet::Encoding", "dotnet/Encoding.h"},
+    {"dotnet::UTF8Encoding", "dotnet/Encoding.h"},
+    {"dotnet::UnicodeEncoding", "dotnet/Encoding.h"},
+    {"dotnet::ASCIIEncoding", "dotnet/Encoding.h"},
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -267,7 +271,9 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 112> kElsewh
     {"InStream", "type/Stream.h"},
     {"OutStream", "type/Stream.h"},
     {"Report", "runtime/Report.h"},
-    {"XmlPort", "runtime/Report.h"},
+    {"XmlPort", "runtime/XmlPort.h"},
+    {"XmlPortTraits", "runtime/XmlPort.h"},
+    {"dotnet::StreamReader", "dotnet/StreamReader.h"},
     {"Query", "runtime/Query.h"},
     {"QueryTraits", "runtime/Query.h"},
     {"QueryHandle", "runtime/Query.h"},
@@ -301,6 +307,8 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 112> kElsewh
     {"platform::PrivacyNoticeApproval", "platform/PrivacyNoticeApproval.h"},
     {"platform::RecordLink", "platform/RecordLink.h"},
     {"platform::RecordLinkType", "platform/RecordLink.h"},
+    {"platform::PageMetadata", "platform/PageMetadata.h"},
+    {"platform::PageMetadataPageType", "platform/PageMetadata.h"},
     {"platform::TableMetadata", "platform/TableMetadata.h"},
     {"platform::TableMetadataTableType", "platform/TableMetadata.h"},
     {"platform::TableMetadataObsoleteState", "platform/TableMetadata.h"},
@@ -410,6 +418,18 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
     case ObjectKind::Page:
       headers.insert("meta/PageDef.h");
       headers.insert("runtime/Page.h");
+      break;
+    case ObjectKind::Report:
+      headers.insert("meta/PageDef.h");
+      headers.insert("meta/TableDef.h");
+      headers.insert("runtime/Page.h");
+      headers.insert("runtime/Report.h");
+      break;
+    case ObjectKind::XmlPort:
+      headers.insert("meta/PageDef.h");
+      headers.insert("meta/TableDef.h");
+      headers.insert("runtime/Page.h");
+      headers.insert("runtime/XmlPort.h");
       break;
     case ObjectKind::Enum: headers.insert("meta/EnumDef.h"); break;
     default: break;

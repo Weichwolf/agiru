@@ -4,6 +4,7 @@
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "type/Decimal.h"
 
 #include <algorithm>
 #include <cctype>
@@ -187,11 +188,17 @@ std::strong_ordering Order(std::string_view value, std::string_view against, con
     case FieldType::Integer:
     case FieldType::BigInteger:
     case FieldType::Option:
-    case FieldType::Enum:
+    case FieldType::Enum: {
+      try {
+        const std::int64_t left = std::stoll(std::string(value));
+        const std::int64_t right = std::stoll(std::string(against));
+        return left <=> right;
+      } catch (const std::exception &) { break; }
+    }
     case FieldType::Decimal: {
       try {
-        const double left = std::stod(std::string(value));
-        const double right = std::stod(std::string(against));
+        const Decimal left = Decimal::FromInvariantString(value);
+        const Decimal right = Decimal::FromInvariantString(against);
         return left < right   ? std::strong_ordering::less
                : right < left ? std::strong_ordering::greater
                               : std::strong_ordering::equal;

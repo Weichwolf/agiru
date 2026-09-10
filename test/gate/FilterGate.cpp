@@ -5,6 +5,7 @@
 
 #include "Check.h"
 #include "Filter.h"
+#include "Selection.h"
 
 #include <array>
 #include <cstdint>
@@ -29,6 +30,18 @@ const FieldDef &TextField() {
                             .no = agiru::FieldNo{1},
                             .length = 50,
                             .type = FieldType::Text};
+  return def;
+}
+
+const FieldDef &BigIntegerField() {
+  static const FieldDef def{.offset = 0,
+                            .name = "Big",
+                            .caption = "Big",
+                            .values = {},
+                            .initValue = {},
+                            .no = agiru::FieldNo{4},
+                            .length = 0,
+                            .type = FieldType::BigInteger};
   return def;
 }
 
@@ -169,6 +182,20 @@ void ADecimalIsComparedByValueAndNotByItsSpelling() {
   CHECK_TRUE("and <>0 does not pass a zero written long",
              !Passes("<>0", "0.00000000000000000000", DecimalField()));
   CHECK_TRUE("while it passes a quantity", Passes("<>0", "3.00000000000000000000", DecimalField()));
+}
+
+/// NO BINARY FLOATING-POINT TYPE CARRIES AN AMOUNT (board:0679): a double calls 2^53 and 2^53 + 1
+/// equal, so a Decimal filter compares as a Decimal and an integer as an integer.
+void ALargeAmountIsNotComparedThroughADouble() {
+  CHECK_TRUE("a Decimal one above 2^53 is above 2^53",
+             Passes(">9007199254740992", "9007199254740993", DecimalField()));
+  CHECK_TRUE("and not equal to it",
+             !Passes("=9007199254740992", "9007199254740993", DecimalField()));
+  CHECK_TRUE("a BigInteger the same",
+             Passes(">9007199254740992", "9007199254740993", BigIntegerField()));
+  CHECK_TRUE(
+      "twenty-eight places still order",
+      Passes("<0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
 }
 
 void NumbersCompareAsNumbers() {
@@ -313,8 +340,80 @@ void ARangeHasTwoEndsAndAnythingElseIsNotARange() {
 
 } // namespace
 
+/// A FILTER ON A FLOWFIELD IS A CORRELATED SUBQUERY (board:0678): `SetRange("Template Type", X)`
+/// on a journal batch, whose field is `lookup("Item Journal Template".Type where(Name =
+/// field("Journal Template Name")))`, reached PostgreSQL as a column that does not exist. The
+/// subquery evaluates the CalcFormula per outer row, the way the platform does.
+void AFlowFieldFilterBecomesACorrelatedSubquery() {
+  static constexpr std::array<agiru::FieldDef, 2> kFields{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "Code",
+                      .caption = "Code",
+                      .no = agiru::FieldNo{1},
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = 32,
+                      .name = "Resource Unit Cost",
+                      .caption = "Resource Unit Cost",
+                      .calcFormula =
+                          "lookup(\"Resource Cost\".\"Unit Cost\" where(Code = field(Code)))",
+                      .no = agiru::FieldNo{2},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Decimal},
+  }};
+  static constexpr std::array<agiru::FieldNo, 1> kKey{{agiru::FieldNo{1}}};
+  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
+      agiru::KeyDef{.name = "Key1", .fields = kKey, .clustered = true},
+  }};
+  static constexpr agiru::TableDef kOuter{.id = agiru::TableId{50000},
+                                          .name = "Flow Outer",
+                                          .caption = "Flow Outer",
+                                          .fields = kFields,
+                                          .keys = kKeys};
+  agiru::detail::RecordState state;
+  state.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "10..20"});
+  const agiru::detail::Selection made = agiru::detail::Select(&state, kOuter);
+  CHECK_TRUE("the column is a lookup over the target, correlated to the outer row",
+             made.where.find("(SELECT \"Unit Cost\" FROM \"Resource Cost\" WHERE (\"Code\" = "
+                             "\"Flow Outer\".\"Code\")") != std::string::npos);
+  CHECK_TRUE("ordered by the target's primary key and limited to one row",
+             made.where.find("ORDER BY \"Type\", \"Code\", \"Work Type Code\" LIMIT 1)") !=
+                 std::string::npos);
+  CHECK_TRUE("the range binds both ends after the subquery",
+             made.binds.size() == 2 && made.binds[0] == "10" && made.binds[1] == "20");
+  CHECK_TRUE("and the range compares the subquery, not a column",
+             made.where.find(" LIMIT 1) BETWEEN $1 AND $2") != std::string::npos);
+  // THE NEGATIVE CONTROL: a FlowField whose formula names a table the catalogue lacks refuses,
+  // naming the field, rather than dropping the filter.
+  static constexpr std::array<agiru::FieldDef, 1> kOrphan{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "Elsewhere",
+                      .caption = "Elsewhere",
+                      .calcFormula = "lookup(\"No Such Table\".Name where(Code = const(A)))",
+                      .no = agiru::FieldNo{1},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Text},
+  }};
+  static constexpr agiru::TableDef kLost{.id = agiru::TableId{50001},
+                                         .name = "Flow Lost",
+                                         .caption = "Flow Lost",
+                                         .fields = kOrphan,
+                                         .keys = kKeys};
+  agiru::detail::RecordState lost;
+  lost.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{1}, .group = 0, .text = "X"});
+  std::string refusal;
+  try {
+    static_cast<void>(agiru::detail::Select(&lost, kLost));
+  } catch (const agiru::Error &e) { refusal = e.what(); }
+  CHECK_TRUE("a formula over an unknown table refuses by name",
+             refusal.find("Elsewhere") != std::string::npos &&
+                 refusal.find("No Such Table") != std::string::npos);
+}
+
 int main() {
   return gate::Run("Filter", [] {
+    AFlowFieldFilterBecomesACorrelatedSubquery();
     AFilterOverIntegersIsASetOfIntervals();
     ASetCountsItselfWithoutCountingRows();
     ConjunctionBindsTighterThanDisjunction();
@@ -324,6 +423,7 @@ int main() {
     TheAtSignIsAModifier();
     RangesIncludeBothEndsAndMayBeOpen();
     NumbersCompareAsNumbers();
+    ALargeAmountIsNotComparedThroughADouble();
     AnOptionIsComparedByOrdinalWhicheverWayItIsSpelled();
     ADecimalIsComparedByValueAndNotByItsSpelling();
     AQuotedOperandIsNotSplitOnItsOperators();

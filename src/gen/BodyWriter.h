@@ -88,6 +88,11 @@ public:
 
   [[nodiscard]] virtual std::string ThisTable() const { return {}; }
 
+  [[nodiscard]] virtual std::string BareRecordCall(std::string_view name) const {
+    static_cast<void>(name);
+    return {};
+  }
+
   [[nodiscard]] virtual std::string ProcedureOf(const OfVariable &member) const {
     static_cast<void>(member);
     return {};

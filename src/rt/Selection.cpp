@@ -55,6 +55,18 @@ void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
   for (const FieldFilter &filter : state->filters) {
     const FieldDef &field = FieldOf(table, filter.field);
     if (field.fieldClass == FieldClass::FlowFilter) { continue; }
+    if (field.fieldClass == FieldClass::FlowField) {
+      const Clause column = FlowFieldColumn(table, field, state, made.binds.size() + 1);
+      if (column.sql.empty()) { continue; }
+      const Clause clause = Where(
+          field, ParseFilter(filter.text), made.binds.size() + 1 + column.binds.size(), column.sql);
+      if (clause.sql.empty()) { continue; }
+      if (!made.where.empty()) { made.where += " AND "; }
+      made.where += clause.sql;
+      made.binds.insert(made.binds.end(), column.binds.begin(), column.binds.end());
+      made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
+      continue;
+    }
     const Clause clause = Where(field, ParseFilter(filter.text), made.binds.size() + 1);
     if (clause.sql.empty()) { continue; }
     if (!made.where.empty()) { made.where += " AND "; }

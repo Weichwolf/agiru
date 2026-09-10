@@ -91,3 +91,63 @@ time. An element trigger's `var` parameter reaches the caller.
 
 **Negative control**: drop one `fieldelement` from the write side and require the round trip to go
 red -- WI-1048 is exactly the case where the read side passed and the write side stored nothing.
+
+## The first cut, 2026-09-10: THE SCHEMA WALKED OUT AND IN, THREE FORMATS
+
+**An xmlport is a page with a schema, the way a report is a page with a dataset (board:0063).**
+The parser reads `schema` into `al::PageObject::dataset` (`xmlport = true`, `currXMLport` spelled
+`CurrPage`), the generated class is `X_XmlPort : XmlPort<X_XmlPort>` with `XmlPort<Derived> :
+Page<Derived>`, and the generator emits `Export_()` and `Import_()` from the element tree:
+
+| element | export | import |
+|---|---|---|
+| `textelement` with children | `Out_().BeginGroup/EndGroup` | `In_().Enter/Leave` |
+| `tableelement` | a record variable (`Instance<T>`, `Temporary<T>` under `UseTemporary`), `SourceTableView` in group 2, `LinkFields`/`LinkTable` in group 4, `OnPreXmlItem`, `FindSet`/`Next` with `OnAfterGetRecord`, `BeginRecord/EndRecord` | `Enter` per record, `Init`, the children, `OnBeforeInsertRecord`, `Insert(true)` under `AutoSave` with `AutoReplace`/`AutoUpdate` turning a duplicate into `Modify`, `OnAfterInsertRecord` |
+| `fieldelement`/`fieldattribute` | `OnBeforePassField`, `Format(field)` (`Format(field, 0, 9)` under `FormatEvaluate = Xml`) | `Evaluate` into a copy, then `Validate` unless `FieldValidate = no` (or `DefaultFieldsValidation = false`), `OnAfterAssignField` |
+| `textelement`/`textattribute` leaf | a `Text` variable of the element's name; `OnBeforePassVariable`, the value; an `Unbound` element loops until `BreakUnbound` | `Evaluate` into the variable, `OnAfterAssignVariable`; `Unbound` reads while fields remain |
+
+**The three formats are one output and one input.** `XmlPortOutput` writes `Xml` as an element
+tree (attributes on the open element, text escaped), `VariableText` as a line per table record
+with the fields between `FieldSeparator` and inside `FieldDelimiter`, `FixedText` as values
+padded to `Width`; `XmlPortInput` is a cursor `Enter`ed and `Left` by the generated walk, and a
+text format serves it too -- a record level is a line, a leaf level a field -- so one `Import_()`
+reads all three. Separators are spelled with the platform's placeholders (`<TAB>`, `<NewLine>`,
+`<None>`, `<,>`) and `FieldSeparator('')` at run time overrides them, which `Export Generic
+Fixed Width` does from the Data Exch. Def. `TextEncoding` (MSDOS, UTF8, UTF16, WINDOWS) goes
+through the rebuilt `Encoding` (board:0680). `Skip`, `Break`, `Quit`, `BreakUnbound` are
+exceptions caught at the record, the loop, the run and the unbound loop. `Filename` is a member
+assigned as a property. `Xmlport.Export/Import/Run(Number, ...)` resolve through an
+`XmlPortEntry` catalogue.
+
+**Beside it:** `dotnet::StreamReader` (`StreamReader(InStream [, Encoding])`, `ReadLine`,
+`ReadToEnd`, `Close`), which is how `Payment Export XMLPort UT` reads an export back.
+
+**Not in this cut:** namespaces and `NamespacePrefix` (written without), `MinOccurs`/`MaxOccurs`/
+`Occurrence` validation, `ImportFile` (waits for `File`), `LinkTableForceInsert`, a request page
+that filters table elements (`RequestFilterFields`), `TableSeparator` between two root-level table
+elements in a text file, and an `Xml`-format import of attributes on the record element beyond
+`Attribute(name)`.
+
+**The second cut, 2026-09-10, all 50 xmlports parsed, 44 in scope translated and every one of the
+90 generated units compiling.** Six generic gaps the first cut left, each a rule and not an object:
+
+- **A field element's name is its XML name and not a variable**, so two `TwnNm` under two
+  `PstlAdr` are legal AL and were one C++ trigger. A repeated `fieldelement`/`fieldattribute` is
+  renamed `_2` and given the `XmlName` it had (`DistinguishFieldElements`), and every other
+  element identifier is numbered like a data item's (`WithElements`).
+- **A declared variable wins over a data item's field**: in `Import/Export Workflow` the text
+  attribute `Type` and `"Workflow Step".Type` share a name, and `Resolve` looked at the field first.
+  Now local, global, then field -- the order a page already uses for `Rec`.
+- **`TextType = BigText` declares a `BigText`**, which is what `EventConditions.AddText` needs.
+- **`currXMLport.ImportFile` is a slot** assigned, tested and called, like `Filename`.
+- **A separator arrives as a `Char`** (`CRLF[1]`) as well as text; the `const char *` overload
+  keeps `FieldSeparator('')` unambiguous.
+- **A builtin declared over `Record` takes a record global by handle**: `CodeCoverageInclude(AllObj)`
+  reaches the `RecordRef &` door through `RecordRef::GetTable(Instance)`.
+
+An attribute of the record element is now read on import (`ParseXml` gathers
+`XmlAttributeCollection`), which closes the one red check of the first cut. The xmlports' option
+variables join the shared option types (`NoteOptions` over the parsed xmlports).
+
+**Measurement.** Chain 98 A/B against chain 97; the 21 cases naming `SetDestination`/`Export` are
+the floor.

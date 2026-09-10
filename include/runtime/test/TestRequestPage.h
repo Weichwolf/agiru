@@ -1,237 +1,102 @@
+/// \file
+/// \brief AL `TestRequestPage` -- a test's hand on a report's request page.
+///
+/// A REQUEST PAGE IS A PAGE, so this is a `TestPage` over the report's class (`runtime/Report.h`):
+/// `SetValue` on a field fires the control's `OnValidate` and lands in the report's global, `OK`
+/// and `Cancel` close the page the way they close any page, and what a `TestPage` cannot do -- the
+/// dataitem filters and `SaveAsXml` -- is added here. The `[RequestPageHandler]` receives it
+/// while the report is standing at its request page; when the handler returns, the report reads
+/// how the page closed and continues or stops (`devenv-report-triggers.md`).
 #pragma once
 
 #include "runtime/Error.h"
 #include "runtime/Report.h"
 #include "runtime/test/TestAction.h"
-#include "runtime/test/TestField.h"
+#include "runtime/test/TestPage.h"
+#include "type/Action.h"
 #include "type/Boolean.h"
-#include "type/Integer.h"
 #include "type/Text.h"
 
 #include <string_view>
 
-/// \file
-/// \brief AL `TestRequestPage` -- a report's request page, driven by a test.
-
 namespace agiru {
 
-/// \brief The stand-in for a report the transpiler has not translated.
-class UnknownReport {};
-
-/// \brief A data item on a request page is the record of its table.
-/// \tparam T The table's generated class.
-template <typename T> using DataItem = T;
-
-}
-
-/// \brief The controls a `TestRequestPage` over an untranslated report has, which is none.
-template <> struct agiru::ReportTraits<agiru::UnknownReport> {
-  /// \brief No controls at all.
-  /// \tparam Field_Kind  How a test reaches a request-page field.
-  /// \tparam Filter_Kind How a test reaches a data item's filters.
-  template <typename Field_Kind, template <typename> class Filter_Kind>
-  using Controls = agiru::UnknownReport;
-};
-
-namespace agiru {
-
-/// \brief AL `TestRequestPage <Report>` -- a report's request page, driven without a screen.
+/// \brief A test's request page over a report.
 ///
-/// \tparam R The generated report class.
+/// \tparam R The report's generated class, which is a page: `ReportTraits<R>::Controls` carries
+///         its request-page fields as `TestField`s and each dataitem as a record of its table, so
+///         `RequestPage."Vendor Ledger Entry".SetFilter("Vendor No.", ...)` narrows that dataitem.
 ///
-/// \note A DATA ITEM IS A RECORD, ON THE REQUEST PAGE AS IN THE REPORT. AL writes
-///       `RequestPage.Vendor.SetFilter("No.", '10000')`: the tab named after the data item carries
-///       the filters of ITS TABLE, and the field named inside it is that table's field. So the
-///       control is the table's own record class, whose `SetFilter`, `GetFilter` and
-///       `SetCurrentKey` are the platform's, and the field is its member. A request-page `field`
-///       is a `TestField`, the way it is on a `TestPage`.
-template <typename R = UnknownReport>
-class TestRequestPage : public ReportTraits<R>::template Controls<TestField, DataItem> {
+/// \note THE FILTERS TRAVEL AT ADOPTION AND AT RELEASE. When the handler receives the page, each
+///       dataitem record here starts as the report's dataitem view (`SetTableView`, the
+///       `DataItemTableView`); when the handler returns and the page closed with OK, what the
+///       handler filtered replaces the report's user filters (group 0) -- the way the platform
+///       reads the request page's filter tab back into the dataitems.
+template <typename R = UnknownPage> class TestRequestPage : public TestPage<R> {
 public:
-  /// \brief AL `TestRequestPage.OK()` -- closes the request page and runs the report.
-  /// \return Whether it ran.
-  /// \throws Error until a report can be run (board:0034).
-  TestAction OK() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestRequestPage() = default;
 
-  /// \brief AL `TestRequestPage.Cancel()` -- closes the request page without running.
-  /// \return Whether it closed.
-  /// \throws Error until a report can be run (board:0034).
-  TestAction Cancel() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  TestRequestPage(const TestRequestPage &) = default;
+  TestRequestPage(TestRequestPage &&) = delete;
+  TestRequestPage &operator=(const TestRequestPage &) = default;
+  TestRequestPage &operator=(TestRequestPage &&) = delete;
 
-  /// \brief AL `TestRequestPage.Schedule()` -- queues the report on the job queue.
-  /// \return The AL `TestAction` the page's own documentation names as the return
-  ///         (`testrequestpage-schedule-method.md`).
-  /// \throws Error until a report can be run (board:0034).
-  TestAction Schedule() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  /// \brief Hands the report's user filters back when the page closed with OK.
+  ~TestRequestPage() override { TakeBack_(); }
 
-  /// \brief AL `TestRequestPage.GoToRecord(Record)` -- positions the request page on a record.
-  /// \tparam Source The record's type.
-  /// \param Record The record to stand on.
-  /// \return Whether the request page could.
-  /// \throws Error until a report runs (board:0034).
-  template <typename Source> Boolean GoToRecord(const Source &Record) {
-    static_cast<void>(Record);
-    throw Error("a TestRequestPage needs a report (board:0034)");
+  /// \brief Binds this harness to the report standing at its request page, and gives each
+  ///        dataitem record here the dataitem's view to start from.
+  /// \param page The report.
+  void Adopt(void *page) {
+    TestPage<R>::Adopt(page);
+    if constexpr (requires(R &report) { this->GiveRequestFilters_(report); }) {
+      this->GiveRequestFilters_(this->Page_());
+    }
   }
 
-  /// \brief AL `TestRequestPage.Caption()` -- the caption the request page shows.
-  /// \return The caption.
-  /// \throws Error until a report can be run (board:0034).
-  [[nodiscard]] ::agiru::Text<0> Caption() const { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Editable()` -- whether the request page may be typed into.
-  /// \return Whether it is editable.
-  /// \throws Error until a report can be run (board:0034).
-  [[nodiscard]] Boolean Editable() const { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Expand(Boolean)` -- expands or collapses the current row.
-  /// \param Expand True to expand, false to collapse.
-  /// \throws Error until a report can be run (board:0034).
-  void Expand(Boolean Expand) {
-    static_cast<void>(Expand);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.IsExpanded()` -- whether the current row is expanded.
-  /// \return Whether it is.
-  /// \throws Error until a report can be run (board:0034).
-  [[nodiscard]] Boolean IsExpanded() const { Unrun(); }
-
-  /// \brief AL `TestRequestPage.FindFirstField(TestField, Any)` -- the first row whose field
-  ///        carries the value.
-  /// \tparam Value What the field is compared against.
-  /// \param Field The control to look in.
-  /// \param value The value to find.
-  /// \return Whether a row carries it.
-  /// \throws Error until a report can be run (board:0034).
-  template <typename Field, typename Value>
-  Boolean FindFirstField(const Field &field, const Value &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.FindNextField(TestField, Any)`.
-  /// \tparam Value What the field is compared against.
-  /// \return Whether a later row carries it.
-  /// \throws Error until a report can be run (board:0034).
-  template <typename Field, typename Value>
-  Boolean FindNextField(const Field &field, const Value &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.FindPreviousField(TestField, Any)`.
-  /// \tparam Value What the field is compared against.
-  /// \return Whether an earlier row carries it.
-  /// \throws Error until a report can be run (board:0034).
-  template <typename Field, typename Value>
-  Boolean FindPreviousField(const Field &field, const Value &value) {
-    static_cast<void>(field);
-    static_cast<void>(value);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.First()` -- moves to the first row.
-  /// \return Whether there is one.
-  /// \throws Error until a report can be run (board:0034).
-  Boolean First() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Next()` -- moves to the next row.
-  /// \return Whether there is one.
-  /// \throws Error until a report can be run (board:0034).
-  Boolean Next() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Previous()` -- moves to the previous row.
-  /// \return Whether there is one.
-  /// \throws Error until a report can be run (board:0034).
-  Boolean Previous() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Last()` -- moves to the last row.
-  /// \return Whether there is one.
-  /// \throws Error until a report can be run (board:0034).
-  Boolean Last() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.New()` -- starts a new row.
-  /// \throws Error until a report can be run (board:0034).
-  void New() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.GoToKey(Value, ...)` -- positions on a row by its key.
-  /// \tparam Values The key's fields, in the key's order.
-  /// \return Whether a row carries that key.
-  /// \throws Error until a report can be run (board:0034).
-  ///
-  /// \note VARIADIC BECAUSE THE KEY IS. `testrequestpage-gotokey-method.md` writes
-  ///       `GoToKey([Value: Any,...])`, and a primary key is up to sixteen fields.
-  template <typename... Values> Boolean GoToKey(const Values &...values) {
-    (static_cast<void>(values), ...);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.GetValidationError([Integer])` -- one of the errors the request
-  ///        page collected.
-  /// \param Index Which one, one-based; the first when omitted.
-  /// \return The error text.
-  /// \throws Error until a report can be run (board:0034).
-  [[nodiscard]] ::agiru::Text<0> GetValidationError(::agiru::Integer Index = {}) const {
-    static_cast<void>(Index);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.ValidationErrorCount()` -- how many it collected.
-  /// \return The count.
-  /// \throws Error until a report can be run (board:0034).
-  [[nodiscard]] ::agiru::Integer ValidationErrorCount() const { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Preview()` -- closes the request page and previews the report.
-  /// \return What the page answered.
-  /// \throws Error until a report can be run (board:0034).
-  TestAction Preview() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.Print()` -- closes the request page and prints the report.
-  /// \return What the page answered.
-  /// \throws Error until a report can be run (board:0034).
-  TestAction Print() { Unrun(); }
-
-  /// \brief AL `TestRequestPage.SaveAsExcel(Text)` -- runs the report into a workbook.
-  /// \param FileName Where it goes.
-  /// \throws Error until a report can be run (board:0034).
-  void SaveAsExcel(std::string_view FileName) {
-    static_cast<void>(FileName);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.SaveAsPdf(Text)` -- runs the report into a PDF.
-  /// \param FileName Where it goes.
-  /// \throws Error until a report can be run (board:0034).
-  void SaveAsPdf(std::string_view FileName) {
-    static_cast<void>(FileName);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.SaveAsWord(Text)` -- runs the report into a document.
-  /// \param FileName Where it goes.
-  /// \throws Error until a report can be run (board:0034).
-  void SaveAsWord(std::string_view FileName) {
-    static_cast<void>(FileName);
-    Unrun();
-  }
-
-  /// \brief AL `TestRequestPage.SaveAsXml(Text, Text)` -- writes the parameters and the data set.
-  /// \param ParameterFileName Where the request page's parameters go.
-  /// \param DataSetFileName   Where the report's data set goes.
-  /// \throws Error until a report can be run (board:0034).
+  /// \brief `TestRequestPage.SaveAsXml(ParameterFileName, DataSetFileName)`: closes the page
+  ///        with OK and has the report write its dataset and its parameters to the files.
+  /// \param ParameterFileName Where the request-page parameters go.
+  /// \param DataSetFileName   Where the dataset goes.
   void SaveAsXml(std::string_view ParameterFileName, std::string_view DataSetFileName) {
-    static_cast<void>(ParameterFileName);
-    static_cast<void>(DataSetFileName);
-    Unrun();
+    this->Page_().SaveAsXmlFromRequestPage_(DataSetFileName, ParameterFileName);
   }
+
+  /// \brief `TestRequestPage.SaveAsPdf(FileName)`. \param FileName The file.
+  /// \throws Error always: a PDF needs a renderer (board:0063).
+  void SaveAsPdf(std::string_view FileName) { NoRenderer_("SaveAsPdf", FileName); }
+
+  /// \brief `TestRequestPage.SaveAsWord(FileName)`. \param FileName The file.
+  /// \throws Error always (board:0063).
+  void SaveAsWord(std::string_view FileName) { NoRenderer_("SaveAsWord", FileName); }
+
+  /// \brief `TestRequestPage.SaveAsExcel(FileName)`. \param FileName The file.
+  /// \throws Error always (board:0063).
+  void SaveAsExcel(std::string_view FileName) { NoRenderer_("SaveAsExcel", FileName); }
+
+  /// \brief `TestRequestPage.Schedule()`. \return The action, which refuses when invoked: there is
+  ///        no job queue behind a request page yet (board:0082).
+  TestAction Schedule() { return this->Bound_("Schedule"); }
+
+  /// \brief `TestRequestPage.Preview()`. \return The action; invoking it needs a renderer.
+  TestAction Preview() { return this->Bound_("Preview"); }
+
+  /// \brief `TestRequestPage.Print()`. \return The action; invoking it needs a renderer.
+  TestAction Print() { return this->Bound_("Print"); }
 
 private:
-  /// \brief The one refusal every method above raises.
-  /// \throws Error always -- a request page needs a report, and reports are board:0034.
-  [[noreturn]] static void Unrun() { throw Error("a TestRequestPage needs a report (board:0034)"); }
+  void TakeBack_() {
+    if constexpr (requires(R &report) { this->TakeRequestFilters_(report); }) {
+      if (this->page_ != nullptr && this->Page_().ClosedWith() == ::agiru::Action::OK) {
+        this->TakeRequestFilters_(this->Page_());
+      }
+    }
+  }
+
+  [[noreturn]] static void NoRenderer_(std::string_view method, std::string_view file) {
+    throw Error("TestRequestPage." + std::string(method) + "(" + std::string(file) +
+                "): " + std::string(ReportTraits<R>::kName) + " has no renderer yet (board:0063)");
+  }
 };
 
 }

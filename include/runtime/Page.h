@@ -586,7 +586,14 @@ public:
   /// brackets: `[X := ] Page.Caption([NewCaption])`.
   /// \return The caption the page shows.
   /// \throws Error until the UI runs (board:0030).
-  std::string Caption() const { throw Error("Page.Caption() needs a running UI (board:0030)"); }
+  std::string Caption() const {
+    if (!caption_.empty()) { return caption_; }
+    if constexpr (!std::is_void_v<Derived>) {
+      return std::string(PageTraits<Derived>::kPage.caption);
+    } else {
+      return {};
+    }
+  }
 
   /// \brief AL `Page.Caption(Text)`. The caption shown in the title bar. For example, the default
   /// value in English (United States) is the same as the name of the page.
@@ -594,8 +601,8 @@ public:
   /// \return The AL `Text`.
   /// \throws Error until the UI runs (board:0030).
   std::string Caption(std::string_view NewCaption) {
-    static_cast<void>(NewCaption);
-    throw Error("Page.Caption(Text) needs a running UI (board:0030)");
+    caption_ = std::string(NewCaption);
+    return caption_;
   }
 
   /// \brief AL `Page.Close()`. Closes the current page.
@@ -836,6 +843,7 @@ public:
 private:
   bool editable_ = true;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
+  std::string caption_;
   ::agiru::Boolean lookupMode_ = false;
 };
 

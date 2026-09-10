@@ -60,6 +60,19 @@ std::string RecordRef::GetView(::agiru::Boolean UseNames) const {
                         static_cast<bool>(UseNames));
 }
 
+::agiru::Boolean RecordRef::Ascending() const {
+  if (State().record == nullptr) { return true; }
+  const detail::RecordState *held =
+      reinterpret_cast<const detail::StateHandle *>(State().record)->Peek();
+  return held == nullptr || held->ascending;
+}
+
+::agiru::Boolean RecordRef::Ascending(::agiru::Boolean SetAscending) {
+  if (State().record == nullptr) { throw Error("RecordRef.Ascending: the RecordRef is not open"); }
+  reinterpret_cast<detail::StateHandle *>(State().record)->Ensure().ascending = SetAscending;
+  return SetAscending;
+}
+
 void RecordRef::SetView(std::string_view String) {
   if (State().record == nullptr) { throw Error("RecordRef.SetView: the RecordRef is not open"); }
   detail::ApplyView(

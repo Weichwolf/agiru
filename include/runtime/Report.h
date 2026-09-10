@@ -1,19 +1,49 @@
+/// \file
+/// \brief AL `REPORT` and `XMLPORT` -- the platform objects a body reaches BY NUMBER, and the base
+///        of every generated report.
+///
+/// A REPORT IS A PAGE WITH A DATASET (board:0063). `devenv-report-object.md` lays a report out as
+/// properties, a `dataset`, a `requestpage`, a `rendering` section and code, and the request page
+/// is a page body; so the transpiler reads a report INTO a page (`al::PageObject::dataset`), the
+/// generated class derives from `Report<Derived>`, which derives from `Page<Derived>`, and the
+/// request page is served by the page machinery -- `TestRequestPage` is a `TestPage` -- while the
+/// dataset walk is generated as `Walk_()` from the dataitem tree.
+///
+/// THE TRIGGER ORDER IS `devenv-report-triggers.md`'s and each stage may end the run:
+/// `OnInitReport`, the request page (a `[RequestPageHandler]` answers it; closing it with anything
+/// but OK ends the run), `OnPreReport`, per dataitem `OnPreDataItem` then per record
+/// `OnAfterGetRecord` with the indented dataitems inside it then `OnPostDataItem`, `OnPostReport`.
+///
+/// `CurrReport.Break`, `Skip` and `Quit` are CONTROL FLOW, thrown and caught at the level they
+/// end: the predecessor kept `Break` as a flag and paid nine timeouts for it (openerp WI-1068).
 #pragma once
 
 #include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
+#include "runtime/Page.h"
+#include "runtime/test/Handlers.h"
+#include "type/Action.h"
 #include "type/Boolean.h"
+#include "type/Decimal.h"
 #include "type/DefaultLayout.h"
 #include "type/Integer.h"
 #include "type/ReportFormat.h"
 #include "type/SecurityFilter.h"
+#include "type/Stream.h"
 #include "type/Text.h"
 #include "type/TextEncoding.h"
+#include "type/Variant.h"
 
+#include <concepts>
+#include <cstdint>
+#include <memory>
 #include <string>
-
-/// \file
-/// \brief AL `REPORT` and `XMLPORT` -- the platform objects a body reaches BY NUMBER.
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace agiru {
 
@@ -25,1044 +55,906 @@ template <typename T> struct ReportTraits;
 /// \tparam T The xmlport's generated class.
 template <typename T> struct XmlPortTraits;
 
-/// \brief AL's `REPORT` object: `REPORT.Run(Number)`, `REPORT.RunModal(Number)`.
+/// \brief `CurrReport.Break()` in flight: ends the trigger and the current dataitem's loop.
+struct ReportBreak {};
+
+/// \brief `CurrReport.Skip()` in flight: ends the trigger and leaves the record out of the dataset.
+struct ReportSkip {};
+
+/// \brief `CurrReport.Quit()` in flight: ends the report without `OnPostReport`.
+struct ReportQuit {};
+
+/// \brief The dataset a run produces: the rows `SaveAsXml` writes, in the shape BC's own report
+///        preview writes them and `Library - Report Dataset` reads them back -- `<DataSet>` with an
+///        embedded `xs:schema` naming every column and its type, then one `<Result>` per row.
+///
+/// \note A ROW IS A LEAF. A dataitem record whose indented dataitems produced rows produces none
+///       of its own; its columns ride on the child rows. That is the RDLC dataset's flattening,
+///       and the predecessor measured the alternative as over-counting (`G/L Register`: 5 rows
+///       where BC writes 3).
+class ReportDataset {
+public:
+  /// \brief Forgets every row and column.
+  void Clear();
+
+  /// \brief Opens a row.
+  void BeginRow();
+
+  /// \brief Adds one column to the open row.
+  /// \param name  The column's AL name.
+  /// \param value The value, formatted as `Format(Value, 0, 9)` -- the XML format.
+  /// \param type  The `xs:` type the schema declares for the column.
+  void Add(std::string_view name, const Variant &value, std::string_view type);
+
+  /// \brief Closes the open row.
+  void EndRow();
+
+  /// \brief The dataset as XML text.
+  [[nodiscard]] std::string Xml() const;
+
+  /// \brief Writes `Xml()` to a file.
+  /// \param path The file.
+  /// \throws Error when the file cannot be written.
+  void WriteFile(std::string_view path) const;
+
+  /// \brief How many rows there are.
+  [[nodiscard]] std::size_t Rows() const { return rows_.size(); }
+
+private:
+  struct Column {
+    std::string name;
+    std::string text;
+  };
+
+  std::vector<std::string> names_;
+  std::vector<std::string> types_;
+  std::vector<std::vector<Column>> rows_;
+};
+
+/// \brief The `xs:` schema type a column of this C++ type declares.
+/// \tparam T The column's value type.
+/// \return `xs:boolean`, `xs:int`, `xs:decimal` or `xs:string`.
+template <typename T> [[nodiscard]] constexpr std::string_view DatasetType() {
+  using V = std::remove_cvref_t<T>;
+  if constexpr (std::same_as<V, Boolean> || std::same_as<V, bool>) {
+    return "xs:boolean";
+  } else if constexpr (std::same_as<V, Integer> || std::integral<V>) {
+    return "xs:int";
+  } else if constexpr (requires { typename V::IsDecimal; } || std::same_as<V, Decimal>) {
+    return "xs:decimal";
+  } else {
+    return "xs:string";
+  }
+}
+
+/// \brief What a request to run a report by number carries, from `Report.Run(Number, ...)` and
+///        its siblings to the generated entry that constructs the report.
+struct ReportRequest {
+  bool modal = false;              ///< `RunModal` rather than `Run`.
+  bool requestPage = true;         ///< Whether the request page is shown (`RequestWindow`).
+  std::string_view datasetFile{};  ///< `SaveAsXml`: where the dataset goes.
+  std::string_view parameters{};   ///< The request-page parameters XML handed in, if any.
+  const void *record = nullptr;    ///< The `var Record` argument, or `nullptr`.
+  const TableDef *table = nullptr; ///< Its declaration, or `nullptr`.
+  OutStream *stream =
+      nullptr; ///< `SaveAs(..., ReportFormat::Xml, OutStream)`: where the dataset goes.
+  bool requestPageOnly = false; ///< `RunRequestPage`: run the page and answer its parameters.
+  std::string *parametersOut = nullptr; ///< Where `RunRequestPage` writes the parameters XML.
+};
+
+/// \brief What the runtime knows about a generated report: its number, its name and how to run it.
+struct ReportEntry {
+  ReportId id;           ///< The AL report number.
+  std::string_view name; ///< The AL name.
+  /// \brief Constructs the report and runs the request. \param request The request.
+  void (*run)(const ReportRequest &request);
+};
+
+/// \brief Puts a report in the catalogue, once per generated report, at load time.
+/// \param entry The entry, which lives for the program.
+void RegisterReportEntry(const ReportEntry *entry);
+
+/// \brief Finds a report by its number.
+/// \param id The number.
+/// \return The entry, or `nullptr` when this build carries no such report.
+[[nodiscard]] const ReportEntry *FindReport(ReportId id);
+
+namespace detail {
+
+/// \brief Applies a dataitem's `DataItemTableView` to its record without losing the filters the
+///        caller or the request page set: the view's sorting and `WHERE` terms land in filter
+///        group 2, the way the platform keeps a fixed view apart from the user's filters.
+/// \param record The dataitem's record (a generated table, `StateHandle` first).
+/// \param table  Its declaration.
+/// \param view   The view text, `sorting(...) where(...)`.
+void ApplyDataItemView(void *record, const TableDef &table, std::string_view view);
+
+/// \brief `ApplyDataItemView` on a typed record. \tparam R The table. \param record The record.
+/// \param view The view text.
+template <typename R> void ApplyDataItemView(R &record, std::string_view view) {
+  ApplyDataItemView(static_cast<void *>(&record), TableTraits<R>::kTable, view);
+}
+
+/// \brief `SetTableView(Record)` and the record `Report.Run(Number, ..., Record)` hands in: the
+///        record's filters join the dataitem's in filter group 2, the group the platform files a
+///        table view under (`record-filtergroup-method.md`), beside the `DataItemTableView`.
+/// \param to   The dataitem's record.
+/// \param from The caller's record of the same table.
+void AdoptTableView(void *to, const void *from);
+
+/// \brief What a request page starts from: the dataitem's filters, every group, so the test's
+///        `SetFilter` narrows what `SetTableView` and the view already say.
+/// \param to   The request page's filter record.
+/// \param from The dataitem's record.
+void GiveRequestFilters(void *to, const void *from);
+
+/// \brief What the request page closed with: its group-0 filters replace the dataitem's group 0.
+/// \param to   The dataitem's record.
+/// \param from The request page's filter record.
+void TakeRequestFilters(void *to, const void *from);
+
+/// \brief The filter group a `DataItemLink` writes into, `record-filtergroup-method.md`'s "Link".
+inline constexpr std::int32_t kLinkFilterGroup = 4;
+
+/// \brief The parameters XML `RunRequestPage` answers with: the report's number and name and no
+///        options, which is what a request page with no changed values yields.
+/// \param id   The report number.
+/// \param name The report name.
+/// \return The XML text.
+[[nodiscard]] std::string ReportParametersXml(ReportId id, std::string_view name);
+
+/// \brief Writes text to a file, creating it. \param path The file. \param text The content.
+/// \throws Error when the file cannot be written.
+void WriteReportFile(std::string_view path, std::string_view text);
+
+}
+
+namespace detail {
+
+/// \brief Reads the `var Record` argument of `Report.Run(Number, ...)` and its siblings into a
+///        request. \param request The request. \param argument One argument.
+template <typename A> void TakeReportArgument(ReportRequest &request, const A &argument) {
+  using V = std::remove_cvref_t<A>;
+  if constexpr (requires { TableTraits<V>::kTable; }) {
+    request.record = static_cast<const void *>(&argument);
+    request.table = &TableTraits<V>::kTable;
+  } else if constexpr (requires {
+                         argument.operator->();
+                         TableTraits<std::remove_cvref_t<decltype(*argument.operator->())>>::kTable;
+                       }) {
+    request.record = static_cast<const void *>(argument.operator->());
+    request.table = &TableTraits<std::remove_cvref_t<decltype(*argument.operator->())>>::kTable;
+  } else if constexpr (std::same_as<V, RecordRef>) {
+    request.record = argument.RecordPointer();
+    request.table = argument.TableDefinition();
+  } else if constexpr (std::same_as<V, Variant>) {
+    if (argument.IsRecord() || argument.IsRecordRef()) {
+      RecordRef reference;
+      reference.GetTable(argument);
+      request.record = reference.RecordPointer();
+      request.table = reference.TableDefinition();
+    }
+  } else {
+    static_cast<void>(argument);
+  }
+}
+
+/// \brief Runs a report by number, or refuses when the build carries none of that number.
+/// \param what The AL method, for the message. \param id The number. \param request The request.
+/// \throws Error when no report of that number is in this build.
+inline void RunReportByNumber(std::string_view what, ::agiru::Integer id, ReportRequest &request) {
+  const ReportEntry *entry = FindReport(ReportId{id});
+  if (entry == nullptr) {
+    throw Error("Report." + std::string(what) + "(" + std::to_string(id) +
+                "): this build carries no report of that number (board:0063)");
+  }
+  entry->run(request);
+}
+
+}
+
+/// \brief AL's `REPORT` object and the base of every generated report.
 ///
 /// \tparam Derived The report's generated class, or `void` for the platform object AL spells
-///         `REPORT`. A report's own class is generated under `apps/`, carries its number and its
-///         name, and refuses its members the same way (board:0034).
+///         `REPORT`. A generated report derives from this, which derives from `Page<Derived>`:
+///         its request page IS its page (`kPage`, `kControlTriggers`, the `Controls` template a
+///         `TestRequestPage` binds to), and the generator adds `Walk_()` -- the dataitem walk --
+///         and `AdoptView_(table, record)`, which lands a `SetTableView` on the dataitem of that
+///         table.
 ///
-/// \note IT IS THE PLATFORM HALF AND NOT THE REPORT. A report's BODY is not translated yet, so
-///       running one by number has nothing to run; refusing here names the number the body asked
-///       for, which a missing symbol never would.
-template <typename Derived = void> class Report {
+/// \note THE INSTANCE METHODS ARE THE DOCUMENTED ONES, `methods-auto/report/reportinstance-*`.
+///       What needs a renderer -- `SaveAsPdf`, `Print`, `Preview`, the layouts -- refuses with the
+///       board item that owns it; what is control flow (`Break`, `Skip`, `Quit`) throws; what is
+///       processing runs.
+template <typename Derived = void> class Report : public Page<Derived> {
 public:
-  /// \brief The order a report owes its triggers, named while it cannot run them.
-  ///
-  /// \warning A REPORT'S TRIGGERS ARE AN ORDER AND NOT A SET, and board:0063 has to keep it:
-  ///          `OnInitReport`, then `OnPreReport`, then per data item `OnPreDataItem`,
-  ///          `OnAfterGetRecord` for each row and `OnPostDataItem` at its end, then `OnPostReport`,
-  ///          and `OnPreRendering` before the layout is applied. Each is one page under
-  ///          `triggers-auto/`. Naming them here is what keeps them from being the silent kind of
-  ///          hole while no report body is translated -- nothing fires until there is one.
+  /// \brief Marks a report class for the test runner's handler dispatch.
+  using IsReport = void;
+
+  /// \brief The order a report runs its triggers, `devenv-report-triggers.md`.
   static constexpr std::string_view kTriggerOrder =
       "OnInitReport, OnPreReport, OnPreDataItem, OnAfterGetRecord, OnPostDataItem, OnPostReport, "
       "OnPreRendering";
 
-  /// \brief What a `reportextension` adds around the report's own data-item triggers.
-  ///
-  /// \warning AN EXTENSION WRAPS, IT DOES NOT REPLACE. `OnBeforePreDataItem` and
-  ///          `OnAfterPreDataItem` stand around the report's `OnPreDataItem`, and the same for
-  ///          `OnBeforeAfterGetRecord`/`OnAfterAfterGetRecord` around `OnAfterGetRecord` and
-  ///          `OnBeforePostDataItem`/`OnAfterPostDataItem` around `OnPostDataItem`. The doubled
-  ///          names are the documentation's own (`triggers-auto/`): the inner `After` belongs to
-  ///          the trigger, the outer `Before`/`After` to the extension.
+  /// \brief The extension triggers around each, `devenv-report-triggers.md`.
   static constexpr std::string_view kExtensionTriggerOrder =
       "OnBeforePreDataItem, OnAfterPreDataItem, OnBeforeAfterGetRecord, OnAfterAfterGetRecord, "
       "OnBeforePostDataItem, OnAfterPostDataItem";
 
-  /// \brief The report's AL number.
-  /// \return The number AL declared.
+  /// \brief The report's number.
   [[nodiscard]] static constexpr ReportId Id() { return ReportTraits<Derived>::kId; }
 
-  /// \brief AL `Report.Break()`. Stops processing the current data item.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Break(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Break is declared and has no translated report body yet (board:0063)");
+  /// \brief The report's name.
+  [[nodiscard]] static constexpr std::string_view Name() { return ReportTraits<Derived>::kName; }
+
+  /// \brief `CurrReport.ObjectId([UseNames])`. \param UseNames Whether to spell the name.
+  /// \return `Report 50000` or `Report Name`.
+  [[nodiscard]] ::agiru::Text<0> ObjectId(Boolean UseNames = {}) const {
+    return ::agiru::Text<0>{UseNames ? "Report " + std::string(Name())
+                                     : "Report " + std::to_string(Id().Value())};
   }
 
-  /// \brief AL `Report.CreateTotals(...)`. Names the variables the platform totals.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
+  /// \brief `CurrReport.Break()`: ends the trigger and the current dataitem's loop.
+  /// \throws ReportBreak always.
+  [[noreturn]] void Break() const { throw ReportBreak{}; }
+
+  /// \brief `CurrReport.Skip()`: ends the trigger and leaves the record out of the dataset.
+  /// \throws ReportSkip always.
+  [[noreturn]] void Skip() const { throw ReportSkip{}; }
+
+  /// \brief `CurrReport.Quit()`: ends the report without `OnPostReport`.
+  /// \throws ReportQuit always.
+  [[noreturn]] void Quit() const { throw ReportQuit{}; }
+
+  /// \brief `Report.UseRequestPage`, which AL calls as a method (`UseRequestPage(false)`,
+  ///        `if UseRequestPage then`) AND assigns as a property (`UseRequestPage := false`, 69
+  ///        BaseApp sites) -- so it is one member that answers both spellings.
+  class RequestPageSwitch {
+  public:
+    /// \brief Starts as the report declares. \param on The `UseRequestPage` property's value.
+    explicit RequestPageSwitch(bool on) : on_(on) {}
+
+    /// \brief `UseRequestPage()`. \return Whether `Run` shows the request page.
+    [[nodiscard]] Boolean operator()() const { return on_; }
+
+    /// \brief `UseRequestPage(Boolean)`. \param on Whether `Run` shows the request page.
+    void operator()(Boolean on) { on_ = on; }
+
+    /// \brief `UseRequestPage := Boolean`. \param on The value. \return This.
+    RequestPageSwitch &operator=(Boolean on) {
+      on_ = on;
+      return *this;
+    }
+
+    /// \brief `if UseRequestPage then`. \return The value.
+    operator Boolean() const { return on_; } // NOLINT(*-explicit-constructor)
+
+  private:
+    bool on_;
+  };
+
+  /// \brief Whether `Run` shows the request page; the `UseRequestPage` property's value first.
+  RequestPageSwitch UseRequestPage{DefaultsToRequestPage_()};
+
+  /// \brief `Report.SetTableView(Record)`: the record's filters and sort order become the view of
+  ///        the dataitem on that table (`reportinstance-settableview-method.md`).
+  /// \tparam R The table.
+  /// \param Record The record.
+  /// \throws Error when no dataitem is on that table -- the predecessor let the last call win on
+  ///         the wrong table (openerp WI-1345).
+  template <typename R>
+    requires requires { TableTraits<std::remove_cvref_t<R>>::kTable; }
+  void SetTableView(const R &Record) {
+    if (!Self_().AdoptView_(&TableTraits<std::remove_cvref_t<R>>::kTable,
+                            static_cast<const void *>(&Record))) {
+      throw Error("Report.SetTableView: " + std::string(Name()) + " has no dataitem on " +
+                  std::string(TableTraits<std::remove_cvref_t<R>>::kTable.name));
+    }
+  }
+
+  /// \brief `Report.SetTableView(RecordRef)` and `SetTableView(Variant)`: the record the
+  ///        reference or the Variant carries. \param Held The reference or Variant.
+  /// \throws Error when no dataitem is on that table, or the Variant holds no record.
+  template <typename H>
+    requires(std::same_as<std::remove_cvref_t<H>, RecordRef> ||
+             std::same_as<std::remove_cvref_t<H>, Variant>)
+  void SetTableView(const H &Held) {
+    ReportRequest request;
+    detail::TakeReportArgument(request, Held);
+    if (request.table == nullptr) {
+      throw Error("Report.SetTableView: " + std::string(Name()) + " was handed no record");
+    }
+    if (!Self_().AdoptView_(request.table, request.record)) {
+      throw Error("Report.SetTableView: " + std::string(Name()) + " has no dataitem on " +
+                  std::string(request.table->name));
+    }
+  }
+
+  /// \brief `Report.Run()`: the request page when `UseRequestPage` says so, then the dataset walk.
+  void Run() { Execute_(ReportRequest{.modal = false, .requestPage = UseRequestPage()}); }
+
+  /// \brief `Report.RunModal()`: the same, modally.
+  void RunModal() { Execute_(ReportRequest{.modal = true, .requestPage = UseRequestPage()}); }
+
+  /// \brief `REPORT.Run(REPORT::X, RequestWindow [, SystemPrinter] [, Record])` spelled on a
+  ///        fresh instance. \param RequestWindow Whether the request page is shown.
+  /// \param SystemPrinter Ignored. \param record The record whose view the dataitem takes.
+  template <typename... Arguments>
+  void Run(Boolean RequestWindow, Boolean SystemPrinter = {}, const Arguments &...record) {
+    static_cast<void>(SystemPrinter);
+    ReportRequest request{.modal = false, .requestPage = RequestWindow};
+    (detail::TakeReportArgument(request, record), ...);
+    Execute_(request);
+  }
+
+  /// \brief `REPORT.RunModal(REPORT::X, RequestWindow [, SystemPrinter] [, Record])` on a fresh
+  ///        instance. \param RequestWindow Whether the request page is shown.
+  /// \param SystemPrinter Ignored. \param record The record whose view the dataitem takes.
+  template <typename... Arguments>
+  void RunModal(Boolean RequestWindow, Boolean SystemPrinter = {}, const Arguments &...record) {
+    static_cast<void>(SystemPrinter);
+    ReportRequest request{.modal = true, .requestPage = RequestWindow};
+    (detail::TakeReportArgument(request, record), ...);
+    Execute_(request);
+  }
+
+  /// \brief `Report.Execute()`: the dataset walk without the request page.
+  void Execute() { Execute_(ReportRequest{.modal = false, .requestPage = false}); }
+
+  /// \brief `Report.Execute(Parameters [, Record])`: the walk without the request page.
+  /// \param Parameters The parameters XML, ignored. \param record The record, if any.
+  template <typename... Arguments>
+  void Execute(std::string_view Parameters, const Arguments &...record) {
+    ReportRequest request{.requestPage = false, .parameters = Parameters};
+    (detail::TakeReportArgument(request, record), ...);
+    Execute_(request);
+  }
+
+  /// \brief `Report.RunRequestPage([Parameters])`: runs the request page alone and answers the
+  ///        parameters it was closed with. \param Parameters Parameters to start from, ignored.
+  /// \return The parameters XML, empty when the page was cancelled.
+  [[nodiscard]] ::agiru::Text<0> RunRequestPage(std::string_view Parameters = {}) {
+    static_cast<void>(Parameters);
+    std::string out;
+    Execute_(ReportRequest{.requestPage = true, .requestPageOnly = true, .parametersOut = &out});
+    return ::agiru::Text<0>{out};
+  }
+
+  /// \brief `Report.SaveAsXml(FileName)`: the dataset walk without the request page, then the
+  ///        dataset into the file (`reportinstance-saveasxml-method.md`).
+  /// \param FileName The file.
+  /// \return `true`.
+  Boolean SaveAsXml(std::string_view FileName) {
+    Execute_(ReportRequest{.requestPage = false, .datasetFile = FileName});
+    return true;
+  }
+
+  /// \brief `REPORT.SaveAsXml(REPORT::X, FileName, Record)` on a fresh instance.
+  /// \param FileName The file. \param Record The record whose view the dataitem takes.
+  /// \return `true`.
+  template <typename R>
+    requires requires { TableTraits<std::remove_cvref_t<R>>::kTable; }
+  Boolean SaveAsXml(std::string_view FileName, const R &Record) {
+    ReportRequest request{.requestPage = false, .datasetFile = FileName};
+    detail::TakeReportArgument(request, Record);
+    Execute_(request);
+    return true;
+  }
+
+  /// \brief `Report.SaveAs(Parameters, Format, OutStream)`: the dataset into the stream for
+  ///        `ReportFormat::Xml`. \param Parameters Ignored. \param Format The format.
+  /// \param Stream Where it goes. \return `true`.
+  /// \throws Error for a format that needs a renderer (board:0063).
+  Boolean SaveAs(std::string_view Parameters, ReportFormat Format, OutStream &Stream) {
+    static_cast<void>(Parameters);
+    if (Format != ReportFormat::Xml) { throw Error(NoRenderer_("SaveAs")); }
+    Execute_(ReportRequest{.requestPage = false, .stream = &Stream});
+    return true;
+  }
+
+  /// \brief `Report.SaveAs(Parameters, Format, OutStream, Record)`: the same, over the record's
+  ///        view. \param Parameters Ignored. \param Format The format. \param Stream Where the
+  ///        dataset goes. \param Record The record, a RecordRef or a Variant. \return `true`.
+  /// \throws Error for a format that needs a renderer (board:0063).
+  template <typename R>
+  Boolean
+  SaveAs(std::string_view Parameters, ReportFormat Format, OutStream &Stream, const R &Record) {
+    static_cast<void>(Parameters);
+    if (Format != ReportFormat::Xml) { throw Error(NoRenderer_("SaveAs")); }
+    ReportRequest request{.requestPage = false, .stream = &Stream};
+    detail::TakeReportArgument(request, Record);
+    Execute_(request);
+    return true;
+  }
+
+  /// \brief `CurrReport.Language()`. \return 1033, en-US, the one language here (board:0066).
+  [[nodiscard]] ::agiru::Integer Language() const { return kEnglish; }
+
+  /// \brief `CurrReport.Language(Id)`. \param Id The new language, kept nowhere.
+  void Language(::agiru::Integer Id) { static_cast<void>(Id); }
+
+  /// \brief `CurrReport.FormatRegion()`. \return `en-US`.
+  [[nodiscard]] ::agiru::Text<0> FormatRegion() const { return ::agiru::Text<0>{"en-US"}; }
+
+  /// \brief `CurrReport.FormatRegion(Region)`. \param Region Kept nowhere.
+  void FormatRegion(std::string_view Region) { static_cast<void>(Region); }
+
+  /// \brief `CurrReport.PageNo()`. \return 1: there is no pagination without a renderer.
+  [[nodiscard]] ::agiru::Integer PageNo() const { return 1; }
+
+  /// \brief `CurrReport.PageNo(No)`. \param No Kept nowhere.
+  void PageNo(::agiru::Integer No) { static_cast<void>(No); }
+
+  /// \brief `CurrReport.NewPage()`: a page break, nothing without a renderer.
+  void NewPage() const {}
+
+  /// \brief `CurrReport.NewPagePerRecord([Value])`. \param arguments Kept nowhere.
+  /// \return `false`.
+  template <typename... Arguments> Boolean NewPagePerRecord(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return false;
+  }
+
+  /// \brief `CurrReport.CreateTotals(...)`: totals belong to the layout, nothing here.
+  /// \param arguments The fields, kept nowhere.
   template <typename... Arguments> void CreateTotals(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.CreateTotals is declared and has no translated report body yet (board:0063)");
   }
 
-  /// \brief AL `Report.DefaultLayout()`. The built-in layout the report is rendered with.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
+  /// \brief `CurrReport.TotalsCausedBy()`. \return 0.
+  [[nodiscard]] ::agiru::Integer TotalsCausedBy() const { return 0; }
+
+  /// \brief `CurrReport.ShowOutput([Show])`. \param arguments Kept nowhere. \return `true`.
+  template <typename... Arguments> Boolean ShowOutput(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return true;
+  }
+
+  /// \brief `CurrReport.PrintOnlyIfDetail([Value])`. \param arguments Kept nowhere.
+  /// \return `false`.
+  template <typename... Arguments> Boolean PrintOnlyIfDetail(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return false;
+  }
+
+  /// \brief `CurrReport.Preview()`. \return `false`: nothing previews without a renderer.
+  [[nodiscard]] Boolean Preview() const { return false; }
+
+  /// \brief `CurrReport.IsReadOnly()`. \return `false`.
+  [[nodiscard]] Boolean IsReadOnly() const { return false; }
+
+  /// \brief `CurrReport.PaperSource(...)`. \param arguments Kept nowhere.
+  template <typename... Arguments> void PaperSource(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+  }
+
+  /// \brief `CurrReport.TargetFormat()`. \return `ReportFormat::Xml`, the one produced here.
+  [[nodiscard]] ReportFormat TargetFormat() const { return ReportFormat::Xml; }
+
+  /// \brief `Report.Print(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always: printing needs a renderer (board:0063).
+  template <typename... Arguments> void Print(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error(NoRenderer_("Print"));
+  }
+
+  /// \brief `Report.SaveAsPdf(FileName)`. \param arguments The file and what else AL passed.
+  /// \throws Error always: needs a renderer (board:0063).
+  template <typename... Arguments> Boolean SaveAsPdf(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error(NoRenderer_("SaveAsPdf"));
+  }
+
+  /// \brief `Report.SaveAsWord(FileName)`. \param arguments The file and what else AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean SaveAsWord(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error(NoRenderer_("SaveAsWord"));
+  }
+
+  /// \brief `Report.SaveAsExcel(FileName)`. \param arguments The file and what else AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean SaveAsExcel(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error(NoRenderer_("SaveAsExcel"));
+  }
+
+  /// \brief `Report.SaveAsHtml(FileName)`. \param arguments The file and what else AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean SaveAsHtml(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error(NoRenderer_("SaveAsHtml"));
+  }
+
+  /// \brief `CurrReport.DefaultLayout()`. \param arguments Whatever AL passed.
+  /// \throws Error always: layouts wait for the renderer (board:0063).
   template <typename... Arguments>
   ::agiru::DefaultLayout DefaultLayout(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.DefaultLayout is declared and has no translated report body yet (board:0063)");
+    throw Error(NoRenderer_("DefaultLayout"));
   }
 
-  /// \brief AL `Report.ExcelLayout(var InStream)`. Reads the report's Excel layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean ExcelLayout(Arguments &&...arguments) const {
+  /// \brief `CurrReport.RDLCLayout(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean RDLCLayout(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.ExcelLayout is declared and has no translated report body yet (board:0063)");
+    throw Error(NoRenderer_("RDLCLayout"));
   }
 
-  /// \brief AL `Report.Execute(...)`. Runs the report without its request page.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Execute(Arguments &&...arguments) const {
+  /// \brief `CurrReport.WordLayout(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean WordLayout(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.Execute is declared and has no translated report body yet (board:0063)");
+    throw Error(NoRenderer_("WordLayout"));
   }
 
-  /// \brief AL `Report.FormatRegion([FormatRegion])`. The format region the run uses.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Text<0> FormatRegion(Arguments &&...arguments) const {
+  /// \brief `CurrReport.ExcelLayout(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always (board:0063).
+  template <typename... Arguments> Boolean ExcelLayout(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.FormatRegion is declared and has no translated report body yet (board:0063)");
+    throw Error(NoRenderer_("ExcelLayout"));
   }
 
-  /// \brief AL `Report.IsReadOnly()`. Whether the report reads at a read-only intent.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean IsReadOnly(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.IsReadOnly is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Language([Language])`. The language the run renders in.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Integer Language(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Language is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.NewPage()`. Starts a new page in the output.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void NewPage(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.NewPage is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.NewPagePerRecord([Set])`. Whether every record starts a page.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>
-  ::agiru::Boolean NewPagePerRecord(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.NewPagePerRecord is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.ObjectId([UseNames])`. The object's identifier as text.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Text<0> ObjectId(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.ObjectId is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.PageNo([NewPageNo])`. The page number the run stands on.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Integer PageNo(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.PageNo is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.PaperSource(PaperBinNo [, PhysicalPage])`. Picks the printer's tray.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void PaperSource(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.PaperSource is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Preview()`. Whether the run is a preview rather than an output.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean Preview(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Preview is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Print(...)`. Sends the report to a printer.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Print(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Print is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.PrintOnlyIfDetail([Set])`. Whether a section prints only with detail under
-  /// it.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>
-  ::agiru::Boolean PrintOnlyIfDetail(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.PrintOnlyIfDetail is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Quit()`. Ends the run without producing output.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Quit(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Quit is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.RDLCLayout(var InStream)`. Reads the report's RDLC layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean RDLCLayout(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.RDLCLayout is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Run()`. Runs the report.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Run(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Run is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.RunModal()`. Runs the report and waits for it.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void RunModal(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.RunModal is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.RunRequestPage([PageParameters])`. Opens the request page and returns its
-  /// parameters.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Text<0> RunRequestPage(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.RunRequestPage is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAs(Parameters, Format, var OutStream [, RecordRef])`. Renders into a
-  /// stream.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAs(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAs is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAsExcel(FileName)`. Renders the report as a workbook.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAsExcel(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.SaveAsExcel is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAsHtml(FileName)`. Renders the report as HTML.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAsHtml(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsHtml is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAsPdf(FileName)`. Renders the report as a PDF.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAsPdf(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsPdf is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAsWord(FileName)`. Renders the report as a Word document.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAsWord(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsWord is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SaveAsXml(FileName)`. Renders the report's dataset as XML.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean SaveAsXml(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsXml is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.SetTableView(var Record)`. Gives a data item the record's filters and key.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void SetTableView(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.SetTableView is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.ShowOutput([Value])`. Whether the current section is printed.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean ShowOutput(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.ShowOutput is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.Skip()`. Leaves the current record out of the dataset.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments> void Skip(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Skip is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.TargetFormat()`. The format the run renders into.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>
-  ::agiru::ReportFormat TargetFormat(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.TargetFormat is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.TotalsCausedBy()`. The field number whose change caused the total.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Integer TotalsCausedBy(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.TotalsCausedBy is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.UseRequestPage([Set])`. Whether the run opens its request page.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean UseRequestPage(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.UseRequestPage is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.ValidateAndPrepareLayout(LayoutStream, var PreparedLayoutStream,
-  /// ReportLayoutType)`. Checks a layout before it is used.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>
-  ::agiru::Boolean ValidateAndPrepareLayout(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.ValidateAndPrepareLayout is declared and has no translated report body yet "
-                "(board:0063)");
-  }
-
-  /// \brief AL `Report.WordLayout(var InStream)`. Reads the report's Word layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
-  template <typename... Arguments>::agiru::Boolean WordLayout(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.WordLayout is declared and has no translated report body yet (board:0063)");
-  }
-
-  /// \brief AL `Report.WordXmlPart([ExtendedFormat])`. The report's Word XML part.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
+  /// \brief `CurrReport.WordXmlPart(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>::agiru::Text<0> WordXmlPart(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error(
-        "Report.WordXmlPart is declared and has no translated report body yet (board:0063)");
+    throw Error(NoRenderer_("WordXmlPart"));
   }
 
-  /// \brief AL `Report.GetSubstituteReportId(...)`. The report an event substituted for this one.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- report bodies are not translated yet (board:0063).
+  /// \brief `CurrReport.ValidateAndPrepareLayout(...)`. \param arguments Whatever AL passed.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
-  ::agiru::Boolean GetSubstituteReportId(Arguments &&...arguments) const {
+  Boolean ValidateAndPrepareLayout(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.GetSubstituteReportId is declared and has no translated report body yet "
-                "(board:0063)");
+    throw Error(NoRenderer_("ValidateAndPrepareLayout"));
   }
+
+  /// \brief `Report.GetSubstituteReportId(...)`. \param arguments Whatever AL passed.
+  /// \return `false`: no substitution is raised yet (board:0063).
+  template <typename... Arguments> Boolean GetSubstituteReportId(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return false;
+  }
+
+  /// \brief A dataset column, as the generated columns trigger spells `column(Name; Expr)`.
+  /// \tparam T The value's type, which decides the schema type.
+  /// \param Name The column's AL name. \param Value The value.
+  template <typename T> void Column(std::string_view Name, const T &Value) {
+    dataset_.Add(Name, Variant{Value}, DatasetType<T>());
+  }
+
+  /// \brief Opens a dataset row; the generated walk calls it before the columns of a leaf record.
+  void BeginRow_() { dataset_.BeginRow(); }
+
+  /// \brief Closes the dataset row the walk opened.
+  void EndRow_() { dataset_.EndRow(); }
+
+  /// \brief The dataset of the last run.
+  [[nodiscard]] const ReportDataset &Dataset() const { return dataset_; }
+
+  /// \brief A `TestRequestPage`'s `SaveAsXml`: the run continues past the request page and the
+  ///        dataset lands in the file. \param datasetFile The dataset file.
+  /// \param parametersFile The parameters file, or empty.
+  void SaveAsXmlFromRequestPage_(std::string_view datasetFile, std::string_view parametersFile) {
+    datasetFile_ = datasetFile;
+    parametersFile_ = parametersFile;
+    this->CloseWith(::agiru::Action::OK);
+  }
+
+  /// \brief Runs a request: the entry the catalogue holds calls this with what `Report.Run(Number,
+  ///        ...)` was given. \param request The request.
+  void Execute_(const ReportRequest &request) {
+    Derived &self = Self_();
+    if (request.record != nullptr && request.table != nullptr) {
+      static_cast<void>(self.AdoptView_(request.table, request.record));
+    }
+    datasetFile_ = std::string(request.datasetFile);
+    parametersFile_.clear();
+    dataset_.Clear();
+    const std::int32_t id = Id().Value();
+    if (const TestHandler *handler = HandlerTable::For(HandlerKind::Report, id);
+        handler != nullptr) {
+      handler->invoke(Name(), &self);
+      HandlerTable::Ran(*handler);
+      return;
+    }
+    try {
+      if constexpr (requires { self.OnInitReport(); }) { self.OnInitReport(); }
+      if (request.requestPage) {
+        detail::OpenPage(self, true, false);
+        const TestHandler *handler = HandlerTable::For(HandlerKind::RequestPage, id);
+        if (handler == nullptr) { throw Error("Unhandled UI: RequestPage " + std::string(Name())); }
+        this->CloseWith(::agiru::Action::None);
+        handler->invoke(Name(), &self);
+        HandlerTable::Ran(*handler);
+        detail::ClosePage(self);
+        if (this->ClosedWith() != ::agiru::Action::OK) { return; }
+        if (request.requestPageOnly) {
+          if (request.parametersOut != nullptr) {
+            *request.parametersOut = detail::ReportParametersXml(Id(), Name());
+          }
+          return;
+        }
+      }
+      if constexpr (requires { self.OnPreReport(); }) { self.OnPreReport(); }
+      self.Walk_();
+      if constexpr (requires { self.OnPostReport(); }) { self.OnPostReport(); }
+    } catch (const ReportQuit &) { return; }
+    if (!datasetFile_.empty()) { dataset_.WriteFile(datasetFile_); }
+    if (!parametersFile_.empty()) {
+      detail::WriteReportFile(parametersFile_, detail::ReportParametersXml(Id(), Name()));
+    }
+    if (request.stream != nullptr) { static_cast<void>(request.stream->WriteText(dataset_.Xml())); }
+  }
+
+private:
+  static constexpr std::int32_t kEnglish = 1033; ///< [SET] the LCID of en-US.
+
+  [[nodiscard]] Derived &Self_() { return static_cast<Derived &>(*this); }
+
+  [[nodiscard]] static std::string NoRenderer_(std::string_view method) {
+    return "Report." + std::string(method) + ": " + std::string(Name()) +
+           " has a dataset and no renderer yet (board:0063)";
+  }
+
+  static constexpr bool DefaultsToRequestPage_() {
+    if constexpr (requires { Derived::kUseRequestPage; }) {
+      return Derived::kUseRequestPage;
+    } else {
+      return true;
+    }
+  }
+
+  std::string datasetFile_;
+  std::string parametersFile_;
+  ReportDataset dataset_;
 };
 
-/// \brief AL `REPORT` reached by NUMBER, which is what a body writes.
+/// \brief Runs a report of the catalogue: the entry `RegisterReport` files.
+/// \tparam R The generated report. \param request What to run.
+template <typename R> void RunReportEntry(const ReportRequest &request) {
+  auto report = std::make_unique<R>();
+  report->Execute_(request);
+}
+
+/// \brief The catalogue entry of a generated report, one per class, in `.rodata`.
+/// \tparam R The generated report.
+template <typename R>
+inline const ReportEntry kReportEntry{
+    .id = ReportTraits<R>::kId, .name = ReportTraits<R>::kName, .run = &RunReportEntry<R>};
+
+/// \brief Puts a generated report in the catalogue by existing, the way `RegisterPage` does.
+/// \tparam R The generated report.
+template <typename R> struct RegisterReport {
+  RegisterReport() { RegisterReportEntry(&kReportEntry<R>); }
+
+  RegisterReport(const RegisterReport &) = delete;
+  RegisterReport(RegisterReport &&) = delete;
+  RegisterReport &operator=(const RegisterReport &) = delete;
+  RegisterReport &operator=(RegisterReport &&) = delete;
+  ~RegisterReport() = default;
+};
+
+/// \brief The platform object AL spells `REPORT`: the static methods by number.
 template <> class Report<void> {
 public:
-  /// \brief AL `REPORT.Run(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.Run(Number [, RequestWindow] [, SystemPrinter] [, var Record])`.
+  /// \param Number The report number. \param RequestWindow Whether the request page is shown.
+  /// \param SystemPrinter Ignored. \param arguments The record, if any.
   template <typename... Arguments>
-  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Run(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  static void Run(::agiru::Integer Number,
+                  Boolean RequestWindow = true,
+                  Boolean SystemPrinter = {},
+                  const Arguments &...arguments) {
+    static_cast<void>(SystemPrinter);
+    ReportRequest request{.modal = false, .requestPage = RequestWindow};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber("Run", Number, request);
   }
 
-  /// \brief AL `REPORT.RunModal(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.RunModal(Number [, RequestWindow] [, SystemPrinter] [, var Record])`.
+  /// \param Number The report number. \param RequestWindow Whether the request page is shown.
+  /// \param SystemPrinter Ignored. \param arguments The record, if any.
   template <typename... Arguments>
-  static void RunModal(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.RunModal(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  static void RunModal(::agiru::Integer Number,
+                       Boolean RequestWindow = true,
+                       Boolean SystemPrinter = {},
+                       const Arguments &...arguments) {
+    static_cast<void>(SystemPrinter);
+    ReportRequest request{.modal = true, .requestPage = RequestWindow};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber("RunModal", Number, request);
   }
 
-  /// \brief AL `REPORT.Execute(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.Execute(Number, Parameters [, RecordRef])`: the walk without a request page.
+  /// \param Number The report number. \param Parameters The parameters XML, ignored.
+  /// \param arguments The record, if any.
   template <typename... Arguments>
-  static void Execute(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Execute(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  static void
+  Execute(::agiru::Integer Number, std::string_view Parameters, const Arguments &...arguments) {
+    ReportRequest request{.requestPage = false, .parameters = Parameters};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber("Execute", Number, request);
   }
 
-  /// \brief AL `REPORT.RunRequestPage(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
-  template <typename... Arguments>
-  static ::agiru::Text<0> RunRequestPage(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.RunRequestPage(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  /// \brief `Report.RunRequestPage(Number [, Parameters])`. \param Number The report number.
+  /// \param Parameters Parameters to start from, ignored. \return The parameters XML the page was
+  ///        closed with, empty when cancelled.
+  static ::agiru::Text<0> RunRequestPage(::agiru::Integer Number,
+                                         std::string_view Parameters = {}) {
+    std::string out;
+    ReportRequest request{.requestPage = true,
+                          .parameters = Parameters,
+                          .requestPageOnly = true,
+                          .parametersOut = &out};
+    detail::RunReportByNumber("RunRequestPage", Number, request);
+    return ::agiru::Text<0>{out};
   }
 
-  /// \brief AL `REPORT.SaveAs(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAsXml(Number, FileName [, var Record])`. \param Number The report number.
+  /// \param FileName The dataset file. \param arguments The record, if any. \return `true`.
   template <typename... Arguments>
-  static ::agiru::Boolean SaveAs(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAs(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  static Boolean
+  SaveAsXml(::agiru::Integer Number, std::string_view FileName, const Arguments &...arguments) {
+    ReportRequest request{.requestPage = false, .datasetFile = FileName};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber("SaveAsXml", Number, request);
+    return true;
   }
 
-  /// \brief AL `REPORT.SaveAsExcel(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAs(Number, Parameters, Format, OutStream [, var Record])`.
+  /// \param Number The report number. \param Parameters Ignored. \param Format The format.
+  /// \param Stream Where the dataset goes. \param arguments The record, if any. \return `true`.
+  /// \throws Error for a format that needs a renderer (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean SaveAsExcel(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsExcel(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  static Boolean SaveAs(::agiru::Integer Number,
+                        std::string_view Parameters,
+                        ReportFormat Format,
+                        OutStream &Stream,
+                        const Arguments &...arguments) {
+    if (Format != ReportFormat::Xml) {
+      throw Error("Report.SaveAs(" + std::to_string(Number) +
+                  "): only ReportFormat::Xml has no renderer to wait for (board:0063)");
+    }
+    ReportRequest request{.requestPage = false, .parameters = Parameters, .stream = &Stream};
+    (detail::TakeReportArgument(request, arguments), ...);
+    detail::RunReportByNumber("SaveAs", Number, request);
+    return true;
   }
 
-  /// \brief AL `REPORT.SaveAsWord(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.Print(Number, ...)`. \param Number The report number. \param arguments Rest.
+  /// \throws Error always: printing needs a renderer (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean SaveAsWord(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean Print(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsWord(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+    throw Error("Report.Print(" + std::to_string(Number) + ") needs a renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.SaveAsHtml(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAsPdf(Number, ...)`. \param Number The report number. \param arguments
+  /// Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean SaveAsHtml(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean SaveAsPdf(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsHtml(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+    throw Error("Report.SaveAsPdf(" + std::to_string(Number) + ") needs a renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.SaveAsXml(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAsWord(Number, ...)`. \param Number The report number.
+  /// \param arguments Rest. \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean SaveAsXml(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean SaveAsWord(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsXml(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+    throw Error("Report.SaveAsWord(" + std::to_string(Number) + ") needs a renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.Print(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAsExcel(Number, ...)`. \param Number The report number.
+  /// \param arguments Rest. \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean Print(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean SaveAsExcel(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.Print(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+    throw Error("Report.SaveAsExcel(" + std::to_string(Number) + ") needs a renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.ObjectId(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.SaveAsHtml(Number, ...)`. \param Number The report number.
+  /// \param arguments Rest. \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Text<0> ObjectId(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean SaveAsHtml(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
-    throw Error("Report.ObjectId(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+    throw Error("Report.SaveAsHtml(" + std::to_string(Number) + ") needs a renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.Language(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
-  template <typename... Arguments>
-  static ::agiru::Text<0> Language(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.Language(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  /// \brief `Report.ObjectId(Number [, UseNames])`. \param Number The report number.
+  /// \param UseNames Whether to spell the name. \return `Report N` or `Report Name`.
+  static ::agiru::Text<0> ObjectId(::agiru::Integer Number, Boolean UseNames = {}) {
+    const ReportEntry *entry = FindReport(ReportId{Number});
+    if (UseNames && entry != nullptr) {
+      return ::agiru::Text<0>{"Report " + std::string(entry->name)};
+    }
+    return ::agiru::Text<0>{"Report " + std::to_string(Number)};
   }
 
-  /// \brief AL `REPORT.FormatRegion(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
-  template <typename... Arguments>
-  static ::agiru::Text<0> FormatRegion(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.FormatRegion(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  /// \brief `Report.Language(Number)`. \param Number The report number. \return 1033.
+  static ::agiru::Integer Language(::agiru::Integer Number) {
+    static_cast<void>(Number);
+    return kEnglish;
   }
 
-  /// \brief AL `REPORT.GetSubstituteReportId(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
-  template <typename... Arguments>
-  static ::agiru::Boolean GetSubstituteReportId(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.GetSubstituteReportId(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+  /// \brief `Report.FormatRegion(Number)`. \param Number The report number. \return `en-US`.
+  static ::agiru::Text<0> FormatRegion(::agiru::Integer Number) {
+    static_cast<void>(Number);
+    return ::agiru::Text<0>{"en-US"};
   }
 
-  /// \brief AL `REPORT.DefaultLayout(Number, ...)` -- the built-in layout a report is rendered
-  /// with.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.GetSubstituteReportId(Number, ...)`. \param Number The report number.
+  /// \param arguments Rest. \return `false`: no substitution is raised yet (board:0063).
+  template <typename... Arguments>
+  static Boolean GetSubstituteReportId(::agiru::Integer Number, Arguments &&...arguments) {
+    static_cast<void>(Number);
+    (static_cast<void>(arguments), ...);
+    return false;
+  }
+
+  /// \brief `Report.DefaultLayout(Number)`. \param Number The report number. \param arguments Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
   static ::agiru::DefaultLayout DefaultLayout(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.DefaultLayout(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.ExcelLayout(Number, ...)` -- a report's Excel layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.ExcelLayout(Number, ...)`. \param Number The report number. \param arguments
+  /// Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean ExcelLayout(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean ExcelLayout(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.ExcelLayout(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.RDLCLayout(Number, ...)` -- a report's RDLC layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.RDLCLayout(Number, ...)`. \param Number The report number. \param arguments
+  /// Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean RDLCLayout(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean RDLCLayout(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.RDLCLayout(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.WordLayout(Number, ...)` -- a report's Word layout.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.WordLayout(Number, ...)`. \param Number The report number. \param arguments
+  /// Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean WordLayout(::agiru::Integer Number, Arguments &&...arguments) {
+  static Boolean WordLayout(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.WordLayout(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.WordXmlPart(Number, ...)` -- a report's Word XML part.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.WordXmlPart(Number, ...)`. \param Number The report number. \param arguments
+  /// Rest.
+  /// \throws Error always (board:0063).
   template <typename... Arguments>
   static ::agiru::Text<0> WordXmlPart(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.WordXmlPart(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.ValidateAndPrepareLayout(Number, ...)` -- a layout checked before it is
-  /// used.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
+  /// \brief `Report.ValidateAndPrepareLayout(Number, ...)`. \param Number The report number.
+  /// \param arguments Rest. \throws Error always (board:0063).
   template <typename... Arguments>
-  static ::agiru::Boolean ValidateAndPrepareLayout(::agiru::Integer Number,
-                                                   Arguments &&...arguments) {
+  static Boolean ValidateAndPrepareLayout(::agiru::Integer Number, Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Report.ValidateAndPrepareLayout(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
+                ") waits for the renderer (board:0063)");
   }
 
-  /// \brief AL `REPORT.SaveAsPdf(Number, ...)` and its siblings.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The report's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- a report has no translated body yet (board:0034).
-  template <typename... Arguments>
-  static void SaveAsPdf(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("Report.SaveAsPdf(" + std::to_string(Number) +
-                ") has no translated report body yet (board:0034)");
-  }
-};
-
-/// \brief AL's `XMLPORT` object, reached by NUMBER.
-///
-/// \tparam Derived The xmlport's generated class, or `void` for the platform object AL spells
-///         `XMLPORT`.
-template <typename Derived = void> class XmlPort {
-public:
-  /// \brief The order an xmlport owes its triggers, named while it cannot run them.
-  ///
-  /// \warning `OnInitXmlPort`, then `OnPreXmlPort`, then per table element `OnAfterInitRecord`,
-  ///          `OnBeforeInsertRecord` and `OnAfterInsertRecord` on an import or `OnAfterGetRecord`
-  ///          on an export, and `OnPostXmlPort` at the end; a field element runs
-  ///          `OnBeforePassField` and `OnAfterAssignField`, a text element `OnBeforePassVariable`
-  ///          and `OnAfterAssignVariable`. Each is one page under `triggers-auto/` and board:0065
-  ///          owes the order, not merely the names.
-  static constexpr std::string_view kTriggerOrder =
-      "OnInitXmlPort, OnPreXmlPort, OnAfterInitRecord, OnBeforeInsertRecord, OnAfterInsertRecord, "
-      "OnAfterGetRecord, OnBeforeModifyRecord, OnAfterModifyRecord, OnPreXmlItem, OnPostXmlPort, "
-      "OnBeforePassField, OnAfterAssignField, OnBeforePassVariable, OnAfterAssignVariable";
-
-  /// \brief The xmlport's AL number.
-  /// \return The number AL declared.
-  [[nodiscard]] static constexpr XmlPortId Id() { return XmlPortTraits<Derived>::kId; }
-
-  /// \brief AL `XmlPort.Break()`. Stops processing the current table element.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Break(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Break is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.BreakUnbound()`. Ends an unbound element's repetition.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void BreakUnbound(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.BreakUnbound is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.CurrentPath()`. The node path the transfer stands on.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> CurrentPath(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.CurrentPath is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Export()`. Writes the port's data to its destination.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Boolean Export(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Export is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.FieldDelimiter([Delimiter])`. The text a field is wrapped in.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> FieldDelimiter(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.FieldDelimiter is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.FieldSeparator([Separator])`. The text between two fields.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> FieldSeparator(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.FieldSeparator is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Filename([Name])`. The file the transfer reads or writes.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> Filename(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Filename is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Import()`. Reads the port's data from its source.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Boolean Import(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Import is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.ImportFile()`. Reads the port's data from a named file.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Boolean ImportFile(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.ImportFile is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Quit()`. Ends the transfer without finishing it.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Quit(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Quit is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.RecordSeparator([Separator])`. The text between two records.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> RecordSeparator(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.RecordSeparator is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Run()`. Runs the port in its declared direction.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Run(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Run is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.SetDestination(var OutStream)`. Names the stream an export writes to.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void SetDestination(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.SetDestination is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.SetSource(var InStream)`. Names the stream an import reads from.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void SetSource(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.SetSource is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.SetTableView(var Record)`. Gives a table element the record's filters and
-  /// key.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void SetTableView(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.SetTableView is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Skip()`. Leaves the current record out of the transfer.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void Skip(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Skip is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.TableSeparator([Separator])`. The text between two tables.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> TableSeparator(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.TableSeparator is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.TextEncoding([Encoding])`. The encoding the transfer reads or writes in.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>
-  ::agiru::TextEncoding TextEncoding(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.TextEncoding is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.FilterGroup([Group])`. The filter group a table element's filters go into.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Integer FilterGroup(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.FilterGroup is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.FormatRegion([FormatRegion])`. The format region the transfer uses.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> FormatRegion(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.FormatRegion is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.GetJsonDocument(var Document)`. Reads what a JSON export produced.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void GetJsonDocument(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.GetJsonDocument is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.GetTableView(var Record)`. The view a table element stands on.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> GetTableView(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.GetTableView is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.GetXmlDocument(var Document)`. Reads what an XML export produced.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void GetXmlDocument(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.GetXmlDocument is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.Language([Language])`. The language the transfer runs in.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Integer Language(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Language is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.ObjectId([UseNames])`. The object's identifier as text.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments>::agiru::Text<0> ObjectId(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.ObjectId is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.SetJsonDocument(Document)`. Names the JSON an import reads.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void SetJsonDocument(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.SetJsonDocument is declared and has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XmlPort.SetXmlDocument(Document)`. Names the XML an import reads.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \throws Error always -- xmlport bodies are not translated yet (board:0065).
-  template <typename... Arguments> void SetXmlDocument(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error(
-        "XmlPort.SetXmlDocument is declared and has no translated xmlport body yet (board:0065)");
-  }
-};
-
-/// \brief AL `XMLPORT` reached by NUMBER.
-template <> class XmlPort<void> {
-public:
-  /// \brief AL `XMLPORT.Export(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The xmlport's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- an xmlport has no translated body yet (board:0065).
-  template <typename... Arguments>
-  static void Export(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Export(" + std::to_string(Number) +
-                ") has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XMLPORT.Import(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The xmlport's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- an xmlport has no translated body yet (board:0065).
-  template <typename... Arguments>
-  static void Import(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Import(" + std::to_string(Number) +
-                ") has no translated xmlport body yet (board:0065)");
-  }
-
-  /// \brief AL `XMLPORT.Run(Number, ...)`.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param Number    The xmlport's number.
-  /// \param arguments The rest, read only to be discarded.
-  /// \throws Error always -- an xmlport has no translated body yet (board:0065).
-  template <typename... Arguments>
-  static void Run(::agiru::Integer Number, Arguments &&...arguments) {
-    (static_cast<void>(arguments), ...);
-    throw Error("XmlPort.Run(" + std::to_string(Number) +
-                ") has no translated xmlport body yet (board:0065)");
-  }
+private:
+  static constexpr std::int32_t kEnglish = 1033; ///< [SET] the LCID of en-US.
 };
 
 }

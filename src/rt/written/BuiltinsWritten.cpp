@@ -49,6 +49,10 @@
 
 namespace agiru {
 
+namespace {
+constexpr std::int32_t kOneServiceTier = 1;
+}
+
 constexpr ::agiru::Integer kDefaultChecksumModulus = 10;
 
 namespace {
@@ -824,8 +828,16 @@ void ClearCollectedErrors() {
 }
 
 ::agiru::Boolean IsNull(const ::agiru::Variant &DotNet) {
-  static_cast<void>(DotNet);
-  RefuseDoor("System.IsNull(DotNet)");
+  return DotNet.IsEmpty();
+}
+
+void CodeCoverageInclude(::agiru::RecordRef &ObjectRecord) {
+  static_cast<void>(ObjectRecord);
+  throw Error("System.CodeCoverageInclude(Record): the surface is declared, the behaviour is not (board:0035)");
+}
+
+::agiru::Integer ServiceInstanceId() {
+  return kOneServiceTier;
 }
 
 ::agiru::Boolean GuiAllowed() {

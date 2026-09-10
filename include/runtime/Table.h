@@ -200,6 +200,20 @@ public:
 ///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
 void CheckRelation(const void *record, const TableDef &table, FieldNo no);
 
+/// \brief `DecimalPlaces` as a STORAGE rule: a Decimal field declared `0 : 5` keeps at most five
+///        places, and the property "is evaluated on text boxes and fields during validation"
+///        (`devenv-decimalplaces-property.md`) -- so `Validate` rounds the value to the declared
+///        maximum, and a direct assignment does not (openerp WI-1320 left the second half open;
+///        the documentation's "during validation" decides it).
+/// \param value The value validated. \param table The table. \param no The field.
+/// \return The value rounded to the declared maximum, or unchanged where none is declared.
+Decimal DeclaredPlaces(const Decimal &value, const TableDef &table, FieldNo no);
+
+/// \brief The rounding `DeclaredPlaces` applies, over the property's text. \param value The
+///        value. \param decimalPlaces `0 : 5`, `2:5`, `2`, `:3` or `2:` as AL wrote it.
+/// \return The value rounded to the maximum named, or unchanged where the text names none.
+Decimal DeclaredPlaces(const Decimal &value, std::string_view decimalPlaces);
+
 /// \brief The AL name of a field, by number.
 /// \param table The declaration.
 /// \param no    The field.
@@ -2188,6 +2202,9 @@ public:
       member = Field::FromInteger(value);
     } else {
       member = static_cast<Field>(value);
+    }
+    if constexpr (std::same_as<Field, Decimal>) {
+      member = detail::DeclaredPlaces(member, TableTraits<Derived>::kTable, no);
     }
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);

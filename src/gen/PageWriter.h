@@ -2,6 +2,7 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
+#include "Scope.h"
 
 #include <map>
 #include <string>
@@ -18,6 +19,23 @@ PageHeader
 WritePage(const al::PageObject &object, const std::string &source, const Objects &objects);
 
 std::string PageHeaderPath(const al::PageObject &object);
+
+[[nodiscard]] ObjectKind PageKind(const al::PageObject &object);
+
+void PrepareReport(al::PageObject &report);
+
+void PrepareXmlPort(al::PageObject &port);
+
+[[nodiscard]] std::vector<const al::PageControl *> DataItemsOf(const al::PageObject &report);
+
+[[nodiscard]] const al::VarDecl *DataItemVariable(const al::PageObject &report,
+                                                  std::string_view name);
+
+[[nodiscard]] std::map<std::string, std::string>
+WithDataItems(std::map<std::string, std::string> named, const al::PageObject &report);
+
+[[nodiscard]] std::map<std::string, std::string>
+WithElements(std::map<std::string, std::string> named, const al::PageObject &port);
 
 void SynthesizeRunObjectActions(al::PageObject &page, const Objects &objects);
 

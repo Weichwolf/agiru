@@ -22,4 +22,11 @@ Where(const FieldDef &def, const Expression &expr, std::size_t first, std::strin
 
 [[nodiscard]] std::string BlankValueOf(const FieldDef &def);
 
+struct RecordState;
+
+[[nodiscard]] Clause FlowFieldColumn(const TableDef &table,
+                                     const FieldDef &def,
+                                     const RecordState *state,
+                                     std::size_t first);
+
 }

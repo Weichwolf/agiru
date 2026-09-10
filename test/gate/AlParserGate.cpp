@@ -15,8 +15,14 @@
 
 using agiru::al::Find;
 using agiru::al::ListValue;
+using agiru::al::PageObject;
+using agiru::al::ParseReport;
+using agiru::al::ParseXmlPort;
+using agiru::al::PageControl;
 using agiru::al::ParseTable;
+using agiru::al::ProcedureDecl;
 using agiru::al::TableObject;
+using agiru::al::Token;
 
 namespace {
 
@@ -192,6 +198,263 @@ void TheRealFileParses() {
 /// WHAT THE LEXER MUST ACCOUNT FOR, and every line here is a lesson the predecessor paid for
 /// (openerp `scripts/transpiler/parser/lexer.py`). None of it is in the platform documentation:
 /// it is what real BaseApp source contains.
+/// `devenv-report-object.md`: a report is five sections in a fixed order -- properties,
+/// `dataset`, `requestpage`, `rendering`, code -- and the request page is a page body. So the
+/// parser reads it INTO a page: the layout, actions and triggers of the request page land where a
+/// page keeps them, the dataitems and columns land in `dataset` with the same control grammar,
+/// `CurrReport` is spelled `CurrPage` the way `CurrQuery` is spelled `Rec`, and the `labels`
+/// block reads as label declarations (board:0063).
+void AReportParsesAsAPageWithADataset() {
+  constexpr std::string_view kReport = R"(namespace Microsoft.Sales.Reports;
+
+report 50000 "Some Statement"
+{
+    Caption = 'Some Statement';
+    ProcessingOnly = false;
+    DefaultLayout = RDLC;
+
+    dataset
+    {
+        dataitem(Customer; Customer)
+        {
+            DataItemTableView = sorting("No.") where(Blocked = const(" "));
+            RequestFilterFields = "No.", "Date Filter";
+            column(CustomerNo; "No.")
+            {
+            }
+            column(Total; TotalAmount)
+            {
+                AutoFormatType = 1;
+            }
+            dataitem("Cust. Ledger Entry"; "Cust. Ledger Entry")
+            {
+                DataItemLink = "Customer No." = field("No.");
+                DataItemTableView = sorting("Entry No.");
+                column(Amount; Amount)
+                {
+                }
+
+                trigger OnAfterGetRecord()
+                begin
+                    TotalAmount += Amount;
+                    if TotalAmount > 100 then
+                        CurrReport.Skip();
+                end;
+            }
+
+            trigger OnPreDataItem()
+            begin
+                TotalAmount := 0;
+            end;
+        }
+    }
+
+    requestpage
+    {
+        SaveValues = true;
+
+        layout
+        {
+            area(content)
+            {
+                group(Options)
+                {
+                    field(ShowDetails; ShowDetails)
+                    {
+                        Caption = 'Show Details';
+
+                        trigger OnValidate()
+                        begin
+                            if ShowDetails then
+                                Message(DetailsMsg);
+                        end;
+                    }
+                }
+            }
+        }
+
+        actions
+        {
+        }
+
+        trigger OnOpenPage()
+        begin
+            ShowDetails := true;
+        end;
+    }
+
+    rendering
+    {
+        layout("Some Statement.rdlc")
+        {
+            Type = RDLC;
+            LayoutFile = './Some Statement.rdlc';
+        }
+    }
+
+    labels
+    {
+        TotalCaption = 'Total', Comment = 'Sum of the amounts', MaxLength = 30;
+        ReportTitle = 'Statement';
+    }
+
+    var
+        TotalAmount: Decimal;
+        ShowDetails: Boolean;
+        DetailsMsg: Label 'Details are shown.';
+
+    trigger OnPreReport()
+    begin
+        TotalAmount := 0;
+    end;
+
+    procedure InitializeRequest(NewShowDetails: Boolean)
+    begin
+        ShowDetails := NewShowDetails;
+    end;
+}
+)";
+  const PageObject report = ParseReport(kReport);
+  CHECK_TRUE("the object is a report", report.report);
+  CHECK_TRUE("report 50000", report.id == 50000);
+  CHECK_TEXT("with its name", report.name, "Some Statement");
+  CHECK_TEXT("in its namespace", report.nameSpace, "Microsoft.Sales.Reports");
+  CHECK_TRUE("one root dataitem", report.dataset.size() == 1);
+  CHECK_TEXT("named as the AL names it", report.dataset.front().name, "Customer");
+  CHECK_TRUE("two columns and one indented dataitem under it",
+             report.dataset.front().children.size() == 3);
+  CHECK_TEXT(
+      "the indented dataitem", report.dataset.front().children[2].name, "Cust. Ledger Entry");
+  CHECK_TEXT("with its DataItemLink",
+             Find(report.dataset.front().children[2].properties, "DataItemLink")->text,
+             "Customer No. = field ( No. )");
+  CHECK_TRUE("the root dataitem's OnPreDataItem",
+             Find(report.dataset.front().triggers, "OnPreDataItem") != nullptr);
+  const ProcedureDecl *got = Find(report.dataset.front().children[2].triggers, "OnAfterGetRecord");
+  CHECK_TRUE("the child's OnAfterGetRecord", got != nullptr);
+  bool currPage = false;
+  if (got != nullptr) {
+    for (const Token &token : got->tokens) {
+      if (token.text == "CurrPage") { currPage = true; }
+    }
+  }
+  CHECK_TRUE("CurrReport is spelled CurrPage, the way CurrQuery is spelled Rec", currPage);
+  CHECK_TRUE("the request page's layout is the page's layout", report.layout.size() == 1);
+  CHECK_TRUE("and its OnOpenPage a page trigger", Find(report.procedures, "OnOpenPage") != nullptr);
+  CHECK_TRUE("the report's OnPreReport beside it",
+             Find(report.procedures, "OnPreReport") != nullptr);
+  CHECK_TRUE("and the procedure", Find(report.procedures, "InitializeRequest") != nullptr);
+  CHECK_TRUE("the labels block belongs to the layout, so only the Label variable is a label",
+             report.labels.size() == 1);
+  CHECK_TEXT("and it keeps its text", report.labels.front().text, "Details are shown.");
+  CHECK_TRUE("two globals", report.variables.size() == 2);
+  CHECK_TRUE("the rendering section is skipped, the properties kept",
+             Find(report.properties, "ProcessingOnly") != nullptr &&
+                 Find(report.properties, "SaveValues") != nullptr);
+}
+
+/// `devenv-xmlport-object.md`: an xmlport is properties, a `schema` of `textelement`,
+/// `tableelement`, `fieldelement`, `textattribute` and `fieldattribute` nodes -- the same
+/// `<kind>(<name>[; <source>]) { properties triggers children }` grammar a page layout and a
+/// report dataset use -- a `requestpage`, and code. So it is read INTO a page the way a report
+/// is, with the schema in `dataset` and `currXMLport` spelled `CurrPage` (board:0065).
+void AnXmlPortParsesAsAPageWithASchema() {
+  constexpr std::string_view kPort = R"(namespace Microsoft.Inventory.Counting;
+
+xmlport 50001 "Export Some Lines"
+{
+    Caption = 'Export Some Lines';
+    Direction = Export;
+    Format = VariableText;
+    FieldSeparator = ';';
+    TextEncoding = WINDOWS;
+    UseRequestPage = false;
+
+    schema
+    {
+        textelement(Root)
+        {
+            tableelement("Some Line"; "Cust. Ledger Entry")
+            {
+                XmlName = 'SomeLine';
+                UseTemporary = true;
+                fieldelement(EntryNo; "Some Line"."Entry No.")
+                {
+                }
+                fieldelement(Amount; "Some Line".Amount)
+                {
+                    trigger OnBeforePassField()
+                    begin
+                        if "Some Line".Amount = 0 then
+                            currXMLport.Skip();
+                    end;
+                }
+                textelement(Note)
+                {
+                    Unbound = true;
+
+                    trigger OnBeforePassVariable()
+                    begin
+                        Note := Format(Counter);
+                        Counter += 1;
+                        if Counter > 3 then
+                            currXMLport.BreakUnbound();
+                    end;
+                }
+
+                trigger OnAfterGetRecord()
+                begin
+                    Counter := 0;
+                end;
+            }
+        }
+    }
+
+    requestpage
+    {
+        layout
+        {
+        }
+        actions
+        {
+        }
+    }
+
+    var
+        Counter: Integer;
+
+    trigger OnPreXmlPort()
+    begin
+        Counter := 0;
+    end;
+}
+)";
+  const PageObject port = ParseXmlPort(kPort);
+  CHECK_TRUE("the object is an xmlport", port.xmlport && !port.report);
+  CHECK_TRUE("xmlport 50001", port.id == 50001);
+  CHECK_TEXT("with its name", port.name, "Export Some Lines");
+  CHECK_TRUE("one root element", port.dataset.size() == 1 && port.dataset.front().kind == "textelement");
+  const PageControl &table = port.dataset.front().children.front();
+  CHECK_TEXT("the table element by its AL name", table.name, "Some Line");
+  CHECK_TRUE("with three children in order",
+             table.children.size() == 3 && table.children[0].kind == "fieldelement" &&
+                 table.children[2].kind == "textelement");
+  CHECK_TRUE("a field element's trigger", Find(table.children[1].triggers, "OnBeforePassField") != nullptr);
+  const ProcedureDecl *pass = Find(table.children[2].triggers, "OnBeforePassVariable");
+  bool currPage = false;
+  if (pass != nullptr) {
+    for (const Token &token : pass->tokens) {
+      if (token.text == "CurrPage") { currPage = true; }
+    }
+  }
+  CHECK_TRUE("currXMLport is spelled CurrPage", pass != nullptr && currPage);
+  CHECK_TRUE("the table element's OnAfterGetRecord", Find(table.triggers, "OnAfterGetRecord") != nullptr);
+  CHECK_TRUE("the port's OnPreXmlPort", Find(port.procedures, "OnPreXmlPort") != nullptr);
+  CHECK_TRUE("one global", port.variables.size() == 1);
+  CHECK_TRUE("the properties are kept",
+             Find(port.properties, "Format") != nullptr && Find(port.properties, "FieldSeparator") != nullptr);
+}
+
 void TheLexerReadsWhatBaseAppActuallyContains() {
   using agiru::al::Tokenize;
   using agiru::al::TokenKind;
@@ -475,6 +738,8 @@ int main() {
     TheLexerReadsWhatBaseAppActuallyContains();
     ThePreprocessorKeepsOneBranch();
     TheRealFileParses();
+    AReportParsesAsAPageWithADataset();
+    AnXmlPortParsesAsAPageWithASchema();
     AVarBlockDoesNotSwallowTheNextMembersAttribute();
     TheOperatorHierarchyIsTheOneCalDocuments();
     ExclusiveDisjunctionIsAnOperator();

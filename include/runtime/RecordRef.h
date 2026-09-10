@@ -584,6 +584,14 @@ public:
   /// \throws Error when it holds neither a record nor a RecordRef.
   void GetTable(const ::agiru::Variant &held) { detail::RecordRefFromVariant(*this, held); }
 
+  /// \brief The record the reference stands on, for a caller that hands it to a report's
+  ///        dataitem (`Report.Run(Number, ..., RecRef)`). \return The record, or `nullptr`
+  ///        before `Open`.
+  [[nodiscard]] const void *RecordPointer() const { return State().record; }
+
+  /// \brief The declaration of the table the reference opened. \return It, or `nullptr`.
+  [[nodiscard]] const TableDef *TableDefinition() const { return State().table; }
+
   friend void detail::RecordRefFromVariant(RecordRef &into, const ::agiru::Variant &held);
 
   /// \brief AL `RecordRef.GetTable(Record)` on a record whose table this build does not carry.
@@ -716,10 +724,12 @@ public:
   /// \param SetAscending The AL `Boolean`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Ascending(::agiru::Boolean SetAscending = {}) {
-    static_cast<void>(SetAscending);
-    throw Error("RecordRef.Ascending(Boolean) is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] ::agiru::Boolean Ascending() const;
+
+  /// \brief AL `RecordRef.Ascending(SetAscending)`: sets the sort direction of the record the
+  ///        reference opened, the way `Record.Ascending(Boolean)` does. \param SetAscending Which
+  ///        way. \return The direction set. \throws Error when the RecordRef is not open.
+  ::agiru::Boolean Ascending(::agiru::Boolean SetAscending);
 
   /// \brief AL `RecordRef.Caption()` -- the caption of the table this RecordRef is open on.
   /// \return The caption, which the declaration carries as `constexpr` data.

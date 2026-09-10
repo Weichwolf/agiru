@@ -83,6 +83,9 @@ public:
   /// \brief Marks the type for the handler thunk, which binds a `[PageHandler]`'s parameter.
   using IsTestPage = void;
 
+  /// \brief The request page over a report reaches the page and the bound actions.
+  template <typename> friend class TestRequestPage;
+
   /// \brief Whether the page has a source table; a dialog with none has no rows to move over.
   static constexpr bool kHasRecord =
       requires(P &page) { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); };

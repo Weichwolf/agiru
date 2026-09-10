@@ -123,6 +123,9 @@ struct PageObject {
   std::vector<ProcedureDecl> procedures;
   std::vector<VarDecl> variables;
   std::vector<LabelDecl> labels;
+  bool report = false;
+  bool xmlport = false;
+  std::vector<PageControl> dataset;
 };
 
 struct QueryObject {
@@ -149,6 +152,7 @@ struct PageExtensionObject {
   std::string nameSpace;
   std::vector<PageControl> layout;
   std::vector<PageControl> actions;
+  std::vector<PageControl> dataset;
   std::vector<ProcedureDecl> procedures;
   std::vector<VarDecl> variables;
   std::vector<LabelDecl> labels;

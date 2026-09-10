@@ -200,6 +200,8 @@ FieldValues KeyOf(const void *record, const TableDef &table) {
 }
 
 constexpr int kHexBase = 16;
+constexpr int kDecimalBase = 10;
+constexpr int kMostPlaces = 18;
 
 namespace {
 
@@ -667,6 +669,32 @@ std::string_view FieldNameOf(const TableDef &table, FieldNo no) {
     if (def.no.Value() == no.Value()) { return def.name; }
   }
   throw Error("FieldName: the table declares no such field");
+}
+
+Decimal DeclaredPlaces(const Decimal &value, const TableDef &table, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr || def->decimalPlaces.empty()) { return value; }
+  return DeclaredPlaces(value, def->decimalPlaces);
+}
+
+Decimal DeclaredPlaces(const Decimal &value, std::string_view decimalPlaces) {
+  std::string_view places = decimalPlaces;
+  if (const std::size_t colon = places.find(':'); colon != std::string_view::npos) {
+    places = places.substr(colon + 1);
+  }
+  while (!places.empty() && places.front() == ' ') { places.remove_prefix(1); }
+  while (!places.empty() && places.back() == ' ') { places.remove_suffix(1); }
+  if (places.empty()) { return value; }
+  int most = 0;
+  for (const char c : places) {
+    if (c < '0' || c > '9') { return value; }
+    most = most * kDecimalBase + (c - '0');
+    if (most > kMostPlaces) { return value; }
+  }
+  std::string precision = "0." + std::string(static_cast<std::size_t>(most), '0');
+  precision.back() = '1';
+  if (most == 0) { precision = "1"; }
+  return Round(value, Decimal::FromInvariantString(precision));
 }
 
 void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
@@ -1185,6 +1213,88 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   }
   const Result result = Session::Current().Database().Execute(sql, predicate.binds);
   Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));
+}
+
+Predicate CorrelatedPredicateOf(const FlowFormula &formula,
+                                const TableDef &target,
+                                const TableDef &table,
+                                const detail::RecordState *state,
+                                const FieldDef &asked,
+                                std::size_t first) {
+  Predicate made;
+  for (const FlowTerm &term : formula.terms) {
+    const FieldDef *at = FieldNamed(target, term.target);
+    if (at == nullptr) {
+      throw Error("the CalcFormula of " + std::string(asked.name) + " filters " +
+                  std::string(target.name) + " on " + term.target + ", which it does not declare");
+    }
+    const std::size_t next = first + made.binds.size();
+    switch (term.how) {
+      case FlowTerm::How::Const: Add(made, detail::Where(*at, Equal(term.value), next)); break;
+      case FlowTerm::How::Filter:
+        Add(made, detail::Where(*at, detail::ParseFilter(term.value), next));
+        break;
+      default: {
+        const FieldDef *source = FieldNamed(table, term.value);
+        if (source == nullptr) {
+          throw Error("the CalcFormula of " + std::string(asked.name) + " reads " + term.value +
+                      ", which " + std::string(table.name) + " does not declare");
+        }
+        const bool fromFilter = term.how == FlowTerm::How::FieldFilter ||
+                                term.how == FlowTerm::How::FieldUpperLimitFilter ||
+                                source->fieldClass == FieldClass::FlowFilter;
+        if (fromFilter) {
+          const std::optional<std::string> text = FilterOn(state, source->no);
+          if (!text.has_value()) { break; }
+          if (term.how == FlowTerm::How::FieldUpperLimitFilter ||
+              term.how == FlowTerm::How::FieldUpperLimit) {
+            const std::string upper = UpperOf(*text);
+            if (!upper.empty()) { Add(made, detail::Where(*at, AtMost(upper), next)); }
+          } else {
+            Add(made, detail::Where(*at, detail::ParseFilter(*text), next));
+          }
+          break;
+        }
+        const std::string outer = detail::Name(table) + "." + detail::Quoted(source->name);
+        const bool upper = term.how == FlowTerm::How::FieldUpperLimit;
+        Add(made,
+            detail::Clause{.sql = detail::Quoted(at->name) + (upper ? " <= " : " = ") + outer,
+                           .binds = {}});
+      }
+    }
+  }
+  return made;
+}
+
+Clause FlowFieldColumn(const TableDef &table,
+                       const FieldDef &def,
+                       const RecordState *state,
+                       std::size_t first) {
+  if (def.fieldClass != FieldClass::FlowField || def.calcFormula.empty()) { return {}; }
+  const FlowFormula formula = FormulaReader(def.calcFormula, def).Read();
+  const TableDef &target = TableNamed(formula.table, def);
+  std::string column;
+  if (formula.kind != FlowFormula::Kind::Count && formula.kind != FlowFormula::Kind::Exist) {
+    const FieldDef *of = FieldNamed(target, formula.field);
+    if (of == nullptr) {
+      throw Error("the CalcFormula of " + std::string(def.name) + " reads " +
+                  std::string(target.name) + "." + formula.field + ", which it does not declare");
+    }
+    column = Quoted(of->name);
+  }
+  const Predicate predicate = CorrelatedPredicateOf(formula, target, table, state, def, first);
+  const std::string where = predicate.sql.empty() ? std::string{} : " WHERE " + predicate.sql;
+  const std::string from = " FROM " + Name(target);
+  Clause made;
+  if (formula.kind == FlowFormula::Kind::Exist) {
+    made.sql = "EXISTS(SELECT 1" + from + where + ")";
+  } else if (formula.kind == FlowFormula::Kind::Lookup) {
+    made.sql = "(SELECT " + column + from + where + OrderByPrimaryKey(target) + " LIMIT 1)";
+  } else {
+    made.sql = "(SELECT " + Aggregate(formula, def, column) + from + where + ")";
+  }
+  made.binds = predicate.binds;
+  return made;
 }
 
 std::string FieldFormat(const void *record, const TableDef &table, FieldNo no) {

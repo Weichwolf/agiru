@@ -1161,6 +1161,39 @@ template <typename T> void Clear(T &Variable) {
 /// \throws Error always -- an absent .NET type holds nothing this runtime can ask (board:0035).
 ::agiru::Boolean IsNull(const ::agiru::Variant &DotNet);
 
+/// \brief AL `System.IsNull(DotNet)` over a rebuilt .NET class: what the class says of itself
+///        when it can (`Regex`, `Encoding` before a factory ran), else never null -- a value type
+///        that exists is not a null reference.
+/// \tparam T A rebuilt class, recognised by the `Binder` its constructor is spelled through.
+/// \param Object The variable. \return Whether it holds nothing yet.
+template <typename T>
+  requires requires { typename T::Binder; } && (!requires(const T &value) { value.IsNullObject(); })
+[[nodiscard]] ::agiru::Boolean IsNull(const T &Object) {
+  if constexpr (requires {
+                  { Object.IsNull() } -> std::convertible_to<bool>;
+                }) {
+    return Object.IsNull();
+  } else {
+    return false;
+  }
+}
+
+/// \brief AL `System.CodeCoverageInclude(Record)`. Includes the code that has been logged.
+/// \param ObjectRecord The `AllObj` record whose objects are included.
+/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+void CodeCoverageInclude(::agiru::RecordRef &ObjectRecord);
+
+/// \brief AL `System.CodeCoverageInclude(Record)` over a record global held by handle.
+/// \tparam T The table. \param ObjectRecord The record.
+template <typename T> void CodeCoverageInclude(::agiru::Instance<T> &ObjectRecord) {
+  ::agiru::RecordRef reference;
+  reference.GetTable(ObjectRecord);
+  CodeCoverageInclude(reference);
+}
+
+/// \brief AL `Database.ServiceInstanceId()`. \return 1: one service tier per process here.
+[[nodiscard]] ::agiru::Integer ServiceInstanceId();
+
 /// \brief AL `System.IsNull(DotNet)`. Whether a .NET variable holds no object.
 ///
 /// \tparam T The rebuilt .NET class, or a refused one.
@@ -1174,7 +1207,8 @@ template <typename T> void Clear(T &Variable) {
 ///       the same shape `BindSubscription` needed for the generated codeunits.
 template <typename T>
   requires(!std::convertible_to<const T &, ::agiru::Variant>) &&
-          (!requires(const T &value) { value.IsNullObject(); })::agiru::Boolean
+          (!requires(const T &value) { value.IsNullObject(); }) &&
+          (!requires { typename T::Binder; })::agiru::Boolean
 IsNull(const T &Variable) {
   static_cast<void>(Variable);
   throw ::agiru::Error("System.IsNull(DotNet) is declared and not implemented yet (board:0035)");

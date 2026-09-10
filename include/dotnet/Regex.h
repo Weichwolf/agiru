@@ -88,8 +88,15 @@ public:
 
   /// \brief `RegexOptions.IgnoreCase` and its siblings, read as flags to combine.
   [[nodiscard]] static RegexOptions IgnoreCase() { return RegexOptions{kIgnoreCase}; }
-  [[nodiscard]] static RegexOptions Multiline() { return RegexOptions{kMultiline}; } ///< \see IgnoreCase
-  [[nodiscard]] static RegexOptions Singleline() { return RegexOptions{kSingleline}; } ///< \see IgnoreCase
+
+  [[nodiscard]] static RegexOptions Multiline() {
+    return RegexOptions{kMultiline};
+  } ///< \see IgnoreCase
+
+  [[nodiscard]] static RegexOptions Singleline() {
+    return RegexOptions{kSingleline};
+  } ///< \see IgnoreCase
+
   [[nodiscard]] static RegexOptions None() { return RegexOptions{kNone}; } ///< \see IgnoreCase
 
   /// \brief The word. \return The flags.
@@ -308,12 +315,14 @@ public:
 
     /// \brief `new Regex(pattern, options)`. \param pattern The pattern. \param options The
     ///        options. \return The regex.
-    [[nodiscard]] class Regex operator()(std::string_view pattern, const RegexOptions &options) const;
+    [[nodiscard]] class Regex operator()(std::string_view pattern,
+                                         const RegexOptions &options) const;
 
     /// \brief `new Regex(pattern, options, timeout)`. \param pattern The pattern. \param options
     ///        The options. \param timeout The match timeout, carried. \return The regex.
-    [[nodiscard]] class Regex
-    operator()(std::string_view pattern, const RegexOptions &options, const TimeSpan &timeout) const;
+    [[nodiscard]] class Regex operator()(std::string_view pattern,
+                                         const RegexOptions &options,
+                                         const TimeSpan &timeout) const;
   };
 
   /// \brief `R.Regex(...)`, the constructor as AL calls it.
@@ -321,6 +330,10 @@ public:
 
   /// \brief `Regex.IsMatch(input)`. \param input The text. \return Whether the pattern matches
   ///        somewhere in it.
+  /// \brief Whether the variable was never given a pattern, which `IsNull(Regex)` answers.
+  /// \return `true` before `Regex(pattern)` ran.
+  [[nodiscard]] Boolean IsNull() const { return compiled_ == nullptr; }
+
   [[nodiscard]] Boolean IsMatch(std::string_view input) const;
 
   /// \brief `Regex.IsMatch(input)` over a member this build refuses. \param input The refusal.
@@ -344,7 +357,8 @@ public:
 
   /// \brief `Regex.Replace(input, replacement)`. \param input The text. \param replacement The
   ///        replacement pattern (`$1`, `${name}`). \return The text with every match replaced.
-  [[nodiscard]] ::agiru::Text<0> Replace(std::string_view input, std::string_view replacement) const;
+  [[nodiscard]] ::agiru::Text<0> Replace(std::string_view input,
+                                         std::string_view replacement) const;
 
   /// \brief `Regex.Replace(input, replacement, count)`. \param input The text. \param replacement
   ///        The pattern. \param count At most this many; -1 for all. \return The text.
@@ -354,8 +368,10 @@ public:
   /// \brief `Regex.Replace(input, replacement, count, startAt)`. \param input The text.
   ///        \param replacement The pattern. \param count At most this many. \param startAt
   ///        Where to begin. \return The text.
-  [[nodiscard]] ::agiru::Text<0>
-  Replace(std::string_view input, std::string_view replacement, Integer count, Integer startAt) const;
+  [[nodiscard]] ::agiru::Text<0> Replace(std::string_view input,
+                                         std::string_view replacement,
+                                         Integer count,
+                                         Integer startAt) const;
 
   /// \brief `Regex.Split(input)`. \param input The text. \return The pieces between matches.
   [[nodiscard]] Array Split(std::string_view input) const;
@@ -415,7 +431,8 @@ public:
   /// \brief `Regex.Unescape(text)`. \param text The text. \return The text with the escapes undone.
   [[nodiscard]] static ::agiru::Text<0> Unescape(std::string_view text);
 
-  /// \brief `Regex.CacheSize`, read. \return The size, a number this runtime carries and never uses.
+  /// \brief `Regex.CacheSize`, read. \return The size, a number this runtime carries and never
+  /// uses.
   [[nodiscard]] static Integer CacheSize();
 
   /// \brief `Regex.CacheSize := n`, set. \param size The size.

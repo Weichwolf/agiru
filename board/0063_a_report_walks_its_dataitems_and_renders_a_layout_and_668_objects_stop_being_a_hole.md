@@ -44,3 +44,29 @@ OK ends the run, which is `devenv-report-triggers.md`'s "each stage may end the 
 - **A `[ReportHandler]` replaces the run** and is invoked with the report; nothing runs after it.
 - **Column properties are not read**; they belong to the layout.
 - **`DataItemLinkReference` resolves by name among the ancestors, else the parent.**
+
+**Chain 94 and 95 findings (2026-09-10), each a generic rule now:**
+
+- **A report and a page may share an AL name** (`VAT Statement`, `Service Order`): the report's
+  Controls class is `X_Report_Controls` and its PageDef symbol `kXReportPage`, or a unit that
+  includes both headers sees a redefinition and a test's `ArchiveDocument` becomes the PAGE's
+  action.
+- **The `labels` block belongs to the layout, not to code**: `Prod. Order Shortage List` declares
+  `PageNoCaptionLbl` in `labels` AND as a `Label` variable, `Quantity Explosion of BOM` a label
+  `Level` beside an Integer `Level`. The block is read and dropped; only `Label` variables are
+  members.
+- **`UseRequestPage` is assigned as a property** in 69 sites (`X.UseRequestPage := false`) and
+  called as a method elsewhere, so it is one member with `operator=`, `operator()` and a Boolean
+  conversion.
+- **Two dataitems may share a C++ identifier** (`CostAllocationSource` and `"Cost Allocation
+  Source"` in `Cost Allocation`): a dataitem's triggers and its `Walk_` are spelled by its
+  VARIABLE identifier, which numbers duplicates.
+- **A `reportextension` adds dataitems and procedures** (`Mfg. WhseSourceCreateDocument` adds
+  `SetProdOrder`, the Service and Assembly extensions add `GetServiceOrderLines` and
+  `GetAssemblyLines` to `Get Demand To Reserve`), and the BaseApp calls them: the 14 extensions
+  are merged into their reports before the walk is generated, the way page extensions are --
+  `dataset` operations spliced by anchor, request-page layout and actions likewise, procedures,
+  variables and labels appended.
+- **`SetTableView` takes a `RecordRef` or a `Variant`** (`AddContacts.SetTableView(RecVar)`) and
+  `SaveAs` a record as its fourth argument; both go through `RecordRef::RecordPointer()` and
+  `TableDefinition()`, which are public for that.

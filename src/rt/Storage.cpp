@@ -7,6 +7,7 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
+#include "platform/PageMetadata.h"
 #include "platform/TableMetadata.h"
 #include "platform/TenantLicenseState.h"
 #include "runtime/Catalogue.h"
@@ -530,6 +531,49 @@ void ProvisionInstalled(const Connection &into) {
     ++tables;
   }
   if (tables != 0) { std::println("{} table(s) written into Table Metadata", tables); }
+  platform::PageMetadata anyPage;
+  if (anyPage.FindFirst()) { return; }
+  std::size_t pages = 0;
+  for (const PageEntry *entry : InstalledPages()) {
+    platform::PageMetadata row;
+    row.ID = entry->page->id.Value();
+    row.Name = entry->page->name;
+    row.Caption = entry->page->caption.empty() ? entry->page->name : entry->page->caption;
+    row.PageType = [type = entry->page->type] {
+      switch (type) {
+        case PageType::Card: return platform::PageMetadataPageType::Card;
+        case PageType::List: return platform::PageMetadataPageType::List;
+        case PageType::RoleCenter: return platform::PageMetadataPageType::RoleCenter;
+        case PageType::CardPart: return platform::PageMetadataPageType::CardPart;
+        case PageType::ListPart: return platform::PageMetadataPageType::ListPart;
+        case PageType::Document: return platform::PageMetadataPageType::Document;
+        case PageType::Worksheet: return platform::PageMetadataPageType::Worksheet;
+        case PageType::ListPlus: return platform::PageMetadataPageType::ListPlus;
+        case PageType::ConfirmationDialog:
+          return platform::PageMetadataPageType::ConfirmationDialog;
+        case PageType::NavigatePage: return platform::PageMetadataPageType::NavigatePage;
+        case PageType::StandardDialog: return platform::PageMetadataPageType::StandardDialog;
+        case PageType::Api: return platform::PageMetadataPageType::Api;
+        case PageType::ReportPreview: return platform::PageMetadataPageType::ReportPreview;
+        case PageType::ReportProcessingOnly:
+          return platform::PageMetadataPageType::ReportProcessingOnly;
+        case PageType::HeadlinePart: return platform::PageMetadataPageType::HeadlinePart;
+        case PageType::PromptDialog: return platform::PageMetadataPageType::PromptDialog;
+        case PageType::UserControlHost: return platform::PageMetadataPageType::UserControlHost;
+        case PageType::XmlPort:
+        case PageType::ConfigurationDialog: return platform::PageMetadataPageType::Card;
+      }
+      return platform::PageMetadataPageType::Card;
+    }();
+    row.SourceTable = entry->page->source.Value();
+    row.Editable = entry->page->editable.empty() || entry->page->editable != "false";
+    row.InsertAllowed = entry->page->insertAllowed != "false";
+    row.ModifyAllowed = entry->page->modifyAllowed != "false";
+    row.DeleteAllowed = entry->page->deleteAllowed != "false";
+    row.Insert();
+    ++pages;
+  }
+  if (pages != 0) { std::println("{} page(s) written into Page Metadata", pages); }
 }
 
 }
