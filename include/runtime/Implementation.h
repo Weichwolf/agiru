@@ -119,8 +119,8 @@ public:
     requires std::derived_from<C, I> && (!std::same_as<C, I>)
   Implementation(const C &codeunit)
       : held_(new C(codeunit)),
-        clone_([](const I *held) -> I * { return new C(*static_cast<const C *>(held)); }),
-        free_([](I *held) { delete static_cast<C *>(held); }) {}
+        clone_([](const I *held) -> I * { return new C(*dynamic_cast<const C *>(held)); }),
+        free_([](I *held) { delete dynamic_cast<C *>(held); }) {}
 
   /// \brief AL `Impl := CodeunitVar`: the interface takes its OWN COPY of the instance.
   ///
@@ -135,8 +135,8 @@ public:
   Implementation &operator=(const C &codeunit) {
     Forget();
     held_ = new C(codeunit);
-    clone_ = [](const I *held) -> I * { return new C(*static_cast<const C *>(held)); };
-    free_ = [](I *held) { delete static_cast<C *>(held); };
+    clone_ = [](const I *held) -> I * { return new C(*dynamic_cast<const C *>(held)); };
+    free_ = [](I *held) { delete dynamic_cast<C *>(held); };
     return *this;
   }
 
@@ -173,6 +173,41 @@ public:
   /// \return It.
   /// \throws Error when nothing was assigned.
   I &operator*() const { return *operator->(); }
+
+  /// \brief AL `Variable is Interface`: whether the implementation behind this variable also
+  ///        implements the other interface.
+  /// \tparam J The other interface's class.
+  /// \return Whether it does; false when nothing is assigned.
+  /// \note IT ASKS THE OBJECT AND NOT THE VARIABLE. A codeunit implementing two interfaces
+  ///       derives from both, so the question is the object's own type.
+  template <typename J> [[nodiscard]] ::agiru::Boolean Is() const {
+    return held_ != nullptr && dynamic_cast<const J *>(held_) != nullptr;
+  }
+
+  /// \brief AL `Variable as Interface`: the same implementation, seen through the other one.
+  /// \tparam J The other interface's class.
+  /// \return A variable that REFERS to this one's instance rather than copying it, which is what
+  ///         AL's `as` yields -- a call through either reaches the same object.
+  /// \throws Error when the implementation is not of that interface, which is what AL does when
+  ///         `as` is written without the `is` in front of it.
+  template <typename J> [[nodiscard]] Implementation<J> As() const {
+    J *seen = held_ == nullptr ? nullptr : dynamic_cast<J *>(held_);
+    if (seen == nullptr) {
+      throw Error("the implementation behind this interface variable is not of that interface");
+    }
+    return Implementation<J>::Borrowed(seen);
+  }
+
+  /// \brief A variable that refers to an instance somebody else owns, which is what `as` makes.
+  /// \param seen The instance.
+  /// \return The variable.
+  [[nodiscard]] static Implementation Borrowed(I *seen) {
+    Implementation made;
+    made.held_ = seen;
+    made.clone_ = [](const I *held) -> I * { return const_cast<I *>(held); };
+    made.free_ = [](I *held) { static_cast<void>(held); };
+    return made;
+  }
 
 private:
   /// THE FREEING FUNCTION IS CAPTURED WHERE THE IMPLEMENTATION IS MADE, the way `Instance<T>`

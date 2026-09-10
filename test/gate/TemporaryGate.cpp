@@ -352,8 +352,31 @@ void SharedFromAGlobalMadeInTheCall() {
   }
 }
 
+/// A TEMPORARY RECORD HANDED TO A CODEUNIT IS THE CALLER'S OWN (board:0691): AL passes it `var`,
+/// the codeunit fills it, and the caller reads the rows back -- the whole shape of
+/// `CODEUNIT.RUN(CODEUNIT::"Get Bank Stmt. Line Candidates", TempProposal)`.
+void RowsAddedByABorrowerAreTheOwnersRows() {
+  Temporary<ResourceCost> owner;
+  ResourceCost borrower;
+  borrower.Copy(owner);
+  agiru::detail::RuntimeBorrowTemporary(&borrower, &owner);
+  borrower.Code = "SEEN";
+  borrower.Insert();
+  CHECK_TRUE("the owner finds what the borrower inserted", static_cast<bool>(owner.FindFirst()));
+  CHECK_TEXT("with the value it was given", std::string(owner.Code.Value()), "SEEN");
+  CHECK_TRUE("and counts it once", owner.Count() == 1);
+
+  // THE NEGATIVE CONTROL: without the borrow the rows stay where they were written, which is what
+  // `Copy` alone means -- a temporary record keeps its own.
+  Temporary<ResourceCost> apart;
+  ResourceCost copied;
+  copied.Copy(apart);
+  CHECK_TRUE("a copy alone shares nothing", apart.Count() == 0);
+}
+
 int main() {
   return gate::Run("Temporary", [] {
+    RowsAddedByABorrowerAreTheOwnersRows();
     SharedThroughAnInstanceAndByValue();
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();

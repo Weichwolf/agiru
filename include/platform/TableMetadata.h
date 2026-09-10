@@ -7,6 +7,8 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
@@ -88,6 +90,16 @@ public:
   ::agiru::Integer DrillDownPageID{};
   Boolean DataIsExternal;
   Text<kCaptionLength> ExternalName;
+  /// \brief AL `TableMetadata.SystemId`.
+  Guid SystemId;
+  /// \brief AL `TableMetadata.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `TableMetadata.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `TableMetadata.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `TableMetadata.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   struct Field_No {
     static constexpr ::agiru::FieldNo ID{1};
@@ -115,22 +127,38 @@ inline constexpr std::array<FieldDef, 11> kTableMetadataFields{{
         TableMetadata::Field_No::Name, "Name", "Name", offsetof(TableMetadata, Name)),
     Declare<&TableMetadata::Caption>(
         TableMetadata::Field_No::Caption, "Caption", "Caption", offsetof(TableMetadata, Caption)),
-    Declare<&TableMetadata::ObsoleteState>(
-        TableMetadata::Field_No::ObsoleteState, "ObsoleteState", "ObsoleteState", offsetof(TableMetadata, ObsoleteState)),
-    Declare<&TableMetadata::ObsoleteReason>(
-        TableMetadata::Field_No::ObsoleteReason, "ObsoleteReason", "ObsoleteReason", offsetof(TableMetadata, ObsoleteReason)),
-    Declare<&TableMetadata::TableType>(
-        TableMetadata::Field_No::TableType, "TableType", "TableType", offsetof(TableMetadata, TableType)),
-    Declare<&TableMetadata::DataPerCompany>(
-        TableMetadata::Field_No::DataPerCompany, "DataPerCompany", "DataPerCompany", offsetof(TableMetadata, DataPerCompany)),
-    Declare<&TableMetadata::LookupPageID>(
-        TableMetadata::Field_No::LookupPageID, "LookupPageID", "LookupPageID", offsetof(TableMetadata, LookupPageID)),
-    Declare<&TableMetadata::DrillDownPageID>(
-        TableMetadata::Field_No::DrillDownPageID, "DrillDownPageID", "DrillDownPageID", offsetof(TableMetadata, DrillDownPageID)),
-    Declare<&TableMetadata::DataIsExternal>(
-        TableMetadata::Field_No::DataIsExternal, "DataIsExternal", "DataIsExternal", offsetof(TableMetadata, DataIsExternal)),
-    Declare<&TableMetadata::ExternalName>(
-        TableMetadata::Field_No::ExternalName, "ExternalName", "ExternalName", offsetof(TableMetadata, ExternalName)),
+    Declare<&TableMetadata::ObsoleteState>(TableMetadata::Field_No::ObsoleteState,
+                                           "ObsoleteState",
+                                           "ObsoleteState",
+                                           offsetof(TableMetadata, ObsoleteState)),
+    Declare<&TableMetadata::ObsoleteReason>(TableMetadata::Field_No::ObsoleteReason,
+                                            "ObsoleteReason",
+                                            "ObsoleteReason",
+                                            offsetof(TableMetadata, ObsoleteReason)),
+    Declare<&TableMetadata::TableType>(TableMetadata::Field_No::TableType,
+                                       "TableType",
+                                       "TableType",
+                                       offsetof(TableMetadata, TableType)),
+    Declare<&TableMetadata::DataPerCompany>(TableMetadata::Field_No::DataPerCompany,
+                                            "DataPerCompany",
+                                            "DataPerCompany",
+                                            offsetof(TableMetadata, DataPerCompany)),
+    Declare<&TableMetadata::LookupPageID>(TableMetadata::Field_No::LookupPageID,
+                                          "LookupPageID",
+                                          "LookupPageID",
+                                          offsetof(TableMetadata, LookupPageID)),
+    Declare<&TableMetadata::DrillDownPageID>(TableMetadata::Field_No::DrillDownPageID,
+                                             "DrillDownPageID",
+                                             "DrillDownPageID",
+                                             offsetof(TableMetadata, DrillDownPageID)),
+    Declare<&TableMetadata::DataIsExternal>(TableMetadata::Field_No::DataIsExternal,
+                                            "DataIsExternal",
+                                            "DataIsExternal",
+                                            offsetof(TableMetadata, DataIsExternal)),
+    Declare<&TableMetadata::ExternalName>(TableMetadata::Field_No::ExternalName,
+                                          "ExternalName",
+                                          "ExternalName",
+                                          offsetof(TableMetadata, ExternalName)),
 }};
 
 inline constexpr std::array<KeyDef, 1> kTableMetadataKeys{{

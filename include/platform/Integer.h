@@ -5,6 +5,8 @@
 #include "meta/TableDef.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 
 #include <array>
@@ -45,6 +47,17 @@ public:
 
   /// \brief AL `Integer.Number`.
   ::agiru::Integer Number{};
+
+  /// \brief AL `Integer.SystemId`.
+  Guid SystemId;
+  /// \brief AL `Integer.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `Integer.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `Integer.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `Integer.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   /// \brief The field numbers.
   struct Field_No {

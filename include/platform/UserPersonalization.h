@@ -7,6 +7,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Code.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -92,6 +93,17 @@ public:
   Text<kTimeZoneLength> TimeZone;
   /// \brief AL `User Personalization."User ID"`.
   Code<kUserIdLength> UserID;
+
+  /// \brief AL `UserPersonalization.SystemId`.
+  Guid SystemId;
+  /// \brief AL `UserPersonalization.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `UserPersonalization.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `UserPersonalization.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `UserPersonalization.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No {

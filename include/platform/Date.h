@@ -6,6 +6,8 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
@@ -83,6 +85,17 @@ public:
   Text<kNameLength> PeriodName;
   /// \brief AL `Date."Period Invariant Name"`, which does not follow the language.
   Text<kNameLength> PeriodInvariantName;
+
+  /// \brief AL `Date.SystemId`.
+  Guid SystemId;
+  /// \brief AL `Date.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `Date.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `Date.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `Date.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No {

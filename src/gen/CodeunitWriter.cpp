@@ -2099,14 +2099,44 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n#pragma once\n\n";
   out += kDoorMarker;
+  for (const std::string &wider : object.extends) {
+    const auto found = objects.interfaces.find(LowerKey(wider));
+    if (found != objects.interfaces.end() && !found->second.header.empty()) {
+      out += "#include \"" + found->second.header + "\"\n";
+    }
+  }
   out += FaceDeclarations(object, objects);
   const std::string space = NamespaceOf(object.nameSpace);
   out += "\nnamespace " + space + " {\n\n";
   const std::string faceClass = ClassName(identifier, ObjectKind::Interface);
   out += "class " + faceClass + ";\n\n";
-  out += "class " + faceClass + " {\n";
+  std::string bases;
+  std::set<std::string> brought;
+  for (const std::string &wider : object.extends) {
+    const auto found = objects.interfaces.find(LowerKey(wider));
+    if (found == objects.interfaces.end()) { continue; }
+    bases += bases.empty() ? " : public virtual " : ", public virtual ";
+    bases += found->second.identifier;
+    for (const al::ProcedureDecl &procedure : object.procedures) {
+      if (!found->second.procedures.contains(LowerKey(procedure.name))) { continue; }
+      const std::string named = Identifier(procedure.name);
+      if (!brought.insert(named).second) { continue; }
+      bases += "";
+    }
+  }
+  out += "class " + faceClass + bases + " {\n";
   out += "public:\n";
   out += "  virtual ~" + faceClass + "() = default;\n\n";
+  for (const std::string &wider : object.extends) {
+    const auto found = objects.interfaces.find(LowerKey(wider));
+    if (found == objects.interfaces.end()) { continue; }
+    for (const al::ProcedureDecl &procedure : object.procedures) {
+      const auto same = found->second.procedures.find(LowerKey(procedure.name));
+      if (same == found->second.procedures.end()) { continue; }
+      out += "  using " + found->second.identifier + "::" + same->second + ";\n";
+    }
+  }
+  if (!object.extends.empty()) { out += "\n"; }
   for (const al::ProcedureDecl &procedure : object.procedures) {
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
            Parameters(procedure, objects, true, object.name) + ") = 0;\n";
@@ -2166,7 +2196,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   for (const std::string &face : unit.implements) {
     const auto found = objects.interfaces.find(LowerKey(face));
     if (found == objects.interfaces.end()) { continue; }
-    out += ", public " + found->second.identifier;
+    out += ", public virtual " + found->second.identifier;
   }
   out += " {\npublic:\n";
   out += "  using Codeunit<" + unitClass + ">::operator=;\n\n";

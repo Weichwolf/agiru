@@ -129,6 +129,17 @@ public:
   /// \brief AL `User."Application ID"`, the Entra application a service user authenticates as.
   Guid ApplicationID;
 
+  /// \brief AL `User.SystemId`.
+  Guid SystemId;
+  /// \brief AL `User.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `User.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `User.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `User.SystemModifiedBy`.
+  Guid SystemModifiedBy;
+
   /// \brief The field numbers, from the system symbols' declaration.
   struct Field_No {
     /// \brief The AL field number of `User Security ID`.

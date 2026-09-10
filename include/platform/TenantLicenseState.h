@@ -7,6 +7,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Option.h"
 
 #include <array>
@@ -65,6 +66,17 @@ public:
   DateTime EndDate;
   /// \brief The state.
   Option<TenantLicenseStateState> State;
+
+  /// \brief AL `TenantLicenseState.SystemId`.
+  Guid SystemId;
+  /// \brief AL `TenantLicenseState.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `TenantLicenseState.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `TenantLicenseState.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `TenantLicenseState.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   /// \brief The field numbers.
   struct Field_No {

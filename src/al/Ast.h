@@ -100,6 +100,7 @@ struct InterfaceObject {
   int id = 0;
   std::string name;
   std::string nameSpace;
+  std::vector<std::string> extends;
   std::vector<ProcedureDecl> procedures;
 };
 

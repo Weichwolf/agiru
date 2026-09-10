@@ -18,6 +18,14 @@
 namespace agiru {
 
 namespace detail {
+
+/// \brief Whether a record holds temporary rows of its own.
+/// \param record The record. \return Whether it does.
+[[nodiscard]] bool RuntimeIsTemporary(const void *record);
+
+/// \brief Points a record at another's temporary rows, leaving its filters alone.
+/// \param record The record that borrows. \param from The one whose rows it borrows.
+void RuntimeBorrowTemporary(void *record, const void *from);
 bool UnbindSubscriptions(CodeunitId id, void *instance);
 }
 
@@ -454,6 +462,9 @@ private:
   template <typename Record> void TakeIn_(Record &rec) {
     if constexpr (requires(Derived &unit) { unit.Rec.Copy(rec); }) {
       static_cast<Derived *>(this)->Rec.Copy(rec);
+      if (detail::RuntimeIsTemporary(&rec)) {
+        detail::RuntimeBorrowTemporary(&static_cast<Derived *>(this)->Rec, &rec);
+      }
     } else if constexpr (requires(Derived &unit) { unit.Rec.Copy(*rec.operator->()); }) {
       static_cast<Derived *>(this)->Rec.Copy(*rec.operator->());
     } else if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {

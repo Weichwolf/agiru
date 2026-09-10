@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 126> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 127> kElsewhere{{
     {"dotnet::Encoding", "dotnet/Encoding.h"},
     {"dotnet::UTF8Encoding", "dotnet/Encoding.h"},
     {"dotnet::UnicodeEncoding", "dotnet/Encoding.h"},
@@ -309,6 +309,7 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 126> kElsewh
     {"platform::RecordLink", "platform/RecordLink.h"},
     {"platform::RecordLinkType", "platform/RecordLink.h"},
     {"dotnet::CameraOptions", "dotnet/CameraProvider.h"},
+    {"dotnet::File", "dotnet/File.h"},
     {"dotnet::CameraProvider", "dotnet/CameraProvider.h"},
     {"platform::ODataEdmType", "platform/ODataEdmType.h"},
     {"platform::ObjectOptions", "platform/ObjectOptions.h"},

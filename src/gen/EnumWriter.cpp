@@ -179,7 +179,7 @@ std::string ImplementationBodies(const al::EnumObject &object,
     out += "\");\n}\n\n";
     const auto cloner = [&faceType](const std::string &unit) {
       return "[](const " + faceType + " *held) -> " + faceType + " * { return new " + unit +
-             "(*static_cast<const " + unit + " *>(held)); }";
+             "(*dynamic_cast<const " + unit + " *>(held)); }";
     };
     out += "auto CloneOf(" + identifier + " value, " + faceType + " *) -> " + faceType +
            " *(*)(const " + faceType + " *) {\n  switch (value) {\n";

@@ -7,6 +7,7 @@
 #include "platform/AllObjType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -38,7 +39,19 @@ public:
   Text<kObjectNameLength> ObjectName;
   Text<kObjectNameLength> ObjectSubtype;
   Guid AppPackageID;
+  /// \brief AL `AllObj.SystemId`.
+  Guid SystemId;
+  /// \brief AL `AllObj.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `AllObj.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `AllObj.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `AllObj.SystemModifiedBy`.
+  Guid SystemModifiedBy;
+
   Guid AppRuntimePackageID;
+
   struct Field_No {
     static constexpr ::agiru::FieldNo ObjectType{1};
     static constexpr ::agiru::FieldNo ObjectID{3};
@@ -47,7 +60,9 @@ public:
     static constexpr ::agiru::FieldNo AppPackageID{20};
     static constexpr ::agiru::FieldNo AppRuntimePackageID{21};
   };
-  static constexpr std::array<::agiru::FieldNo, 2> kKey1{{Field_No::ObjectType, Field_No::ObjectID}};
+
+  static constexpr std::array<::agiru::FieldNo, 2> kKey1{
+      {Field_No::ObjectType, Field_No::ObjectID}};
   static constexpr std::array<::agiru::FieldNo, 1> kKey2{{Field_No::ObjectName}};
 };
 
@@ -60,12 +75,18 @@ inline constexpr std::array<FieldDef, 6> kAllObjFields{{
         AllObj::Field_No::ObjectID, "Object ID", "Object ID", offsetof(AllObj, ObjectID)),
     Declare<&AllObj::ObjectName>(
         AllObj::Field_No::ObjectName, "Object Name", "Object Name", offsetof(AllObj, ObjectName)),
-    Declare<&AllObj::ObjectSubtype>(
-        AllObj::Field_No::ObjectSubtype, "Object Subtype", "Object Subtype", offsetof(AllObj, ObjectSubtype)),
-    Declare<&AllObj::AppPackageID>(
-        AllObj::Field_No::AppPackageID, "App Package ID", "App Package ID", offsetof(AllObj, AppPackageID)),
-    Declare<&AllObj::AppRuntimePackageID>(
-        AllObj::Field_No::AppRuntimePackageID, "App Runtime Package ID", "App Runtime Package ID", offsetof(AllObj, AppRuntimePackageID)),
+    Declare<&AllObj::ObjectSubtype>(AllObj::Field_No::ObjectSubtype,
+                                    "Object Subtype",
+                                    "Object Subtype",
+                                    offsetof(AllObj, ObjectSubtype)),
+    Declare<&AllObj::AppPackageID>(AllObj::Field_No::AppPackageID,
+                                   "App Package ID",
+                                   "App Package ID",
+                                   offsetof(AllObj, AppPackageID)),
+    Declare<&AllObj::AppRuntimePackageID>(AllObj::Field_No::AppRuntimePackageID,
+                                          "App Runtime Package ID",
+                                          "App Runtime Package ID",
+                                          offsetof(AllObj, AppRuntimePackageID)),
 }};
 
 inline constexpr std::array<KeyDef, 2> kAllObjKeys{{

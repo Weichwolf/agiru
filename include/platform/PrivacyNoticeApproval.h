@@ -8,6 +8,7 @@
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 
 #include <array>
@@ -34,6 +35,16 @@ public:
   Guid UserSID;
   Guid ApproverUserSID;
   Boolean Approved{};
+  /// \brief AL `PrivacyNoticeApproval.SystemId`.
+  Guid SystemId;
+  /// \brief AL `PrivacyNoticeApproval.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `PrivacyNoticeApproval.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `PrivacyNoticeApproval.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `PrivacyNoticeApproval.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   struct Field_No {
     static constexpr ::agiru::FieldNo ID{1};

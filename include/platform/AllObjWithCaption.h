@@ -7,6 +7,7 @@
 #include "platform/AllObjType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -17,7 +18,8 @@
 #include <string_view>
 
 /// \file
-/// \brief The platform's `AllObjWithCaption` table (2000000058): every installed object, one row each.
+/// \brief The platform's `AllObjWithCaption` table (2000000058): every installed object, one row
+/// each.
 ///
 /// \note IT HAS NO AL SOURCE AND ITS ROWS COME FROM THE CATALOGUES. `ProvisionInstalled` writes one
 ///       row per installed table, codeunit and page into a clone that lacks them (board:0004); a
@@ -39,7 +41,19 @@ public:
   Text<kObjectCaptionLength> ObjectCaption;
   Text<kObjectNameLength> ObjectSubtype;
   Guid AppPackageID;
+  /// \brief AL `AllObjWithCaption.SystemId`.
+  Guid SystemId;
+  /// \brief AL `AllObjWithCaption.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `AllObjWithCaption.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `AllObjWithCaption.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `AllObjWithCaption.SystemModifiedBy`.
+  Guid SystemModifiedBy;
+
   Guid AppRuntimePackageID;
+
   struct Field_No {
     static constexpr ::agiru::FieldNo ObjectType{1};
     static constexpr ::agiru::FieldNo ObjectID{3};
@@ -49,27 +63,44 @@ public:
     static constexpr ::agiru::FieldNo AppPackageID{20};
     static constexpr ::agiru::FieldNo AppRuntimePackageID{21};
   };
-  static constexpr std::array<::agiru::FieldNo, 2> kKey1{{Field_No::ObjectType, Field_No::ObjectID}};
+
+  static constexpr std::array<::agiru::FieldNo, 2> kKey1{
+      {Field_No::ObjectType, Field_No::ObjectID}};
   static constexpr std::array<::agiru::FieldNo, 1> kKey2{{Field_No::ObjectName}};
 };
 
 using AllObjWithCaption = AllObjWithCaption_Table;
 
 inline constexpr std::array<FieldDef, 7> kAllObjWithCaptionFields{{
-    Declare<&AllObjWithCaption::ObjectType>(
-        AllObjWithCaption::Field_No::ObjectType, "Object Type", "Object Type", offsetof(AllObjWithCaption, ObjectType)),
-    Declare<&AllObjWithCaption::ObjectID>(
-        AllObjWithCaption::Field_No::ObjectID, "Object ID", "Object ID", offsetof(AllObjWithCaption, ObjectID)),
-    Declare<&AllObjWithCaption::ObjectName>(
-        AllObjWithCaption::Field_No::ObjectName, "Object Name", "Object Name", offsetof(AllObjWithCaption, ObjectName)),
-    Declare<&AllObjWithCaption::ObjectCaption>(
-        AllObjWithCaption::Field_No::ObjectCaption, "Object Caption", "Object Caption", offsetof(AllObjWithCaption, ObjectCaption)),
-    Declare<&AllObjWithCaption::ObjectSubtype>(
-        AllObjWithCaption::Field_No::ObjectSubtype, "Object Subtype", "Object Subtype", offsetof(AllObjWithCaption, ObjectSubtype)),
-    Declare<&AllObjWithCaption::AppPackageID>(
-        AllObjWithCaption::Field_No::AppPackageID, "App Package ID", "App Package ID", offsetof(AllObjWithCaption, AppPackageID)),
+    Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
+                                            "Object Type",
+                                            "Object Type",
+                                            offsetof(AllObjWithCaption, ObjectType)),
+    Declare<&AllObjWithCaption::ObjectID>(AllObjWithCaption::Field_No::ObjectID,
+                                          "Object ID",
+                                          "Object ID",
+                                          offsetof(AllObjWithCaption, ObjectID)),
+    Declare<&AllObjWithCaption::ObjectName>(AllObjWithCaption::Field_No::ObjectName,
+                                            "Object Name",
+                                            "Object Name",
+                                            offsetof(AllObjWithCaption, ObjectName)),
+    Declare<&AllObjWithCaption::ObjectCaption>(AllObjWithCaption::Field_No::ObjectCaption,
+                                               "Object Caption",
+                                               "Object Caption",
+                                               offsetof(AllObjWithCaption, ObjectCaption)),
+    Declare<&AllObjWithCaption::ObjectSubtype>(AllObjWithCaption::Field_No::ObjectSubtype,
+                                               "Object Subtype",
+                                               "Object Subtype",
+                                               offsetof(AllObjWithCaption, ObjectSubtype)),
+    Declare<&AllObjWithCaption::AppPackageID>(AllObjWithCaption::Field_No::AppPackageID,
+                                              "App Package ID",
+                                              "App Package ID",
+                                              offsetof(AllObjWithCaption, AppPackageID)),
     Declare<&AllObjWithCaption::AppRuntimePackageID>(
-        AllObjWithCaption::Field_No::AppRuntimePackageID, "App Runtime Package ID", "App Runtime Package ID", offsetof(AllObjWithCaption, AppRuntimePackageID)),
+        AllObjWithCaption::Field_No::AppRuntimePackageID,
+        "App Runtime Package ID",
+        "App Runtime Package ID",
+        offsetof(AllObjWithCaption, AppRuntimePackageID)),
 }};
 
 inline constexpr std::array<KeyDef, 2> kAllObjWithCaptionKeys{{

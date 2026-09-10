@@ -211,6 +211,12 @@ void RuntimeShareTemporary(void *record, const void *from) {
   state->positioned = false;
 }
 
+void RuntimeBorrowTemporary(void *record, const void *from) {
+  const RecordState *source = PeekOf(from);
+  if (source == nullptr || source->temporary == nullptr) { return; }
+  StateOf(record)->temporary = source->temporary;
+}
+
 void RuntimeAdoptTemporary(void *record, const void *from) {
   const RecordState *source = PeekOf(from);
   if (source == nullptr || source->temporary == nullptr) { return; }

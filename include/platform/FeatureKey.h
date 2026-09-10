@@ -7,6 +7,8 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Option.h"
 #include "type/Text.h"
 
@@ -77,6 +79,17 @@ public:
   Boolean IsOneWay{};
   /// \brief Whether enabling it updates data.
   Boolean DataUpdateRequired{};
+
+  /// \brief AL `FeatureKey.SystemId`.
+  Guid SystemId;
+  /// \brief AL `FeatureKey.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `FeatureKey.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `FeatureKey.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `FeatureKey.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   /// \brief The field numbers.
   struct Field_No {

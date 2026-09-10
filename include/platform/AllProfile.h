@@ -9,6 +9,7 @@
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
@@ -26,9 +27,9 @@
 ///       reach it through `Conf./Personalization Mgt.GetDefaultProfileID` (2026-09-09), and the
 ///       fields below are the ones that code names: `Scope`, `App ID`, `Profile ID`, `Description`,
 ///       `Role Center ID`, `Default Role Center`, `Caption`, `Enabled`, `Promoted` and
-///       `Disable Personalization`. The FIELD NUMBERS ARE ASSIGNED HERE in that order [SET]; BC's own
-///       are not in the documentation this tree reads, and nothing in AL names a field of this table
-///       by number.
+///       `Disable Personalization`. The FIELD NUMBERS ARE ASSIGNED HERE in that order [SET]; BC's
+///       own are not in the documentation this tree reads, and nothing in AL names a field of this
+///       table by number.
 /// \warning ITS ROWS COME FROM THE PROFILE CATALOGUE. `ProvisionInstalled` writes one row per
 ///          translated `profile` object into a clone that lacks it (board:0004), which is what BC
 ///          does at app install; `Default Role Center` is then the tenant's to set.
@@ -52,7 +53,19 @@ public:
   Boolean DisablePersonalization{};
   Text<kCaptionLength> Caption;
   Boolean Enabled{};
+  /// \brief AL `AllProfile.SystemId`.
+  Guid SystemId;
+  /// \brief AL `AllProfile.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `AllProfile.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `AllProfile.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `AllProfile.SystemModifiedBy`.
+  Guid SystemModifiedBy;
+
   Boolean Promoted{};
+
   struct Field_No {
     static constexpr ::agiru::FieldNo Scope{1};
     static constexpr ::agiru::FieldNo AppID{2};
@@ -65,6 +78,7 @@ public:
     static constexpr ::agiru::FieldNo Enabled{9};
     static constexpr ::agiru::FieldNo Promoted{10};
   };
+
   static constexpr std::array<::agiru::FieldNo, 3> kKey1{
       {Field_No::Scope, Field_No::AppID, Field_No::ProfileID}};
   static constexpr std::array<::agiru::FieldNo, 1> kKey2{{Field_No::RoleCenterID}};

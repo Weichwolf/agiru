@@ -1365,7 +1365,21 @@ private:
     return "::agiru::dotnet::Refused({.type = \"" + type + "\", .member = \"" + member + "\"})()";
   }
 
+  std::string InterfaceTest(const al::Expr &expression) {
+    if (expression.kind != al::ExprKind::Binary || expression.children.size() != 2) { return {}; }
+    if (!SameName(expression.text, "is") && !SameName(expression.text, "as")) { return {}; }
+    const al::Expr &named = expression.children.back();
+    if (named.kind != al::ExprKind::Name && named.kind != al::ExprKind::StringLiteral) {
+      return {};
+    }
+    const std::string interface = scope_.ObjectNamed("interfaces", named.text);
+    if (interface.empty() || interface.starts_with("absent::")) { return {}; }
+    return Expression(expression.children.front(), kPrimaryPrecedence) +
+           (SameName(expression.text, "is") ? ".Is<" : ".As<") + interface + ">()";
+  }
+
   std::string Expression(const al::Expr &expression, int outer) {
+    if (const std::string asked = InterfaceTest(expression); !asked.empty()) { return asked; }
     if (expression.kind == al::ExprKind::Binary || expression.kind == al::ExprKind::Call) {
       if (const std::string folded = RefusedFold(expression); !folded.empty()) { return folded; }
     }

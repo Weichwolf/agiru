@@ -490,6 +490,12 @@ void RuntimeShareTemporary(void *record, const void *from);
 /// \param from The temporary record.
 void RuntimeAdoptTemporary(void *record, const void *from);
 
+/// rief Points a record at another's temporary rows and leaves its FILTERS alone, which is what
+///        a `var` parameter needs: the callee sees the caller's rows through its own view.
+/// \param record The record that borrows.
+/// \param from   The temporary record whose rows it borrows.
+void RuntimeBorrowTemporary(void *record, const void *from);
+
 /// \brief AL `Record.Reset()` on any record: the filters, marks, key and load selection go, and
 ///        a temporary record's ROWS stay.
 /// \param record The record.

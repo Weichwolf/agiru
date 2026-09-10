@@ -7,6 +7,8 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
+#include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Text.h"
@@ -89,6 +91,16 @@ public:
   Boolean InsertAllowed;
   Boolean ModifyAllowed;
   Boolean DeleteAllowed;
+  /// \brief AL `PageMetadata.SystemId`.
+  Guid SystemId;
+  /// \brief AL `PageMetadata.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `PageMetadata.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `PageMetadata.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `PageMetadata.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   struct Field_No {
     static constexpr ::agiru::FieldNo ID{1};

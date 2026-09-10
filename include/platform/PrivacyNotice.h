@@ -8,6 +8,7 @@
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
+#include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Text.h"
 
@@ -40,6 +41,16 @@ public:
   Boolean Enabled{};
   Boolean Disabled{};
   Guid UserSIDFilter{};
+  /// \brief AL `PrivacyNotice.SystemId`.
+  Guid SystemId;
+  /// \brief AL `PrivacyNotice.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `PrivacyNotice.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `PrivacyNotice.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `PrivacyNotice.SystemModifiedBy`.
+  Guid SystemModifiedBy;
 
   struct Field_No {
     static constexpr ::agiru::FieldNo ID{1};

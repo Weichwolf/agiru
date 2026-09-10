@@ -249,7 +249,7 @@ public:
     if (AtKeyword("extends")) {
       Advance();
       while (!AtEnd() && !AtPunctuation("{")) {
-        (void)ExpectName();
+        object.extends.push_back(ExpectName());
         if (AtPunctuation(",")) { Advance(); }
       }
     }

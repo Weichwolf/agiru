@@ -13928,3 +13928,7 @@ tests/core/codeunit/SCMSalesOrderManagement.cpp
 tests/core/codeunit/SMBServiceItem.cpp
 tests/core/codeunit/TestUserPermissions.cpp
 tests/core/codeunit/UTPageActionsControls.cpp
+base/inventory/costing/codeunit/InventoryAdjustmentHandler.cpp
+base/system/email/codeunit/EmailAddressLookupSubs.cpp
+system/system/email/codeunit/EmailImpl.cpp
+system/system/email/page/EmailAccounts.cpp

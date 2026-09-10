@@ -877,6 +877,15 @@ std::set<std::string> InterfaceReturnsOf(const agiru::al::InterfaceObject &objec
   return returning;
 }
 
+std::map<std::string, std::string>
+NamesOfProcedures(const std::vector<agiru::al::ProcedureDecl> &procedures) {
+  std::map<std::string, std::string> named;
+  for (const agiru::al::ProcedureDecl &one : procedures) {
+    named.emplace(agiru::gen::LowerKey(one.name), agiru::gen::Identifier(one.name));
+  }
+  return named;
+}
+
 Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Interfaces kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Interface.al")) {
@@ -895,7 +904,7 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
                   agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) +
                   "/" + identifier + ".h",
               .fields = {},
-              .procedures = {},
+              .procedures = NamesOfProcedures(object.procedures),
               .name = {},
               .dataItems = {},
               .requestFields = {},
