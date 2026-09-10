@@ -7,6 +7,7 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
+#include "platform/Field.h"
 #include "platform/PageMetadata.h"
 #include "platform/TableMetadata.h"
 #include "platform/TenantLicenseState.h"
@@ -14,6 +15,7 @@
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 
 #include "Rows.h"
@@ -531,6 +533,34 @@ void ProvisionInstalled(const Connection &into) {
     ++tables;
   }
   if (tables != 0) { std::println("{} table(s) written into Table Metadata", tables); }
+  platform::Field anyField;
+  if (!anyField.FindFirst()) {
+    std::size_t fields = 0;
+    for (const TableEntry *entry : InstalledTables()) {
+      const std::span<const FieldNo> key = entry->table->keys.empty()
+                                               ? std::span<const FieldNo>{}
+                                               : entry->table->keys.front().fields;
+      for (const FieldDef &field : entry->table->fields) {
+        platform::Field row;
+        row.TableNo = entry->table->id.Value();
+        row.No = field.no.Value();
+        row.TableName = Fitted(entry->table->name, platform::Field::kNameLength);
+        row.FieldName = Fitted(field.name, platform::Field::kNameLength);
+        row.Type = field.type;
+        row.Len = static_cast<::agiru::Integer>(field.length);
+        row.Class = field.fieldClass;
+        row.RelationTableNo = ::agiru::detail::RelationTableNo(&field);
+        row.ObsoleteState = platform::ObsoleteState::No;
+        row.FieldCaption = Fitted(field.caption.empty() ? field.name : field.caption,
+                                  platform::Field::kCaptionLength);
+        row.Enabled = true;
+        row.IsPartOfPrimaryKey = std::ranges::find(key, field.no) != key.end();
+        row.Insert();
+        ++fields;
+      }
+    }
+    if (fields != 0) { std::println("{} field(s) written into Field", fields); }
+  }
   platform::PageMetadata anyPage;
   if (anyPage.FindFirst()) { return; }
   std::size_t pages = 0;

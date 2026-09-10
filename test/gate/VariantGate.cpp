@@ -185,8 +185,37 @@ void AnIntegerTakesAnOptionsOrdinalFromAVariant() {
   CHECK_TRUE("and by reference, into the ordinal it holds", bound == 4);
 }
 
+/// A VARIANT HANDED TO A TEXT RENDERS WHAT IT HOLDS (board:0694): `FieldRef.Value` on a Date field
+/// is a Variant holding a Date, and the BaseApp passes it into a `Text` parameter -- shipping AL,
+/// so the conversion is the platform's and not a convenience.
+void AVariantReadsAsTextWhateverItHolds() {
+  CHECK_TEXT("a date renders",
+             std::string(std::string_view(agiru::Variant{agiru::Date::FromYmd(2026, 9, 11)})),
+             std::string(agiru::Date::FromYmd(2026, 9, 11).ToInvariantString()));
+  CHECK_TEXT("an integer renders",
+             std::string(std::string_view(agiru::Variant{agiru::Integer{42}})),
+             "42");
+  CHECK_TEXT("a boolean renders as AL formats it",
+             std::string(std::string_view(agiru::Variant{true})),
+             "Yes");
+  // THE SCALE IS PART OF THE VALUE, so `2.50` reads as `2.50` -- the same text `FieldText` gives
+  // a Decimal field, which is what a test comparing the two needs.
+  CHECK_TEXT(
+      "a decimal keeps its scale",
+      std::string(std::string_view(agiru::Variant{agiru::Decimal::FromInvariantString("2.50")})),
+      "2.50");
+  CHECK_TEXT("and text is itself",
+             std::string(std::string_view(agiru::Variant{std::string_view("plain")})),
+             "plain");
+
+  // THE NEGATIVE CONTROL: a Variant holding nothing reads as blank and not as a refusal, and one
+  // holding a value with no text form refuses -- which is what `RecordInVariant` is.
+  CHECK_TRUE("an empty Variant is blank", std::string_view(agiru::Variant{}).empty());
+}
+
 int main() {
   return gate::Run("Variant", [] {
+    AVariantReadsAsTextWhateverItHolds();
     AnOptionTakesAnIntegerFromAVariant();
     AnIntegerTakesAnOptionsOrdinalFromAVariant();
     ATextPositionHoldsItsChar();

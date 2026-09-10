@@ -1108,9 +1108,10 @@ public:
   ///       mismatch because AL's does: what it must not do is hand back an empty string for an
   ///       Integer, which is the wrong answer wearing the right type.
   operator std::string_view() const {
-    const std::string *text = std::get_if<std::string>(&held_);
-    if (text == nullptr) { Refuse("Text"); }
-    return *text;
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return *text;
+    }
+    return Rendered();
   }
 
   /// \brief Lends one of its alternatives as a REFERENCE, when that is what it holds.
@@ -1280,7 +1281,17 @@ public:
 private:
   [[noreturn]] void Refuse(const char *wanted) const;
 
+  /// \brief What a value that is not text reads as when AL hands it to a `Text`.
+  /// \return A view of the rendering, which the Variant keeps for as long as it holds the value.
+  /// \throws Error for what has no text form -- a record, a stream, a codeunit.
+  [[nodiscard]] std::string_view Rendered() const;
+
+  /// \brief Whether what it holds has a text form at all.
+  /// \return Whether it has.
+  [[nodiscard]] bool HoldsSomethingTextual() const;
+
   Held held_;
+  mutable std::string rendered_;
 };
 
 // NOLINTEND(bugprone-easily-swappable-parameters,readability-magic-numbers,modernize-use-nodiscard)
