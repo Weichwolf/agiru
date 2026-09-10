@@ -781,6 +781,15 @@ void Randomize(::agiru::Integer Seed) {
   return ::agiru::CurrentDateTime().Date();
 }
 
+void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
+                               std::string_view Name,
+                               ::agiru::Boolean Scoped) {
+  static_cast<void>(Type);
+  static_cast<void>(Name);
+  static_cast<void>(Scoped);
+  RefuseDoor("Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)");
+}
+
 ::agiru::Text<0> UserId() {
   return ::agiru::Text<0>{Session::Current().UserId()};
 }

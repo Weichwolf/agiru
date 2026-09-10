@@ -23,6 +23,7 @@
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
+#include "type/TableConnectionType.h"
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
 #include "type/Time.h"
@@ -1191,6 +1192,31 @@ template <typename T>
   }
 [[nodiscard]] ::agiru::Boolean IsNull(const T &Variable) {
   return Variable.IsNullObject();
+}
+
+/// \brief AL `Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)`: names the
+///        connection a `TableType = CRM` / `CDS` table reads through. There is no such connection
+///        on premises, and the call refuses saying so.
+/// \param Type   The connection type.
+/// \param Name   The connection's name.
+/// \param Scoped Whether the default holds for the current scope only.
+/// \throws Error always.
+void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
+                               std::string_view Name,
+                               ::agiru::Boolean Scoped = {});
+
+/// \brief The same call with a `Guid` for the name, which AL converts to text on the way in:
+///        `CRM Int. Table. Subscriber` names its connection `Format(CreateGuid())` held in a Guid.
+/// \param Type   The connection type.
+/// \param Name   The connection's name as a Guid.
+/// \param Scoped Whether the default holds for the current scope only.
+/// \throws Error always.
+template <typename Name>
+  requires std::same_as<std::remove_cvref_t<Name>, ::agiru::Guid>
+void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
+                               const Name &Connection,
+                               ::agiru::Boolean Scoped = {}) {
+  SetDefaultTableConnection(Type, std::string_view(Connection.ToText()), Scoped);
 }
 
 /// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on.

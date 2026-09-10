@@ -975,9 +975,7 @@ public:
   /// \brief AL `RecordRef.HasLinks()`. Determines whether a record contains any links.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean HasLinks() {
-    throw Error("RecordRef.HasLinks() is declared and not implemented yet (board:0035)");
-  }
+  ::agiru::Boolean HasLinks() { return detail::RuntimeHasLinks(RecordId()); }
 
   /// \brief AL `RecordRef.Init()` -- every field to its default, the way `Record.Init` does it
   ///        (`recordref-init-method.md`: the table's InitValue, else the type's zero).

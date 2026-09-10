@@ -454,17 +454,6 @@ std::string SerialNumber();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Integer ServiceInstanceId();
 
-/// \brief AL `Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)`. Establishes
-/// a connection to an external database based on a previously registered connection of the
-/// specified type.
-/// \param Type The AL `TableConnectionType`.
-/// \param Name The AL `Text`.
-/// \param Scoped The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
-                               std::string_view Name,
-                               ::agiru::Boolean Scoped = {});
-
 /// \brief AL `Database.SetUserPassword(Guid, Text)`. Sets a password for the user iwith the given
 /// user security ID. If the given password is blank, an empty string will be stored instead of a
 /// password hash. This will prevent the user from logging in using a password. Only SUPER can call

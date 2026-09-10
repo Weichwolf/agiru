@@ -11,3 +11,9 @@ the codeunit left.
 
 **Choice.** `Run(Rec)` / `Ok_Run(Rec)` copy the record in and back out with `Copy` (fields,
 filters, key and position), through a handle where the caller holds one. Silent-wrong-data.
+
+**2026-09-10, chain 89.** Copying the record BACK with `Copy` reset the caller's walk:
+`Exp. Validation Gen. Jnl.` runs `Codeunit.Run(Check, GenJnlLine)` per line inside
+`repeat ... until GenJnlLine.Next() = 0`, and the cleared position ended the walk after the first
+line (3 cases lost). The way back is now fields only; the filters go in, the caller keeps its
+cursor. Measured by chain 90.

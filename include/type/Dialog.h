@@ -118,6 +118,17 @@ public:
   /// \param String The dialog text.
   void Open(std::string_view String);
 
+  /// \brief AL `Dialog.Open(String, var Value1 [, var Value2 ...])` with typed variables or record
+  ///        fields behind the placeholders. Nothing is shown headless, so the values are only
+  ///        named here; `Update` redraws nothing either.
+  /// \tparam Values The variables' types. \param String The text. \param values The variables.
+  template <typename... Values>
+    requires(sizeof...(Values) >= 1)
+  void Open(std::string_view String, Values &...values) {
+    (static_cast<void>(values), ...);
+    Open(String);
+  }
+
   /// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series
   /// of options.
   /// \param OptionMembers The AL `Text`.

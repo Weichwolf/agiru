@@ -9,6 +9,7 @@
 #include "platform/PrivacyNotice.h"
 #include "platform/PrivacyNoticeApproval.h"
 #include "platform/RecordLink.h"
+#include "platform/TableMetadata.h"
 #include "platform/TenantLicenseState.h"
 #include "platform/User.h"
 #include "platform/UserPersonalization.h"
@@ -28,6 +29,7 @@ const RegisterTable<platform::Integer> kInteger;
 const RegisterTable<platform::PrivacyNotice> kPrivacyNotice;
 const RegisterTable<platform::PrivacyNoticeApproval> kPrivacyNoticeApproval;
 const RegisterTable<platform::RecordLink> kRecordLink;
+const RegisterTable<platform::TableMetadata> kTableMetadata;
 const RegisterTable<platform::TenantLicenseState> kTenantLicenseState;
 const RegisterTable<platform::User> kUser;
 const RegisterTable<platform::UserPersonalization> kUserPersonalization;

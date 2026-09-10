@@ -254,6 +254,10 @@ public:
   /// \throws Error when the text is not XML, the way .NET throws.
   void Load(const ::agiru::InStream &stream);
 
+  /// \brief `XmlDocument.Load(reader)`: the document the reader reads, taken whole.
+  /// \param reader The reader. \throws Error on bad XML.
+  void Load(const class XmlReader &reader);
+
   /// \brief `XmlDocument.Load(reader)`, over a reader this runtime has not rebuilt.
   /// \tparam T The stub. \throws Error always (board:0035).
   template <typename T>

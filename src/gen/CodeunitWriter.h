@@ -142,11 +142,6 @@ bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
 
 bool IsTryFunction(const al::ProcedureDecl &procedure);
 
-/// \brief Whether a trigger's Boolean answer is TRUE when its body never sets it:
-///        `OnQueryClosePage` (`devenv-onqueryclosepage-page-trigger.md`: "The default value is
-///        true"), so a trigger that only raises on a bad state lets the page close otherwise.
-/// \param procedure The trigger.
-/// \return True for `OnQueryClosePage`.
 bool DefaultsToTrue(const al::ProcedureDecl &procedure);
 
 std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,

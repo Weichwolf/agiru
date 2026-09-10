@@ -289,6 +289,12 @@ void RuntimeInit(void *record, const TableDef &table);
 /// \param table Its declaration.
 void RuntimeInitValues(void *record, const TableDef &table);
 
+/// \brief AL `Record.CurrentCompany()`: the company the session works in, which is the company
+///        every record of a per-company table belongs to here (`record-currentcompany-method.md`;
+///        21 UT cases refused, 2026-09-10).
+/// \return The company name.
+[[nodiscard]] std::string RuntimeCurrentCompany();
+
 /// \brief The current key's fields by AL name, comma-separated: `SetCurrentKey`'s fields when one
 ///        ran, the primary key otherwise (`record-currentkey-method.md`).
 /// \param record The record.
@@ -1218,10 +1224,7 @@ public:
   /// \param arguments The arguments, read only to be discarded.
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string CurrentCompany(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CurrentCompany is declared and not implemented yet (board:0035)");
-  }
+  [[nodiscard]] std::string CurrentCompany() const { return detail::RuntimeCurrentCompany(); }
 
   /// \brief AL `Record.CurrentKey(...)`. Gets the current key of a database table.
   /// \tparam Arguments Whatever AL's overload set takes.

@@ -10,6 +10,7 @@
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
@@ -96,6 +97,18 @@ public:
   /// \brief The addressee.
   Code<kUserLength> ToUserID;
 
+  /// \brief AL `Record Link.SystemId` -- the system fields every table carries
+  ///        (`devenv-table-system-fields.md`); `CRM Int. Table. Subscriber` reads them here.
+  Guid SystemId;
+  /// \brief AL `Record Link.SystemCreatedAt`.
+  DateTime SystemCreatedAt;
+  /// \brief AL `Record Link.SystemCreatedBy`.
+  Guid SystemCreatedBy;
+  /// \brief AL `Record Link.SystemModifiedAt`.
+  DateTime SystemModifiedAt;
+  /// \brief AL `Record Link.SystemModifiedBy`.
+  Guid SystemModifiedBy;
+
   /// \brief The field numbers.
   struct Field_No {
     static constexpr ::agiru::FieldNo LinkID{1};
@@ -124,7 +137,7 @@ public:
 using RecordLink = RecordLink_Table;
 
 /// \brief The field table.
-inline constexpr std::array<FieldDef, 14> kRecordLinkFields{{
+inline constexpr auto kRecordLinkFields = WithSystemFields<RecordLink>(std::array<FieldDef, 14>{{
     Declare<&RecordLink::LinkID>(RecordLink::Field_No::LinkID,
                                  "Link ID",
                                  "Link ID",
@@ -132,16 +145,22 @@ inline constexpr std::array<FieldDef, 14> kRecordLinkFields{{
                                  Declared{.autoIncrement = true}),
     Declare<&RecordLink::RecordID>(
         RecordLink::Field_No::RecordID, "Record ID", "Record ID", offsetof(RecordLink, RecordID)),
-    Declare<&RecordLink::URL1>(RecordLink::Field_No::URL1, "URL1", "URL1", offsetof(RecordLink, URL1)),
-    Declare<&RecordLink::URL2>(RecordLink::Field_No::URL2, "URL2", "URL2", offsetof(RecordLink, URL2)),
-    Declare<&RecordLink::URL3>(RecordLink::Field_No::URL3, "URL3", "URL3", offsetof(RecordLink, URL3)),
-    Declare<&RecordLink::URL4>(RecordLink::Field_No::URL4, "URL4", "URL4", offsetof(RecordLink, URL4)),
+    Declare<&RecordLink::URL1>(
+        RecordLink::Field_No::URL1, "URL1", "URL1", offsetof(RecordLink, URL1)),
+    Declare<&RecordLink::URL2>(
+        RecordLink::Field_No::URL2, "URL2", "URL2", offsetof(RecordLink, URL2)),
+    Declare<&RecordLink::URL3>(
+        RecordLink::Field_No::URL3, "URL3", "URL3", offsetof(RecordLink, URL3)),
+    Declare<&RecordLink::URL4>(
+        RecordLink::Field_No::URL4, "URL4", "URL4", offsetof(RecordLink, URL4)),
     Declare<&RecordLink::Description>(RecordLink::Field_No::Description,
                                       "Description",
                                       "Description",
                                       offsetof(RecordLink, Description)),
-    Declare<&RecordLink::Type>(RecordLink::Field_No::Type, "Type", "Type", offsetof(RecordLink, Type)),
-    Declare<&RecordLink::Note>(RecordLink::Field_No::Note, "Note", "Note", offsetof(RecordLink, Note)),
+    Declare<&RecordLink::Type>(
+        RecordLink::Field_No::Type, "Type", "Type", offsetof(RecordLink, Type)),
+    Declare<&RecordLink::Note>(
+        RecordLink::Field_No::Note, "Note", "Note", offsetof(RecordLink, Note)),
     Declare<&RecordLink::Created>(
         RecordLink::Field_No::Created, "Created", "Created", offsetof(RecordLink, Created)),
     Declare<&RecordLink::UserID>(
@@ -152,7 +171,7 @@ inline constexpr std::array<FieldDef, 14> kRecordLinkFields{{
         RecordLink::Field_No::Notify, "Notify", "Notify", offsetof(RecordLink, Notify)),
     Declare<&RecordLink::ToUserID>(
         RecordLink::Field_No::ToUserID, "To User ID", "To User ID", offsetof(RecordLink, ToUserID)),
-}};
+}});
 
 /// \brief The keys.
 inline constexpr std::array<KeyDef, 2> kRecordLinkKeys{{

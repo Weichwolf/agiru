@@ -587,7 +587,8 @@ public:
   /// \param at The position.
   template <typename T>
     requires requires { typename T::IsATextPosition; }
-  Variant(const T &at) : Variant(static_cast<::agiru::Char>(at)) {} // NOLINT(*-explicit-constructor)
+  Variant(const T &at)
+      : Variant(static_cast<::agiru::Char>(at)) {} // NOLINT(*-explicit-constructor)
 
   /// \brief Holds a `BigText`, which AL hands to an `Any` like any other text.
   /// \tparam T The BigText's type, recognised by the `ToText()` a `StringValue` does not have.
@@ -1140,8 +1141,13 @@ public:
              (!std::is_same_v<T, BigInteger>)
   operator T &() {
     T *value = std::get_if<T>(&held_);
-    if (value == nullptr) { Refuse(typeid(T).name()); }
-    return *value;
+    if (value != nullptr) { return *value; }
+    if constexpr (std::is_same_v<T, Integer>) {
+      if (auto *ordinal = std::get_if<OrdinalInVariant>(&held_); ordinal != nullptr) {
+        return ordinal->ordinal;
+      }
+    }
+    Refuse(typeid(T).name());
   }
 
   /// \brief AL `Proc(var Typed: T)` given a Variant: the alternative it already holds, by
@@ -1211,6 +1217,18 @@ public:
   ///       `OrdinalInVariant` -- the number plus the value table -- because the enumeration is a
   ///       generated type the Variant cannot name. So the way back is `FromInteger`, and
   ///       `Validate(Type, GetRangeMin(Type))` in `Library - ERM` is what needs it.
+  /// \brief The `Char` a variant holds: a text's first code point, or an integer's value.
+  /// \throws Error when it holds neither.
+  operator ::agiru::Char() const {
+    if (const auto *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return ::agiru::Char{text->empty() ? 0 : static_cast<unsigned char>(text->front())};
+    }
+    if (const auto *number = std::get_if<Integer>(&held_); number != nullptr) {
+      return ::agiru::Char{static_cast<std::int32_t>(*number)};
+    }
+    Refuse("a Char");
+  }
+
   template <typename T>
     requires(!detail::InVariant<T, Held>::value) &&
             requires(std::int32_t ordinal) { T::FromInteger(ordinal); }

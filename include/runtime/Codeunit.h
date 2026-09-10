@@ -461,11 +461,14 @@ private:
     }
   }
 
+  /// THE WAY BACK CARRIES THE FIELDS AND NOT THE STATE. The filters went in with `Copy` so the
+  /// codeunit's `Rec.FindSet()` sees them; what comes back is the record the codeunit left, and
+  /// the caller keeps its own cursor: `Exp. Validation Gen. Jnl.` runs a codeunit per line inside
+  /// `repeat ... until GenJnlLine.Next() = 0`, and a `Copy` back reset the walk's position, so the
+  /// second line was never checked (3 cases of Payment Export Validation UT, chain 89, 2026-09-10).
   template <typename Record> void GiveBack_(Record &rec) {
-    if constexpr (requires(Derived &unit) { rec.Copy(unit.Rec); }) {
-      rec.Copy(static_cast<Derived *>(this)->Rec);
-    } else if constexpr (requires(Derived &unit) { rec.operator->()->Copy(unit.Rec); }) {
-      rec.operator->()->Copy(static_cast<Derived *>(this)->Rec);
+    if constexpr (requires(Derived &unit) { *rec.operator->() = unit.Rec; }) {
+      *rec.operator->() = static_cast<Derived *>(this)->Rec;
     } else if constexpr (requires(Derived &unit) { rec = unit.Rec; }) {
       rec = static_cast<Derived *>(this)->Rec;
     }

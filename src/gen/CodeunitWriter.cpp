@@ -1557,7 +1557,8 @@ std::string Locals(const al::ProcedureDecl &procedure,
         "  " + unused(Identifier(procedure.returnName)) +
         (Hidden(Returns(procedure, objects), names) ? Qualified(Returns(procedure, objects), names)
                                                     : Returns(procedure, objects)) +
-        " " + Identifier(procedure.returnName) + (DefaultsToTrue(procedure) ? "{true};\n" : "{};\n");
+        " " + Identifier(procedure.returnName) +
+        (DefaultsToTrue(procedure) ? "{true};\n" : "{};\n");
   }
   for (const al::VarDecl &declared : procedure.variables) {
     std::string type = TypeOf(declared, objects, OptionNameOf(unit, procedure.name, declared, all));
@@ -1969,6 +1970,7 @@ TableIndex PlatformTables() {
   add("Privacy Notice", "1560");
   add("Privacy Notice Approval", "1561");
   add("Record Link", "2000000068");
+  add("Table Metadata", "2000000136");
   add("Tenant License State", "2000000189");
   add("Date", "2000000007");
   add("User", "2000000120");
@@ -1995,6 +1997,9 @@ FieldEnums PlatformFieldEnums() {
   enums["feature key"]["enabled"] = "::agiru::platform::FeatureKeyEnabled";
   enums["2000000211"] = enums["feature key"];
   enums["record link"]["type"] = "::agiru::platform::RecordLinkType";
+  enums["table metadata"]["tabletype"] = "::agiru::platform::TableMetadataTableType";
+  enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
+  enums["2000000136"] = enums["table metadata"];
   enums["2000000068"] = enums["record link"];
   enums["tenant license state"]["state"] = "::agiru::platform::TenantLicenseStateState";
   enums["2000000189"] = enums["tenant license state"];

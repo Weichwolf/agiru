@@ -265,6 +265,13 @@ private:
         const std::string element = Expression(statement.expression, 0);
         const std::string over = Expression(statement.labels.front(), 0);
         const std::string enumeration = scope_.DeclaredEnum(statement.expression.text);
+        if (enumeration.empty() && scope_.IsVariable(statement.expression.text) &&
+            LowerKey(scope_.DeclaredType(statement.expression.text)) == "dotnet") {
+          out = Pad(indent) + "for (auto &&Element_Block : " + over + ") {\n" + Pad(indent + 2) +
+                element + " = Element_Block;\n" + Statements(statement.body, indent + 2) +
+                Pad(indent) + "}\n";
+          break;
+        }
         if (enumeration.empty()) {
           out = Pad(indent) + "for ([[maybe_unused]] auto &" + element + " : " + over + ") {\n" +
                 Statements(statement.body, indent + 2) + Pad(indent) + "}\n";
@@ -356,10 +363,11 @@ private:
     return NumberedKind(kind).empty() ? named : named + "::Id().Value()";
   }
 
-  static constexpr std::array<std::pair<std::string_view, std::string_view>, 3> kMethodOptions{
+  static constexpr std::array<std::pair<std::string_view, std::string_view>, 4> kMethodOptions{
       {{"securityfiltering", "SecurityFilter"},
        {"readisolation", "IsolationLevel"},
-       {"currenttransactiontype", "TransactionType"}}};
+       {"currenttransactiontype", "TransactionType"},
+       {"type", "FieldType"}}};
 
   static std::string MethodOption(std::string_view method, std::string_view member) {
     const std::string lowered = LowerKey(std::string(method));
@@ -380,7 +388,9 @@ private:
           OfVariable{.variable = Indexed(base.children[0]).text, .field = base.children[1].text});
       if (!enumeration.empty()) { return AsOption(enumeration, expression.text); }
       if (const std::string option = MethodOption(base.children[1].text, expression.text);
-          !option.empty()) {
+          !option.empty() &&
+          (LowerKey(base.children[1].text) != "type" ||
+           LowerKey(scope_.DeclaredType(Indexed(base.children[0]).text)) == "fieldref")) {
         return option;
       }
       if (scope_.IsRecord(Indexed(base.children[0]).text)) {
@@ -2469,6 +2479,16 @@ std::string WriteSource(const al::PageObject &page,
     bodies += "\n" + locals;
     if (!locals.empty() && !body.empty()) { bodies += "\n"; }
     bodies += body + "}\n\n";
+  }
+  if (!std::ranges::any_of(page.procedures, [](const al::ProcedureDecl &procedure) {
+        return Identifier(procedure.name) == "ClearAll";
+      })) {
+    bodies += "void " + pageClass + "::ClearAll() {\n";
+    for (const al::VarDecl &declared : page.variables) {
+      const std::string named = PageVariableIdentifier(page, declared.name);
+      bodies += "  " + named + " = decltype(" + named + "){};\n";
+    }
+    bodies += "}\n\n";
   }
   bodies += "} // namespace " + space + "\n";
   out += SourceIncludesOf(page.variables, page.procedures, objects);

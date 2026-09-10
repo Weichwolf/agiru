@@ -183,7 +183,8 @@ void TestField(const void *record, const TableDef &table, FieldNo no) {
 namespace detail {
 std::string MemberText(const FieldDef &def, std::int32_t ordinal) {
   const EnumValueDef *value = ValueOf(def.values, ordinal);
-  return value != nullptr ? std::string(value->name) : std::to_string(ordinal);
+  if (value == nullptr) { return std::to_string(ordinal); }
+  return std::string(value->caption.empty() ? value->name : value->caption);
 }
 
 std::string MemberOrdinal(const FieldDef &def, std::string_view text) {

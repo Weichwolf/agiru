@@ -1,4 +1,6 @@
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "type/Option.h"
@@ -6,6 +8,7 @@
 #include "Check.h"
 #include "ResourceCost.h"
 
+#include <array>
 #include <string>
 
 using agiru::Error;
@@ -134,6 +137,22 @@ void TestFieldOnABlankOptionNamesTheMember() {
              "Type='Resource', Code='', Work Type Code=''. It cannot be zero or empty.");
 }
 
+/// A MEMBER'S TEXT IS ITS CAPTION: `Price Asset Type` declares `value(0; " ") { Caption = '(All)';
+/// }` and BC says "Product Type must not be (All)", not "must not be  " (6 cases of Price List Line
+/// UT, 2026-09-10). The name stands in only where no caption is declared, and a filter reads
+/// either back (`MemberOrdinal`).
+void AMembersTextIsItsCaption() {
+  static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
+      agiru::EnumValueDef{.ordinal = 0, .name = " ", .caption = "(All)"},
+      agiru::EnumValueDef{.ordinal = 1, .name = "Item", .caption = ""},
+  }};
+  const agiru::FieldDef def{.name = "Asset Type", .values = kValues};
+  CHECK_TEXT("the caption where one is declared", agiru::detail::MemberText(def, 0), "(All)");
+  CHECK_TEXT("the name where none is", agiru::detail::MemberText(def, 1), "Item");
+  CHECK_TEXT(
+      "and a caption reads back to its ordinal", agiru::detail::MemberOrdinal(def, "(All)"), "0");
+}
+
 void ThePrimaryKeySeparatorsDiffferBetweenTheTwo() {
   // NOT A SLIP. FieldError joins the key with a bare comma after a space; TestField prefixes a
   // colon and joins with a comma AND a space. The first is the documentation's own examples, the
@@ -178,6 +197,7 @@ int main() {
     TestFieldMismatchCarriesBothValues();
     TestFieldOnABlankFieldSaysSo();
     TestFieldOnABlankOptionNamesTheMember();
+    AMembersTextIsItsCaption();
     TheCodeNamesTheRaisingSite();
     ThePrimaryKeySeparatorsDiffferBetweenTheTwo();
     StrSubstNoReplacesWhatItIsGiven();

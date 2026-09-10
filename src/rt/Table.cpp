@@ -500,6 +500,10 @@ void CheckEntryRange(std::string_view text, std::string_view minValue, std::stri
   }
 }
 
+std::string RuntimeCurrentCompany() {
+  return std::string(Session::Current().CompanyName());
+}
+
 std::string RuntimeCurrentKey(const void *record, const TableDef &table) {
   std::string out;
   const auto add = [&out, &table](FieldNo no) {

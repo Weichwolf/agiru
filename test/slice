@@ -12481,3 +12481,11 @@ base/system/visualization/page/CopyGenericChart.cpp
 base/system/automation/codeunit/RequestPageParametersHelper.cpp
 system/system/environment/configuration/codeunit/ChecklistBannerImpl.cpp
 system/system/environment/configuration/codeunit/SpotlightTourImpl.cpp
+base/foundation/reporting/codeunit/DocumentReportMgt.cpp
+base/foundation/reporting/codeunit/ReportLayoutUpdateLog.cpp
+base/integration/d365_sales/codeunit/CRMIntTableSubscriber.cpp
+base/system/integration/codeunit/ExchangeWebServicesServer.cpp
+base/system/integration/codeunit/SOAPWebServiceRequestMgt.cpp
+foundation/foundation/no_series/codeunit/NoSeriesCopAddIntent.cpp
+system/system/azure/identity/codeunit/AzureADUserSyncImpl.cpp
+tests/core/codeunit/LibraryReportValidation.cpp

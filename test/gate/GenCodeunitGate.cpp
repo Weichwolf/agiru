@@ -324,6 +324,58 @@ void AVariableNamedAfterItsTypeScopesThroughTheType() {
   CHECK_TRUE("and nothing is refused", generated.find("RefusedOption") == std::string::npos);
 }
 
+/// `FieldRef.Type::Code` SCOPES THROUGH THE FIELD TYPE, on an array element as much as on a
+/// variable: `Find Record Management` writes `SearchFieldRef[1].Type <>
+/// SearchFieldRef[1].Type::Code`, and the generator wrote `RefusedOption(".::Code")` -- the
+/// receiver's `.Type` was neither a field enumeration nor a method with an option (6 cases of
+/// Record Set UT, 2026-09-10).
+void AFieldRefsTypeScopesThroughFieldType() {
+  const std::string source = R"(codeunit 50004 "Typed Caller"
+{
+    procedure IsCode(FieldRef: FieldRef; Refs: array[2] of FieldRef): Boolean
+    begin
+        exit((FieldRef.Type = FieldRef.Type::Code) and (Refs[1].Type = Refs[1].Type::Code));
+    end;
+})";
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables()),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "TypedCaller.cpp"});
+  CHECK_TRUE("the member is the field type's",
+             generated.find("::agiru::FieldType::Code") != std::string::npos);
+  CHECK_TRUE("and nothing is refused", generated.find("RefusedOption") == std::string::npos);
+}
+
+/// `foreach Item in Collection` OVER A .NET COLLECTION FILLS THE DECLARED VARIABLE: `Library -
+/// Report Validation` declares `CellData: DotNet CellData` and reads `CellData.RowNumber` in the
+/// loop, and a loop that bound a fresh `auto &` to the element left the declared variable's members
+/// unreachable (the unit was out of the slice, 8 UT cases, 2026-09-10). A declared AL variable is
+/// what the body names, so the element is assigned into it.
+void AForeachOverADotNetCollectionFillsTheDeclaredVariable() {
+  const std::string source = R"(codeunit 50005 "Cell Walker"
+{
+    procedure Rows(Reader: DotNet WorksheetReader): Integer
+    var
+        CellData: DotNet CellData;
+        Last: Integer;
+    begin
+        foreach CellData in Reader do
+            Last := CellData.RowNumber;
+        exit(Last);
+    end;
+})";
+  const std::string generated = agiru::gen::Formatted(agiru::gen::FormatRequest{
+      .source = agiru::gen::WriteCodeunitSource(
+          agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables()),
+      .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
+      .assumedName = "CellWalker.cpp"});
+  CHECK_TRUE("the element goes into the declared variable",
+             generated.find("CellData = Element_Block;") != std::string::npos);
+  CHECK_TRUE("and the body reads that variable",
+             generated.find("CellData.RowNumber()") != std::string::npos);
+}
+
 /// A PARAMETER MAY BE NAMED AFTER ITS TYPE, and AL writes it constantly. C++ then has the name hide
 /// the type, so the declaration has to qualify it -- and WHICH namespace it qualifies with is
 /// decided by what the type IS. An AL object becomes a class in `agiru::app`; every other AL type
@@ -398,6 +450,8 @@ int main() {
     AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives();
     AFieldNamedOnAnArrayElementIsTheElementsField();
     AVariableNamedAfterItsTypeScopesThroughTheType();
+    AFieldRefsTypeScopesThroughFieldType();
+    AForeachOverADotNetCollectionFillsTheDeclaredVariable();
     AStaticPlatformMemberWithoutParenthesesIsACall();
     ACodeunitIncludesEveryObjectItNames();
   });

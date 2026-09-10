@@ -337,15 +337,6 @@ std::string SerialNumber() {
   RefuseDoor("Database.ServiceInstanceId()");
 }
 
-void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
-                               std::string_view Name,
-                               ::agiru::Boolean Scoped) {
-  static_cast<void>(Type);
-  static_cast<void>(Name);
-  static_cast<void>(Scoped);
-  RefuseDoor("Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)");
-}
-
 ::agiru::Boolean SetUserPassword(::agiru::Guid USID, std::string_view Password) {
   static_cast<void>(USID);
   static_cast<void>(Password);

@@ -1122,6 +1122,11 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
         ProcedureDeclaration(procedure, objects, object.name, shadowed, object.procedures);
   }
   if (!publics.empty()) { out += "\n" + publics; }
+  if (!std::ranges::any_of(object.procedures, [](const al::ProcedureDecl &procedure) {
+        return Identifier(procedure.name) == "ClearAll";
+      })) {
+    out += "\n  void ClearAll();\n";
+  }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
 
   out += "};\n\n";

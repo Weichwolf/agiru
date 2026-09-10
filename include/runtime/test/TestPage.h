@@ -174,6 +174,7 @@ public:
       static_cast<void>(Page_());
       Relink_();
       Platform_(Record_()).Init();
+      newRecord_ = true;
       if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
       detail::AfterGetRecord(Page_());
     } else {
@@ -562,6 +563,9 @@ private:
   }
 
   /// A PART FOLLOWS ITS PARENT, and following means the part's current record moves with the
+  /// link and `OnAfterGetRecord` runs for it -- unless the part stands on a NEW record, which
+  /// `New()` made and nothing has inserted yet: a re-find would move it onto an existing row
+  /// (`Price List Line UT.VariantCodeMustBeBlankWhenInsertNewRecord`, chain 88, 2026-09-10).
   /// link and `OnAfterGetRecord` runs for it: `Whse. Pick Subform` sets `BinCodeEditable` there,
   /// and `WarehousePick.WhseActivityLines."Bin Code".Editable()` read a stale one after the
   /// parent's filter moved (3 cases of SCM - Warehouse UT, 2026-09-10). A relink that only set
@@ -572,6 +576,7 @@ private:
         parent_->LinkPart(partName_, static_cast<void *>(&page_->Rec), RecordTraits_().kTable);
         using Source = std::remove_cvref_t<decltype(page_->Rec)>;
         auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
+        if (newRecord_) { return; }
         if (static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst())) {
           detail::AfterGetRecord(*page_);
         }
@@ -611,6 +616,7 @@ private:
       owned_ = true;
       Bind_();
       detail::OpenPage(*page_, editable, isNew);
+      newRecord_ = isNew;
     } else {
       static_cast<void>(editable);
       static_cast<void>(isNew);
@@ -663,6 +669,7 @@ private:
     if constexpr (kHasRecord) {
       static_cast<void>(Page_());
       Relink_();
+      newRecord_ = false;
       const bool found = step(Record_());
       if (found) { detail::AfterGetRecord(Page_()); }
       return found;
@@ -851,6 +858,7 @@ private:
 
   P *page_ = nullptr;
   bool owned_ = false;
+  bool newRecord_ = false;
   PageCore *parent_ = nullptr;
   std::string partName_;
 };

@@ -1,5 +1,6 @@
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
+#include "dotnet/XmlReader.h"
 #include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
@@ -422,6 +423,10 @@ std::string XmlNamespaceManager::LookupPrefix(std::string_view uri) const {
 void XmlDocument::Load(const ::agiru::InStream &stream) {
   auto &input = const_cast<::agiru::InStream &>(stream);
   LoadXml(input.ReadBytes(input.Length()));
+}
+
+void XmlDocument::Load(const XmlReader &reader) {
+  LoadXml(reader.Source());
 }
 
 void XmlDocument::LoadXml(std::string_view text) {

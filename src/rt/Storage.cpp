@@ -7,6 +7,7 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
+#include "platform/TableMetadata.h"
 #include "platform/TenantLicenseState.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
@@ -501,6 +502,34 @@ void ProvisionInstalled(const Connection &into) {
            entry->page->caption);
   }
   if (objects != 0) { std::println("{} object(s) written into AllObj", objects); }
+  platform::TableMetadata anyTable;
+  if (anyTable.FindFirst()) { return; }
+  std::size_t tables = 0;
+  for (const TableEntry *entry : InstalledTables()) {
+    platform::TableMetadata row;
+    row.ID = entry->table->id.Value();
+    row.Name = entry->table->name;
+    row.Caption = entry->table->caption.empty() ? entry->table->name : entry->table->caption;
+    row.ObsoleteState = platform::TableMetadataObsoleteState::No;
+    row.TableType = [type = entry->table->tableType] {
+      switch (type) {
+        case TableType::Normal: return platform::TableMetadataTableType::Normal;
+        case TableType::CRM: return platform::TableMetadataTableType::CRM;
+        case TableType::CDS: return platform::TableMetadataTableType::CDS;
+        case TableType::ExternalSQL: return platform::TableMetadataTableType::ExternalSQL;
+        case TableType::Exchange: return platform::TableMetadataTableType::Exchange;
+        case TableType::MicrosoftGraph: return platform::TableMetadataTableType::MicrosoftGraph;
+        case TableType::Temporary: return platform::TableMetadataTableType::Temporary;
+      }
+      return platform::TableMetadataTableType::Normal;
+    }();
+    row.DataPerCompany = entry->table->dataPerCompany;
+    row.LookupPageID = entry->table->lookupPageId.Value();
+    row.DrillDownPageID = entry->table->drillDownPageId.Value();
+    row.Insert();
+    ++tables;
+  }
+  if (tables != 0) { std::println("{} table(s) written into Table Metadata", tables); }
 }
 
 }

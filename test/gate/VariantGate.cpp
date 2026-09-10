@@ -165,7 +165,8 @@ void AnOptionTakesAnIntegerFromAVariant() {
 void ATextPositionHoldsItsChar() {
   agiru::Code<20> code("ABC7");
   const agiru::Variant held(agiru::At(code, 4));
-  CHECK_TRUE("the position is a Char", held.IsChar() || held.IsInteger() || held.IsText() || !held.IsEmpty());
+  CHECK_TRUE("the position is a Char",
+             held.IsChar() || held.IsInteger() || held.IsText() || !held.IsEmpty());
   CHECK_TEXT("and formats as the character", std::string(agiru::Format(held).Value()), "7");
 }
 
@@ -174,6 +175,14 @@ void AnIntegerTakesAnOptionsOrdinalFromAVariant() {
   CHECK_TRUE("it is an option", held.IsOption());
   const agiru::Integer number = held;
   CHECK_TRUE("and an Integer reads its ordinal", number == 3);
+  // THE NON-CONST PATH IS THE ONE A CALL ARGUMENT TAKES -- `IncludeOption(Type, FieldRef.Value(),
+  // RecRef)` hands a fresh Variant to an `Integer` parameter, and the reference conversion was
+  // chosen over the value one and refused (47 UT cases still, chain 88, 2026-09-10).
+  agiru::Variant fresh(agiru::Option<>::FromInteger(4));
+  agiru::Integer taken = fresh;
+  CHECK_TRUE("a non-const Variant reads the same way", taken == 4);
+  agiru::Integer &bound = fresh;
+  CHECK_TRUE("and by reference, into the ordinal it holds", bound == 4);
 }
 
 int main() {
