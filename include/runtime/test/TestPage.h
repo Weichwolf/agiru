@@ -169,6 +169,8 @@ public:
   /// \brief AL `TestPage.New()` -- moves to a new record and runs `OnNewRecord`.
   void New() {
     if constexpr (kHasRecord) {
+      static_cast<void>(Page_());
+      Relink_();
       Platform_(Record_()).Init();
       if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
       detail::AfterGetRecord(Page_());
@@ -185,8 +187,8 @@ public:
     if constexpr (requires { Record.RecordId(); }) {
       return Landed_([&](auto &rec) { return Platform_(rec).Get(Record.RecordId()); });
     } else {
-      static_cast<void>(Record);
-      throw Error("TestPage.GoToRecord needs a record and not a Variant (board:0030)");
+      return Landed_(
+          [&](auto &rec) { return Platform_(rec).Get(detail::RecordIdInVariant(Record)); });
     }
   }
 
@@ -342,6 +344,8 @@ public:
   TestFilter Filter{}; // NOLINT(misc-non-private-member-variables-in-classes)
 
   void SetControlText(std::string_view control, std::string_view text) override {
+    static_cast<void>(Page_());
+    Relink_();
     const ControlDef *def = ControlNamed_(control);
     if (def == nullptr || def->field.Value() == 0) {
       throw Error("the control '" + std::string(control) + "' shows no field to set");
@@ -441,6 +445,41 @@ public:
     return std::nullopt;
   }
 
+  /// \brief AL `Parent.Part` bound as a nested test page: attaches to the parent's subpage on
+  ///        first use and follows its `SubPageLink` from then on.
+  /// \param parent The parent test page.
+  /// \param name The part control's AL name.
+  void BindPart(PageCore &parent, std::string_view name) {
+    parent_ = &parent;
+    partName_ = std::string(name);
+    page_ = nullptr;
+    owned_ = false;
+  }
+
+  [[nodiscard]] void *PartInstance(std::string_view control) override {
+    if constexpr (requires(P &page) { page.PartInstance(control); }) {
+      return page_ == nullptr ? nullptr : page_->PartInstance(control);
+    } else {
+      return nullptr;
+    }
+  }
+
+  void LinkPart(std::string_view control, void *subRecord, const TableDef &subTable) override {
+    if constexpr (kHasRecord) {
+      const ControlDef *def = ControlNamed_(control);
+      if (def == nullptr || def->subPageLink.empty() || page_ == nullptr) { return; }
+      detail::ApplySubPageLink(subRecord,
+                               subTable,
+                               static_cast<const void *>(&page_->Rec),
+                               RecordTraits_().kTable,
+                               def->subPageLink);
+    } else {
+      static_cast<void>(control);
+      static_cast<void>(subRecord);
+      static_cast<void>(subTable);
+    }
+  }
+
   [[nodiscard]] std::string ControlCaption(std::string_view control) const override {
     const ControlDef *def = ControlNamed_(control);
     if (def == nullptr) { return std::string(control); }
@@ -470,8 +509,29 @@ private:
   }
 
   P &Page_() {
+    if (page_ == nullptr && parent_ != nullptr) { Attach_(); }
     if (page_ == nullptr) { Unopened_(); }
     return *page_;
+  }
+
+  void Attach_() {
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      auto *sub = static_cast<P *>(parent_->PartInstance(partName_));
+      if (sub == nullptr) { return; }
+      page_ = sub;
+      owned_ = false;
+      Bind_();
+      Relink_();
+      detail::OpenPage(*page_, true, false);
+    }
+  }
+
+  void Relink_() {
+    if constexpr (kHasRecord) {
+      if (parent_ != nullptr && page_ != nullptr) {
+        parent_->LinkPart(partName_, static_cast<void *>(&page_->Rec), RecordTraits_().kTable);
+      }
+    }
   }
 
   const P &Page_() const {
@@ -556,6 +616,8 @@ private:
 
   template <typename Step> Boolean Landed_(Step step) {
     if constexpr (kHasRecord) {
+      static_cast<void>(Page_());
+      Relink_();
       const bool found = step(Record_());
       if (found) { detail::AfterGetRecord(Page_()); }
       return found;
@@ -680,6 +742,8 @@ private:
 
   P *page_ = nullptr;
   bool owned_ = false;
+  PageCore *parent_ = nullptr;
+  std::string partName_;
 };
 
 }

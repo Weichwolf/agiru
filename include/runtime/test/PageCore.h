@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/TableDef.h"
 #include "type/Boolean.h"
 
 #include <cstdint>
@@ -75,6 +76,18 @@ public:
   /// \param control The control's AL name.
   /// \return The control's caption, or the field's.
   [[nodiscard]] virtual std::string ControlCaption(std::string_view control) const = 0;
+
+  /// \brief The running page instance behind a `part` control, for the nested test page.
+  /// \param control The part's AL name.
+  /// \return The subpage instance, or nothing when the page is not running or has no such part.
+  [[nodiscard]] virtual void *PartInstance(std::string_view control) = 0;
+
+  /// \brief Applies a part's `SubPageLink` to the subpage's record from this page's current record,
+  ///        which is what keeps `SalesInvoice.SalesLines` on the invoice's own lines.
+  /// \param control The part's AL name.
+  /// \param subRecord The subpage's record.
+  /// \param subTable Its declaration.
+  virtual void LinkPart(std::string_view control, void *subRecord, const TableDef &subTable) = 0;
 };
 
 namespace detail {

@@ -109,7 +109,8 @@ void WriteParts(std::string &out,
                 const std::vector<const al::PageControl *> &parts,
                 const Objects &objects,
                 const std::map<std::string, std::string> &named,
-                std::set<std::string> &taken) {
+                std::set<std::string> &taken,
+                std::vector<std::pair<std::string, std::string>> *bound) {
   if (parts.empty()) { return; }
   out += "\n";
   for (const al::PageControl *control : parts) {
@@ -121,6 +122,7 @@ void WriteParts(std::string &out,
       continue;
     }
     out += "  Part_Kind<" + found->second.identifier + "> " + identifier + ";\n";
+    if (bound != nullptr) { bound->emplace_back(identifier, control->name); }
   }
 }
 
@@ -1019,7 +1021,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   WriteControls(out, all.fields, "Field_Kind", named, taken, &bound);
   if (!all.fields.empty() && !all.actions.empty()) { out += "\n"; }
   WriteControls(out, all.actions, "Action_Kind", named, taken, &bound);
-  WriteParts(out, all.parts, objects, named, taken);
+  std::vector<std::pair<std::string, std::string>> boundParts;
+  WriteParts(out, all.parts, objects, named, taken, &boundParts);
   for (const auto &[field, identifier] : named) {
     if (!taken.insert(identifier).second) { continue; }
     out += "  Field_Kind " + identifier + "{" + Literal(field) + "};\n";
@@ -1027,7 +1030,10 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   }
   out += "\n  template <typename Core> void BindControls(Core &core) {\n";
   for (const std::string &identifier : bound) { out += "    " + identifier + ".Bind(core);\n"; }
-  if (bound.empty()) { out += "    static_cast<void>(core);\n"; }
+  for (const auto &[identifier, name] : boundParts) {
+    out += "    " + identifier + ".BindPart(core, " + Literal(name) + ");\n";
+  }
+  if (bound.empty() && boundParts.empty()) { out += "    static_cast<void>(core);\n"; }
   out += "  }\n";
   out += "};\n\n";
   out += "class " + pageClass + ";\n\n";
@@ -1050,6 +1056,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     Flatten(object.layout, all);
     Flatten(object.actions, all);
     std::set<std::string> written;
+    std::string instances;
     for (const al::PageControl *control : all.parts) {
       const std::string member = ControlIdentifier(named, control->name);
       if (member.empty() || !written.insert(member).second) { continue; }
@@ -1061,8 +1068,14 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
       out += "> ";
       out += member;
       out += ";\n";
+      instances +=
+          "    if (name == " + Literal(control->name) + ") { return &" + member + ".Held(); }\n";
     }
     if (!written.empty()) { out += "\n"; }
+    if (!instances.empty()) {
+      out += "  void *PartInstance(std::string_view name) {\n" + instances +
+             "    return nullptr;\n  }\n\n";
+    }
   }
 
   const std::set<std::string> shadowed =

@@ -551,6 +551,29 @@ public:
     *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
   }
 
+  /// \brief AL `RecordRef.GetTable(Record)` on a record global held by handle, which is how a
+  ///        codeunit's temporary globals arrive.
+  /// \tparam H The handle type.
+  /// \param handle The handle.
+  template <typename H>
+    requires requires(H &h) {
+      { *h } -> std::convertible_to<const ::agiru::detail::StateHandle &>;
+    } && (!requires { H::kId; })
+  void GetTable(H &handle) {
+    GetTable(*handle);
+  }
+
+  /// \brief AL `RecordRef.SetTable(Record)` on a record global held by handle.
+  /// \tparam H The handle type.
+  /// \param handle The handle.
+  template <typename H>
+    requires requires(H &h) {
+      { *h } -> std::convertible_to<const ::agiru::detail::StateHandle &>;
+    } && (!requires { H::kId; })
+  void SetTable(H &handle) {
+    SetTable(*handle);
+  }
+
   /// \brief AL `RecordRef.GetTable(Variant)`: the record the Variant carries, or the RecordRef it
   ///        refers to, which `Find Record Management` hands over as `SourceRec: Variant`.
   /// \param held The Variant.

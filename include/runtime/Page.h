@@ -104,6 +104,19 @@ template <typename P> struct ControlTrigger {
 ///       reaching it needs a running UI (board:0030).
 namespace detail {
 template <typename P> void OpenPage(P &page, bool editable, bool isNew);
+
+/// \brief Applies a `SubPageLink` -- `Field = field(Other)`, `= const(Value)`, `= filter(...)` --
+///        as filters on the subpage's record, read from the parent's current record.
+/// \param sub The subpage's record.
+/// \param subTable Its declaration.
+/// \param parent The parent page's record.
+/// \param parentTable Its declaration.
+/// \param link The property text as the page declares it.
+void ApplySubPageLink(void *sub,
+                      const TableDef &subTable,
+                      const void *parent,
+                      const TableDef &parentTable,
+                      std::string_view link);
 }
 
 template <typename P> class PartRef {
@@ -121,6 +134,14 @@ public:
       detail::OpenPage(page, true, false);
     }
     return page;
+  }
+
+  /// \brief The instance without opening it, for a test page that opens and links it itself and
+  ///        then counts as the one that opened it.
+  /// \return The subpage instance.
+  [[nodiscard]] P &Held() const {
+    opened_ = true;
+    return *page_.operator->();
   }
 
   /// \brief AL `CurrPage.<Part>.Visible(Boolean)` -- sets whether the part shows.
@@ -626,8 +647,12 @@ public:
   ///       `RecordRef` is a different AL type -- a record reached by NUMBER -- and using it
   ///       would refuse every call that hands over a record it has.
   template <typename Record> void SetRecord(Record &record) {
-    static_cast<void>(record);
-    throw Error("Page.SetRecord(Record) needs a running UI (board:0030)");
+    if constexpr (requires { static_cast<Derived &>(*this).Rec = record; }) {
+      static_cast<Derived &>(*this).Rec = record;
+    } else {
+      static_cast<void>(record);
+      throw Error("Page.SetRecord(Record): the record is not of the page's source table");
+    }
   }
 
   /// \brief AL `Page.SetSelectionFilter(Record)`. Notes the records that the user has selected on
