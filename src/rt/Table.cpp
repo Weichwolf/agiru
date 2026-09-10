@@ -463,6 +463,42 @@ void MarkConsistent(const TableDef &table, bool consistent) {
   Session::Current().Transaction().MarkConsistent(table.name, consistent);
 }
 
+namespace {
+
+std::string_view Entered(std::string_view text) {
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
+    text.remove_prefix(1);
+  }
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
+    text.remove_suffix(1);
+  }
+  return text;
+}
+
+std::optional<Decimal> Numeric(std::string_view text) {
+  try {
+    return Decimal::FromInvariantString(Entered(text));
+  } catch (const DecimalError &) { return std::nullopt; }
+}
+
+}
+
+void CheckEntryRange(std::string_view text, std::string_view minValue, std::string_view maxValue) {
+  if (minValue.empty() && maxValue.empty()) { return; }
+  const std::optional<Decimal> entered = Numeric(text);
+  if (!entered.has_value()) { return; }
+  if (const std::optional<Decimal> low = Numeric(minValue); low.has_value() && *entered < *low) {
+    throw Error("The value must be greater than or equal to " + std::string(Entered(minValue)) +
+                ". Value: " + std::string(Entered(text)) + ".")
+        .Coded("TestValidation");
+  }
+  if (const std::optional<Decimal> high = Numeric(maxValue); high.has_value() && *entered > *high) {
+    throw Error("The value must be less than or equal to " + std::string(Entered(maxValue)) +
+                ". Value: " + std::string(Entered(text)) + ".")
+        .Coded("TestValidation");
+  }
+}
+
 void RuntimeInitValues(void *record, const TableDef &table) {
   InitValuesOnly(record, table);
 }

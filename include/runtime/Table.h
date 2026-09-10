@@ -53,6 +53,15 @@ template <typename T> struct OnValidateOf {
   void (*run)(T &); ///< What calls it.
 };
 
+/// \brief One field's `OnLookup` trigger, emitted beside its table the way `OnValidateOf` is: a
+///        page control with no `OnLookup` of its own runs the FIELD's before it falls back to the
+///        `TableRelation` lookup (`devenv-onlookup-field-trigger.md`; 549 in the BaseApp).
+/// \tparam T The generated table class.
+template <typename T> struct OnLookupOf {
+  FieldNo field;    ///< The field the trigger belongs to.
+  void (*run)(T &); ///< What calls it.
+};
+
 /// \brief The platform half of a record operation. Not part of the door's vocabulary.
 namespace detail {
 
@@ -280,6 +289,20 @@ void RuntimeInit(void *record, const TableDef &table);
 /// \param table Its declaration.
 void RuntimeInitValues(void *record, const TableDef &table);
 
+/// \brief A user's entry checked against a `MinValue` / `MaxValue` declaration.
+///
+/// `devenv-minvalue-property.md`: "Validation occurs only if the field or control value is
+/// updated through the UI ... If a field is updated through application code, then the MinValue
+/// property is not validated." So this is called from a PAGE'S entry and never from `Validate`
+/// (openerp WI-801 shipped the same gate after every `Rec.Validate` had checked it: GAINED 36).
+/// A bound that is not a number, or an entry that is not one, is left to the field's own parse.
+/// \param text     What the user entered.
+/// \param minValue The declared lower bound, as AL wrote it; empty when none.
+/// \param maxValue The declared upper bound; empty when none.
+/// \throws Error with the platform's wording, "The value must be greater than or equal to 0.
+///         Value: -1." and its `less than or equal to` twin, coded `TestValidation`.
+void CheckEntryRange(std::string_view text, std::string_view minValue, std::string_view maxValue);
+
 /// \brief AL `Record.Consistent(Boolean)`: marks the TABLE consistent or not for the running
 ///        transaction, and a commit while any table is marked inconsistent is refused with BC's
 ///        own message (`record-consistent-method.md`). `Gen. Jnl.-Post Line` marks `G/L Entry`
@@ -300,11 +323,15 @@ void MarkConsistent(const TableDef &table, bool consistent);
 ///       one.
 void RuntimeClear(void *record, const TableDef &table);
 
-/// \brief Holds the field number a `Validate` is running for, and restores it afterwards.
+/// \brief The field the USER is editing, which is what `CurrFieldNo` answers; 0 when nobody is.
 ///
 /// `devenv-system-defined-variables.md` gives `CurrFieldNo` as "the field number of the current
-/// field in the current table". A trigger that runs another `Validate` nests, so this is a stack
-/// discipline and not an assignment -- and the BaseApp nests constantly.
+/// field in the current table", and the BaseApp reads it 301 times as `CurrFieldNo <> 0` -- the
+/// discriminator between a value the user typed into a page field and one a `Validate` from code
+/// set. So a `Validate` from code LEAVES IT ALONE: the page's entry installs the field for the
+/// whole of the user's change, the triggers and events under it see that field however deep
+/// they nest, and `Item."Standard Cost"` validated from a test no longer asks a confirm meant for
+/// the web client (9 UT cases, measured 2026-09-10; openerp WI-1309 asked and never measured).
 std::int32_t &Validating();
 
 class ValidatingField {
@@ -906,6 +933,32 @@ public:
   [[nodiscard]] static bool FieldNotBlank(::agiru::FieldNo no) {
     const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
     return def != nullptr && def->notBlank;
+  }
+
+  /// \brief Runs the field's own `OnLookup` trigger, if the table declares one.
+  /// \param no The field.
+  /// \return Whether there was one to run.
+  bool RunOnLookup(::agiru::FieldNo no) {
+    if constexpr (requires { TableTraits<Derived>::kOnLookup; }) {
+      for (const auto &[field, run] : TableTraits<Derived>::kOnLookup) {
+        if (field == no) {
+          run(static_cast<Derived &>(*this));
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// \brief A user's entry into this field checked against the field's `MinValue` / `MaxValue`,
+  ///        which a page does before it validates (`devenv-minvalue-property.md`: the UI checks,
+  ///        application code does not).
+  /// \param no   The field.
+  /// \param text What the user entered.
+  /// \throws Error when the entry lies outside the declared range.
+  static void CheckEntryRange(::agiru::FieldNo no, std::string_view text) {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    if (def != nullptr) { detail::CheckEntryRange(text, def->minValue, def->maxValue); }
   }
 
   /// \brief AL `Record.TestField(Field, Value)`.
@@ -2081,7 +2134,6 @@ public:
   void ValidateText(::agiru::FieldNo no, std::string_view text) {
     Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before, Self());
-    const detail::ValidatingField current(no);
     try {
       detail::EvaluateInto(Self(), TableTraits<Derived>::kTable, no, text);
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
@@ -2112,7 +2164,6 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before, Self());
-    const detail::ValidatingField current(no);
     if constexpr (requires { member = value; }) {
       member = value;
     } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
@@ -2144,7 +2195,6 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before, Self());
-    const detail::ValidatingField current(no);
     detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
     RunOnValidate(no);
   }
@@ -2279,7 +2329,9 @@ private:
   ///        before image is read from the row (board:0057, phase 2), `RunTrigger` the flag.
   /// \brief Raises `OnBeforeValidateEvent` or `OnAfterValidateEvent` for one field, the field's
   ///        AL name as the element, with `Rec`, `xRec` (the record before the assignment) and
-  ///        `CurrFieldNo` (`devenv-event-types.md:151`).
+  ///        `CurrFieldNo` (`devenv-event-types.md:151`) -- the system variable, so 0 from code:
+  ///        the BaseApp compares it with `Rec.FieldNo(<the element>)` eleven times, which under
+  ///        the other reading would be a tautology (openerp WI-1309).
   void ValidateEvent(std::string_view event, ::agiru::FieldNo no, const Derived &before) {
     static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "CurrFieldNo"};
     std::string_view element;
@@ -2288,7 +2340,7 @@ private:
     }
     auto &rec = static_cast<Derived &>(*this);
     Derived xRec = before;
-    ::agiru::Integer currFieldNo = no.Value();
+    ::agiru::Integer currFieldNo = detail::Validating();
     detail::RaiseEventOn(EventObject::Table,
                          TableTraits<Derived>::kTable.id.Value(),
                          TableTraits<Derived>::kTable.name,
@@ -2447,22 +2499,18 @@ template <typename T> struct TempRows {
 
 /// \brief The `TempOps` for one table, one instance per type in `.rodata`.
 ///
-/// \brief Whether a generated table carries a block of AL global variables (`Var_Block`, which
-///        412 tables declare).
-///
-/// \note A ROW CARRIES NO VARIABLES EITHER. A table's globals belong to the record VARIABLE and
-///       not to a row: `Sales Line` initialises its global `Currency` and then walks its own rows,
-///       and a load that assigned the whole object handed it the row's empty block -- every VAT
-///       amount was then rounded to a precision of zero (44 UT cases, measured 2026-09-09). The
-///       load keeps the variable's block the way it keeps its state, and a stored row holds none.
-template <typename T>
-concept HasVariableBlock = requires(T &t) { t.Var_Block; };
-
 /// \tparam T The generated table class.
 ///
 /// \note A ROW CARRIES NO STATE. What goes into the store is the record's fields; its filters,
 ///       its cursor and its own store pointer stay with the variable, and `load` copies the
 ///       fields back out around the variable's state -- so a walk never inherits a row's filters.
+///
+/// \note A ROW CARRIES NO VARIABLES EITHER. A table's globals belong to the record VARIABLE and
+///       not to a row: `Sales Line` initialises its global `Currency` and then walks its own rows,
+///       and a load that assigned the whole object handed it the row's empty block -- every VAT
+///       amount was then rounded to a precision of zero (44 UT cases, measured 2026-09-09). The
+///       `Var_Block` handle is a `Globals`, which an assignment leaves alone and a copy starts
+///       unmade, so a stored row holds none and a load keeps the variable's.
 template <typename T>
 constexpr detail::TempOps kTempOps{
     .make = []() -> void * { return new TempRows<T>{}; },
@@ -2476,18 +2524,12 @@ constexpr detail::TempOps kTempOps{
           std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
-          if constexpr (HasVariableBlock<T>) {
-            copy.Var_Block = std::remove_cvref_t<decltype(copy.Var_Block)>{};
-          }
           held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
         },
     .replace =
         [](void *rows, std::size_t at, const void *record) {
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
-          if constexpr (HasVariableBlock<T>) {
-            copy.Var_Block = std::remove_cvref_t<decltype(copy.Var_Block)>{};
-          }
           static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
         },
     .erase =
@@ -2500,14 +2542,7 @@ constexpr detail::TempOps kTempOps{
         [](void *record, const void *row) {
           auto *state = reinterpret_cast<detail::StateHandle *>(record);
           detail::StateHandle keep = std::move(*state);
-          if constexpr (HasVariableBlock<T>) {
-            T &into = *static_cast<T *>(record);
-            auto block = std::move(into.Var_Block);
-            into = *static_cast<const T *>(row);
-            into.Var_Block = std::move(block);
-          } else {
-            *static_cast<T *>(record) = *static_cast<const T *>(row);
-          }
+          *static_cast<T *>(record) = *static_cast<const T *>(row);
           *state = std::move(keep);
         },
 };

@@ -31,6 +31,7 @@ class Publisher_Codeunit;
 class Listener_Codeunit;
 class Misnamed_Codeunit;
 class Watcher_Codeunit;
+class Edited_Codeunit;
 class Told_Codeunit;
 class Unsent_Codeunit;
 } // namespace
@@ -48,6 +49,11 @@ template <> struct agiru::CodeunitTraits<Listener_Codeunit> {
 template <> struct agiru::CodeunitTraits<Watcher_Codeunit> {
   static constexpr CodeunitId kId{50103};
   static constexpr std::string_view kName{"Event Gate Watcher"};
+};
+
+template <> struct agiru::CodeunitTraits<Edited_Codeunit> {
+  static constexpr CodeunitId kId{50106};
+  static constexpr std::string_view kName{"Event Gate Edited"};
 };
 
 template <> struct agiru::CodeunitTraits<Told_Codeunit> {
@@ -109,6 +115,24 @@ public:
 
   int seen = 0;
   Boolean sawRunTrigger = false;
+};
+
+// `CurrFieldNo` IN A VALIDATE EVENT IS THE SYSTEM VARIABLE: the field the user is editing, and 0
+// from a `Validate` in code -- which is what the BaseApp's `CurrFieldNo = Rec.FieldNo(Quantity)`
+// subscribers discriminate on.
+class Edited_Codeunit : public Codeunit<Edited_Codeunit> {
+public:
+  void Validated(agiru::app::tables::LineNumberBuffer &Rec,
+                 agiru::app::tables::LineNumberBuffer &xRec,
+                 Integer CurrFieldNo) {
+    static_cast<void>(Rec);
+    static_cast<void>(xRec);
+    sawFieldNo = CurrFieldNo;
+    ++validated;
+  }
+
+  int validated = 0;
+  Integer sawFieldNo = -1;
 };
 
 // A SUBSCRIBER MAY NAME ITS FIRST PARAMETER `Sender` AND RECEIVE THE RAISING OBJECT, which the
@@ -212,6 +236,23 @@ const SubscriptionCatalogue kUnsentCatalogue{
     true,
     []() -> void * { return new Unsent_Codeunit(); },
     [](void *instance) { delete static_cast<Unsent_Codeunit *>(instance); }};
+constexpr std::array<std::string_view, 3> kValidatedNames{"Rec", "xRec", "CurrFieldNo"};
+constexpr std::array<Subscription, 1> kEditedSubscriptions{{
+    {.kind = EventObject::Table,
+     .objectId = 0,
+     .objectName = "Line Number Buffer",
+     .event = "OnBeforeValidateEvent",
+     .element = "New Line Number",
+     .parameters = kValidatedNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Edited_Codeunit, &Edited_Codeunit::Validated>},
+}};
+const SubscriptionCatalogue kEditedCatalogue{
+    CodeunitTraits<Edited_Codeunit>::kId,
+    CodeunitTraits<Edited_Codeunit>::kName,
+    kEditedSubscriptions,
+    true,
+    []() -> void * { return new Edited_Codeunit(); },
+    [](void *instance) { delete static_cast<Edited_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
 constexpr std::array<Subscription, 1> kWatcherSubscriptions{{
     {.kind = EventObject::Table,
@@ -275,6 +316,27 @@ void ATableTriggerEventReachesASubscriber() {
   static_cast<void>(agiru::UnbindSubscription(watcher));
 }
 
+void CurrFieldNoIsTheUsersFieldAndZeroFromCode() {
+  Edited_Codeunit edited;
+  static_cast<void>(agiru::BindSubscription(edited));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  constexpr agiru::Integer kLine = 4;
+  buffer.Validate(buffer.NewLineNumber, kLine);
+  CHECK_TRUE("a Validate from code raised the event once", edited.validated == 1);
+  CHECK_TRUE("with CurrFieldNo 0, because no user is editing anything", edited.sawFieldNo == 0);
+  CHECK_TRUE("and the system variable says the same", agiru::CurrFieldNo() == 0);
+  {
+    const agiru::detail::ValidatingField editing(
+        agiru::app::tables::LineNumberBuffer::Field_No::OldLineNumber);
+    buffer.Validate(buffer.NewLineNumber, kLine + 1);
+    CHECK_TRUE("under the page's entry the event carries the USER'S field, not the validated one",
+               edited.sawFieldNo ==
+                   agiru::app::tables::LineNumberBuffer::Field_No::OldLineNumber.Value());
+  }
+  CHECK_TRUE("and the scope restores nobody", agiru::CurrFieldNo() == 0);
+  static_cast<void>(agiru::UnbindSubscription(edited));
+}
+
 void AManualSubscriberHearsOnlyWhileBound() {
   Publisher_Codeunit publisher;
   Listener_Codeunit listener;
@@ -314,6 +376,7 @@ void ASubscriberNamingAnUnpublishedParameterIsRefused() {
 int main() {
   return gate::Run("Event", [] {
     AManualSubscriberHearsOnlyWhileBound();
+    CurrFieldNoIsTheUsersFieldAndZeroFromCode();
     ASubscriberNamingAnUnpublishedParameterIsRefused();
     ATableTriggerEventReachesASubscriber();
     ASubscriberNamedSenderReceivesTheRaisingRecord();

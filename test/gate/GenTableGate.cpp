@@ -271,6 +271,57 @@ void ATableWithAnInitValueConstructsWithIt() {
           std::string::npos);
 }
 
+/// A TABLE DECLARED `TableType = Temporary` IS IN MEMORY IN EVERY VARIABLE.
+/// `devenv-tabletype-property.md` calls it "an in-memory table used to store temporary data", and
+/// 99 BaseApp tables declare it -- `Duplicate Price Line` among them, whose page `Set` does
+/// `Rec.Copy(DuplicatePriceLine, true)` on two plain record variables and was refused as "neither
+/// record is temporary" (8 cases of `Suggest Price Lines UT`, 2026-09-10). So the generated class
+/// constructs its own store, the way `Temporary<T>` does, and the declaration decides rather than
+/// the variable.
+void ATableDeclaredTemporaryConstructsItsStore() {
+  const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
+  CHECK_TRUE("the target table is a database table, so no constructor",
+             agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {}, {})
+                     .text.find("ResourceCost_Table();") == std::string::npos);
+  std::string declared = original;
+  const std::size_t at = declared.find("Caption = 'Resource Cost';");
+  CHECK_TRUE("the source carries the caption the property is placed beside",
+             at != std::string::npos);
+  declared.insert(at, "TableType = Temporary;\n    ");
+  const std::string generated =
+      agiru::gen::WriteHeader(agiru::al::ParseTable(declared), std::string(kAlPath), {}, {}).text;
+  CHECK_TRUE("declared temporary, the class declares its constructor",
+             generated.find("  ResourceCost_Table();") != std::string::npos);
+  CHECK_TRUE(
+      "and defines it over the runtime's temporary store after the traits",
+      generated.find("::ResourceCost_Table() {\n  ::agiru::detail::RuntimeMakeTemporary(this, "
+                     "&::agiru::kTempOps<") != std::string::npos);
+  CHECK_TRUE("and the traits say so",
+             generated.find(".tableType = TableType::Temporary,") != std::string::npos);
+}
+
+/// A FIELD'S `OnLookup` TRIGGER IS IN THE MAP BESIDE ITS TABLE, like `OnValidate`: the method was
+/// always emitted and nothing could reach it, so a page control without its own `OnLookup` fell
+/// straight through to "declares no such trigger" (26 cases of `Price List Line UT` and
+/// `Price Worksheet Line UT`, 2026-09-10).
+void AFieldWithAnOnLookupTriggerIsInTheLookupMap() {
+  const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
+  CHECK_TRUE("the target table declares no OnLookup, so no map",
+             agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {}, {})
+                     .text.find("kOnLookup") == std::string::npos);
+  std::string looked = original;
+  const std::size_t at = looked.find("field(5; \"Direct Unit Cost\"; Decimal)");
+  CHECK_TRUE("the source declares the field to give a trigger", at != std::string::npos);
+  const std::size_t brace = looked.find('{', at);
+  looked.insert(brace + 1, "\n            trigger OnLookup()\n            begin\n            end;");
+  const std::string generated =
+      agiru::gen::WriteHeader(agiru::al::ParseTable(looked), std::string(kAlPath), {}, {}).text;
+  CHECK_TRUE("with one, the traits carry the map",
+             generated.find("> kOnLookup{{") != std::string::npos);
+  CHECK_TRUE("naming the field and its method",
+             generated.find("record.OnLookupDirectUnitCost(); }") != std::string::npos);
+}
+
 /// A KEY NAMED `Name` WOULD GIVE `kName`, which is already the table's own name constant. 19 of the
 /// BaseApp's keys are called exactly that.
 void AKeyNamedLikeAClassConstantStillCompiles() {
@@ -343,6 +394,8 @@ int main() {
     AFieldThatShadowsARuntimeTypeStillCompiles();
     AKeyNamedLikeAClassConstantStillCompiles();
     ATableWithAnInitValueConstructsWithIt();
+    ATableDeclaredTemporaryConstructsItsStore();
+    AFieldWithAnOnLookupTriggerIsInTheLookupMap();
     ACollidingNameCarriesASeam();
   });
 }

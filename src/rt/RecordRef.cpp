@@ -262,13 +262,16 @@ void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Varian
     detail::Narrow(state, def_->no, {});
     return;
   }
-  const std::string from = detail::Literally(Format(FromValue, 0, kInvariantFormat));
+  const auto asFilter = [](const ::agiru::Variant &held) {
+    return held.IsRecordId() ? held.Get<RecordId>().ToStorageText()
+                             : std::string(Format(held, 0, kInvariantFormat));
+  };
+  const std::string from = detail::Literally(asFilter(FromValue));
   if (ToValue.IsEmpty()) {
     detail::Narrow(state, def_->no, from);
     return;
   }
-  detail::Narrow(
-      state, def_->no, from + ".." + detail::Literally(Format(ToValue, 0, kInvariantFormat)));
+  detail::Narrow(state, def_->no, from + ".." + detail::Literally(asFilter(ToValue)));
 }
 
 void FieldRef::SetFilterText(const std::string &text) const {

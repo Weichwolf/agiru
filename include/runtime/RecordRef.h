@@ -561,7 +561,7 @@ public:
   /// \param handle The handle.
   template <typename H>
     requires requires(H &h) {
-      { *h } -> std::convertible_to<const ::agiru::detail::StateHandle &>;
+      { std::remove_cvref_t<decltype(*h)>::kId } -> std::convertible_to<TableId>;
     } && (!requires { H::kId; })
   void GetTable(H &handle) {
     GetTable(*handle);
@@ -572,7 +572,7 @@ public:
   /// \param handle The handle.
   template <typename H>
     requires requires(H &h) {
-      { *h } -> std::convertible_to<const ::agiru::detail::StateHandle &>;
+      { std::remove_cvref_t<decltype(*h)>::kId } -> std::convertible_to<TableId>;
     } && (!requires { H::kId; })
   void SetTable(H &handle) {
     SetTable(*handle);
@@ -591,7 +591,8 @@ public:
   /// \param rec The stand-in.
   /// \throws Error always, naming the gap rather than instantiating traits the table lacks.
   template <typename T>
-    requires(!requires { T::kId; }) && (!std::same_as<std::remove_cvref_t<T>, ::agiru::Variant>)
+    requires(!requires { T::kId; }) && (!std::same_as<std::remove_cvref_t<T>, ::agiru::Variant>) &&
+            (!requires(T &h) { std::remove_cvref_t<decltype(*h)>::kId; })
   void GetTable(T &rec) {
     static_cast<void>(rec);
     throw Error("RecordRef.GetTable: the record's table is not translated in this build");

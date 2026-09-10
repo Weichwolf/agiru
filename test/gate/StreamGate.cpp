@@ -2,9 +2,11 @@
 #include "dotnet/BinaryWriter.h"
 #include "runtime/Error.h"
 #include "type/Blob.h"
+#include "type/Code.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/StringValue.h"
+#include "type/Text.h"
 
 #include "Check.h"
 
@@ -78,6 +80,24 @@ void ReadingWalksTheStreamAndStopsAtItsEnd() {
   CHECK_TRUE("a read longer than the stream takes what is there", in.ReadText(read, 100) == 6);
 }
 
+/// `InStream.Read(var Text)` IS THE TEXT FORM, not a typed read: AL's `Read` on a `Text` variable
+/// takes the bytes up to the terminator, the way `My Notifications` reads back the filter it wrote
+/// with `WriteText`. The overload used to demand `std::assignable_from`, which `Text` fails on the
+/// common-reference clause, and so a `Text` went to the typed refusal (17 cases, 2026-09-10).
+void ReadOfATextTakesTheTextForm() {
+  Blob blob;
+  OutStream out = blob.CreateOutStream();
+  (void)out.WriteText("WHERE(Field1=1(*))");
+  InStream in = blob.CreateInStream();
+  agiru::Text<0> filters;
+  in.Read(filters);
+  CHECK_TEXT("the text comes back whole", filters.Value(), "WHERE(Field1=1(*))");
+  in.ResetPosition();
+  agiru::Code<10> code;
+  in.Read(code, 5);
+  CHECK_TEXT("and a Code reads the same way, bounded", code.Value(), "WHERE");
+}
+
 /// A TYPED READ OR WRITE REFUSES rather than inventing a binary layout: the platform has its own,
 /// and a BLOB written with a made-up one reads back wrong wherever BC reads it.
 void ATypedReadOrWriteRefuses() {
@@ -140,6 +160,7 @@ int main() {
     WhatIsWrittenLandsInTheBlob();
     WriteTextWithNoArgumentWritesALineBreak();
     ReadingWalksTheStreamAndStopsAtItsEnd();
+    ReadOfATextTakesTheTextForm();
     ATypedReadOrWriteRefuses();
     ABinaryWriterAndReaderRoundTripANote();
   });

@@ -155,6 +155,27 @@ void ACopyOfWhatCannotBeCopiedHoldsNothing() {
   }
   CHECK_TRUE("both are freed exactly once", Counted::gone == 2);
 }
+
+/// A RECORD'S GLOBALS ARE THE VARIABLE'S OWN. `Rec := Other` copies fields; the `Var_Block` handle
+/// keeps what this variable made, and a copy starts unmade (`Globals`, see its \warning).
+void AssigningKeepsTheVariablesOwnGlobals() {
+  Reset();
+  {
+    agiru::Globals<Counted> mine;
+    mine->Value(kWritten);
+    agiru::Globals<Counted> other;
+    mine = other;
+    CHECK_TRUE("assigning from an unmade handle keeps mine", mine->Value() == kWritten);
+    CHECK_TRUE("and makes nothing", Counted::made == 1);
+    other->Value(kWritten + 1);
+    mine = other;
+    CHECK_TRUE("assigning from a made one keeps mine too", mine->Value() == kWritten);
+    agiru::Globals<Counted> copy(mine);
+    CHECK_TRUE("a copy starts unmade", Counted::made == 2);
+    CHECK_TRUE("and makes its own on first use", copy->Value() == kInitial && Counted::made == 3);
+  }
+  CHECK_TRUE("each is freed exactly once", Counted::gone == 3);
+}
 }
 
 int main() {
@@ -165,5 +186,6 @@ int main() {
     AnUnusedHandleFreesNothing();
     AHandleConvertsToTheObject();
     MovingTakesTheInstance();
+    AssigningKeepsTheVariablesOwnGlobals();
   });
 }

@@ -253,6 +253,42 @@ private:
   void (*free_)(void *) = nullptr;
 };
 
+/// \brief A record variable's own AL globals -- the `Var_Block` a generated table carries for the
+///        variables its `.al` declares -- made on the variable's first use and never anyone else's.
+///
+/// \tparam T The generated `Variables` block.
+///
+/// \warning `Rec := Other` COPIES FIELDS AND NEVER THE VARIABLE'S GLOBALS. `Currency Exchange Rate`
+///          finds a rate into an element of its global `CurrencyExchRate2` array and then does
+///          `Rec := CurrencyExchRate2[CacheNo]` -- and an assignment that copied the block handed
+///          the variable the element's EMPTY one, so the rate it had just found was gone and the
+///          cache said to use it: "Exchange Rate Amount must have a value" with a blank key (8 UT
+///          cases, measured 2026-09-10). So assigning to this handle keeps what it holds, and a
+///          copy starts with its own, unmade -- which is what the `Instance` doc already promised
+///          of a record's object variables, and what the temporary store's `load` had to arrange by
+///          hand.
+template <typename T> class Globals : public Instance<T> {
+public:
+  /// \brief Nothing made yet.
+  Globals() = default;
+
+  /// \brief A copy starts with its own, unmade.
+  Globals(const Globals &) : Instance<T>() {}
+
+  /// \brief Takes the other's.
+  Globals(Globals &&other) noexcept = default;
+
+  /// \brief AL `Rec := Other`: the globals stay this variable's own.
+  /// \return This handle, unchanged.
+  Globals &operator=(const Globals &) { return *this; }
+
+  /// \brief Takes the other's, letting go of these.
+  /// \return This handle.
+  Globals &operator=(Globals &&other) noexcept = default;
+
+  ~Globals() = default;
+};
+
 /// \brief What every AL codeunit can do, without the generated class saying any of it.
 ///
 /// \tparam Derived The generated codeunit class.

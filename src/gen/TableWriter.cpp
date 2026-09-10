@@ -300,6 +300,17 @@ bool CarriesInitValues(const al::TableObject &table,
   });
 }
 
+bool DeclaredTemporary(const al::TableObject &table) {
+  const al::Property *kind = Find(table.properties, "TableType");
+  return kind != nullptr && LowerKey(kind->text) == "temporary";
+}
+
+bool CarriesConstructor(const al::TableObject &table,
+                        const std::vector<OptionField> &options,
+                        const EnumIndex &enums) {
+  return CarriesInitValues(table, options, enums) || DeclaredTemporary(table);
+}
+
 std::string PropertyText(const al::FieldDecl &field, std::string_view name) {
   const al::Property *found = Find(field.properties, name);
   if (found == nullptr) { return {}; }
@@ -713,7 +724,7 @@ std::string ClassBody(const al::TableObject &table,
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
            FieldIdentifier(table, field.name) + "{};\n";
   }
-  if (CarriesInitValues(table, options, enums)) { out += "\n  " + tableClass + "();\n"; }
+  if (CarriesConstructor(table, options, enums)) { out += "\n  " + tableClass + "();\n"; }
 
   out += ClassConstants(table);
 
@@ -742,7 +753,7 @@ std::string ClassBody(const al::TableObject &table,
       if (DeclaresAnObject(declared)) { type.insert(0, "Instance<").append(">"); }
       out += "    " + type + " " + VariableIdentifier(table, declared.name) + ";\n";
     }
-    out += "  };\n\n  Instance<Variables> Var_Block;\n";
+    out += "  };\n\n  Globals<Variables> Var_Block;\n";
   }
   if (!publics.empty()) { out += "\n" + publics; }
   if (!locals.empty()) { out += "\nprivate:\n" + locals; }
@@ -987,11 +998,34 @@ TableHeader WriteHeader(const al::TableObject &declared,
     out += "  static constexpr std::array<agiru::OnValidateOf<" + qualified + ">, " +
            std::to_string(validated) + "> kOnValidate{{\n" + validators + "  }};\n";
   }
+  std::string lookups;
+  std::size_t lookedUp = 0;
+  for (const al::FieldDecl &field : table.fields) {
+    for (const al::Trigger &trigger : field.triggers) {
+      if (LowerKey(trigger.name) != "onlookup") { continue; }
+      const std::string member = FieldIdentifier(table, field.name);
+      lookups += "      {.field = " + qualified + "::Field_No::" + member + ",\n       .run = [](" +
+                 qualified + " &record) { record.OnLookup" + member + "(); }},\n";
+      ++lookedUp;
+    }
+  }
+  if (!lookups.empty()) {
+    out += "  static constexpr std::array<agiru::OnLookupOf<" + qualified + ">, " +
+           std::to_string(lookedUp) + "> kOnLookup{{\n" + lookups + "  }};\n";
+  }
   out += "};\n";
-  if (CarriesInitValues(table, options, enums)) {
-    out += "\ninline " + qualified + "::" + ClassName(tableIdentifier, ObjectKind::Table) +
-           "() {\n  ::agiru::detail::RuntimeInitValues(this, ::agiru::TableTraits<" + qualified +
-           ">::kTable);\n}\n";
+  if (CarriesConstructor(table, options, enums)) {
+    out +=
+        "\ninline " + qualified + "::" + ClassName(tableIdentifier, ObjectKind::Table) + "() {\n";
+    if (CarriesInitValues(table, options, enums)) {
+      out += "  ::agiru::detail::RuntimeInitValues(this, ::agiru::TableTraits<" + qualified +
+             ">::kTable);\n";
+    }
+    if (DeclaredTemporary(table)) {
+      out +=
+          "  ::agiru::detail::RuntimeMakeTemporary(this, &::agiru::kTempOps<" + qualified + ">);\n";
+    }
+    out += "}\n";
   }
   DotNetUse dotnet;
   DotNetUse absent;

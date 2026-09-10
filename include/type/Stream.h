@@ -16,6 +16,16 @@
 
 namespace agiru {
 
+/// \brief What `InStream.Read(var Value)` reads in its TEXT form: anything a `std::string_view`
+///        assigns to -- `Text`, `Code`, a `std::string`.
+///
+/// \note A REQUIRES-EXPRESSION AND NOT `std::assignable_from`, because that concept also demands a
+///       common reference between the two types, which `Text` and `std::string_view` do not have --
+///       so under it `Read(Filters)` with `Filters: Text` fell through to the typed refusal, and
+///       `My Notifications` could not read its own filter BLOB (17 cases, measured 2026-09-10).
+template <typename T>
+concept TextAssignable = requires(T &target, std::string_view text) { target = text; };
+
 /// \brief AL `OutStream` -- what a BLOB is written through.
 ///
 /// \note IT DOES NOT OWN THE BLOB. `Blob.CreateOutStream(Out)` points a stream at a BLOB that
@@ -191,7 +201,7 @@ public:
   ///       from `ReadText`: `devenv-write-read-methods-line-break-behavior.md` reads
   ///       `A<CR><LF>B` back as one value here and as two there.
   template <typename T>
-    requires std::assignable_from<T &, std::string_view>
+    requires TextAssignable<T>
   Integer Read(T &value, Integer length) {
     std::string got;
     const Integer read = ReadTerminated(got, length);
@@ -204,7 +214,7 @@ public:
   /// \param value Receives what was read.
   /// \return How many bytes were read, the terminator counted.
   template <typename T>
-    requires std::assignable_from<T &, std::string_view>
+    requires TextAssignable<T>
   Integer Read(T &value) {
     return Read(value, -1);
   }
@@ -215,7 +225,7 @@ public:
   /// \throws Error always.
   /// \warning REFUSED, for the reason OutStream::Write gives.
   template <typename T>
-    requires(!std::assignable_from<T &, std::string_view>)
+    requires(!TextAssignable<T>)
   void Read(T &value) {
     static_cast<void>(value);
     RefuseTyped();

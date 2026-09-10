@@ -414,6 +414,12 @@ template <typename T> [[nodiscard]] std::string AsText(const T &value) {
 /// \param value The value.
 /// \return The text the filter language holds.
 ///
+/// \warning A RECORDID FILTERS BY ITS STORED FORM, for the same reason: `Format(RecordId)` is a
+///          caption and a key that nothing can read back into a table number, while the column
+///          holds `<table>\x1f<caption>\x1f<key>` (`RecordId::ToStorageText`). A `SetRange(Value,
+///          RecRef.RecordId)` against a `RecordID` column therefore binds the stored form, and a
+///          temporary row is compared on the same form (`Record Set UT`, measured 2026-09-10).
+///
 /// \warning AN ENUMERATION FILTERS BY ITS ORDINAL AND RENDERS BY ITS CAPTION, AND THE TWO ARE NOT
 ///          THE SAME TEXT. `option-data-type.md` calls an option "a zero-based enumerator type" and
 ///          the column holds that number, so `SetRange(Type, Type::Resource)` is `"Type" = 0`;
@@ -426,6 +432,8 @@ template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
     return std::to_string(static_cast<std::int32_t>(value));
   } else if constexpr (requires { value.AsInteger(); }) {
     return std::to_string(value.AsInteger());
+  } else if constexpr (requires { value.ToStorageText(); }) {
+    return value.ToStorageText();
   } else {
     return AsText(value);
   }
