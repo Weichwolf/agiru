@@ -454,6 +454,7 @@ public:
     partName_ = std::string(name);
     page_ = nullptr;
     owned_ = false;
+    Bind_();
   }
 
   [[nodiscard]] void *PartInstance(std::string_view control) override {

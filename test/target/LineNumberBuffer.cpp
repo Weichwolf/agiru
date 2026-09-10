@@ -2,6 +2,8 @@
 
 #include "LineNumberBuffer.h"
 
+#include "runtime/Catalogue.h"
+
 // @door
 
 namespace agiru::app::tables {
@@ -39,5 +41,9 @@ static_assert(std::is_standard_layout_v<LineNumberBuffer>,
               "offsetof over the field table requires standard layout. The base carries NO data, "
               "which is what keeps it so");
 static_assert(kLineNumberBufferFields.size() == 2, "table 283 declares 2 fields");
+
+namespace {
+const RegisterTable<LineNumberBuffer> kInCatalogue;
+}
 
 } // namespace agiru::app::tables

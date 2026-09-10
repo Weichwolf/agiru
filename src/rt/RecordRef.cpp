@@ -175,15 +175,7 @@ std::string FieldRef::ToText() const {
 }
 
 void RecordRef::GetTable(Variant &rec) {
-  const RecordInVariant *held = rec.HeldRecord();
-  if (held == nullptr) { throw Error("RecordRef.GetTable: this Variant holds no record"); }
-  const TableEntry *entry = FindTable(held->table);
-  if (entry == nullptr) {
-    throw Error("RecordRef.GetTable: table " + std::to_string(held->table.Value()) +
-                " is not installed in this binary");
-  }
-  Open(held->table.Value());
-  entry->copy(State().record, held->record);
+  detail::RecordRefFromVariant(*this, rec);
 }
 
 std::string RecordRef::GetFilters() const {
@@ -495,6 +487,12 @@ bool RecordRef::FieldExist(Integer fieldNo) const {
 
 namespace detail {
 
+::agiru::Integer RelationTableNo(const FieldDef *def) {
+  if (def == nullptr || def->relationTable.empty()) { return 0; }
+  const TableEntry *entry = FindTable(def->relationTable);
+  return entry == nullptr ? 0 : entry->table->id.Value();
+}
+
 void RecordRefFromVariant(RecordRef &into, const Variant &held) {
   if (held.IsRecordRef()) {
     into.Copy(static_cast<const RecordRef &>(held));
@@ -510,6 +508,9 @@ void RecordRefFromVariant(RecordRef &into, const Variant &held) {
   }
   into.Open(record.table.Value());
   entry->copy(into.State().record, record.record);
+  if (RuntimeIsTemporary(record.record)) {
+    RuntimeAdoptTemporary(into.State().record, record.record);
+  }
 }
 
 }

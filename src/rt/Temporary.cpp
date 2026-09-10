@@ -209,6 +209,15 @@ void RuntimeShareTemporary(void *record, const void *from) {
   state->positioned = false;
 }
 
+void RuntimeAdoptTemporary(void *record, const void *from) {
+  const RecordState *source = PeekOf(from);
+  if (source == nullptr || source->temporary == nullptr) { return; }
+  RecordState *state = StateOf(record);
+  state->temporary = source->temporary;
+  state->view.clear();
+  state->positioned = false;
+}
+
 bool TempInsert(void *record, const TableDef &table) {
   const Held held = Reach(record);
   const std::size_t at = LowerBound(*held.temp, table, record);

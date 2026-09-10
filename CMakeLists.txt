@@ -326,8 +326,13 @@ endif()
 # was translated once PER GATE -- 30 copies of `ResourceCost.cpp.o` for two source files, each one
 # parsing the whole door again. The image does not depend on which case links it, so translating it
 # per case bought nothing at all.
+#
+# AND IT IS AN OBJECT LIBRARY, NOT A STATIC ONE: a static archive lends the linker only the objects
+# a case references, and a table's catalogue registration -- a namespace-scope `RegisterTable` in
+# its own definition unit -- is referenced by nothing, so it was dropped and `RecordRef.Open(202)`
+# found "no table 202" in every gate that opened one (measured 2026-09-10).
 file(GLOB target_image CONFIGURE_DEPENDS "test/target/*.cpp")
-add_library(gate_image STATIC ${target_image})
+add_library(gate_image OBJECT ${target_image})
 target_include_directories(gate_image PUBLIC
   "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/target")
 

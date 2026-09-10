@@ -428,6 +428,14 @@ void RuntimeDeleteLinks(const RecordId &of);
 /// \throws Error when either is not temporary, which is what the platform refuses too.
 void RuntimeShareTemporary(void *record, const void *from);
 
+/// \brief AL `RecordRef.GetTable(TempRecord)`: the reference refers to the temporary rows the
+///        record holds, so `RecRef.FindSet` walks them and not the table -- `IsTemporary` is true
+///        on the reference afterwards (`recordref-gettable-method.md`). Unlike `Copy(From, true)`
+///        the target need not be temporary yet: it becomes so by adopting the store.
+/// \param record The reference's record.
+/// \param from The temporary record.
+void RuntimeAdoptTemporary(void *record, const void *from);
+
 /// \brief AL `Record.Reset()` on any record: the filters, marks, key and load selection go, and
 ///        a temporary record's ROWS stay.
 /// \param record The record.

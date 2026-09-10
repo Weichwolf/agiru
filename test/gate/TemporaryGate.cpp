@@ -1,9 +1,11 @@
 #include "runtime/Codeunit.h"
 #include "runtime/Error.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
+#include "type/Variant.h"
 
 #include "Check.h"
 #include "LineNumberBuffer.h"
@@ -221,6 +223,23 @@ void AssigningOneHandleToAnotherKeepsTheRowsApart() {
   CHECK_TRUE("while the buffer keeps one row", buffer->Count() == 1);
 }
 
+/// A RECORDREF OVER A TEMPORARY RECORD WALKS ITS ROWS AND NOT THE TABLE
+/// (`recordref-gettable-method.md`: the reference is temporary afterwards). `Record Set
+/// Management` hands its temporary set to a RecordRef through a Variant and counted the table
+/// instead -- 159 customers where the set held 1 (Record Set UT, 57 cases, 2026-09-10).
+void ARecordRefOverATemporaryRecordSeesItsRows() {
+  Temporary<LineNumberBuffer> buffer = With({1, 2, 3});
+  agiru::RecordRef reference;
+  reference.GetTable(buffer);
+  CHECK_TRUE("the reference is temporary", reference.IsTemporary());
+  CHECK_TRUE("and counts the rows", reference.Count() == 3);
+  agiru::Variant held(buffer);
+  agiru::RecordRef fromVariant;
+  fromVariant.GetTable(held);
+  CHECK_TRUE("and one taken from a Variant is temporary", fromVariant.IsTemporary());
+  CHECK_TRUE("and counts the rows too", fromVariant.Count() == 3);
+}
+
 void AFilterNarrowsATemporaryWalk() {
   constexpr agiru::Integer kFive = 5;
   Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
@@ -318,6 +337,7 @@ int main() {
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
+    ARecordRefOverATemporaryRecordSeesItsRows();
     AssigningOneHandleToAnotherKeepsTheRowsApart();
     AnOptionAndADecimalFilterATemporaryRowByValue();
     RowsWalkInPrimaryKeyOrder();

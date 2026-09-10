@@ -122,6 +122,12 @@ namespace detail {
 /// \param into The reference.
 /// \param held The Variant.
 void RecordRefFromVariant(RecordRef &into, const Variant &held);
+
+/// \brief AL `FieldRef.Relation()`: the number of the table the field's `TableRelation` names,
+///        0 when it names none or the table is not in this build.
+/// \param def The field, or nothing.
+/// \return The table number.
+[[nodiscard]] ::agiru::Integer RelationTableNo(const FieldDef *def);
 }
 }
 
@@ -368,11 +374,8 @@ public:
   ::agiru::RecordRef Record() const;
 
   /// \brief AL `FieldRef.Relation()`. Finds the table relationship of a given field.
-  /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer Relation() const {
-    throw Error("FieldRef.Relation() is declared and not implemented yet (board:0035)");
-  }
+  /// \return The related table's number, or 0 when the field relates to none in this build.
+  ::agiru::Integer Relation() const { return detail::RelationTableNo(def_); }
 
   /// \brief AL `FieldRef.SetFilter(...)` where the filter text is a member the runtime has not
   ///        rebuilt.
@@ -549,6 +552,7 @@ public:
   void GetTable(T &rec) {
     Open(TableTraits<T>::kTable.id.Value());
     *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
+    if (detail::RuntimeIsTemporary(&rec)) { detail::RuntimeAdoptTemporary(State().record, &rec); }
   }
 
   /// \brief AL `RecordRef.GetTable(Record)` on a record global held by handle, which is how a

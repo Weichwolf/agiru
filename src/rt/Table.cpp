@@ -231,7 +231,10 @@ void SetFieldText(void *record, const FieldDef &def, std::string_view text) {
       return;
     }
     case FieldType::Decimal:
-      *reinterpret_cast<Decimal *>(At(record, def)) = Decimal::FromInvariantString(text);
+      *reinterpret_cast<Decimal *>(At(record, def)) =
+          text.find_first_not_of(' ') == std::string_view::npos
+              ? Decimal{}
+              : Decimal::FromInvariantString(text);
       return;
     case FieldType::Boolean:
       *reinterpret_cast<Boolean *>(At(record, def)) =
