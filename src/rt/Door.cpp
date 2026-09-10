@@ -891,81 +891,6 @@ std::string HttpResponseMessage::ReasonPhrase() {
   RefuseDoor("HttpResponseMessage.ReasonPhrase()");
 }
 
-void JsonArray::Add(::agiru::BigInteger Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(BigInteger)");
-}
-
-void JsonArray::Add(::agiru::Boolean Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Boolean)");
-}
-
-void JsonArray::Add(::agiru::Byte Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Byte)");
-}
-
-void JsonArray::Add(::agiru::Char Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Char)");
-}
-
-void JsonArray::Add(::agiru::Date Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Date)");
-}
-
-void JsonArray::Add(::agiru::DateTime Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(DateTime)");
-}
-
-void JsonArray::Add(::agiru::Decimal Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Decimal)");
-}
-
-void JsonArray::Add(::agiru::Duration Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Duration)");
-}
-
-void JsonArray::Add(::agiru::Integer Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Integer)");
-}
-
-void JsonArray::Add(const ::agiru::JsonArray &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(JsonArray)");
-}
-
-void JsonArray::Add(const ::agiru::JsonObject &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(JsonObject)");
-}
-
-void JsonArray::Add(const ::agiru::JsonToken &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(JsonToken)");
-}
-
-void JsonArray::Add(const ::agiru::JsonValue &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(JsonValue)");
-}
-
-void JsonArray::Add(std::string_view Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Text)");
-}
-
-void JsonArray::Add(::agiru::Time Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Add(Time)");
-}
-
 ::agiru::JsonToken JsonArray::AsToken() {
   RefuseDoor("JsonArray.AsToken()");
 }
@@ -980,16 +905,6 @@ void JsonArray::Add(::agiru::Time Value) {
 
 ::agiru::JsonToken *JsonArray::end() {
   RefuseDoor("JsonArray.end()");
-}
-
-::agiru::Integer JsonArray::Count() {
-  RefuseDoor("JsonArray.Count()");
-}
-
-::agiru::Boolean JsonArray::Get(::agiru::Integer Index, ::agiru::JsonToken &Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Get(Integer, JsonToken)");
 }
 
 ::agiru::JsonArray JsonArray::GetArray(::agiru::Integer Index) {
@@ -1062,171 +977,6 @@ std::string JsonArray::GetText(::agiru::Integer Index) {
   RefuseDoor("JsonArray.GetTime(Integer)");
 }
 
-::agiru::Integer JsonArray::IndexOf(::agiru::BigInteger Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(BigInteger)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Boolean Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Boolean)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Byte Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Byte)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Char Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Char)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Date Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Date)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::DateTime Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(DateTime)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Decimal Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Decimal)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Duration Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Duration)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Integer Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Integer)");
-}
-
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonArray &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(JsonArray)");
-}
-
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonObject &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(JsonObject)");
-}
-
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonToken &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(JsonToken)");
-}
-
-::agiru::Integer JsonArray::IndexOf(const ::agiru::JsonValue &Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(JsonValue)");
-}
-
-::agiru::Integer JsonArray::IndexOf(std::string_view Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Text)");
-}
-
-::agiru::Integer JsonArray::IndexOf(::agiru::Time Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.IndexOf(Time)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::BigInteger Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, BigInteger)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Boolean Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Boolean)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Byte Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Byte)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Char Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Char)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Date Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Date)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::DateTime Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, DateTime)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Decimal Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Decimal)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Duration Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Duration)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Integer Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Integer)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonArray &Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, JsonArray)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonObject &Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, JsonObject)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonToken &Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, JsonToken)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, const ::agiru::JsonValue &Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, JsonValue)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, std::string_view Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Text)");
-}
-
-::agiru::Boolean JsonArray::Insert(::agiru::Integer Index, ::agiru::Time Value) {
-  static_cast<void>(Index);
-  static_cast<void>(Value);
-  RefuseDoor("JsonArray.Insert(Integer, Time)");
-}
-
 std::string JsonArray::Path() {
   RefuseDoor("JsonArray.Path()");
 }
@@ -1236,22 +986,6 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonArray.ReadFrom(InStream)");
 }
 
-::agiru::Boolean JsonArray::ReadFrom(std::string_view String) {
-  static_cast<void>(String);
-  RefuseDoor("JsonArray.ReadFrom(Text)");
-}
-
-::agiru::Boolean JsonArray::RemoveAt(::agiru::Integer Index) {
-  static_cast<void>(Index);
-  RefuseDoor("JsonArray.RemoveAt(Integer)");
-}
-
-::agiru::Boolean JsonArray::SelectToken(std::string_view Path, ::agiru::JsonToken &Result) {
-  static_cast<void>(Path);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.SelectToken(Text, JsonToken)");
-}
-
 ::agiru::Boolean JsonArray::SelectTokens(std::string_view Path,
                                          ::agiru::List<::agiru::JsonToken> &Result) {
   static_cast<void>(Path);
@@ -1259,194 +993,9 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonArray.SelectTokens(Text, List of [JsonToken])");
 }
 
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::BigInteger Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, BigInteger)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Boolean Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Boolean)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Byte Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Byte)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Char Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Char)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Date Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Date)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::DateTime Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, DateTime)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Decimal Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Decimal)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Duration Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Duration)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Integer Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Integer)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonArray &Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, JsonArray)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonObject &Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, JsonObject)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonToken &Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, JsonToken)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, const ::agiru::JsonValue &Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, JsonValue)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, std::string_view Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Text)");
-}
-
-::agiru::Boolean JsonArray::Set(::agiru::Integer Index, ::agiru::Time Result) {
-  static_cast<void>(Index);
-  static_cast<void>(Result);
-  RefuseDoor("JsonArray.Set(Integer, Time)");
-}
-
 ::agiru::Boolean JsonArray::WriteTo(const ::agiru::OutStream &OutStream) {
   static_cast<void>(OutStream);
   RefuseDoor("JsonArray.WriteTo(OutStream)");
-}
-
-::agiru::Boolean JsonArray::WriteTo(::agiru::Text<0> &String) {
-  static_cast<void>(String);
-  RefuseDoor("JsonArray.WriteTo(Text)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::BigInteger Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, BigInteger)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Boolean Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Boolean)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Byte Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Byte)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Char Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Char)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Date Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Date)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::DateTime Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, DateTime)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Decimal Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Decimal)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Duration Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Duration)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Integer Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Integer)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonArray &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, JsonArray)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonObject &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, JsonObject)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonToken &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, JsonToken)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, const ::agiru::JsonValue &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, JsonValue)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, std::string_view Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Text)");
-}
-
-::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::Time Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Add(Text, Time)");
 }
 
 ::agiru::JsonToken JsonObject::AsToken() {
@@ -1457,34 +1006,11 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonObject.Clone()");
 }
 
-::agiru::Boolean JsonObject::Contains(std::string_view Key) {
-  static_cast<void>(Key);
-  RefuseDoor("JsonObject.Contains(Text)");
-}
-
-::agiru::Boolean JsonObject::Get(std::string_view Key, ::agiru::JsonToken &Result) {
-  static_cast<void>(Key);
-  static_cast<void>(Result);
-  RefuseDoor("JsonObject.Get(Text, JsonToken)");
-}
-
-::agiru::JsonArray JsonObject::GetArray(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetArray(Text, Boolean)");
-}
-
 ::agiru::BigInteger JsonObject::GetBigInteger(std::string_view Key,
                                               ::agiru::Boolean DefaultIfNotFound) {
   static_cast<void>(Key);
   static_cast<void>(DefaultIfNotFound);
   RefuseDoor("JsonObject.GetBigInteger(Text, Boolean)");
-}
-
-::agiru::Boolean JsonObject::GetBoolean(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetBoolean(Text, Boolean)");
 }
 
 ::agiru::Byte JsonObject::GetByte(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
@@ -1512,30 +1038,11 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonObject.GetDateTime(Text, Boolean)");
 }
 
-::agiru::Decimal JsonObject::GetDecimal(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetDecimal(Text, Boolean)");
-}
-
 ::agiru::Duration JsonObject::GetDuration(std::string_view Key,
                                           ::agiru::Boolean DefaultIfNotFound) {
   static_cast<void>(Key);
   static_cast<void>(DefaultIfNotFound);
   RefuseDoor("JsonObject.GetDuration(Text, Boolean)");
-}
-
-::agiru::Integer JsonObject::GetInteger(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetInteger(Text, Boolean)");
-}
-
-::agiru::JsonObject JsonObject::GetObject(std::string_view Key,
-                                          ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetObject(Text, Boolean)");
 }
 
 ::agiru::Integer JsonObject::GetOption(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
@@ -1544,20 +1051,10 @@ std::string JsonArray::Path() {
   RefuseDoor("JsonObject.GetOption(Text, Boolean)");
 }
 
-std::string JsonObject::GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
-  static_cast<void>(Key);
-  static_cast<void>(DefaultIfNotFound);
-  RefuseDoor("JsonObject.GetText(Text, Boolean)");
-}
-
 ::agiru::Time JsonObject::GetTime(std::string_view Key, ::agiru::Boolean DefaultIfNotFound) {
   static_cast<void>(Key);
   static_cast<void>(DefaultIfNotFound);
   RefuseDoor("JsonObject.GetTime(Text, Boolean)");
-}
-
-::agiru::List<std::string> JsonObject::Keys() {
-  RefuseDoor("JsonObject.Keys()");
 }
 
 std::string JsonObject::Path() {
@@ -1567,11 +1064,6 @@ std::string JsonObject::Path() {
 ::agiru::Boolean JsonObject::ReadFrom(const ::agiru::InStream &InStream) {
   static_cast<void>(InStream);
   RefuseDoor("JsonObject.ReadFrom(InStream)");
-}
-
-::agiru::Boolean JsonObject::ReadFrom(std::string_view String) {
-  static_cast<void>(String);
-  RefuseDoor("JsonObject.ReadFrom(Text)");
 }
 
 ::agiru::Boolean JsonObject::ReadFromYaml(const ::agiru::InStream &InStream) {
@@ -1584,107 +1076,6 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.ReadFromYaml(Text)");
 }
 
-::agiru::Boolean JsonObject::Remove(std::string_view Key) {
-  static_cast<void>(Key);
-  RefuseDoor("JsonObject.Remove(Text)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::BigInteger Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, BigInteger)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Boolean Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Boolean)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Byte Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Byte)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Char Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Char)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Date Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Date)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::DateTime Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, DateTime)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Decimal Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Decimal)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Duration Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Duration)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Integer Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Integer)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonArray &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, JsonArray)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonObject &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, JsonObject)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonToken &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, JsonToken)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, const ::agiru::JsonValue &Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, JsonValue)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, std::string_view Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Text)");
-}
-
-::agiru::Boolean JsonObject::Replace(std::string_view Key, ::agiru::Time Value) {
-  static_cast<void>(Key);
-  static_cast<void>(Value);
-  RefuseDoor("JsonObject.Replace(Text, Time)");
-}
-
-::agiru::Boolean JsonObject::SelectToken(std::string_view Path, ::agiru::JsonToken &Result) {
-  static_cast<void>(Path);
-  static_cast<void>(Result);
-  RefuseDoor("JsonObject.SelectToken(Text, JsonToken)");
-}
-
 ::agiru::Boolean JsonObject::SelectTokens(std::string_view Path,
                                           ::agiru::List<::agiru::JsonToken> &Result) {
   static_cast<void>(Path);
@@ -1692,18 +1083,9 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.SelectTokens(Text, List of [JsonToken])");
 }
 
-::agiru::List<::agiru::JsonToken> JsonObject::Values() {
-  RefuseDoor("JsonObject.Values()");
-}
-
 ::agiru::Boolean JsonObject::WriteTo(const ::agiru::OutStream &OutStream) {
   static_cast<void>(OutStream);
   RefuseDoor("JsonObject.WriteTo(OutStream)");
-}
-
-::agiru::Boolean JsonObject::WriteTo(::agiru::Text<0> &String) {
-  static_cast<void>(String);
-  RefuseDoor("JsonObject.WriteTo(Text)");
 }
 
 ::agiru::Boolean JsonObject::WriteToYaml(const ::agiru::OutStream &OutStream) {
@@ -1733,32 +1115,8 @@ std::string JsonObject::Path() {
   RefuseDoor("JsonObject.WriteWithSecretsTo(Text, SecretText, SecretText)");
 }
 
-::agiru::JsonArray JsonToken::AsArray() {
-  RefuseDoor("JsonToken.AsArray()");
-}
-
-::agiru::JsonObject JsonToken::AsObject() {
-  RefuseDoor("JsonToken.AsObject()");
-}
-
-::agiru::JsonValue JsonToken::AsValue() {
-  RefuseDoor("JsonToken.AsValue()");
-}
-
 ::agiru::JsonToken JsonToken::Clone() {
   RefuseDoor("JsonToken.Clone()");
-}
-
-::agiru::Boolean JsonToken::IsArray() {
-  RefuseDoor("JsonToken.IsArray()");
-}
-
-::agiru::Boolean JsonToken::IsObject() {
-  RefuseDoor("JsonToken.IsObject()");
-}
-
-::agiru::Boolean JsonToken::IsValue() {
-  RefuseDoor("JsonToken.IsValue()");
 }
 
 std::string JsonToken::Path() {
@@ -1793,29 +1151,12 @@ std::string JsonToken::Path() {
   RefuseDoor("JsonToken.WriteTo(OutStream)");
 }
 
-::agiru::Boolean JsonToken::WriteTo(::agiru::Text<0> &String) {
-  static_cast<void>(String);
-  RefuseDoor("JsonToken.WriteTo(Text)");
-}
-
-::agiru::BigInteger JsonValue::AsBigInteger() {
-  RefuseDoor("JsonValue.AsBigInteger()");
-}
-
-::agiru::Boolean JsonValue::AsBoolean() {
-  RefuseDoor("JsonValue.AsBoolean()");
-}
-
 ::agiru::Byte JsonValue::AsByte() {
   RefuseDoor("JsonValue.AsByte()");
 }
 
 ::agiru::Char JsonValue::AsChar() {
   RefuseDoor("JsonValue.AsChar()");
-}
-
-std::string JsonValue::AsCode() {
-  RefuseDoor("JsonValue.AsCode()");
 }
 
 ::agiru::Date JsonValue::AsDate() {
@@ -1826,24 +1167,12 @@ std::string JsonValue::AsCode() {
   RefuseDoor("JsonValue.AsDateTime()");
 }
 
-::agiru::Decimal JsonValue::AsDecimal() {
-  RefuseDoor("JsonValue.AsDecimal()");
-}
-
 ::agiru::Duration JsonValue::AsDuration() {
   RefuseDoor("JsonValue.AsDuration()");
 }
 
-::agiru::Integer JsonValue::AsInteger() {
-  RefuseDoor("JsonValue.AsInteger()");
-}
-
 ::agiru::Integer JsonValue::AsOption() {
   RefuseDoor("JsonValue.AsOption()");
-}
-
-std::string JsonValue::AsText() {
-  RefuseDoor("JsonValue.AsText()");
 }
 
 ::agiru::Time JsonValue::AsTime() {
@@ -1856,10 +1185,6 @@ std::string JsonValue::AsText() {
 
 ::agiru::JsonToken JsonValue::Clone() {
   RefuseDoor("JsonValue.Clone()");
-}
-
-::agiru::Boolean JsonValue::IsNull() {
-  RefuseDoor("JsonValue.IsNull()");
 }
 
 ::agiru::Boolean JsonValue::IsUndefined() {
@@ -1884,61 +1209,6 @@ std::string JsonValue::Path() {
   static_cast<void>(Path);
   static_cast<void>(Result);
   RefuseDoor("JsonValue.SelectToken(Text, JsonToken)");
-}
-
-void JsonValue::SetValue(::agiru::BigInteger Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(BigInteger)");
-}
-
-void JsonValue::SetValue(::agiru::Boolean Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Boolean)");
-}
-
-void JsonValue::SetValue(::agiru::Byte Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Byte)");
-}
-
-void JsonValue::SetValue(::agiru::Char Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Char)");
-}
-
-void JsonValue::SetValue(::agiru::Date Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Date)");
-}
-
-void JsonValue::SetValue(::agiru::DateTime Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(DateTime)");
-}
-
-void JsonValue::SetValue(::agiru::Decimal Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Decimal)");
-}
-
-void JsonValue::SetValue(::agiru::Duration Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Duration)");
-}
-
-void JsonValue::SetValue(::agiru::Integer Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Integer)");
-}
-
-void JsonValue::SetValue(std::string_view Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Text)");
-}
-
-void JsonValue::SetValue(::agiru::Time Value) {
-  static_cast<void>(Value);
-  RefuseDoor("JsonValue.SetValue(Time)");
 }
 
 void JsonValue::SetValueToNull() {

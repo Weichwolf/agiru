@@ -163,6 +163,7 @@ endif()
 if(TARGET agiru_net)
   find_package(LibXml2 REQUIRED)
   target_link_libraries(agiru_net PRIVATE LibXml2::LibXml2)
+  target_include_directories(agiru_net PRIVATE "${CMAKE_SOURCE_DIR}/third_party")
 endif()
 
 

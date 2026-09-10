@@ -13,6 +13,7 @@
 #include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/JsonHandle.h"
 #include "type/List.h"
 #include "type/RecordId.h"
 #include "type/SecretText.h"
@@ -529,6 +530,14 @@ public:
   ::agiru::Boolean WriteWithSecretsTo(std::string_view Path,
                                       const ::agiru::SecretText &Secret,
                                       ::agiru::SecretText &Result);
+
+public:
+  /// \brief The node this value refers to, which is how two AL variables share one.
+  ///
+  /// \note A DECLARED VARIABLE ALREADY HOLDS ONE. AL's `JsonObject` starts as an empty
+  ///       object and `JsonArray` as an empty array -- `JsonObject.Add` on a variable
+  ///       nothing was read into is ordinary AL and must work.
+  ::agiru::detail::JsonHandle Handle_ = ::agiru::detail::NewJsonObject();
 };
 
 }
