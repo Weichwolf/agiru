@@ -17,9 +17,11 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 /// \file
 /// \brief AL `XmlNode` -- the surface the platform documentation declares.
@@ -52,12 +54,34 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddAfterSelf(const ::agiru::Variant &Content);
 
+  /// \brief AL `AddAfterSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddAfterSelf(const First &first, const Rest &...rest) {
+    return AddAfterSelf(::agiru::Variant(first)) && (AddAfterSelf(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlNode.AddBeforeSelf(Any)`. Adds the specified content immediately before this
   /// node.
   /// \param Content The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddBeforeSelf(const ::agiru::Variant &Content);
+
+  /// \brief AL `AddBeforeSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddBeforeSelf(const First &first, const Rest &...rest) {
+    return AddBeforeSelf(::agiru::Variant(first)) && (AddBeforeSelf(::agiru::Variant(rest)) && ...);
+  }
 
   /// \brief AL `XmlNode.AsXmlAttribute()`. Converts the node to an XmlAttribute node. The operation
   /// will fail if the node is not an XmlAttribute.
@@ -257,6 +281,22 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
+
+  /// \brief The node this value refers to; empty for a value never assigned.
+  [[nodiscard]] const detail::XmlHandle &Handle() const noexcept { return handle_; }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::Node;
+
+  /// \brief A value over a node, made by the engine.
+  /// \param handle The node.
+  explicit XmlNode(detail::XmlHandle handle) noexcept : handle_(std::move(handle)) {}
+
+  /// \brief A value that refers to nothing yet, which AL's declaration is.
+  XmlNode() = default;
+
+private:
+  detail::XmlHandle handle_;
 };
 
 }

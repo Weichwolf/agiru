@@ -2019,6 +2019,7 @@ std::string NearestPresent(const std::string &type, const agiru::gen::DotNetUse 
   for (auto found = DotNetBase().find(walking); found != DotNetBase().end();
        found = DotNetBase().find(walking)) {
     walking = found->second;
+    if (Rebuilt().contains(walking)) { return {}; }
     if (use.contains(walking)) { return walking; }
   }
   return {};

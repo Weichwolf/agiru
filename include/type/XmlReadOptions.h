@@ -43,6 +43,9 @@ public:
   ::agiru::Boolean PreserveWhitespace();
 
   ::agiru::Boolean PreserveWhitespace(::agiru::Boolean NewValue);
+
+private:
+  ::agiru::Boolean preserveWhitespace_ = false;
 };
 
 }

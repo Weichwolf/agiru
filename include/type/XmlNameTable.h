@@ -16,9 +16,11 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 /// \file
 /// \brief AL `XmlNameTable` -- the surface the platform documentation declares.
@@ -45,6 +47,9 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Get(std::string_view Key, ::agiru::Text<0> &Result);
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::NameTable;
 };
 
 }

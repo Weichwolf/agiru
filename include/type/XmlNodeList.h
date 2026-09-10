@@ -15,9 +15,12 @@
 #include "type/RecordId.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 /// \file
 /// \brief AL `XmlNodeList` -- the surface the platform documentation declares.
@@ -54,6 +57,23 @@ public:
   /// \return A pointer one past the last node.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::XmlNode *end();
+
+  /// \brief The nodes, in document order.
+  [[nodiscard]] const std::vector<detail::XmlHandle> &Items() const noexcept { return items_; }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::NodeList;
+
+  /// \brief A list over nodes, made by the engine.
+  /// \param items The nodes.
+  explicit XmlNodeList(std::vector<detail::XmlHandle> items) noexcept : items_(std::move(items)) {}
+
+  /// \brief An empty list, which AL's declaration is.
+  XmlNodeList() = default;
+
+private:
+  std::vector<detail::XmlHandle> items_;
+  mutable std::vector<XmlNode> walked_;
 };
 
 }

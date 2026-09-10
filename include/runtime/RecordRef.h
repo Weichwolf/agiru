@@ -721,18 +721,14 @@ public:
 
   /// \brief AL `RecordRef.CopyLinks(RecordRef)`. Copies all the links from a particular record.
   /// \param FromRecord The AL `RecordRef`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CopyLinks(const ::agiru::RecordRef &FromRecord) {
-    static_cast<void>(FromRecord);
-    throw Error("RecordRef.CopyLinks(RecordRef) is declared and not implemented yet (board:0035)");
+    detail::RuntimeCopyLinks(FromRecord.RecordId(), RecordId());
   }
 
   /// \brief AL `RecordRef.CopyLinks(Variant)`. Copies all the links from a particular record.
   /// \param FromRecordOrRecordRef The AL `Variant`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void CopyLinks(const ::agiru::Variant &FromRecordOrRecordRef) {
-    static_cast<void>(FromRecordOrRecordRef);
-    throw Error("RecordRef.CopyLinks(Variant) is declared and not implemented yet (board:0035)");
+    detail::RuntimeCopyLinks(detail::RecordIdInVariant(FromRecordOrRecordRef), RecordId());
   }
 
   /// \brief AL `RecordRef.Count()`. Counts the number of records that are in the filters that are

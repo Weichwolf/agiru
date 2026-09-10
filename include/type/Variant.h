@@ -18,6 +18,7 @@
 #include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/Time.h"
+#include "type/XmlHandle.h"
 
 #include <concepts>
 #include <cstdint>
@@ -69,6 +70,19 @@ template <typename T> struct CodeunitTraits;
 ///
 /// \note THE COST IS A ROW COPY PER VARIANT, which is AL's own cost. `StrSubstNo('%1', Rec)`
 ///       copies the row it formats; that is microseconds against the query it describes.
+/// \brief An AL XML value inside a Variant: the node it refers to and which AL type it was seen as,
+///        so `Element.Add(Content: Any)` can take an `XmlElement`, an `XmlText` or an `XmlNode`
+///        and `Variant.IsXmlElement()` answers by the type and not the node.
+struct XmlInVariant {
+  detail::XmlHandle handle; ///< The node.
+  detail::XmlKind kind;     ///< The AL type it travelled as.
+
+  /// \brief Two XML values are equal when they refer to the same node as the same type.
+  friend bool operator==(const XmlInVariant &a, const XmlInVariant &b) {
+    return a.handle.node == b.handle.node && a.kind == b.kind;
+  }
+};
+
 class RecordInVariant {
 public:
   /// \brief Takes a copy of the record.
@@ -284,7 +298,8 @@ public:
                             OrdinalInVariant,
                             RecordInVariant,
                             RecordRefInVariant,
-                            CodeunitInVariant>;
+                            CodeunitInVariant,
+                            XmlInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
@@ -328,6 +343,33 @@ public:
   template <typename T>
     requires detail::InVariant<T, Held>::value
   Variant(T value) : held_(std::move(value)) {}
+
+  /// \brief AL `Variant := XmlElement` (and every other AL XML node type): the node travels by
+  ///        reference, the way the XML types themselves do.
+  /// \tparam T An AL XML node type, which carries its kind and its handle.
+  /// \param value The value.
+  template <typename T>
+    requires requires(const T &value) {
+      { T::kKind } -> std::convertible_to<detail::XmlKind>;
+      { value.Handle() } -> std::convertible_to<const detail::XmlHandle &>;
+    }
+  explicit(false) Variant(const T &value)
+      : held_(XmlInVariant{.handle = value.Handle(), .kind = T::kKind}) {}
+
+  /// \brief The XML node this holds, for the XML types' `Add(Any)`.
+  /// \return The handle, or nothing when this is not an XML value.
+  [[nodiscard]] const detail::XmlHandle *XmlHeld() const {
+    const auto *held = std::get_if<XmlInVariant>(&held_);
+    return held == nullptr ? nullptr : &held->handle;
+  }
+
+  /// \brief Which AL XML type this holds.
+  /// \param kind The type asked about.
+  /// \return True when it holds an XML value seen as that type.
+  [[nodiscard]] bool HoldsXml(detail::XmlKind kind) const {
+    const auto *held = std::get_if<XmlInVariant>(&held_);
+    return held != nullptr && held->kind == kind;
+  }
 
   /// \brief Holds an option or an enum, with the member table it was declared with.
   ///
@@ -509,7 +551,8 @@ public:
             (!std::is_same_v<T, ::agiru::Char>) && (!std::is_same_v<T, class RecordRef>) &&
             (!requires { typename T::IsAlRefusal; }) &&
             (!requires { typename T::IsAnAbsentType; }) && (!detail::IsEnumHolder<T>::value) &&
-            (!requires { T::Traits::kValues; }) && (!requires(const T &held) { held.AsInteger(); })
+            (!requires { T::Traits::kValues; }) &&
+            (!requires(const T &held) { held.AsInteger(); }) && (!requires { T::kKind; })
   Variant(const T &value) { // NOLINT(*-explicit-constructor)
     static_cast<void>(value);
     Refuse("that type");
@@ -881,7 +924,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlAttribute() const { return false; }
+  ::agiru::Boolean IsXmlAttribute() const { return HoldsXml(detail::XmlKind::Attribute); }
 
   /// \brief AL `Variant.IsXmlAttributeCollection()`. Indicates whether an AL variant contains an
   /// XmlAttributeCollection variable.
@@ -889,7 +932,9 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlAttributeCollection() const { return false; }
+  ::agiru::Boolean IsXmlAttributeCollection() const {
+    return HoldsXml(detail::XmlKind::AttributeCollection);
+  }
 
   /// \brief AL `Variant.IsXmlCData()`. Indicates whether an AL variant contains an XmlCData
   /// variable.
@@ -897,7 +942,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlCData() const { return false; }
+  ::agiru::Boolean IsXmlCData() const { return HoldsXml(detail::XmlKind::CData); }
 
   /// \brief AL `Variant.IsXmlComment()`. Indicates whether an AL variant contains an XmlComment
   /// variable.
@@ -905,7 +950,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlComment() const { return false; }
+  ::agiru::Boolean IsXmlComment() const { return HoldsXml(detail::XmlKind::Comment); }
 
   /// \brief AL `Variant.IsXmlDeclaration()`. Indicates whether an AL variant contains an
   /// XmlDeclaration variable.
@@ -913,7 +958,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDeclaration() const { return false; }
+  ::agiru::Boolean IsXmlDeclaration() const { return HoldsXml(detail::XmlKind::Declaration); }
 
   /// \brief AL `Variant.IsXmlDocument()`. Indicates whether an AL variant contains an XmlDocument
   /// variable.
@@ -921,7 +966,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDocument() const { return false; }
+  ::agiru::Boolean IsXmlDocument() const { return HoldsXml(detail::XmlKind::Document); }
 
   /// \brief AL `Variant.IsXmlDocumentType()`. Indicates whether an AL variant contains an
   /// XmlDocumentType variable.
@@ -929,7 +974,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlDocumentType() const { return false; }
+  ::agiru::Boolean IsXmlDocumentType() const { return HoldsXml(detail::XmlKind::DocumentType); }
 
   /// \brief AL `Variant.IsXmlElement()`. Indicates whether an AL variant contains an XmlElement
   /// variable.
@@ -937,7 +982,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlElement() const { return false; }
+  ::agiru::Boolean IsXmlElement() const { return HoldsXml(detail::XmlKind::Element); }
 
   /// \brief AL `Variant.IsXmlNamespaceManager()`. Indicates whether an AL variant contains an
   /// XmlNamespaceManager variable.
@@ -945,7 +990,9 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNamespaceManager() const { return false; }
+  ::agiru::Boolean IsXmlNamespaceManager() const {
+    return HoldsXml(detail::XmlKind::NamespaceManager);
+  }
 
   /// \brief AL `Variant.IsXmlNameTable()`. Indicates whether an AL variant contains an XmlNameTable
   /// variable.
@@ -953,14 +1000,14 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNameTable() const { return false; }
+  ::agiru::Boolean IsXmlNameTable() const { return HoldsXml(detail::XmlKind::NameTable); }
 
   /// \brief AL `Variant.IsXmlNode()`. Indicates whether an AL variant contains an XmlNode variable.
   /// \return The AL `Boolean`.
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNode() const { return false; }
+  ::agiru::Boolean IsXmlNode() const { return HoldsXml(detail::XmlKind::Node); }
 
   /// \brief AL `Variant.IsXmlNodeList()`. Indicates whether an AL variant contains an XmlNodeList
   /// variable.
@@ -968,7 +1015,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlNodeList() const { return false; }
+  ::agiru::Boolean IsXmlNodeList() const { return HoldsXml(detail::XmlKind::NodeList); }
 
   /// \brief AL `Variant.IsXmlProcessingInstruction()`. Indicates whether an AL variant contains an
   /// XmlProcessingInstruction variable.
@@ -976,7 +1023,9 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlProcessingInstruction() const { return false; }
+  ::agiru::Boolean IsXmlProcessingInstruction() const {
+    return HoldsXml(detail::XmlKind::ProcessingInstruction);
+  }
 
   /// \brief AL `Variant.IsXmlReadOptions()`. Indicates whether an AL variant contains an
   /// XmlReadOptions variable.
@@ -991,7 +1040,7 @@ public:
   /// \note FALSE ALWAYS, and honestly so: a Variant here has no alternative for
   ///       that type, so the assignment refuses at COMPILE time and no such value
   ///       can be inside one (board:0035).
-  ::agiru::Boolean IsXmlText() const { return false; }
+  ::agiru::Boolean IsXmlText() const { return HoldsXml(detail::XmlKind::Text); }
 
   /// \brief AL `Variant.IsXmlWriteOptions()`. Indicates whether an AL variant contains an
   /// XmlWriteOptions variable.

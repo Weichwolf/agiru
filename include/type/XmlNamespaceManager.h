@@ -16,9 +16,12 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 /// \file
 /// \brief AL `XmlNamespaceManager` -- the surface the platform documentation declares.
@@ -91,6 +94,18 @@ public:
   /// \param Uri The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void RemoveNamespace(std::string_view Prefix, std::string_view Uri);
+
+  /// \brief The prefixes and their URIs, in the order added; a later `AddNamespace` of a prefix
+  ///        replaces the earlier.
+  [[nodiscard]] const std::vector<std::pair<std::string, std::string>> &Declared() const noexcept {
+    return declared_;
+  }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::NamespaceManager;
+
+private:
+  std::vector<std::pair<std::string, std::string>> declared_;
 };
 
 }

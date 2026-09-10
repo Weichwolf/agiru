@@ -17,9 +17,13 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
+#include <concepts>
 #include <string>
+#include <type_traits>
 #include <string_view>
+#include <utility>
 
 /// \file
 /// \brief AL `XmlElement` -- the surface the platform documentation declares.
@@ -47,12 +51,33 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Add(const ::agiru::Variant &Content);
 
+  /// \brief AL `Add(Content: Any, ...)` with more than one content: each in turn, in order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  Add(const First &first, const Rest &...rest) {
+    return Add(::agiru::Variant(first)) && (Add(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlElement.AddAfterSelf(Any)`. Adds the specified content immediately after this
   /// node.
   /// \param Content The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddAfterSelf(const ::agiru::Variant &Content);
+
+  /// \brief AL `AddAfterSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddAfterSelf(const First &first, const Rest &...rest) {
+    return AddAfterSelf(::agiru::Variant(first)) && (AddAfterSelf(::agiru::Variant(rest)) && ...);
+  }
 
   /// \brief AL `XmlElement.AddBeforeSelf(Any)`. Adds the specified content immediately before this
   /// node.
@@ -61,12 +86,33 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddBeforeSelf(const ::agiru::Variant &Content);
 
+  /// \brief AL `AddBeforeSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddBeforeSelf(const First &first, const Rest &...rest) {
+    return AddBeforeSelf(::agiru::Variant(first)) && (AddBeforeSelf(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlElement.AddFirst(Any)`. Adds the specified content at the start of the child
   /// list of this element.
   /// \param Content The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddFirst(const ::agiru::Variant &Content);
+
+  /// \brief AL `AddFirst(Content: Any, ...)` with more than one content: each in turn, in order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddFirst(const First &first, const Rest &...rest) {
+    return AddFirst(::agiru::Variant(first)) && (AddFirst(::agiru::Variant(rest)) && ...);
+  }
 
   /// \brief AL `XmlElement.AsXmlNode()`. Converts the node to an XmlNode.
   /// \return The AL `XmlNode`.
@@ -85,7 +131,12 @@ public:
   /// \param Content The AL `Any`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::XmlElement Create(std::string_view Name, const ::agiru::Variant &Content);
+  template <typename Content>
+    requires(!std::convertible_to<const Content &, std::string_view> ||
+             std::same_as<std::remove_cvref_t<Content>, ::agiru::Variant>)
+  static ::agiru::XmlElement Create(std::string_view Name, const Content &content) {
+    return CreateWith(Name, ::agiru::Variant(content));
+  }
 
   /// \brief AL `XmlElement.Create(Text)`. Creates an XmlElement node.
   /// \param Name The AL `Text`.
@@ -99,9 +150,22 @@ public:
   /// \param Content The AL `Any`.
   /// \return The AL `XmlElement`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  static ::agiru::XmlElement Create(std::string_view LocalName,
-                                    std::string_view NamespaceUri,
-                                    const ::agiru::Variant &Content);
+  template <typename Content>
+  static ::agiru::XmlElement
+  Create(std::string_view LocalName, std::string_view NamespaceUri, const Content &content) {
+    return CreateWith(LocalName, NamespaceUri, ::agiru::Variant(content));
+  }
+
+  /// \brief `Create(Name, Content)` once the content is a Variant.
+  /// \param Name The name. \param Content The content. \return The element.
+  static ::agiru::XmlElement CreateWith(std::string_view Name, const ::agiru::Variant &Content);
+
+  /// \brief `Create(LocalName, NamespaceUri, Content)` once the content is a Variant.
+  /// \param LocalName The local name. \param NamespaceUri The namespace. \param Content The
+  ///        content. \return The element.
+  static ::agiru::XmlElement CreateWith(std::string_view LocalName,
+                                        std::string_view NamespaceUri,
+                                        const ::agiru::Variant &Content);
 
   /// \brief AL `XmlElement.Create(Text, Text)`. Creates an XmlElement node.
   /// \param LocalName The AL `Text`.
@@ -277,6 +341,17 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean ReplaceNodes(const ::agiru::Variant &Content);
 
+  /// \brief AL `ReplaceNodes(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  ReplaceNodes(const First &first, const Rest &...rest) {
+    return ReplaceNodes(::agiru::Variant(first)) && (ReplaceNodes(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlElement.ReplaceWith(Any)`. Replaces this node with the specified content.
   /// \param Node The AL `Any`.
   /// \return The AL `Boolean`.
@@ -367,6 +442,22 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
+
+  /// \brief The node this value refers to; empty for a value never assigned.
+  [[nodiscard]] const detail::XmlHandle &Handle() const noexcept { return handle_; }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::Element;
+
+  /// \brief A value over a node, made by the engine.
+  /// \param handle The node.
+  explicit XmlElement(detail::XmlHandle handle) noexcept : handle_(std::move(handle)) {}
+
+  /// \brief A value that refers to nothing yet, which AL's declaration is.
+  XmlElement() = default;
+
+private:
+  detail::XmlHandle handle_;
 };
 
 }

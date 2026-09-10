@@ -7,6 +7,7 @@
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
+#include "platform/TenantLicenseState.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
@@ -347,6 +348,22 @@ void ProvisionInstalled(const Connection &into) {
       row.DisplayName = company;
       row.Insert();
       std::println("the company {} is written into Company", company);
+    }
+  }
+  {
+    platform::TenantLicenseState standing;
+    if (standing.IsEmpty()) {
+      platform::TenantLicenseState row;
+      constexpr int kLicensedFromYear = 1980;
+      constexpr int kLicensedToYear = 2079;
+      constexpr unsigned kDecember = 12;
+      constexpr unsigned kLastOfDecember = 31;
+      row.StartDate = DateTime::Create(Date::FromYmd(kLicensedFromYear, 1, 1), Time{});
+      row.EndDate =
+          DateTime::Create(Date::FromYmd(kLicensedToYear, kDecember, kLastOfDecember), Time{});
+      row.State = platform::TenantLicenseStateState::Paid;
+      row.Insert();
+      std::println("the tenant licence is written into Tenant License State as Paid");
     }
   }
   std::size_t profiles = 0;

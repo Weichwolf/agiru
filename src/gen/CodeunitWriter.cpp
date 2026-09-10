@@ -1965,6 +1965,7 @@ TableIndex PlatformTables() {
   add("Privacy Notice", "1560");
   add("Privacy Notice Approval", "1561");
   add("Record Link", "2000000068");
+  add("Tenant License State", "2000000189");
   add("Date", "2000000007");
   add("User", "2000000120");
   add("User Personalization", "2000000073");
@@ -1991,6 +1992,8 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000211"] = enums["feature key"];
   enums["record link"]["type"] = "::agiru::platform::RecordLinkType";
   enums["2000000068"] = enums["record link"];
+  enums["tenant license state"]["state"] = "::agiru::platform::TenantLicenseStateState";
+  enums["2000000189"] = enums["tenant license state"];
   enums["allobj"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";

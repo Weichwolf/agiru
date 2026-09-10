@@ -785,6 +785,11 @@ void ClearCollectedErrors() {
   return !ErrorScope::Collected().empty();
 }
 
+::agiru::Boolean IsNull(const ::agiru::Variant &DotNet) {
+  static_cast<void>(DotNet);
+  RefuseDoor("System.IsNull(DotNet)");
+}
+
 ::agiru::Boolean GuiAllowed() {
   if (HandlerTable::Installed()) { return true; }
   RefuseDoor("System.GuiAllowed()");
@@ -793,6 +798,15 @@ void ClearCollectedErrors() {
 void Hyperlink(std::string_view URL) {
   if (AnsweredByHandler(3, URL, nullptr)) { return; }
   RefuseDoor("System.Hyperlink(Text)");
+}
+
+}
+
+namespace agiru::detail {
+
+::agiru::Integer NextStartedSession() {
+  static ::agiru::Integer started = 0;
+  return ++started;
 }
 
 }

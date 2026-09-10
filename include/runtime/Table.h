@@ -381,6 +381,34 @@ void RuntimeMakeTemporary(void *record, const TempOps *ops);
 /// \return Whether its state carries temporary rows.
 [[nodiscard]] bool RuntimeIsTemporary(const void *record);
 
+/// \brief AL `Record.AddLink(URL [, Description])`: a `Record Link` row for the record.
+/// \param to The record's id.
+/// \param url The link.
+/// \param description What it shows.
+/// \return The new `Link ID`.
+Integer RuntimeAddLink(const RecordId &to, std::string_view url, std::string_view description);
+
+/// \brief AL `Record.CopyLinks(From)`: every `Record Link` row of `from` copied to `to`, which is
+///        how a posted document keeps the links of the one it came from.
+/// \param from The source record's id.
+/// \param to The target record's id.
+void RuntimeCopyLinks(const RecordId &from, const RecordId &to);
+
+/// \brief AL `Record.DeleteLinks()`.
+/// \param of The record's id.
+void RuntimeDeleteLinks(const RecordId &of);
+
+/// \brief AL `Record.HasLinks()`.
+/// \param of The record's id.
+/// \return Whether a `Record Link` row names it.
+[[nodiscard]] bool RuntimeHasLinks(const RecordId &of);
+
+/// \brief The record id a Variant carries when it holds a record or a RecordRef.
+/// \param held The Variant.
+/// \return Its record id.
+/// \throws Error when the Variant holds neither.
+[[nodiscard]] RecordId RecordIdInVariant(const class Variant &held);
+
 /// \brief AL `Record.Copy(From, true)`: the record shares `from`'s temporary rows from now on.
 /// \param record The record.
 /// \param from   The temporary record whose rows it joins.
@@ -909,13 +937,11 @@ public:
   }
 
   /// \brief AL `Record.AddLink(...)`. Adds a link to a record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Integer AddLink(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.AddLink is declared and not implemented yet (board:0035)");
+  /// \param URL The link.
+  /// \param Description What it shows; empty when AL gives none.
+  /// \return The new link's `Link ID`.
+  Integer AddLink(std::string_view URL, std::string_view Description = {}) const {
+    return detail::RuntimeAddLink(RecordId(), URL, Description);
   }
 
   /// \brief AL `Record.AddLoadFields(...)`. Specifies fields to be initially loaded when the record
@@ -1081,14 +1107,16 @@ public:
     State().filters = source == nullptr ? std::vector<detail::FieldFilter>{} : source->filters;
   }
 
-  /// \brief AL `Record.CopyLinks(...)`. Copies all the links from a specified record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void CopyLinks(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.CopyLinks is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.CopyLinks(FromRecord)`: the links of another record, or of the record a
+  ///        Variant or RecordRef carries, become this record's too.
+  /// \tparam From A record, a RecordRef or a Variant.
+  /// \param from The source.
+  template <typename From> void CopyLinks(const From &from) const {
+    if constexpr (requires { from.RecordId(); }) {
+      detail::RuntimeCopyLinks(from.RecordId(), RecordId());
+    } else {
+      detail::RuntimeCopyLinks(detail::RecordIdInVariant(from), RecordId());
+    }
   }
 
   /// \brief AL `Record.CountApprox(...)`. Returns an approximate count of the number of records in
@@ -1132,16 +1160,8 @@ public:
     throw Error("Record.DeleteLink is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.DeleteLinks(...)`. Deletes all of the links that have been added to a
-  /// record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void DeleteLinks(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.DeleteLinks is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.DeleteLinks()`: every link of this record goes.
+  void DeleteLinks() const { detail::RuntimeDeleteLinks(RecordId()); }
 
   /// \brief AL `Record.FieldActive(Field)`. Whether the field is enabled.
   /// \tparam FieldType The field member's type.
@@ -1407,15 +1427,9 @@ public:
     return state != nullptr && !state->filters.empty();
   }
 
-  /// \brief AL `Record.HasLinks(...)`. Determines whether a record contains any links.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> Boolean HasLinks(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.HasLinks is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `Record.HasLinks()`.
+  /// \return Whether a `Record Link` row names this record.
+  [[nodiscard]] Boolean HasLinks() const { return detail::RuntimeHasLinks(RecordId()); }
 
   /// \brief AL `Record.Init()` -- every field to its default, the primary key excepted.
   ///
@@ -2421,7 +2435,7 @@ template <typename T> struct TempRows {
 ///       amount was then rounded to a precision of zero (44 UT cases, measured 2026-09-09). The
 ///       load keeps the variable's block the way it keeps its state, and a stored row holds none.
 template <typename T>
-concept HasVariableBlock = requires(T &t) { t.Var_Block = {}; };
+concept HasVariableBlock = requires(T &t) { t.Var_Block; };
 
 /// \tparam T The generated table class.
 ///
@@ -2441,14 +2455,18 @@ constexpr detail::TempOps kTempOps{
           std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
-          if constexpr (HasVariableBlock<T>) { copy.Var_Block = {}; }
+          if constexpr (HasVariableBlock<T>) {
+            copy.Var_Block = std::remove_cvref_t<decltype(copy.Var_Block)>{};
+          }
           held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
         },
     .replace =
         [](void *rows, std::size_t at, const void *record) {
           T copy = *static_cast<const T *>(record);
           reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
-          if constexpr (HasVariableBlock<T>) { copy.Var_Block = {}; }
+          if constexpr (HasVariableBlock<T>) {
+            copy.Var_Block = std::remove_cvref_t<decltype(copy.Var_Block)>{};
+          }
           static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
         },
     .erase =

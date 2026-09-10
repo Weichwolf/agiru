@@ -178,6 +178,7 @@ std::map<std::string, std::string> ReadSpellings() {
   for (const auto &entry : std::filesystem::recursive_directory_iterator(root)) {
     if (entry.path().extension() != ".h") { continue; }
     const bool platformTable = entry.path().parent_path().filename() == "platform";
+    if (entry.path().filename() == "Refused.h") { continue; }
     std::ifstream file(entry.path());
     std::string line;
     bool inEnum = false;
@@ -245,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 74> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 83> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -300,6 +301,8 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 74> kElsewhe
     {"platform::PrivacyNoticeApproval", "platform/PrivacyNoticeApproval.h"},
     {"platform::RecordLink", "platform/RecordLink.h"},
     {"platform::RecordLinkType", "platform/RecordLink.h"},
+    {"platform::TenantLicenseState", "platform/TenantLicenseState.h"},
+    {"platform::TenantLicenseStateState", "platform/TenantLicenseState.h"},
     {"platform::Tenant", "platform/Tenant.h"},
     {"platform::User", "platform/User.h"},
     {"platform::UserPersonalization", "platform/UserPersonalization.h"},
@@ -313,6 +316,13 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 74> kElsewhe
     {"dotnet::NavTestExecution", "dotnet/NavTestExecution.h"},
     {"dotnet::BinaryReader", "dotnet/BinaryReader.h"},
     {"dotnet::BinaryWriter", "dotnet/BinaryWriter.h"},
+    {"dotnet::XmlDocument", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlElement", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlAttribute", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlAttributeCollection", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlNamespaceManager", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlNode", "dotnet/XmlNode.h"},
+    {"dotnet::XmlNodeList", "dotnet/XmlNode.h"},
     {"DateTimeOffset", "dotnet/DateTimeOffset.h"},
     {"DateTime", "dotnet/DateTime.h"},
     {"StrSubstNo", "runtime/Record.h"},

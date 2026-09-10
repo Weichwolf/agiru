@@ -31,3 +31,11 @@ their door signatures, the .NET classes get `include/dotnet/Xml*.h` with the mem
 names. CLAUDE.md allows the library and names XML as one of the four things not written from
 scratch. Gate cases per documented method under `test/gate/XmlGate.cpp`. Ranks after
 board:0645's measurement lands.
+
+**Delivered 2026-09-10 (chain 75, 1 255 -> 1 307).** The engine, the AL door and the .NET
+`XmlDocument`/`XmlNode`/`XmlElement`/`XmlAttribute`/`XmlNodeList`/`XmlAttributeCollection`/
+`XmlNamespaceManager` are in; `XmlGate` holds 45 checks. Inc Doc Attachment Overview UT +4,
+WF Buffer +1, Incoming Doc. To Data Exch. +1. **Still open:** the .NET leaf classes a wrapper
+assigns to (`XmlDeclaration :=`, 19 cases -- `CreateXmlDeclaration` answers an `XmlNode` and the
+absent stub refuses the assignment), `XmlReaderSettings`/`XmlReader`/`XmlTextReader` (11), and
+`XSDParser` (GenericList, out of the slice).

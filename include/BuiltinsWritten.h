@@ -321,6 +321,14 @@ Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
   return static_cast<::agiru::Boolean>(refusal);
 }
 
+namespace detail {
+
+/// \brief The number a `StartSession` hands back: counted up per call, never the caller's own.
+/// \return The next session number.
+[[nodiscard]] ::agiru::Integer NextStartedSession();
+
+}
+
 /// \brief AL `StartSession(SessionId, CodeunitId, Timeout, Company, Record)` -- the record travels
 ///        as its OWN table.
 /// \tparam R The record's class, because AL hands a `var Record` of any table.
@@ -330,7 +338,12 @@ Evaluate(Any1 &Variable, const T &refusal, ::agiru::Integer Number = {}) {
 /// \param Company    Which company it runs in.
 /// \param Record     The record it starts on.
 /// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
+/// \note THE CODEUNIT RUNS IN THIS SESSION, synchronously and inside the caller's transaction:
+///       there is no second session layer yet (board:0035), so what the platform would run in
+///       the background runs here before the call returns, and `SessionId` counts the calls.
+///       A test that starts a session and then reads what it wrote sees it; one that expects
+///       the work NOT to be there yet sees the deviation.
+/// \return True, the way the platform answers when the session started.
 template <typename R>
   requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
 StartSession(::agiru::Integer &SessionId,
@@ -338,12 +351,11 @@ StartSession(::agiru::Integer &SessionId,
              ::agiru::Duration Timeout,
              std::string_view Company,
              R &Record) {
-  static_cast<void>(SessionId);
+  SessionId = ::agiru::detail::NextStartedSession();
   static_cast<void>(CodeunitId);
   static_cast<void>(Timeout);
   static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+  return ::agiru::detail::RunCodeunitByNumber(true, CodeunitId, Record);
 }
 
 /// \brief AL `StartSession(SessionId, CodeunitId, Company, Record, Timeout)`.
@@ -354,7 +366,12 @@ StartSession(::agiru::Integer &SessionId,
 /// \param Record     The record it starts on.
 /// \param Timeout    How long it may take.
 /// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
+/// \note THE CODEUNIT RUNS IN THIS SESSION, synchronously and inside the caller's transaction:
+///       there is no second session layer yet (board:0035), so what the platform would run in
+///       the background runs here before the call returns, and `SessionId` counts the calls.
+///       A test that starts a session and then reads what it wrote sees it; one that expects
+///       the work NOT to be there yet sees the deviation.
+/// \return True, the way the platform answers when the session started.
 template <typename R>
   requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
 StartSession(::agiru::Integer &SessionId,
@@ -363,11 +380,10 @@ StartSession(::agiru::Integer &SessionId,
              R &Record,
              ::agiru::Duration Timeout) {
   static_cast<void>(Timeout);
-  static_cast<void>(SessionId);
+  SessionId = ::agiru::detail::NextStartedSession();
   static_cast<void>(CodeunitId);
   static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+  return ::agiru::detail::RunCodeunitByNumber(true, CodeunitId, Record);
 }
 
 /// \brief AL `StartSession(SessionId, CodeunitId, Company, Record)`.
@@ -377,18 +393,22 @@ StartSession(::agiru::Integer &SessionId,
 /// \param Company    Which company it runs in.
 /// \param Record     The record it starts on.
 /// \return Never.
-/// \throws Error always -- a background session needs a session layer (board:0035).
+/// \note THE CODEUNIT RUNS IN THIS SESSION, synchronously and inside the caller's transaction:
+///       there is no second session layer yet (board:0035), so what the platform would run in
+///       the background runs here before the call returns, and `SessionId` counts the calls.
+///       A test that starts a session and then reads what it wrote sees it; one that expects
+///       the work NOT to be there yet sees the deviation.
+/// \return True, the way the platform answers when the session started.
 template <typename R>
   requires requires { ::agiru::TableTraits<R>::kTable; } ::agiru::Boolean
 StartSession(::agiru::Integer &SessionId,
              ::agiru::Integer CodeunitId,
              std::string_view Company,
              R &Record) {
-  static_cast<void>(SessionId);
+  SessionId = ::agiru::detail::NextStartedSession();
   static_cast<void>(CodeunitId);
   static_cast<void>(Company);
-  static_cast<void>(Record);
-  throw ::agiru::Error("Session.StartSession is declared and not implemented yet (board:0035)");
+  return ::agiru::detail::RunCodeunitByNumber(true, CodeunitId, Record);
 }
 
 /// \brief AL `System.CopyStream(OutStream, InStream [, Integer])` between two AL streams.
@@ -1127,6 +1147,13 @@ template <typename T> void Clear(T &Variable) {
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Date Today();
 
+/// \brief AL `System.IsNull(DotNet)` over a Variant, which is what an absent .NET stub becomes
+///        on the way in.
+/// \param DotNet The variable.
+/// \return Never.
+/// \throws Error always -- an absent .NET type holds nothing this runtime can ask (board:0035).
+::agiru::Boolean IsNull(const ::agiru::Variant &DotNet);
+
 /// \brief AL `System.IsNull(DotNet)`. Whether a .NET variable holds no object.
 ///
 /// \tparam T The rebuilt .NET class, or a refused one.
@@ -1139,10 +1166,25 @@ template <typename T> void Clear(T &Variable) {
 ///       unrelated structs with no common base, so a `Variant` signature takes none of them --
 ///       the same shape `BindSubscription` needed for the generated codeunits.
 template <typename T>
-  requires(!std::convertible_to<const T &, ::agiru::Variant>)::agiru::Boolean
+  requires(!std::convertible_to<const T &, ::agiru::Variant>) &&
+          (!requires(const T &value) { value.IsNullObject(); })::agiru::Boolean
 IsNull(const T &Variable) {
   static_cast<void>(Variable);
   throw ::agiru::Error("System.IsNull(DotNet) is declared and not implemented yet (board:0035)");
+}
+
+/// \brief AL `System.IsNull(DotNet)` for a rebuilt .NET class that knows whether it refers to an
+///        object: `XmlDocument.SelectSingleNode` answers null when nothing matches, and AL tests
+///        `IsNull(XmlNode)` for exactly that.
+/// \tparam T A rebuilt .NET class with `IsNullObject()`.
+/// \param Variable The variable.
+/// \return Whether it holds no object.
+template <typename T>
+  requires requires(const T &value) {
+    { value.IsNullObject() } -> std::convertible_to<bool>;
+  }
+[[nodiscard]] ::agiru::Boolean IsNull(const T &Variable) {
+  return Variable.IsNullObject();
 }
 
 /// \brief AL `Database.UserId()`. Gets the user name of the user account that is logged on.

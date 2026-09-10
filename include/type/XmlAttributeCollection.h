@@ -15,9 +15,12 @@
 #include "type/RecordId.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 /// \file
 /// \brief AL `XmlAttributeCollection` -- the surface the platform documentation declares.
@@ -100,6 +103,24 @@ public:
   /// \param Value The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void Set(std::string_view LocalName, std::string_view NamespaceUri, std::string_view Value);
+
+  /// \brief The nodes, in document order.
+  [[nodiscard]] const std::vector<detail::XmlHandle> &Items() const noexcept { return items_; }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::AttributeCollection;
+
+  /// \brief A list over nodes, made by the engine.
+  /// \param items The nodes.
+  explicit XmlAttributeCollection(std::vector<detail::XmlHandle> items) noexcept
+      : items_(std::move(items)) {}
+
+  /// \brief An empty list, which AL's declaration is.
+  XmlAttributeCollection() = default;
+
+private:
+  std::vector<detail::XmlHandle> items_;
+  mutable std::vector<XmlAttribute> walked_;
 };
 
 }

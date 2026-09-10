@@ -157,6 +157,14 @@ if(TARGET agiru_db)
   target_link_libraries(agiru_db PUBLIC PostgreSQL::PostgreSQL)
 endif()
 
+# THE XML ENGINE IS libxml2 (board:0646): XPath and namespaces come with it, it is on every Debian
+# architecture, and CLAUDE.md names XML as one of the four things not written from scratch. It is
+# PRIVATE to the value layer: the door sees a handle and never a libxml2 header.
+if(TARGET agiru_net)
+  find_package(LibXml2 REQUIRED)
+  target_link_libraries(agiru_net PRIVATE LibXml2::LibXml2)
+endif()
+
 
 set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
     CACHE STRING "The AL source the gate parses")

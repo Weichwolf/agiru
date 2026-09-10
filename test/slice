@@ -12460,3 +12460,10 @@ system/system/tooling/page/PerformanceProfileList.cpp
 base/manufacturing/routing/codeunit/CalculateRoutingLine.cpp
 tests/core/codeunit/SCMItemVariantAttributes.cpp
 system/system/utilities/codeunit/RecordLinkImpl.cpp
+base/system/automation/codeunit/WorkflowImpExpMgt.cpp
+base/system/xml/codeunit/SignedXMLMgt.cpp
+base/system/xml/codeunit/XMLDOMManagement.cpp
+tests/core/codeunit/ERMTestSEPACreditTransfers.cpp
+tests/core/codeunit/ERMTestSEPADD08.cpp
+tests/core/codeunit/ERMTestSEPADirectDebit.cpp
+tests/core/codeunit/SMBOfficeAddinMgmtTest.cpp

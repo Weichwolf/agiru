@@ -17,9 +17,11 @@
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
+#include "type/XmlHandle.h"
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 /// \file
 /// \brief AL `XmlDocument` -- the surface the platform documentation declares.
@@ -49,12 +51,33 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean Add(const ::agiru::Variant &Content);
 
+  /// \brief AL `Add(Content: Any, ...)` with more than one content: each in turn, in order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  Add(const First &first, const Rest &...rest) {
+    return Add(::agiru::Variant(first)) && (Add(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlDocument.AddAfterSelf(Any)`. Adds the specified content immediately after this
   /// node.
   /// \param Content The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddAfterSelf(const ::agiru::Variant &Content);
+
+  /// \brief AL `AddAfterSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddAfterSelf(const First &first, const Rest &...rest) {
+    return AddAfterSelf(::agiru::Variant(first)) && (AddAfterSelf(::agiru::Variant(rest)) && ...);
+  }
 
   /// \brief AL `XmlDocument.AddBeforeSelf(Any)`. Adds the specified content immediately before this
   /// node.
@@ -63,12 +86,33 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddBeforeSelf(const ::agiru::Variant &Content);
 
+  /// \brief AL `AddBeforeSelf(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddBeforeSelf(const First &first, const Rest &...rest) {
+    return AddBeforeSelf(::agiru::Variant(first)) && (AddBeforeSelf(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlDocument.AddFirst(Any)`. Adds the specified content at the start of the child
   /// list of this document.
   /// \param Content The AL `Any`.
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean AddFirst(const ::agiru::Variant &Content);
+
+  /// \brief AL `AddFirst(Content: Any, ...)` with more than one content: each in turn, in order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  AddFirst(const First &first, const Rest &...rest) {
+    return AddFirst(::agiru::Variant(first)) && (AddFirst(::agiru::Variant(rest)) && ...);
+  }
 
   /// \brief AL `XmlDocument.AsXmlNode()`. Converts the node to an XmlNode.
   /// \return The AL `XmlNode`.
@@ -78,13 +122,13 @@ public:
   /// \brief AL `XmlDocument.Create()`. Creates an XmlDocument.
   /// \return The AL `XmlDocument`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlDocument Create();
+  static ::agiru::XmlDocument Create();
 
   /// \brief AL `XmlDocument.Create(Any)`. Creates an XmlDocument.
   /// \param Content The AL `Any`.
   /// \return The AL `XmlDocument`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlDocument Create(const ::agiru::Variant &Content);
+  static ::agiru::XmlDocument Create(const ::agiru::Variant &Content);
 
   /// \brief AL `XmlDocument.GetChildElements()`. Gets a list containing the child elements for this
   /// document, in document order.
@@ -233,6 +277,17 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean ReplaceNodes(const ::agiru::Variant &Content);
 
+  /// \brief AL `ReplaceNodes(Content: Any, ...)` with more than one content: each in turn, in
+  /// order.
+  /// \tparam First The first content's type. \tparam Rest The others' types.
+  /// \param first The first. \param rest The others.
+  /// \return Whether every one was added.
+  template <typename First, typename... Rest>
+    requires(sizeof...(Rest) > 0)::agiru::Boolean
+  ReplaceNodes(const First &first, const Rest &...rest) {
+    return ReplaceNodes(::agiru::Variant(first)) && (ReplaceNodes(::agiru::Variant(rest)) && ...);
+  }
+
   /// \brief AL `XmlDocument.ReplaceWith(Any)`. Replaces this node with the specified content.
   /// \param Node The AL `Any`.
   /// \return The AL `Boolean`.
@@ -314,6 +369,22 @@ public:
   /// \return The AL `Boolean`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   ::agiru::Boolean WriteTo(const ::agiru::XmlWriteOptions &WriteOptions, ::agiru::Text<0> &Text);
+
+  /// \brief The node this value refers to; empty for a value never assigned.
+  [[nodiscard]] const detail::XmlHandle &Handle() const noexcept { return handle_; }
+
+  /// \brief The AL XML type this is, for a Variant.
+  static constexpr detail::XmlKind kKind = detail::XmlKind::Document;
+
+  /// \brief A value over a node, made by the engine.
+  /// \param handle The node.
+  explicit XmlDocument(detail::XmlHandle handle) noexcept : handle_(std::move(handle)) {}
+
+  /// \brief A value that refers to nothing yet, which AL's declaration is.
+  XmlDocument() = default;
+
+private:
+  detail::XmlHandle handle_;
 };
 
 }
