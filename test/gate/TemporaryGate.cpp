@@ -204,6 +204,23 @@ void AnOptionAndADecimalFilterATemporaryRowByValue() {
   CHECK_TRUE("and a decimal SetRange finds its row", costs.FindFirst() && costs.Code == "R02");
 }
 
+/// TWO TEMPORARY GLOBALS HELD BY HANDLE ARE TWO STORES AFTER `A := B`. `Gen. Jnl.-Post Line`
+/// writes `TempGLEntryPreview := TempGLEntryBuf; TempGLEntryPreview.Insert()` for every entry in
+/// its buffer, and a handle assignment that cloned the other handle made the two share one store,
+/// so the first `Insert` refused the entry as already there (chain 75, 29 UT cases).
+void AssigningOneHandleToAnotherKeepsTheRowsApart() {
+  agiru::Instance<Temporary<LineNumberBuffer>> buffer;
+  agiru::Instance<Temporary<LineNumberBuffer>> preview;
+  buffer->Init();
+  buffer->OldLineNumber = 1;
+  buffer->Insert();
+  preview = buffer;
+  CHECK_TRUE("the fields came across", preview->OldLineNumber == 1);
+  CHECK_TRUE("and the preview's store is its own", preview->Count() == 0);
+  CHECK_TRUE("so the same key inserts there", preview->Insert());
+  CHECK_TRUE("while the buffer keeps one row", buffer->Count() == 1);
+}
+
 void AFilterNarrowsATemporaryWalk() {
   constexpr agiru::Integer kFive = 5;
   Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
@@ -301,6 +318,7 @@ int main() {
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
+    AssigningOneHandleToAnotherKeepsTheRowsApart();
     AnOptionAndADecimalFilterATemporaryRowByValue();
     RowsWalkInPrimaryKeyOrder();
     ADuplicateKeyIsRefused();

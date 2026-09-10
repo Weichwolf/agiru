@@ -19,6 +19,11 @@ namespace agiru::dotnet {
 class XmlElement : public XmlNode {
 public:
   using XmlNode::XmlNode;
+
+  /// \brief The node seen as an element, which AL's `XmlElement := XmlNode` does. \param node The
+  /// node.
+  explicit(false) XmlElement(const XmlNode &node) : XmlNode(node.Handle()) {}
+
   /// \brief `XmlElement.SetAttribute(name, value)`. \param name The name. \param value The value.
   void SetAttribute(std::string_view name, std::string_view value);
   /// \brief `XmlElement.GetAttribute(name)`. \param name The name. \return The value, or empty.
@@ -33,12 +38,88 @@ public:
   [[nodiscard]] ::agiru::Boolean IsEmpty() const;
 };
 
+/// \brief .NET `XmlDeclaration`, `XmlDocumentType`, `XmlProcessingInstruction`, `XmlComment`,
+///        `XmlText`, `XmlCDataSection`: nodes a wrapper codeunit assigns a `CreateXxx` result to.
+///        Each is the node it was made as, and assignment from an `XmlNode` is what AL's
+///        `XmlDeclaration := XmlDoc.CreateXmlDeclaration(...)` needs.
+class XmlDeclaration : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as a declaration. \param node The node.
+  explicit(false) XmlDeclaration(const XmlNode &node) : XmlNode(node.Handle()) {}
+};
+
+/// \brief .NET `XmlDocumentType`.
+class XmlDocumentType : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as a document type. \param node The node.
+  explicit(false) XmlDocumentType(const XmlNode &node) : XmlNode(node.Handle()) {}
+
+  /// \brief `XmlDocumentType.PublicId`. \return The public id, or empty.
+  [[nodiscard]] std::string PublicId() const;
+  /// \brief `XmlDocumentType.SystemId`. \return The system id, or empty.
+  [[nodiscard]] std::string SystemId() const;
+
+  /// \brief `XmlDocumentType.InternalSubset`. \return Empty; the subset is not kept.
+  [[nodiscard]] std::string InternalSubset() const { return {}; }
+};
+
+/// \brief .NET `XmlProcessingInstruction`.
+class XmlProcessingInstruction : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as an instruction. \param node The node.
+  explicit(false) XmlProcessingInstruction(const XmlNode &node) : XmlNode(node.Handle()) {}
+
+  /// \brief `XmlProcessingInstruction.Target`. \return The target.
+  [[nodiscard]] std::string Target() const { return LocalName(); }
+
+  /// \brief `XmlProcessingInstruction.Data`. \return The data.
+  [[nodiscard]] std::string Data() const { return Value(); }
+};
+
+/// \brief .NET `XmlComment`.
+class XmlComment : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as a comment. \param node The node.
+  explicit(false) XmlComment(const XmlNode &node) : XmlNode(node.Handle()) {}
+};
+
+/// \brief .NET `XmlText`.
+class XmlText : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as a text. \param node The node.
+  explicit(false) XmlText(const XmlNode &node) : XmlNode(node.Handle()) {}
+};
+
+/// \brief .NET `XmlCDataSection`.
+class XmlCDataSection : public XmlNode {
+public:
+  using XmlNode::XmlNode;
+
+  /// \brief The node seen as a CDATA section. \param node The node.
+  explicit(false) XmlCDataSection(const XmlNode &node) : XmlNode(node.Handle()) {}
+};
+
 /// \brief .NET `System.Xml.XmlAttribute`: a node that is an attribute.
 class XmlAttribute : public XmlNode {
 public:
   using XmlNode::XmlNode;
+
+  /// \brief The node seen as an attribute. \param node The node.
+  explicit(false) XmlAttribute(const XmlNode &node) : XmlNode(node.Handle()) {}
+
   /// \brief `XmlAttribute.OwnerElement`. \return The element.
   [[nodiscard]] XmlElement OwnerElement() const;
+
   /// \brief `XmlAttribute.Specified`. \return True, every attribute here was written.
   [[nodiscard]] ::agiru::Boolean Specified() const { return true; }
 };
@@ -47,17 +128,22 @@ public:
 class XmlAttributeCollection {
 public:
   XmlAttributeCollection() = default;
+
   /// \brief The collection over an element's attributes. \param owner The element.
   explicit XmlAttributeCollection(::agiru::detail::XmlHandle owner) noexcept
       : owner_(std::move(owner)) {}
+
   /// \brief `XmlAttributeCollection.Count`. \return How many.
   [[nodiscard]] ::agiru::Integer Count() const;
   /// \brief `XmlAttributeCollection.Item(i)`, zero-based. \param index The index. \return It.
   [[nodiscard]] XmlAttribute Item(::agiru::Integer index) const;
+
   /// \brief `XmlAttributeCollection[i]`, spelled `ItemOf`. \param index The index. \return It.
   [[nodiscard]] XmlAttribute ItemOf(::agiru::Integer index) const { return Item(index); }
+
   /// \brief `XmlAttributeCollection[name]`, spelled `ItemOf`. \param name The name. \return It.
   [[nodiscard]] XmlAttribute ItemOf(std::string_view name) const { return GetNamedItem(name); }
+
   /// \brief `XmlAttributeCollection.GetNamedItem(name)`. \param name The qualified name.
   /// \return The attribute, or null.
   [[nodiscard]] XmlAttribute GetNamedItem(std::string_view name) const;
@@ -67,11 +153,14 @@ public:
   /// \brief `XmlAttributeCollection.RemoveNamedItem(name)`. \param name The name.
   /// \return The removed attribute, or null.
   XmlAttribute RemoveNamedItem(std::string_view name);
+
   /// \brief `XmlAttributeCollection.Append(attribute)`. \param attribute The attribute.
   /// \return It.
   XmlAttribute Append(const XmlNode &attribute) { return SetNamedItem(attribute); }
+
   /// \brief AL `IsNull(XmlAttributeCollection)`. \return Whether there is no element behind it.
   [[nodiscard]] bool IsNullObject() const noexcept { return owner_.Empty(); }
+
   /// \brief The first attribute, for `foreach`.
   [[nodiscard]] std::vector<XmlAttribute>::const_iterator begin() const;
   /// \brief The end, for `foreach`.
@@ -110,18 +199,24 @@ public:
   /// \brief `XmlNamespaceManager.HasNamespace(prefix)`. \param prefix The prefix.
   /// \return Whether it was added.
   [[nodiscard]] ::agiru::Boolean HasNamespace(std::string_view prefix) const;
+
   /// \brief `XmlNamespaceManager.DefaultNamespace`. \return The namespace of the empty prefix.
   [[nodiscard]] std::string DefaultNamespace() const { return LookupNamespace(""); }
+
   /// \brief `XmlNamespaceManager.NameTable`. \return An empty name table.
   [[nodiscard]] ::agiru::XmlNameTable NameTable() const { return {}; }
+
   /// \brief The prefixes and namespaces, for the XPath engine.
   [[nodiscard]] const std::vector<std::pair<std::string, std::string>> &Declared() const noexcept {
     return declared_;
   }
+
   /// \brief AL `IsNull(XmlNamespaceManager)`. \return False; a manager is made by its binder.
   [[nodiscard]] bool IsNullObject() const noexcept { return false; }
+
   /// \brief `PushScope`, `PopScope`: one scope here.
   void PushScope() {}
+
   void PopScope() {}
 
 private:
@@ -158,42 +253,51 @@ public:
   /// \param stream The stream.
   /// \throws Error when the text is not XML, the way .NET throws.
   void Load(const ::agiru::InStream &stream);
+
   /// \brief `XmlDocument.Load(reader)`, over a reader this runtime has not rebuilt.
   /// \tparam T The stub. \throws Error always (board:0035).
   template <typename T>
     requires ::agiru::dotnet::IsAbsent<T>
   void Load(const T &) {
-    throw Error("XmlDocument.Load over an XmlReader is declared and not implemented yet (board:0035)");
+    throw Error(
+        "XmlDocument.Load over an XmlReader is declared and not implemented yet (board:0035)");
   }
+
   /// \brief `XmlDocument.Load(OutStream)`, which AL writes and .NET refuses at run time: an
   ///        output stream cannot be read.
   /// \throws Error always.
   void Load(const ::agiru::OutStream &) {
     throw Error("XmlDocument.Load: an OutStream cannot be read from; the platform refuses it too");
   }
+
   /// \brief `XmlDocument.LoadXml(text)`. \param text The document. \throws Error on bad XML.
   void LoadXml(std::string_view text);
   /// \brief `XmlDocument.Save(stream)`. \param stream The stream.
   void Save(const ::agiru::OutStream &stream);
+
   /// \brief `XmlDocument.Save(InStream)`, which AL writes and cannot mean: an input stream is
   ///        not written to.
   /// \throws Error always.
   void Save(const ::agiru::InStream &) {
     throw Error("XmlDocument.Save: an InStream cannot be written to; the platform refuses it too");
   }
+
   /// \brief `XmlDocument.Save(stream)` over a .NET stream this runtime has not rebuilt
   ///        (`MemoryStream`): refused (board:0035).
   /// \tparam T The stub. \throws Error always.
   template <typename T>
     requires ::agiru::dotnet::IsAbsent<T>
   void Save(const T &) {
-    throw Error("XmlDocument.Save over a .NET Stream is declared and not implemented yet (board:0035)");
+    throw Error(
+        "XmlDocument.Save over a .NET Stream is declared and not implemented yet (board:0035)");
   }
+
   /// \brief `XmlDocument.Save(filename)`, which this runtime does not write (board:0035).
   /// \throws Error always.
   void Save(std::string_view) {
     throw Error("XmlDocument.Save(filename) is declared and not implemented yet (board:0035)");
   }
+
   /// \brief `XmlDocument.DocumentElement`. \return The root, or null.
   [[nodiscard]] XmlElement DocumentElement() const;
   /// \brief `XmlDocument.DocumentType`. \return The DTD node, or null.
@@ -244,24 +348,31 @@ public:
                              std::string_view publicId,
                              std::string_view systemId,
                              std::string_view subset);
+
   /// \brief `CreateDocumentType` over .NET strings this runtime has not rebuilt (board:0035).
   /// \tparam Arguments The stubs. \throws Error always.
   template <typename... Arguments>
     requires(sizeof...(Arguments) == 4 && (::agiru::dotnet::IsAbsent<Arguments> || ...))
   XmlNode CreateDocumentType(const Arguments &...) {
-    throw Error("XmlDocument.CreateDocumentType over .NET String is declared and not implemented yet (board:0035)");
+    throw Error("XmlDocument.CreateDocumentType over .NET String is declared and not implemented "
+                "yet (board:0035)");
   }
+
   /// \brief `XmlDocument.GetElementsByTagName(name)`. \param name The name. \return The matches.
   [[nodiscard]] XmlNodeList GetElementsByTagName(std::string_view name) const;
+
   /// \brief `XmlDocument.NameTable`. \return An empty name table.
   [[nodiscard]] ::agiru::XmlNameTable NameTable() const { return {}; }
+
   /// \brief `XmlDocument.PreserveWhitespace` read. \return The setting.
   [[nodiscard]] ::agiru::Boolean PreserveWhitespace() const { return preserveWhitespace_; }
+
   /// \brief `XmlDocument.PreserveWhitespace` write. \param value The setting. \return It.
   ::agiru::Boolean PreserveWhitespace(::agiru::Boolean value) {
     preserveWhitespace_ = value;
     return value;
   }
+
   /// \brief `XmlDocument.ImportNode`, not rebuilt.
   ::agiru::dotnet::Refused ImportNode{{.type = "XmlDocument", .member = "ImportNode"}};
   /// \brief `XmlDocument.Schemas`, not rebuilt.

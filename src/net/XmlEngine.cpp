@@ -2,18 +2,18 @@
 
 #include "type/XmlHandle.h"
 
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-#include <libxml/xpath.h>
-#include <libxml/xmlerror.h>
-#include <libxml/xpathInternals.h>
-
 #include <algorithm>
 #include <cstring>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <libxml/parser.h>
+#include <libxml/tree.h>
+#include <libxml/xmlerror.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 
 namespace agiru::detail {
 
@@ -227,10 +227,19 @@ bool SameLocalName(xmlNodePtr node, std::string_view local, std::string_view uri
   return held == uri;
 }
 
+bool Attachable(xmlNodePtr target, xmlNodePtr node) {
+  if (target == nullptr || node == nullptr) { return false; }
+  if (node->type == XML_DOCUMENT_NODE) { return false; }
+  for (xmlNodePtr walk = target; walk != nullptr; walk = walk->parent) {
+    if (walk == node) { return false; }
+  }
+  return true;
+}
+
 void Adopt(const XmlHandle &parent, const XmlHandle &child) {
   xmlNodePtr target = NodeOf(parent);
   xmlNodePtr node = NodeOf(child);
-  if (target == nullptr || node == nullptr) { return; }
+  if (!Attachable(target, node)) { return; }
   xmlUnlinkNode(node);
   if (target->type == XML_DOCUMENT_NODE) {
     xmlDocPtr doc = reinterpret_cast<xmlDocPtr>(target);

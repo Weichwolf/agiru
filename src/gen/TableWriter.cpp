@@ -292,6 +292,14 @@ InitValue(const al::FieldDecl &field, const OptionField *option, const EnumIndex
              : std::optional<std::string>(std::to_string(value->second));
 }
 
+bool CarriesInitValues(const al::TableObject &table,
+                       const std::vector<OptionField> &options,
+                       const EnumIndex &enums) {
+  return std::ranges::any_of(table.fields, [&](const al::FieldDecl &field) {
+    return InitValue(field, OptionOf(options, field), enums).has_value();
+  });
+}
+
 std::string PropertyText(const al::FieldDecl &field, std::string_view name) {
   const al::Property *found = Find(field.properties, name);
   if (found == nullptr) { return {}; }
@@ -705,6 +713,7 @@ std::string ClassBody(const al::TableObject &table,
     out += "  " + MemberType(table, field, OptionOf(options, field), enums) + " " +
            FieldIdentifier(table, field.name) + "{};\n";
   }
+  if (CarriesInitValues(table, options, enums)) { out += "\n  " + tableClass + "();\n"; }
 
   out += ClassConstants(table);
 
@@ -979,6 +988,11 @@ TableHeader WriteHeader(const al::TableObject &declared,
            std::to_string(validated) + "> kOnValidate{{\n" + validators + "  }};\n";
   }
   out += "};\n";
+  if (CarriesInitValues(table, options, enums)) {
+    out += "\ninline " + qualified + "::" + ClassName(tableIdentifier, ObjectKind::Table) +
+           "() {\n  ::agiru::detail::RuntimeInitValues(this, ::agiru::TableTraits<" + qualified +
+           ">::kTable);\n}\n";
+  }
   DotNetUse dotnet;
   DotNetUse absent;
   GatherAbsentIn(table.variables, bodies, objects, dotnet, absent);

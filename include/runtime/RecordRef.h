@@ -114,6 +114,18 @@ private:
 }
 
 namespace agiru {
+class RecordRef;
+class Variant;
+
+namespace detail {
+/// \brief `RecordRef.GetTable(Variant)`: opens the held record's table and copies the row.
+/// \param into The reference.
+/// \param held The Variant.
+void RecordRefFromVariant(RecordRef &into, const Variant &held);
+}
+}
+
+namespace agiru {
 
 /// \brief AL `FieldRef` -- one field of one record, reached without naming its type.
 ///
@@ -539,12 +551,20 @@ public:
     *static_cast<std::remove_cvref_t<T> *>(State().record) = rec;
   }
 
+  /// \brief AL `RecordRef.GetTable(Variant)`: the record the Variant carries, or the RecordRef it
+  ///        refers to, which `Find Record Management` hands over as `SourceRec: Variant`.
+  /// \param held The Variant.
+  /// \throws Error when it holds neither a record nor a RecordRef.
+  void GetTable(const ::agiru::Variant &held) { detail::RecordRefFromVariant(*this, held); }
+
+  friend void detail::RecordRefFromVariant(RecordRef &into, const ::agiru::Variant &held);
+
   /// \brief AL `RecordRef.GetTable(Record)` on a record whose table this build does not carry.
   /// \tparam T The stand-in for the absent table.
   /// \param rec The stand-in.
   /// \throws Error always, naming the gap rather than instantiating traits the table lacks.
   template <typename T>
-    requires(!requires { T::kId; })
+    requires(!requires { T::kId; }) && (!std::same_as<std::remove_cvref_t<T>, ::agiru::Variant>)
   void GetTable(T &rec) {
     static_cast<void>(rec);
     throw Error("RecordRef.GetTable: the record's table is not translated in this build");

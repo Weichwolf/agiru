@@ -1,3 +1,5 @@
+#include "dotnet/XmlDocument.h"
+#include "dotnet/XmlNode.h"
 #include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Stream.h"
@@ -11,9 +13,6 @@
 #include "type/XmlNode.h"
 #include "type/XmlNodeList.h"
 #include "type/XmlText.h"
-
-#include "dotnet/XmlDocument.h"
-#include "dotnet/XmlNode.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
@@ -70,13 +69,16 @@ void ElementsAreWalkedAndRead() {
   CHECK_TRUE("an attribute is found by name", attributes.Get("id", id));
   CHECK_TEXT("with its value", id.Value(), "2");
   CHECK_TEXT("the prefixed child keeps its qualified name",
-             root.GetChildElements("p:b").Count() == 1 ? "p:b" : "?", "p:b");
+             root.GetChildElements("p:b").Count() == 1 ? "p:b" : "?",
+             "p:b");
   CHECK_TEXT("and its local name and namespace apart",
-             root.GetChildElements("b", "urn:p").Count() == 1 ? "b" : "?", "b");
+             root.GetChildElements("b", "urn:p").Count() == 1 ? "b" : "?",
+             "b");
 }
 
 /// XPATH WITH AND WITHOUT A NAMESPACE MANAGER: `SelectSingleNode` answers the first match, or
-/// false, and a prefix is resolved through the manager (`xmlnode-selectsinglenode-string-xmlnamespacemanager-xmlnode-method.md`).
+/// false, and a prefix is resolved through the manager
+/// (`xmlnode-selectsinglenode-string-xmlnamespacemanager-xmlnode-method.md`).
 void XPathSelectsWithNamespaces() {
   XmlDocument document;
   CHECK_TRUE("read", XmlDocument::ReadFrom(kSample, document));
@@ -144,7 +146,8 @@ void DotNetClassesWalkTheSameTree() {
   manager = manager.XmlNamespaceManager(document.NameTable());
   manager.AddNamespace("x", "urn:p");
   CHECK_TEXT("a prefixed path resolves through the manager",
-             root.SelectSingleNode("x:b", manager).InnerText(), "three");
+             root.SelectSingleNode("x:b", manager).InnerText(),
+             "three");
   agiru::dotnet::XmlElement made = document.CreateElement("c");
   made.InnerText("four");
   static_cast<void>(root.AppendChild(made));
@@ -154,7 +157,14 @@ void DotNetClassesWalkTheSameTree() {
   for ([[maybe_unused]] auto &node : root.ChildNodes()) { ++walked; }
   CHECK_TRUE("and foreach walks every child", walked == 4);
   CHECK_TEXT("an attribute is read by name",
-             root.SelectSingleNode("a").Attributes().GetNamedItem("id").Value(), "1");
+             root.SelectSingleNode("a").Attributes().GetNamedItem("id").Value(),
+             "1");
+  agiru::dotnet::XmlNode declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "");
+  static_cast<void>(document.InsertBefore(declaration, document.DocumentElement()));
+  static_cast<void>(document.AppendChild(declaration));
+  CHECK_TRUE("a declaration inserted the .NET way is the document's own, not a child",
+             document.OuterXml().find("<?xml version=\"1.0\" encoding=\"UTF-8\"?>") == 0 &&
+                 document.ChildNodes().Count() == 1);
   bool threw = false;
   try {
     document.LoadXml("<a>");

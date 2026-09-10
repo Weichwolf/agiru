@@ -413,6 +413,27 @@ public:
   /// \tparam T `RecordRef`, deduced at the assignment.
   /// \return The RecordRef.
   /// \throws Error when the Variant holds no RecordRef.
+  /// \brief AL `SomeCodeunit.Procedure(VariantVar)` where the parameter is `var Codeunit X` and
+  ///        the Variant holds one: the held instance itself, by reference, which is what a
+  ///        codeunit variable is. `Item Jnl.-Post Line` keeps itself in a `Variant` global and
+  ///        hands it to the manufacturing posting this way.
+  /// \tparam C The codeunit class the parameter names.
+  /// \return The held instance.
+  /// \throws Error when the Variant holds no codeunit, or another one.
+  template <typename C>
+    requires requires {
+      { ::agiru::CodeunitTraits<C>::kId } -> std::convertible_to<CodeunitId>;
+    }
+  operator C &() const {
+    const auto *held = std::get_if<CodeunitInVariant>(&held_);
+    if (held == nullptr || held->id != ::agiru::CodeunitTraits<C>::kId.Value()) {
+      throw Error(std::string("this Variant holds no codeunit ") +
+                  std::string(::agiru::CodeunitTraits<C>::kName));
+    }
+    return *const_cast<C *>(
+        static_cast<const C *>(held->instance)); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  }
+
   template <typename T>
     requires std::same_as<std::remove_cv_t<T>, class RecordRef>
   operator T &() const {

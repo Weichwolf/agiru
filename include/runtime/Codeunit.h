@@ -106,18 +106,28 @@ public:
         clone_(other.clone_),
         free_(other.free_) {}
 
-  /// \brief Lets go of what this one made; the other's instance is not shared.
-  /// \param other The handle assigned from, whose instance is NOT shared.
+  /// \brief AL `TempA := TempB` between two record globals held by handle: the fields and the
+  ///        filters come across and the rows stay this variable's own, which is what
+  ///        `T::operator=` does -- a handle that cloned the other instead handed
+  ///        `TempGLEntryPreview` the SAME rows as `TempGLEntryBuf`, and every posting then refused
+  ///        the first G/L entry as already there (29 UT cases, measured 2026-09-10). A codeunit
+  ///        handle keeps the clone, because two codeunit variables are two instances.
+  /// \param other The other handle.
   /// \return This handle.
-  ///
-  /// \note SELF-ASSIGNMENT IS THE ORDINARY PATH AND NOT A SPECIAL ONE. What it does is RELEASE,
-  ///       so `a = a` frees what `a` made and leaves it to make it again on the next use -- which
-  ///       is the same answer as for any other right-hand side, because the handle copies nothing.
   Instance &operator=(const Instance &other) {
     if (this == &other) { return *this; }
-    Instance copy(other);
-    *this = std::move(copy);
-    return *this;
+    if constexpr (requires { T::kId; }) {
+      if (other.held_ == nullptr) {
+        Release();
+        return *this;
+      }
+      *Made() = *static_cast<const T *>(other.held_);
+      return *this;
+    } else {
+      Instance copy(other);
+      *this = std::move(copy);
+      return *this;
+    }
   }
 
   /// \brief Assigns a VALUE into the instance, which is what AL writes for a record variable.

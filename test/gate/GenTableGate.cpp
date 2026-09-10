@@ -247,6 +247,30 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
                      .text.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
 }
 
+/// A RECORD VARIABLE CARRIES ITS FIELDS' `InitValue` BEFORE ANYTHING TOUCHES IT
+/// (`devenv-initvalue-property.md`): `Item Jnl.-Post Line` rounds by a `Currency` global it never
+/// loads, and the platform answers the field's `0.00001`. A table with any `InitValue` therefore
+/// declares a constructor that applies them; one without declares none, which is the control.
+void ATableWithAnInitValueConstructsWithIt() {
+  const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
+  CHECK_TRUE("the target table declares no InitValue, so no constructor",
+             agiru::gen::WriteHeader(agiru::al::ParseTable(original), std::string(kAlPath), {}, {})
+                     .text.find("ResourceCost_Table();") == std::string::npos);
+  std::string valued = original;
+  const std::size_t at = valued.find("field(5; \"Direct Unit Cost\"; Decimal)");
+  CHECK_TRUE("the source declares the field to give a value", at != std::string::npos);
+  const std::size_t brace = valued.find('{', at);
+  valued.insert(brace + 1, "\n            InitValue = 0.5;");
+  const std::string generated =
+      agiru::gen::WriteHeader(agiru::al::ParseTable(valued), std::string(kAlPath), {}, {}).text;
+  CHECK_TRUE("with one, the class declares its constructor",
+             generated.find("  ResourceCost_Table();") != std::string::npos);
+  CHECK_TRUE(
+      "and defines it over the runtime's init values after the traits",
+      generated.find("::ResourceCost_Table() {\n  ::agiru::detail::RuntimeInitValues(this, ") !=
+          std::string::npos);
+}
+
 /// A KEY NAMED `Name` WOULD GIVE `kName`, which is already the table's own name constant. 19 of the
 /// BaseApp's keys are called exactly that.
 void AKeyNamedLikeAClassConstantStillCompiles() {
@@ -318,6 +342,7 @@ int main() {
     AChangedStatementChangesTheBody();
     AFieldThatShadowsARuntimeTypeStillCompiles();
     AKeyNamedLikeAClassConstantStillCompiles();
+    ATableWithAnInitValueConstructsWithIt();
     ACollidingNameCarriesASeam();
   });
 }

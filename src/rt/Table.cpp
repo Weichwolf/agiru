@@ -393,6 +393,12 @@ void StampInserted(void *record, const TableDef &table) {
 
 namespace {
 
+void InitValuesOnly(void *record, const TableDef &table) {
+  for (const FieldDef &def : table.fields) {
+    if (def.initValue.has_value()) { SetFieldText(record, def, *def.initValue); }
+  }
+}
+
 void Defaulted(void *record, const TableDef &table, bool sparePrimaryKey) {
   const std::span<const FieldNo> key =
       table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
@@ -452,6 +458,10 @@ void RuntimeTransferFields(void *into,
 
 void MarkConsistent(const TableDef &table, bool consistent) {
   Session::Current().Transaction().MarkConsistent(table.name, consistent);
+}
+
+void RuntimeInitValues(void *record, const TableDef &table) {
+  InitValuesOnly(record, table);
 }
 
 void RuntimeInit(void *record, const TableDef &table) {

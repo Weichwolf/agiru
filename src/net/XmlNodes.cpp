@@ -1,5 +1,3 @@
-#include "XmlEngine.h"
-
 #include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
@@ -24,7 +22,7 @@
 #include "type/XmlText.h"
 #include "type/XmlWriteOptions.h"
 
-#include <libxml/tree.h>
+#include "XmlEngine.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -32,6 +30,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <libxml/tree.h>
 
 namespace agiru {
 
@@ -130,9 +130,7 @@ const std::vector<std::pair<std::string, std::string>> &NoNamespaces() {
 }
 
 XmlHandle NodeFrom(const Variant &content) {
-  if (content.IsText()) {
-    return detail::Detached(xmlNewText(Bytes(content.Get<std::string>())));
-  }
+  if (content.IsText()) { return detail::Detached(xmlNewText(Bytes(content.Get<std::string>()))); }
   if (const XmlHandle *held = content.XmlHeld(); held != nullptr) { return *held; }
   throw Error("XML content must be a node or a text, and this Variant holds neither");
 }
@@ -144,6 +142,7 @@ bool AddBeside(const XmlHandle &self, const Variant &content, bool after) {
   }
   const XmlHandle other = NodeFrom(content);
   xmlNodePtr added = NodeOf(other);
+  if (!detail::Attachable(node->parent, added)) { return false; }
   xmlUnlinkNode(added);
   if (after) {
     xmlAddNextSibling(node, added);
@@ -165,6 +164,7 @@ bool Replace(const XmlHandle &self, const Variant &content) {
   }
   const XmlHandle other = NodeFrom(content);
   xmlNodePtr added = NodeOf(other);
+  if (!detail::Attachable(node->parent, added)) { return false; }
   xmlUnlinkNode(added);
   xmlReplaceNode(node, added);
   if (self.tree != other.tree) {
@@ -189,7 +189,8 @@ bool Replace(const XmlHandle &self, const Variant &content) {
                                            std::string_view Value) {
   xmlNodePtr holder = xmlNewNode(nullptr, Bytes("attribute"));
   const XmlHandle tree = detail::Detached(holder);
-  xmlNsPtr ns = NamespaceUri.empty() ? nullptr : xmlNewNs(holder, Bytes(std::string(NamespaceUri)), nullptr);
+  xmlNsPtr ns =
+      NamespaceUri.empty() ? nullptr : xmlNewNs(holder, Bytes(std::string(NamespaceUri)), nullptr);
   xmlAttrPtr attribute =
       xmlNewNsProp(holder, ns, Bytes(std::string(LocalName)), Bytes(std::string(Value)));
   return XmlAttribute(XmlHandle(tree.tree, attribute));
@@ -262,9 +263,10 @@ std::string XmlAttribute::NamespaceUri() {
   return SelectAll(handle_, XPath, NoNamespaces(), NodeList);
 }
 
-::agiru::Boolean XmlAttribute::SelectSingleNode(std::string_view XPath,
-                                                const ::agiru::XmlNamespaceManager &NamespaceManager,
-                                                ::agiru::XmlNode &Node) {
+::agiru::Boolean
+XmlAttribute::SelectSingleNode(std::string_view XPath,
+                               const ::agiru::XmlNamespaceManager &NamespaceManager,
+                               ::agiru::XmlNode &Node) {
   return Select(handle_, XPath, NamespaceManager.Declared(), Node);
 }
 
@@ -321,8 +323,7 @@ std::string XmlAttribute::Value(std::string_view NewValue) {
   return true;
 }
 
-::agiru::Boolean XmlAttributeCollection::Get(std::string_view Name,
-                                             ::agiru::XmlAttribute &Result) {
+::agiru::Boolean XmlAttributeCollection::Get(std::string_view Name, ::agiru::XmlAttribute &Result) {
   for (const XmlHandle &item : items_) {
     if (detail::SameName(NodeOf(item), Name)) {
       Result = XmlAttribute(item);
@@ -353,16 +354,17 @@ void XmlAttributeCollection::Remove(std::string_view LocalName, std::string_view
 }
 
 void XmlAttributeCollection::Remove(const ::agiru::XmlAttribute &Attribute) {
-  const auto at = std::ranges::find_if(items_, [&Attribute](const XmlHandle &item) {
-    return item.node == Attribute.Handle().node;
-  });
+  const auto at = std::ranges::find_if(
+      items_, [&Attribute](const XmlHandle &item) { return item.node == Attribute.Handle().node; });
   if (at == items_.end()) { return; }
   xmlRemoveProp(reinterpret_cast<xmlAttrPtr>(NodeOf(*at)));
   items_.erase(at);
 }
 
 void XmlAttributeCollection::RemoveAll() {
-  for (const XmlHandle &item : items_) { xmlRemoveProp(reinterpret_cast<xmlAttrPtr>(NodeOf(item))); }
+  for (const XmlHandle &item : items_) {
+    xmlRemoveProp(reinterpret_cast<xmlAttrPtr>(NodeOf(item)));
+  }
   items_.clear();
 }
 
@@ -383,7 +385,8 @@ void XmlAttributeCollection::Set(std::string_view LocalName,
   xmlNodePtr owner = reinterpret_cast<xmlAttrPtr>(NodeOf(items_.front()))->parent;
   if (owner == nullptr) { return; }
   xmlNsPtr ns = xmlSearchNsByHref(owner->doc, owner, Bytes(std::string(NamespaceUri)));
-  xmlAttrPtr set = xmlSetNsProp(owner, ns, Bytes(std::string(LocalName)), Bytes(std::string(Value)));
+  xmlAttrPtr set =
+      xmlSetNsProp(owner, ns, Bytes(std::string(LocalName)), Bytes(std::string(Value)));
   if (std::ranges::none_of(items_, [set](const XmlHandle &item) { return item.node == set; })) {
     items_.emplace_back(items_.front().tree, set);
   }
@@ -400,7 +403,8 @@ void XmlNamespaceManager::AddNamespace(std::string_view Prefix, std::string_view
 }
 
 ::agiru::Boolean XmlNamespaceManager::HasNamespace(std::string_view Prefix) {
-  return std::ranges::any_of(declared_, [Prefix](const auto &entry) { return entry.first == Prefix; });
+  return std::ranges::any_of(declared_,
+                             [Prefix](const auto &entry) { return entry.first == Prefix; });
 }
 
 ::agiru::Boolean XmlNamespaceManager::LookupNamespace(std::string_view Prefix,

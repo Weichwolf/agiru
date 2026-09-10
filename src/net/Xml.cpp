@@ -1,5 +1,3 @@
-#include "XmlEngine.h"
-
 #include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Stream.h"
@@ -23,12 +21,14 @@
 #include "type/XmlText.h"
 #include "type/XmlWriteOptions.h"
 
-#include <libxml/tree.h>
+#include "XmlEngine.h"
 
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include <libxml/tree.h>
 
 namespace agiru {
 
@@ -120,9 +120,7 @@ bool SelectAll(const XmlHandle &from,
 }
 
 XmlHandle NodeFrom(const Variant &content) {
-  if (content.IsText()) {
-    return detail::Detached(xmlNewText(Bytes(content.Get<std::string>())));
-  }
+  if (content.IsText()) { return detail::Detached(xmlNewText(Bytes(content.Get<std::string>()))); }
   if (const XmlHandle *held = content.XmlHeld(); held != nullptr) { return *held; }
   throw Error("XML content must be a node or a text, and this Variant holds neither");
 }
@@ -132,6 +130,7 @@ bool AddInto(const XmlHandle &parent, const Variant &content, bool first) {
   const XmlHandle child = NodeFrom(content);
   if (first && NodeOf(parent)->children != nullptr) {
     xmlNodePtr node = NodeOf(child);
+    if (!detail::Attachable(NodeOf(parent), node)) { return false; }
     xmlUnlinkNode(node);
     xmlAddPrevSibling(NodeOf(parent)->children, node);
     if (parent.tree != child.tree) {
@@ -150,6 +149,7 @@ bool AddBeside(const XmlHandle &self, const Variant &content, bool after) {
   if (node == nullptr || node->parent == nullptr) { return false; }
   const XmlHandle other = NodeFrom(content);
   xmlNodePtr added = NodeOf(other);
+  if (!detail::Attachable(node->parent, added)) { return false; }
   xmlUnlinkNode(added);
   if (after) {
     xmlAddNextSibling(node, added);
@@ -169,6 +169,7 @@ bool Replace(const XmlHandle &self, const Variant &content) {
   if (node == nullptr || node->parent == nullptr) { return false; }
   const XmlHandle other = NodeFrom(content);
   xmlNodePtr added = NodeOf(other);
+  if (!detail::Attachable(node->parent, added)) { return false; }
   xmlUnlinkNode(added);
   xmlReplaceNode(node, added);
   if (self.tree != other.tree) {

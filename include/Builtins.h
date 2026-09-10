@@ -244,13 +244,6 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format = {});
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean IsCollectingErrors();
 
-/// \brief AL `System.IsNull(DotNet)`. Gets a value indicating whether a DotNet object has been
-/// created or not.
-/// \param DotNet The AL `DotNet`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean IsNull(const ::agiru::Variant &DotNet);
-
 /// \brief AL `System.IsServiceTier()`. Gets a value indicating whether the runtime is a service
 /// tier.
 /// \return The AL `Boolean`.

@@ -12467,3 +12467,5 @@ tests/core/codeunit/ERMTestSEPACreditTransfers.cpp
 tests/core/codeunit/ERMTestSEPADD08.cpp
 tests/core/codeunit/ERMTestSEPADirectDebit.cpp
 tests/core/codeunit/SMBOfficeAddinMgmtTest.cpp
+base/bank/reconciliation/codeunit/BankAccReconPostPreview.cpp
+base/inventory/posting/codeunit/ItemJnlPostLine.cpp

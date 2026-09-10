@@ -267,6 +267,19 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
 ///       says of `SystemId`.
 void RuntimeInit(void *record, const TableDef &table);
 
+/// \brief What a record VARIABLE holds before anything touches it: every field with an
+///        `InitValue` carries it (`devenv-initvalue-property.md`), the rest stay blank.
+///
+/// \warning A GENERATED TABLE WITH ANY `InitValue` CALLS THIS FROM ITS CONSTRUCTOR. `Item
+///          Jnl.-Post Line` rounds by `Currency."Unit-Amount Rounding Precision"` of a `Currency`
+///          global it never loads when there is no additional reporting currency, and the platform
+///          answers `0.00001` there because the field says so; a zero-initialised member answered
+///          0 and every item posting refused with "Round: precision is zero" (86 UT cases,
+///          measured 2026-09-10).
+/// \param record The record.
+/// \param table Its declaration.
+void RuntimeInitValues(void *record, const TableDef &table);
+
 /// \brief AL `Record.Consistent(Boolean)`: marks the TABLE consistent or not for the running
 ///        transaction, and a commit while any table is marked inconsistent is refused with BC's
 ///        own message (`record-consistent-method.md`). `Gen. Jnl.-Post Line` marks `G/L Entry`

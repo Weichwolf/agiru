@@ -2,12 +2,12 @@
 
 #include "type/XmlHandle.h"
 
-#include <libxml/tree.h>
-#include <libxml/xpath.h>
-
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <libxml/tree.h>
+#include <libxml/xpath.h>
 
 namespace agiru::detail {
 
@@ -37,6 +37,7 @@ std::vector<XmlHandle> Attributes(const XmlHandle &of);
 bool SameName(xmlNodePtr node, std::string_view qualified);
 bool SameLocalName(xmlNodePtr node, std::string_view local, std::string_view uri);
 void Adopt(const XmlHandle &parent, const XmlHandle &child);
+bool Attachable(xmlNodePtr target, xmlNodePtr node);
 std::string QualifiedName(xmlNodePtr node);
 
 }

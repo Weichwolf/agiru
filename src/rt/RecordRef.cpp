@@ -493,4 +493,25 @@ bool RecordRef::FieldExist(Integer fieldNo) const {
   return State().table != nullptr && agiru::Field(*State().table, FieldNo{fieldNo}) != nullptr;
 }
 
+namespace detail {
+
+void RecordRefFromVariant(RecordRef &into, const Variant &held) {
+  if (held.IsRecordRef()) {
+    into.Copy(static_cast<const RecordRef &>(held));
+    return;
+  }
+  if (!held.IsRecord()) {
+    throw Error("RecordRef.GetTable(Variant): the Variant holds neither a record nor a RecordRef");
+  }
+  const RecordInVariant &record = held.Get<RecordInVariant>();
+  const TableEntry *entry = FindTable(record.table);
+  if (entry == nullptr) {
+    throw Error("RecordRef.GetTable: the record's table is not translated in this build");
+  }
+  into.Open(record.table.Value());
+  entry->copy(into.State().record, record.record);
+}
+
+}
+
 }

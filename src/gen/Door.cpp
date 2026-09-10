@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 83> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 89> kElsewhere{{
     {"Implementation", "runtime/Implementation.h"},
     {"CurrFieldNo", "runtime/Table.h"},
     {"Temporary", "runtime/Table.h"},
@@ -321,6 +321,12 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 83> kElsewhe
     {"dotnet::XmlAttribute", "dotnet/XmlDocument.h"},
     {"dotnet::XmlAttributeCollection", "dotnet/XmlDocument.h"},
     {"dotnet::XmlNamespaceManager", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlDeclaration", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlDocumentType", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlProcessingInstruction", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlComment", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlText", "dotnet/XmlDocument.h"},
+    {"dotnet::XmlCDataSection", "dotnet/XmlDocument.h"},
     {"dotnet::XmlNode", "dotnet/XmlNode.h"},
     {"dotnet::XmlNodeList", "dotnet/XmlNode.h"},
     {"DateTimeOffset", "dotnet/DateTimeOffset.h"},
