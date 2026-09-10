@@ -76,6 +76,11 @@ template <typename P> struct ControlTrigger {
   ::agiru::Boolean (P::*visible)() = nullptr;
   ::agiru::Boolean (P::*enabled)() = nullptr;  ///< \see visible
   ::agiru::Boolean (P::*editable)() = nullptr; ///< \see visible
+  /// \brief Sets the control's page VARIABLE from text, for a control whose source is one
+  ///        (`SourceExpr = JobSourceType`): what `TestField.SetValue` does when there is no field.
+  void (*set)(P &page, std::string_view text) = nullptr;
+  /// \brief Reads the control's page variable as text, the same way.
+  std::string (*text)(const P &page) = nullptr;
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.

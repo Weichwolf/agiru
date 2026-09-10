@@ -2,6 +2,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
@@ -143,11 +144,14 @@ void AValueCarriesItsType() {
   CHECK_TEXT(
       "with its value and its scale", cost.Get<agiru::Decimal>().ToInvariantString(), "12.50");
 
-  // AN OPTION COMES OUT AS ITS ORDINAL, because that is what it is -- and the NAMES come from the
-  // same FieldRef, out of the field's declaration.
+  // AN OPTION COMES OUT AS AN OPTION (`fieldref-value-method.md`: the Variant answers `IsOption`),
+  // carrying its ordinal and the member names out of the field's declaration -- so
+  // `MyOption := FieldRef.Value` assigns and `Format` names the member (measured 2026-09-10, 30 UT
+  // cases that read "the Variant does not hold that type (alternative 2)").
   const agiru::Variant type = ref.Field(1).Value();
-  CHECK_TRUE("an option comes out as an integer ordinal", type.IsInteger());
-  CHECK_TRUE("carrying the member's number", type.Get<agiru::Integer>() == 2);
+  CHECK_TRUE("an option comes out as an option", type.IsOption() && !type.IsInteger());
+  CHECK_TRUE("carrying the member's number", type.Get<agiru::OrdinalInVariant>().ordinal == 2);
+  CHECK_TRUE("and the member names", type.Get<agiru::OrdinalInVariant>().values.size() == 3);
 }
 
 /// POSITION AND ORDINAL ARE DIFFERENT QUESTIONS, and the platform gives both accessors because of
@@ -207,6 +211,7 @@ template <> struct agiru::OptionTraits<Shade> {
 namespace {
 
 struct Painted : agiru::Table<Painted> {
+  agiru::detail::StateHandle State_Block;
   static constexpr agiru::TableId kId{50000};
   static constexpr std::string_view kName{"Painted"};
 
@@ -260,6 +265,13 @@ inline constexpr agiru::TableDef kPaintedTable{.id = Painted::kId,
 template <> struct agiru::TableTraits<Painted> {
   static constexpr const agiru::TableDef &kTable = kPaintedTable;
 };
+
+namespace {
+// THE GATE'S OWN TABLE IS IN THE CATALOGUE, the way every generated definition unit registers its
+// table: `RecordRef.Open(50000)` looks it up there, and without this line the gate refused itself
+// with "this installation carries no table 50000".
+const agiru::RegisterTable<Painted> kPaintedInCatalogue;
+}
 
 namespace {
 

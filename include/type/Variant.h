@@ -1200,8 +1200,11 @@ public:
     requires(!detail::InVariant<T, Held>::value) &&
             requires(std::int32_t ordinal) { T::FromInteger(ordinal); }
   operator T() const {
+    if (const auto *number = std::get_if<Integer>(&held_); number != nullptr) {
+      return T::FromInteger(*number);
+    }
     const OrdinalInVariant *held = std::get_if<OrdinalInVariant>(&held_);
-    if (held == nullptr) { Refuse("that type"); }
+    if (held == nullptr) { Refuse("an option"); }
     return T::FromInteger(held->ordinal);
   }
 

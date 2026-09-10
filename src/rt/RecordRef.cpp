@@ -332,7 +332,9 @@ Variant FieldRef::Value() const {
     case FieldType::RecordId: return Variant{As<RecordId>(record_, *def_)};
     case FieldType::DateFormula: return Variant{As<DateFormula>(record_, *def_)};
     case FieldType::Option:
-    case FieldType::Enum: return Variant{Integer{As<OrdinalValue>(record_, *def_).AsInteger()}};
+    case FieldType::Enum:
+      return Variant{OrdinalInVariant{.ordinal = As<OrdinalValue>(record_, *def_).AsInteger(),
+                                      .values = def_->values}};
     case FieldType::Blob: return Variant{As<Blob>(record_, *def_)};
     case FieldType::Media:
     case FieldType::MediaSet:
@@ -504,7 +506,8 @@ void RecordRefFromVariant(RecordRef &into, const Variant &held) {
   const RecordInVariant &record = held.Get<RecordInVariant>();
   const TableEntry *entry = FindTable(record.table);
   if (entry == nullptr) {
-    throw Error("RecordRef.GetTable: the record's table is not translated in this build");
+    throw Error("RecordRef.GetTable: the record's table " + std::to_string(record.table.Value()) +
+                " is not translated in this build");
   }
   into.Open(record.table.Value());
   entry->copy(into.State().record, record.record);

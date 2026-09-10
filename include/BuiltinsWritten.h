@@ -607,7 +607,13 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
     into = *read;
     return true;
   } else if constexpr (std::is_same_v<T, ::agiru::Decimal>) {
-    into = ::agiru::Decimal::FromInvariantString(text);
+    if (text.find_first_not_of(' ') == std::string_view::npos) {
+      into = ::agiru::Decimal{};
+      return true;
+    }
+    try {
+      into = ::agiru::Decimal::FromInvariantString(text);
+    } catch (const ::agiru::DecimalError &) { return false; }
     return true;
   } else if constexpr (std::is_same_v<T, ::agiru::Date>) {
     return EvaluatedDate(into, text);

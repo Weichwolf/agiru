@@ -347,6 +347,14 @@ public:
     static_cast<void>(Page_());
     Relink_();
     const ControlDef *def = ControlNamed_(control);
+    if (def != nullptr && def->field.Value() == 0) {
+      if (const ControlTrigger<P> *row = TriggerRow_(control);
+          row != nullptr && row->set != nullptr) {
+        row->set(Page_(), text);
+        RunTrigger_(control, ControlTriggerKind::Validate, true);
+        return;
+      }
+    }
     if (def == nullptr || def->field.Value() == 0) {
       throw Error("the control '" + std::string(control) + "' shows no field to set");
     }
@@ -370,6 +378,12 @@ public:
   [[nodiscard]] std::string ControlText(std::string_view control) const override {
     const ControlDef *def = ControlNamed_(control);
     if (def == nullptr || def->field.Value() == 0) {
+    if (def != nullptr && def->field.Value() == 0 && page_ != nullptr) {
+      if (const ControlTrigger<P> *row = TriggerRow_(control);
+          row != nullptr && row->text != nullptr) {
+        return row->text(*page_);
+      }
+    }
       throw Error("the control '" + std::string(control) + "' shows no field to read");
     }
     if constexpr (kHasRecord) {
@@ -679,6 +693,15 @@ private:
   }
 
   void RunTrigger_(std::string_view control, ControlTriggerKind kind, bool optional) {
+  [[nodiscard]] static const ControlTrigger<P> *TriggerRow_(std::string_view control) {
+    if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
+      for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
+        if (SameWord_(trigger.control, control)) { return &trigger; }
+      }
+    }
+    return nullptr;
+  }
+
     if constexpr (requires { PageTraits<P>::kControlTriggers; }) {
       for (const ControlTrigger<P> &trigger : PageTraits<P>::kControlTriggers) {
         if (!SameWord_(trigger.control, control)) { continue; }

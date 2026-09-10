@@ -12469,3 +12469,11 @@ tests/core/codeunit/ERMTestSEPADirectDebit.cpp
 tests/core/codeunit/SMBOfficeAddinMgmtTest.cpp
 base/bank/reconciliation/codeunit/BankAccReconPostPreview.cpp
 base/inventory/posting/codeunit/ItemJnlPostLine.cpp
+base/integration/dataverse/page/CDSConnectionSetup.cpp
+base/integration/dataverse/page/CDSConnectionSetupWizard.cpp
+base/inventory/planning/page/WhatIfImpacts.cpp
+base/manufacturing/document/page/ProdOrderCompItemFactBox.cpp
+base/purchases/document/page/PurchaseOrderSubform.cpp
+base/purchases/document/page/PurchInvoiceSubform.cpp
+base/sales/document/page/SalesCrMemoSubform.cpp
+base/service/document/page/ServiceCreditMemoSubform.cpp

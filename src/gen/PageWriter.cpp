@@ -150,7 +150,25 @@ struct TriggerRow {
   std::string visible;
   std::string enabled;
   std::string editable;
+  std::string variable;
 };
+
+std::string VariableSource(const al::PageControl &control, const al::PageObject &page) {
+  if (LowerKey(control.kind) != "field" || control.source.size() != 1 ||
+      control.source.front().kind != al::TokenKind::Identifier) {
+    return {};
+  }
+  for (const al::VarDecl &declared : page.variables) {
+    if (LowerKey(declared.name) == LowerKey(control.source.front().text) &&
+        TypeName(declared.type) != "Record" && TypeName(declared.type) != "Codeunit" &&
+        TypeName(declared.type) != "DotNet" && TypeName(declared.type) != "Interface" &&
+        TypeName(declared.type) != "Page" && TypeName(declared.type) != "Query" &&
+        TypeName(declared.type) != "Report" && TypeName(declared.type) != "XmlPort") {
+      return PageVariableIdentifier(page, declared.name);
+    }
+  }
+  return {};
+}
 
 void GatherTriggerRows(const std::vector<al::PageControl> &controls,
                        const std::map<std::string, std::string> &named,
@@ -159,6 +177,7 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
   for (const al::PageControl &control : controls) {
     TriggerRow row;
     row.control = control.name;
+    row.variable = VariableSource(control, page);
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string lowered = LowerKey(trigger.name);
       const bool lookup = lowered == "onlookup" && trigger.parameters.size() == 1;
@@ -185,7 +204,7 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
     }
     if (!row.validate.empty() || !row.action.empty() || !row.drillDown.empty() ||
         !row.assistEdit.empty() || !row.visible.empty() || !row.enabled.empty() ||
-        !row.editable.empty()) {
+        !row.editable.empty() || !row.variable.empty()) {
       rows.push_back(std::move(row));
     }
     GatherTriggerRows(control.children, named, page, rows);
@@ -211,7 +230,14 @@ std::string TriggerTable(const al::PageObject &page,
            ", .action = " + member(row.action) + ", .drillDown = " + member(row.drillDown) +
            ", .assistEdit = " + member(row.assistEdit) + ", .lookup = " + member(row.lookup) +
            ", .visible = " + member(row.visible) + ", .enabled = " + member(row.enabled) +
-           ", .editable = " + member(row.editable) + "}";
+           ", .editable = " + member(row.editable);
+    if (!row.variable.empty()) {
+      out += ", .set = [](" + pageClass +
+             " &page, std::string_view text) { static_cast<void>(::agiru::Evaluate(page." +
+             row.variable + ", text)); }, .text = [](const " + pageClass +
+             " &page) { return std::string(::agiru::AsText(page." + row.variable + ")); }";
+    }
+    out += "}";
   }
   out += rows.empty() ? "}};\n" : "\n  }};\n";
   return out;

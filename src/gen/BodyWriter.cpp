@@ -1960,6 +1960,13 @@ public:
       return {};
     }
     const al::VarDecl *declared = DeclarationOf(member.variable);
+    if (declared != nullptr && TypeName(declared->type) == "Codeunit" &&
+        !declared->subtype.empty()) {
+      const auto unit = objects_.codeunits.find(LowerKey(declared->subtype));
+      if (unit == objects_.codeunits.end()) { return {}; }
+      const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
+      return found == unit->second.procedures.end() ? std::string{} : found->second;
+    }
     if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
     const auto table = objects_.tables.find(LowerKey(declared->subtype));
     if (table == objects_.tables.end()) { return {}; }

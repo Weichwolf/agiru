@@ -144,8 +144,19 @@ void ALessGeneralNumberReadsAsAMoreGeneralOne() {
 
 } // namespace
 
+/// AL `Option := Variant` WHERE THE VARIANT HOLDS AN INTEGER: `Option Lookup Buffer` writes
+/// `Option := FieldRef.Value()` and AL takes the number as the ordinal, which this runtime
+/// refused as "not that type" (39 UT cases behind the credit memo and invoice subforms,
+/// 2026-09-10).
+void AnOptionTakesAnIntegerFromAVariant() {
+  const agiru::Variant held(agiru::Integer{2});
+  const agiru::Option<> option = held;
+  CHECK_TRUE("the number is the ordinal", option.AsInteger() == 2);
+}
+
 int main() {
   return gate::Run("Variant", [] {
+    AnOptionTakesAnIntegerFromAVariant();
     ItAnswersWhatItHolds();
     AskingForTheWrongTypeRefuses();
     AnEmptyVariantHoldsNothingAndSaysSo();
