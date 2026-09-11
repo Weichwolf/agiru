@@ -1,6 +1,8 @@
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
+#include "platform/Company.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
+#include "runtime/Session.h"
 #include "runtime/test/TestHttpRequestMessage.h"
 #include "runtime/test/TestHttpResponseMessage.h"
 #include "type/BigInteger.h"
@@ -140,7 +142,12 @@ void BigText::AddText(std::string_view String, ::agiru::Integer Position) {
 }
 
 std::string CompanyProperty::DisplayName() {
-  RefuseDoor("CompanyProperty.DisplayName()");
+  const std::string name = std::string(Session::Current().CompanyName());
+  platform::Company company;
+  if (company.Get(name) && company.DisplayName != "") {
+    return std::string(company.DisplayName.Value());
+  }
+  return name;
 }
 
 ::agiru::Guid CompanyProperty::ID() {

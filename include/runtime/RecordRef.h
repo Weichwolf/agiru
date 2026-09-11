@@ -258,12 +258,13 @@ public:
     throw Error("FieldRef.Active() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `FieldRef.CalcField()`. Updates FlowFields in a record.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean CalcField() const {
-    throw Error("FieldRef.CalcField() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `FieldRef.CalcField()`. Evaluates this FlowField into the record.
+  /// \return True, as AL's statement form does.
+  /// \throws Error when the formula names what this build does not carry (board:0047).
+  ///
+  /// \note IT IS `Record.CalcFields` FOR ONE FIELD (`fieldref-calcfield-method.md`), and a stored
+  ///       field passed here is left alone, which is what `CalcFields` does with one.
+  ::agiru::Boolean CalcField() const;
 
   /// \brief AL `FieldRef.CalcSum()`. Calculates the total of all values of a SumIndexField in a
   /// table.
@@ -819,13 +820,9 @@ public:
     throw Error("RecordRef.CountApprox() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.CurrentCompany()`. Gets the current company of a database table referred
-  /// to by a RecordRef.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string CurrentCompany() {
-    throw Error("RecordRef.CurrentCompany() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.CurrentCompany()`. The company whose rows this reference reads.
+  /// \return The session's company name; a company is a SCHEMA here and not a prefix.
+  std::string CurrentCompany();
 
   /// \brief AL `RecordRef.CurrentKey()`. Gets the current key of the table referred to by the
   /// RecordRef. The current key is returned as a string.
@@ -879,12 +876,15 @@ public:
     throw Error("RecordRef.DeleteLinks() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.Duplicate()`. Duplicates the table that contains the RecordRef.
-  /// \return The AL `RecordRef`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::RecordRef Duplicate() {
-    throw Error("RecordRef.Duplicate() is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.Duplicate()`. A SECOND reference on the same table, with this one's
+  ///        filters, current key and marks copied into it.
+  /// \return The new reference.
+  /// \throws Error when the reference is closed.
+  ///
+  /// \note IT IS NOT ASSIGNMENT. `RecRef2 := RecRef1` makes both names for ONE reference, and the
+  ///       page says so outright; what this returns has its own filters, so narrowing one leaves
+  ///       the other alone.
+  ::agiru::RecordRef Duplicate();
 
   /// \brief AL `RecordRef.FilterGroup(Integer)`. Changes the filter group that is being applied to
   /// the table. You can also use this method to return the number of the current filtergroup. You

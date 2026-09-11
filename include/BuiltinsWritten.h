@@ -173,6 +173,71 @@ void LogAuditMessage(
 /// \return The operating system's id of this process: one process is one session here, and the
 ///         number is what `Session.LogMessage` and the job queue compare, never a key.
 ::agiru::Integer SessionId();
+/// \brief AL `File.Exists(Text)`. Whether a file of that name is there.
+/// \param Name The path.
+/// \return Whether it exists and is a regular file.
+::agiru::Boolean Exists(std::string_view Name);
+
+/// \brief AL `File.Erase(Text)`. Deletes a file.
+/// \param Name The path.
+/// \return Whether it went.
+::agiru::Boolean Erase(std::string_view Name);
+
+/// \brief AL `File.Copy(Text, Text)`. Copies a file, overwriting the target.
+/// \param FromName The source path.
+/// \param ToName The target path.
+/// \return Whether the copy happened.
+::agiru::Boolean Copy(std::string_view FromName, std::string_view ToName);
+
+/// \brief AL `File.Rename(Text, Text)`. Renames a file.
+/// \param OldName The path it has.
+/// \param NewName The path it gets.
+/// \return Whether it moved.
+::agiru::Boolean Rename(std::string_view OldName, std::string_view NewName);
+
+/// \brief AL `File.IsPathTemporary(Text)`. Whether the path is under this session's temp folder.
+/// \param Name The path.
+/// \return Whether it is.
+::agiru::Boolean IsPathTemporary(std::string_view Name);
+
+/// \brief AL `File.Download(Text, Text, Text, Text, Text)`. Sends a file from the server to the
+///        client.
+/// \param FromFile The server file.
+/// \param DialogTitle The title the client's dialog would carry; there is no client here.
+/// \param ToFolder The folder the client names, which may be blank.
+/// \param ToFilter The file filter the client's dialog would show.
+/// \param ToFile The client's file name, and where the name it got comes back.
+/// \return Whether the file was delivered.
+///
+/// \note THE CLIENT IS WHAT IS ABSENT, NOT THE FILE. A service tier with no browser in front of it
+///       can still put the bytes where the caller asked, so this copies `FromFile` to
+///       `ToFolder`/`ToFile` when either names a target and answers whether the source was there.
+///       A blank target is delivery to a client that cannot take it, and that is `false`.
+::agiru::Boolean Download(std::string_view FromFile,
+                          std::string_view DialogTitle,
+                          std::string_view ToFolder,
+                          std::string_view ToFilter,
+                          ::agiru::Text<0> &ToFile);
+
+/// \brief AL `Session.IsSessionActive(Integer)`. Whether a session of that number is running.
+/// \param SessionID The session number.
+/// \return Whether it is this session; no other session of this tier is reachable from here.
+::agiru::Boolean IsSessionActive(::agiru::Integer SessionID);
+
+/// \brief AL `Database.CurrentTransactionType(TransactionType)`. Gets, and optionally sets, the
+///        transaction type of the current transaction.
+/// \param TransactionType The type to take, which the reading form leaves at its default.
+/// \return The type in force before the call.
+///
+/// \note THE ISOLATION IS A STATE MACHINE PER TABLE HERE (`devenv-tri-state-locking.md`,
+///       board:0012), so the type is carried and answered rather than mapped onto a PostgreSQL
+///       isolation level that would mean something else.
+::agiru::TransactionType CurrentTransactionType(const ::agiru::TransactionType &TransactionType);
+
+/// \brief AL `Database.CurrentTransactionType()` -- the READING form, which the documentation's
+///        syntax block brackets: `[X := ] Database.CurrentTransactionType([NewX])`.
+/// \return The type in force.
+::agiru::TransactionType CurrentTransactionType();
 
 /// \brief AL `System.NormalDate(Date)`. The normal date of a closing date, and a normal date
 ///        unchanged (`system-normaldate-method.md`).

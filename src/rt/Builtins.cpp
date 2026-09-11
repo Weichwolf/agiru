@@ -20,7 +20,6 @@
 #include "type/StringValue.h"
 #include "type/TableConnectionType.h"
 #include "type/Time.h"
-#include "type/TransactionType.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
@@ -214,11 +213,6 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
   RefuseDoor("Database.CopyCompany(Text, Text)");
 }
 
-::agiru::TransactionType CurrentTransactionType(const ::agiru::TransactionType &TransactionType) {
-  static_cast<void>(TransactionType);
-  RefuseDoor("Database.CurrentTransactionType(TransactionType)");
-}
-
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
                                      ::agiru::Text<0> &FileName,
                                      ::agiru::Text<0> &Description,
@@ -381,11 +375,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
   RefuseDoor("Session.GetModuleExecutionContext(Guid)");
 }
 
-::agiru::Boolean IsSessionActive(::agiru::Integer SessionID) {
-  static_cast<void>(SessionID);
-  RefuseDoor("Session.IsSessionActive(Integer)");
-}
-
 void LogSecurityAudit(std::string_view Description,
                       const ::agiru::SecurityOperationResult &Result,
                       std::string_view ResultDescription,
@@ -460,25 +449,6 @@ void LogInternalError(std::string_view Message,
   RefuseDoor("Dialog.StrMenu(Text, Integer, Text)");
 }
 
-::agiru::Boolean Copy(std::string_view FromName, std::string_view ToName) {
-  static_cast<void>(FromName);
-  static_cast<void>(ToName);
-  RefuseDoor("File.Copy(Text, Text)");
-}
-
-::agiru::Boolean Download(std::string_view FromFile,
-                          std::string_view DialogTitle,
-                          std::string_view ToFolder,
-                          std::string_view ToFilter,
-                          ::agiru::Text<0> &ToFile) {
-  static_cast<void>(FromFile);
-  static_cast<void>(DialogTitle);
-  static_cast<void>(ToFolder);
-  static_cast<void>(ToFilter);
-  static_cast<void>(ToFile);
-  RefuseDoor("File.Download(Text, Text, Text, Text, Text)");
-}
-
 ::agiru::Boolean DownloadFromStream(const ::agiru::InStream &InStream,
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,
@@ -492,32 +462,11 @@ void LogInternalError(std::string_view Message,
   RefuseDoor("File.DownloadFromStream(InStream, Text, Text, Text, Text)");
 }
 
-::agiru::Boolean Erase(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.Erase(Text)");
-}
-
-::agiru::Boolean Exists(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.Exists(Text)");
-}
-
 ::agiru::Boolean GetStamp(std::string_view Name, ::agiru::Date &Date, ::agiru::Time &Time) {
   static_cast<void>(Name);
   static_cast<void>(Date);
   static_cast<void>(Time);
   RefuseDoor("File.GetStamp(Text, Date, Time)");
-}
-
-::agiru::Boolean IsPathTemporary(std::string_view Name) {
-  static_cast<void>(Name);
-  RefuseDoor("File.IsPathTemporary(Text)");
-}
-
-::agiru::Boolean Rename(std::string_view OldName, std::string_view NewName) {
-  static_cast<void>(OldName);
-  static_cast<void>(NewName);
-  RefuseDoor("File.Rename(Text, Text)");
 }
 
 ::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time) {

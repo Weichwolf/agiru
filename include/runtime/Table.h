@@ -442,6 +442,20 @@ template <typename Source> [[nodiscard]] const void *RecordAddress(const Source 
   }
 }
 
+/// \brief AL `Record.GetPosition([UseNames])` -- the primary key as text.
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param useNames Whether the parts are keyed by field name rather than by number.
+/// \return The position text.
+[[nodiscard]] std::string PositionText(const void *record, const TableDef &table, bool useNames);
+
+/// \brief AL `Record.SetPosition(Position)` -- the primary key from text.
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param position The text `PositionText` wrote.
+/// \throws Error when a part names a field the table does not carry.
+void TakePosition(void *record, const TableDef &table, std::string_view position);
+
 /// \brief AL `Record.TransferFields` -- copies by field NUMBER between two tables.
 ///
 /// \param into                 The destination record.
@@ -1508,15 +1522,16 @@ public:
     return detail::FiltersText(Filtered(), TableTraits<Derived>::kTable);
   }
 
-  /// \brief AL `Record.GetPosition(...)`. Gets a string that contains the primary key of the
-  /// current record.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> std::string GetPosition(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.GetPosition is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.GetPosition([UseNames])`. The current record's primary key, as text.
+  ///
+  /// \param UseNames Whether each part is keyed by the field's NAME rather than its number.
+  /// \return `<key>=<'value'>` per primary-key field, comma separated.
+  ///
+  /// \note IT IS THE ROUND TRIP `SetPosition` TAKES BACK, so the value is quoted and an inner
+  ///       quote is doubled -- a key whose text carries a comma or an equals sign would otherwise
+  ///       come back as two parts.
+  [[nodiscard]] std::string GetPosition(Boolean UseNames = false) const {
+    return detail::PositionText(Self(), TableTraits<Derived>::kTable, UseNames);
   }
 
   /// \brief AL `Record.GetRangeMax(Field)`. The upper bound of the range standing on a field.
@@ -2020,15 +2035,12 @@ public:
     throw Error("Record.SetPermissionFilter is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `Record.SetPosition(...)`. Sets the fields in a primary key on a record to the
-  /// values specified in the supplied string. The remaining fields are not changed.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
-  template <typename... Arguments> void SetPosition(Arguments &&...arguments) const {
-    (static_cast<void>(arguments), ...);
-    throw Error("Record.SetPosition is declared and not implemented yet (board:0035)");
+  /// \brief AL `Record.SetPosition(Position)`. Puts the primary key back from what `GetPosition`
+  ///        wrote and positions on that row.
+  /// \param Position The text `GetPosition` returned.
+  /// \throws Error when a part names a field the table does not carry.
+  void SetPosition(std::string_view Position) {
+    detail::TakePosition(Self(), TableTraits<Derived>::kTable, Position);
   }
 
   /// \brief AL `Record.SetRange(...)`. Sets a simple filter, such as a single range or a single

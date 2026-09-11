@@ -442,6 +442,72 @@ bool InPrimaryKey(const TableDef &table, FieldNo no) {
 }
 }
 
+std::string PositionText(const void *record, const TableDef &table, bool useNames) {
+  std::string out;
+  if (table.keys.empty()) { return out; }
+  for (const FieldNo no : table.keys[0].fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    std::string value = StorageText(record, *def);
+    std::string quoted;
+    for (const char c : value) {
+      quoted += c;
+      if (c == '\'') { quoted += c; }
+    }
+    if (!out.empty()) { out += ','; }
+    out += useNames ? std::string(def->name) : std::to_string(no.Value());
+    out += "='" + quoted + "'";
+  }
+  return out;
+}
+
+void TakePosition(void *record, const TableDef &table, std::string_view position) {
+  std::size_t at = 0;
+  while (at < position.size()) {
+    const std::size_t equals = position.find('=', at);
+    if (equals == std::string_view::npos) { break; }
+    const std::string_view key = position.substr(at, equals - at);
+    std::size_t i = equals + 1;
+    std::string value;
+    if (i < position.size() && position[i] == '\'') {
+      ++i;
+      while (i < position.size()) {
+        if (position[i] == '\'') {
+          if (i + 1 < position.size() && position[i + 1] == '\'') {
+            value += '\'';
+            i += 2;
+            continue;
+          }
+          ++i;
+          break;
+        }
+        value += position[i];
+        ++i;
+      }
+    } else {
+      while (i < position.size() && position[i] != ',') {
+        value += position[i];
+        ++i;
+      }
+    }
+    while (i < position.size() && position[i] != ',') { ++i; }
+    at = i + 1;
+    const FieldDef *def = nullptr;
+    if (!key.empty() && std::isdigit(static_cast<unsigned char>(key.front())) != 0) {
+      def = Field(table, FieldNo{static_cast<std::int32_t>(std::stol(std::string(key)))});
+    } else {
+      for (const FieldDef &one : table.fields) {
+        if (one.name == key) { def = &one; }
+      }
+    }
+    if (def == nullptr) {
+      throw Error("Record.SetPosition: " + std::string(table.name) + " carries no field " +
+                  std::string(key));
+    }
+    SetFieldText(record, *def, value);
+  }
+}
+
 void RuntimeTransferFields(void *into,
                            const TableDef &table,
                            const void *from,

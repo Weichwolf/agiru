@@ -8,6 +8,7 @@
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -389,6 +390,25 @@ RecordRef FieldRef::Record() const {
 
 void RecordRef::Init() {
   detail::RuntimeInit(State().record, Table());
+}
+
+std::string RecordRef::CurrentCompany() {
+  return std::string(Session::Current().CompanyName());
+}
+
+RecordRef RecordRef::Duplicate() {
+  RecordRef copy;
+  copy.Open(Table().id.Value());
+  const TableEntry *entry = FindTable(Table().id);
+  if (entry == nullptr) { throw Error("the RecordRef is not open"); }
+  entry->copy(copy.State().record, State().record);
+  return copy;
+}
+
+Boolean FieldRef::CalcField() const {
+  detail::CalcField(
+      record_, Table_(), reinterpret_cast<const detail::StateHandle *>(record_)->Peek(), Def_().no);
+  return true;
 }
 
 void RecordRef::Open(Integer tableNo) {

@@ -18,7 +18,6 @@
 #include "type/Stream.h"
 #include "type/TableConnectionType.h"
 #include "type/Time.h"
-#include "type/TransactionType.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
@@ -301,14 +300,6 @@ void CheckLicenseFile(::agiru::Integer KeyNumber);
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean CopyCompany(std::string_view SourceName, std::string_view DestinationName);
 
-/// \brief AL `Database.CurrentTransactionType(TransactionType)`. Gets the current transaction type
-/// and sets a new type to be assigned.
-/// \param TransactionType The AL `TransactionType`.
-/// \return The AL `TransactionType`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::TransactionType
-CurrentTransactionType(const ::agiru::TransactionType &TransactionType = {});
-
 /// \brief AL `Database.DataFileInformation(Boolean, Text, Text, Boolean, Boolean, Boolean, Text,
 /// DateTime, Record)`. Specifies data from a file that has been exported from a database.
 /// \param ShowDialog The AL `Boolean`.
@@ -524,13 +515,6 @@ void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::ExecutionContext GetModuleExecutionContext(::agiru::Guid AppId = {});
 
-/// \brief AL `Session.IsSessionActive(Integer)`. Tests if the specified SessionID is active on the
-/// server instance where it was started.
-/// \param SessionID The AL `Integer`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean IsSessionActive(::agiru::Integer SessionID);
-
 /// \brief AL `Session.LogSecurityAudit(Text, SecurityOperationResult, Text, AuditCategory, Array of
 /// [Text], Array of [Text])`. Logs an IfX audit message to a telemetry account.
 /// \param Description The AL `Text`.
@@ -615,29 +599,6 @@ void LogInternalError(std::string_view Message,
                          ::agiru::Integer DefaultNumber = {},
                          std::string_view Instruction = {});
 
-/// \brief AL `File.Copy(Text, Text)`. Copies a file.
-/// \param FromName The AL `Text`.
-/// \param ToName The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Copy(std::string_view FromName, std::string_view ToName);
-
-/// \brief AL `File.Download(Text, Text, Text, Text, Text)`. Sends a file from a server computer to
-/// the client computer. The client computer is the computer that is running the Windows client or
-/// the computer that is running a browser that accesses the web client.
-/// \param FromFile The AL `Text`.
-/// \param DialogTitle The AL `Text`.
-/// \param ToFolder The AL `Text`.
-/// \param ToFilter The AL `Text`.
-/// \param ToFile The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Download(std::string_view FromFile,
-                          std::string_view DialogTitle,
-                          std::string_view ToFolder,
-                          std::string_view ToFilter,
-                          ::agiru::Text<0> &ToFile);
-
 /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from server
 /// computer to the client computer. The client computer is the computer that is running the Windows
 /// client or the computer that is running the browser that accesses the web client.
@@ -654,18 +615,6 @@ void LogInternalError(std::string_view Message,
                                     std::string_view ToFilter,
                                     ::agiru::Text<0> &ToFile);
 
-/// \brief AL `File.Erase(Text)`. Deletes a file.
-/// \param Name The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Erase(std::string_view Name);
-
-/// \brief AL `File.Exists(Text)`. Determines whether a file exists.
-/// \param Name The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Exists(std::string_view Name);
-
 /// \brief AL `File.GetStamp(Text, Date, Time)`. Gets the exact time that a file was last written
 /// to.
 /// \param Name The AL `Text`.
@@ -674,20 +623,6 @@ void LogInternalError(std::string_view Message,
 /// \return The AL `Boolean`.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Boolean GetStamp(std::string_view Name, ::agiru::Date &Date, ::agiru::Time &Time);
-
-/// \brief AL `File.IsPathTemporary(Text)`. Validates whether the given path is located in the
-/// current users temporary folder within the current service.
-/// \param Name The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean IsPathTemporary(std::string_view Name);
-
-/// \brief AL `File.Rename(Text, Text)`. Renames an ASCII or binary file.
-/// \param OldName The AL `Text`.
-/// \param NewName The AL `Text`.
-/// \return The AL `Boolean`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Boolean Rename(std::string_view OldName, std::string_view NewName);
 
 /// \brief AL `File.SetStamp(Text, Date, Time)`. Sets a timestamp for a file.
 /// \param Name The AL `Text`.

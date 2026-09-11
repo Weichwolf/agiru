@@ -1,5 +1,7 @@
 #pragma once
 
+#include "type/TransactionType.h"
+
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -99,6 +101,23 @@ public:
   }
 
   /// \brief AL `ClearLastError()`.
+  /// \brief AL `Database.CurrentTransactionType()` -- the type in force.
+  /// \return The type this transaction is running under.
+  [[nodiscard]] TransactionType CurrentType() const { return type_; }
+
+  /// \brief AL `Database.CurrentTransactionType(TransactionType)` -- takes a new type.
+  /// \param wanted The type to run under from here on.
+  /// \return The type that was in force before the call, which is what AL's form returns.
+  ///
+  /// \note THE TYPE IS CARRIED AND NOT MAPPED. BC's isolation is a state machine per table
+  ///       (`devenv-tri-state-locking.md`, board:0012) and PostgreSQL has no dirty read, so a type
+  ///       mapped onto an isolation level would mean something else; what a caller sets, it reads.
+  TransactionType CurrentType(TransactionType wanted) {
+    const TransactionType held = type_;
+    type_ = wanted;
+    return held;
+  }
+
   void ClearLastError() {
     lastError_.clear();
     lastErrorCode_.clear();
@@ -111,6 +130,7 @@ private:
   std::size_t rollbacks_ = 0;
   std::string lastErrorCode_;
   std::size_t issued_ = 0;
+  TransactionType type_ = TransactionType::UpdateNoLocks;
 };
 
 }

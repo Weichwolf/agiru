@@ -19,6 +19,7 @@
 #include "type/Duration.h"
 #include "type/ErrorInfo.h"
 #include "type/ExecutionContext.h"
+#include "type/File.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/List.h"
@@ -29,6 +30,7 @@
 #include "type/TelemetryScope.h"
 #include "type/Text.h"
 #include "type/Time.h"
+#include "type/TransactionType.h"
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
@@ -37,6 +39,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <format>
 #include <limits>
 #include <optional>
@@ -369,6 +372,60 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
 
 ::agiru::Integer SessionId() {
   return static_cast<::agiru::Integer>(::getpid());
+}
+
+::agiru::Boolean Exists(std::string_view Name) {
+  return ::agiru::File::Exists(Name);
+}
+
+::agiru::Boolean Erase(std::string_view Name) {
+  return ::agiru::File::Erase(Name);
+}
+
+::agiru::Boolean Copy(std::string_view FromName, std::string_view ToName) {
+  return ::agiru::File::Copy(FromName, ToName);
+}
+
+::agiru::Boolean Rename(std::string_view OldName, std::string_view NewName) {
+  return ::agiru::File::Rename(OldName, NewName);
+}
+
+::agiru::Boolean IsPathTemporary(std::string_view Name) {
+  return ::agiru::File::IsPathTemporary(Name);
+}
+
+::agiru::Boolean Download(std::string_view FromFile,
+                          std::string_view DialogTitle,
+                          std::string_view ToFolder,
+                          std::string_view ToFilter,
+                          ::agiru::Text<0> &ToFile) {
+  static_cast<void>(DialogTitle);
+  static_cast<void>(ToFilter);
+  if (!::agiru::File::Exists(FromFile)) { return false; }
+  std::string target(ToFile.Value());
+  if (!ToFolder.empty()) {
+    std::string folder(ToFolder);
+    if (!folder.empty() && folder.back() != '/') { folder += '/'; }
+    target = target.empty()
+                 ? folder + std::filesystem::path(std::string(FromFile)).filename().string()
+                 : folder + target;
+  }
+  if (target.empty()) { return false; }
+  if (target != FromFile && !::agiru::File::Copy(FromFile, target)) { return false; }
+  ToFile = target;
+  return true;
+}
+
+::agiru::Boolean IsSessionActive(::agiru::Integer SessionID) {
+  return SessionID == SessionId();
+}
+
+::agiru::TransactionType CurrentTransactionType(const ::agiru::TransactionType &TransactionType) {
+  return Session::Current().Transaction().CurrentType(TransactionType);
+}
+
+::agiru::TransactionType CurrentTransactionType() {
+  return Session::Current().Transaction().CurrentType();
 }
 
 ::agiru::Date NormalDate(::agiru::Date Date) {
