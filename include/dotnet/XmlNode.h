@@ -59,27 +59,27 @@ public:
   /// \brief `XmlNode.HasChildNodes`. \return Whether there is a child.
   [[nodiscard]] ::agiru::Boolean HasChildNodes() const;
   /// \brief `XmlNode.InnerText` read. \return The concatenated text.
-  [[nodiscard]] std::string InnerText() const;
+  [[nodiscard]] ::agiru::Text<0> InnerText() const;
   /// \brief `XmlNode.InnerText` write. \param text The new content. \return It.
-  std::string InnerText(std::string_view text);
+  ::agiru::Text<0> InnerText(std::string_view text);
   /// \brief `XmlNode.InnerXml` read. \return The children's markup.
-  [[nodiscard]] std::string InnerXml() const;
+  [[nodiscard]] ::agiru::Text<0> InnerXml() const;
   /// \brief `XmlNode.InnerXml` write. \param markup The new children. \return It.
-  std::string InnerXml(std::string_view markup);
+  ::agiru::Text<0> InnerXml(std::string_view markup);
   /// \brief `XmlNode.OuterXml`. \return This node's markup.
-  [[nodiscard]] std::string OuterXml() const;
+  [[nodiscard]] ::agiru::Text<0> OuterXml() const;
   /// \brief `XmlNode.LocalName`. \return The name without its prefix.
-  [[nodiscard]] std::string LocalName() const;
+  [[nodiscard]] ::agiru::Text<0> LocalName() const;
   /// \brief `XmlNode.Name`. \return The qualified name.
-  [[nodiscard]] std::string Name() const;
+  [[nodiscard]] ::agiru::Text<0> Name() const;
   /// \brief `XmlNode.NamespaceURI`. \return The namespace, or empty.
-  [[nodiscard]] std::string NamespaceURI() const;
+  [[nodiscard]] ::agiru::Text<0> NamespaceURI() const;
   /// \brief `XmlNode.Prefix`. \return The prefix, or empty.
-  [[nodiscard]] std::string Prefix() const;
+  [[nodiscard]] ::agiru::Text<0> Prefix() const;
   /// \brief `XmlNode.Value` read. \return A text or attribute node's value.
-  [[nodiscard]] std::string Value() const;
+  [[nodiscard]] ::agiru::Text<0> Value() const;
   /// \brief `XmlNode.Value` write. \param text The value. \return It.
-  std::string Value(std::string_view text);
+  ::agiru::Text<0> Value(std::string_view text);
   /// \brief `XmlNode.RemoveChild(node)`. \param node The child. \return It.
   XmlNode RemoveChild(const XmlNode &node);
   /// \brief `XmlNode.ReplaceChild(new, old)`. \param made The new. \param old The old.
@@ -129,17 +129,22 @@ protected:
 class XmlNodeList {
 public:
   XmlNodeList() = default;
+
   /// \brief A list over nodes. \param items The nodes.
   explicit XmlNodeList(std::vector<::agiru::detail::XmlHandle> items) noexcept
       : items_(std::move(items)) {}
+
   /// \brief `XmlNodeList.Count`. \return How many.
   [[nodiscard]] ::agiru::Integer Count() const;
   /// \brief `XmlNodeList.Item(i)`, zero-based. \param index The index. \return The node, or null.
   [[nodiscard]] XmlNode Item(::agiru::Integer index) const;
+
   /// \brief `XmlNodeList[i]`, spelled `ItemOf`. \param index The index. \return The node.
   [[nodiscard]] XmlNode ItemOf(::agiru::Integer index) const { return Item(index); }
+
   /// \brief AL `IsNull(XmlNodeList)`: a list is never null once made.
   [[nodiscard]] bool IsNullObject() const noexcept { return false; }
+
   /// \brief AL `foreach Node in List`: the nodes, as XmlNode values.
   [[nodiscard]] std::vector<XmlNode> Nodes() const;
   /// \brief The first node, for `foreach`.

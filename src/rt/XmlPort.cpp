@@ -229,7 +229,9 @@ void XmlPortInput::Load(std::string_view bytes,
       }
       std::string line = text.substr(at, end == std::string::npos ? std::string::npos : end - at);
       if (!line.empty() && line.back() == '\r') { line.pop_back(); }
-      at = end == std::string::npos ? text.size() + 1 : end + (text.compare(end, separator.size(), separator) == 0 ? separator.size() : 1);
+      at = end == std::string::npos
+               ? text.size() + 1
+               : end + (text.compare(end, separator.size(), separator) == 0 ? separator.size() : 1);
       if (line.empty() && at > text.size()) { break; }
       std::vector<std::string> fields;
       if (def.format == XmlPortFormat::FixedText || between.empty()) {
@@ -276,7 +278,7 @@ void XmlPortInput::ParseXml(std::string_view text) {
     }
     std::string text;
     for (const dotnet::XmlNode &child : from.ChildNodes().Nodes()) {
-      const std::string name = child.Name();
+      const std::string name(std::string_view(child.Name()));
       if (name.empty()) { continue; }
       if (name.front() == '#') {
         if (name == "#text" || name == "#cdata-section") { text += child.Value(); }

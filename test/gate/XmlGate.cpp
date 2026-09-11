@@ -152,7 +152,7 @@ void DotNetClassesWalkTheSameTree() {
   made.InnerText("four");
   static_cast<void>(root.AppendChild(made));
   CHECK_TRUE("an appended child is in the markup",
-             root.OuterXml().find("<c>four</c></root>") != std::string::npos);
+             std::string_view(root.OuterXml()).find("<c>four</c></root>") != std::string::npos);
   int walked = 0;
   for ([[maybe_unused]] auto &node : root.ChildNodes()) { ++walked; }
   CHECK_TRUE("and foreach walks every child", walked == 4);
@@ -162,9 +162,11 @@ void DotNetClassesWalkTheSameTree() {
   agiru::dotnet::XmlNode declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "");
   static_cast<void>(document.InsertBefore(declaration, document.DocumentElement()));
   static_cast<void>(document.AppendChild(declaration));
-  CHECK_TRUE("a declaration inserted the .NET way is the document's own, not a child",
-             document.OuterXml().find("<?xml version=\"1.0\" encoding=\"UTF-8\"?>") == 0 &&
-                 document.ChildNodes().Count() == 1);
+  CHECK_TRUE(
+      "a declaration inserted the .NET way is the document's own, not a child",
+      std::string_view(document.OuterXml()).find("<?xml version=\"1.0\" encoding=\"UTF-8\"?>") ==
+              0 &&
+          document.ChildNodes().Count() == 1);
   bool threw = false;
   try {
     document.LoadXml("<a>");

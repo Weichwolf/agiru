@@ -49,9 +49,10 @@ public:
   /// \tparam D The number's type, which must convert to one.
   /// \param milliseconds The milliseconds, rounded to whole ones.
   template <typename D>
-    requires(!std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
-             !requires { typename D::IsAlRefusal; } &&
-             std::is_convertible_v<const D &, std::int32_t>)
+    requires(
+        !std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
+        !requires { typename D::IsAlRefusal; } && !requires { typename D::Held; } &&
+        std::is_convertible_v<const D &, std::int32_t>)
   constexpr Duration(const D &milliseconds)
       : milliseconds_(static_cast<std::int64_t>(static_cast<std::int32_t>(milliseconds))) {}
 

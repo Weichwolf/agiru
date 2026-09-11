@@ -13932,3 +13932,5 @@ base/inventory/costing/codeunit/InventoryAdjustmentHandler.cpp
 base/system/email/codeunit/EmailAddressLookupSubs.cpp
 system/system/email/codeunit/EmailImpl.cpp
 system/system/email/page/EmailAccounts.cpp
+base/system/io/codeunit/ConfigValidateManagement.cpp
+tests/core/codeunit/RSTableInfoTelemetryTest.cpp

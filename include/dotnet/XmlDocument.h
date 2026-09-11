@@ -27,7 +27,7 @@ public:
   /// \brief `XmlElement.SetAttribute(name, value)`. \param name The name. \param value The value.
   void SetAttribute(std::string_view name, std::string_view value);
   /// \brief `XmlElement.GetAttribute(name)`. \param name The name. \return The value, or empty.
-  [[nodiscard]] std::string GetAttribute(std::string_view name) const;
+  [[nodiscard]] ::agiru::Text<0> GetAttribute(std::string_view name) const;
   /// \brief `XmlElement.HasAttribute(name)`. \param name The name. \return Whether it is there.
   [[nodiscard]] ::agiru::Boolean HasAttribute(std::string_view name) const;
   /// \brief `XmlElement.RemoveAttribute(name)`. \param name The name.
@@ -59,12 +59,12 @@ public:
   explicit(false) XmlDocumentType(const XmlNode &node) : XmlNode(node.Handle()) {}
 
   /// \brief `XmlDocumentType.PublicId`. \return The public id, or empty.
-  [[nodiscard]] std::string PublicId() const;
+  [[nodiscard]] ::agiru::Text<0> PublicId() const;
   /// \brief `XmlDocumentType.SystemId`. \return The system id, or empty.
-  [[nodiscard]] std::string SystemId() const;
+  [[nodiscard]] ::agiru::Text<0> SystemId() const;
 
   /// \brief `XmlDocumentType.InternalSubset`. \return Empty; the subset is not kept.
-  [[nodiscard]] std::string InternalSubset() const { return {}; }
+  [[nodiscard]] ::agiru::Text<0> InternalSubset() const { return {}; }
 };
 
 /// \brief .NET `XmlProcessingInstruction`.
@@ -76,10 +76,10 @@ public:
   explicit(false) XmlProcessingInstruction(const XmlNode &node) : XmlNode(node.Handle()) {}
 
   /// \brief `XmlProcessingInstruction.Target`. \return The target.
-  [[nodiscard]] std::string Target() const { return LocalName(); }
+  [[nodiscard]] ::agiru::Text<0> Target() const { return LocalName(); }
 
   /// \brief `XmlProcessingInstruction.Data`. \return The data.
-  [[nodiscard]] std::string Data() const { return Value(); }
+  [[nodiscard]] ::agiru::Text<0> Data() const { return Value(); }
 };
 
 /// \brief .NET `XmlComment`.
@@ -192,16 +192,16 @@ public:
   void AddNamespace(std::string_view prefix, std::string_view uri);
   /// \brief `XmlNamespaceManager.LookupNamespace(prefix)`. \param prefix The prefix.
   /// \return The namespace, or empty.
-  [[nodiscard]] std::string LookupNamespace(std::string_view prefix) const;
+  [[nodiscard]] ::agiru::Text<0> LookupNamespace(std::string_view prefix) const;
   /// \brief `XmlNamespaceManager.LookupPrefix(uri)`. \param uri The namespace.
   /// \return The prefix, or empty.
-  [[nodiscard]] std::string LookupPrefix(std::string_view uri) const;
+  [[nodiscard]] ::agiru::Text<0> LookupPrefix(std::string_view uri) const;
   /// \brief `XmlNamespaceManager.HasNamespace(prefix)`. \param prefix The prefix.
   /// \return Whether it was added.
   [[nodiscard]] ::agiru::Boolean HasNamespace(std::string_view prefix) const;
 
   /// \brief `XmlNamespaceManager.DefaultNamespace`. \return The namespace of the empty prefix.
-  [[nodiscard]] std::string DefaultNamespace() const { return LookupNamespace(""); }
+  [[nodiscard]] ::agiru::Text<0> DefaultNamespace() const { return LookupNamespace(""); }
 
   /// \brief `XmlNamespaceManager.NameTable`. \return An empty name table.
   [[nodiscard]] ::agiru::XmlNameTable NameTable() const { return {}; }

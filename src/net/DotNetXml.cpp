@@ -123,11 +123,11 @@ XmlDocument XmlNode::OwnerDocument() const {
   return NodeOf(handle_) != nullptr && NodeOf(handle_)->children != nullptr;
 }
 
-std::string XmlNode::InnerText() const {
+::agiru::Text<0> XmlNode::InnerText() const {
   return ContentOf(handle_);
 }
 
-std::string XmlNode::InnerText(std::string_view text) {
+::agiru::Text<0> XmlNode::InnerText(std::string_view text) {
   if (NodeOf(handle_) != nullptr) {
     const std::string held(text);
     xmlNodeSetContent(NodeOf(handle_), Bytes(held));
@@ -135,11 +135,11 @@ std::string XmlNode::InnerText(std::string_view text) {
   return std::string(text);
 }
 
-std::string XmlNode::InnerXml() const {
+::agiru::Text<0> XmlNode::InnerXml() const {
   return ::agiru::detail::DumpChildren(handle_);
 }
 
-std::string XmlNode::InnerXml(std::string_view markup) {
+::agiru::Text<0> XmlNode::InnerXml(std::string_view markup) {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr) { return std::string(markup); }
   while (node->children != nullptr) {
@@ -162,15 +162,15 @@ std::string XmlNode::InnerXml(std::string_view markup) {
   return held;
 }
 
-std::string XmlNode::OuterXml() const {
+::agiru::Text<0> XmlNode::OuterXml() const {
   return ::agiru::detail::Dump(handle_);
 }
 
-std::string XmlNode::LocalName() const {
+::agiru::Text<0> XmlNode::LocalName() const {
   return NodeOf(handle_) == nullptr ? std::string{} : ::agiru::detail::Text(NodeOf(handle_)->name);
 }
 
-std::string XmlNode::Name() const {
+::agiru::Text<0> XmlNode::Name() const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr) { return {}; }
   if (node->type == XML_DOCUMENT_NODE) { return "#document"; }
@@ -180,19 +180,19 @@ std::string XmlNode::Name() const {
   return ::agiru::detail::QualifiedName(node);
 }
 
-std::string XmlNode::NamespaceURI() const {
+::agiru::Text<0> XmlNode::NamespaceURI() const {
   xmlNodePtr node = NodeOf(handle_);
   return node == nullptr || node->ns == nullptr ? std::string{}
                                                 : ::agiru::detail::Text(node->ns->href);
 }
 
-std::string XmlNode::Prefix() const {
+::agiru::Text<0> XmlNode::Prefix() const {
   xmlNodePtr node = NodeOf(handle_);
   return node == nullptr || node->ns == nullptr ? std::string{}
                                                 : ::agiru::detail::Text(node->ns->prefix);
 }
 
-std::string XmlNode::Value() const {
+::agiru::Text<0> XmlNode::Value() const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr || node->type == XML_ELEMENT_NODE || node->type == XML_DOCUMENT_NODE) {
     return {};
@@ -200,7 +200,7 @@ std::string XmlNode::Value() const {
   return ContentOf(handle_);
 }
 
-std::string XmlNode::Value(std::string_view text) {
+::agiru::Text<0> XmlNode::Value(std::string_view text) {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr) { return std::string(text); }
   const std::string held(text);
@@ -303,7 +303,7 @@ void XmlElement::SetAttribute(std::string_view name, std::string_view value) {
   xmlSetProp(node, Bytes(std::string(name)), Bytes(std::string(value)));
 }
 
-std::string XmlElement::GetAttribute(std::string_view name) const {
+::agiru::Text<0> XmlElement::GetAttribute(std::string_view name) const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr) { return {}; }
   xmlChar *value = xmlGetProp(node, Bytes(std::string(name)));
@@ -399,14 +399,14 @@ void XmlNamespaceManager::AddNamespace(std::string_view prefix, std::string_view
   declared_.emplace_back(std::string(prefix), std::string(uri));
 }
 
-std::string XmlNamespaceManager::LookupNamespace(std::string_view prefix) const {
+::agiru::Text<0> XmlNamespaceManager::LookupNamespace(std::string_view prefix) const {
   for (const auto &[held, value] : declared_) {
     if (held == prefix) { return value; }
   }
   return {};
 }
 
-std::string XmlNamespaceManager::LookupPrefix(std::string_view uri) const {
+::agiru::Text<0> XmlNamespaceManager::LookupPrefix(std::string_view uri) const {
   for (const auto &[held, value] : declared_) {
     if (value == uri) { return held; }
   }
@@ -575,13 +575,13 @@ XmlNodeList XmlDocument::GetElementsByTagName(std::string_view name) const {
   return XmlNodeList(ByTagName(handle_, name));
 }
 
-std::string XmlDocumentType::PublicId() const {
+::agiru::Text<0> XmlDocumentType::PublicId() const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr || node->type != XML_DTD_NODE) { return {}; }
   return ::agiru::detail::Text(reinterpret_cast<xmlDtdPtr>(node)->ExternalID);
 }
 
-std::string XmlDocumentType::SystemId() const {
+::agiru::Text<0> XmlDocumentType::SystemId() const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr || node->type != XML_DTD_NODE) { return {}; }
   return ::agiru::detail::Text(reinterpret_cast<xmlDtdPtr>(node)->SystemID);
