@@ -34,3 +34,15 @@ enum's first member (`" "`, Comment) instead of `Item`, which is the next link a
 **The lesson, again:** a trigger's return value is a PLATFORM guarantee and the documentation
 states it per trigger. Reading one page and generalising from it is how four of the five were
 missed.
+
+**Third half, and the one that paid: a linked part positioned on NO ROW is on a NEW row.**
+`SalesLines.Last(); SalesLines.Next(); SalesLines."No.".SetValue(ItemNo)` -- the test never sets
+`Type`, because page 96's `OnNewRecord` calls `Rec.InitType()`. So when a relink finds no row, the
+part seeds from its filters AND runs `OnNewRecord`, which is what BC does for the blank row an
+editable list carries.
+
+This is the same ground chain 122 lost two cases on, approached from the other side: `Next()` still
+answers what the data says, so the tests asserting "there is no next row" stay green -- what changed
+is what a part's record IS when nothing was found, not what `Next()` returns.
+
+**Measured: 1 777 -> 1 788 (+11, 0 new red).** `ERM Sales Cr. Memo Aggr. UT` went 21 -> 26 of 44.

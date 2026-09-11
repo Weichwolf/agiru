@@ -627,6 +627,8 @@ private:
         }
         detail::SeedFromFilters(
             static_cast<void *>(&page_->Rec), RecordTraits_().kTable, PopulateAllFields_());
+        newRecord_ = true;
+        if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { page_->OnNewRecord(false); }
       }
     }
   }
