@@ -615,10 +615,18 @@ private:
         parent_->LinkPart(partName_, static_cast<void *>(&page_->Rec), RecordTraits_().kTable);
         using Source = std::remove_cvref_t<decltype(page_->Rec)>;
         auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
+        if constexpr (requires { PageTraits<P>::kPage; }) {
+          detail::ApplyPageView(static_cast<void *>(&page_->Rec),
+                                RecordTraits_().kTable,
+                                PageTraits<P>::kPage.sourceTableView);
+        }
         if (newRecord_) { return; }
         if (static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst())) {
           detail::AfterGetRecord(*page_);
+          return;
         }
+        detail::SeedFromFilters(
+            static_cast<void *>(&page_->Rec), RecordTraits_().kTable, PopulateAllFields_());
       }
     }
   }

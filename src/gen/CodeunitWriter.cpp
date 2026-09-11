@@ -200,7 +200,9 @@ bool IsTryFunction(const al::ProcedureDecl &procedure) {
 }
 
 bool DefaultsToTrue(const al::ProcedureDecl &procedure) {
-  return LowerKey(procedure.name) == "onqueryclosepage";
+  const std::string name = LowerKey(procedure.name);
+  return name == "onqueryclosepage" || name == "oninsertrecord" || name == "onmodifyrecord" ||
+         name == "ondeleterecord" || name == "onbeforetestrun";
 }
 
 bool IsPublisher(const al::ProcedureDecl &procedure) {

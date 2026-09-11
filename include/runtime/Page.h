@@ -110,6 +110,35 @@ template <typename P> struct ControlTrigger {
 namespace detail {
 template <typename P> void OpenPage(P &page, bool editable, bool isNew);
 
+/// \brief Puts a page's `SourceTableView` on its record, as FILTER GROUP 2.
+///
+/// \param record The page's record.
+/// \param table  Its declaration.
+/// \param view   The `SourceTableView` property, as AL wrote it; nothing happens when empty.
+///
+/// \note GROUP 2 IS WHERE THE PLATFORM PUTS IT (`record-filtergroup-method.md`, `Form`), so what a
+///       caller set in group 0 survives and `GetFilters` still answers what the caller asked. A
+///       SUBFORM carries its own view beside the `SubPageLink`, and that is where a sales line's
+///       `Document Type` comes from: the link names only `Document No.`.
+void ApplyPageView(void *record, const TableDef &table, std::string_view view);
+
+/// \brief Gives a record a page opens NEW what the page's `SourceTableView` fixes.
+///
+/// \param record   The page's record, freshly `Init`ed.
+/// \param table    Its declaration.
+/// \param view     The `SourceTableView` property, as AL wrote it; nothing happens when empty.
+/// \param allFields Whether fields outside the primary key are seeded too.
+///
+/// \note THE VIEW IS FILTER GROUP 2 AND NOT THE RECORD'S OWN FILTERS
+///       (`record-filtergroup-method.md` tabulates `SourceTableView` and `DataItemTableView` under
+///       group 2, `Form`). So `GetFilters` in group 0 is unchanged and a test that reads the
+///       record's filters sees what it set itself.
+///
+/// \note IT SEEDS ONLY A PAGE THAT OPENS NEW. A page handed a record by its caller is positioned
+///       on that row and takes nothing from the view -- applying the view on every open cost 12 UT
+///       cases and flipped two number series (board:0696, chain 123).
+void SeedNewPageRecord(void *record, const TableDef &table, std::string_view view, bool allFields);
+
 /// \brief Applies a `SubPageLink` -- `Field = field(Other)`, `= const(Value)`, `= filter(...)` --
 ///        as filters on the subpage's record, read from the parent's current record.
 /// \param sub The subpage's record.
@@ -206,8 +235,19 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
     auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
     if (isNew) {
       platform.Init();
+      if constexpr (requires { PageTraits<P>::kPage; }) {
+        detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
+                                  TableTraits<Source>::kTable,
+                                  PageTraits<P>::kPage.sourceTableView,
+                                  true);
+      }
       if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(false); }
     } else {
+      if constexpr (requires { PageTraits<P>::kPage; }) {
+        detail::ApplyPageView(static_cast<void *>(&page.Rec),
+                              TableTraits<Source>::kTable,
+                              PageTraits<P>::kPage.sourceTableView);
+      }
       found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
     }
   }

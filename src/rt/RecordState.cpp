@@ -182,7 +182,7 @@ void ApplyView(RecordState &state, const TableDef &table, std::string_view view)
         std::string_view value = Trimmed(term.substr(equals + 1));
         const std::size_t open = value.find('(');
         if (open != std::string_view::npos && value.ends_with(")")) {
-          value = value.substr(open + 1, value.size() - open - 2);
+          value = Trimmed(value.substr(open + 1, value.size() - open - 2));
         }
         Narrow(state, field.no, std::string(value));
       }

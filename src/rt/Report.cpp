@@ -1,10 +1,12 @@
 #include "runtime/Report.h"
 
-#include "BuiltinsWritten.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
+#include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Variant.h"
+
+#include "BuiltinsWritten.h"
 
 #include <algorithm>
 #include <fstream>
@@ -116,6 +118,25 @@ void ReportDataset::WriteFile(std::string_view path) const {
 
 namespace detail {
 
+void ApplyPageView(void *record, const TableDef &table, std::string_view view) {
+  if (view.empty()) { return; }
+  RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+  std::vector<FieldFilter> kept;
+  for (const FieldFilter &one : state.filters) {
+    if (one.group != kFixedViewGroup) { kept.push_back(one); }
+  }
+  const Integer group = state.group;
+  state.group = kFixedViewGroup;
+  ApplyView(state, table, view);
+  state.group = group;
+  state.filters.insert(state.filters.end(), kept.begin(), kept.end());
+}
+
+void SeedNewPageRecord(void *record, const TableDef &table, std::string_view view, bool allFields) {
+  ApplyPageView(record, table, view);
+  SeedFromFilters(record, table, allFields);
+}
+
 void ApplyDataItemView(void *record, const TableDef &table, std::string_view view) {
   RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
   std::vector<FieldFilter> kept;
@@ -134,7 +155,8 @@ void AdoptTableView(void *to, const void *from) {
   const RecordState *source = reinterpret_cast<const StateHandle *>(from)->Peek();
   if (source == nullptr) { return; }
   for (const FieldFilter &one : source->filters) {
-    into.filters.push_back(FieldFilter{.field = one.field, .group = kFixedViewGroup, .text = one.text});
+    into.filters.push_back(
+        FieldFilter{.field = one.field, .group = kFixedViewGroup, .text = one.text});
   }
 }
 
@@ -156,7 +178,8 @@ void TakeRequestFilters(void *to, const void *from) {
 
 std::string ReportParametersXml(ReportId id, std::string_view name) {
   return "<?xml version=\"1.0\" standalone=\"yes\"?>\n<ReportParameters name=\"" + Escaped(name) +
-         "\" id=\"" + std::to_string(id.Value()) + "\">\n  <Options />\n  <DataItems />\n</ReportParameters>\n";
+         "\" id=\"" + std::to_string(id.Value()) +
+         "\">\n  <Options />\n  <DataItems />\n</ReportParameters>\n";
 }
 
 void WriteReportFile(std::string_view path, std::string_view text) {
