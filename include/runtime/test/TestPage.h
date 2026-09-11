@@ -507,6 +507,7 @@ public:
 
   void LinkPart(std::string_view control, void *subRecord, const TableDef &subTable) override {
     if constexpr (kHasRecord) {
+      SaveNewRecord_();
       const ControlDef *def = ControlNamed_(control);
       if (def == nullptr || def->subPageLink.empty() || page_ == nullptr) { return; }
       detail::ApplySubPageLink(subRecord,
@@ -575,6 +576,39 @@ private:
   /// and `WarehousePick.WhseActivityLines."Bin Code".Editable()` read a stale one after the
   /// parent's filter moved (3 cases of SCM - Warehouse UT, 2026-09-10). A relink that only set
   /// the filters left the part on the row it opened on.
+  /// \brief Writes a record `New()` or `OpenNew()` made, which is what BC does when focus leaves
+  ///        the header: the part that follows reads a document with a number.
+  /// \note IT IS THE PLATFORM'S SAVE AND NOT AN INSERT THE TEST ASKED FOR. `OnInsert` runs, so
+  ///       the No. Series assigns the number the lines key on; a page that inserts nothing (a
+  ///       list on a temporary table) simply has nothing to save.
+  void SaveNewRecord_() {
+    if constexpr (kHasRecord) {
+      if (!newRecord_ || page_ == nullptr) { return; }
+      newRecord_ = false;
+      using Source = std::remove_cvref_t<decltype(page_->Rec)>;
+      auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
+      if constexpr (requires { page_->OnInsertRecord(Boolean{}); }) {
+        if (!static_cast<bool>(page_->OnInsertRecord(false))) { return; }
+      }
+      static_cast<void>(platform.Insert(true));
+    }
+  }
+
+  /// \brief Whether the page lets a row be written, which decides whether stepping past the last
+  ///        one lands on the blank row BC's editable list carries.
+  /// \return Whether it does.
+  [[nodiscard]] bool Editable_() const {
+    if (page_ == nullptr) { return false; }
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      const auto says = [](std::string_view property) {
+        return property.empty() || !SameWord_(property, "false");
+      };
+      return says(PageTraits<P>::kPage.editable) && says(PageTraits<P>::kPage.insertAllowed);
+    } else {
+      return true;
+    }
+  }
+
   void Relink_() {
     if constexpr (kHasRecord) {
       if (parent_ != nullptr && page_ != nullptr) {
