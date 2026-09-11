@@ -899,7 +899,8 @@ public:
   /// \return Never.
   /// \throws Error always -- there is no running page yet (board:0030).
   template <typename... Arguments>
-  static ::agiru::Text<0> GetBackgroundParameters(Arguments &&...arguments) {
+  static ::agiru::Dictionary<::agiru::Text<0>, ::agiru::Text<0>>
+  GetBackgroundParameters(Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Page.GetBackgroundParameters is declared and needs a running UI (board:0030)");
   }
@@ -908,6 +909,16 @@ public:
   /// \tparam Arguments Whatever AL's overload set takes.
   /// \param arguments The arguments, read only to be discarded.
   /// \throws Error always -- there is no running page yet (board:0030).
+  /// \brief AL `PAGE.SetBackgroundTaskResult(Dictionary)` -- what a page background task hands
+  ///        back to its page.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \throws Error always -- there is no background task without a running page (board:0030).
+  template <typename... Arguments> static void SetBackgroundTaskResult(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    throw Error("Page.SetBackgroundTaskResult is declared and needs a running UI (board:0030)");
+  }
+
   template <typename... Arguments> static void SetFilterToMultipleValues(Arguments &&...arguments) {
     (static_cast<void>(arguments), ...);
     throw Error("Page.SetFilterToMultipleValues is declared and needs a running UI (board:0030)");

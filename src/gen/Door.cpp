@@ -565,6 +565,53 @@ bool HiddenByABaseMember(std::string_view name) {
   return BaseMembers().contains(std::string(name));
 }
 
+std::set<std::string> ClassMembersOf(const std::filesystem::path &path, std::string_view stem) {
+  const std::string whole = TextOf(path);
+  const std::string head = "class " + std::string(stem) + " ";
+  std::size_t at = whole.find("template <typename Derived");
+  while (at != std::string::npos) {
+    const std::size_t line = whole.find('\n', at);
+    if (whole.substr(at, line - at).find(head) != std::string::npos) { break; }
+    at = whole.find("template <typename Derived", at + 1);
+  }
+  if (at == std::string::npos) {
+    throw std::runtime_error("the object base " + std::string(stem) + " is not in " +
+                             path.string());
+  }
+  const std::size_t close = whole.find("\n};\n", at);
+  const std::string body =
+      whole.substr(at, close == std::string::npos ? std::string::npos : close - at);
+  std::set<std::string> found;
+  static const std::regex declared(R"([\w>&*:\s]\s([A-Z][A-Za-z0-9]*)\s*\()");
+  for (std::sregex_iterator it(body.begin(), body.end(), declared), end; it != end; ++it) {
+    found.insert((*it)[1].str());
+  }
+  if (found.empty()) {
+    throw std::runtime_error("the object base " + std::string(stem) + " declares no members");
+  }
+  return found;
+}
+
+const std::set<std::string> &MembersOfBase(std::string_view header) {
+  static std::map<std::string, std::set<std::string>> perHeader;
+  const std::string key(header);
+  const auto known = perHeader.find(key);
+  if (known != perHeader.end()) { return known->second; }
+  const std::filesystem::path runtime =
+      std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "runtime";
+  const std::string stem = key.substr(0, key.find('.'));
+  std::set<std::string> found = ClassMembersOf(runtime / key, stem);
+  if (stem == "Report" || stem == "XmlPort") {
+    const std::set<std::string> page = ClassMembersOf(runtime / "Page.h", "Page");
+    found.insert(page.begin(), page.end());
+  }
+  return perHeader.emplace(key, std::move(found)).first->second;
+}
+
+bool DeclaredByBase(std::string_view header, std::string_view name) {
+  return MembersOfBase(header).contains(std::string(name));
+}
+
 bool DoorCalls(std::string_view name) {
   const std::string spelled = AsTheDoorSpellsIt(name);
   return Callables().contains(spelled);

@@ -1380,6 +1380,17 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
           : object.report ? "Report<"
                           : "Page<") +
          pageClass + "> {\npublic:\n";
+  {
+    const std::string base = object.xmlport ? "XmlPort<" : object.report ? "Report<" : "Page<";
+    const std::string header = object.xmlport ? "XmlPort.h" : object.report ? "Report.h" : "Page.h";
+    std::set<std::string> unhidden;
+    for (const al::ProcedureDecl &procedure : object.procedures) {
+      const std::string named = Identifier(procedure.name);
+      if (!DeclaredByBase(header, named) || !unhidden.insert(named).second) { continue; }
+      out += "  using " + base + pageClass + ">::" + named + ";\n";
+    }
+    if (!unhidden.empty()) { out += "\n"; }
+  }
   out += "  static constexpr PageId kId{" + std::to_string(object.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n\n";
 

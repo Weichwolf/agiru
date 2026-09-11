@@ -660,12 +660,22 @@ std::string Qualified(const std::string &type, const std::set<std::string> &name
 std::string Unsized(const std::string &type) {
   const std::size_t at = type.rfind(", ");
   if (type.starts_with("AlArray<") && type.ends_with(">") && at != std::string::npos) {
-    return type.substr(0, at) + ", 0>";
+    std::string element = type.substr(8, at - 8);
+    if (element.starts_with("AlArray<")) { return "AlArray<" + element + ", 0>"; }
+    constexpr std::string_view kTemporary = "Temporary<";
+    if (element.starts_with(kTemporary) && element.ends_with(">")) {
+      element = element.substr(kTemporary.size(), element.size() - kTemporary.size() - 1);
+    }
+    return "AlArray<" + Unsized(element) + ", 0>";
   }
   if (!type.ends_with(">") || std::ranges::count(type, '<') != 1) { return type; }
   const std::size_t opens = type.find('<');
   const std::string_view head{type.data(), opens + 1};
   return head.ends_with("Text<") || head.ends_with("Code<") ? std::string(head) + "0>" : type;
+}
+
+bool IsArrayView(const std::string &type) {
+  return type.starts_with("AlArray<") && type.ends_with(", 0>");
 }
 
 std::string Signature(const al::VarDecl &declared,
@@ -679,6 +689,7 @@ std::string Signature(const al::VarDecl &declared,
   }
   if (Hidden(type, names)) { type = Qualified(type, names); }
   if (declared.byReference) { type = Unsized(type); }
+  if (declared.byReference && IsArrayView(type)) { return type + " "; }
   return type + (declared.byReference ? " &" : " ");
 }
 
@@ -2209,7 +2220,16 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
     out += ", public virtual " + found->second.identifier;
   }
   out += " {\npublic:\n";
-  out += "  using Codeunit<" + unitClass + ">::operator=;\n\n";
+  out += "  using Codeunit<" + unitClass + ">::operator=;\n";
+  {
+    std::set<std::string> unhidden;
+    for (const al::ProcedureDecl &procedure : unit.procedures) {
+      const std::string named = Identifier(procedure.name);
+      if (!DeclaredByBase("Codeunit.h", named) || !unhidden.insert(named).second) { continue; }
+      out += "  using Codeunit<" + unitClass + ">::" + named + ";\n";
+    }
+  }
+  out += "\n";
 
   const std::string source = SourceTableOf(unit, objects);
   if (!source.empty()) { out += "  " + source + " Rec;\n\n"; }

@@ -95,7 +95,7 @@ public:
   /// \brief AL `JsonValue.AsText()`. Converts the value in a JsonValue to a Text data type.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string AsText();
+  ::agiru::Text<0> AsText();
 
   /// \brief AL `JsonValue.AsTime()`. Converts the value in a JsonValue to a Time data type.
   /// \return The AL `Time`.

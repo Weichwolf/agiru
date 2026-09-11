@@ -7,6 +7,7 @@
 #include "runtime/Table.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
+#include "type/Char.h"
 #include "type/ClientType.h"
 #include "type/DataClassification.h"
 #include "type/Date.h"
@@ -872,6 +873,20 @@ ConvertStr(std::string_view String, std::string_view FromCharacters, std::string
 ::agiru::Text<0> DelChr(std::string_view String,
                         std::optional<std::string_view> Where = std::nullopt,
                         std::optional<std::string_view> Which = std::nullopt);
+
+/// \brief AL `Text.DelChr(Text, Text, Char)` -- the characters to delete given as ONE `Char`, which
+///        is how `DelChr(PlainText, '>', NullChar)` and `DelChr(S, '=', S[1])` write it.
+/// \param String The text.
+/// \param Where Where to delete: `<`, `>`, `=` or a combination.
+/// \param Which The one character to delete.
+/// \return The text without it.
+template <typename C>
+  requires(std::same_as<std::remove_cvref_t<C>, ::agiru::Char> ||
+           requires { typename std::remove_cvref_t<C>::IsATextPosition; })::agiru::Text<0>
+DelChr(std::string_view String, std::string_view Where, const C &Which) {
+  return DelChr(
+      String, Where, std::string_view(::agiru::Encoded(static_cast<::agiru::Char>(Which))));
+}
 
 /// \brief AL `Text.DelStr(Text, Integer, Integer)`. Deletes a substring inside a string (text or
 /// code).

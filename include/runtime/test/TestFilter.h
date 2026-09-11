@@ -1,6 +1,7 @@
 #pragma once
 
 #include "runtime/Error.h"
+#include "runtime/Record.h"
 #include "runtime/test/PageCore.h"
 #include "type/Boolean.h"
 #include "type/Text.h"
@@ -36,6 +37,20 @@ public:
       static_cast<void>(filter);
       throw Error("TestFilter.SetFilter names a page control, not a value (board:0030)");
     }
+  }
+
+  /// \brief AL `TestFilter.SetFilter(Field, Filter)` where the filter is a VALUE and not text --
+  ///        `Filter.SetFilter("User Security ID", User."User Security ID")` hands a Guid, and a
+  ///        number, a date or an option arrive the same way.
+  /// \tparam Field The control the filter names.
+  /// \tparam Value Anything with a text form and no view of its own.
+  /// \param field The control.
+  /// \param value The value, rendered the way `Format` renders it.
+  template <typename Field, typename Value>
+    requires(!std::convertible_to<const Value &, std::string_view>) &&
+            requires(const Value &v) { ::agiru::AsText(v); }
+  void SetFilter(const Field &field, const Value &value) {
+    SetFilter(field, std::string_view(::agiru::AsText(value)));
   }
 
   /// \brief Binds the filter pane to its page; `TestPage` does this when the page opens.

@@ -5,6 +5,7 @@
 #include "type/Guid.h"
 #include "type/List.h"
 
+#include <concepts>
 #include <string_view>
 
 /// \file
@@ -115,6 +116,20 @@ public:
                     std::string_view Description,
                     std::string_view MimeType = {},
                     std::string_view FileName = {});
+
+  /// \brief AL `Media.ImportStream(InStream, Guid)` -- a value with a text form where the
+  ///        description is declared `Text`, which AL converts on the way in.
+  /// \tparam D Anything that renders itself and is not text already.
+  /// \param Stream The stream.
+  /// \param Description The value, rendered.
+  /// \return The identifier the media object was given.
+  template <typename D>
+    requires(!std::convertible_to<const D &, std::string_view>) && requires(const D &d) {
+      { d.ToText() } -> std::convertible_to<std::string_view>;
+    }
+  Guid ImportStream(class InStream &Stream, const D &Description) {
+    return ImportStream(Stream, std::string_view(Description.ToText()));
+  }
 
   /// \brief AL `Media.FindOrphans()`.
   /// \return The identifiers of media objects no record references.

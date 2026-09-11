@@ -31,6 +31,16 @@ namespace agiru {
 ///       what an error message and a filter string have to say.
 template <typename E> struct OptionTraits;
 
+class Variant;
+
+namespace detail {
+/// \brief The ordinal a Variant carries, for `Option := Variant`.
+/// \param held The Variant, which must hold an option, an enum or an integer.
+/// \return The ordinal.
+/// \throws Error when it holds anything else.
+[[nodiscard]] std::int32_t OrdinalOf(const Variant &held);
+}
+
 /// \brief AL `Option`, either with a vocabulary or without one.
 /// \tparam E The generated enumeration naming the members, or `void` when AL declared none.
 template <typename E = void> class Option;
@@ -253,6 +263,43 @@ public:
   template <typename F>
     requires std::is_enum_v<F> && (!std::same_as<F, E>)
   constexpr explicit(false) Option(F value) : Option<void>(static_cast<std::int32_t>(value)) {}
+
+  /// \brief AL `Option := Variant`, which `LibraryVariableStorage.Dequeue` hands a test constantly.
+  /// \param held The Variant, holding an option, an enum or an integer.
+  /// \throws Error when it holds anything else.
+  ///
+  /// \note EXACT, SO THAT NOTHING COMPETES. A Variant converts to an Integer, to an ordinal and to
+  ///       a member, and each of those is a constructor here -- three equally good routes, which
+  ///       is an ambiguity in nine translation units. One route named after the source is none.
+  ///
+  /// \note A TEMPLATE THAT DEDUCES EXACTLY `Variant`, and not an overload taking `const Variant &`:
+  ///       an enumerator converts to a Variant too, so the plain overload competed with the
+  ///       enumerator constructor for `Option := Enumerator` -- in `src/rt/Storage.cpp` first. A
+  ///       deduced parameter converts nothing, so only a Variant arrives here.
+  template <typename V>
+    requires std::same_as<std::remove_cvref_t<V>, Variant>
+  explicit(false) Option(const V &held) : Option<void>(detail::OrdinalOf(held)) {}
+
+  /// \brief AL `Option := Variant` on an existing variable.
+  /// \tparam V Exactly `Variant`.
+  /// \param held The Variant.
+  /// \return This option.
+  template <typename V>
+    requires std::same_as<std::remove_cvref_t<V>, Variant>
+  Option &operator=(const V &held) {
+    *this = Option(held);
+    return *this;
+  }
+
+  /// \brief AL `Option = Variant` and `Option <> Variant`, by ordinal.
+  /// \tparam V Exactly `Variant`.
+  /// \param held The Variant.
+  /// \return Whether the ordinals agree.
+  template <typename V>
+    requires std::same_as<std::remove_cvref_t<V>, Variant>
+  [[nodiscard]] bool operator==(const V &held) const {
+    return AsInteger() == detail::OrdinalOf(held);
+  }
 
   /// \brief Holds the ordinal another option carries.
   ///

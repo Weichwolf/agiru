@@ -102,7 +102,7 @@ void TextBuilder::Clear() {
   return Replace(OldText, NewText, 1, static_cast<Integer>(text_.size()));
 }
 
-std::string TextBuilder::ToText() const {
+::agiru::Text<0> TextBuilder::ToText() const {
   return text_;
 }
 

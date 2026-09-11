@@ -39,10 +39,12 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <limits>
 #include <optional>
+#include <print>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -863,6 +865,11 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
 
 bool AnsweredByHandler(std::int32_t kind, std::string_view text, void *reply) {
   const TestHandler *handler = HandlerTable::For(static_cast<HandlerKind>(kind));
+  static const bool traced = std::getenv("AGIRU_TRACE_UI") != nullptr;
+  if (traced) {
+    std::println(
+        stderr, "ui {}: {} -> {}", kind, text, handler == nullptr ? "no handler" : "handled");
+  }
   if (handler == nullptr) { return false; }
   HandlerTable::Ran(*handler);
   handler->invoke(text, reply);

@@ -674,6 +674,9 @@ bool RuntimeGet(void *record, const TableDef &table) {
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
   if (!row.has_value()) { return false; }
   LoadRow(record, table, *row);
+  RecordState &state = reinterpret_cast<StateHandle *>(record)->Ensure();
+  state.open.Forget();
+  state.positioned = true;
   return true;
 }
 

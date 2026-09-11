@@ -1040,7 +1040,8 @@ private:
     const al::Expr &target = expression.children.front();
     if (target.kind == al::ExprKind::Name && scope_.Resolve(target.text).empty() &&
         DoorCalls(target.text) && !IsSystemFieldName(target.text)) {
-      return AsTheDoorSpellsIt(Identifier(target.text)) + "(" +
+      const std::string bare = scope_.BareRecordCall(target.text);
+      return (bare.empty() ? AsTheDoorSpellsIt(Identifier(target.text)) : bare) + "(" +
              Expression(expression.children.back(), 0) + ")";
     }
     if (target.kind == al::ExprKind::Name && !scope_.Resolve(target.text).empty() &&
@@ -1050,9 +1051,16 @@ private:
       return scope_.Resolve(target.text) + "(" + Expression(expression.children.back(), 0) + ")";
     }
     if (target.kind != al::ExprKind::Binary || target.text != "." || target.children.size() != 2 ||
-        target.children[0].kind != al::ExprKind::Name ||
         target.children[1].kind != al::ExprKind::Name) {
       return {};
+    }
+    if (target.children[0].kind != al::ExprKind::Name) {
+      const al::Expr &owner = target.children[0];
+      const bool chained =
+          owner.kind == al::ExprKind::Binary && owner.text == "." && owner.children.size() == 2;
+      if (!chained || !DoorCalls(target.children[1].text)) { return {}; }
+      return Binary(target, kPrimaryPrecedence, true) + "(" +
+             Expression(expression.children.back(), 0) + ")";
     }
     if (!scope_.MemberIsCall(
             OfVariable{.variable = target.children[0].text, .field = target.children[1].text})) {
@@ -1106,6 +1114,16 @@ private:
         SameName(scope_.DeclaredType(reach.base.text), "Query") && DoorCalls(reach.link.text);
     if (calledOnAQuery && besideAField.empty()) {
       besideAField = AsTheDoorSpellsIt(Identifier(reach.link.text));
+    }
+    const std::string baseType =
+        reach.base.kind == al::ExprKind::Name ? scope_.DeclaredType(reach.base.text) : "";
+    const bool calledOnATestPage =
+        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
+        (SameName(baseType, "TestPage") || SameName(baseType, "TestRequestPage")) &&
+        DoorCalls(reach.link.text);
+    if (calledOnATestPage && besideAField.empty()) {
+      const std::string spelled = AsTheDoorSpellsIt(Identifier(reach.link.text));
+      if (scope_.MemberSpelling(member) != spelled) { besideAField = spelled; }
     }
     out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
@@ -1922,9 +1940,15 @@ public:
   }
 
   [[nodiscard]] std::string BareRecordCall(std::string_view name) const override {
-    if (DataItemTable() == nullptr || !LocalSpelling(name).empty() ||
-        !GlobalSpelling(name).empty()) {
-      return {};
+    if (!LocalSpelling(name).empty() || !GlobalSpelling(name).empty()) { return {}; }
+    if (DataItemTable() == nullptr && source_ == nullptr) { return {}; }
+    if (source_ != nullptr && DataItemTable() == nullptr) {
+      if (FieldNamed(*source_, name) != nullptr || !ControlOf(name).empty()) { return {}; }
+      for (const al::ProcedureDecl &procedure : source_->procedures) {
+        if (SameName(procedure.name, name)) {
+          return "Rec." + ProcedureIdentifier(*source_, procedure.name);
+        }
+      }
     }
     const std::string spelled = AsTheDoorSpellsIt(Identifier(name));
     return TableMembers().contains(spelled) ? "Rec." + spelled : std::string{};
@@ -2444,7 +2468,8 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
     for (const al::Trigger &trigger : field.triggers) {
       const std::string body =
           WriteStatements(TableNames(table, objects, &trigger), trigger.body, 2);
-      out += "void " + tableClass + "::" + trigger.name + Identifier(field.name) + "() {\n";
+      out += "void " + tableClass + "::" + trigger.name + FieldIdentifier(table, field.name) +
+             "() {\n";
       out +=
           ProcedureLocals(trigger, objects, table.name, table.procedures, shadowedByFields, body);
       out += BindsBefore(body, InNamespace(space, tableClass), true);

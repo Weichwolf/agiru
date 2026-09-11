@@ -406,13 +406,13 @@ template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
 ///          conversion REFUSES when it holds an Integer -- `Assert.AreEqual(1, Count, Msg)` renders
 ///          its message through here and read `the Variant does not hold Text` instead of the
 ///          number (26 UT cases, 2026-09-09).
-template <typename T> [[nodiscard]] std::string AsText(const T &value) {
+template <typename T> [[nodiscard]] ::agiru::Text<0> AsText(const T &value) {
   if constexpr (std::same_as<std::remove_cvref_t<T>, Variant>) {
     return detail::VariantText(value);
   } else if constexpr (std::convertible_to<const T &, std::string_view>) {
     return std::string(std::string_view(value));
   } else if constexpr (requires { value.ToText(); }) {
-    return value.ToText();
+    return std::string(std::string_view(value.ToText()));
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
   } else if constexpr (Enumeration<T>) {
@@ -456,7 +456,7 @@ template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
   } else if constexpr (requires { value.ToStorageText(); }) {
     return value.ToStorageText();
   } else {
-    return AsText(value);
+    return std::string(std::string_view(AsText(value)));
   }
 }
 
@@ -488,7 +488,7 @@ template <typename T>
 /// \see `text-strsubstno-method.md`
 template <typename... Args>
 [[nodiscard]] std::string StrSubstNo(std::string_view pattern, const Args &...args) {
-  const std::initializer_list<std::string> rendered{AsText(args)...};
+  const std::initializer_list<std::string> rendered{std::string(std::string_view(AsText(args)))...};
   std::vector<std::string_view> values;
   values.reserve(rendered.size());
   for (const std::string &one : rendered) { values.emplace_back(one); }

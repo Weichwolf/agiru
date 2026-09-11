@@ -142,6 +142,7 @@ base/assembly/history/table/PostedAssemblyHeader.def.cpp
 base/assembly/history/table/PostedAssemblyLine.cpp
 base/assembly/history/table/PostedAssemblyLine.def.cpp
 base/assembly/posting/codeunit/AssemblyPost.cpp
+base/assembly/posting/codeunit/AssemblyPostYesNo.cpp
 base/assembly/reports/report/AssembleToOrderSales.cpp
 base/assembly/reports/report/AssembleToOrderSales.def.cpp
 base/assembly/reports/report/AssemblyBOMEndItems.cpp
@@ -700,6 +701,7 @@ base/cost_accounting/account/page/CostObjectCard.cpp
 base/cost_accounting/account/page/CostObjectCard.def.cpp
 base/cost_accounting/account/page/CostTypeBalanceBudget.cpp
 base/cost_accounting/account/page/CostTypeBalanceBudget.def.cpp
+base/cost_accounting/account/page/CostTypeBalance.cpp
 base/cost_accounting/account/page/CostTypeBalance.def.cpp
 base/cost_accounting/account/page/CostTypeBalanceMatrix.cpp
 base/cost_accounting/account/page/CostTypeBalanceMatrix.def.cpp
@@ -742,6 +744,7 @@ base/cost_accounting/budget/page/CostBudgetEntries.cpp
 base/cost_accounting/budget/page/CostBudgetEntries.def.cpp
 base/cost_accounting/budget/page/CostBudgetNames.cpp
 base/cost_accounting/budget/page/CostBudgetNames.def.cpp
+base/cost_accounting/budget/page/CostBudgetPerPeriod.cpp
 base/cost_accounting/budget/page/CostBudgetPerPeriod.def.cpp
 base/cost_accounting/budget/page/CostBudgetPerPeriodMatrix.cpp
 base/cost_accounting/budget/page/CostBudgetPerPeriodMatrix.def.cpp
@@ -828,10 +831,12 @@ base/cost_accounting/setup/report/UpdateCostAcctgDimensions.def.cpp
 base/cost_accounting/setup/table/CostAccountingSetup.cpp
 base/cost_accounting/setup/table/CostAccountingSetup.def.cpp
 base/crm/analysis/codeunit/OpportunityChartMgt.cpp
+base/crm/analysis/page/Opportunities.cpp
 base/crm/analysis/page/Opportunities.def.cpp
 base/crm/analysis/page/OpportunitiesMatrix.cpp
 base/crm/analysis/page/OpportunitiesMatrix.def.cpp
 base/crm/analysis/page/OpportunityChart.def.cpp
+base/crm/analysis/page/Tasks.cpp
 base/crm/analysis/page/Tasks.def.cpp
 base/crm/analysis/page/TasksMatrix.cpp
 base/crm/analysis/page/TasksMatrix.def.cpp
@@ -1612,8 +1617,10 @@ base/finance/allocation_account/table/AllocationLine.cpp
 base/finance/allocation_account/table/AllocationLine.def.cpp
 base/finance/analysis/codeunit/AnalysisViewEntryToGLEntries.cpp
 base/finance/analysis/codeunit/ExportAnalysisView.cpp
+base/finance/analysis/codeunit/MatrixManagement.cpp
 base/finance/analysis/codeunit/UpdateAnalysisViewBackgr.cpp
 base/finance/analysis/codeunit/UpdateAnalysisView.cpp
+base/finance/analysis/page/AnalysisByDimensions.cpp
 base/finance/analysis/page/AnalysisByDimensions.def.cpp
 base/finance/analysis/page/AnalysisByDimensionsMatrix.cpp
 base/finance/analysis/page/AnalysisByDimensionsMatrix.def.cpp
@@ -1627,6 +1634,7 @@ base/finance/analysis/page/AnalysisViewFilter.cpp
 base/finance/analysis/page/AnalysisViewFilter.def.cpp
 base/finance/analysis/page/AnalysisViewList.cpp
 base/finance/analysis/page/AnalysisViewList.def.cpp
+base/finance/analysis/page/Budget.cpp
 base/finance/analysis/page/Budget.def.cpp
 base/finance/analysis/page/BudgetMatrix.cpp
 base/finance/analysis/page/BudgetMatrix.def.cpp
@@ -1735,6 +1743,7 @@ base/finance/consolidation/report/ConsolidationTest.cpp
 base/finance/consolidation/report/ConsolidationTestDatabase.cpp
 base/finance/consolidation/report/ConsolidationTestDatabase.def.cpp
 base/finance/consolidation/report/ConsolidationTest.def.cpp
+base/finance/consolidation/report/ConsolidationTestFile.cpp
 base/finance/consolidation/report/ConsolidationTestFile.def.cpp
 base/finance/consolidation/report/ExportConsolidation.cpp
 base/finance/consolidation/report/ExportConsolidation.def.cpp
@@ -1924,6 +1933,7 @@ base/finance/dimension/page/DefaultDimensionPriorities.cpp
 base/finance/dimension/page/DefaultDimensionPriorities.def.cpp
 base/finance/dimension/page/DefaultDimensions.cpp
 base/finance/dimension/page/DefaultDimensions.def.cpp
+base/finance/dimension/page/DefaultDimensionsMultiple.cpp
 base/finance/dimension/page/DefaultDimensionsMultiple.def.cpp
 base/finance/dimension/page/DefaultDimensionWhereUsed.cpp
 base/finance/dimension/page/DefaultDimensionWhereUsed.def.cpp
@@ -2129,6 +2139,7 @@ base/finance/financial_reports/page/NewFinReportExcelTempl.cpp
 base/finance/financial_reports/page/NewFinReportExcelTempl.def.cpp
 base/finance/financial_reports/page/TotalingAccountsFactbox.cpp
 base/finance/financial_reports/page/TotalingAccountsFactbox.def.cpp
+base/finance/financial_reports/page/TrialBalance.cpp
 base/finance/financial_reports/page/TrialBalance.def.cpp
 base/finance/financial_reports/page/TrialBalanceSetup.cpp
 base/finance/financial_reports/page/TrialBalanceSetup.def.cpp
@@ -3535,6 +3546,7 @@ base/human_resources/absence/page/AbsenceOverByCatMatrix.cpp
 base/human_resources/absence/page/AbsenceOverByCatMatrix.def.cpp
 base/human_resources/absence/page/AbsenceOverviewByCategories.cpp
 base/human_resources/absence/page/AbsenceOverviewByCategories.def.cpp
+base/human_resources/absence/page/AbsenceOverviewByPeriods.cpp
 base/human_resources/absence/page/AbsenceOverviewByPeriods.def.cpp
 base/human_resources/absence/page/AbsenceRegistration.cpp
 base/human_resources/absence/page/AbsenceRegistration.def.cpp
@@ -3944,6 +3956,7 @@ base/integration/dataverse/page/CDSOwningTeamRoles.cpp
 base/integration/dataverse/page/CDSOwningTeamRoles.def.cpp
 base/integration/dataverse/page/CRMCouplingFields.cpp
 base/integration/dataverse/page/CRMCouplingFields.def.cpp
+base/integration/dataverse/page/CRMCouplingRecord.cpp
 base/integration/dataverse/page/CRMCouplingRecord.def.cpp
 base/integration/dataverse/page/CRMOptionMapping.cpp
 base/integration/dataverse/page/CRMOptionMapping.def.cpp
@@ -4465,6 +4478,7 @@ base/inventory/analysis/page/InventoryAnalysisReport.cpp
 base/inventory/analysis/page/InventoryAnalysisReport.def.cpp
 base/inventory/analysis/page/InvtAnalysByDimMatrix.cpp
 base/inventory/analysis/page/InvtAnalysByDimMatrix.def.cpp
+base/inventory/analysis/page/InvtAnalysisByDimensions.cpp
 base/inventory/analysis/page/InvtAnalysisByDimensions.def.cpp
 base/inventory/analysis/page/InvtAnalysisViewCard.cpp
 base/inventory/analysis/page/InvtAnalysisViewCard.def.cpp
@@ -4486,6 +4500,7 @@ base/inventory/analysis/page/ItemsByLocationMatrix.cpp
 base/inventory/analysis/page/ItemsByLocationMatrix.def.cpp
 base/inventory/analysis/page/ItemStatistics2.cpp
 base/inventory/analysis/page/ItemStatistics2.def.cpp
+base/inventory/analysis/page/ItemStatistics.cpp
 base/inventory/analysis/page/ItemStatistics.def.cpp
 base/inventory/analysis/page/ItemStatisticsMatrix.cpp
 base/inventory/analysis/page/ItemStatisticsMatrix.def.cpp
@@ -5810,6 +5825,7 @@ base/inventory/transfer/codeunit/TransferOrderPostPrint.cpp
 base/inventory/transfer/codeunit/TransferOrderPostReceipt.cpp
 base/inventory/transfer/codeunit/TransferOrderPostShipment.cpp
 base/inventory/transfer/codeunit/TransferOrderPostTransfer.cpp
+base/inventory/transfer/codeunit/TransferOrderPostYesNo.cpp
 base/inventory/transfer/codeunit/TransferWarehouseMgt.cpp
 base/inventory/transfer/codeunit/UndoTransferShipment.cpp
 base/inventory/transfer/codeunit/WhseTransferRelease.cpp
@@ -6096,6 +6112,7 @@ base/manufacturing/family/table/Family.cpp
 base/manufacturing/family/table/Family.def.cpp
 base/manufacturing/family/table/FamilyLine.cpp
 base/manufacturing/family/table/FamilyLine.def.cpp
+base/manufacturing/forecast/page/DemandForecastCard.cpp
 base/manufacturing/forecast/page/DemandForecastCard.def.cpp
 base/manufacturing/forecast/page/DemandForecastEntries.cpp
 base/manufacturing/forecast/page/DemandForecastEntries.def.cpp
@@ -6132,6 +6149,7 @@ base/manufacturing/journal/page/RecurringOutputJournal.cpp
 base/manufacturing/journal/page/RecurringOutputJournal.def.cpp
 base/manufacturing/journal/page/SubcontractingWorksheet.cpp
 base/manufacturing/journal/page/SubcontractingWorksheet.def.cpp
+base/manufacturing/machine_center/page/MachineCenterCalendar.cpp
 base/manufacturing/machine_center/page/MachineCenterCalendar.def.cpp
 base/manufacturing/machine_center/page/MachineCenterCalendarMatrix.cpp
 base/manufacturing/machine_center/page/MachineCenterCalendarMatrix.def.cpp
@@ -6419,6 +6437,7 @@ base/manufacturing/wizard/page/TempProdOrdRtngList.cpp
 base/manufacturing/wizard/page/TempProdOrdRtngList.def.cpp
 base/manufacturing/wizard/page/TempRoutingLines.cpp
 base/manufacturing/wizard/page/TempRoutingLines.def.cpp
+base/manufacturing/work_center/page/WorkCenterCalendar.cpp
 base/manufacturing/work_center/page/WorkCenterCalendar.def.cpp
 base/manufacturing/work_center/page/WorkCenterCalendarMatrix.cpp
 base/manufacturing/work_center/page/WorkCenterCalendarMatrix.def.cpp
@@ -6440,6 +6459,7 @@ base/manufacturing/work_center/page/WorkCenterStatistics.cpp
 base/manufacturing/work_center/page/WorkCenterStatistics.def.cpp
 base/manufacturing/work_center/page/WorkCenterTaskList.cpp
 base/manufacturing/work_center/page/WorkCenterTaskList.def.cpp
+base/manufacturing/work_center/page/WorkCtrGroupCalendar.cpp
 base/manufacturing/work_center/page/WorkCtrGroupCalendar.def.cpp
 base/manufacturing/work_center/page/WorkCtrGrpCalendarMatrix.cpp
 base/manufacturing/work_center/page/WorkCtrGrpCalendarMatrix.def.cpp
@@ -6550,9 +6570,11 @@ base/projects/project/analysis/codeunit/JobChartMgt.cpp
 base/projects/project/analysis/page/JobActToBudCostChart.def.cpp
 base/projects/project/analysis/page/JobActToBudPriceChart.def.cpp
 base/projects/project/analysis/page/JobProfitabilityChart.def.cpp
+base/projects/project/analysis/page/ResGrAllocatedPerJob.cpp
 base/projects/project/analysis/page/ResGrAllocatedPerJob.def.cpp
 base/projects/project/analysis/page/ResGrpAllocPerJobMatrix.cpp
 base/projects/project/analysis/page/ResGrpAllocPerJobMatrix.def.cpp
+base/projects/project/analysis/page/ResourceAllocatedPerJob.cpp
 base/projects/project/analysis/page/ResourceAllocatedPerJob.def.cpp
 base/projects/project/analysis/page/ResourceAllocPerJobMatrix.cpp
 base/projects/project/analysis/page/ResourceAllocPerJobMatrix.def.cpp
@@ -6766,6 +6788,7 @@ base/projects/project/reports/report/JobActualToBudget.cpp
 base/projects/project/reports/report/JobActualToBudget.def.cpp
 base/projects/project/reports/report/JobAnalysis.cpp
 base/projects/project/reports/report/JobAnalysis.def.cpp
+base/projects/project/reports/report/JobJournalTest.cpp
 base/projects/project/reports/report/JobJournalTest.def.cpp
 base/projects/project/reports/report/JobQuote.cpp
 base/projects/project/reports/report/JobQuote.def.cpp
@@ -6827,11 +6850,13 @@ base/projects/resources/analysis/page/ResGrAvailabilityLines.cpp
 base/projects/resources/analysis/page/ResGrAvailabilityLines.def.cpp
 base/projects/resources/analysis/page/ResGroupAvailability.cpp
 base/projects/resources/analysis/page/ResGroupAvailability.def.cpp
+base/projects/resources/analysis/page/ResGroupCapacity.cpp
 base/projects/resources/analysis/page/ResGroupCapacity.def.cpp
 base/projects/resources/analysis/page/ResGroupCapacityMatrix.cpp
 base/projects/resources/analysis/page/ResGroupCapacityMatrix.def.cpp
 base/projects/resources/analysis/page/ResourceAvailability.cpp
 base/projects/resources/analysis/page/ResourceAvailability.def.cpp
+base/projects/resources/analysis/page/ResourceCapacity.cpp
 base/projects/resources/analysis/page/ResourceCapacity.def.cpp
 base/projects/resources/analysis/page/ResourceCapacityMatrix.cpp
 base/projects/resources/analysis/page/ResourceCapacityMatrix.def.cpp
@@ -7088,6 +7113,7 @@ base/purchases/analysis/page/AnalysisViewListPurchase.cpp
 base/purchases/analysis/page/AnalysisViewListPurchase.def.cpp
 base/purchases/analysis/page/BudgetNamesPurchase.cpp
 base/purchases/analysis/page/BudgetNamesPurchase.def.cpp
+base/purchases/analysis/page/PurchAnalysisByDimensions.cpp
 base/purchases/analysis/page/PurchAnalysisByDimensions.def.cpp
 base/purchases/analysis/page/PurchAnalysisByDimMatrix.cpp
 base/purchases/analysis/page/PurchAnalysisByDimMatrix.def.cpp
@@ -7099,6 +7125,7 @@ base/purchases/analysis/page/PurchaseAnalysisReport.cpp
 base/purchases/analysis/page/PurchaseAnalysisReport.def.cpp
 base/purchases/analysis/page/PurchaseAnalysisViewCard.cpp
 base/purchases/analysis/page/PurchaseAnalysisViewCard.def.cpp
+base/purchases/analysis/page/PurchaseBudgetOverview.cpp
 base/purchases/analysis/page/PurchaseBudgetOverview.def.cpp
 base/purchases/analysis/page/PurchBudgetOverviewMatrix.cpp
 base/purchases/analysis/page/PurchBudgetOverviewMatrix.def.cpp
@@ -7474,6 +7501,7 @@ base/purchases/posting/codeunit/PurchPostInvoice.cpp
 base/purchases/posting/codeunit/PurchPostInvoiceEvents.cpp
 base/purchases/posting/codeunit/PurchPostPrepmtYesNo.cpp
 base/purchases/posting/codeunit/PurchPostPrint.cpp
+base/purchases/posting/codeunit/PurchPostYesNo.cpp
 base/purchases/posting/codeunit/ServPurchPost.cpp
 base/purchases/posting/enum/PurchaseInvoicePosting.cpp
 base/purchases/pricing/codeunit/PurchaseLinePrice.cpp
@@ -7723,6 +7751,7 @@ base/sales/analysis/page/CustomerSalesLines.cpp
 base/sales/analysis/page/CustomerSalesLines.def.cpp
 base/sales/analysis/page/CustStatsByCurrLines.cpp
 base/sales/analysis/page/CustStatsByCurrLines.def.cpp
+base/sales/analysis/page/SalesAnalysisByDimensions.cpp
 base/sales/analysis/page/SalesAnalysisByDimensions.def.cpp
 base/sales/analysis/page/SalesAnalysisByDimMatrix.cpp
 base/sales/analysis/page/SalesAnalysisByDimMatrix.def.cpp
@@ -7734,6 +7763,7 @@ base/sales/analysis/page/SalesAnalysisReport.cpp
 base/sales/analysis/page/SalesAnalysisReport.def.cpp
 base/sales/analysis/page/SalesAnalysisViewCard.cpp
 base/sales/analysis/page/SalesAnalysisViewCard.def.cpp
+base/sales/analysis/page/SalesBudgetOverview.cpp
 base/sales/analysis/page/SalesBudgetOverview.def.cpp
 base/sales/analysis/page/SalesBudgetOverviewMatrix.cpp
 base/sales/analysis/page/SalesBudgetOverviewMatrix.def.cpp
@@ -8283,6 +8313,7 @@ base/sales/posting/codeunit/SalesPostPrepayments.cpp
 base/sales/posting/codeunit/SalesPostPrepaymentYesNo.cpp
 base/sales/posting/codeunit/SalesPostPrint.cpp
 base/sales/posting/codeunit/SalesPostViaJobQueue.cpp
+base/sales/posting/codeunit/SalesPostYesNo.cpp
 base/sales/posting/codeunit/ServSalesPost.cpp
 base/sales/posting/enum/SalesInvoicePosting.cpp
 base/sales/pricing/codeunit/SalesLinePrice.cpp
@@ -8548,6 +8579,7 @@ base/sales/reminder/table/SortingTable.cpp
 base/sales/reminder/table/SortingTable.def.cpp
 base/sales/reports/report/AgedAccountsReceivable.cpp
 base/sales/reports/report/AgedAccountsReceivable.def.cpp
+base/sales/reports/report/CustomerBalanceToDate.cpp
 base/sales/reports/report/CustomerBalanceToDate.def.cpp
 base/sales/reports/report/CustomerDetailedAging.cpp
 base/sales/reports/report/CustomerDetailedAging.def.cpp
@@ -8633,6 +8665,7 @@ base/service/analysis/page/ContrGLossCustMatrix.cpp
 base/service/analysis/page/ContrGLossCustMatrix.def.cpp
 base/service/analysis/page/ContrGLossResCtrMatrix.cpp
 base/service/analysis/page/ContrGLossResCtrMatrix.def.cpp
+base/service/analysis/page/ResAllocPerServiceOrder.cpp
 base/service/analysis/page/ResAllocPerServiceOrder.def.cpp
 base/service/analysis/page/ResAllPerServiceMatrix.cpp
 base/service/analysis/page/ResAllPerServiceMatrix.def.cpp
@@ -8640,14 +8673,17 @@ base/service/analysis/page/ResAvailabilityLinesSM.cpp
 base/service/analysis/page/ResAvailabilityLinesSM.def.cpp
 base/service/analysis/page/ResAvailabilityOverview.cpp
 base/service/analysis/page/ResAvailabilityOverview.def.cpp
+base/service/analysis/page/ResAvailabilityService.cpp
 base/service/analysis/page/ResAvailabilityService.def.cpp
 base/service/analysis/page/ResAvailServiceMatrix.cpp
 base/service/analysis/page/ResAvailServiceMatrix.def.cpp
+base/service/analysis/page/ResGrAllocPerServOrder.cpp
 base/service/analysis/page/ResGrAllocPerServOrder.def.cpp
 base/service/analysis/page/ResGrAvailabilityLinesSM.cpp
 base/service/analysis/page/ResGrAvailabilityLinesSM.def.cpp
 base/service/analysis/page/ResGrAvailabilityOverview.cpp
 base/service/analysis/page/ResGrAvailabilityOverview.def.cpp
+base/service/analysis/page/ResGrAvailabilityService.cpp
 base/service/analysis/page/ResGrAvailabilityService.def.cpp
 base/service/analysis/page/ResGrAvailServMatrix.cpp
 base/service/analysis/page/ResGrAvailServMatrix.def.cpp
@@ -8688,6 +8724,7 @@ base/service/archive/table/ServiceLineArchive.def.cpp
 base/service/archive/table/ServiceOrderAllocatArchive.cpp
 base/service/archive/table/ServiceOrderAllocatArchive.def.cpp
 base/service/cash_flow/codeunit/ServCashFlowSubscribers.cpp
+base/service/comment/page/ServiceCommentSheet.cpp
 base/service/comment/page/ServiceCommentSheet.def.cpp
 base/service/comment/table/ServiceCommentLine.cpp
 base/service/comment/table/ServiceCommentLine.def.cpp
@@ -8705,6 +8742,7 @@ base/service/contract/page/ContractChangeLog.cpp
 base/service/contract/page/ContractChangeLog.def.cpp
 base/service/contract/page/ContractGainLossEntries.cpp
 base/service/contract/page/ContractGainLossEntries.def.cpp
+base/service/contract/page/ContractLineSelection.cpp
 base/service/contract/page/ContractLineSelection.def.cpp
 base/service/contract/page/ContractServiceDiscounts.cpp
 base/service/contract/page/ContractServiceDiscounts.def.cpp
@@ -8722,6 +8760,7 @@ base/service/contract/page/FiledContractServDiscounts.cpp
 base/service/contract/page/FiledContractServDiscounts.def.cpp
 base/service/contract/page/FiledContractServiceHours.cpp
 base/service/contract/page/FiledContractServiceHours.def.cpp
+base/service/contract/page/FiledServContractCmSheet.cpp
 base/service/contract/page/FiledServContractCmSheet.def.cpp
 base/service/contract/page/FiledServiceContract.cpp
 base/service/contract/page/FiledServiceContract.def.cpp
@@ -8874,6 +8913,7 @@ base/service/document/page/ServiceLineFactBox.cpp
 base/service/document/page/ServiceLineFactBox.def.cpp
 base/service/document/page/ServiceLineList.cpp
 base/service/document/page/ServiceLineList.def.cpp
+base/service/document/page/ServiceLines.cpp
 base/service/document/page/ServiceLines.def.cpp
 base/service/document/page/ServiceLinesSubform.cpp
 base/service/document/page/ServiceLinesSubform.def.cpp
@@ -8986,6 +9026,7 @@ base/service/history/page/PostedServiceInvUpdate.cpp
 base/service/history/page/PostedServiceInvUpdate.def.cpp
 base/service/history/page/PostedServiceShipment.cpp
 base/service/history/page/PostedServiceShipment.def.cpp
+base/service/history/page/PostedServiceShipmentLines.cpp
 base/service/history/page/PostedServiceShipmentLines.def.cpp
 base/service/history/page/PostedServiceShipments.cpp
 base/service/history/page/PostedServiceShipments.def.cpp
@@ -9168,6 +9209,7 @@ base/service/posting/codeunit/ServicePost.cpp
 base/service/posting/codeunit/ServicePostInvoice.cpp
 base/service/posting/codeunit/ServicePostInvoiceEvents.cpp
 base/service/posting/codeunit/ServicePostPrint.cpp
+base/service/posting/codeunit/ServicePostYesNo.cpp
 base/service/posting/codeunit/ServItemTrackingRsrvMgt.cpp
 base/service/posting/codeunit/ServLedgEntriesPost.cpp
 base/service/posting/codeunit/ServPostingJournalsMgt.cpp
@@ -9414,6 +9456,7 @@ base/system/automation/page/RestrictedRecords.cpp
 base/system/automation/page/RestrictedRecords.def.cpp
 base/system/automation/page/WFEventEventCombMatrix.cpp
 base/system/automation/page/WFEventEventCombMatrix.def.cpp
+base/system/automation/page/WFEventResponseCombinations.cpp
 base/system/automation/page/WFEventResponseCombinations.def.cpp
 base/system/automation/page/WFEventResponseCombMatrix.cpp
 base/system/automation/page/WFEventResponseCombMatrix.def.cpp
@@ -9632,7 +9675,9 @@ base/system/diagnostics/page/MonitoredFieldsWorksheet.def.cpp
 base/system/diagnostics/page/MonitorFieldSetupWizard.cpp
 base/system/diagnostics/page/MonitorFieldSetupWizard.def.cpp
 base/system/diagnostics/report/ChangeLogDelete.def.cpp
+base/system/diagnostics/report/ChangeLogEntries.cpp
 base/system/diagnostics/report/ChangeLogEntries.def.cpp
+base/system/diagnostics/report/ChangeLogSetupList.cpp
 base/system/diagnostics/report/ChangeLogSetupList.def.cpp
 base/system/diagnostics/table/ChangeLogEntry.cpp
 base/system/diagnostics/table/ChangeLogEntry.def.cpp
@@ -10742,6 +10787,7 @@ base/warehouse/activity/codeunit/ScanWarehouseActivityLine.cpp
 base/warehouse/activity/codeunit/WarehouseDocumentPrint.cpp
 base/warehouse/activity/codeunit/WhseActivityPost.cpp
 base/warehouse/activity/codeunit/WhseActivityRegister.cpp
+base/warehouse/activity/codeunit/WhseActPostYesNo.cpp
 base/warehouse/activity/codeunit/WhseActRegisterYesNo.cpp
 base/warehouse/activity/codeunit/WhsePrinted.cpp
 base/warehouse/activity/history/page/RegisteredMovement.cpp
@@ -10908,8 +10954,10 @@ base/warehouse/cross_dock/table/WhseCrossDockOpportunity.def.cpp
 base/warehouse/document/codeunit/WhsePostReceipt.cpp
 base/warehouse/document/codeunit/WhsePostReceiptPrint.cpp
 base/warehouse/document/codeunit/WhsePostReceiptPrPos.cpp
+base/warehouse/document/codeunit/WhsePostReceiptYesNo.cpp
 base/warehouse/document/codeunit/WhsePostShipment.cpp
 base/warehouse/document/codeunit/WhsePostShipmentPrint.cpp
+base/warehouse/document/codeunit/WhsePostShipmentYesNo.cpp
 base/warehouse/document/codeunit/WhseShipmentRelease.cpp
 base/warehouse/document/page/WarehouseReceipt.cpp
 base/warehouse/document/page/WarehouseReceipt.def.cpp
@@ -11434,6 +11482,7 @@ system/system/azure/identity/codeunit/AzureADPlan.cpp
 system/system/azure/identity/codeunit/AzureADPlanImpl.cpp
 system/system/azure/identity/codeunit/AzureADTenant.cpp
 system/system/azure/identity/codeunit/AzureADUserManagement.cpp
+system/system/azure/identity/codeunit/AzureADUserMgmtImpl.cpp
 system/system/azure/identity/codeunit/AzureADUserSubscribers.cpp
 system/system/azure/identity/codeunit/AzureADUserSyncImpl.cpp
 system/system/azure/identity/codeunit/Microsoft365License.cpp
@@ -11736,6 +11785,7 @@ system/system/environment/configuration/codeunit/FeatureDataErrorHandler.cpp
 system/system/environment/configuration/codeunit/FeatureManagementFacade.cpp
 system/system/environment/configuration/codeunit/FeatureManagementImpl.cpp
 system/system/environment/configuration/codeunit/GuidedExperience.cpp
+system/system/environment/configuration/codeunit/GuidedExperienceImpl.cpp
 system/system/environment/configuration/codeunit/GuidedExperienceItemCleanup.cpp
 system/system/environment/configuration/codeunit/GuidedExperienceUpgrade.cpp
 system/system/environment/configuration/codeunit/GuidedExperienceUpgradeTag.cpp
@@ -11867,8 +11917,13 @@ system/system/integration/sharepoint/codeunit/SharePointClient.cpp
 system/system/integration/sharepoint/codeunit/SharePointClientCredentials.cpp
 system/system/integration/sharepoint/codeunit/SharePointClientImpl.cpp
 system/system/integration/sharepoint/codeunit/SharePointDiagnostics.cpp
+system/system/integration/sharepoint/codeunit/SharePointFile.cpp
+system/system/integration/sharepoint/codeunit/SharePointFolder.cpp
 system/system/integration/sharepoint/codeunit/SharePointGraphParser.cpp
 system/system/integration/sharepoint/codeunit/SharePointHttpContent.cpp
+system/system/integration/sharepoint/codeunit/SharePointList.cpp
+system/system/integration/sharepoint/codeunit/SharePointListItemAtch.cpp
+system/system/integration/sharepoint/codeunit/SharePointListItem.cpp
 system/system/integration/sharepoint/codeunit/SharePointRequestHelper.cpp
 system/system/integration/sharepoint/codeunit/SharePointUriBuilder.cpp
 system/system/integration/sharepoint/table/SharePointFile.cpp
@@ -12016,6 +12071,7 @@ system/system/security/access_control/codeunit/LogActivityPermissions.cpp
 system/system/security/access_control/codeunit/PasswordDialogImpl.cpp
 system/system/security/access_control/codeunit/PasswordDialogManagement.cpp
 system/system/security/access_control/codeunit/PasswordHandler.cpp
+system/system/security/access_control/codeunit/PasswordHandlerImpl.cpp
 system/system/security/access_control/codeunit/PermissionImpl.cpp
 system/system/security/access_control/codeunit/PermissionSetCardSubscriber.cpp
 system/system/security/access_control/codeunit/PermissionSetCopyImpl.cpp
@@ -12102,6 +12158,7 @@ system/system/security/encryption/codeunit/AesCryptoServiceProviderImpl.cpp
 system/system/security/encryption/codeunit/CertificateRequest.cpp
 system/system/security/encryption/codeunit/CertificateRequestImpl.cpp
 system/system/security/encryption/codeunit/CryptographyManagement.cpp
+system/system/security/encryption/codeunit/CryptographyManagementImpl.cpp
 system/system/security/encryption/codeunit/DESCryptoServiceProvider.cpp
 system/system/security/encryption/codeunit/DESCryptoServiceProviderImpl.cpp
 system/system/security/encryption/codeunit/DSACryptoServiceProvider.cpp
@@ -12500,6 +12557,7 @@ tests/assembly/test/codeunit/SCMKittingItemProfit.cpp
 tests/assembly/test/codeunit/SCMKittingPlanning.cpp
 tests/assembly/test/codeunit/SCMKittingPrintoutReports.cpp
 tests/assembly/test/codeunit/SCMKittingReports.cpp
+tests/assembly/test/codeunit/SCMKittingReservation.cpp
 tests/assembly/test/codeunit/SCMKittingReservations.cpp
 tests/assembly/test/codeunit/SCMKittingStdCostWksheet.cpp
 tests/assembly/test/codeunit/SCMKittingUndo.cpp
@@ -12560,6 +12618,7 @@ tests/core/codeunit/CertificateTest.cpp
 tests/core/codeunit/CFForecastWizardTests.cpp
 tests/core/codeunit/CFFrcstAzureAI.cpp
 tests/core/codeunit/ChangeGlobalDimBufferMgt.cpp
+tests/core/codeunit/ChangeLog.cpp
 tests/core/codeunit/ChartsTestALCharts.cpp
 tests/core/codeunit/CheckDimensionsOnPosting.cpp
 tests/core/codeunit/CheckDocumentNoUnitTest.cpp
@@ -12568,6 +12627,7 @@ tests/core/codeunit/CollectDotNextException.cpp
 tests/core/codeunit/CommonDemodata.cpp
 tests/core/codeunit/CompanyConsolWizardTests.cpp
 tests/core/codeunit/CompanyCreationWizardTests.cpp
+tests/core/codeunit/CompanyCreationWizardUser.cpp
 tests/core/codeunit/CompanyInitUnitTest.cpp
 tests/core/codeunit/CompanyInitUnitTestII.cpp
 tests/core/codeunit/CompanyMetadataTest.cpp
@@ -12597,6 +12657,7 @@ tests/core/codeunit/CurrencyExchRateFileMgt.cpp
 tests/core/codeunit/CurrencyExchRateUnitTests.cpp
 tests/core/codeunit/CurrencyUT.cpp
 tests/core/codeunit/CustAppSetupWizardTests.cpp
+tests/core/codeunit/CustomAddressFormat.cpp
 tests/core/codeunit/CustomerConsentTests.cpp
 tests/core/codeunit/CustomerStatistics.cpp
 tests/core/codeunit/CustVendItemEmplTemplates.cpp
@@ -12639,6 +12700,7 @@ tests/core/codeunit/DocAddressPropagationTest.cpp
 tests/core/codeunit/DocAppSetupWizardTests.cpp
 tests/core/codeunit/DocBackgrErrorHandling.cpp
 tests/core/codeunit/DocSendingProfileCRUDTests.cpp
+tests/core/codeunit/DocumentApprovalComments.cpp
 tests/core/codeunit/DocumentApprovalDocuments.cpp
 tests/core/codeunit/DocumentApprovalErrors.cpp
 tests/core/codeunit/DocumentApprovalRequests.cpp
@@ -12744,6 +12806,7 @@ tests/core/codeunit/ERMDocumentPostingError.cpp
 tests/core/codeunit/ERMDocumentTotalsUT.cpp
 tests/core/codeunit/ERMECSLShowVATEntries.cpp
 tests/core/codeunit/ERMEditPostingGroups.cpp
+tests/core/codeunit/ERMEmployeeApplication.cpp
 tests/core/codeunit/ERMExcelReports.cpp
 tests/core/codeunit/ERMExchRateAdjmtApply.cpp
 tests/core/codeunit/ERMExchRateAdjmtBank.cpp
@@ -12758,6 +12821,7 @@ tests/core/codeunit/ERMFinancePaymentTolerance.cpp
 tests/core/codeunit/ERMFinancePerformance.cpp
 tests/core/codeunit/ERMFinancialReports.cpp
 tests/core/codeunit/ERMFinancialReportsII.cpp
+tests/core/codeunit/ERMFinancialReportsIII.cpp
 tests/core/codeunit/ERMFinancialReportsIV.cpp
 tests/core/codeunit/ERMFinReportSheetHandler.cpp
 tests/core/codeunit/ERMFinRepPackageHandler.cpp
@@ -12809,6 +12873,8 @@ tests/core/codeunit/ERMPaymentTolerancePurchase.cpp
 tests/core/codeunit/ERMPaymentToleranceSales.cpp
 tests/core/codeunit/ERMPaymentToleranceVendor.cpp
 tests/core/codeunit/ERMPmtDiscAndVATCustVend.cpp
+tests/core/codeunit/ERMPmtDiscForCustVendor.cpp
+tests/core/codeunit/ERMPmtToleranceVATAppln.cpp
 tests/core/codeunit/ERMPostedGenJournalLine.cpp
 tests/core/codeunit/ERMPostingOutsideDate.cpp
 tests/core/codeunit/ERMPostingRounding.cpp
@@ -12867,6 +12933,7 @@ tests/core/codeunit/ERMRSCreateJournalLines.cpp
 tests/core/codeunit/ERMRSDataTemplates.cpp
 tests/core/codeunit/ERMRSDimensionsAsColumns.cpp
 tests/core/codeunit/ERMRSFldValidateAndApply.cpp
+tests/core/codeunit/ERMRSPackageBaseOperations.cpp
 tests/core/codeunit/ERMRSPackageDimensions.cpp
 tests/core/codeunit/ERMRSProcessData.cpp
 tests/core/codeunit/ERMRSQuestionnaire.cpp
@@ -12876,9 +12943,11 @@ tests/core/codeunit/ERMSalesBatchPosting.cpp
 tests/core/codeunit/ERMSalesBlanketOrder.cpp
 tests/core/codeunit/ERMSalesCrMemoAggrUT.cpp
 tests/core/codeunit/ERMSalesDocReports.cpp
+tests/core/codeunit/ERMSalesDocumentsIII.cpp
 tests/core/codeunit/ERMSalesFullPrepmtRounding.cpp
 tests/core/codeunit/ERMSalesInvoiceAggregateUT.cpp
 tests/core/codeunit/ERMSalesOrder.cpp
+tests/core/codeunit/ERMSalesPurchaseApplication.cpp
 tests/core/codeunit/ERMSalesPurchCorrectDocs.cpp
 tests/core/codeunit/ERMSalesPurchStatusError.cpp
 tests/core/codeunit/ERMSalesQuotes.cpp
@@ -13125,6 +13194,7 @@ tests/core/codeunit/MarketingInteraction.cpp
 tests/core/codeunit/MarketingInteractionsUI.cpp
 tests/core/codeunit/MarketingLogInteractPerm.cpp
 tests/core/codeunit/MarketingMatrixManagement.cpp
+tests/core/codeunit/MarketingOpportunityMgmt.cpp
 tests/core/codeunit/MarketingProfiling.cpp
 tests/core/codeunit/MarketingQuotationsContacts.cpp
 tests/core/codeunit/MarketingReports.cpp
@@ -13149,6 +13219,7 @@ tests/core/codeunit/MonitorSensitiveFieldTest.cpp
 tests/core/codeunit/MyNotifications.cpp
 tests/core/codeunit/MyRecordsDemoSetupTest.cpp
 tests/core/codeunit/MyRecordsUpdateMgtTests.cpp
+tests/core/codeunit/NavigateToPostedDocument.cpp
 tests/core/codeunit/NetCustVendBalancesTest.cpp
 tests/core/codeunit/NewDocumentFromCustomerCard.cpp
 tests/core/codeunit/NewDocumentFromVendorList.cpp
@@ -13232,6 +13303,7 @@ tests/core/codeunit/O365TemplatesTest.cpp
 tests/core/codeunit/O365TestBlockFinSharedDb.cpp
 tests/core/codeunit/O365TestNameNearness.cpp
 tests/core/codeunit/O365TotalsAndInvDiscPurch.cpp
+tests/core/codeunit/O365TrialBalance.cpp
 tests/core/codeunit/ObjectSelection.cpp
 tests/core/codeunit/OCRMasterDataSyncEvents.cpp
 tests/core/codeunit/OpenXMLManagementUT.cpp
@@ -13313,6 +13385,7 @@ tests/core/codeunit/RemovedTablesDataSetup.cpp
 tests/core/codeunit/ReportCaptionSubscriber.cpp
 tests/core/codeunit/ReportCatalogTests.cpp
 tests/core/codeunit/ReportLayout.cpp
+tests/core/codeunit/ReportLayoutTest.cpp
 tests/core/codeunit/ReportSettings.cpp
 tests/core/codeunit/RepSelectionsStdStmt.cpp
 tests/core/codeunit/ReservOrderPromisingE2E.cpp
@@ -13320,6 +13393,7 @@ tests/core/codeunit/ResetStateBeforeTestRun.cpp
 tests/core/codeunit/ResJnlErrorHandling.cpp
 tests/core/codeunit/ResolvingCaptionClass.cpp
 tests/core/codeunit/ResourceBatchJobs.cpp
+tests/core/codeunit/Resource.cpp
 tests/core/codeunit/ResourceEmployee.cpp
 tests/core/codeunit/ResourceJournal.cpp
 tests/core/codeunit/ResourceLabels.cpp
@@ -13355,6 +13429,7 @@ tests/core/codeunit/SCMBugfixes.cpp
 tests/core/codeunit/SCMBugfixesRunModalErrors.cpp
 tests/core/codeunit/SCMCalculateStandardCost.cpp
 tests/core/codeunit/SCMCapacityReqPlanning.cpp
+tests/core/codeunit/SCMCapacityRequirements.cpp
 tests/core/codeunit/SCMCertificateOfSupply.cpp
 tests/core/codeunit/SCMCETAFAddCostSales.cpp
 tests/core/codeunit/SCMCETAFCostingRevaluation.cpp
@@ -13397,6 +13472,7 @@ tests/core/codeunit/SCMInventoryCostingIII.cpp
 tests/core/codeunit/SCMInventoryCostingIV.cpp
 tests/core/codeunit/SCMInventoryCostingOrders.cpp
 tests/core/codeunit/SCMInventoryDocuments.cpp
+tests/core/codeunit/SCMInventoryItemTracking.cpp
 tests/core/codeunit/SCMInventoryItemTrackingII.cpp
 tests/core/codeunit/SCMInventoryJournals.cpp
 tests/core/codeunit/SCMInventoryMiscellaneous.cpp
@@ -13409,10 +13485,13 @@ tests/core/codeunit/SCMInventoryOrders.cpp
 tests/core/codeunit/SCMInventoryOrdersII.cpp
 tests/core/codeunit/SCMInventoryOrderTracking.cpp
 tests/core/codeunit/SCMInventoryReportsI.cpp
+tests/core/codeunit/SCMInventoryReportsII.cpp
 tests/core/codeunit/SCMInventoryReportsIII.cpp
+tests/core/codeunit/SCMInventoryReportsV.cpp
 tests/core/codeunit/SCMInventoryUT.cpp
 tests/core/codeunit/SCMInventoryValuationWIP.cpp
 tests/core/codeunit/SCMInvtDocPstPreview.cpp
+tests/core/codeunit/SCMInvtItemTrackingIII.cpp
 tests/core/codeunit/SCMInvtPickPostPreview.cpp
 tests/core/codeunit/SCMInvtPutAwayPostPrev.cpp
 tests/core/codeunit/SCMItemAnalysisView.cpp
@@ -13421,6 +13500,7 @@ tests/core/codeunit/SCMItemChargeBlockedItem.cpp
 tests/core/codeunit/SCMItemJournal.cpp
 tests/core/codeunit/SCMItemJournalPostPreview.cpp
 tests/core/codeunit/SCMItemReservation.cpp
+tests/core/codeunit/SCMItemTracking.cpp
 tests/core/codeunit/SCMItemVariantAttributes.cpp
 tests/core/codeunit/SCMLotNosByBin.cpp
 tests/core/codeunit/SCMLowLevelCode.cpp
@@ -13434,9 +13514,14 @@ tests/core/codeunit/SCMOrderPlanningII.cpp
 tests/core/codeunit/SCMOrderPlanningIII.cpp
 tests/core/codeunit/SCMOrderPromisingII.cpp
 tests/core/codeunit/SCMOrderReports.cpp
+tests/core/codeunit/SCMOrdersIV.cpp
+tests/core/codeunit/SCMOrdersUI.cpp
+tests/core/codeunit/SCMOrdersV.cpp
+tests/core/codeunit/SCMOrdersVI.cpp
 tests/core/codeunit/SCMOrderTracking.cpp
 tests/core/codeunit/SCMPackageTrackingFixes.cpp
 tests/core/codeunit/SCMPackageTrackingPurchase.cpp
+tests/core/codeunit/SCMPackageTrackingSales.cpp
 tests/core/codeunit/SCMPackageTrackingTransfer.cpp
 tests/core/codeunit/SCMPACOutputConsumption.cpp
 tests/core/codeunit/SCMPickBinPolicy.cpp
@@ -13444,6 +13529,7 @@ tests/core/codeunit/SCMPickWorksheet.cpp
 tests/core/codeunit/SCMPlanning.cpp
 tests/core/codeunit/SCMPlanningNTFTests.cpp
 tests/core/codeunit/SCMPlanningOptions.cpp
+tests/core/codeunit/SCMPlanningOrderTracking.cpp
 tests/core/codeunit/SCMPlanningParameters.cpp
 tests/core/codeunit/SCMPlanningReports.cpp
 tests/core/codeunit/SCMPlanningTransparency.cpp
@@ -13458,6 +13544,9 @@ tests/core/codeunit/SCMPurchasesPayables.cpp
 tests/core/codeunit/SCMPutAwayBinPolicy.cpp
 tests/core/codeunit/SCMQtyOnCombInvoice.cpp
 tests/core/codeunit/SCMReports.cpp
+tests/core/codeunit/SCMReservationII.cpp
+tests/core/codeunit/SCMReservationIII.cpp
+tests/core/codeunit/SCMReservationIV.cpp
 tests/core/codeunit/SCMReservationsDataDriven.cpp
 tests/core/codeunit/SCMReservationSubscriber.cpp
 tests/core/codeunit/SCMReservationV.cpp
@@ -13472,6 +13561,8 @@ tests/core/codeunit/SCMSalesPriceWksht.cpp
 tests/core/codeunit/SCMSalesReceivables.cpp
 tests/core/codeunit/SCMStockout.cpp
 tests/core/codeunit/SCMSupplyPlanningII.cpp
+tests/core/codeunit/SCMSupplyPlanningIII.cpp
+tests/core/codeunit/SCMSupplyPlanningIV.cpp
 tests/core/codeunit/SCMTestUpdateDateTime.cpp
 tests/core/codeunit/SCMTrackingPackageBase.cpp
 tests/core/codeunit/SCMTransferReservation.cpp
@@ -13479,14 +13570,24 @@ tests/core/codeunit/SCMTransfers.cpp
 tests/core/codeunit/SCMUpdateUnitCost.cpp
 tests/core/codeunit/SCMWarehouseI.cpp
 tests/core/codeunit/SCMWarehouseII.cpp
+tests/core/codeunit/SCMWarehouseIII.cpp
 tests/core/codeunit/SCMWarehouseIV.cpp
+tests/core/codeunit/SCMWarehouseJournal.cpp
 tests/core/codeunit/SCMWarehouseManagement.cpp
+tests/core/codeunit/SCMWarehouseManagementII.cpp
 tests/core/codeunit/SCMWarehouseOrangeLocation.cpp
+tests/core/codeunit/SCMWarehouseOrders.cpp
 tests/core/codeunit/SCMWarehousePick.cpp
+tests/core/codeunit/SCMWarehouseReceiving.cpp
 tests/core/codeunit/SCMWarehouseReports.cpp
+tests/core/codeunit/SCMWarehouseShipping.cpp
+tests/core/codeunit/SCMWarehouseShippingII.cpp
+tests/core/codeunit/SCMWarehouseShippingIII.cpp
 tests/core/codeunit/SCMWarehouseUnitTests.cpp
+tests/core/codeunit/SCMWarehouseUOM.cpp
 tests/core/codeunit/SCMWarehouseUT.cpp
 tests/core/codeunit/SCMWarehouseV.cpp
+tests/core/codeunit/SCMWarehouseVI.cpp
 tests/core/codeunit/SCMWhseGetSourceInbound.cpp
 tests/core/codeunit/SCMWhseUOMRndingUT.cpp
 tests/core/codeunit/SCMWIPCostingAddnlCurrency.cpp
@@ -13514,6 +13615,7 @@ tests/core/codeunit/SMBOfficeAddinMgmtTest.cpp
 tests/core/codeunit/SMBServiceItem.cpp
 tests/core/codeunit/SnapshotManagement.cpp
 tests/core/codeunit/SnapshotManagementTest.cpp
+tests/core/codeunit/StreamlineAutofillNoSeries.cpp
 tests/core/codeunit/StringConversionMgtUnitTests.cpp
 tests/core/codeunit/SuggestPriceLinesUT.cpp
 tests/core/codeunit/SystemInformationTest.cpp
@@ -13539,6 +13641,7 @@ tests/core/codeunit/TestDatabaseAccessIntent.cpp
 tests/core/codeunit/TestDataExchImportCSV.cpp
 tests/core/codeunit/TestDataExchImportXML.cpp
 tests/core/codeunit/TestDateCompression.cpp
+tests/core/codeunit/TestEditingPermissions.cpp
 tests/core/codeunit/TestExperienceChange.cpp
 tests/core/codeunit/TestGeneralDocumentLookup.cpp
 tests/core/codeunit/TestGenJnlPostPreview.cpp
@@ -13552,6 +13655,7 @@ tests/core/codeunit/TestLibraryInitialize.cpp
 tests/core/codeunit/TestManualRelease.cpp
 tests/core/codeunit/TestMemoryMappedFile.cpp
 tests/core/codeunit/TestMyPlatformNotifications.cpp
+tests/core/codeunit/TestMySettings.cpp
 tests/core/codeunit/TestOAuth20UT.cpp
 tests/core/codeunit/TestObjectRanges.cpp
 tests/core/codeunit/TestOCRServiceSetup.cpp
@@ -13714,6 +13818,7 @@ tests/core/page/CountyCaptionTestList.cpp
 tests/core/page/CountyCaptionTestList.def.cpp
 tests/core/page/CustomizationTestPage.cpp
 tests/core/page/CustomizationTestPage.def.cpp
+tests/core/page/GenerateTestData.cpp
 tests/core/page/GenerateTestData.def.cpp
 tests/core/page/JobQueueSampleLogging.cpp
 tests/core/page/JobQueueSampleLogging.def.cpp
@@ -13727,10 +13832,12 @@ tests/core/page/MockPriceListLine.cpp
 tests/core/page/MockPriceListLine.def.cpp
 tests/core/page/MockPriceWorksheetLine.cpp
 tests/core/page/MockPriceWorksheetLine.def.cpp
+tests/core/page/Snapshots.cpp
 tests/core/page/Snapshots.def.cpp
 tests/core/page/TableRelationTypeMismatch.def.cpp
 tests/core/page/TableWithLinkToGLAccount.cpp
 tests/core/page/TableWithLinkToGLAccount.def.cpp
+tests/core/page/TaintedTables.cpp
 tests/core/page/TaintedTables.def.cpp
 tests/core/page/UpdateParentFactBox.cpp
 tests/core/page/UpdateParentFactBox.def.cpp
@@ -13870,6 +13977,7 @@ tests/core/xmlport/ImportCodeCovTestResults.cpp
 tests/core/xmlport/ImportCodeCovTestResults.def.cpp
 tests/crm/outlook/codeunit/ContactSyncTest.cpp
 tests/e_services/e_document/codeunit/ReportInboxAPIE2E.cpp
+tests/finance/tests/erm/codeunit/SpendRequestTests.cpp
 tests/human_resources/test/table/WatchEmployee.cpp
 tests/human_resources/test/table/WatchEmployee.def.cpp
 tests/human_resources/test/table/WatchEmployeeLedgerEntry.cpp
@@ -13890,13 +13998,17 @@ tests/manufacturing/test/codeunit/ProdDefWizSourceTest.cpp
 tests/manufacturing/test/codeunit/ProdDefWizVariantTest.cpp
 tests/manufacturing/test/codeunit/SCMCapValueEntryLocation.cpp
 tests/manufacturing/test/codeunit/SCMCopyProductionBOM.cpp
+tests/manufacturing/test/codeunit/SCMManufacturing70.cpp
+tests/manufacturing/test/codeunit/SCMManufacturing.cpp
 tests/manufacturing/test/codeunit/SCMManufacturingReports.cpp
 tests/manufacturing/test/codeunit/SCMManufacturingReportsII.cpp
+tests/manufacturing/test/codeunit/SCMManufCalendars.cpp
 tests/manufacturing/test/codeunit/SCMManufLowLevelCode.cpp
 tests/manufacturing/test/codeunit/SCMPlanningAndManufacturing.cpp
 tests/manufacturing/test/codeunit/SCMProductionJournal.cpp
 tests/manufacturing/test/codeunit/SCMProductionOrderIII.cpp
 tests/manufacturing/test/codeunit/SCMProductionOrdersIV.cpp
+tests/manufacturing/test/codeunit/SCMProductionOrdersV.cpp
 tests/manufacturing/test/codeunit/SCMProdWhseHandling.cpp
 tests/manufacturing/test/codeunit/SCMWIPCostingProductionI.cpp
 tests/manufacturing/test/codeunit/SCMWIPCostingProductionII.cpp
@@ -13921,6 +14033,7 @@ tests/service/test/codeunit/ServiceDemandOverview.cpp
 tests/service/test/codeunit/ServiceInvoicesDelete.cpp
 tests/service/test/codeunit/ServiceItemBlocked.cpp
 tests/service/test/codeunit/ServiceItemReference.cpp
+tests/service/test/codeunit/ServiceItems.cpp
 tests/service/test/codeunit/ServiceItemTracking.cpp
 tests/service/test/codeunit/ServiceLineUpdateValidation.cpp
 tests/service/test/codeunit/ServiceManagementSetup.cpp
@@ -13930,6 +14043,7 @@ tests/service/test/codeunit/ServiceOrderArchive.cpp
 tests/service/test/codeunit/ServiceOrderCheck.cpp
 tests/service/test/codeunit/ServiceOrderRelease.cpp
 tests/service/test/codeunit/ServiceOrderReleaseValidate.cpp
+tests/service/test/codeunit/ServiceOrderTracking.cpp
 tests/service/test/codeunit/ServiceOrderWarehouseOrange.cpp
 tests/service/test/codeunit/ServiceOrderWarehousePick.cpp
 tests/service/test/codeunit/ServicePages.cpp

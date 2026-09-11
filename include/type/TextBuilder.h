@@ -125,7 +125,7 @@ public:
 
   /// \brief AL `TextBuilder.ToText()`. Converts the value of this TextBuilder instance to a Text.
   /// \return The AL `Text`.
-  std::string ToText() const;
+  ::agiru::Text<0> ToText() const;
 
   /// \brief AL `TextBuilder.ToText(Integer, Integer)`. Converts the value of a substring of this
   /// TextBuilder instance to a Text.

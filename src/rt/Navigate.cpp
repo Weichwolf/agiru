@@ -13,6 +13,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -146,7 +147,10 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
                     "' is not one of the characters record-find-method.md declares");
     }
     const bool backwards = step == '+' || step == '<';
-    if (ReadOne(record, table, made, Reversed(made, state, table, backwards))) { return true; }
+    if (ReadOne(record, table, made, Reversed(made, state, table, backwards))) {
+      state->positioned = true;
+      return true;
+    }
   }
   return false;
 }
@@ -177,12 +181,17 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
 
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();
-  if (open == nullptr || !state->positioned) { return 0; }
-  if (steps < 0) {
-    throw Error("Record.Next with a negative step needs a scrollable cursor, which this one is not "
-                "(board:0044)");
-  }
+  if (!state->positioned) { return 0; }
   const std::int32_t wanted = steps == 0 ? 1 : steps;
+  if (wanted < 0 || open == nullptr) {
+    const std::string_view direction = wanted < 0 ? "<" : ">";
+    std::int32_t moved = 0;
+    for (std::int32_t taken = 0; taken < std::abs(wanted); ++taken) {
+      if (!RuntimeFind(record, table, direction)) { break; }
+      ++moved;
+    }
+    return wanted < 0 ? -moved : moved;
+  }
   for (std::int32_t taken = 0; taken < wanted; ++taken) {
     if (!open->cursor.Step()) {
       state->positioned = false;

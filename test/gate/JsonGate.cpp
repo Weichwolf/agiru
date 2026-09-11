@@ -27,7 +27,8 @@ agiru::JsonArray AnArray() {
 /// read into is ordinary AL, and 106 UT cases did exactly that.
 void ADeclaredVariableIsAlreadyADocument() {
   agiru::JsonObject fresh;
-  CHECK_TRUE("a declared object takes an Add", static_cast<bool>(fresh.Add("a", agiru::Integer{1})));
+  CHECK_TRUE("a declared object takes an Add",
+             static_cast<bool>(fresh.Add("a", agiru::Integer{1})));
   agiru::JsonArray list;
   list.Add(agiru::Integer{1});
   CHECK_TRUE("and a declared array takes one too", list.Count() == 1);
@@ -41,7 +42,8 @@ void ADeclaredVariableIsAlreadyADocument() {
 /// reads as the type the value has.
 void AnObjectHoldsWhatWasAddedToIt() {
   agiru::JsonObject object = AnObject();
-  CHECK_TRUE("a key is added once", static_cast<bool>(object.Add("name", std::string_view("Widget"))));
+  CHECK_TRUE("a key is added once",
+             static_cast<bool>(object.Add("name", std::string_view("Widget"))));
   CHECK_TRUE("and a number beside it", static_cast<bool>(object.Add("count", agiru::Integer{7})));
   CHECK_TRUE("a key that is already there is refused rather than overwritten",
              !static_cast<bool>(object.Add("count", agiru::Integer{8})));
@@ -54,7 +56,8 @@ void AnObjectHoldsWhatWasAddedToIt() {
   agiru::JsonToken token;
   CHECK_TRUE("Get finds the key", static_cast<bool>(object.Get("count", token)));
   CHECK_TRUE("and the token reads as the number it holds", token.AsValue().AsInteger() == 8);
-  CHECK_TRUE("Contains answers for a key that is there", static_cast<bool>(object.Contains("name")));
+  CHECK_TRUE("Contains answers for a key that is there",
+             static_cast<bool>(object.Contains("name")));
   CHECK_TRUE("Keys names them", object.Keys().Count() == 2);
   CHECK_TRUE("Remove takes one out", static_cast<bool>(object.Remove("name")));
 
@@ -112,9 +115,9 @@ void ATokenLooksIntoTheDocument() {
   agiru::Text<0> written;
   CHECK_TRUE("shows in the outer document", static_cast<bool>(object.WriteTo(written)));
   CHECK_TEXT("which is what a reference type means",
-             std::string(std::string_view(written)), R"({"inner":{"n":9}})");
+             std::string(std::string_view(written)),
+             R"({"inner":{"n":9}})");
 }
-
 
 /// SELECTTOKEN WALKS A PATH, the JSONPath subset the BaseApp uses: `$.a.b`, `a.b`, and `a[0]`.
 void SelectTokenWalksThePath() {
@@ -139,7 +142,7 @@ void SelectTokenWalksThePath() {
     static_cast<void>(object.GetText("nope"));
   } catch (const agiru::Error &e) { said = e.what(); }
   CHECK_TRUE("GetText without a default refuses", !said.empty());
-  CHECK_TRUE("and with one answers blank", object.GetText("nope", true).empty());
+  CHECK_TRUE("and with one answers blank", object.GetText("nope", true).Length() == 0);
 }
 
 } // namespace

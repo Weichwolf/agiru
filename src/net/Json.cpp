@@ -1,5 +1,3 @@
-#include "type/JsonHandle.h"
-
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -11,6 +9,7 @@
 #include "type/Duration.h"
 #include "type/Integer.h"
 #include "type/JsonArray.h"
+#include "type/JsonHandle.h"
 #include "type/JsonObject.h"
 #include "type/JsonToken.h"
 #include "type/JsonValue.h"
@@ -20,12 +19,12 @@
 #include "type/Text.h"
 #include "type/Time.h"
 
-#include <nlohmann/json.hpp>
-
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 namespace agiru::detail {
 
@@ -88,30 +87,39 @@ template <typename T> Json Valued(const T &value);
 template <> Json Valued<BigInteger>(const BigInteger &value) {
   return Json(static_cast<std::int64_t>(value));
 }
+
 template <> Json Valued<Boolean>(const Boolean &value) {
   return Json(static_cast<bool>(value));
 }
+
 template <> Json Valued<Byte>(const Byte &value) {
   return Json(static_cast<std::int64_t>(value));
 }
+
 template <> Json Valued<Char>(const Char &value) {
   return Json(Encoded(value));
 }
+
 template <> Json Valued<Date>(const Date &value) {
   return Json(value.ToInvariantString());
 }
+
 template <> Json Valued<DateTime>(const DateTime &value) {
   return Json(value.ToInvariantString());
 }
+
 template <> Json Valued<Decimal>(const Decimal &value) {
   return FromDecimal(value);
 }
+
 template <> Json Valued<Duration>(const Duration &value) {
   return Json(static_cast<std::int64_t>(value.Milliseconds()));
 }
+
 template <> Json Valued<Integer>(const Integer &value) {
   return Json(static_cast<std::int64_t>(value));
 }
+
 template <> Json Valued<Time>(const Time &value) {
   return Json(value.ToInvariantString());
 }
@@ -129,6 +137,7 @@ std::string TextOf(const Json &node) {
 }
 
 }
+
 namespace agiru {
 
 namespace {
@@ -196,6 +205,7 @@ Integer IndexIn(const detail::JsonHandle &handle, const Json &value) {
 }
 
 }
+
 namespace agiru {
 
 ::agiru::Boolean JsonObject::Add(std::string_view Key, ::agiru::BigInteger Value) {
@@ -734,7 +744,7 @@ Boolean JsonValue::IsNull() {
   return Node(Handle_).is_null();
 }
 
-std::string JsonValue::AsText() {
+::agiru::Text<0> JsonValue::AsText() {
   return TextOf(Node(Handle_));
 }
 
@@ -828,7 +838,7 @@ Boolean JsonArray::SelectToken(std::string_view Path, JsonToken &Result) {
   return SelectIn(Handle_, Path, Result);
 }
 
-std::string JsonObject::GetText(std::string_view Key, Boolean DefaultIfNotFound) {
+::agiru::Text<0> JsonObject::GetText(std::string_view Key, Boolean DefaultIfNotFound) {
   bool found = false;
   JsonToken token = FoundAt(Handle_, Key, found);
   if (!found) {

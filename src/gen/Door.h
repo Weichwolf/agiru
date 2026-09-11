@@ -29,6 +29,8 @@ inline constexpr std::string_view kDoorMarker = "// @door\n";
 
 [[nodiscard]] bool DoorCalls(std::string_view name);
 
+[[nodiscard]] bool DeclaredByBase(std::string_view header, std::string_view name);
+
 struct StaticMember {
   std::string_view type;
   std::string_view member;

@@ -137,7 +137,8 @@ const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
     const std::string bare = Identifier(field.name);
     const std::string lowerBare = LowerKey(bare);
     const bool platform = field.number >= kSystemFields.front().no.Value();
-    const bool collides = !taken.insert(lowerBare).second && !platform;
+    const bool hidesABaseMethod = !platform && DeclaredByBase("Table.h", bare);
+    const bool collides = (!taken.insert(lowerBare).second || hidesABaseMethod) && !platform;
     const std::string spelled = collides ? bare + "_" + std::to_string(field.number) : bare;
     cached.byName.emplace(LowerKey(field.name), spelled);
     cached.byBare.emplace(lowerBare, spelled);
@@ -731,6 +732,15 @@ std::string ClassBody(const al::TableObject &table,
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
   out += "class " + tableClass + ";\n\n";
   out += "class " + tableClass + " : public Table<" + tableClass + "> {\npublic:\n";
+  {
+    std::set<std::string> unhidden;
+    for (const al::ProcedureDecl &procedure : table.procedures) {
+      const std::string named = ProcedureIdentifier(table, procedure.name);
+      if (!DeclaredByBase("Table.h", named) || !unhidden.insert(named).second) { continue; }
+      out += "  using Table<" + tableClass + ">::" + named + ";\n";
+    }
+    if (!unhidden.empty()) { out += "\n"; }
+  }
   out += "  using Table<" + tableClass + ">::operator=;\n\n";
   out += "  static constexpr " + Reach(table, "TableId", "TableId") + " kId{" +
          std::to_string(table.id) + "};\n";

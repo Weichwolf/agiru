@@ -1422,10 +1422,16 @@ public:
   Integer Next() { return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1)); }
 
   /// \brief AL `Record.Next(Steps)`.
-  /// \param Steps How far to step.
-  /// \return How many steps were taken, 0 at the end.
-  /// \throws Error when `Steps` is negative -- stepping back needs a scrollable cursor, which this
-  ///         one is not (board:0044).
+  /// \param Steps How far to step: forward when positive, back when negative.
+  /// \return How many steps were taken, with the sign of the direction; 0 at either end.
+  ///
+  /// \note A STEP BACK, AND A STEP FROM A ROW `Get` OR `Find` LANDED ON, IS RELATIVE TO THE KEY.
+  ///       The open set streams through a forward-only cursor (board:0045), so what cannot be
+  ///       fetched backwards is found again: `Next(-1)` is `Find('<')` from the current row's key
+  ///       under the current filters, once per step, which is what `record-next-method.md`
+  ///       describes and how the predecessor moves (`_find_relative`). A forward `Next` on a row
+  ///       that `Get` reached -- `Item.Get(No); Item.Next` -- moves the same way, since there is
+  ///       no set open to step.
   Integer Next(Integer Steps) {
     return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps));
   }
@@ -1504,7 +1510,7 @@ public:
   /// \note IT READS THE CURRENT FILTER GROUP AND NOTHING ELSE, which is what
   ///       `record-getfilter-method.md` describes and what `SetFilter` wrote. A record that never
   ///       filtered has no state at all and answers empty rather than allocating one.
-  template <typename Field> [[nodiscard]] std::string GetFilter(const Field &member) const {
+  template <typename Field> [[nodiscard]] ::agiru::Text<0> GetFilter(const Field &member) const {
     const detail::RecordState *state = Filtered();
     if (state == nullptr) { return {}; }
     const ::agiru::FieldNo no = NumberOf(&member);
@@ -1518,8 +1524,8 @@ public:
   /// the current filter group for all fields in a record. In addition, this method also returns the
   /// state of the MARKEDONLY method (Record).
   /// \return `Caption: filter, Caption: filter` over the current group; empty when unfiltered.
-  [[nodiscard]] std::string GetFilters() const {
-    return detail::FiltersText(Filtered(), TableTraits<Derived>::kTable);
+  [[nodiscard]] ::agiru::Text<0> GetFilters() const {
+    return ::agiru::Text<0>(detail::FiltersText(Filtered(), TableTraits<Derived>::kTable));
   }
 
   /// \brief AL `Record.GetPosition([UseNames])`. The current record's primary key, as text.
@@ -2091,8 +2097,8 @@ public:
 
   /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.
   /// \return The `Caption` the table declares, which is its name when it declares none.
-  [[nodiscard]] std::string TableCaption() const {
-    return std::string(TableTraits<Derived>::kTable.caption);
+  [[nodiscard]] ::agiru::Text<0> TableCaption() const {
+    return ::agiru::Text<0>(TableTraits<Derived>::kTable.caption);
   }
 
   /// \brief AL `Record.TableName()`. Gets the name of a table.

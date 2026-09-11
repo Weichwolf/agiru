@@ -110,3 +110,14 @@ bool Variant::operator==(const Variant &o) const {
 }
 
 }
+
+namespace agiru::detail {
+
+std::int32_t OrdinalOf(const Variant &held) {
+  if (held.Is<OrdinalInVariant>()) { return held.Get<OrdinalInVariant>().ordinal; }
+  if (held.Is<Integer>()) { return held.Get<Integer>(); }
+  throw Error("an Option takes a Variant holding an option or an integer, and this one holds " +
+              std::string(held.HeldName()));
+}
+
+}

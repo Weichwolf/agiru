@@ -108,7 +108,8 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
     throw Error("FieldRef.Validate: this build carries no table " + std::string(Table_().name));
   }
   const std::string text =
-      NewValue.IsEmpty() ? FieldText(record_, Def_()) : ::agiru::AsText(NewValue);
+      NewValue.IsEmpty() ? FieldText(record_, Def_())
+                         : std::string(std::string_view(::agiru::AsText(NewValue)));
   entry->validate(record_, Def_().no, text);
 }
 
@@ -394,6 +395,18 @@ void RecordRef::Init() {
 
 std::string RecordRef::CurrentCompany() {
   return std::string(Session::Current().CompanyName());
+}
+
+void RecordRef::Copy(const RecordRef &FromRecordRef, Boolean ShareTable) {
+  if (ShareTable) {
+    *this = FromRecordRef;
+    return;
+  }
+  const TableDef &table = FromRecordRef.Table();
+  Open(table.id.Value());
+  const TableEntry *entry = FindTable(table.id);
+  if (entry == nullptr) { throw Error("the RecordRef is not open"); }
+  entry->copy(State().record, FromRecordRef.State().record);
 }
 
 RecordRef RecordRef::Duplicate() {

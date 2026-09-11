@@ -402,6 +402,19 @@ public:
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
   void SetFilter(std::string_view String) const { SetFilterText(std::string(String)); }
 
+  /// \brief AL `FieldRef.SetFilter(Value)` where the argument is a VALUE and not text --
+  ///        `IDFieldRef.SetFilter(Rec."CRM ID")` hands a Guid, and AL renders it into the filter.
+  /// \tparam Value Anything with a text form that is not text already.
+  /// \param value The value.
+  template <typename Value>
+    requires(!std::convertible_to<const Value &, std::string_view>) &&
+            (!requires { typename Value::IsAlRefusal; }) &&
+            (!std::same_as<std::remove_cvref_t<Value>, ::agiru::Variant>) &&
+            requires(const Value &v) { ::agiru::AsText(v); }
+  void SetFilter(const Value &value) const {
+    SetFilterText(std::string(std::string_view(::agiru::AsText(value))));
+  }
+
   /// \brief AL `FieldRef.SetFilter(Text, Any)`: the one placeholder substituted.
   /// \param String The filter, with `%1`.
   /// \param Value  What `%1` stands for.
@@ -460,7 +473,8 @@ public:
   /// \throws Error naming the field, the way `Record.TestField(Field, Value)` does.
   template <typename V> void TestField(const V &Expected) const {
     if (!(Value() == ::agiru::Variant(Expected))) {
-      throw Error(std::string(Name()) + " must be equal to '" + ::agiru::AsText(Expected) + "'");
+      throw Error(std::string(Name()) + " must be equal to '" +
+                  std::string(std::string_view(::agiru::AsText(Expected))) + "'");
     }
   }
 
@@ -769,29 +783,25 @@ public:
     throw Error("RecordRef.ClearMarks() is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief AL `RecordRef.Copy(RecordRef, Boolean)`. Copies a specified record referece's filters,
-  /// views, automatically calculated FlowFields, marks, fields, and keys that are associated with
-  /// the record from a table or creates a reference to a record.
+  /// \brief AL `RecordRef.Copy(RecordRef, Boolean)`. Copies the other reference's record --
+  ///        fields, filters, keys and marks -- into this one, or with `ShareTable` makes this a
+  ///        second handle on the same record.
   /// \param FromRecordRef The AL `RecordRef`.
-  /// \param ShareTable The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Copy(const ::agiru::RecordRef &FromRecordRef, ::agiru::Boolean ShareTable = {}) {
-    static_cast<void>(FromRecordRef);
-    static_cast<void>(ShareTable);
-    throw Error(
-        "RecordRef.Copy(RecordRef, Boolean) is declared and not implemented yet (board:0035)");
-  }
+  /// \param ShareTable Whether the two references share one record from here on.
+  /// \throws Error when the other reference is closed.
+  void Copy(const ::agiru::RecordRef &FromRecordRef, ::agiru::Boolean ShareTable = {});
 
-  /// \brief AL `RecordRef.Copy(Record, Boolean)`. Copies a specified record's filters, views,
-  /// automatically calculated FlowFields, marks, fields, and keys that are associated with the
-  /// record from a table or creates a reference to a record.
-  /// \param FromRecord The AL `Record`.
-  /// \param ShareTable The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void Copy(::agiru::RecordRef &FromRecord, ::agiru::Boolean ShareTable = {}) {
-    static_cast<void>(FromRecord);
+  /// \brief AL `RecordRef.Copy(Record, Boolean)`. Takes the record's table, fields and filters,
+  ///        the way `GetTable` does.
+  /// \tparam T The generated table class.
+  /// \param FromRecord The record.
+  /// \param ShareTable Read and not acted on: a reference to a typed record's OWN storage is
+  ///        board:0037's open half, so the fields are copied either way.
+  template <typename T>
+    requires requires { T::kId; }
+  void Copy(T &FromRecord, ::agiru::Boolean ShareTable = {}) {
     static_cast<void>(ShareTable);
-    throw Error("RecordRef.Copy(Record, Boolean) is declared and not implemented yet (board:0035)");
+    GetTable(FromRecord);
   }
 
   /// \brief AL `RecordRef.CopyLinks(RecordRef)`. Copies all the links from a particular record.

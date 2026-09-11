@@ -92,6 +92,14 @@ public:
   ///       only one of those in an implicit conversion sequence.
   explicit Guid(const char *text) : Guid(std::string_view(text)) {}
 
+  /// \brief AL `Guid := '{...}'` -- a text assigned to a GUID variable, which AL converts.
+  /// \param text The text, in any of the forms `FromText` reads.
+  /// \return This GUID.
+  Guid &operator=(std::string_view text) {
+    *this = Guid(text);
+    return *this;
+  }
+
   /// \brief AL passes a `Text[N]` where a `Guid` is declared, and converts it on the way.
   ///
   /// \tparam N The declared length, which the conversion ignores.

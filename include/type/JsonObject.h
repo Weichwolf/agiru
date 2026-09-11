@@ -286,7 +286,7 @@ public:
   /// \param DefaultIfNotFound The AL `Boolean`.
   /// \return The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
+  ::agiru::Text<0> GetText(std::string_view Key, ::agiru::Boolean DefaultIfNotFound = {});
 
   /// \brief AL `JsonObject.GetTime(Text, Boolean)`. Retrieves the value of a property with a given
   /// key from a JsonObject as a Time.

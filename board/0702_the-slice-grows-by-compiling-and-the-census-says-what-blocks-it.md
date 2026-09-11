@@ -34,3 +34,20 @@ first.
 `IndexOf`, `TrimEnd`, `Split` called on what a door method returned, 11 units) is the largest
 single named cause inside class one, and it is the name-equality invariant failing: AL `Text` is
 `::agiru::Text<0>` and never `std::string`. 169 door declarations return `std::string` today.
+
+**Second census, 2026-09-11 evening, after board:0703's round (the array view, the property
+assignment through a chain, the un-hidden base overloads, `Rec.` before a page's own table
+procedures, `Option := Variant`, `SetFilter` with a value, `Text` out of `GetFilter`/`ToText`/
+`AsText`):** 458 absent, **114 compile and joined the slice** (13 999 -> 14 113). What is left:
+
+| first error | units |
+|---|---|
+| `no member named 'X' in 'X'` | 105 -> 96 |
+| `reference to non-static member function must be called` | 31 -> 25 |
+| `no matching function for call to 'X'` | 27 -> 25 |
+| `use of undeclared identifier 'X'` | 26 -> 23 |
+| `no type named 'X' in 'X'` (all `Page<>::SetBackgroundTaskResult`) | 21 |
+| `no matching member function for call to 'X'` | 39 -> 19 |
+| `non-const lvalue reference ... unrelated type` | 47 -> 12 |
+
+Suite: 1 788 -> 1 800.
