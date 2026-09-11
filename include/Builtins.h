@@ -588,17 +588,6 @@ void LogInternalError(std::string_view Message,
                       const ::agiru::DataClassification &DataClassificationInstance,
                       const ::agiru::Verbosity &VerbosityInstance);
 
-/// \brief AL `Dialog.StrMenu(Text, Integer, Text)`. Creates a menu window that displays a series of
-/// options.
-/// \param OptionMembers The AL `Text`.
-/// \param DefaultNumber The AL `Integer`.
-/// \param Instruction The AL `Text`.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer StrMenu(std::string_view OptionMembers,
-                         ::agiru::Integer DefaultNumber = {},
-                         std::string_view Instruction = {});
-
 /// \brief AL `File.DownloadFromStream(InStream, Text, Text, Text, Text)`. Sends a file from server
 /// computer to the client computer. The client computer is the computer that is running the Windows
 /// client or the computer that is running the browser that accesses the web client.

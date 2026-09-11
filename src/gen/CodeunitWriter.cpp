@@ -167,9 +167,10 @@ std::string RaisingBody(const al::ProcedureDecl &procedure,
     if (i != 0) { out += ", "; }
     out += Literal(procedure.parameters[i].name);
   }
-  out += "};\n  ::agiru::detail::RaiseEventFrom(static_cast<void *>(this), ::agiru::" +
-         std::string(kind) + ", " + objectId + ", " + objectName + ", " + Literal(procedure.name) +
-         ", {}, kNames";
+  out += std::string("};\n  ::agiru::detail::") +
+         (IsIsolatedPublisher(procedure) ? "RaiseIsolatedEventFrom" : "RaiseEventFrom") +
+         "(static_cast<void *>(this), ::agiru::" + std::string(kind) + ", " + objectId + ", " +
+         objectName + ", " + Literal(procedure.name) + ", {}, kNames";
   for (const al::VarDecl &parameter : procedure.parameters) {
     out += ", " + Identifier(parameter.name);
   }
@@ -209,6 +210,14 @@ bool IsPublisher(const al::ProcedureDecl &procedure) {
   return al::HasAttribute(procedure, "IntegrationEvent") ||
          al::HasAttribute(procedure, "BusinessEvent") ||
          al::HasAttribute(procedure, "InternalEvent");
+}
+
+bool IsIsolatedPublisher(const al::ProcedureDecl &procedure) {
+  for (const std::string_view attribute : {"IntegrationEvent", "BusinessEvent", "InternalEvent"}) {
+    const std::vector<std::string> arguments = al::AttributeArguments(procedure, attribute);
+    if (arguments.size() >= 3 && LowerKey(arguments[2]) == "true") { return true; }
+  }
+  return false;
 }
 
 namespace {

@@ -155,8 +155,9 @@ void AdoptTableView(void *to, const void *from) {
   const RecordState *source = reinterpret_cast<const StateHandle *>(from)->Peek();
   if (source == nullptr) { return; }
   for (const FieldFilter &one : source->filters) {
-    into.filters.push_back(
-        FieldFilter{.field = one.field, .group = kFixedViewGroup, .text = one.text});
+    into.filters.push_back(FieldFilter{.field = one.field,
+                                       .group = one.group == kFixedViewGroup ? 0 : one.group,
+                                       .text = one.text});
   }
 }
 

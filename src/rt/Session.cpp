@@ -6,6 +6,7 @@
 #include "type/Date.h"
 
 #include "BuiltinsWritten.h"
+#include "Subscribers.h"
 
 #include <string>
 #include <string_view>
@@ -24,6 +25,7 @@ Session::Session(const std::string &connectionInfo)
 }
 
 Session::~Session() {
+  detail::ReleaseAutomaticInstances();
   g_current = previous_;
 }
 

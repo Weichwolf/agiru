@@ -145,6 +145,12 @@ template <typename Codeunit, auto Method> void InvokeHandler(std::string_view te
                          (codeunit.*Method)(::agiru::Text<0>{}, answer);
                        }) {
     (codeunit.*Method)(::agiru::Text<0>{text}, *static_cast<::agiru::Integer *>(reply));
+  } else if constexpr (requires(::agiru::Integer answer) {
+                         (codeunit.*Method)(::agiru::Text<0>{}, answer, ::agiru::Text<0>{});
+                       }) {
+    auto *answer = static_cast<StrMenuAnswer *>(reply);
+    (codeunit.*
+     Method)(::agiru::Text<0>{text}, answer->choice, ::agiru::Text<0>{answer->instruction});
   } else if constexpr (requires {
                          typename std::remove_cvref_t<decltype(detail::FirstParameterOf(
                              Method))>::IsReport;

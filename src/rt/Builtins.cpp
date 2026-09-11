@@ -440,15 +440,6 @@ void LogInternalError(std::string_view Message,
   RefuseDoor("Dialog.LogInternalError(Text, Text, DataClassification, Verbosity)");
 }
 
-::agiru::Integer StrMenu(std::string_view OptionMembers,
-                         ::agiru::Integer DefaultNumber,
-                         std::string_view Instruction) {
-  static_cast<void>(OptionMembers);
-  static_cast<void>(DefaultNumber);
-  static_cast<void>(Instruction);
-  RefuseDoor("Dialog.StrMenu(Text, Integer, Text)");
-}
-
 ::agiru::Boolean DownloadFromStream(const ::agiru::InStream &InStream,
                                     std::string_view DialogTitle,
                                     std::string_view ToFolder,

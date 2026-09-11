@@ -204,6 +204,16 @@ void InvokeSubscriber(void *instance, const EventArgs &args, std::span<const std
 /// \param element The element, for a trigger event.
 /// \param names The publisher's parameter names.
 /// \param values The arguments.
+/// \brief The addresses an event hands its subscribers, one per argument.
+/// \tparam Values The argument types.
+/// \param values The arguments; a `const` one is handed over as the subscriber's by-value copy
+///        source, which is what the cast below is for.
+/// \return The addresses, in order.
+template <typename... Values>
+std::array<void *, sizeof...(Values)> ArgumentAddresses(Values &...values) {
+  return {const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
+}
+
 template <typename... Values>
 void RaiseEventFrom(void *sender,
                     EventObject kind,
@@ -213,14 +223,42 @@ void RaiseEventFrom(void *sender,
                     std::string_view element,
                     std::span<const std::string_view> names,
                     Values &...values) {
-  std::array<void *, sizeof...(Values)> addresses{
-      const_cast<void *>(static_cast<const void *>(&values))...}; // NOLINT
+  std::array<void *, sizeof...(Values)> addresses = ArgumentAddresses(values...);
   Raise(kind,
         objectId,
         objectName,
         event,
         element,
         EventArgs{.names = names, .values = addresses, .sender = sender});
+}
+
+/// \brief `RaiseEventFrom` for a publisher declared `[IntegrationEvent(_, _, true)]`: an ISOLATED
+///        event, whose subscribers each run in a boundary of their own
+///        (`devenv-events-isolated.md`)
+///        -- `System Initialization.OnAfterLogin` is one, and a subscriber refusing there stopped
+///        every later one, the API binder among them (2026-09-11).
+/// \tparam Values The argument types.
+/// \param sender The raising object.
+/// \param kind The publisher's object kind. \param objectId Its number. \param objectName Its AL
+///        name. \param event The published method. \param element The field, for a table trigger
+///        event; empty otherwise. \param names The publisher's parameter names.
+/// \param values The arguments.
+template <typename... Values>
+void RaiseIsolatedEventFrom(void *sender,
+                            EventObject kind,
+                            std::int32_t objectId,
+                            std::string_view objectName,
+                            std::string_view event,
+                            std::string_view element,
+                            std::span<const std::string_view> names,
+                            Values &...values) {
+  std::array<void *, sizeof...(Values)> addresses = ArgumentAddresses(values...);
+  RaiseIsolated(kind,
+                objectId,
+                objectName,
+                event,
+                element,
+                EventArgs{.names = names, .values = addresses, .sender = sender});
 }
 
 template <typename... Values>

@@ -76,6 +76,8 @@
 #include "type/XmlText.h"
 #include "type/XmlWriteOptions.h"
 
+#include "BuiltinsWritten.h"
+
 #include <cctype>
 #include <string>
 #include <string_view>
@@ -405,10 +407,7 @@ void Dialog::Open(std::string_view String, ::agiru::Variant &Variable1) {
 ::agiru::Integer Dialog::StrMenu(std::string_view OptionMembers,
                                  ::agiru::Integer DefaultNumber,
                                  std::string_view Instruction) {
-  static_cast<void>(OptionMembers);
-  static_cast<void>(DefaultNumber);
-  static_cast<void>(Instruction);
-  RefuseDoor("Dialog.StrMenu(Text, Integer, Text)");
+  return ::agiru::StrMenu(OptionMembers, DefaultNumber, Instruction);
 }
 
 void Dialog::Update(::agiru::Integer Number, const ::agiru::Variant &Value) {

@@ -246,7 +246,11 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 127> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 131> kElsewhere{{
+    {"dotnet::Uri", "dotnet/Uri.h"},
+    {"dotnet::UriPartial", "dotnet/Uri.h"},
+    {"dotnet::UriKind", "dotnet/Uri.h"},
+    {"dotnet::UriBuilder", "dotnet/Uri.h"},
     {"dotnet::Encoding", "dotnet/Encoding.h"},
     {"dotnet::UTF8Encoding", "dotnet/Encoding.h"},
     {"dotnet::UnicodeEncoding", "dotnet/Encoding.h"},

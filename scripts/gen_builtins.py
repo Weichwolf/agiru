@@ -1,4 +1,4 @@
-import sys, pathlib, re
+import sys, pathlib, re, subprocess
 
 # THE SCRIPT FINDS ITS OWN NEIGHBOURS AND ITS OWN ROOT. Both were absolute paths -- one into a
 # session's temporary directory, one into a checkout by name -- so this ran on exactly one machine
@@ -11,13 +11,23 @@ ROOT = HERE.parent
 
 
 def settle(path, text):
-    """Write only when the bytes differ.
+    """Write only when the FORMATTED bytes differ.
 
     An unconditional write changes the mtime, and clang's precompiled header compares MTIME rather
     than content: a rewrite that changes nothing still kills the PCH for the whole door and every
     ccache entry behind it, and a `make tree` running beside it loses its entire census to
     "file has been modified since the precompiled header was built".
+
+    The text is passed through clang-format first, because that is what `make` does to every file
+    that differs from HEAD: an unformatted write looked non-idempotent -- 349 lines gone, then
+    back on the next run -- and the gate that compared formatted output was suspected of being
+    blind (board:0698). The generator's output is what the tree will hold, or it is not comparable
+    with anything, including itself.
     """
+    formatted = subprocess.run(["clang-format", f"--assume-filename={path.name}"],
+                               input=text, capture_output=True, text=True, check=False)
+    if formatted.returncode == 0:
+        text = formatted.stdout
     if path.exists() and path.read_text() == text:
         return
     path.write_text(text)

@@ -123,6 +123,8 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit);
 
 bool IsPublisher(const al::ProcedureDecl &procedure);
 
+bool IsIsolatedPublisher(const al::ProcedureDecl &procedure);
+
 std::string RaisingBody(const al::ProcedureDecl &procedure,
                         std::string_view kind,
                         const std::string &objectId,

@@ -185,8 +185,15 @@ template <typename R> void ApplyDataItemView(R &record, std::string_view view) {
 }
 
 /// \brief `SetTableView(Record)` and the record `Report.Run(Number, ..., Record)` hands in: the
-///        record's filters join the dataitem's in filter group 2, the group the platform files a
-///        table view under (`record-filtergroup-method.md`), beside the `DataItemTableView`.
+///        record's filters join the dataitem's in the groups the caller set them, which is
+///        where the request page shows them; the `DataItemTableView` alone owns filter group 2,
+///        and a caller's group-2 filter lands in group 0 beside the rest.
+///
+/// \note THEY DO NOT JOIN GROUP 2, and that is a measurement: filed there, `ApplyDataItemView`
+///       replaced them with the dataitem's own view at the start of the walk, so `Get Source
+///       Documents` run for ONE purchase order made a receipt for every open order of the
+///       location -- and the put-away that followed met a full bin (`SCM Available to Pick UT`,
+///       23 cases asking to exceed a bin's capacity, 2026-09-11).
 /// \param to   The dataitem's record.
 /// \param from The caller's record of the same table.
 void AdoptTableView(void *to, const void *from);

@@ -5,6 +5,7 @@
 #include "runtime/Events.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
+#include "runtime/test/Handlers.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"
 #include "type/Char.h"
@@ -1463,6 +1464,23 @@ Confirm(std::string_view String, ::agiru::Boolean Default, const Values &...valu
   ::agiru::Boolean reply = Default;
   if (::agiru::AnsweredByHandler(0, asked, &reply)) { return reply; }
   throw ::agiru::Error(std::string("Confirm(") + asked + ") needs a running UI (board:0030)");
+}
+
+/// \brief AL `Dialog.StrMenu(OptionString [, DefaultNumber [, Instruction]])`. Shows a menu of
+///        the comma-separated options and answers the number chosen, 0 for cancel
+///        (`dialog-strmenu-method.md`).
+/// \param OptionMembers The options, comma-separated.
+/// \param DefaultNumber The option the menu opens on; 1 by default.
+/// \param Instruction The text above the menu.
+/// \return The chosen number.
+/// \throws Error when no `[StrMenuHandler]` answers -- a menu needs a running UI (board:0030).
+inline ::agiru::Integer StrMenu(std::string_view OptionMembers,
+                                ::agiru::Integer DefaultNumber = 1,
+                                std::string_view Instruction = {}) {
+  ::agiru::StrMenuAnswer answer{.instruction = Instruction, .choice = DefaultNumber};
+  if (::agiru::AnsweredByHandler(2, OptionMembers, &answer)) { return answer.choice; }
+  throw ::agiru::Error(std::string("StrMenu(") + std::string(OptionMembers) +
+                       ") needs a running UI (board:0030)");
 }
 
 /// \brief AL `Dialog.Confirm(Text)` -- the one-argument form.

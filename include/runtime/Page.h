@@ -214,6 +214,16 @@ template <typename P> void AfterGetRecord(P &page) {
   if constexpr (requires { page.OnAfterGetCurrRecord(); }) { page.OnAfterGetCurrRecord(); }
 }
 
+/// \brief Starts a new record on a page the way the platform does: the page notes it, then
+///        `OnNewRecord` runs.
+/// \tparam P The generated page class.
+/// \param page The page, whose `Rec` was just initialised.
+/// \param belowXRec What `OnNewRecord` is told.
+template <typename P> void StartNewRecord(P &page, bool belowXRec) {
+  page.StartedNewRecord();
+  if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(belowXRec); }
+}
+
 /// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
 ///        with `OnNewRecord`), `OnOpenPage`, then the after-get triggers.
 /// \note THE RECORD `Page.Run(Rec)` PASSED IS THE ONE SHOWN, when it exists in the set:
@@ -241,17 +251,24 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
                                   PageTraits<P>::kPage.sourceTableView,
                                   true);
       }
-      if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(false); }
+      StartNewRecord(page, false);
     } else {
       if constexpr (requires { PageTraits<P>::kPage; }) {
         detail::ApplyPageView(static_cast<void *>(&page.Rec),
                               TableTraits<Source>::kTable,
                               PageTraits<P>::kPage.sourceTableView);
       }
-      found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
     }
   }
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    if (!isNew) {
+      using Source = std::remove_cvref_t<decltype(page.Rec)>;
+      auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
+      found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
+    }
+  }
+  if (found) { page.LandedOnRecord(); }
   if (found || isNew) { AfterGetRecord(page); }
 }
 
@@ -793,6 +810,11 @@ public:
     throw Error("Page.PromptMode(PromptMode) needs a running UI (board:0030)");
   }
 
+  /// \note A PAGE ON NO RECORD SAVES NOTHING. `page-saverecord-method.md` says "if the record does
+  ///       not exist it is inserted, otherwise it is modified" -- of the CURRENT record, and an
+  ///       empty list has none: `Price Worksheet` calls `CurrPage.SaveRecord()` from its
+  ///       `OnOpenPage`, and inserting the blank row there put a `("", 1)` worksheet line in the
+  ///       way of the copy that followed (`Suggest Price Lines UT`, 12 cases; board:0705).
   /// \brief AL `Page.SaveRecord()`. Saves the current record as if performed by the client. If the
   /// record does not exist it is inserted, otherwise it is modified.
   /// \throws Error until the UI runs (board:0030).
@@ -807,13 +829,22 @@ public:
       Source probe = rec;
       if (static_cast<typename Source::Platform_Half &>(probe).Find("=")) {
         rec.Modify(true);
-      } else {
-        rec.Insert(true);
+        return;
       }
+      if (!newRecord_) { return; }
+      rec.Insert(true);
+      newRecord_ = false;
     } else {
       throw Error("Page.SaveRecord(): the page has no source table");
     }
   }
+
+  /// \brief The runner says the page stands on a NEW record -- `OnNewRecord` is about to run --
+  ///        which is the one `SaveRecord` inserts.
+  void StartedNewRecord() { newRecord_ = true; }
+
+  /// \brief The runner says the page landed on an existing record.
+  void LandedOnRecord() { newRecord_ = false; }
 
   /// \brief AL `Page.SetBackgroundTaskResult(Dictionary of [Text, Text])`. Sets the page background
   /// task result as a dictionary. When the task is completed, the OnPageBackgroundCompleted trigger
@@ -907,6 +938,7 @@ public:
 private:
   bool editable_ = true;
   bool modal_ = false;
+  bool newRecord_ = false;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
   std::string caption_;
   ::agiru::Boolean lookupMode_ = false;

@@ -168,9 +168,11 @@ void TheLengthPadsANumberOnTheLeftAndTextOnTheRight() {
 // A HALF-UNDERSTOOD SPECIFICATION IS THE DEFECT THIS REFUSES TO BE. An element that is not
 // rendered names itself, so the failure says which one rather than producing a plausible string.
 void AnElementThatIsNotRenderedNamesItself() {
-  const std::string said =
-      Raised([] { return Format(Variant{kExampleDate}, 0, "<Month Text,3>"); });
-  CHECK_TRUE("the refusal names the element", said.find("<month text>") != std::string::npos);
+  const std::string said = Raised([] { return Format(Variant{kExampleDate}, 0, "<Closing>"); });
+  CHECK_TRUE("the refusal names the element", said.find("<closing>") != std::string::npos);
+  CHECK_TEXT("Month Text and Weekday Text are the English names, the former cut to a width",
+             Format(Variant{kExampleDate}, 0, "<Month Text,3> <Day> <Weekday Text>"),
+             "Apr 5 Monday");
   const std::string number =
       Raised([] { return Format(Variant{agiru::Integer{1}}, 0, kUntabulatedFormat); });
   CHECK_TRUE("and an untabulated standard format names its number",

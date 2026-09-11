@@ -180,7 +180,7 @@ public:
       detail::SeedFromFilters(
           static_cast<void *>(&Record_()), RecordTraits_().kTable, PopulateAllFields_());
       newRecord_ = true;
-      if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { Page_().OnNewRecord(false); }
+      detail::StartNewRecord(Page_(), false);
       detail::AfterGetRecord(Page_());
     } else {
       Unopened_();
@@ -460,10 +460,33 @@ public:
 
   [[nodiscard]] Boolean ControlVisible(std::string_view control) const override {
     AttachedForReading_();
-    if (const auto computed = Computed_(control, &ControlTrigger<P>::visible); computed) {
-      return *computed;
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      const int within = VisibleWithin_(PageTraits<P>::kPage.layout, control);
+      if (within >= 0) { return within == 1; }
+      const int action = VisibleWithin_(PageTraits<P>::kPage.actions, control);
+      if (action >= 0) { return action == 1; }
     }
-    const ControlDef *def = ControlNamed_(control);
+    return OwnVisible_(control, ControlNamed_(control));
+  }
+
+  /// A control is visible when it is and every container above it is; the client shows nothing
+  /// of a hidden group. Returns 1 for visible, 0 for hidden, -1 when the name is not here.
+  [[nodiscard]] int VisibleWithin_(std::span<const ControlDef> controls,
+                                   std::string_view name) const {
+    for (const ControlDef &control : controls) {
+      if (SameWord_(control.name, name)) { return OwnVisible_(control.name, &control) ? 1 : 0; }
+      const int below = VisibleWithin_(control.children, name);
+      if (below < 0) { continue; }
+      if (below == 0) { return 0; }
+      return OwnVisible_(control.name, &control) ? 1 : 0;
+    }
+    return -1;
+  }
+
+  [[nodiscard]] bool OwnVisible_(std::string_view name, const ControlDef *def) const {
+    if (const auto computed = Computed_(name, &ControlTrigger<P>::visible); computed) {
+      return static_cast<bool>(*computed);
+    }
     return def == nullptr || !SameWord_(def->visible, "false");
   }
 
@@ -639,13 +662,14 @@ private:
         }
         if (newRecord_) { return; }
         if (static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst())) {
+          page_->LandedOnRecord();
           detail::AfterGetRecord(*page_);
           return;
         }
         detail::SeedFromFilters(
             static_cast<void *>(&page_->Rec), RecordTraits_().kTable, PopulateAllFields_());
         newRecord_ = true;
-        if constexpr (requires { Page_().OnNewRecord(Boolean{}); }) { page_->OnNewRecord(false); }
+        detail::StartNewRecord(*page_, false);
       }
     }
   }
@@ -745,7 +769,10 @@ private:
       Relink_();
       newRecord_ = false;
       const bool found = step(Record_());
-      if (found) { detail::AfterGetRecord(Page_()); }
+      if (found) {
+        Page_().LandedOnRecord();
+        detail::AfterGetRecord(Page_());
+      }
       return found;
     } else {
       static_cast<void>(step);

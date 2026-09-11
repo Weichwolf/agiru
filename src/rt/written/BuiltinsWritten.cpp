@@ -229,6 +229,33 @@ bool IsTimeElement(std::string_view name) {
   return name == "hours24" || name == "minutes" || name == "seconds";
 }
 
+std::string DateText(const ::agiru::Variant &Value, const Token &token) {
+  if (!Value.Is<Date>()) { throw Error("Format: a date text element wants a date"); }
+  static constexpr std::array<std::string_view, 12> kMonths{"January",
+                                                            "February",
+                                                            "March",
+                                                            "April",
+                                                            "May",
+                                                            "June",
+                                                            "July",
+                                                            "August",
+                                                            "September",
+                                                            "October",
+                                                            "November",
+                                                            "December"};
+  static constexpr std::array<std::string_view, 7> kWeekdays{
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+  const Date held = Value.Get<Date>();
+  if (held.IsUndefined()) { return {}; }
+  const std::string_view name = token.name == "month text"
+                                    ? kMonths[static_cast<std::size_t>(held.Month() - 1)]
+                                    : kWeekdays[static_cast<std::size_t>(held.DayOfWeek() - 1)];
+  const std::int32_t width = Number(token.argument);
+  return width > 0 && static_cast<std::size_t>(width) < name.size()
+             ? std::string(name.substr(0, static_cast<std::size_t>(width)))
+             : std::string(name);
+}
+
 std::string DateElement(const ::agiru::Variant &Value, const Token &token, char filler) {
   if (!Value.Is<Date>()) { throw Error("Format: a date element wants a date"); }
   const Date held = Value.Get<Date>();
@@ -309,6 +336,7 @@ SpecToken(const ::agiru::Variant &Value, const Token &token, char filler, const 
     return Rendered(Value, Number(token.argument));
   }
   if (IsDateElement(token.name)) { return DateElement(Value, token, filler); }
+  if (token.name == "month text" || token.name == "weekday text") { return DateText(Value, token); }
   if (IsTimeElement(token.name)) { return TimeElement(Value, token, filler); }
   throw Error("Format: the format element <" + token.name +
               "> is declared by devenv-format-property.md and not implemented yet (board:0007)");

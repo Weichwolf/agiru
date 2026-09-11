@@ -4,6 +4,8 @@
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 
+#include "Subscribers.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
@@ -50,8 +52,13 @@ struct Automatic {
   ~Automatic() { catalogue->Free(instance); }
 };
 
-void *AutomaticInstance(const SubscriptionCatalogue &catalogue) {
+std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &Made() {
   thread_local std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> made;
+  return made;
+}
+
+void *AutomaticInstance(const SubscriptionCatalogue &catalogue) {
+  std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &made = Made();
   auto found = made.find(&catalogue);
   if (found == made.end()) {
     found =
@@ -187,6 +194,10 @@ void RaiseIsolated(EventObject kind,
                    std::string_view element,
                    const EventArgs &args) {
   Dispatch(kind, objectId, objectName, event, element, args, true);
+}
+
+void ReleaseAutomaticInstances() {
+  Made().clear();
 }
 
 bool BindSubscriptions(CodeunitId id, void *instance) {

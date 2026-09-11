@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "type/Integer.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -33,6 +34,13 @@ enum class HandlerKind : std::uint8_t {
   RecallNotification, ///< `[RecallNotificationHandler]` -- a notification being recalled.
   Session,            ///< `[SessionSettingsHandler]` -- a session-settings dialog.
   HttpClient,         ///< `[HttpClientHandler]` -- an outbound request.
+};
+
+/// \brief What a `[StrMenuHandler]` is handed: the instruction beside the options the thunk's
+///        text carries, and where the chosen number goes.
+struct StrMenuAnswer {
+  std::string_view instruction; ///< The `Instruction` text.
+  ::agiru::Integer choice;      ///< In: the default; out: what the handler chose.
 };
 
 /// \brief What every handler thunk looks like from the outside.
