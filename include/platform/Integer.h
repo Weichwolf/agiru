@@ -90,6 +90,7 @@ inline constexpr TableDef kIntegerTable{
     .caption = Integer::kName,
     .fields = kIntegerFields,
     .keys = kIntegerKeys,
+    .sequenceField = Integer::Field_No::Number,
 };
 
 }

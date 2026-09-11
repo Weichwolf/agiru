@@ -38,7 +38,7 @@ const RecordState *PeekOf(const void *record) {
 }
 
 std::string SelectFrom(const Selection &made, const TableDef &table) {
-  std::string sql = "SELECT " + Columns(table) + " FROM " + Name(table);
+  std::string sql = "SELECT " + Columns(table) + " FROM " + made.from;
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
   if (!made.order.empty()) { sql += " ORDER BY " + made.order; }
   return sql;
@@ -100,7 +100,7 @@ void Compare(Selection &made, const TableDef &table, const void *record, std::st
 }
 
 bool ReadOne(void *record, const TableDef &table, const Selection &made, const std::string &order) {
-  std::string sql = "SELECT " + Columns(table) + " FROM " + Name(table);
+  std::string sql = "SELECT " + Columns(table) + " FROM " + made.from;
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
   if (!order.empty()) { sql += " ORDER BY " + order; }
   sql += " LIMIT 1";
@@ -198,7 +198,7 @@ std::int32_t RuntimeCount(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempCount(const_cast<void *>(record), table); }
 
   const Selection made = Select(PeekOf(record), table);
-  std::string sql = "SELECT count(*) FROM " + Name(table);
+  std::string sql = "SELECT count(*) FROM " + made.from;
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
   const Result result = Session::Current().Database().Execute(sql, made.binds);
   if (result.Rows() == 0) { return 0; }
@@ -210,7 +210,7 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempIsEmpty(const_cast<void *>(record), table); }
 
   const Selection made = Select(PeekOf(record), table);
-  std::string sql = "SELECT 1 FROM " + Name(table);
+  std::string sql = "SELECT 1 FROM " + made.from;
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
   sql += " LIMIT 1";
   return Session::Current().Database().Execute(sql, made.binds).Rows() == 0;

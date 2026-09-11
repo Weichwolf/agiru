@@ -422,6 +422,26 @@ bool RuntimeIsEmpty(const void *record, const TableDef &table);
 /// \return How many rows went.
 std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
 
+/// \brief The address of the RECORD a source names.
+///
+/// \tparam Source The source's type: a record, or a handle that holds one.
+/// \param from The source.
+/// \return The record's own address.
+///
+/// \note AN `Instance<T>` IS NOT ITS RECORD, AND IT CARRIES THE TABLE'S TRAITS. A codeunit that
+///       holds a record by handle (board:0018) declares what its table declares, so
+///       `Other.TransferFields(Held)` compiles with the handle's own address and reads a field
+///       table against a pointer holder -- garbage, and a `bad_alloc` on the first text field
+///       (11 UT cases, measured 2026-09-11). Every runtime entry that takes a source record's
+///       address goes through here.
+template <typename Source> [[nodiscard]] const void *RecordAddress(const Source &from) {
+  if constexpr (requires { from.operator->(); }) {
+    return from.operator->();
+  } else {
+    return &from;
+  }
+}
+
 /// \brief AL `Record.TransferFields` -- copies by field NUMBER between two tables.
 ///
 /// \param into                 The destination record.
@@ -2095,7 +2115,7 @@ public:
                       Boolean SkipFieldsNotMatchingType = false) {
     detail::RuntimeTransferFields(Self(),
                                   TableTraits<Derived>::kTable,
-                                  &From,
+                                  detail::RecordAddress(From),
                                   TableTraits<Source>::kTable,
                                   InitPrimaryKeyFields,
                                   SkipFieldsNotMatchingType);

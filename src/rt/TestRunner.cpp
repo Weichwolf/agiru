@@ -7,16 +7,41 @@
 #include "type/TransactionModel.h"
 
 #include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <exception>
 #include <mutex>
+#include <new>
+#include <print>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include <execinfo.h>
+#include <unistd.h>
+
 namespace agiru {
 
 namespace {
+
+void TracedAllocationFailure_() {
+  std::println(stderr, "out of memory at:");
+  std::array<void *, 64> frames{};
+  const int depth = backtrace(frames.data(), static_cast<int>(frames.size()));
+  backtrace_symbols_fd(frames.data(), depth, STDERR_FILENO);
+  std::set_new_handler(nullptr);
+  throw std::bad_alloc();
+}
+
+void TraceAllocationFailures_() {
+  static std::once_flag once;
+  std::call_once(once, [] {
+    if (std::getenv("AGIRU_TRACE_ERRORS") != nullptr) {
+      std::set_new_handler(&TracedAllocationFailure_);
+    }
+  });
+}
 
 std::vector<const TestCatalogue *> &Registered() {
   static std::vector<const TestCatalogue *> registered;
@@ -55,6 +80,7 @@ struct Driven {
 };
 
 TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void *instance) {
+  TraceAllocationFailures_();
   detail::Scope scope;
   HandlerTable::Install(codeunit.Handlers(), method.handlers);
   try {

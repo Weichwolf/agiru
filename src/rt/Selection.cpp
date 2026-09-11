@@ -9,6 +9,8 @@
 #include "Where.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -48,6 +50,45 @@ std::vector<FieldNo> OrderedBy(const RecordState *state, const TableDef &table) 
     if (std::ranges::find(named, no) == named.end()) { named.push_back(no); }
   }
   return named;
+}
+
+constexpr Interval kSeriesDomain{.low = -1000000000, .high = 1000000000};
+
+constexpr std::int64_t kSeriesLimit = 1000000;
+
+Intervals Both(const Intervals &left, const Intervals &right) {
+  Intervals both;
+  for (const Interval &one : left) {
+    for (const Interval &other : right) {
+      const std::int64_t low = std::max(one.low, other.low);
+      const std::int64_t high = std::min(one.high, other.high);
+      if (low <= high) { both.push_back(Interval{.low = low, .high = high}); }
+    }
+  }
+  return both;
+}
+
+std::string Series(const RecordState *state, const TableDef &table) {
+  const FieldDef &field = FieldOf(table, table.sequenceField);
+  Intervals admitted{{kSeriesDomain}};
+  if (state == nullptr) { return {}; }
+  for (const FieldFilter &filter : state->filters) {
+    if (filter.field != table.sequenceField) { continue; }
+    const std::optional<Intervals> one = IntegerIntervals(ParseFilter(filter.text), kSeriesDomain);
+    if (!one.has_value()) { return {}; }
+    admitted = Both(admitted, *one);
+  }
+  if (admitted.empty() || CountOf(admitted) > kSeriesLimit) { return {}; }
+  for (const Interval &one : admitted) {
+    if (one.low == kSeriesDomain.low || one.high == kSeriesDomain.high) { return {}; }
+  }
+  std::string series;
+  for (const Interval &one : admitted) {
+    if (!series.empty()) { series += " UNION ALL "; }
+    series += "SELECT g::int AS " + Quoted(field.name) + " FROM generate_series(" +
+              std::to_string(one.low) + ", " + std::to_string(one.high) + ") AS g";
+  }
+  return "(" + series + ") AS " + Quoted(table.name);
 }
 
 void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
@@ -102,6 +143,11 @@ bool Ascends(const RecordState *state, FieldNo no) {
 
 Selection Select(const RecordState *state, const TableDef &table) {
   Selection made;
+  made.from = Name(table);
+  if (table.sequenceField.Value() != 0) {
+    const std::string series = Series(state, table);
+    if (!series.empty()) { made.from = series; }
+  }
   Narrow(made, state, table);
   made.sorted = OrderedBy(state, table);
   for (const FieldNo no : made.sorted) {

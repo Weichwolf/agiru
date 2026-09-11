@@ -12,6 +12,7 @@
 namespace agiru::detail {
 
 struct Selection {
+  std::string from;
   std::string where;
   std::string order;
   std::vector<std::optional<std::string>> binds;

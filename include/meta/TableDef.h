@@ -445,6 +445,17 @@ struct TableDef {
 
   /// \brief The `ObsoleteState` property, as AL wrote it.
   std::string_view obsoleteState{};
+
+  /// \brief The field whose VALUES this table's rows are, for a table that is computed rather than
+  ///        stored; `0` for every stored table.
+  ///
+  /// \note A COMPUTED TABLE HAS NO ROWS UNTIL A FILTER NAMES THEM. AL writes
+  ///       `Integer.SetRange(Number, 1, N); Integer.FindSet` where C would say `for`, so the rows
+  ///       are the integers the filter admits and nothing is stored. A read on such a table is a
+  ///       series over the admitted intervals; a filter that admits the whole domain yields
+  ///       nothing, because an unbounded series is a loop AL ends with `CurrReport.Break` and this
+  ///       runtime has no such brake yet (board:0697).
+  FieldNo sequenceField{};
 };
 
 /// \brief Finds a field by its AL number.
