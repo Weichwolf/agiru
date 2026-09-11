@@ -1002,6 +1002,12 @@ private:
         scope_.MembersAreCalls(base.children.front().text)) {
       return Parens::First;
     }
+    if (base.kind == al::ExprKind::Index && !base.children.empty() &&
+        base.children.front().kind == al::ExprKind::Name && last.kind == al::ExprKind::Name &&
+        scope_.MemberIsCall(
+            OfVariable{.variable = base.children.front().text, .field = last.text})) {
+      return Parens::Last;
+    }
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
         base.children.back().kind == al::ExprKind::Name &&
         base.children.front().kind == al::ExprKind::Name &&
@@ -2070,6 +2076,10 @@ public:
     }
     const al::VarDecl *declared = DeclarationOf(member.variable);
     if (declared == nullptr) {
+      if (HasField(OfVariable{.variable = "Rec", .field = member.variable}) &&
+          DoorCalls(member.field)) {
+        return true;
+      }
       return !ControlOf(member.variable).empty() && DoorCalls(member.field);
     }
     const std::string type = TypeName(declared->type);

@@ -8045,10 +8045,13 @@ base/sales/document/report/PickInstruction.cpp
 base/sales/document/report/PickInstruction.def.cpp
 base/sales/document/report/ReturnOrderConfirmation.cpp
 base/sales/document/report/ReturnOrderConfirmation.def.cpp
+base/sales/document/report/StandardSalesDraftInvoice.cpp
 base/sales/document/report/StandardSalesDraftInvoice.def.cpp
+base/sales/document/report/StandardSalesOrderConf.cpp
 base/sales/document/report/StandardSalesOrderConf.def.cpp
 base/sales/document/report/StandardSalesProFormaInv.cpp
 base/sales/document/report/StandardSalesProFormaInv.def.cpp
+base/sales/document/report/StandardSalesQuote.cpp
 base/sales/document/report/StandardSalesQuote.def.cpp
 base/sales/document/report/WorkOrder.cpp
 base/sales/document/report/WorkOrder.def.cpp
@@ -8230,10 +8233,13 @@ base/sales/history/report/SalesReturnReceipt.cpp
 base/sales/history/report/SalesReturnReceipt.def.cpp
 base/sales/history/report/SalesShipment.cpp
 base/sales/history/report/SalesShipment.def.cpp
+base/sales/history/report/StandardSalesCreditMemo.cpp
 base/sales/history/report/StandardSalesCreditMemo.def.cpp
+base/sales/history/report/StandardSalesInvoice.cpp
 base/sales/history/report/StandardSalesInvoice.def.cpp
 base/sales/history/report/StandardSalesReturnRcpt.cpp
 base/sales/history/report/StandardSalesReturnRcpt.def.cpp
+base/sales/history/report/StandardSalesShipment.cpp
 base/sales/history/report/StandardSalesShipment.def.cpp
 base/sales/history/table/ReturnReceiptHeader.cpp
 base/sales/history/table/ReturnReceiptHeader.def.cpp
@@ -12555,6 +12561,7 @@ tests/core/codeunit/CFForecastWizardTests.cpp
 tests/core/codeunit/CFFrcstAzureAI.cpp
 tests/core/codeunit/ChangeGlobalDimBufferMgt.cpp
 tests/core/codeunit/ChartsTestALCharts.cpp
+tests/core/codeunit/CheckDimensionsOnPosting.cpp
 tests/core/codeunit/CheckDocumentNoUnitTest.cpp
 tests/core/codeunit/ChecklistInitializationTest.cpp
 tests/core/codeunit/CollectDotNextException.cpp
@@ -12567,6 +12574,7 @@ tests/core/codeunit/CompanyMetadataTest.cpp
 tests/core/codeunit/CompositeLayoutTests.cpp
 tests/core/codeunit/CopyLocationTestSubscriber.cpp
 tests/core/codeunit/CopyPhysInvtOrderUTREP.cpp
+tests/core/codeunit/CopyPriceDataTest.cpp
 tests/core/codeunit/CopyPurchSalesDocUT.cpp
 tests/core/codeunit/CopyWorkflowTests.cpp
 tests/core/codeunit/CorrCreditMemoNotifcation.cpp
@@ -12633,6 +12641,7 @@ tests/core/codeunit/DocBackgrErrorHandling.cpp
 tests/core/codeunit/DocSendingProfileCRUDTests.cpp
 tests/core/codeunit/DocumentApprovalDocuments.cpp
 tests/core/codeunit/DocumentApprovalErrors.cpp
+tests/core/codeunit/DocumentApprovalRequests.cpp
 tests/core/codeunit/DocumentApprovalUsers.cpp
 tests/core/codeunit/DocumentAttachmentTests.cpp
 tests/core/codeunit/DocumentNoVisibilityClearCache.cpp
@@ -12666,6 +12675,7 @@ tests/core/codeunit/ERMBankAccLedgerReversal.cpp
 tests/core/codeunit/ERMBankAccount.cpp
 tests/core/codeunit/ERMBankReconciliation.cpp
 tests/core/codeunit/ERMBaseCalendar.cpp
+tests/core/codeunit/ERMBatchJob.cpp
 tests/core/codeunit/ERMBatchJobII.cpp
 tests/core/codeunit/ERMBATTestForApplication.cpp
 tests/core/codeunit/ERMBudget.cpp
@@ -12760,6 +12770,7 @@ tests/core/codeunit/ERMFixedAssetsReports.cpp
 tests/core/codeunit/ERMFixedAssetsReportsII.cpp
 tests/core/codeunit/ERMFixedAssetsReportsIII.cpp
 tests/core/codeunit/ERMGeneralJournalUT.cpp
+tests/core/codeunit/ERMGenJnlErrorHandling.cpp
 tests/core/codeunit/ERMGenLinesForVendor.cpp
 tests/core/codeunit/ERMGLAccountWhereUsed.cpp
 tests/core/codeunit/ERMGLCurrencyRevaluation.cpp
@@ -12815,12 +12826,14 @@ tests/core/codeunit/ERMPurchaseBlanketOrder.cpp
 tests/core/codeunit/ERMPurchaseCreditMemo.cpp
 tests/core/codeunit/ERMPurchaseInvoice.cpp
 tests/core/codeunit/ERMPurchaseOrder.cpp
+tests/core/codeunit/ERMPurchasePayables.cpp
 tests/core/codeunit/ERMPurchasePrepayments.cpp
 tests/core/codeunit/ERMPurchaseQuote.cpp
 tests/core/codeunit/ERMPurchaseReports.cpp
 tests/core/codeunit/ERMPurchaseReportsIII.cpp
 tests/core/codeunit/ERMPurchaseSubform.cpp
 tests/core/codeunit/ERMPurchaseVATPostingGroup.cpp
+tests/core/codeunit/ERMPurchBatchPosting.cpp
 tests/core/codeunit/ERMPurchCrMemoAggrUT.cpp
 tests/core/codeunit/ERMPurchDocReports.cpp
 tests/core/codeunit/ERMPurchDocReportsII.cpp
@@ -12859,6 +12872,7 @@ tests/core/codeunit/ERMRSProcessData.cpp
 tests/core/codeunit/ERMRSQuestionnaire.cpp
 tests/core/codeunit/ERMRSRoleCenter.cpp
 tests/core/codeunit/ERMRSValidateAndApply.cpp
+tests/core/codeunit/ERMSalesBatchPosting.cpp
 tests/core/codeunit/ERMSalesBlanketOrder.cpp
 tests/core/codeunit/ERMSalesCrMemoAggrUT.cpp
 tests/core/codeunit/ERMSalesDocReports.cpp
@@ -12918,6 +12932,7 @@ tests/core/codeunit/ERMVendDateCompressManual.cpp
 tests/core/codeunit/ERMVendorDateCompression.cpp
 tests/core/codeunit/ERMVendorReversalMessage.cpp
 tests/core/codeunit/ERMVendorStatistics.cpp
+tests/core/codeunit/ErrorMessageHandling.cpp
 tests/core/codeunit/ErrorMessagePostingSetup.cpp
 tests/core/codeunit/ErrorMessageTests.cpp
 tests/core/codeunit/ExcelBufferTest.cpp
@@ -12935,6 +12950,7 @@ tests/core/codeunit/FieldStyleUnitTests.cpp
 tests/core/codeunit/FinReportExportHandler.cpp
 tests/core/codeunit/FixedAssetsPlanBasedE2E.cpp
 tests/core/codeunit/GeneralJournalBatchApproval.cpp
+tests/core/codeunit/GeneralJournalLineApproval.cpp
 tests/core/codeunit/GenerateTestDataMgt.cpp
 tests/core/codeunit/GLAcctCategoriesPageTests.cpp
 tests/core/codeunit/GLAcctCategoryDemoData.cpp
@@ -12958,6 +12974,7 @@ tests/core/codeunit/ItemAvailByLotNoTests.cpp
 tests/core/codeunit/ItemBlockedTest.cpp
 tests/core/codeunit/ItemChargesPlanBasedE2E.cpp
 tests/core/codeunit/ItemCostingPlanBasedE2E.cpp
+tests/core/codeunit/ItemJnlErrorHandling.cpp
 tests/core/codeunit/ItemVariantBlockedTest.cpp
 tests/core/codeunit/JobArchiving.cpp
 tests/core/codeunit/JobBatchJobs.cpp
@@ -12970,6 +12987,7 @@ tests/core/codeunit/JobCreationWizardTests.cpp
 tests/core/codeunit/JobCustomerChangeTest.cpp
 tests/core/codeunit/JobInvoicing.cpp
 tests/core/codeunit/JobItemTracking.cpp
+tests/core/codeunit/JobJnlErrorHandling.cpp
 tests/core/codeunit/JobJournal.cpp
 tests/core/codeunit/JobOrderTracking.cpp
 tests/core/codeunit/JobPerformanceWIP.cpp
@@ -13268,7 +13286,9 @@ tests/core/codeunit/ProfileImportExportTest.cpp
 tests/core/codeunit/PurchaseDocuments.cpp
 tests/core/codeunit/PurchaseOverReceipt.cpp
 tests/core/codeunit/PurchaseQuotePlanBasedE2E.cpp
+tests/core/codeunit/PurchBatchDocumentPosting.cpp
 tests/core/codeunit/PurchCorrectCrMemo.cpp
+tests/core/codeunit/PurchDocumentPostingErrors.cpp
 tests/core/codeunit/PurchOrderWhseValidateLine.cpp
 tests/core/codeunit/RapidStartNotificationTests.cpp
 tests/core/codeunit/RapidStartWarningPageUT.cpp
@@ -13297,6 +13317,7 @@ tests/core/codeunit/ReportSettings.cpp
 tests/core/codeunit/RepSelectionsStdStmt.cpp
 tests/core/codeunit/ReservOrderPromisingE2E.cpp
 tests/core/codeunit/ResetStateBeforeTestRun.cpp
+tests/core/codeunit/ResJnlErrorHandling.cpp
 tests/core/codeunit/ResolvingCaptionClass.cpp
 tests/core/codeunit/ResourceBatchJobs.cpp
 tests/core/codeunit/ResourceEmployee.cpp
@@ -13314,8 +13335,10 @@ tests/core/codeunit/RSTableInfoTelemetryTest.cpp
 tests/core/codeunit/RTCAdmin_User_PermissionSet.cpp
 tests/core/codeunit/RunPerformanceTestPDF.cpp
 tests/core/codeunit/SaaSLoginTest.cpp
+tests/core/codeunit/SalesBatchDocumentPosting.cpp
 tests/core/codeunit/SalesCalcDiscountTest.cpp
 tests/core/codeunit/SalesCorrectCrMemo.cpp
+tests/core/codeunit/SalesDocumentPostingErrors.cpp
 tests/core/codeunit/SalesE2E.cpp
 tests/core/codeunit/SalesOrderWhseValidateLine.cpp
 tests/core/codeunit/SalesTax.cpp
@@ -13545,6 +13568,7 @@ tests/core/codeunit/TestProxyNotificationMgt.cpp
 tests/core/codeunit/TestProxyNotifMgtExt.cpp
 tests/core/codeunit/TestPurchasePreview.cpp
 tests/core/codeunit/TestREDSetupGenJnl.cpp
+tests/core/codeunit/TestReportLayoutSelection.cpp
 tests/core/codeunit/TestReportRequestFailure.cpp
 tests/core/codeunit/TestReportSaveAs.cpp
 tests/core/codeunit/TestRetenPolDocArch.cpp
