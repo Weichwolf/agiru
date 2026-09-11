@@ -1439,6 +1439,21 @@ void NoteOptions(const std::vector<agiru::al::VarDecl> &variables,
   }
 }
 
+void NoteControlOptions(const std::vector<agiru::al::PageControl> &controls, OptionsInScope &into) {
+  for (const agiru::al::PageControl &control : controls) {
+    NoteOptions({}, control.triggers, into);
+    NoteControlOptions(control.children, into);
+  }
+}
+
+void NoteObjectOptions(const agiru::al::PageObject &object, OptionsInScope &into) {
+  NoteOptions(object.variables, object.procedures, into);
+  NoteControlOptions(object.layout, into);
+  NoteControlOptions(object.actions, into);
+  NoteControlOptions(object.views, into);
+  NoteControlOptions(object.dataset, into);
+}
+
 void NoteFieldEnums(const agiru::al::TableObject &table,
                     const agiru::gen::EnumIndex &enums,
                     agiru::gen::FieldEnums &into) {
@@ -2443,13 +2458,13 @@ int Scan(const Job &job) {
       }
     }
     for (const agiru::al::PageObject &page : parsed.objects) {
-      NoteOptions(page.variables, page.procedures, gathered.options);
+      NoteObjectOptions(page, gathered.options);
     }
     for (const agiru::al::PageObject &report : parsedReports.objects) {
-      NoteOptions(report.variables, report.procedures, gathered.options);
+      NoteObjectOptions(report, gathered.options);
     }
     for (const agiru::al::PageObject &port : parsedXmlPorts.objects) {
-      NoteOptions(port.variables, port.procedures, gathered.options);
+      NoteObjectOptions(port, gathered.options);
     }
     WriteEnums(run, heldEnums, objects);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);

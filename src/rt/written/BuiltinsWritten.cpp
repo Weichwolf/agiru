@@ -145,7 +145,9 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
   if (const ::agiru::RecordInVariant *held = Value.HeldRecord(); held != nullptr) {
     return held->id.ToText();
   }
-  throw Error("Format: this Variant holds a value with no text form yet");
+  if (Value.Is<Blob>()) { return {}; }
+  throw Error(std::string("Format: a Variant holding ") + Value.HeldName() +
+              " has no text form yet");
 }
 
 std::string Fitted(std::string rendered, ::agiru::Integer Length, bool numeric, char filler) {

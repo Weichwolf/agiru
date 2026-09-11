@@ -1278,6 +1278,14 @@ public:
     return held != nullptr && held->ordinal == other.AsInteger();
   }
 
+  /// \brief The AL name of the type this Variant holds.
+  /// \return `"Integer"`, `"Record"`, `"Codeunit"`, ... ; `"nothing"` for an empty Variant.
+  ///
+  /// \note A REFUSAL THAT NAMES WHAT IT REFUSED IS A DIAGNOSIS. `Format` over a Variant it cannot
+  ///       render used to say "a value with no text form yet", which names the gap and not the
+  ///       case; the next reader had to instrument the runtime to learn which alternative it was.
+  [[nodiscard]] std::string_view HeldName() const;
+
 private:
   [[noreturn]] void Refuse(const char *wanted) const;
 

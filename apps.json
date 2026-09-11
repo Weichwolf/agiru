@@ -78,6 +78,15 @@
       ]
     },
     {
+      "name": "peppol",
+      "source": "Apps/W1/PEPPOL/App",
+      "depends": [
+        "system",
+        "foundation",
+        "base"
+      ]
+    },
+    {
       "name": "tests",
       "source": "Layers/W1/Tests",
       "depends": [
@@ -88,7 +97,8 @@
         "permissions_mock",
         "test_runner",
         "system_test_library",
-        "foundation_test_library"
+        "foundation_test_library",
+        "peppol"
       ]
     }
   ]

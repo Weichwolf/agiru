@@ -1310,6 +1310,10 @@ private:
                              walk->children.front().kind == al::ExprKind::Name &&
                              scope_.ReturnsAHandle(walk->children.front().text)) ||
                             MemberCallReturnsAHandle(*walk));
+    const bool throughThis = spelling == "." && walk->kind == al::ExprKind::Name &&
+                             SameName(walk->text, "this") && chain.size() >= 2 &&
+                             chain.back()->kind == al::ExprKind::Name &&
+                             scope_.IsHandle(chain.back()->text);
     const Parens calls = Calls(spelling, *walk, *chain.front());
     std::string out = Expression(*walk, precedence);
     if (spelling == "||" && walk->kind == al::ExprKind::Binary && walk->text == "and") {
@@ -1320,7 +1324,7 @@ private:
       const bool here = i > 1 && Calls(spelling, base, *chain[i - 1]) == Parens::Last;
       Link(out,
            {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
-           {.arrow = handle && i == chain.size(),
+           {.arrow = (handle && i == chain.size()) || (throughThis && i + 1 == chain.size()),
             .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
                       (!asCallee || i != 1),
             .precedence = precedence,

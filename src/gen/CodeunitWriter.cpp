@@ -918,6 +918,11 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
     }
   }
   const auto reach = [&](const al::VarDecl &declared) { Reaching(declared, objects, headers); };
+  const auto reachWhole = [&](const al::VarDecl &declared) {
+    if (declared.byReference || !NamesAnObject(declared)) { return; }
+    const TableRef *ref = Reach(declared, objects);
+    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+  };
   const auto reachEnum = [&](const std::string &subtype) {
     EnumHeader(objects.enums, subtype, headers);
   };
@@ -940,7 +945,10 @@ std::string Includes(const al::CodeunitObject &unit, const Objects &objects) {
   for (const al::VarDecl &declared : unit.variables) { reach(declared); }
   for (const al::VarDecl &declared : unit.variables) { both(declared); }
   for (const al::ProcedureDecl &procedure : unit.procedures) {
-    for (const al::VarDecl &declared : procedure.parameters) { both(declared); }
+    for (const al::VarDecl &declared : procedure.parameters) {
+      both(declared);
+      reachWhole(declared);
+    }
     for (const al::VarDecl &declared : procedure.variables) { both(declared); }
     both(procedure.returned);
     if (!procedure.returned.byReference) { reach(procedure.returned); }

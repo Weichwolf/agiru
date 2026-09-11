@@ -6,6 +6,53 @@
 
 namespace agiru {
 
+std::string_view Variant::HeldName() const {
+  return std::visit(
+      [](const auto &held) -> std::string_view {
+        using Held = std::remove_cvref_t<decltype(held)>;
+        if constexpr (std::same_as<Held, std::monostate>) {
+          return "nothing";
+        } else if constexpr (std::same_as<Held, Boolean>) {
+          return "Boolean";
+        } else if constexpr (std::same_as<Held, Integer>) {
+          return "Integer";
+        } else if constexpr (std::same_as<Held, BigInteger>) {
+          return "BigInteger";
+        } else if constexpr (std::same_as<Held, Decimal>) {
+          return "Decimal";
+        } else if constexpr (std::same_as<Held, std::string>) {
+          return "Text";
+        } else if constexpr (std::same_as<Held, Date>) {
+          return "Date";
+        } else if constexpr (std::same_as<Held, Time>) {
+          return "Time";
+        } else if constexpr (std::same_as<Held, DateTime>) {
+          return "DateTime";
+        } else if constexpr (std::same_as<Held, Duration>) {
+          return "Duration";
+        } else if constexpr (std::same_as<Held, Guid>) {
+          return "Guid";
+        } else if constexpr (std::same_as<Held, RecordId>) {
+          return "RecordId";
+        } else if constexpr (std::same_as<Held, DateFormula>) {
+          return "DateFormula";
+        } else if constexpr (std::same_as<Held, Blob>) {
+          return "Blob";
+        } else if constexpr (std::same_as<Held, OrdinalInVariant>) {
+          return "Option";
+        } else if constexpr (std::same_as<Held, RecordInVariant>) {
+          return "Record";
+        } else if constexpr (std::same_as<Held, RecordRefInVariant>) {
+          return "RecordRef";
+        } else if constexpr (std::same_as<Held, CodeunitInVariant>) {
+          return "Codeunit";
+        } else {
+          return "Xml";
+        }
+      },
+      held_);
+}
+
 std::string_view Variant::Rendered() const {
   rendered_ = std::visit(
       [](const auto &held) -> std::string {

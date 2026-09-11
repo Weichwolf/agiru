@@ -89,7 +89,7 @@ public:
   /// \param Standalone The AL `Text`.
   /// \return The AL `XmlDeclaration`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::XmlDeclaration
+  static ::agiru::XmlDeclaration
   Create(std::string_view Version, std::string_view Encoding, std::string_view Standalone);
 
   /// \brief AL `XmlDeclaration.Encoding(Text)`. Gets or sets the encoding of the XML document.

@@ -159,16 +159,14 @@ std::string ImplementationBodies(const al::EnumObject &object,
       cloneable.emplace_back(EnumeratorName(value.name), unit->second.identifier);
     }
     std::string fallback;
-    if (const al::Property *given = al::Find(object.properties, "DefaultImplementation");
-        given != nullptr) {
-      const std::size_t at = given->text.find('=');
-      if (at != std::string::npos) {
-        std::string named = given->text.substr(at + 1);
-        while (!named.empty() && named.front() == ' ') { named.erase(0, 1); }
-        while (!named.empty() && named.back() == ' ') { named.pop_back(); }
-        const auto unit = objects.codeunits.find(LowerKey(named));
-        if (unit != objects.codeunits.end()) { fallback = unit->second.identifier; }
-      }
+    for (const char *property : {"DefaultImplementation", "UnknownValueImplementation"}) {
+      if (!fallback.empty()) { break; }
+      const al::Property *given = al::Find(object.properties, property);
+      if (given == nullptr) { continue; }
+      const std::string named = ImplementationFor(given->text, face);
+      if (named.empty()) { continue; }
+      const auto unit = objects.codeunits.find(LowerKey(named));
+      if (unit != objects.codeunits.end()) { fallback = unit->second.identifier; }
     }
     out += fallback.empty() ? "    default: break;\n"
                             : "    default: return new " + fallback + "{};\n";
