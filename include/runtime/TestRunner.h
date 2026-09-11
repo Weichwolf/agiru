@@ -5,6 +5,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/TestPermissions.h"
+#include "type/Action.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Notification.h"
@@ -108,7 +109,17 @@ namespace detail {
 /// \return Never called; it exists for `decltype`.
 template <typename C, typename A> A &FirstParameterOf(void (C::*)(A &));
 
+/// \brief The same for a handler with two `var` parameters -- `(var Page: Page X; var Response:
+///        Action)`, the RAW-page form of a `[ModalPageHandler]`.
+/// \tparam C The codeunit. \tparam A The first parameter's type. \tparam B The second's.
+/// \return Never called; it exists for `decltype`.
+template <typename C, typename A, typename B> A &FirstParameterOf(void (C::*)(A &, B &));
+
 }
+
+/// \brief A generated page's declaration, which `runtime/Page.h` defines; named here so a handler
+///        taking a RAW page can be told from one taking a test page.
+template <typename T> struct PageTraits;
 
 /// \brief What a `[FilterPageHandler]` is handed: the filter page's first control as the
 ///        RecordRef the procedure declares `var`, and where its Boolean answer goes.
@@ -161,6 +172,19 @@ template <typename Codeunit, auto Method> void InvokeHandler(std::string_view te
   } else if constexpr (requires(::agiru::Notification &sent) { (codeunit.*Method)(sent); }) {
     static_cast<void>(text);
     static_cast<void>((codeunit.*Method)(*static_cast<::agiru::Notification *>(reply)));
+  } else if constexpr (requires {
+                         PageTraits<
+                             std::remove_cvref_t<decltype(detail::FirstParameterOf(Method))>>::kId;
+                         requires requires(
+                             std::remove_cvref_t<decltype(detail::FirstParameterOf(Method))> &page,
+                             ::agiru::Action &response) { (codeunit.*Method)(page, response); };
+                       }) {
+    static_cast<void>(text);
+    using Handled = std::remove_cvref_t<decltype(detail::FirstParameterOf(Method))>;
+    auto *page = static_cast<Handled *>(reply);
+    ::agiru::Action response = ::agiru::Action::OK;
+    (codeunit.*Method)(*page, response);
+    page->CloseWith(response);
   } else if constexpr (requires(::agiru::RecordRef &record) {
                          { (codeunit.*Method)(record) } -> std::convertible_to<::agiru::Boolean>;
                        }) {

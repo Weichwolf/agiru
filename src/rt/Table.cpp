@@ -621,6 +621,7 @@ void RuntimeInit(void *record, const TableDef &table) {
 
 void RuntimeClear(void *record, const TableDef &table) {
   Defaulted(record, table, false);
+  RuntimeReset(record);
 }
 
 namespace {

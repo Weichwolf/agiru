@@ -3462,7 +3462,9 @@ std::string WriteDefinitions(const al::PageObject &page,
     };
     const std::string format = LowerKey(text("Format", "Xml"));
     const std::string direction = LowerKey(text("Direction", "Both"));
-    const std::string encoding = LowerKey(text("TextEncoding", "MSDOS"));
+    const std::string encoding = format == "variabletext" || format == "fixedtext"
+                                     ? LowerKey(text("TextEncoding", "MSDOS"))
+                                     : LowerKey(text("Encoding", "UTF8"));
     const std::string rootName =
         page.dataset.empty() ? std::string{} : XmlNameOf(page.dataset.front());
     out += "namespace " + space + " {\n\nconstexpr XmlPortDef k" + identifier + "XmlPort{\n";
@@ -3479,10 +3481,11 @@ std::string WriteDefinitions(const al::PageObject &page,
                                                : "Both") +
            ",\n";
     out += "    .encoding = ::agiru::TextEncoding::" +
-           std::string(encoding == "utf8"      ? "UTF8"
-                       : encoding == "utf16"   ? "UTF16"
-                       : encoding == "windows" ? "Windows"
-                                               : "MSDos") +
+           std::string(encoding == "utf8"       ? "UTF8"
+                       : encoding == "utf16"    ? "UTF16"
+                       : encoding == "windows"  ? "Windows"
+                       : encoding == "iso88592" ? "Windows"
+                                                : "MSDos") +
            ",\n";
     out += "    .fieldSeparator = " + Literal(text("FieldSeparator", "<,>")) + ",\n";
     out += "    .recordSeparator = " + Literal(text("RecordSeparator", "<NewLine>")) + ",\n";

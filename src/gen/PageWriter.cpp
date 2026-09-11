@@ -194,6 +194,20 @@ VariableSource(const al::PageControl &control, const al::PageObject &page, const
     }
     return {};
   }
+  if (LowerKey(control.kind) == "field" && control.source.size() == 4 &&
+      control.source[0].kind == al::TokenKind::Identifier && control.source[1].text == "[" &&
+      control.source[2].kind == al::TokenKind::Integer && control.source[3].text == "]") {
+    for (const al::VarDecl &declared : page.variables) {
+      if (LowerKey(declared.name) != LowerKey(control.source[0].text) ||
+          declared.dimensions.empty() || TypeName(declared.type) == "Record" ||
+          TypeName(declared.type) == "Codeunit") {
+        continue;
+      }
+      return PageVariableIdentifier(page, declared.name) + ".operator[](" + control.source[2].text +
+             ")";
+    }
+    return {};
+  }
   if (LowerKey(control.kind) != "field" || control.source.size() != 1 ||
       control.source.front().kind != al::TokenKind::Identifier) {
     return {};

@@ -1740,6 +1740,10 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     out += "void " + unitClass + "::ClearAll() {\n";
     for (const al::VarDecl &declared : unit.variables) {
       const std::string named = Identifier(declared.name);
+      if (TypeName(declared.type) == "Record") {
+        out += "  ::agiru::Clear(" + named + ");\n";
+        continue;
+      }
       out += "  ";
       out += named;
       out += " = decltype(";

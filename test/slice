@@ -14155,3 +14155,34 @@ tests/system/test/tooling/codeunit/BCPTWarehouseTasks.cpp
 tests/test/foundation/no_series/codeunit/NoSeriesCheckTests.cpp
 # THE SLICE: the generated sources that compile and are LINKED INTO `agiru`, so that
 # whole point of naming them rather than globbing whatever happens to work.
+base/integration/dataverse/codeunit/CDSIntegrationImpl.cpp
+tests/core/codeunit/AllProfileV2Test.cpp
+tests/core/codeunit/DimFilterUnitTests.cpp
+tests/core/codeunit/ERMCostAccountingPages.cpp
+tests/core/codeunit/ERMCustomerStatistics.cpp
+tests/core/codeunit/ERMInsertStdPurchLines.cpp
+tests/core/codeunit/ERMPmtTolMultiDocCustomer.cpp
+tests/core/codeunit/ERMRSWizardWorksheet.cpp
+tests/core/codeunit/ERMSalesDocumentsII.cpp
+tests/core/codeunit/ERMVATSalesPurchase.cpp
+tests/core/codeunit/ERMVendorPmtTolWithWrning.cpp
+tests/core/codeunit/JobsStockout.cpp
+tests/core/codeunit/O365PurchCodeTypeLkupTest.cpp
+tests/core/codeunit/O365SalesCodeTypeLkupTest.cpp
+tests/core/codeunit/O365SimplifyUISalesInvoice.cpp
+tests/core/codeunit/PaymentServicesTest.cpp
+tests/core/codeunit/PayrollImportGenJnlTest.cpp
+tests/core/codeunit/ReminderAutomationTests.cpp
+tests/core/codeunit/ReportLayoutsTest.cpp
+tests/core/codeunit/SalesStockout.cpp
+tests/core/codeunit/SCMOrderPromising.cpp
+tests/core/codeunit/SCMReservation.cpp
+tests/core/codeunit/SCMWarehouseVII.cpp
+tests/core/codeunit/ServiceMgmtPlanBasedE2E.cpp
+tests/core/codeunit/TestMergeDuplicates.cpp
+tests/core/codeunit/UserRoleTest.cpp
+tests/manufacturing/test/codeunit/SCMProductionOrders.cpp
+tests/service/test/codeunit/ServiceItemAvailability.cpp
+tests/service/test/codeunit/ServiceOrderManagement.cpp
+tests/service/test/codeunit/ServiceOrders.cpp
+tests/service/test/codeunit/ServiceStockout.cpp
