@@ -21,6 +21,7 @@ agiru::gen::Objects Tables() {
                                       {"customer no.", "CustomerNo"},
                                       {"amount", "Amount"}},
                            .procedures = {},
+                           .parts = {},
                            .name = {},
                            .dataItems = {},
                            .requestFields = {},
@@ -106,29 +107,40 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
   const agiru::gen::Objects objects = Tables();
   const agiru::gen::PageHeader header =
       agiru::gen::WritePage(port, "Inventory/Counting/ExportSomeLines.XmlPort.al", objects);
-  CHECK_TRUE("the class derives from XmlPort",
-             Has(header.text, "class ExportSomeLines_XmlPort : public XmlPort<ExportSomeLines_XmlPort>"));
-  CHECK_TRUE("the table element is a temporary record member",
-             Has(header.text, "Instance<Temporary<::agiru::Sales::Receivables::CustLedgerEntry_Table>> SomeLine;"));
+  CHECK_TRUE(
+      "the class derives from XmlPort",
+      Has(header.text, "class ExportSomeLines_XmlPort : public XmlPort<ExportSomeLines_XmlPort>"));
+  CHECK_TRUE(
+      "the table element is a temporary record member",
+      Has(header.text,
+          "Instance<Temporary<::agiru::Sales::Receivables::CustLedgerEntry_Table>> SomeLine;"));
   CHECK_TRUE("the text element is a Text variable", Has(header.text, "::agiru::Text<0> Note;"));
   CHECK_TRUE("the walks are declared",
              Has(header.text, "void Export_();") && Has(header.text, "void Import_();"));
   CHECK_TRUE("the traits name the definition",
-             Has(header.text, "static constexpr const XmlPortDef &kPort = agiru::Inventory::Counting::kExportSomeLinesXmlPort;"));
+             Has(header.text,
+                 "static constexpr const XmlPortDef &kPort = "
+                 "agiru::Inventory::Counting::kExportSomeLinesXmlPort;"));
 
   const std::string source = agiru::gen::WriteSource(
       port, "Inventory/Counting/ExportSomeLines.XmlPort.al", objects, nullptr);
   CHECK_TRUE("a field trigger stands on the table element's record",
-             Has(source, "void ExportSomeLines_XmlPort::OnBeforePassFieldAmount() {\n  [[maybe_unused]] auto &Rec = *SomeLine.operator->();"));
+             Has(source,
+                 "void ExportSomeLines_XmlPort::OnBeforePassFieldAmount() {\n  [[maybe_unused]] "
+                 "auto &Rec = *SomeLine.operator->();"));
   CHECK_TRUE("and a bare field is the record's", Has(source, "Rec.Amount == 0"));
   CHECK_TRUE("Skip and BreakUnbound are the base's",
              Has(source, "(*this).Skip()") && Has(source, "(*this).BreakUnbound()"));
   CHECK_TRUE("the export opens the root group", Has(source, "Out_().BeginGroup(\"Root\");"));
   CHECK_TRUE("a record is a FindSet loop with OnAfterGetRecord",
-             Has(source, "if (Item_Block.FindSet()) {") && Has(source, "OnAfterGetRecordSomeLine();") &&
+             Has(source, "if (Item_Block.FindSet()) {") &&
+                 Has(source, "OnAfterGetRecordSomeLine();") &&
                  Has(source, "Out_().BeginRecord(\"SomeLine\");"));
   CHECK_TRUE("a field element writes the field formatted",
-             Has(source, "Out_().Value(\"EntryNo\", std::string(FormatsAsXml_() ? ::agiru::Format(SomeLine->EntryNo, 0, 9) : ::agiru::Format(SomeLine->EntryNo)), false, 0);"));
+             Has(source,
+                 "Out_().Value(\"EntryNo\", std::string(FormatsAsXml_() ? "
+                 "::agiru::Format(SomeLine->EntryNo, 0, 9) : ::agiru::Format(SomeLine->EntryNo)), "
+                 "false, 0);"));
   CHECK_TRUE("an unbound text element loops until BreakUnbound",
              Has(source, "OnBeforePassVariableNote();") &&
                  Has(source, "catch (const ::agiru::XmlPortBreakUnbound &) { break; }"));
@@ -136,7 +148,8 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
              Has(source, "catch (const ::agiru::XmlPortSkip &) {}") &&
                  Has(source, "catch (const ::agiru::XmlPortBreak &) {}"));
   CHECK_TRUE("the import reads records under the same names",
-             Has(source, "while (In_().Enter(\"SomeLine\")) {") && Has(source, "Item_Block.Init();"));
+             Has(source, "while (In_().Enter(\"SomeLine\")) {") &&
+                 Has(source, "Item_Block.Init();"));
   CHECK_TRUE("a field with FieldValidate = no is assigned, the other validated",
              Has(source, "SomeLine->EntryNo = Value_Block;") &&
                  Has(source, "SomeLine->Validate(SomeLine->Amount, Value_Block);"));

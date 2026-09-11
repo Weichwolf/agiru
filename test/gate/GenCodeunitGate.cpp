@@ -46,6 +46,7 @@ agiru::gen::Objects Tables() {
                            .header = "LineNumberBuffer.h",
                            .fields = {},
                            .procedures = {},
+                           .parts = {},
                            .name = {},
                            .dataItems = {},
                            .requestFields = {},

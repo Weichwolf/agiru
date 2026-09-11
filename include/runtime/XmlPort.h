@@ -62,9 +62,9 @@ struct XmlPortDef {
   XmlPortFormat format = XmlPortFormat::Xml;              ///< `Format`.
   XmlPortDirection direction = XmlPortDirection::Both;    ///< `Direction`.
   TextEncoding encoding = TextEncoding::MSDos;            ///< `TextEncoding`, MSDOS by default.
-  std::string_view fieldSeparator = "<TAB>";              ///< `FieldSeparator`.
+  std::string_view fieldSeparator = "<,>";                ///< `FieldSeparator`, a comma by default.
   std::string_view recordSeparator = "<NewLine>";         ///< `RecordSeparator`.
-  std::string_view fieldDelimiter = "<None>";             ///< `FieldDelimiter`.
+  std::string_view fieldDelimiter = "<\">";               ///< `FieldDelimiter`, `"` by default.
   std::string_view tableSeparator = "<NewLine><NewLine>"; ///< `TableSeparator`.
   bool useRequestPage = true;                             ///< `UseRequestPage`.
   bool formatEvaluateXml = false;                         ///< `FormatEvaluate = Xml`.

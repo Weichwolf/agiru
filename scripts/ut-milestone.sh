@@ -35,9 +35,10 @@ one() {
     printf '%s\n' "$log" > "$PARTS/$key.log"
   else
     printf 'LOST %s (exit %d)\n' "$name" "$status" > "$PARTS/$key.log"
+    mkdir -p "$OUT.lost" && printf '%s\n' "$log" > "$OUT.lost/$key.log"
   fi
 }
-export -f one; export PARTS="$parts" DSN="$dsn"
+export -f one; export PARTS="$parts" DSN="$dsn" OUT="$out"
 start=$(date +%s)
 xargs -P "$workers" -I{} bash -c 'one "$@"' _ {} < "$list"
 : > "$out"

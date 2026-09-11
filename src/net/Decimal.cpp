@@ -25,7 +25,7 @@ public:
 namespace {
 __extension__ using U128 = unsigned __int128;
 
-constexpr std::uint8_t kMaxScale = 28;
+constexpr std::uint8_t kMaxScale = 20;
 constexpr unsigned kMantissaBits = 96;
 constexpr U128 kMaxUnits = (static_cast<U128>(1) << kMantissaBits) - 1;
 
@@ -244,6 +244,13 @@ Decimal Decimal::Abs() const {
   return DecimalAccess::Make(units_, scale_, false);
 }
 
+Decimal Decimal::Trimmed() const {
+  U128 units = units_;
+  std::uint8_t scale = scale_;
+  StripTrailingZeros(units, scale);
+  return DecimalAccess::Make(units, scale, negative_);
+}
+
 Decimal Decimal::operator-() const {
   return DecimalAccess::Make(units_, scale_, units_ != 0 && !negative_);
 }
@@ -269,6 +276,7 @@ Decimal Decimal::FromInvariantString(std::string_view text) {
   std::uint8_t scale = 0;
   bool seenDigit = false;
   bool seenPoint = false;
+  bool dropped = false;
   for (; i < text.size(); ++i) {
     const char c = text[i];
     if (c == '.') {
@@ -280,12 +288,14 @@ Decimal Decimal::FromInvariantString(std::string_view text) {
       throw DecimalError("Decimal: not a number");
     }
     seenDigit = true;
+    if (seenPoint && scale == kMaxScale) {
+      if (!dropped && c >= '5') { units += 1; }
+      dropped = true;
+      continue;
+    }
     if (units > kMaxUnits / 10) { throw DecimalError("Decimal: overflow while parsing"); }
     units = units * 10 + static_cast<unsigned>(c - '0');
-    if (seenPoint) {
-      if (scale == kMaxScale) { throw DecimalError("Decimal: more than 28 decimal places"); }
-      ++scale;
-    }
+    if (seenPoint) { ++scale; }
   }
   if (!seenDigit) { throw DecimalError("Decimal: no digit"); }
   return DecimalAccess::Make(units, scale, neg && units != 0);

@@ -133,6 +133,27 @@ void Raise(EventObject kind,
            std::string_view element,
            const EventArgs &args);
 
+/// \brief Dispatches an ISOLATED event: every subscriber runs in a boundary of its own, and one
+///        that raises has its writes discarded while the rest still run.
+///
+/// `devenv-events-isolated.md`: "an error in an event subscriber doesn't stop the other
+/// subscribers", and the platform's sign-in events are of that kind -- with the obsolete
+/// `OnCompanyOpen`, "a failure in any event subscriber will stop the sign-in process"
+/// (`devenv-oncompanyopencompleted.md`), which is what isolation was introduced to end.
+///
+/// \param kind       The publisher's object kind.
+/// \param objectId   Its number.
+/// \param objectName Its AL name.
+/// \param event      The published method.
+/// \param element    The field, for a table trigger event; empty otherwise.
+/// \param args       The arguments.
+void RaiseIsolated(EventObject kind,
+                   std::int32_t objectId,
+                   std::string_view objectName,
+                   std::string_view event,
+                   std::string_view element,
+                   const EventArgs &args);
+
 /// \brief AL `BindSubscription(Codeunit)` for the session.
 /// \param id       The codeunit.
 /// \param instance The instance to dispatch to.

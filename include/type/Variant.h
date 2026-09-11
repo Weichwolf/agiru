@@ -83,6 +83,28 @@ struct XmlInVariant {
   }
 };
 
+namespace detail {
+
+/// \brief Whether a text spells a Decimal the invariant way, and the value when it does.
+/// \param text The text. \param into Where the value lands.
+/// \return True when it spelled one.
+[[nodiscard]] bool TextSpells(std::string_view text, Decimal &into);
+
+/// \brief Whether a text spells an Integer. \param text The text. \param into The value.
+/// \return True when it spelled one.
+[[nodiscard]] bool TextSpells(std::string_view text, Integer &into);
+
+/// \brief Whether a text spells a BigInteger. \param text The text. \param into The value.
+/// \return True when it spelled one.
+[[nodiscard]] bool TextSpells(std::string_view text, BigInteger &into);
+
+/// \brief Whether a text spells a Boolean -- `Yes`, `No`, `true`, `false`, `1`, `0`.
+/// \param text The text. \param into The value.
+/// \return True when it spelled one.
+[[nodiscard]] bool TextSpells(std::string_view text, Boolean &into);
+
+}
+
 class RecordInVariant {
 public:
   /// \brief Takes a copy of the record.
@@ -132,8 +154,8 @@ public:
   /// \brief Frees the copy.
   ~RecordInVariant() { Free_(); }
 
-  const void *record; ///< The copy.
-  TableId table;      ///< Which table it is, so a reader can refuse the wrong one.
+  void *record;  ///< The copy, owned here -- `RecordRef.SetTable(Variant)` writes into it.
+  TableId table; ///< Which table it is, so a reader can refuse the wrong one.
 
   /// \brief What the record was when the Variant was built: its table, caption and primary key,
   ///        which is what `Format` reads (board:0624).
@@ -141,9 +163,7 @@ public:
 
 private:
   void Free_() {
-    if (record != nullptr) {
-      free_(const_cast<void *>(record));
-    } // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    if (record != nullptr) { free_(record); }
     record = nullptr;
   }
 
@@ -1182,6 +1202,11 @@ public:
   /// \note THE SAME UNWRAP THE TEXT ONE DOES, and for the same reason: AL hands an `Any` to a typed
   ///       parameter and the platform unwraps it, raising on a mismatch. What it must not do is
   ///       hand back a zero for a Text, which is the wrong answer wearing the right type.
+  /// \note A TEXT IS EVALUATED INTO A NUMBER OR A BOOLEAN, because that is what AL's `exit(Any)`
+  ///       into a typed return does: `LibraryVariableStorage.DequeueDecimal` returns a Variant that
+  ///       was enqueued from a `TestField.Value`, which is text, and `Price List Line UT` reads
+  ///       `"Qty. per Unit of Measure".Value` back as a Decimal that way (4 cases, 2026-09-11).
+  ///       A text that does not spell the type still refuses.
   template <typename T>
     requires detail::InVariant<T, Held>::value
   operator T() const {
@@ -1203,6 +1228,13 @@ public:
     if constexpr (std::is_same_v<T, Integer>) {
       if (const auto *ordinal = std::get_if<OrdinalInVariant>(&held_); ordinal != nullptr) {
         return Integer{ordinal->ordinal};
+      }
+    }
+    if constexpr (std::is_same_v<T, Decimal> || std::is_same_v<T, Integer> ||
+                  std::is_same_v<T, BigInteger> || std::is_same_v<T, Boolean>) {
+      if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
+        T evaluated{};
+        if (detail::TextSpells(*text, evaluated)) { return evaluated; }
       }
     }
     Refuse("that type");

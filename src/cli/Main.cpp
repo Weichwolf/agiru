@@ -179,6 +179,7 @@ int RunTests(const Options &options) {
   agiru::Session session(runner.Dsn());
   session.CompanyName(kTestCompany);
   agiru::ProvisionInstalled(session.Database());
+  session.OpenCompany();
   const agiru::TestRun run =
       agiru::RunRegisteredTests(options.codeunit, [](const agiru::TestResult &result) {
         if (result.passed) { return; }

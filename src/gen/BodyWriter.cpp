@@ -1074,6 +1074,7 @@ private:
     std::string_view spelling;
     const al::Expr &base;
     const al::Expr &link;
+    const al::Expr *through = nullptr;
   };
 
   struct How {
@@ -1094,6 +1095,16 @@ private:
     const bool andUnderOr = reach.spelling == "||" && reach.link.kind == al::ExprKind::Binary &&
                             reach.link.text == "and";
     const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
+    if (reach.spelling == "." && reach.through != nullptr &&
+        reach.through->kind == al::ExprKind::Name && reach.link.kind == al::ExprKind::Name &&
+        reach.base.kind == al::ExprKind::Name) {
+      const std::string viaPart =
+          scope_.PartControlSpelling(reach.base.text, reach.through->text, reach.link.text);
+      if (!viaPart.empty()) {
+        out += viaPart;
+        return;
+      }
+    }
     const bool calledBesideAField =
         how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
         reach.base.kind == al::ExprKind::Name && scope_.HasField(member);
@@ -1352,7 +1363,10 @@ private:
       const al::Expr &base = i == chain.size() ? *walk : *chain[i];
       const bool here = i > 1 && Calls(spelling, base, *chain[i - 1]) == Parens::Last;
       Link(out,
-           {.spelling = spelling, .base = *walk, .link = *chain[i - 1]},
+           {.spelling = spelling,
+            .base = *walk,
+            .link = *chain[i - 1],
+            .through = i < chain.size() ? chain[i] : nullptr},
            {.arrow = (handle && i == chain.size()) || (throughThis && i + 1 == chain.size()),
             .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
                       (!asCallee || i != 1),
@@ -1811,6 +1825,33 @@ public:
     if (page == index.end()) { return {}; }
     const auto control = page->second.fields.find(LowerKey(std::string(member)));
     return control == page->second.fields.end() ? std::string{} : control->second;
+  }
+
+  [[nodiscard]] std::string PartControlOf_(const al::VarDecl *declared,
+                                           std::string_view part,
+                                           std::string_view control) const {
+    if (declared == nullptr || declared->subtype.empty()) { return {}; }
+    const std::string type = TypeName(declared->type);
+    if (type != "TestPage" && type != "Page") { return {}; }
+    const TableIndex &index = PageIndexFor(objects_, type);
+    const auto page = index.find(LowerKey(declared->subtype));
+    if (page == index.end()) { return {}; }
+    const auto shown = page->second.parts.find(LowerKey(std::string(part)));
+    if (shown == page->second.parts.end()) { return {}; }
+    const auto sub = index.find(shown->second);
+    if (sub == index.end()) { return {}; }
+    const auto found = sub->second.fields.find(LowerKey(std::string(control)));
+    return found == sub->second.fields.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
+                                                std::string_view part,
+                                                std::string_view control) const override {
+    for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
+      const std::string spelled = PartControlOf_(where, part, control);
+      if (!spelled.empty()) { return spelled; }
+    }
+    return {};
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
@@ -2274,6 +2315,29 @@ public:
     if (type != "Codeunit" && type != "Interface") { return false; }
     const TableRef *ref = ReachOf(*declared, objects_);
     return ref != nullptr && ref->interfaceReturns.contains(LowerKey(std::string(procedure)));
+  }
+
+  [[nodiscard]] std::string PartControlOf_(const al::VarDecl *declared,
+                                           std::string_view part,
+                                           std::string_view control) const {
+    if (declared == nullptr || declared->subtype.empty()) { return {}; }
+    const std::string type = TypeName(declared->type);
+    if (type != "TestPage" && type != "Page") { return {}; }
+    const TableIndex &index = PageIndexFor(objects_, type);
+    const auto page = index.find(LowerKey(declared->subtype));
+    if (page == index.end()) { return {}; }
+    const auto shown = page->second.parts.find(LowerKey(std::string(part)));
+    if (shown == page->second.parts.end()) { return {}; }
+    const auto sub = index.find(shown->second);
+    if (sub == index.end()) { return {}; }
+    const auto found = sub->second.fields.find(LowerKey(std::string(control)));
+    return found == sub->second.fields.end() ? std::string{} : found->second;
+  }
+
+  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
+                                                std::string_view part,
+                                                std::string_view control) const override {
+    return PartControlOf_(DeclarationOf(variable), part, control);
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
@@ -3420,9 +3484,9 @@ std::string WriteDefinitions(const al::PageObject &page,
                        : encoding == "windows" ? "Windows"
                                                : "MSDos") +
            ",\n";
-    out += "    .fieldSeparator = " + Literal(text("FieldSeparator", "<TAB>")) + ",\n";
+    out += "    .fieldSeparator = " + Literal(text("FieldSeparator", "<,>")) + ",\n";
     out += "    .recordSeparator = " + Literal(text("RecordSeparator", "<NewLine>")) + ",\n";
-    out += "    .fieldDelimiter = " + Literal(text("FieldDelimiter", "<None>")) + ",\n";
+    out += "    .fieldDelimiter = " + Literal(text("FieldDelimiter", "<\">")) + ",\n";
     out += "    .tableSeparator = " + Literal(text("TableSeparator", "<NewLine><NewLine>")) + ",\n";
     out += "    .useRequestPage = " +
            std::string(LowerKey(text("UseRequestPage", "true")) == "false" ? "false" : "true") +

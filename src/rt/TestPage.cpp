@@ -41,6 +41,8 @@ void TestField::AssertEqualsText(std::string_view expected) const {
   if (detail::Evaluated(left, actual) && detail::Evaluated(right, expected) && left == right) {
     return;
   }
+  const std::string ordinal = core_->ControlOrdinal(name_);
+  if (!ordinal.empty() && ordinal == expected) { return; }
   throw Error("Assert.AreEqual failed. Expected:<" + std::string(expected) + ">. Actual:<" +
               actual + ">. Control '" + std::string(name_) + "'.");
 }

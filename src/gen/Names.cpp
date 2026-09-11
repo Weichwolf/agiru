@@ -1,5 +1,7 @@
 #include "Names.h"
 
+#include "Door.h"
+#include "EnumWriter.h"
 #include "Scope.h"
 
 #include <algorithm>
@@ -7,6 +9,7 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -358,6 +361,85 @@ void NoteObjectName(std::string_view identifier) {
 
 bool ShadowsADoorType(std::string_view name) {
   return ObjectNames().contains(std::string(name));
+}
+
+namespace {
+
+std::map<std::string, std::map<std::string, std::size_t>> &DotNetCensus() {
+  static std::map<std::string, std::map<std::string, std::size_t>> counted;
+  return counted;
+}
+
+std::map<std::string, std::string> &DotNetChosen() {
+  static std::map<std::string, std::string> chosen;
+  return chosen;
+}
+
+bool WordAt(std::string_view text, std::size_t at, std::string_view word) {
+  if (at + word.size() > text.size()) { return false; }
+  for (std::size_t i = 0; i < word.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(text[at + i])) != word[i]) { return false; }
+  }
+  const bool startsWord = at == 0 || (std::isalnum(static_cast<unsigned char>(text[at - 1])) == 0 &&
+                                      text[at - 1] != '_');
+  const std::size_t after = at + word.size();
+  const bool endsWord =
+      after >= text.size() ||
+      (std::isalnum(static_cast<unsigned char>(text[after])) == 0 && text[after] != '_');
+  return startsWord && endsWord;
+}
+
+}
+
+void NoteDotNetSpellings(std::string_view source) {
+  static constexpr std::string_view kDotNet = "dotnet";
+  for (std::size_t at = source.find(':'); at != std::string_view::npos;
+       at = source.find(':', at + 1)) {
+    std::size_t next = at + 1;
+    while (next < source.size() && (source[next] == ' ' || source[next] == '\t')) { ++next; }
+    if (!WordAt(source, next, kDotNet)) { continue; }
+    next += kDotNet.size();
+    while (next < source.size() && (source[next] == ' ' || source[next] == '\t')) { ++next; }
+    if (next >= source.size()) { break; }
+    std::string spelled;
+    if (source[next] == '"') {
+      const std::size_t close = source.find('"', next + 1);
+      if (close == std::string_view::npos) { break; }
+      spelled = std::string(source.substr(next + 1, close - next - 1));
+    } else {
+      std::size_t end = next;
+      while (end < source.size() && (std::isalnum(static_cast<unsigned char>(source[end])) != 0 ||
+                                     source[end] == '_' || source[end] == '.')) {
+        ++end;
+      }
+      spelled = std::string(source.substr(next, end - next));
+    }
+    if (spelled.empty()) { continue; }
+    const std::string identifier = Identifier(spelled);
+    ++DotNetCensus()[LowerKey(identifier)][identifier];
+  }
+}
+
+void FixDotNetSpellings() {
+  for (const auto &[key, spellings] : DotNetCensus()) {
+    if (DotNetChosen().contains(key)) { continue; }
+    std::string best;
+    std::size_t most = 0;
+    for (const auto &[spelling, count] : spellings) {
+      if (count > most || (count == most && spelling < best)) {
+        best = spelling;
+        most = count;
+      }
+    }
+    DotNetChosen().insert_or_assign(key, best);
+  }
+}
+
+std::string DotNetSpelling(std::string_view subtype) {
+  const std::string identifier = Identifier(subtype);
+  if (const std::string door = AsTheDoorSpellsIt(identifier); door != identifier) { return door; }
+  const auto found = DotNetChosen().find(LowerKey(identifier));
+  return found == DotNetChosen().end() ? identifier : found->second;
 }
 
 namespace {

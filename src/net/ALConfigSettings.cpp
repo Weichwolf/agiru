@@ -13,10 +13,6 @@ Boolean Service() {
 
 }
 
-Boolean ALConfigSettings::ApiServicesEnabled() {
-  return Service();
-}
-
 Boolean ALConfigSettings::IsSaaS() {
   return Service();
 }

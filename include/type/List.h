@@ -107,7 +107,9 @@ public:
   /// \note NOT `[[nodiscard]]`, because the RESULT IS NOT THE PRODUCT. AL writes
   ///       `Expected.Get(Key, ExpectedValue);` as a statement and reads the out parameter; the
   ///       Boolean says only whether it was there, and AL lets a caller discard any result at all.
-  Boolean Get(Integer index, T &value) const {
+  template <typename V>
+    requires std::assignable_from<V &, const T &>
+  Boolean Get(Integer index, V &value) const {
     if (!Inside(index)) { return false; }
     value = values_[static_cast<std::size_t>(index) - 1];
     return true;

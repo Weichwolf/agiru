@@ -200,12 +200,19 @@ public:
 ///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
 void CheckRelation(const void *record, const TableDef &table, FieldNo no);
 
-/// \brief `DecimalPlaces` as a STORAGE rule: a Decimal field declared `0 : 5` keeps at most five
-///        places, and the property "is evaluated on text boxes and fields during validation"
-///        (`devenv-decimalplaces-property.md`) -- so `Validate` rounds the value to the declared
-///        maximum, and a direct assignment does not (openerp WI-1320 left the second half open;
-///        the documentation's "during validation" decides it).
-/// \param value The value validated. \param table The table. \param no The field.
+/// \brief `DecimalPlaces` as an ENTRY rule: a Decimal field declared `0 : 5` takes at most five
+///        places from what a user TYPES, and the property "is evaluated on text boxes and fields
+///        during validation" (`devenv-decimalplaces-property.md`) the way `MinValue` and
+///        `NotBlank` are -- at the client, never on a `Validate` from code.
+///
+/// \note A CODE-DRIVEN `Validate` DOES NOT ROUND, and that is measured against the suite rather
+///       than read: `SCM Whse. UOM Rnding. UT` assigns `1 / 7` to a base unit's `Qty. Rounding
+///       Precision` (twenty places, by assignment) and validates `44 * (1 / 7)` into a `0 : 5`
+///       field, then requires `QtyPerUoM mod Precision = 0` -- which holds exactly when the
+///       validated value keeps its twenty places and fails for every rounding of it. The first
+///       reading here rounded on `Validate` (board:0677, 2026-09-10) and the nine cases stayed red
+///       with different digits.
+/// \param value The value typed. \param table The table. \param no The field.
 /// \return The value rounded to the declared maximum, or unchanged where none is declared.
 Decimal DeclaredPlaces(const Decimal &value, const TableDef &table, FieldNo no);
 
@@ -1401,6 +1408,18 @@ public:
   ///       request for the matching rows, and a table with a hundred million of them would put all
   ///       of them in the session. SQL Server declares a cursor for this and BC is written against
   ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
+  /// \brief AL `Record.FindSet(ForUpdate, UpdateKey)` -- the two-argument form
+  ///        (`record-findset-boolean-boolean-method.md`), whose flags are hints this runtime
+  ///        needs nothing from: a set is read through a cursor either way.
+  /// \param ForUpdate Whether the rows are to be modified; carried and acted on by nothing.
+  /// \param UpdateKey Whether the key is to be modified; the same.
+  /// \return As `FindSet()`.
+  detail::Found FindSet(Boolean ForUpdate, Boolean UpdateKey) {
+    static_cast<void>(ForUpdate);
+    static_cast<void>(UpdateKey);
+    return FindSet();
+  }
+
   detail::Found FindSet() {
     return detail::Found{Read(detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable)),
                          TableTraits<Derived>::kTable.name};
@@ -2246,9 +2265,6 @@ public:
       member = Field::FromInteger(value);
     } else {
       member = static_cast<Field>(value);
-    }
-    if constexpr (std::same_as<Field, Decimal>) {
-      member = detail::DeclaredPlaces(member, TableTraits<Derived>::kTable, no);
     }
     try {
       detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);

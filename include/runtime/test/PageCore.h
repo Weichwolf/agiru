@@ -45,6 +45,12 @@ public:
   /// \throws Error when the control has no field.
   [[nodiscard]] virtual std::string ControlText(std::string_view control) const = 0;
 
+  /// \brief The ordinal behind an Option or Enum control, which `AssertEquals(1)` names where
+  ///        `ControlText` shows the caption.
+  /// \param control The control's AL name.
+  /// \return The ordinal as text; empty for a control that is not an option.
+  [[nodiscard]] virtual std::string ControlOrdinal(std::string_view control) const = 0;
+
   /// \brief Runs one of a control's triggers.
   /// \param control The control's AL name; `OK`, `Cancel`, `Yes` and `No` are the page's own.
   /// \param kind    Which trigger.

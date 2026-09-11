@@ -459,14 +459,19 @@ public:
 private:
   friend Derived;
 
+  /// THE HANDLE IS REACHED THROUGH BEFORE THE STATE IS READ. A caller's record global arrives as
+  /// an `Instance<T>`, and its address is the address of a POINTER and not of a record: read as a
+  /// record state it made the pointer a `TempTable` and "borrowed" it into `Rec`, and the next
+  /// `Get` inside the codeunit dereferenced it (`SCM Available to Pick UT`, `Purch.-Post` run
+  /// from `Whse.-Act.-Post`, exit 139, 2026-09-11).
   template <typename Record> void TakeIn_(Record &rec) {
-    if constexpr (requires(Derived &unit) { unit.Rec.Copy(rec); }) {
+    if constexpr (requires { *rec.operator->(); }) {
+      TakeIn_(*rec.operator->());
+    } else if constexpr (requires(Derived &unit) { unit.Rec.Copy(rec); }) {
       static_cast<Derived *>(this)->Rec.Copy(rec);
       if (detail::RuntimeIsTemporary(&rec)) {
         detail::RuntimeBorrowTemporary(&static_cast<Derived *>(this)->Rec, &rec);
       }
-    } else if constexpr (requires(Derived &unit) { unit.Rec.Copy(*rec.operator->()); }) {
-      static_cast<Derived *>(this)->Rec.Copy(*rec.operator->());
     } else if constexpr (requires(Derived &unit) { unit.Rec = rec; }) {
       static_cast<Derived *>(this)->Rec = rec;
     }

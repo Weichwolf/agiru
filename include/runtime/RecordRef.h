@@ -244,7 +244,24 @@ public:
   ///       assigns a Decimal and `:= WorkDate` a Date, neither of which is a `std::string_view` --
   ///       a cast refused both, which the property-access rule then surfaced at every such
   ///       assignment at once.
-  template <typename T> void Value(const T &value) { SetValue(AsText(value)); }
+  template <typename T>
+    requires(!std::same_as<std::remove_cvref_t<T>, ::agiru::Blob>)
+  void Value(const T &value) {
+    if constexpr (std::same_as<std::remove_cvref_t<T>, ::agiru::Variant>) {
+      if (value.template Is<::agiru::Blob>()) {
+        Value(value.template Get<::agiru::Blob>());
+        return;
+      }
+    }
+    SetValue(AsText(value));
+  }
+
+  /// \brief AL `FieldRef.Value := Blob` -- the BYTES, which have no text a message could carry.
+  ///        `TempBlob.ToFieldRef` is how an imported file reaches a record's BLOB field, and a
+  ///        rendering of the bytes as text arrived as an EMPTY blob (18 UT cases, 2026-09-11).
+  /// \param blob The bytes.
+  /// \throws Error when the field is not a BLOB.
+  void Value(const ::agiru::Blob &blob);
 
   /// \brief AL `FieldRef.Value := X` -- writes the field from text.
   /// \param text The value, as the column would hold it.
@@ -847,14 +864,11 @@ public:
   /// 1, and so on. If RecordRef does not have an active record, CURRENTKEYINDEX will return -1. If
   /// this value is then passed to KEYINDEX, an index out of bounds error will occur. Therefore it
   /// is important to implement a check of the RecordRef parameter.
-  /// \param NewKeyIndex The AL `Integer`.
-  /// \return The AL `Integer`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Integer CurrentKeyIndex(::agiru::Integer NewKeyIndex = {}) {
-    static_cast<void>(NewKeyIndex);
-    throw Error(
-        "RecordRef.CurrentKeyIndex(Integer) is declared and not implemented yet (board:0035)");
-  }
+  /// \param NewKeyIndex The key to select, 1-based; 0 asks without selecting.
+  /// \return The index of the current key -- the first, when none was selected -- or -1 when the
+  ///         RecordRef is not open.
+  /// \throws Error when the index names no key of the table.
+  ::agiru::Integer CurrentKeyIndex(::agiru::Integer NewKeyIndex = {});
 
   /// \brief AL `RecordRef.Delete(Boolean)`. Deletes a record in a table.
   /// \param RunTrigger The AL `Boolean`.
@@ -984,13 +998,12 @@ public:
   [[nodiscard]] std::string GetFilters() const;
 
   /// \brief AL `RecordRef.GetPosition(Boolean)`. Gets a string that contains the primary key of the
-  /// current record.
-  /// \param UseNames The AL `Boolean`.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  std::string GetPosition(::agiru::Boolean UseNames = {}) {
-    static_cast<void>(UseNames);
-    throw Error("RecordRef.GetPosition(Boolean) is declared and not implemented yet (board:0035)");
+  /// current record, the text `Record.GetPosition` writes.
+  /// \param UseNames Whether the fields are named rather than numbered.
+  /// \return `Field0=0(...)` per primary key field, the form `SetPosition` reads back.
+  /// \throws Error when the RecordRef is not open.
+  [[nodiscard]] std::string GetPosition(::agiru::Boolean UseNames = {}) const {
+    return detail::PositionText(State().record, Table(), UseNames);
   }
 
   /// \brief AL `RecordRef.GetView(Boolean)`. Returns a string that describes the current sort
@@ -1290,13 +1303,19 @@ public:
   /// \brief AL `RecordRef.SetView(Text)`. Sets the current sort order, key, and filters on a table.
   /// \param String The AL `Text`.
   /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  /// \brief AL `RecordRef.SetTable(Variant)` -- the record a Variant carries.
-  /// \param Rec The Variant.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetTable(const ::agiru::Variant &Rec) {
-    static_cast<void>(Rec);
-    throw Error("RecordRef.SetTable(Variant) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief AL `RecordRef.SetTable(Variant)` -- the record a Variant carries takes this
+  ///        RecordRef's fields, which is how `DataTypeManagement.SetFieldValue(var RecordVariant,
+  ///        ...)` hands a written record back through a `var Variant`.
+  /// \param Rec The Variant, which must hold a record of this RecordRef's table.
+  /// \throws Error when the RecordRef is not open, or the Variant holds no record of its table.
+  void SetTable(::agiru::Variant &Rec);
+
+  /// \brief `SetTable` given something that only CONVERTS to a Variant -- a value of a table this
+  ///        build does not carry. What it writes lands in the temporary, and the refusal that a
+  ///        Variant without a record raises is the loud answer such a call deserves.
+  /// \param Rec The temporary Variant.
+  /// \throws Error as the reference form does.
+  void SetTable(::agiru::Variant &&Rec) { SetTable(Rec); }
 
   /// \brief AL `RecordRef.SetView(Text)`. Sets the sort order, direction and filters a view
   ///        string names, the `SourceTableView` form `GetView` writes.

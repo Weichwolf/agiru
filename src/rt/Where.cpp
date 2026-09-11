@@ -2,6 +2,7 @@
 
 #include "meta/TableDef.h"
 #include "runtime/Record.h"
+#include "type/StringValue.h"
 
 #include "Filter.h"
 
@@ -74,11 +75,14 @@ void One(const Atom &atom,
          std::size_t &next,
          const std::string &column) {
   const bool byMember = def.type == FieldType::Option || def.type == FieldType::Enum;
-  const auto bind = [&into, &next, &def, byMember](const std::string &value) {
+  const bool asCode = def.type == FieldType::Code;
+  const auto bind = [&into, &next, &def, byMember, asCode](const std::string &value) {
     if (value.empty()) {
       into.binds.emplace_back(BlankValueOf(def));
     } else {
-      into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value) : value);
+      into.binds.emplace_back(byMember ? detail::MemberOrdinal(def, value)
+                              : asCode ? NormaliseCode(value)
+                                       : value);
     }
     return Placeholder(next++);
   };

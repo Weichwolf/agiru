@@ -326,6 +326,31 @@ std::string_view Fitted(std::string_view text, std::size_t length) {
 
 }
 
+namespace {
+
+std::size_t AddMissingColumns(const Connection &into, const TableDef &table) {
+  const std::array<std::optional<std::string>, 1> named{std::string(table.name)};
+  const Result columns = into.Execute(
+      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND "
+      "table_name = $1",
+      named);
+  std::set<std::string> there;
+  for (std::size_t row = 0; row < columns.Rows(); ++row) {
+    const std::optional<std::string_view> name = columns.Value(row, 0);
+    if (name.has_value()) { there.emplace(*name); }
+  }
+  std::size_t added = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field) || there.contains(std::string(field.name))) { continue; }
+    into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + Quoted(field.name) + " " +
+             ColumnType(field) + " NOT NULL DEFAULT " + ColumnZero(field));
+    ++added;
+  }
+  return added;
+}
+
+}
+
 void ProvisionInstalled(const Connection &into) {
   const Result standing =
       into.Execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
@@ -335,12 +360,19 @@ void ProvisionInstalled(const Connection &into) {
     if (name.has_value()) { there.emplace(*name); }
   }
   std::size_t made = 0;
+  std::size_t widened = 0;
   for (const TableEntry *entry : InstalledTables()) {
-    if (there.contains(std::string(entry->table->name))) { continue; }
+    if (there.contains(std::string(entry->table->name))) {
+      widened += AddMissingColumns(into, *entry->table);
+      continue;
+    }
     CreateTable(into, *entry->table);
     ++made;
   }
   if (made != 0) { std::println("{} table(s) created in the runner's database", made); }
+  if (widened != 0) {
+    std::println("{} column(s) added to platform tables the database already had", widened);
+  }
   if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
   const std::string_view company = Session::Current().CompanyName();
   if (!company.empty()) {

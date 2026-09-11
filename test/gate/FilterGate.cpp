@@ -197,9 +197,11 @@ void ALargeAmountIsNotComparedThroughADouble() {
              !Passes("=9007199254740992", "9007199254740993", DecimalField()));
   CHECK_TRUE("a BigInteger the same",
              Passes(">9007199254740992", "9007199254740993", BigIntegerField()));
+  CHECK_TRUE("twenty places still order, and a twenty-first is rounded away as the column would",
+             Passes("<0.14285714285714285715", "0.14285714285714285714", DecimalField()));
   CHECK_TRUE(
-      "twenty-eight places still order",
-      Passes("<0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
+      "so two texts that differ past the twentieth place compare equal",
+      Passes("=0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
 }
 
 void NumbersCompareAsNumbers() {

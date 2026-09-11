@@ -44,6 +44,8 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
 
 [[nodiscard]] std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object);
 
+[[nodiscard]] std::map<std::string, std::string> PartPages(const al::PageObject &object);
+
 [[nodiscard]] std::string PageVariableIdentifier(const al::PageObject &page, std::string_view name);
 
 [[nodiscard]] std::vector<al::VarDecl> VariablesAside(const al::PageObject &page);

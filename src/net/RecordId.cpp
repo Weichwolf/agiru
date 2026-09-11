@@ -14,7 +14,7 @@
 namespace agiru {
 
 Integer RecordId::TableNo() const {
-  if (IsEmpty()) { throw Error("the RecordId is blank and names no table"); }
+  if (IsEmpty()) { return 0; }
   return static_cast<Integer>(table_.Value());
 }
 

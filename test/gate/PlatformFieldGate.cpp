@@ -65,11 +65,14 @@ void ItIsTheTableTheBaseAppReadsFrom() {
 
   CHECK_TRUE("the AL table number", ref.Number() == 2000000041);
   CHECK_TEXT("the AL name", std::string(ref.Name()), "Field");
-  // THE CLAIM CHANGED: nothing stores a virtual row, and the five system fields exist anyway,
-  // because AL reaches them by number even here -- `Config. Package Management` writes
-  // `Field.FieldNo(SystemId)` to filter them out of a table's field list.
-  CHECK_TRUE("fifteen declared fields plus the five system fields, which AL names by FieldNo",
-             ref.FieldCount() == 15 + agiru::kSystemFieldCount);
+  // THE INDEX COUNTS THE FIELDS AL DECLARES AND NEVER THE FIVE THE PLATFORM ADDS: with
+  // `SystemId` in `FieldCount()`, `ApplicationAreaMgmt` read a Guid into a Boolean (214 cases,
+  // commit 1b27053). The system fields exist all the same and AL reaches them BY NUMBER --
+  // `Config. Package Management` writes `Field.FieldNo(SystemId)` -- which `FieldExist` answers.
+  CHECK_TRUE("seventeen declared fields, and not the five the platform adds",
+             ref.FieldCount() == 17);
+  CHECK_TRUE("while a system field is reachable by number",
+             ref.FieldExist(agiru::kSystemFields.front().no.Value()));
   CHECK_TEXT("the field AL calls \"No.\" keeps its dot", std::string(ref.Field(2).Name()), "No.");
   CHECK_TEXT(
       "and the caption field keeps its space", std::string(ref.Field(20).Name()), "Field Caption");

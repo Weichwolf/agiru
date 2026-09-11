@@ -1,9 +1,11 @@
+#include "runtime/Query.h"
+
 #include "meta/Ids.h"
 #include "meta/QueryDef.h"
 #include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
-#include "runtime/Query.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
@@ -165,7 +167,7 @@ public:
       Expect('(');
       const std::string inside = Balanced();
       if (SameName(how, "const")) {
-        term.filter = Literally(Unquoted(Trimmed(inside)));
+        term.filter = Literally(ObjectNumberOr(Unquoted(Trimmed(inside))));
       } else if (SameName(how, "filter")) {
         term.filter = Trimmed(inside);
       } else {
@@ -182,6 +184,21 @@ public:
   }
 
 private:
+  static std::string ObjectNumberOr(std::string value) {
+    static constexpr std::string_view kDatabase = "Database::";
+    if (!value.starts_with(kDatabase)) { return value; }
+    std::string named = Trimmed(value.substr(kDatabase.size()));
+    if (named.size() >= 2 && named.front() == '"' && named.back() == '"') {
+      named = named.substr(1, named.size() - 2);
+    }
+    const TableEntry *entry = FindTable(std::string_view(named));
+    if (entry == nullptr) {
+      throw Error("a DataItemTableFilter names the table " + named +
+                  ", which this build does not carry");
+    }
+    return std::to_string(entry->table->id.Value());
+  }
+
   void Space() {
     while (at_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[at_])) != 0) {
       ++at_;
@@ -213,7 +230,9 @@ private:
            (std::isalnum(static_cast<unsigned char>(text_[at_])) != 0 || text_[at_] == '_')) {
       ++at_;
     }
-    if (start == at_) { throw Error("a table filter expected a name in \"" + std::string(text_) + "\""); }
+    if (start == at_) {
+      throw Error("a table filter expected a name in \"" + std::string(text_) + "\"");
+    }
     return std::string(text_.substr(start, at_ - start));
   }
 
@@ -326,7 +345,8 @@ Statement Build(const QueryDef &def, const QueryState &state) {
     const std::string_view text = set != nullptr ? std::string_view(*set) : column.columnFilter;
     if (text.empty()) { continue; }
     const FieldDef field = DefOf(def, column);
-    const Clause clause = Where(field, ParseFilter(text), made.binds.size() + 1, ColumnSql(def, column));
+    const Clause clause =
+        Where(field, ParseFilter(text), made.binds.size() + 1, ColumnSql(def, column));
     And(Aggregates(column.method) ? having : where, clause, made.binds);
   }
 
@@ -403,9 +423,8 @@ void QueryClose(QueryState &state) noexcept {
 }
 
 void QueryNarrow(QueryState &state, std::size_t column, const std::string &text) {
-  std::erase_if(state.filters, [column](const ColumnFilter &filter) {
-    return filter.column == column;
-  });
+  std::erase_if(state.filters,
+                [column](const ColumnFilter &filter) { return filter.column == column; });
   if (!text.empty()) { state.filters.push_back(ColumnFilter{.column = column, .text = text}); }
 }
 

@@ -23,6 +23,8 @@ struct TableRef {
   std::map<std::string, std::string> fields;
   std::map<std::string, std::string> procedures;
 
+  std::map<std::string, std::string> parts;
+
   std::string name;
   std::vector<std::pair<std::string, std::string>> dataItems;
   std::vector<std::string> requestFields;

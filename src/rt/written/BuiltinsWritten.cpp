@@ -125,7 +125,7 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
     return TrailingSign(format) ? WithTrailingSign(text) : text;
   }
   if (Value.Is<Decimal>()) {
-    const std::string text = Value.Get<Decimal>().ToInvariantString();
+    const std::string text = Value.Get<Decimal>().Trimmed().ToInvariantString();
     return TrailingSign(format) ? WithTrailingSign(text) : text;
   }
   if (Value.Is<std::string>()) { return Value.Get<std::string>(); }
@@ -249,7 +249,49 @@ std::string TimeElement(const ::agiru::Variant &Value, const Token &token, char 
   return Fitted(std::to_string(part), Number(token.argument), true, filler);
 }
 
-std::string SpecToken(const ::agiru::Variant &Value, const Token &token, char filler) {
+struct Places {
+  std::int32_t least = -1;
+  std::int32_t most = -1;
+};
+
+Places PlacesOf(std::string_view argument) {
+  Places places;
+  const std::size_t colon = argument.find(':');
+  if (colon == std::string_view::npos) {
+    places.least = Number(argument);
+    places.most = places.least;
+    return places;
+  }
+  places.least = Number(argument.substr(0, colon));
+  places.most = Number(argument.substr(colon + 1));
+  return places;
+}
+
+std::string WithPlaces(const Decimal &value, const Places &places) {
+  Decimal shown = value;
+  if (places.most >= 0) {
+    std::string precision = "0." + std::string(static_cast<std::size_t>(places.most), '0');
+    precision.back() = '1';
+    if (places.most == 0) { precision = "1"; }
+    shown = ::agiru::Round(value, Decimal::FromInvariantString(precision));
+  }
+  std::string text = shown.ToInvariantString();
+  const std::size_t point = text.find('.');
+  std::size_t have = point == std::string::npos ? 0 : text.size() - point - 1;
+  if (places.most >= 0 && have > static_cast<std::size_t>(places.most)) {
+    text.resize(text.size() - (have - static_cast<std::size_t>(places.most)));
+    have = static_cast<std::size_t>(places.most);
+    if (have == 0 && !text.empty() && text.back() == '.') { text.pop_back(); }
+  }
+  if (places.least > 0 && have < static_cast<std::size_t>(places.least)) {
+    if (have == 0) { text += '.'; }
+    text += std::string(static_cast<std::size_t>(places.least) - have, '0');
+  }
+  return text;
+}
+
+std::string
+SpecToken(const ::agiru::Variant &Value, const Token &token, char filler, const Places &places) {
   const std::int32_t width = Number(token.argument);
   if (token.name == "integer") {
     const std::int64_t whole = WholeOf(Value);
@@ -259,7 +301,13 @@ std::string SpecToken(const ::agiru::Variant &Value, const Token &token, char fi
   if (token.name == "text") {
     return Fitted(Rendered(Value, kDisplayFormat), width, false, filler);
   }
-  if (token.name == "standard format") { return Rendered(Value, Number(token.argument)); }
+  if (token.name == "standard format") {
+    if (Value.Is<Decimal>() && (places.least >= 0 || places.most >= 0)) {
+      const std::string text = WithPlaces(Value.Get<Decimal>(), places);
+      return TrailingSign(Number(token.argument)) ? WithTrailingSign(text) : text;
+    }
+    return Rendered(Value, Number(token.argument));
+  }
   if (IsDateElement(token.name)) { return DateElement(Value, token, filler); }
   if (IsTimeElement(token.name)) { return TimeElement(Value, token, filler); }
   throw Error("Format: the format element <" + token.name +
@@ -497,6 +545,10 @@ Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view 
       filler = token.argument.front();
     }
   }
+  Places places;
+  for (const Token &token : tokens) {
+    if (!token.literal && token.name == "precision") { places = PlacesOf(token.argument); }
+  }
   std::string rendered;
   bool numeric = false;
   for (const Token &token : tokens) {
@@ -504,9 +556,9 @@ Format(const ::agiru::Variant &Value, ::agiru::Integer Length, std::string_view 
       rendered += token.name;
       continue;
     }
-    if (IsFiller(token)) { continue; }
+    if (IsFiller(token) || token.name == "precision") { continue; }
     numeric = numeric || token.name == "integer" || token.name == "sign";
-    rendered += SpecToken(Value, token, filler);
+    rendered += SpecToken(Value, token, filler, places);
   }
   return Fitted(std::move(rendered), Length, numeric, filler);
 }

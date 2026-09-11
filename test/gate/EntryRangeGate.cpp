@@ -48,13 +48,14 @@ void AnEntryOutsideTheDeclaredRangeIsRefusedWithThePlatformsWording() {
       "TestValidation");
 }
 
-/// `DecimalPlaces` "sets display AND STORAGE requirements" and "is evaluated on text boxes and
-/// fields during validation" (`devenv-decimalplaces-property.md`): a `Validate` rounds a Decimal
-/// to the declared maximum, an assignment does not. `Item Unit of Measure."Qty. Rounding
-/// Precision"` declares `0 : 5`, and `SCM Whse. UOM Rnding. UT` divides one by a random integer
-/// into it and then expects `Qty. per Unit of Measure mod Precision = 0` -- which only holds once
-/// the precision was stored with five places (openerp WI-1320 left it open).
-void AValidatedDecimalKeepsTheDeclaredPlaces() {
+/// `DecimalPlaces` "is evaluated on text boxes and fields during validation"
+/// (`devenv-decimalplaces-property.md`): what a user TYPES into a `0 : 5` field is rounded to
+/// five places, the way `MinValue` and `NotBlank` are checked at the client -- and a `Validate`
+/// from code is NOT rounded. `SCM Whse. UOM Rnding. UT` assigns `1 / 7` to a base unit's
+/// `Qty. Rounding Precision` and validates `44 * (1 / 7)` into a `0 : 5` field, then expects
+/// `Qty. per Unit of Measure mod Precision = 0`, which only an unrounded validate satisfies
+/// (nine cases; the rounding-on-validate reading of board:0677 left them red).
+void ATypedDecimalKeepsTheDeclaredPlaces() {
   const agiru::Decimal seventh = agiru::Decimal{1} / agiru::Decimal{7};
   CHECK_TEXT("0 : 5 keeps five",
              agiru::detail::DeclaredPlaces(seventh, "0 : 5").ToInvariantString(),
@@ -83,6 +84,6 @@ void AValidatedDecimalKeepsTheDeclaredPlaces() {
 int main() {
   return gate::Run("EntryRange", [] {
     AnEntryOutsideTheDeclaredRangeIsRefusedWithThePlatformsWording();
-    AValidatedDecimalKeepsTheDeclaredPlaces();
+    ATypedDecimalKeepsTheDeclaredPlaces();
   });
 }

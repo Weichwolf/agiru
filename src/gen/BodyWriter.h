@@ -35,6 +35,15 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual std::string PartControlSpelling(std::string_view variable,
+                                                        std::string_view part,
+                                                        std::string_view control) const {
+    static_cast<void>(variable);
+    static_cast<void>(part);
+    static_cast<void>(control);
+    return {};
+  }
+
   [[nodiscard]] virtual std::string ObjectNamed(std::string_view kind,
                                                 std::string_view name) const {
     return std::string(kind) + "::" + Identifier(name);

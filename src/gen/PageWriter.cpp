@@ -174,6 +174,26 @@ VariableSource(const al::PageControl &control, const al::PageObject &page, const
     }
     return {};
   }
+  if (LowerKey(control.kind) == "field" && control.source.size() == 6 &&
+      control.source[0].kind == al::TokenKind::Identifier && control.source[1].text == "[" &&
+      control.source[2].kind == al::TokenKind::Integer && control.source[3].text == "]" &&
+      control.source[4].text == "." &&
+      (control.source[5].kind == al::TokenKind::Identifier ||
+       control.source[5].kind == al::TokenKind::QuotedIdentifier)) {
+    for (const al::VarDecl &declared : page.variables) {
+      if (LowerKey(declared.name) != LowerKey(control.source[0].text) ||
+          TypeName(declared.type) != "Record" || declared.dimensions.empty()) {
+        continue;
+      }
+      const auto table = objects.tables.find(LowerKey(declared.subtype));
+      if (table == objects.tables.end()) { return {}; }
+      const auto field = table->second.fields.find(LowerKey(control.source[5].text));
+      if (field == table->second.fields.end()) { return {}; }
+      return PageVariableIdentifier(page, declared.name) + ".operator->()->operator[](" +
+             control.source[2].text + ")." + field->second;
+    }
+    return {};
+  }
   if (LowerKey(control.kind) != "field" || control.source.size() != 1 ||
       control.source.front().kind != al::TokenKind::Identifier) {
     return {};
@@ -422,6 +442,17 @@ std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &obje
     }
   }
   return named;
+}
+
+std::map<std::string, std::string> PartPages(const al::PageObject &object) {
+  Controls all;
+  Flatten(object.layout, all);
+  std::map<std::string, std::string> pages;
+  for (const al::PageControl *control : all.parts) {
+    const std::string page = PartSource(*control);
+    if (!page.empty()) { pages.emplace(Lowered(control->name), LowerKey(page)); }
+  }
+  return pages;
 }
 
 std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &object,

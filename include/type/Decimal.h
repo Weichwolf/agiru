@@ -26,9 +26,19 @@ public:
 /// `decimal-data-type.md`: "The Decimal data type is mapped to the Microsoft .NET Framework common
 /// language runtime (CLR) Decimal data type, which controls the precision and limits", with a
 /// maximum calculating value of 79'228'162'514'264'337'593'543'950'335 (two to the ninety-sixth
-/// less one) and a scaling factor up to 28.
+/// less one).
 ///
 /// The value is the mantissa divided by ten to the power of the scale, with a sign.
+///
+/// \note THE SCALE STOPS AT TWENTY PLACES, NOT AT THE CLR'S TWENTY-EIGHT. The platform stores a
+///       Decimal as `DECIMAL(38,20)` (`fieldtype-option.md`), and a value the runtime holds must
+///       be the value the database gives back, or the same expression evaluates differently on
+///       either side of a `Modify` -- which `SCM Whse. UOM Rnding. UT` requires: `1 / 7` is
+///       written to a base unit's rounding precision, `44 * (1 / 7)` validated into another unit,
+///       and the check is `QtyPerUoM mod Precision = 0` against the precision READ BACK. With
+///       twenty-eight places the product carries digits the column cannot, and the remainder is
+///       a hundred-quintillionth (nine cases, 2026-09-11). So division fills twenty places, a
+///       product's scale is reduced to twenty, and a parsed text with more is rounded to twenty.
 ///
 /// \note THE SCALE IS PART OF THE VALUE. `0.10` and `0.1` compare equal but are not the same
 ///       decimal: CLR arithmetic carries the scale through addition, subtraction and
@@ -73,7 +83,7 @@ public:
   /// \param text The text, optionally signed, with at most one full stop.
   /// \return The value, preserving the written scale as CLR parsing does, so `1.2300` keeps four
   ///         decimal places.
-  /// \throws DecimalError when the text is not a number, or carries more than 28 decimal places.
+  /// \throws DecimalError when the text is not a number; more than twenty places are rounded.
   static Decimal FromInvariantString(std::string_view text);
 
   /// \return True when the value is zero, whatever its scale.
@@ -87,6 +97,13 @@ public:
 
   /// \return The magnitude, with the same scale.
   [[nodiscard]] Decimal Abs() const;
+
+  /// \brief The same value with its trailing fractional zeros dropped: `10.500` as `10.5`, `10.00`
+  ///        as `10`. AL's standard format shows a Decimal that way (a quantity read back from a
+  ///        `numeric(38,20)` column prints as `10`, never as twenty zeros), while
+  ///        `ToInvariantString` keeps the scale for the database and for round trips.
+  /// \return The trimmed value; equal to this one.
+  [[nodiscard]] Decimal Trimmed() const;
 
   /// \return The value with its sign flipped; zero stays unsigned.
   [[nodiscard]] Decimal operator-() const;
@@ -109,7 +126,7 @@ public:
   /// \throws DecimalError on overflow.
   Decimal &operator*=(const Decimal &o);
 
-  /// \brief Divides, filling up to 28 decimal places and normalising the result.
+  /// \brief Divides, filling up to twenty decimal places and normalising the result.
   /// \param o The divisor.
   /// \return This object.
   /// \throws DecimalError when the divisor is zero, or on overflow.

@@ -592,7 +592,8 @@ std::string Element(const al::VarDecl &declared, const Objects &objects, const s
   const std::string type = TypeName(declared.type);
   if (NamesAnObject(declared)) { return ObjectType(declared, objects); }
   if (type == "DotNet") {
-    return declared.subtype.empty() ? "dotnet::Unnamed" : "dotnet::" + Identifier(declared.subtype);
+    return declared.subtype.empty() ? "dotnet::Unnamed"
+                                    : "dotnet::" + DotNetSpelling(declared.subtype);
   }
   if (type == "Enum") {
     if (declared.subtype.empty()) { return "Enum<>"; }
@@ -973,7 +974,7 @@ using DotNetNames = std::map<std::string, std::string>;
 
 void NoteDotNet(const al::VarDecl &declared, DotNetNames &named, DotNetUse &use) {
   if (TypeName(declared.type) == "DotNet" && !declared.subtype.empty()) {
-    const std::string bare = Identifier(declared.subtype);
+    const std::string bare = DotNetSpelling(declared.subtype);
     named.insert_or_assign(LowerKey(declared.name), bare);
     use.try_emplace(bare);
   }
@@ -1283,6 +1284,24 @@ public:
     if (subtype.empty()) { return {}; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     return table == objects_.tables.end() ? std::string{} : table->second.identifier;
+  }
+
+  [[nodiscard]] std::string PartControlSpelling(std::string_view variable,
+                                                std::string_view part,
+                                                std::string_view control) const override {
+    const al::VarDecl *declared = Declaration(variable);
+    if (declared == nullptr || declared->subtype.empty()) { return {}; }
+    const std::string type = TypeName(declared->type);
+    if (type != "TestPage" && type != "Page") { return {}; }
+    const TableIndex &index = PageIndexFor(objects_, type);
+    const auto page = index.find(LowerKey(declared->subtype));
+    if (page == index.end()) { return {}; }
+    const auto shown = page->second.parts.find(LowerKey(std::string(part)));
+    if (shown == page->second.parts.end()) { return {}; }
+    const auto sub = index.find(shown->second);
+    if (sub == index.end()) { return {}; }
+    const auto found = sub->second.fields.find(LowerKey(std::string(control)));
+    return found == sub->second.fields.end() ? std::string{} : found->second;
   }
 
   [[nodiscard]] std::string MemberSpelling(const OfVariable &member) const override {
@@ -1978,7 +1997,9 @@ std::string CodeunitHeaderPath(const al::CodeunitObject &unit) {
 std::string AbsentDotNetOf(const al::VarDecl &declared) {
   if (NamesAbsentType(declared)) { return declared.type; }
   if (TypeName(declared.type) != "DotNet" || declared.subtype.empty()) { return {}; }
-  return RebuiltDotNet().contains(Identifier(declared.subtype)) ? std::string{} : declared.subtype;
+  return RebuiltDotNet().contains(DotNetSpelling(declared.subtype))
+             ? std::string{}
+             : DotNetSpelling(declared.subtype);
 }
 
 bool NamesAbsentType(const al::VarDecl &declared) {
@@ -1993,6 +2014,7 @@ TableIndex PlatformTables() {
                        .header = "platform/" + Identifier(name) + ".h",
                        .fields = {},
                        .procedures = {},
+                       .parts = {},
                        .name = {},
                        .dataItems = {},
                        .requestFields = {},
@@ -2028,6 +2050,7 @@ FieldEnums PlatformFieldEnums() {
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
   enums["field"]["obsoletestate"] = "::agiru::platform::ObsoleteState";
+  enums["field"]["dataclassification"] = "::agiru::DataClassification";
   enums["2000000041"] = enums["field"];
   enums["user"]["state"] = "::agiru::platform::UserState";
   enums["user"]["license type"] = "::agiru::platform::UserLicenseType";

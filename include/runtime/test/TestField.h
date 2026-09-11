@@ -5,6 +5,7 @@
 #include "runtime/test/PageCore.h"
 #include "type/Boolean.h"
 
+#include <concepts>
 #include <string_view>
 
 /// \file
@@ -62,6 +63,15 @@ public:
   ///        `testfield-value-method.md`: "Gets or sets the value of this field."
   /// \param value The text to set, the way `SetValue` sets it.
   void Value(std::string_view value) { SetValueText(value); }
+
+  /// \brief AL `TestField.Value := Any` for a value that is not text -- a Guid, a date, a number.
+  /// \tparam T The value's type.
+  /// \param value The value, rendered the way `SetValue` renders it.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>)
+  void Value(const T &value) {
+    SetValue(value);
+  }
 
   /// \brief AL `TestField.Value()`.
   /// \return The control's value as text.

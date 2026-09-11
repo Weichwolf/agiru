@@ -288,6 +288,15 @@ void SeedFromFilters(void *record, const TableDef &table, bool populateAllFields
 /// \throws Error when the table lacks the field.
 [[nodiscard]] std::string FieldFormat(const void *record, const TableDef &table, FieldNo no);
 
+/// \brief An Option or Enum field's ORDINAL as text, which is what an AL `Option` value passed
+///        through a Variant renders as -- `TestField.AssertEquals(EntryType)` with an `Option`
+///        parameter compares `1` against the control, whose text is the caption.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \return The ordinal; empty for a field of any other type or a table without the field.
+[[nodiscard]] std::string FieldOrdinalText(const void *record, const TableDef &table, FieldNo no);
+
 /// \brief Writes a field the way a user TYPES it: `Evaluate` for the field's type, so `100` lands
 ///        in a Decimal, `Yes` in a Boolean, a member's name or caption in an Option.
 /// \param record The record.

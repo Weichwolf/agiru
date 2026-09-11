@@ -36,14 +36,17 @@ public:
 
   /// \brief Whether API web services are enabled.
   ///
-  /// \return True in the service, false on a self-hosted instance.
+  /// \return True.
   ///
-  /// \note THE DOCUMENTED DEFAULT IS "Not enabled" AND IT IS NOT A CONSTANT HERE, which is the one
-  ///       place this type departs from the page. That default describes the SELF-HOSTED instance;
-  ///       in the service the API endpoints are part of the offer, and the test libraries switch to
-  ///       exactly that with `EnvironmentInfoTestLibrary.SetTestabilitySoftwareAsAService(true)`.
-  ///       So it follows the environment rather than a constant.
-  [[nodiscard]] static Boolean ApiServicesEnabled();
+  /// \note THE DOCUMENTED DEFAULT IS "Not enabled" AND THIS INSTANCE IS CONFIGURED THE OTHER WAY.
+  ///       `configure-server-instance.md` gives a DEFAULT an administrator overrides, and the
+  ///       instance the UT suite is written against has the endpoints on: `API Setup UT` is
+  ///       `[Scope('OnPrem')]`, never switches to the service, and expects `Insert(false)` on a
+  ///       Customer to carry the related record ids -- which only the login-bound
+  ///       `API - Update Referenced Fields` does, and its binder exits when this is false. The
+  ///       predecessor coupled it to SaaS and measured the coupling wrong (openerp WI-1217: +6, 0
+  ///       lost, once decoupled).
+  [[nodiscard]] static Boolean ApiServicesEnabled() { return true; }
 
   /// \brief Whether API subscriptions are enabled.
   /// \return True -- the page's default is "Enabled".

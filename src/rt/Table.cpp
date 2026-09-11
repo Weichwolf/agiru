@@ -40,22 +40,42 @@
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <expected>
 #include <format>
 #include <map>
 #include <mutex>
 #include <optional>
+#include <print>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
 
+#include <execinfo.h>
+#include <unistd.h>
+
 namespace agiru::detail {
+
+namespace {
+
+void TraceRefusal(std::string_view what) {
+  static const bool traced = std::getenv("AGIRU_TRACE_ERRORS") != nullptr;
+  if (!traced) { return; }
+  std::println(stderr, "refused: {}", what);
+  constexpr int kTraceFrames = 32;
+  std::array<void *, kTraceFrames> frames{};
+  const int depth = backtrace(frames.data(), static_cast<int>(frames.size()));
+  backtrace_symbols_fd(frames.data(), depth, STDERR_FILENO);
+}
+
+}
 
 Found::~Found() noexcept(false) {
   if (read_ || found_ || std::uncaught_exceptions() != 0) { return; }
+  TraceRefusal(table_);
   if (!key_.empty()) {
     throw Error("The " + std::string(table_) +
                 " does not exist. Identification fields and values: " + key_);
@@ -1366,6 +1386,15 @@ Clause FlowFieldColumn(const TableDef &table,
   return made;
 }
 
+std::string FieldOrdinalText(const void *record, const TableDef &table, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr || (def->type != FieldType::Option && def->type != FieldType::Enum)) {
+    return {};
+  }
+  return std::to_string(
+      reinterpret_cast<const OrdinalValue *>(At(const_cast<void *>(record), *def))->AsInteger());
+}
+
 std::string FieldFormat(const void *record, const TableDef &table, FieldNo no) {
   const FieldDef *def = Field(table, no);
   if (def == nullptr) { throw Error("the table lacks the field a control reads"); }
@@ -1414,7 +1443,7 @@ void EvaluateInto(void *record, const TableDef &table, FieldNo no, std::string_v
     case FieldType::Decimal: {
       Decimal value{};
       if (!::agiru::detail::Evaluated(value, text)) { refuse(); }
-      *reinterpret_cast<Decimal *>(At(record, *def)) = value;
+      *reinterpret_cast<Decimal *>(At(record, *def)) = DeclaredPlaces(value, def->decimalPlaces);
       return;
     }
     case FieldType::Integer: {

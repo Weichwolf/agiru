@@ -129,6 +129,22 @@ public:
   /// \param name The company.
   void CompanyName(std::string_view name) { company_ = name; }
 
+  /// \brief The platform's sign-in, once the company is named: `Company Triggers.
+  ///        OnCompanyOpenCompleted` is raised as the isolated event it is, and what its
+  ///        subscribers wrote is kept.
+  ///
+  /// `devenv-oncompanyopencompleted.md`: the base application subscribes to that platform event
+  /// and raises `System Initialization.OnAfterLogin` from it, "both raised during sign-in when
+  /// Business Central tries to open the relevant company". A session that never signed in left
+  /// every `OnAfterLogin` subscriber dead -- among them the binder that makes `Insert(false)` on a
+  /// Customer carry its related record ids (`API Setup UT`, 6 cases; openerp WI-1216/WI-1217).
+  ///
+  /// \warning THE OBSOLETE `OnCompanyOpen` IS NOT RAISED. It is not isolated -- "a failure in any
+  ///          event subscriber will stop the sign-in process" -- and its base-application
+  ///          subscriber commits twice on its way through; the predecessor measured the isolated
+  ///          event alone as safe and left the other as a question (openerp WI-1218).
+  void OpenCompany();
+
   /// \brief Whether this session runs as the service rather than a self-hosted instance.
   ///
   /// \return False unless the host said otherwise.

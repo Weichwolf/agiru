@@ -905,6 +905,7 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
                   "/" + identifier + ".h",
               .fields = {},
               .procedures = NamesOfProcedures(object.procedures),
+              .parts = {},
               .name = {},
               .dataItems = {},
               .requestFields = {},
@@ -1066,6 +1067,7 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .id = object.id,
                                .fields = std::move(controlNames),
                                .procedures = {},
+                               .parts = agiru::gen::PartPages(object),
                                .name = SourceTableNameOf(object),
                                .dataItems = {},
                                .requestFields = {},
@@ -1508,6 +1510,7 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           .header = TableHeaderPath(table),
           .fields = std::move(fieldNames),
           .procedures = std::move(procedureNames),
+          .parts = {},
           .name = {},
           .dataItems = {},
           .requestFields = {},
@@ -1739,6 +1742,7 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
                       "/" + identifier + ".h",
             .fields = {},
             .procedures = procedures,
+            .parts = {},
             .name = {},
             .dataItems = {},
             .requestFields = {},
@@ -1781,6 +1785,7 @@ Pages IndexReports(Run &run, agiru::gen::Objects &objects) {
             .id = declared.id,
             .fields = std::move(controlNames),
             .procedures = {},
+            .parts = {},
             .name = {},
             .dataItems = std::move(dataItems),
             .requestFields = {},
@@ -1832,6 +1837,7 @@ Pages IndexXmlPorts(Run &run, agiru::gen::Objects &objects) {
             .fields = parsed.has_value() ? agiru::gen::ControlIdentifiers(*parsed, objects)
                                          : std::map<std::string, std::string>{},
             .procedures = {},
+            .parts = {},
             .name = {},
             .dataItems = {},
             .requestFields = {},
@@ -1874,6 +1880,7 @@ Queries IndexQueries(Run &run, agiru::gen::Objects &objects) {
             .fields = parsed.has_value() ? agiru::gen::QueryColumns(*parsed)
                                          : std::map<std::string, std::string>{},
             .procedures = {},
+            .parts = {},
             .name = declared.name,
             .dataItems = {},
             .requestFields = {},
@@ -2415,6 +2422,10 @@ int Scan(const Job &job) {
     Counts pages;
     Counts extensions;
     ClaimApp(run.output);
+    for (const std::filesystem::path &path : SourcesEndingIn(run, ".al")) {
+      agiru::gen::NoteDotNetSpellings(Read(path));
+    }
+    agiru::gen::FixDotNetSpellings();
     IndexCodeunits(run, objects);
     Pages parsedReports = IndexReports(run, objects);
     extensions.emitted += MergeReportExtensions(store, parsedReports);

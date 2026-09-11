@@ -7,6 +7,7 @@
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
+#include "type/DataClassification.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
@@ -113,6 +114,27 @@ template <> struct agiru::OptionTraits<agiru::FieldType> {
 };
 
 /// \brief The vocabulary of AL `FieldClass`.
+/// \brief The members of `Field.DataClassification`, in the order `type/DataClassification.h`
+///        declares them.
+template <> struct agiru::OptionTraits<agiru::DataClassification> {
+  /// \brief The seven classifications, dense.
+  static constexpr std::array<agiru::EnumValueDef, 7> kValues{{
+      {.ordinal = 0, .name = "ToBeClassified", .caption = "ToBeClassified"},
+      {.ordinal = 1, .name = "SystemMetadata", .caption = "SystemMetadata"},
+      {.ordinal = 2,
+       .name = "EndUserIdentifiableInformation",
+       .caption = "EndUserIdentifiableInformation"},
+      {.ordinal = 3, .name = "AccountData", .caption = "AccountData"},
+      {.ordinal = 4,
+       .name = "EndUserPseudonymousIdentifiers",
+       .caption = "EndUserPseudonymousIdentifiers"},
+      {.ordinal = 5, .name = "CustomerContent", .caption = "CustomerContent"},
+      {.ordinal = 6,
+       .name = "OrganizationIdentifiableInformation",
+       .caption = "OrganizationIdentifiableInformation"},
+  }};
+};
+
 template <> struct agiru::OptionTraits<agiru::platform::FieldClass> {
   /// \brief The three classes, which are dense already.
   static constexpr std::array<agiru::EnumValueDef, 3> kValues{{
@@ -211,6 +233,12 @@ public:
   Boolean Enabled{};
   /// \brief AL `Field.IsPartOfPrimaryKey`, which the declaration spells without spaces.
   Boolean IsPartOfPrimaryKey{};
+  /// \brief AL `Field.DataClassification` (`Field-Virtual-Table.md`: "The classification of data
+  ///        in the field"). Blank until the transpiler carries the property (board:0358's kind).
+  Option<::agiru::DataClassification> DataClassification;
+  /// \brief AL `Field.ExternalName` -- the name the field carries outward, which the API pages
+  ///        read. Blank until the transpiler carries the property.
+  Text<kOptionStringLength> ExternalName;
 
   /// \brief AL `Field.SystemId` -- blank, because a virtual table has no row to carry one.
   Guid SystemId;
@@ -260,6 +288,11 @@ public:
     static constexpr ::agiru::FieldNo Enabled{8};
     /// \brief The AL field number of `IsPartOfPrimaryKey`.
     static constexpr ::agiru::FieldNo IsPartOfPrimaryKey{28};
+    /// \brief The AL field number of `DataClassification`, which follows `ObsoleteReason` (26)
+    ///        in the order the platform page lists the columns and the predecessor numbers them.
+    static constexpr ::agiru::FieldNo DataClassification{27};
+    /// \brief The AL field number of `ExternalName`, the next number the table had free.
+    static constexpr ::agiru::FieldNo ExternalName{29};
   };
 
   /// \brief The primary key: the table and the field within it.
@@ -284,7 +317,7 @@ public:
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.
-inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 15>{{
+inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 17>{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
     Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),
@@ -321,10 +354,18 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
                                     "ObsoleteReason",
                                     "ObsoleteReason",
                                     offsetof(Field, ObsoleteReason)),
+    Declare<&Field::DataClassification>(Field::Field_No::DataClassification,
+                                        "DataClassification",
+                                        "DataClassification",
+                                        offsetof(Field, DataClassification)),
     Declare<&Field::IsPartOfPrimaryKey>(Field::Field_No::IsPartOfPrimaryKey,
                                         "IsPartOfPrimaryKey",
                                         "IsPartOfPrimaryKey",
                                         offsetof(Field, IsPartOfPrimaryKey)),
+    Declare<&Field::ExternalName>(Field::Field_No::ExternalName,
+                                  "ExternalName",
+                                  "ExternalName",
+                                  offsetof(Field, ExternalName)),
 }});
 
 /// \brief The keys of the virtual `Field` table.

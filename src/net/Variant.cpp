@@ -2,7 +2,12 @@
 
 #include "runtime/Error.h"
 
+#include <cerrno>
+#include <cstdint>
+#include <cstdlib>
+#include <limits>
 #include <string>
+#include <string_view>
 
 namespace agiru {
 
@@ -112,6 +117,65 @@ bool Variant::operator==(const Variant &o) const {
 }
 
 namespace agiru::detail {
+
+namespace {
+
+std::string_view Trimmed(std::string_view text) {
+  while (!text.empty() && text.front() == ' ') { text.remove_prefix(1); }
+  while (!text.empty() && text.back() == ' ') { text.remove_suffix(1); }
+  return text;
+}
+
+bool WholeSpelled(std::string_view text, long long &into) {
+  const std::string held(Trimmed(text));
+  if (held.empty()) { return false; }
+  char *end = nullptr;
+  errno = 0;
+  into = std::strtoll(held.c_str(), &end, 10);
+  return errno == 0 && end != nullptr && *end == '\0';
+}
+
+}
+
+bool TextSpells(std::string_view text, Decimal &into) {
+  const std::string_view held = Trimmed(text);
+  if (held.empty()) { return false; }
+  try {
+    into = Decimal::FromInvariantString(held);
+  } catch (const DecimalError &) { return false; }
+  return true;
+}
+
+bool TextSpells(std::string_view text, Integer &into) {
+  long long whole = 0;
+  if (!WholeSpelled(text, whole)) { return false; }
+  if (whole < std::numeric_limits<std::int32_t>::min() ||
+      whole > std::numeric_limits<std::int32_t>::max()) {
+    return false;
+  }
+  into = static_cast<Integer>(whole);
+  return true;
+}
+
+bool TextSpells(std::string_view text, BigInteger &into) {
+  long long whole = 0;
+  if (!WholeSpelled(text, whole)) { return false; }
+  into = static_cast<BigInteger>(whole);
+  return true;
+}
+
+bool TextSpells(std::string_view text, Boolean &into) {
+  const std::string_view held = Trimmed(text);
+  if (held == "1" || held == "true" || held == "Yes" || held == "yes" || held == "True") {
+    into = true;
+    return true;
+  }
+  if (held == "0" || held == "false" || held == "No" || held == "no" || held == "False") {
+    into = false;
+    return true;
+  }
+  return false;
+}
 
 std::int32_t OrdinalOf(const Variant &held) {
   if (held.Is<OrdinalInVariant>()) { return held.Get<OrdinalInVariant>().ordinal; }

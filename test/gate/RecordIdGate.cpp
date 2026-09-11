@@ -60,17 +60,16 @@ void AStoredBlankReadsAsTheEmptyId() {
   CHECK_TRUE("while a non-zero byte string still refuses", !other.has_value());
 }
 
-/// `recordid-tableno-method.md`: "This function returns an error if the record is blank."
-void TableNoRefusesOnABlankRecordId() {
+/// `recordid-tableno-method.md` says "returns an error if the record is blank", and the BaseApp
+/// branches on `RecId.TableNo = 0` in `NotificationLifecycleMgt` and `ErrorMessageManagement`
+/// and enables an action on `RecID.TableNo <> 0` in the Error Messages pages -- code that runs on
+/// every notification without a context record. The source declares; a blank RecordId answers 0.
+void TableNoOfABlankRecordIdIsZero() {
   constexpr int kSalesHeader = 36;
   CHECK_TRUE("a RecordId that names a row answers its table",
              SalesOrder().TableNo() == kSalesHeader);
-
-  std::string said;
-  try {
-    (void)RecordId{}.TableNo();
-  } catch (const Error &e) { said = e.what(); }
-  CHECK_TRUE("a blank one refuses rather than answering 0", !said.empty());
+  CHECK_TRUE("a blank one answers 0, which is what the BaseApp tests for",
+             RecordId{}.TableNo() == 0);
 }
 
 void TwoRecordIdsCompareByTableAndKey() {
@@ -87,7 +86,7 @@ int main() {
   return gate::Run("RecordId", [] {
     TheTextFormIsCaptionColonSpaceThenTheKey();
     ABlankRecordIdFormatsToTheEmptyString();
-    TableNoRefusesOnABlankRecordId();
+    TableNoOfABlankRecordIdIsZero();
     TwoRecordIdsCompareByTableAndKey();
     AStoredBlankReadsAsTheEmptyId();
   });

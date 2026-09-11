@@ -248,6 +248,11 @@ public:
   /// \return The action, to `Invoke`.
   TestAction Edit() { return Bound_("Edit"); }
 
+  /// \brief AL `TestPage.View()` -- switches an editing page to viewing, the system action
+  ///        `testpage-view-method.md` documents beside `Edit`.
+  /// \return The action, to `Invoke`.
+  TestAction View() { return Bound_("View"); }
+
   /// \brief AL `TestPage.Caption()`.
   /// \return The page's caption, or its name.
   [[nodiscard]] Text<0> Caption() const {
@@ -416,8 +421,20 @@ public:
     }
   }
 
+  [[nodiscard]] std::string ControlOrdinal(std::string_view control) const override {
+    AttachedForReading_();
+    const ControlDef *def = ControlNamed_(control);
+    if (def == nullptr || def->field.Value() == 0) { return {}; }
+    if constexpr (kHasRecord) {
+      return detail::FieldOrdinalText(&Record_(), RecordTraits_().kTable, def->field);
+    } else {
+      return {};
+    }
+  }
+
   void RunControlTrigger(std::string_view control, ControlTriggerKind kind) override {
     if (kind == ControlTriggerKind::Action && CloseAction_(control)) { return; }
+    if (kind == ControlTriggerKind::Action && ModeAction_(control)) { return; }
     RunTrigger_(control, kind, kind == ControlTriggerKind::Action);
   }
 
@@ -756,6 +773,14 @@ private:
                                   kNames,
                                   rec,
                                   before);
+  }
+
+  bool ModeAction_(std::string_view control) {
+    const bool edit = SameWord_(control, "Edit");
+    const bool view = SameWord_(control, "View");
+    if ((!edit && !view) || ControlNamed_(control) != nullptr || page_ == nullptr) { return false; }
+    if constexpr (requires(P &page) { page.OpenedAs(edit); }) { page_->OpenedAs(edit); }
+    return true;
   }
 
   bool CloseAction_(std::string_view control) {

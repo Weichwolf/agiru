@@ -53,6 +53,8 @@ public:
   Boolean DisablePersonalization{};
   Text<kCaptionLength> Caption;
   Boolean Enabled{};
+  /// \brief AL `AllProfile."App Name"` -- the name of the app the profile came with.
+  Text<kDescriptionLength> AppName;
   /// \brief AL `AllProfile.SystemId`.
   Guid SystemId;
   /// \brief AL `AllProfile.SystemCreatedAt`.
@@ -77,6 +79,8 @@ public:
     static constexpr ::agiru::FieldNo Caption{8};
     static constexpr ::agiru::FieldNo Enabled{9};
     static constexpr ::agiru::FieldNo Promoted{10};
+    /// \brief The AL field number of `App Name`, the next number the table had free.
+    static constexpr ::agiru::FieldNo AppName{11};
   };
 
   static constexpr std::array<::agiru::FieldNo, 3> kKey1{
@@ -86,7 +90,7 @@ public:
 
 using AllProfile = AllProfile_Table;
 
-inline constexpr std::array<FieldDef, 10> kAllProfileFields{{
+inline constexpr std::array<FieldDef, 11> kAllProfileFields{{
     Declare<&AllProfile::Scope>(
         AllProfile::Field_No::Scope, "Scope", "Scope", offsetof(AllProfile, Scope)),
     Declare<&AllProfile::AppID>(
@@ -117,6 +121,8 @@ inline constexpr std::array<FieldDef, 10> kAllProfileFields{{
         AllProfile::Field_No::Enabled, "Enabled", "Enabled", offsetof(AllProfile, Enabled)),
     Declare<&AllProfile::Promoted>(
         AllProfile::Field_No::Promoted, "Promoted", "Promoted", offsetof(AllProfile, Promoted)),
+    Declare<&AllProfile::AppName>(
+        AllProfile::Field_No::AppName, "App Name", "App Name", offsetof(AllProfile, AppName)),
 }};
 
 inline constexpr std::array<KeyDef, 2> kAllProfileKeys{{

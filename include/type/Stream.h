@@ -51,6 +51,14 @@ public:
   /// \return How many characters were written.
   Integer WriteText(std::string_view text);
 
+  /// \brief AL `OutStream.WriteText(Text, Length)` -- the first `Length` characters.
+  /// \param text The text. \param length How many characters of it.
+  /// \return How many bytes were written.
+  Integer WriteText(std::string_view text, Integer length) {
+    const std::size_t take = length < 0 ? 0 : static_cast<std::size_t>(length);
+    return WriteText(text.substr(0, take < text.size() ? take : text.size()));
+  }
+
   /// \brief AL `OutStream.WriteText()` -- with no text at all.
   ///
   /// \return How many characters were written, which is two.

@@ -1,9 +1,9 @@
 #include "Ast.h"
+#include "BodyWriter.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
 #include "PageWriter.h"
 #include "Parser.h"
-#include "BodyWriter.h"
 
 #include <map>
 #include <string>
@@ -19,6 +19,7 @@ agiru::gen::Objects Tables() {
                            .header = "sales/customer/table/Customer.h",
                            .fields = {{"no.", "No"}, {"blocked", "Blocked"}, {"name", "Name"}},
                            .procedures = {{"calcavailablecredit", "CalcAvailableCredit"}},
+                           .parts = {},
                            .name = {},
                            .dataItems = {},
                            .requestFields = {},
@@ -32,6 +33,7 @@ agiru::gen::Objects Tables() {
                                       {"customer no.", "CustomerNo"},
                                       {"amount", "Amount"}},
                            .procedures = {},
+                           .parts = {},
                            .name = {},
                            .dataItems = {},
                            .requestFields = {},
@@ -146,16 +148,20 @@ void TheGeneratorWritesTheReportAsAPageWithADatasetWalk() {
   CHECK_TRUE("the dataitem is a record member",
              Has(header.text, "Instance<::agiru::Sales::Customer::Customer_Table> Customer;"));
   CHECK_TRUE("a dataitem spelled like a global in C++ is kept apart from it",
-             Has(header.text, "Instance<::agiru::Sales::Receivables::CustLedgerEntry_Table> "
-                              "CustLedgerEntry;") &&
-                 Has(header.text, "Instance<::agiru::Sales::Receivables::CustLedgerEntry_Table> "
-                                  "CustLedgerEntry_2;"));
+             Has(header.text,
+                 "Instance<::agiru::Sales::Receivables::CustLedgerEntry_Table> "
+                 "CustLedgerEntry;") &&
+                 Has(header.text,
+                     "Instance<::agiru::Sales::Receivables::CustLedgerEntry_Table> "
+                     "CustLedgerEntry_2;"));
   CHECK_TRUE("the request page's filter records stand in the controls",
              Has(header.text, "::agiru::Sales::Customer::Customer_Table Customer{};") &&
-                 Has(header.text, "GiveRequestFilters_") && Has(header.text, "TakeRequestFilters_"));
-  CHECK_TRUE("the report traits carry the number",
-             Has(header.text, "struct agiru::ReportTraits<agiru::Sales::Reports::SomeStatement_Report>") &&
-                 Has(header.text, "static constexpr ReportId kId{50000};"));
+                 Has(header.text, "GiveRequestFilters_") &&
+                 Has(header.text, "TakeRequestFilters_"));
+  CHECK_TRUE(
+      "the report traits carry the number",
+      Has(header.text, "struct agiru::ReportTraits<agiru::Sales::Reports::SomeStatement_Report>") &&
+          Has(header.text, "static constexpr ReportId kId{50000};"));
   CHECK_TRUE("the dataitem tables are included whole",
              Has(header.text, "#include \"sales/receivables/table/CustLedgerEntry.h\""));
 
@@ -172,18 +178,21 @@ void TheGeneratorWritesTheReportAsAPageWithADatasetWalk() {
   CHECK_TRUE("RequestOptionsPage is the page itself", Has(source, "(*this).Update(false)"));
   CHECK_TRUE("a column lands in the dataset",
              Has(source, "(*this).Column(\"Amount\", Rec.Amount)"));
-  CHECK_TRUE("the view is applied in the fixed group",
-             Has(source, "::agiru::detail::ApplyDataItemView(Item_Block, \"sorting(\\\"No.\\\")where("));
+  CHECK_TRUE(
+      "the view is applied in the fixed group",
+      Has(source, "::agiru::detail::ApplyDataItemView(Item_Block, \"sorting(\\\"No.\\\")where("));
   CHECK_TRUE("the link narrows the child in the link group",
              Has(source, "Item_Block.FilterGroup(::agiru::detail::kLinkFilterGroup);") &&
                  Has(source, "Item_Block.SetRange(Item_Block.CustomerNo, Customer->No);"));
-  CHECK_TRUE("MaxIteration stops the loop", Has(source, "if (++Iterations_Block >= ::agiru::Integer{100}) { break; }"));
+  CHECK_TRUE("MaxIteration stops the loop",
+             Has(source, "if (++Iterations_Block >= ::agiru::Integer{100}) { break; }"));
   CHECK_TRUE("Break ends the dataitem and Skip the record",
              Has(source, "catch (const ::agiru::ReportBreak &)") &&
                  Has(source, "catch (const ::agiru::ReportSkip &)"));
   CHECK_TRUE("a leaf row carries its ancestors' columns first",
-             Has(source, "BeginRow_();\n            OnColumnsCustomer();\n            "
-                         "OnColumnsCustLedgerEntry_2();\n            EndRow_();"));
+             Has(source,
+                 "BeginRow_();\n            OnColumnsCustomer();\n            "
+                 "OnColumnsCustLedgerEntry_2();\n            EndRow_();"));
   CHECK_TRUE("the walk starts at the root", Has(source, "static_cast<void>(Walk_Customer_());"));
   CHECK_TRUE("a dataitem spelled like a global walks under its own identifier",
              Has(source, "bool SomeStatement_Report::Walk_CustLedgerEntry_2_()"));

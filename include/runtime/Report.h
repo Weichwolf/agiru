@@ -23,6 +23,7 @@
 #include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/Page.h"
+#include "runtime/RecordRef.h"
 #include "runtime/test/Handlers.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
@@ -140,6 +141,14 @@ struct ReportRequest {
       nullptr; ///< `SaveAs(..., ReportFormat::Xml, OutStream)`: where the dataset goes.
   bool requestPageOnly = false; ///< `RunRequestPage`: run the page and answer its parameters.
   std::string *parametersOut = nullptr; ///< Where `RunRequestPage` writes the parameters XML.
+  /// \brief The record `record` points INTO when the argument was a Variant, kept alive for the
+  ///        whole request.
+  ///
+  /// \warning THE POINTER MUST NOT OUTLIVE ITS OWNER. `TakeReportArgument` once unpacked a Variant
+  ///          into a LOCAL `RecordRef`, took its record's address and let the reference die at the
+  ///          closing brace -- a use-after-free that `Phys. Invt. COD UT` hit under four workers
+  ///          and never alone (board:0704, 2026-09-11). The handle lives here, beside the pointer.
+  RecordRef held{};
 };
 
 /// \brief What the runtime knows about a generated report: its number, its name and how to run it.
@@ -229,10 +238,9 @@ template <typename A> void TakeReportArgument(ReportRequest &request, const A &a
     request.table = argument.TableDefinition();
   } else if constexpr (std::same_as<V, Variant>) {
     if (argument.IsRecord() || argument.IsRecordRef()) {
-      RecordRef reference;
-      reference.GetTable(argument);
-      request.record = reference.RecordPointer();
-      request.table = reference.TableDefinition();
+      request.held.GetTable(argument);
+      request.record = request.held.RecordPointer();
+      request.table = request.held.TableDefinition();
     }
   } else {
     static_cast<void>(argument);

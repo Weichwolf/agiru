@@ -2,11 +2,13 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
+#include "runtime/Transaction.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -124,12 +126,15 @@ SubscriptionCatalogue::SubscriptionCatalogue(CodeunitId id,
 
 namespace detail {
 
-void Raise(EventObject kind,
-           std::int32_t objectId,
-           std::string_view objectName,
-           std::string_view event,
-           std::string_view element,
-           const EventArgs &args) {
+namespace {
+
+void Dispatch(EventObject kind,
+              std::int32_t objectId,
+              std::string_view objectName,
+              std::string_view event,
+              std::string_view element,
+              const EventArgs &args,
+              bool isolated) {
   for (const SubscriptionCatalogue *catalogue : Catalogues()) {
     for (const Subscription &subscription : catalogue->Subscriptions()) {
       if (!Listens(subscription, kind, objectId, objectName, event, element)) { continue; }
@@ -143,9 +148,45 @@ void Raise(EventObject kind,
       }
       if (instances.empty()) { continue; }
       const std::vector<std::size_t> bound = Bind(subscription, *catalogue, args);
-      for (void *instance : instances) { subscription.invoke(instance, args, bound); }
+      for (void *instance : instances) {
+        if (!isolated) {
+          subscription.invoke(instance, args, bound);
+          continue;
+        }
+        Scope boundary;
+        try {
+          subscription.invoke(instance, args, bound);
+        } catch (const Error &e) {
+          boundary.Discard(e);
+          continue;
+        } catch (const std::exception &e) {
+          boundary.Discard(e.what());
+          continue;
+        }
+        boundary.Keep();
+      }
     }
   }
+}
+
+}
+
+void Raise(EventObject kind,
+           std::int32_t objectId,
+           std::string_view objectName,
+           std::string_view event,
+           std::string_view element,
+           const EventArgs &args) {
+  Dispatch(kind, objectId, objectName, event, element, args, false);
+}
+
+void RaiseIsolated(EventObject kind,
+                   std::int32_t objectId,
+                   std::string_view objectName,
+                   std::string_view event,
+                   std::string_view element,
+                   const EventArgs &args) {
+  Dispatch(kind, objectId, objectName, event, element, args, true);
 }
 
 bool BindSubscriptions(CodeunitId id, void *instance) {

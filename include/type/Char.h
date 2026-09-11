@@ -43,9 +43,9 @@ public:
   ///          `std::string_view` in the tree was also a `Char`, and `Text + Text` became
   ///          ambiguous with `Char + Text` (73 diagnostics over the slice).
   constexpr explicit Char(std::string_view text)
-      : code_(text.size() == 1 ? static_cast<std::int32_t>(static_cast<unsigned char>(text.front()))
-                               : throw Error("A text of length " + std::to_string(text.size()) +
-                                             " is not one character")) {}
+      : code_(Decoded(text) >= 0 ? Decoded(text)
+                                 : throw Error("A text of length " + std::to_string(text.size()) +
+                                               " is not one character")) {}
 
   /// \brief AL passes a one-character literal where a `Char` is declared.
   /// \tparam N The literal's length, one character and its terminator.
@@ -169,11 +169,38 @@ public:
 
 private:
   static constexpr std::int32_t OneOf(std::string_view text) {
-    if (text.size() != 1) {
+    const std::int32_t code = Decoded(text);
+    if (code < 0) {
       throw Error("a Char is compared with a text that is not one character: '" +
                   std::string(text) + "'");
     }
-    return static_cast<unsigned char>(text[0]);
+    return code;
+  }
+
+  /// \brief The one code point a UTF-8 text encodes, or -1 when it encodes none or several.
+  /// \note A CHARACTER IS A CODE POINT AND NOT A BYTE. `'Ç'` is two bytes of UTF-8 and one AL
+  ///       character, and `Char = 'Ç'` counted the bytes (`Data Exch. to RapidStart UT`, 10
+  ///       cases, 2026-09-11); the text form of a `Char` is `Encoded` below, and this is its
+  ///       inverse.
+  static constexpr std::int32_t Decoded(std::string_view text) {
+    if (text.empty()) { return -1; }
+    const auto lead = static_cast<unsigned char>(text[0]);
+    const std::size_t length = lead < 0x80U              ? 1
+                               : (lead & 0xE0U) == 0xC0U ? 2
+                               : (lead & 0xF0U) == 0xE0U ? 3
+                               : (lead & 0xF8U) == 0xF0U ? 4
+                                                         : 0;
+    if (length == 0 || text.size() != length) { return -1; }
+    std::uint32_t code = length == 1   ? lead
+                         : length == 2 ? (lead & 0x1FU)
+                         : length == 3 ? (lead & 0x0FU)
+                                       : (lead & 0x07U);
+    for (std::size_t i = 1; i < length; ++i) {
+      const auto unit = static_cast<unsigned char>(text[i]);
+      if ((unit & 0xC0U) != 0x80U) { return -1; }
+      code = (code << 6U) | (unit & 0x3FU);
+    }
+    return static_cast<std::int32_t>(code);
   }
 
   std::int32_t code_ = 0;

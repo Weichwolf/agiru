@@ -345,6 +345,7 @@ template <typename P>::agiru::Action RunHandled(P &page, bool modal) {
     throw Error(std::string("Unhandled UI: ") + (modal ? "ModalPage " : "Page ") +
                 std::string(PageTraits<P>::kName));
   }
+  if (modal) { page.RunsModally(); }
   handler->invoke(PageTraits<P>::kName, &page);
   HandlerTable::Ran(*handler);
   ClosePage(page);
@@ -503,7 +504,30 @@ public:
 
   /// \brief Records the action the page closed with (`OK`, `Cancel`, `Yes`, `No`, `LookupOK`).
   /// \param action The action.
-  void CloseWith(::agiru::Action action) { closeAction_ = action; }
+  ///
+  /// \note `OK` ON A LOOKUP WINDOW IS `LookupOK`, which `page-runmodal--method.md` states: "To
+  ///       close a lookup window, the user chooses the OK button" returns `LookupOK`, and
+  ///       `Cancel` there is `LookupCancel`. A page is a lookup window when `LookupMode` is on, and
+  ///       when a collection-oriented page (`List`, `ListPart`, `Worksheet`) runs MODALLY -- the
+  ///       documentation's own example is `SetRecord; if RunModal = Action::LookupOK then
+  ///       GetRecord` with no `LookupMode` in sight, and `Price Source - Customer.IsLookupOK`
+  ///       reads `Page.RunModal(Page::"Customer Lookup", Customer) = Action::LookupOK` the same
+  ///       way (6 cases of `Price Source UT`, 2026-09-11). A Card or a dialog closes with `OK`.
+  void CloseWith(::agiru::Action action) {
+    bool lookup = static_cast<bool>(lookupMode_);
+    if constexpr (requires { PageTraits<Derived>::kPage.type; }) {
+      lookup = lookup || (modal_ && !EntityOriented(PageTraits<Derived>::kPage.type));
+    }
+    if (lookup && action == ::agiru::Action::OK) {
+      action = ::agiru::Action::LookupOK;
+    } else if (lookup && action == ::agiru::Action::Cancel) {
+      action = ::agiru::Action::LookupCancel;
+    }
+    closeAction_ = action;
+  }
+
+  /// \brief Notes that the page runs modally, which is what makes a list a lookup window.
+  void RunsModally() { modal_ = true; }
 
   /// \brief What `Page.RunModal` answers: the action the page closed with.
   /// \return The action; `OK` when nothing said otherwise.
@@ -882,6 +906,7 @@ public:
 
 private:
   bool editable_ = true;
+  bool modal_ = false;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
   std::string caption_;
   ::agiru::Boolean lookupMode_ = false;

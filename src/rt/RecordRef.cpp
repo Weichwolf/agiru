@@ -107,9 +107,9 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
   if (entry == nullptr || entry->validate == nullptr) {
     throw Error("FieldRef.Validate: this build carries no table " + std::string(Table_().name));
   }
-  const std::string text =
-      NewValue.IsEmpty() ? FieldText(record_, Def_())
-                         : std::string(std::string_view(::agiru::AsText(NewValue)));
+  const std::string text = NewValue.IsEmpty()
+                               ? FieldText(record_, Def_())
+                               : std::string(std::string_view(::agiru::AsText(NewValue)));
   entry->validate(record_, Def_().no, text);
 }
 
@@ -367,6 +367,13 @@ void FieldRef::SetValue(std::string_view text) {
   detail::SetFieldText(record_, Def_(), text);
 }
 
+void FieldRef::Value(const ::agiru::Blob &blob) {
+  if (Def_().type != FieldType::Blob) {
+    throw Error("FieldRef.Value: " + std::string(Def_().name) + " is not a BLOB field");
+  }
+  *reinterpret_cast<Blob *>(static_cast<std::byte *>(record_) + Def_().offset) = blob;
+}
+
 void FieldRef::TestField() const {
   agiru::detail::TestField(record_, Table_(), Def_().no);
 }
@@ -491,6 +498,52 @@ FieldRef RecordRef::FieldIndex(Integer index) const {
                 std::to_string(indexed.size()));
   }
   return FieldRef{State().record, table, *indexed[static_cast<std::size_t>(index) - 1]};
+}
+
+Integer RecordRef::CurrentKeyIndex(Integer NewKeyIndex) {
+  if (State().record == nullptr || State().table == nullptr) { return -1; }
+  const TableDef &table = Table();
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(State().record)->Ensure();
+  if (NewKeyIndex != 0) {
+    if (NewKeyIndex < 1 || static_cast<std::size_t>(NewKeyIndex) > table.keys.size()) {
+      throw Error("the key index " + std::to_string(NewKeyIndex) + " is outside 1.." +
+                  std::to_string(table.keys.size()));
+    }
+    state.key.clear();
+    for (const FieldNo no : table.keys[static_cast<std::size_t>(NewKeyIndex) - 1].fields) {
+      state.key.push_back(detail::SortField{.field = no, .ascending = true});
+    }
+    return NewKeyIndex;
+  }
+  if (state.key.empty()) { return table.keys.empty() ? -1 : 1; }
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    const KeyDef &key = table.keys[i];
+    if (key.fields.size() != state.key.size()) { continue; }
+    bool same = true;
+    for (std::size_t f = 0; f < key.fields.size() && same; ++f) {
+      same = key.fields[f].Value() == state.key[f].field.Value();
+    }
+    if (same) { return static_cast<Integer>(i + 1); }
+  }
+  return -1;
+}
+
+void RecordRef::SetTable(Variant &Rec) {
+  if (State().record == nullptr || State().table == nullptr) {
+    throw Error("RecordRef.SetTable: the RecordRef is not open");
+  }
+  if (!Rec.IsRecord()) { throw Error("RecordRef.SetTable(Variant): the Variant holds no record"); }
+  const RecordInVariant &record = Rec.Get<RecordInVariant>();
+  if (record.table != State().table->id) {
+    throw Error("RecordRef.SetTable: the RecordRef refers to " + std::string(State().table->name) +
+                " and the Variant holds a record of table " + std::to_string(record.table.Value()));
+  }
+  const TableEntry *entry = FindTable(record.table);
+  if (entry == nullptr) {
+    throw Error("RecordRef.SetTable: the record's table " + std::to_string(record.table.Value()) +
+                " is not translated in this build");
+  }
+  entry->copy(record.record, State().record);
 }
 
 KeyRef RecordRef::KeyIndex(Integer Index) const {

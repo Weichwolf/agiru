@@ -72,9 +72,14 @@ public:
 
   /// \brief AL `RecordId.TableNo()`.
   ///
-  /// \return The table number.
-  /// \throws Error when the RecordId is blank, which the page says it must: "This function returns
-  ///         an error if the record is blank."
+  /// \return The table number; 0 for a blank RecordId.
+  ///
+  /// \note THE PAGE SAYS "returns an error if the record is blank" AND THE BASEAPP SAYS OTHERWISE
+  ///       FIVE TIMES: `NotificationLifecycleMgt` and `ErrorMessageManagement` branch on
+  ///       `RecId.TableNo = 0`, the Error Messages pages enable an action on `RecID.TableNo <> 0`.
+  ///       Those lines run on every notification and every error page with no context record,
+  ///       so the sentence is the C/SIDE page's and not the platform's; refusing here failed 11
+  ///       cases of `Inc Doc Attachment Overview UT` the moment notifications ran (2026-09-11).
   [[nodiscard]] Integer TableNo() const;
 
   /// \brief AL `RecordId.GetRecord()` -- the row this id names

@@ -3,6 +3,7 @@
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
+#include "runtime/TestRunner.h"
 #include "runtime/test/TestHttpRequestMessage.h"
 #include "runtime/test/TestHttpResponseMessage.h"
 #include "type/BigInteger.h"
@@ -75,8 +76,10 @@
 #include "type/XmlText.h"
 #include "type/XmlWriteOptions.h"
 
+#include <cctype>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace agiru {
 
@@ -84,6 +87,17 @@ namespace {
 
 [[noreturn]] void RefuseDoor(std::string_view what) {
   throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");
+}
+
+bool SameControlName(std::string_view a, std::string_view b) {
+  if (a.size() != b.size()) { return false; }
+  for (std::size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i]))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 }
@@ -509,81 +523,114 @@ std::string FileUpload::FileName() {
   RefuseDoor("FileUpload.FileName()");
 }
 
+FilterPageBuilder::Control_ *FilterPageBuilder::Named_(std::string_view name) {
+  for (Control_ &control : controls_) {
+    if (SameControlName(control.name, name)) { return &control; }
+  }
+  return nullptr;
+}
+
+FilterPageBuilder::Control_ &FilterPageBuilder::Require_(std::string_view name,
+                                                         std::string_view method) {
+  Control_ *control = Named_(name);
+  if (control == nullptr) {
+    throw Error("FilterPageBuilder." + std::string(method) + ": no filter control is named '" +
+                std::string(name) + "'");
+  }
+  return *control;
+}
+
+std::string FilterPageBuilder::Add_(std::string_view name, ::agiru::RecordRef record) {
+  if (Control_ *control = Named_(name); control != nullptr) {
+    control->record = std::move(record);
+    return control->name;
+  }
+  controls_.push_back(
+      Control_{.name = std::string(name), .record = std::move(record), .fields = {}});
+  return controls_.back().name;
+}
+
 ::agiru::Boolean FilterPageBuilder::AddField(std::string_view Name,
                                              const ::agiru::FieldRef &Field,
                                              std::string_view Filter) {
-  static_cast<void>(Name);
-  static_cast<void>(Field);
-  static_cast<void>(Filter);
-  RefuseDoor("FilterPageBuilder.AddField(Text, FieldRef, Text)");
+  return AddFieldNo(Name, Field.Number(), Filter);
 }
 
 ::agiru::Boolean FilterPageBuilder::AddField(std::string_view Name,
                                              const ::agiru::Variant &Field,
                                              std::string_view Filter) {
-  static_cast<void>(Name);
-  static_cast<void>(Field);
-  static_cast<void>(Filter);
-  RefuseDoor("FilterPageBuilder.AddField(Text, Any, Text)");
+  if (Field.IsInteger()) { return AddFieldNo(Name, Field.Get<Integer>(), Filter); }
+  throw Error("FilterPageBuilder.AddField(Any): the Variant holds no field number, and a FieldRef "
+              "cannot be inside a Variant here (board:0035)");
 }
 
 ::agiru::Boolean FilterPageBuilder::AddFieldNo(std::string_view Name,
                                                ::agiru::Integer FieldNo,
                                                std::string_view Filter) {
-  static_cast<void>(Name);
-  static_cast<void>(FieldNo);
-  static_cast<void>(Filter);
-  RefuseDoor("FilterPageBuilder.AddFieldNo(Text, Integer, Text)");
+  Control_ &control = Require_(Name, "AddFieldNo");
+  if (!control.record.FieldExist(FieldNo)) { return false; }
+  bool listed = false;
+  for (const Integer no : control.fields) { listed = listed || no == FieldNo; }
+  if (!listed) { control.fields.push_back(FieldNo); }
+  if (!Filter.empty()) { control.record.Field(FieldNo).SetFilter(Filter); }
+  return true;
 }
 
 std::string FilterPageBuilder::AddRecord(std::string_view Name, const ::agiru::RecordRef &Record) {
-  static_cast<void>(Name);
-  static_cast<void>(Record);
-  RefuseDoor("FilterPageBuilder.AddRecord(Text, Record)");
+  return AddRecordRef(Name, Record);
 }
 
 std::string FilterPageBuilder::AddRecordRef(std::string_view Name,
                                             const ::agiru::RecordRef &RecordRef) {
-  static_cast<void>(Name);
-  static_cast<void>(RecordRef);
-  RefuseDoor("FilterPageBuilder.AddRecordRef(Text, RecordRef)");
+  ::agiru::RecordRef own;
+  own.Copy(RecordRef);
+  return Add_(Name, std::move(own));
 }
 
 std::string FilterPageBuilder::AddTable(const ::agiru::TextArgument &Name,
                                         ::agiru::Integer TableNo) {
-  static_cast<void>(Name);
-  static_cast<void>(TableNo);
-  RefuseDoor("FilterPageBuilder.AddTable(Text, Integer)");
+  ::agiru::RecordRef own;
+  own.Open(TableNo);
+  return Add_(std::string_view(Name), std::move(own));
 }
 
 ::agiru::Integer FilterPageBuilder::Count() {
-  RefuseDoor("FilterPageBuilder.Count()");
+  return static_cast<Integer>(controls_.size());
 }
 
 std::string FilterPageBuilder::GetView(std::string_view Name, ::agiru::Boolean UseNames) {
-  static_cast<void>(Name);
-  static_cast<void>(UseNames);
-  RefuseDoor("FilterPageBuilder.GetView(Text, Boolean)");
+  return Require_(Name, "GetView").record.GetView(UseNames);
 }
 
 std::string FilterPageBuilder::Name(::agiru::Integer Index) {
-  static_cast<void>(Index);
-  RefuseDoor("FilterPageBuilder.Name(Integer)");
+  if (Index < 1 || static_cast<std::size_t>(Index) > controls_.size()) {
+    throw Error("FilterPageBuilder.Name: the index " + std::to_string(Index) + " is outside 1.." +
+                std::to_string(controls_.size()));
+  }
+  return controls_[static_cast<std::size_t>(Index) - 1].name;
+}
+
+std::string FilterPageBuilder::PageCaption() {
+  return pageCaption_;
 }
 
 std::string FilterPageBuilder::PageCaption(std::string_view PageCaption) {
-  static_cast<void>(PageCaption);
-  RefuseDoor("FilterPageBuilder.PageCaption(Text)");
+  pageCaption_ = std::string(PageCaption);
+  return pageCaption_;
 }
 
 ::agiru::Boolean FilterPageBuilder::RunModal() {
-  RefuseDoor("FilterPageBuilder.RunModal()");
+  const TestHandler *handler = HandlerTable::For(HandlerKind::FilterPage);
+  if (handler == nullptr || controls_.empty()) { return false; }
+  FilterPageAnswer answer{.record = controls_.front().record, .accepted = false};
+  handler->invoke(pageCaption_, &answer);
+  HandlerTable::Ran(*handler);
+  return answer.accepted;
 }
 
 ::agiru::Boolean FilterPageBuilder::SetView(std::string_view Name, std::string_view View) {
-  static_cast<void>(Name);
-  static_cast<void>(View);
-  RefuseDoor("FilterPageBuilder.SetView(Text, Text)");
+  Require_(Name, "SetView").record.SetView(View);
+  return true;
 }
 
 void HttpClient::AddCertificate(const ::agiru::SecretText &Certificate,
@@ -1787,10 +1834,6 @@ std::string SessionSettings::TimeZone() {
 
 ::agiru::Boolean Dialog::HideSubsequentDialogs() {
   RefuseDoor("Dialog.HideSubsequentDialogs()");
-}
-
-std::string FilterPageBuilder::PageCaption() {
-  RefuseDoor("FilterPageBuilder.PageCaption()");
 }
 
 ::agiru::Duration HttpClient::Timeout() {

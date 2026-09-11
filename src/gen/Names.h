@@ -33,6 +33,12 @@ bool IsAlTypeName(std::string_view alType);
 
 void NoteObjectName(std::string_view identifier);
 
+void NoteDotNetSpellings(std::string_view source);
+
+void FixDotNetSpellings();
+
+std::string DotNetSpelling(std::string_view subtype);
+
 bool ShadowsADoorType(std::string_view name);
 
 std::string Literal(std::string_view text);

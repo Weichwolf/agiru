@@ -1,11 +1,14 @@
 #include "runtime/Session.h"
 
 #include "runtime/Database.h"
+#include "runtime/Events.h"
+#include "runtime/Transaction.h"
 #include "type/Date.h"
 
 #include "BuiltinsWritten.h"
 
 #include <string>
+#include <string_view>
 
 namespace agiru {
 
@@ -35,6 +38,14 @@ bool Session::HasCurrent() {
 
 Date Session::WorkDate() const {
   return workDate_.IsUndefined() ? Today() : workDate_;
+}
+
+void Session::OpenCompany() {
+  static constexpr std::string_view kCompanyTriggers = "Company Triggers";
+  static constexpr std::string_view kOpened = "OnCompanyOpenCompleted";
+  detail::Scope boundary;
+  detail::RaiseIsolated(EventObject::Codeunit, 0, kCompanyTriggers, kOpened, "", EventArgs{});
+  boundary.Keep();
 }
 
 Date Session::WorkDate(Date date) {

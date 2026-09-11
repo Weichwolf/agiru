@@ -39,9 +39,19 @@ void Arithmetic() {
   CHECK_TEXT("multiplication keeps s1 + s2, as CLR does", T(D("2.50") * D("2")), "5.00");
   CHECK_TEXT("sign under multiplication", T(D("-2.5") * D("4")), "-10.0");
   CHECK_TEXT("division that comes out even", T(D("1") / D("2")), "0.5");
-  CHECK_TEXT("division that does not, fills 28 places",
+  CHECK_TEXT("division that does not, fills the platform's twenty places",
              T(D("1") / D("3")),
-             "0.3333333333333333333333333333");
+             "0.33333333333333333333");
+  CHECK_TEXT("a product survives the column it is stored in",
+             T((D("1") / D("7")) * D("44") % (D("1") / D("7"))),
+             "0.00000000000000000000");
+  CHECK_TEXT("Trimmed drops the fractional zeros and nothing else",
+             T(D("10.50000000000000000000").Trimmed()),
+             "10.5");
+  CHECK_TEXT("Trimmed leaves an integer bare", T(D("100.00").Trimmed()), "100");
+  CHECK_TEXT("a text with more places is rounded to twenty",
+             T(D("0.142857142857142857142857142876")),
+             "0.14285714285714285714");
   CHECK_TEXT("division by a fraction", T(D("1") / D("0.25")), "4");
   // AL `mod` OVER DECIMALS, which `Item Unit of Measure` uses to check a quantity against a
   // rounding precision. Without a decimal operator the call went through the Integer conversion,

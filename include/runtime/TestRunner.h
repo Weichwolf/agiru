@@ -2,6 +2,7 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
+#include "runtime/RecordRef.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/TestPermissions.h"
 #include "type/Boolean.h"
@@ -10,6 +11,7 @@
 #include "type/Text.h"
 #include "type/TransactionModel.h"
 
+#include <concepts>
 #include <cstddef>
 #include <optional>
 #include <span>
@@ -108,6 +110,13 @@ template <typename C, typename A> A &FirstParameterOf(void (C::*)(A &));
 
 }
 
+/// \brief What a `[FilterPageHandler]` is handed: the filter page's first control as the
+///        RecordRef the procedure declares `var`, and where its Boolean answer goes.
+struct FilterPageAnswer {
+  ::agiru::RecordRef &record; ///< The control's record, whose filters the handler edits.
+  ::agiru::Boolean accepted;  ///< What the handler returned -- whether the user pressed OK.
+};
+
 template <typename Codeunit, auto Method> void InvokeHandler(std::string_view text, void *reply) {
   std::optional<Codeunit> own;
   if (CurrentTestInstance() == nullptr) { own.emplace(); }
@@ -146,6 +155,12 @@ template <typename Codeunit, auto Method> void InvokeHandler(std::string_view te
   } else if constexpr (requires(::agiru::Notification &sent) { (codeunit.*Method)(sent); }) {
     static_cast<void>(text);
     static_cast<void>((codeunit.*Method)(*static_cast<::agiru::Notification *>(reply)));
+  } else if constexpr (requires(::agiru::RecordRef &record) {
+                         { (codeunit.*Method)(record) } -> std::convertible_to<::agiru::Boolean>;
+                       }) {
+    static_cast<void>(text);
+    auto *answer = static_cast<FilterPageAnswer *>(reply);
+    answer->accepted = (codeunit.*Method)(answer->record);
   } else {
     static_cast<void>(text);
     static_cast<void>(reply);
