@@ -44,6 +44,16 @@ std::string_view Media::ExportFile(std::string_view filename) const {
   RefuseWithoutStore("exporting media " + id_.ToText() + " to '" + std::string(filename) + "'");
 }
 
+Media &Media::operator=(const ::agiru::Variant &held) {
+  static_cast<void>(held);
+  throw Error("a Variant carries no media here, so the field cannot take one (board:0031)");
+}
+
+MediaSet &MediaSet::operator=(const ::agiru::Variant &held) {
+  static_cast<void>(held);
+  throw Error("a Variant carries no media set here, so the field cannot take one (board:0031)");
+}
+
 Integer MediaSet::Count() const {
   if (id_.IsNull()) { return 0; }
   RefuseWithoutStore("counting media set " + id_.ToText());

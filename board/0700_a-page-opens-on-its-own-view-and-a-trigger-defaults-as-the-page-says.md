@@ -46,3 +46,15 @@ answers what the data says, so the tests asserting "there is no next row" stay g
 is what a part's record IS when nothing was found, not what `Next()` returns.
 
 **Measured: 1 777 -> 1 788 (+11, 0 new red).** `ERM Sales Cr. Memo Aggr. UT` went 21 -> 26 of 44.
+
+**A fourth try, measured and TAKEN BACK: `Init()` on the blank row.** `Sales Line."Allow Invoice
+Disc."` carries `InitValue = true`, and 12 cases said `Cannot apply an invoice discount because the
+document does not include lines where the Allow Invoice Disc. field is selected` -- so the blank row
+a part lands on looked like a record that never met `Init`. Calling it there measured **1 788 ->
+1 786, minus two and nothing fixed**, and it is out.
+
+Why it is wrong, on the evidence: BC's blank row is not a freshly initialised record. The trigger is
+`OnNewRecord(BelowxRec)` and it takes `xRec` -- the row the user was standing on -- so a new sales
+line inherits from the PREVIOUS line rather than from the field defaults, and `Init` threw that
+inheritance away. `InitValue` still has to reach that row; it reaches it through whatever BC does
+with `xRec`, which is the next thing to find out and not a guess to ship.

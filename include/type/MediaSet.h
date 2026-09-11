@@ -12,6 +12,8 @@
 
 namespace agiru {
 
+class Variant;
+
 /// \brief AL `MediaSet`.
 ///
 /// From `mediaset-data-type.md`: a complex type that encapsulates media in application database
@@ -29,6 +31,15 @@ public:
   /// \brief References a media set by its identifier.
   /// \param id The set's GUID.
   constexpr explicit MediaSet(const Guid &id) : id_(id) {}
+
+  /// \brief AL `MediaSetField := FieldRef.Value()` -- a media set out of a `Variant`.
+  ///
+  /// \param held What the FieldRef handed over.
+  /// \return This field.
+  /// \throws Error always -- a `Variant` carries no media set here (board:0031), and AL's own
+  ///         `FieldRef.Value` on a MediaSet field hands one over, so the line has to COMPILE and
+  ///         refuse when it runs rather than keep its whole translation unit out of the build.
+  MediaSet &operator=(const ::agiru::Variant &held);
 
   /// \brief AL `MediaSet.MediaId()`.
   /// \return The set's identifier, or the blank GUID when the field is empty.

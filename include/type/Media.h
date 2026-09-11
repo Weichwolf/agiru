@@ -12,6 +12,8 @@
 
 namespace agiru {
 
+class Variant;
+
 class OutStream;
 
 /// \brief AL `Media`.
@@ -30,6 +32,15 @@ class OutStream;
 ///       `uuid` and why everything that moves BYTES refuses here (board:0031).
 class Media {
 public:
+  /// \brief AL `MediaField := FieldRef.Value()` -- media out of a `Variant`.
+  ///
+  /// \param held What the FieldRef handed over.
+  /// \return This field.
+  /// \throws Error always -- a `Variant` carries no media here (board:0031), and the line has to
+  ///         COMPILE and refuse when it runs rather than keep its translation unit out of the
+  ///         build.
+  Media &operator=(const ::agiru::Variant &held);
+
   /// \brief No media object.
   constexpr Media() = default;
 

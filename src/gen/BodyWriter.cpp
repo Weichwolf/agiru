@@ -243,13 +243,18 @@ private:
         const std::string counter = Expression(statement.expression.children.front(), 0);
         const std::string first = Expression(statement.expression.children.back(), 0);
         const std::string last = Expression(statement.labels.front(), 0);
+        const auto ordinal = [](const std::string &bound) {
+          if (bound == "true") { return std::string("1"); }
+          if (bound == "false") { return std::string("0"); }
+          return "(" + bound + " ? 1 : 0)";
+        };
         const bool overBooleans =
-            (first == "true" || first == "false") && (last == "true" || last == "false");
+            ((first == "true" || first == "false") && (last == "true" || last == "false")) ||
+            SameName(scope_.DeclaredType(statement.expression.children.front().text), "Boolean");
         if (overBooleans) {
           const std::string step = "Step_Block";
-          out = Pad(indent) + "for (::agiru::Integer " + step + " = " +
-                (first == "true" ? "1" : "0") + "; " + step +
-                (statement.descending ? " >= " : " <= ") + (last == "true" ? "1" : "0") + "; " +
+          out = Pad(indent) + "for (::agiru::Integer " + step + " = " + ordinal(first) + "; " +
+                step + (statement.descending ? " >= " : " <= ") + ordinal(last) + "; " +
                 (statement.descending ? "--" : "++") + step + ") {\n" + Pad(indent + 2) + counter +
                 " = " + step + " != 0;\n" + Statements(statement.body, indent + 2) + Pad(indent) +
                 "}\n";

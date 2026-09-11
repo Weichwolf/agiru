@@ -2551,6 +2551,7 @@ base/finance/role_centers/page/AccountReceivables.cpp
 base/finance/role_centers/page/AccountReceivables.def.cpp
 base/finance/role_centers/page/AccountReceivablesKPIs.cpp
 base/finance/role_centers/page/AccountReceivablesKPIs.def.cpp
+base/finance/role_centers/page/AccPayableActivities.cpp
 base/finance/role_centers/page/AccPayableActivities.def.cpp
 base/finance/role_centers/page/AccPayableAdministratorRC.cpp
 base/finance/role_centers/page/AccPayableAdministratorRC.def.cpp
@@ -2572,6 +2573,7 @@ base/finance/role_centers/page/BusinessManagerRoleCenter.def.cpp
 base/finance/role_centers/page/FinanceManagerRoleCenter.cpp
 base/finance/role_centers/page/FinanceManagerRoleCenter.def.cpp
 base/finance/role_centers/page/FinancePerformance.def.cpp
+base/finance/role_centers/page/HeadlineRCAPAdmin.cpp
 base/finance/role_centers/page/HeadlineRCAPAdmin.def.cpp
 base/finance/role_centers/page/OverdueCustomers.cpp
 base/finance/role_centers/page/OverdueCustomers.def.cpp
@@ -5648,6 +5650,7 @@ base/inventory/tracking/codeunit/AsmItemTrackingMgt.cpp
 base/inventory/tracking/codeunit/AsmItemTrackingNavigateMgt.cpp
 base/inventory/tracking/codeunit/AsmReservCheckDateConfl.cpp
 base/inventory/tracking/codeunit/CreateReservEntry.cpp
+base/inventory/tracking/codeunit/InventoryProfileOffsetting.cpp
 base/inventory/tracking/codeunit/InvoiceableReceipts.cpp
 base/inventory/tracking/codeunit/ItemTracingMgt.cpp
 base/inventory/tracking/codeunit/ItemTrackingCaptionClassMgt.cpp
@@ -9868,6 +9871,7 @@ base/system/io/codeunit/ConfigTemplateManagement.cpp
 base/system/io/codeunit/ConfigTryValidate.cpp
 base/system/io/codeunit/ConfigValidateManagement.cpp
 base/system/io/codeunit/ConfigValidatePackage.cpp
+base/system/io/codeunit/ConfigXMLExchange.cpp
 base/system/io/codeunit/DataExchTypeSelector.cpp
 base/system/io/codeunit/DotNet_BinaryReader.cpp
 base/system/io/codeunit/DotNet_BinaryWriter.cpp
@@ -12158,6 +12162,7 @@ system/system/telemetry/table/FeatureUptake.cpp
 system/system/telemetry/table/FeatureUptake.def.cpp
 system/system/text/codeunit/AutoFormat.cpp
 system/system/text/codeunit/AutoFormatImpl.cpp
+system/system/text/codeunit/Base64Convert.cpp
 system/system/text/codeunit/CaptionClass.cpp
 system/system/text/codeunit/CaptionClassImpl.cpp
 system/system/text/codeunit/Dynamics2DProvider.cpp
