@@ -153,6 +153,13 @@ public:
     return false;
   }
 
+  [[nodiscard]] virtual bool IsTryFunctionOf(std::string_view variable,
+                                             std::string_view name) const {
+    static_cast<void>(variable);
+    static_cast<void>(name);
+    return false;
+  }
+
   [[nodiscard]] virtual std::string DeclaredEnum(std::string_view variable) const {
     static_cast<void>(variable);
     return {};

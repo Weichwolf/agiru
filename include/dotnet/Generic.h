@@ -6,7 +6,9 @@
 #include "type/Variant.h"
 
 #include <concepts>
+#include <cstddef>
 #include <map>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -243,6 +245,107 @@ public:
   /// \brief AL `foreach Item in List`: past the last item.
   /// \return The iterator.
   [[nodiscard]] std::vector<Variant>::const_iterator end() const { return items_.end(); }
+
+private:
+  std::vector<Variant> items_;
+};
+
+/// \brief .NET `System.Collections.Generic.IEnumerator<T>`, rebuilt over Variants: what
+///        `IEnumerable.GetEnumerator()` hands back and a `while IEnumerator.MoveNext() do X :=
+///        IEnumerator.Current` loop walks (`JSON Management` walks a `JObject`'s properties and
+///        a `JArray`'s matches this way, board:0714).
+class GenericIEnumerator1 {
+public:
+  /// \brief The binder AL never calls; it marks the class as rebuilt.
+  struct Binder {};
+
+  /// \brief An enumerator over nothing, which is what an unassigned variable holds.
+  GenericIEnumerator1() = default;
+
+  /// \brief An enumerator over items, standing before the first. \param items The items.
+  explicit GenericIEnumerator1(std::vector<Variant> items) : items_(std::move(items)) {}
+
+  /// \brief `IEnumerator.MoveNext()`: steps to the next item. \return Whether there was one.
+  ::agiru::Boolean MoveNext() {
+    if (at_ >= items_.size()) { return false; }
+    ++at_;
+    return at_ <= items_.size();
+  }
+
+  /// \brief `IEnumerator.Current`: the item `MoveNext` stepped to. \return It.
+  /// \throws Error before the first `MoveNext` and after the last.
+  [[nodiscard]] const Variant &Current() const {
+    if (at_ == 0 || at_ > items_.size()) {
+      throw Error("IEnumerator.Current: the enumerator stands on no item");
+    }
+    return items_[at_ - 1];
+  }
+
+  /// \brief `IEnumerator.Reset()`: back before the first item.
+  void Reset() { at_ = 0; }
+
+private:
+  std::vector<Variant> items_;
+  std::size_t at_ = 0;
+};
+
+/// \brief .NET `System.Collections.Generic.IEnumerable<T>`, rebuilt over Variants.
+class GenericIEnumerable1 {
+public:
+  /// \brief The binder AL never calls; it marks the class as rebuilt.
+  struct Binder {};
+
+  /// \brief An enumerable over nothing.
+  GenericIEnumerable1() = default;
+
+  /// \brief An enumerable over items. \param items The items.
+  explicit GenericIEnumerable1(std::vector<Variant> items) : items_(std::move(items)) {}
+
+  /// \brief `IEnumerable := List` -- AL hands a .NET collection to a variable declared as the
+  ///        interface, `UserRoles := UserInfo.Roles()` (Azure AD Graph Impl.).
+  /// \tparam R A range.
+  /// \param range The collection.
+  /// \return This.
+  /// \throws Error when an element is of a type a `Variant` cannot carry, rather than dropping it.
+  template <typename R>
+    requires(!std::same_as<std::remove_cvref_t<R>, GenericIEnumerable1>) &&
+            (!requires { typename std::remove_cvref_t<R>::IsAlRefusal; }) && requires(const R &r) {
+              std::ranges::begin(r);
+              std::ranges::end(r);
+            }
+  GenericIEnumerable1 &operator=(const R &range) {
+    items_.clear();
+    for (const auto &item : range) {
+      if constexpr (std::constructible_from<Variant, decltype(item)>) {
+        items_.emplace_back(item);
+      } else {
+        throw Error("an IEnumerable over this .NET type cannot be walked here yet: its elements "
+                    "do not travel in a Variant (board:0035)");
+      }
+    }
+    return *this;
+  }
+
+  /// \brief `IEnumerable := AbsentType.Member()`: the call refused before the assignment.
+  /// \tparam R The refusal. \param refused It. \return This.
+  template <typename R>
+    requires requires { typename R::IsAlRefusal; }
+  GenericIEnumerable1 &operator=(const R &refused) {
+    static_cast<void>(refused);
+    return *this;
+  }
+
+  /// \brief `IEnumerable.GetEnumerator()`. \return An enumerator standing before the first item.
+  [[nodiscard]] GenericIEnumerator1 GetEnumerator() const { return GenericIEnumerator1{items_}; }
+
+  /// \brief AL `foreach`: the first item. \return The iterator.
+  [[nodiscard]] std::vector<Variant>::const_iterator begin() const { return items_.begin(); }
+
+  /// \brief AL `foreach`: past the last item. \return The iterator.
+  [[nodiscard]] std::vector<Variant>::const_iterator end() const { return items_.end(); }
+
+  /// \brief The items, for a caller that builds another collection. \return Them.
+  [[nodiscard]] const std::vector<Variant> &Items() const { return items_; }
 
 private:
   std::vector<Variant> items_;

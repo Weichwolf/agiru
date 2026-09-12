@@ -125,7 +125,10 @@ public:
     return *this;
   }
 
-  ~TestPage() override { Release_(); }
+  ~TestPage() override {
+    detail::WithdrawTraps(this);
+    Release_();
+  }
 
   /// \brief AL `TestPage.OpenNew()` -- opens the page on a new record.
   /// \throws Error when the page is already open, as AL does.
@@ -514,7 +517,8 @@ public:
           detail::CheckEntryRange(text, def->minValue, def->maxValue);
         } catch (const Error &e) { throw e.Coded("TestValidation"); }
         row->set(Page_(), text);
-        RunTrigger_(control, ControlTriggerKind::Validate, true);
+        RunSavingIfValidated_(
+            [this, control] { RunTrigger_(control, ControlTriggerKind::Validate, true); });
         return;
       }
     }
@@ -546,6 +550,46 @@ public:
     } else {
       static_cast<void>(text);
       Unopened_();
+    }
+  }
+
+  /// A CONTROL'S OWN TRIGGER SAVES THE ROW TOO, WHEN IT VALIDATED THE RECORD. `field("Recurring
+  /// Frequency"; RecurringFrequency)` writes nothing itself; its `OnValidate` runs `Rec.Validate(
+  /// "Recurring Frequency", ...)`, an `OnLookup` that answers false may still have run
+  /// `Validate("Item No.", ...)` on the row (`Item Reference Management`), and
+  /// `devenv-onmodifyrecord-page-trigger.md` has the platform write the changed row the same way
+  /// it writes one a field control changed. Not every such trigger edits: most variable controls
+  /// show a sum or a filter, and a journal's batch control MOVES the record to another row. So
+  /// the row is saved only when a `Validate` ran inside the trigger, the key is the one the page
+  /// stood on, and a field differs -- the three guards the predecessor measured on
+  /// `BatchNameLookup_SaveRecord_OnlyWhenNotEmptyLine` (openerp
+  /// `_zeile_schmutzig_wenn_satz_veraendert`; ERM General Journal UT's recurring-frequency cases
+  /// and Phys. Invt. Order Line TAB UT's reference lookups, 2026-09-12).
+  template <typename Run> void RunSavingIfValidated_(Run &&run) {
+    if constexpr (kHasRecord) {
+      if (page_ == nullptr) {
+        run();
+        return;
+      }
+      const auto before = Record_();
+      const std::size_t taken = detail::BeforeImagesTaken();
+      run();
+      SaveIfValidated_(before, taken);
+    } else {
+      run();
+    }
+  }
+
+  template <typename R> void SaveIfValidated_(const R &before, std::size_t taken) {
+    if constexpr (kHasRecord) {
+      if (page_ == nullptr || detail::BeforeImagesTaken() == taken) { return; }
+      if (detail::SameFields(before, Record_())) { return; }
+      if (!newRecord_ && !detail::SameKey(before, Record_())) { return; }
+      edited_ = true;
+      SaveExistingRecord_();
+    } else {
+      static_cast<void>(before);
+      static_cast<void>(taken);
     }
   }
 
@@ -1246,12 +1290,26 @@ private:
         if (!SameWord_(trigger.control, control)) { continue; }
         if (kind == ControlTriggerKind::Lookup && trigger.lookup != nullptr) {
           ::agiru::Text<0> text(ControlText(control));
-          if ((Page_().*trigger.lookup)(text)) { SetControlText(control, text.Value()); }
+          if constexpr (kHasRecord) {
+            const auto before = Record_();
+            const std::size_t taken = detail::BeforeImagesTaken();
+            if ((Page_().*trigger.lookup)(text)) {
+              SetControlText(control, text.Value());
+            } else {
+              SaveIfValidated_(before, taken);
+            }
+          } else {
+            if ((Page_().*trigger.lookup)(text)) { SetControlText(control, text.Value()); }
+          }
           return;
         }
         void (P::*run)() = Trigger_(trigger, kind);
         if (run != nullptr) {
-          (Page_().*run)();
+          if (kind == ControlTriggerKind::DrillDown || kind == ControlTriggerKind::AssistEdit) {
+            RunSavingIfValidated_([this, run] { (Page_().*run)(); });
+          } else {
+            (Page_().*run)();
+          }
           return;
         }
         break;

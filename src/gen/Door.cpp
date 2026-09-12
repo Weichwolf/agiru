@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 136> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 144> kElsewhere{{
     {"dotnet::String", "dotnet/String.h"},
     {"dotnet::Uri", "dotnet/Uri.h"},
     {"dotnet::UriPartial", "dotnet/Uri.h"},
@@ -290,6 +290,14 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 136> kElsewh
     {"QueryDef", "meta/QueryDef.h"},
     {"GenericList1", "dotnet/Generic.h"},
     {"GenericDictionary2", "dotnet/Generic.h"},
+    {"GenericIEnumerable1", "dotnet/Generic.h"},
+    {"GenericIEnumerator1", "dotnet/Generic.h"},
+    {"dotnet::JObject", "dotnet/JObject.h"},
+    {"dotnet::JArray", "dotnet/JObject.h"},
+    {"dotnet::JToken", "dotnet/JObject.h"},
+    {"dotnet::JProperty", "dotnet/JObject.h"},
+    {"dotnet::JValue", "dotnet/JObject.h"},
+    {"dotnet::JsonConvert", "dotnet/JObject.h"},
     {"Materialised", "runtime/Events.h"},
     {"Subscription", "runtime/Events.h"},
     {"SubscriptionCatalogue", "runtime/Events.h"},

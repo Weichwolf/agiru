@@ -15,6 +15,7 @@
 #include "type/Enum.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/JsonHandle.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
 #include "type/Time.h"
@@ -220,6 +221,21 @@ struct CodeunitInVariant {
   const void *instance; ///< The instance, for a runner that knows the type.
 };
 
+/// \brief A Newtonsoft token (`dotnet::JObject` and its family) a Variant refers to -- AL
+///        `Variant := JProperty.Value` -- by reference into its tree, the way the token itself is.
+struct JsonInVariant {
+  detail::JsonHandle handle; ///< The node.
+  detail::JsonHandle owner;  ///< For a property: the object it lives in.
+  std::string name;          ///< For a property: its name.
+  detail::JsonKind kind;     ///< Which class put it here.
+};
+
+/// \brief Two tokens are equal when they refer to the same node the same way.
+/// \param a One. \param b The other. \return Whether the same.
+[[nodiscard]] inline bool operator==(const JsonInVariant &a, const JsonInVariant &b) {
+  return a.handle.node == b.handle.node && a.kind == b.kind && a.name == b.name;
+}
+
 /// \brief Two codeunit values are equal when they name the same object and instance.
 /// \param a One value. \param b The other.
 /// \return Whether they are the same.
@@ -319,7 +335,8 @@ public:
                             RecordInVariant,
                             RecordRefInVariant,
                             CodeunitInVariant,
-                            XmlInVariant>;
+                            XmlInVariant,
+                            JsonInVariant>;
 
   /// \brief An empty Variant, which is what an unassigned one holds.
   Variant() = default;
@@ -375,6 +392,31 @@ public:
     }
   explicit(false) Variant(const T &value)
       : held_(XmlInVariant{.handle = value.Handle(), .kind = T::kKind}) {}
+
+  /// \brief AL `Variant := JObject` (and the rest of Newtonsoft's family): the token travels by
+  ///        reference, the way the classes themselves do; a property brings its owner and name.
+  /// \tparam T A rebuilt Newtonsoft class, which carries its kind and its handle.
+  /// \param value The value.
+  template <typename T>
+    requires requires(const T &value) {
+      { T::kJsonKind } -> std::convertible_to<detail::JsonKind>;
+      { value.Handle() } -> std::convertible_to<const detail::JsonHandle &>;
+    }
+  explicit(false) Variant(const T &value)
+      : held_(JsonInVariant{
+            .handle = value.Handle(), .owner = {}, .name = {}, .kind = T::kJsonKind}) {
+    if constexpr (requires {
+                    { value.Owner() } -> std::convertible_to<const detail::JsonHandle &>;
+                    { std::string_view(value.Name()) };
+                  }) {
+      auto &held = std::get<JsonInVariant>(held_);
+      held.owner = value.Owner();
+      held.name = std::string(std::string_view(value.Name()));
+    }
+  }
+
+  /// \brief The Newtonsoft token this holds. \return It, or nothing when this is not one.
+  [[nodiscard]] const JsonInVariant *JsonHeld() const { return std::get_if<JsonInVariant>(&held_); }
 
   /// \brief The XML node this holds, for the XML types' `Add(Any)`.
   /// \return The handle, or nothing when this is not an XML value.
@@ -594,7 +636,7 @@ public:
             (!requires { typename T::IsAnAbsentType; }) && (!detail::IsEnumHolder<T>::value) &&
             (!requires { T::Traits::kValues; }) &&
             (!requires(const T &held) { held.AsInteger(); }) && (!requires { T::kKind; }) &&
-            (!requires { typename T::IsATextPosition; })
+            (!requires { T::kJsonKind; }) && (!requires { typename T::IsATextPosition; })
   Variant(const T &value) { // NOLINT(*-explicit-constructor)
     static_cast<void>(value);
     Refuse("that type");

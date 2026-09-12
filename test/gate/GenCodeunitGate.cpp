@@ -51,7 +51,8 @@ agiru::gen::Objects Tables() {
                            .dataItems = {},
                            .requestFields = {},
                            .columnSources = {},
-                           .interfaceReturns = {}});
+                           .interfaceReturns = {},
+                           .tryFunctions = {}});
   objects.enums.insert_or_assign("sales line type",
                                  agiru::gen::EnumRef{.identifier = "SalesLineType",
                                                      .header = "SalesLineType.h",

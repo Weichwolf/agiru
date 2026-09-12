@@ -142,6 +142,24 @@ void PushBefore(const void *record, const void *owner);
 /// \brief Ends what PushBefore began.
 void PopBefore();
 
+/// \brief How many before-images this session has taken so far -- one per `Validate`, and one
+///        per rename -- which is how a page harness tells that a control's trigger VALIDATED the
+///        record, rather than merely touched it.
+/// \return The count; it only grows.
+[[nodiscard]] std::size_t BeforeImagesTaken();
+
+/// \brief Whether two records of the same table carry the same values in every field.
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when no field differs.
+template <typename T> bool SameFields(const T &a, const T &b) {
+  for (const FieldDef &def : TableTraits<T>::kTable.fields) {
+    if (CompareField(&a, &b, def) != std::strong_ordering::equal) { return false; }
+  }
+  return true;
+}
+
 /// \brief The record the running trigger is changing FROM.
 /// \return It, or `nullptr` outside a trigger.
 [[nodiscard]] const void *CurrentBefore();

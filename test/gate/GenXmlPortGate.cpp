@@ -26,7 +26,8 @@ agiru::gen::Objects Tables() {
                            .dataItems = {},
                            .requestFields = {},
                            .columnSources = {},
-                           .interfaceReturns = {}});
+                           .interfaceReturns = {},
+                           .tryFunctions = {}});
   return objects;
 }
 

@@ -59,10 +59,17 @@ Suite: 1 788 -> 1 800.
   `"Production Order"` (the report's dataitem, an `Instance<>` member reached with `->`) from
   `ProductionOrder` (a `Record` local of the dataitem's own `OnAfterGetRecord`) by the quotes;
   `Identifier()` folds both to `ProductionOrder`, the local shadows the member, and the body reads
-  `ProductionOrder->VariantCode` on a plain record (5 UT cases wait behind that one report). The
-  shape of the fix is the page variables' `_Var` rule applied to LOCALS AND PARAMETERS: a
-  local whose identifier is a control's or dataitem's is spelled with the suffix, in
-  `Locals(...)` and in `PageNames::LocalSpelling` alike, since the two must agree.
+  `ProductionOrder->VariantCode` on a plain record (5 UT cases wait behind that one report).
+  **Done 2026-09-12 (batch194), and not with a suffix:** the member is reached through `this->`
+  when a local or parameter of the running procedure spells the same identifier -- the way
+  `TableNames` already reaches a field a local hides -- in `PageNames::GlobalSpelling`, the
+  dataitem `Rec` alias and `CodeunitNames::Resolve`. A census over the AL corpus counted 2 128
+  such collisions (1 596 in reports, mostly a `SalesHeader` parameter beside a `"Sales Header"`
+  dataitem); 30 generated units change, 13 of them in the slice and COMPILING BEFORE -- those
+  bodies read the LOCAL where AL reads the member (`SEPA DD pain.008` handed the local
+  `DirectDebitCollectionEntry` to `FillExportBuffer`), which is the silent-wrong-data kind -- and
+  17 reports join the slice (`Refresh Production Order`, `Replan Production Order`, `Combine
+  Shipments`, `Copy Company`, ...).
 - **A namespace-qualified type in an expression.** `case
   Microsoft.Foundation.Enums."Supply Document Type".FromInteger(DocumentType) of` -- the
   namespace path is read as member access on an identifier `Microsoft`. A dotted path whose last

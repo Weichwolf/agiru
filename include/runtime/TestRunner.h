@@ -299,6 +299,15 @@ struct TestRun {
 /// \warning A FAILING PROCEDURE DOES NOT STOP THE NEXT ONE.
 /// `devenv-test-codeunits-and-test-methods.md`
 ///          separates a test codeunit from a normal one on exactly this.
+/// \note EVERY PROCEDURE STARTS FROM THE SAME STATE. BC's own runner raises `Test Runner - Mgt.
+///       OnBeforeTestMethodRun` before each one, and the subscriber `ALTestRunner Reset
+///       Environment` clears the last error and runs codeunit 130301, whose `OnRun` seeds
+///       `Library - Random` with 1 -- so under BC every test method draws the SAME sequence
+///       whatever ran before it, and the suite was written against that. This runner does the
+///       same natively: the last error is cleared, the session's generator is reseeded with 1,
+///       and every page trap is forgotten, before each procedure. The AL events themselves are
+///       not raised: their subscriber chain reaches `Permissions Mock`, whose
+///       `PermissionTestHelper` is a platform type this tree does not carry yet (board:0715).
 [[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit);
 
 /// \brief What a run reports about one procedure the moment it finishes.

@@ -4,10 +4,14 @@
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
+#include "runtime/test/PageCore.h"
 #include "type/TransactionModel.h"
+
+#include "BuiltinsWritten.h"
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdlib>
 #include <exception>
 #include <mutex>
@@ -43,6 +47,18 @@ void TraceAllocationFailures_() {
   });
 }
 
+bool Named(std::string_view list, std::string_view name) {
+  for (std::size_t at = 0; at <= list.size();) {
+    const std::size_t comma = list.find(',', at);
+    const std::string_view one =
+        list.substr(at, comma == std::string_view::npos ? std::string_view::npos : comma - at);
+    if (one == name) { return true; }
+    if (comma == std::string_view::npos) { break; }
+    at = comma + 1;
+  }
+  return false;
+}
+
 std::vector<const TestCatalogue *> &Registered() {
   static std::vector<const TestCatalogue *> registered;
   return registered;
@@ -56,6 +72,8 @@ std::string Missed(const std::vector<std::string_view> &names) {
   }
   return out;
 }
+
+constexpr ::agiru::Integer kSeedBeforeEachTest = 1;
 
 void *&CurrentInstance() {
   thread_local void *instance = nullptr;
@@ -81,6 +99,9 @@ struct Driven {
 
 TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void *instance) {
   TraceAllocationFailures_();
+  detail::ClearTraps();
+  ClearLastError();
+  Randomize(kSeedBeforeEachTest);
   detail::Scope scope;
   HandlerTable::Install(codeunit.Handlers(), method.handlers);
   try {
@@ -179,7 +200,7 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
     }
     static const char *const only = std::getenv("AGIRU_TEST_PROCEDURE");
     for (const TestMethod &method : catalogue->Methods()) {
-      if (only != nullptr && method.name != only) { continue; }
+      if (only != nullptr && !Named(only, method.name)) { continue; }
       run.results.push_back(RunOne(*catalogue, method, driven.instance));
       if (run.results.back().passed) {
         ++run.passed;

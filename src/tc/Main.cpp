@@ -910,7 +910,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
               .dataItems = {},
               .requestFields = {},
               .columnSources = {},
-              .interfaceReturns = InterfaceReturnsOf(object)});
+              .interfaceReturns = InterfaceReturnsOf(object),
+              .tryFunctions = {}});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -1088,7 +1089,8 @@ Pages IndexPages(Run &run, Counts &counts, agiru::gen::Objects &objects) {
                                .dataItems = {},
                                .requestFields = {},
                                .columnSources = {},
-                               .interfaceReturns = {}});
+                               .interfaceReturns = {},
+                               .tryFunctions = {}});
       pages.paths.push_back(std::filesystem::relative(path, run.root).string());
       pages.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -1431,6 +1433,47 @@ void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects)
   }
 }
 
+std::set<std::string> TryFunctionsOf(const std::vector<agiru::al::ProcedureDecl> &procedures) {
+  std::set<std::string> tried;
+  for (const agiru::al::ProcedureDecl &procedure : procedures) {
+    if (agiru::gen::IsTryFunction(procedure)) {
+      tried.insert(agiru::gen::LowerKey(procedure.name));
+    }
+  }
+  return tried;
+}
+
+std::set<std::string> DeclaredTryFunctions(std::string_view source) {
+  std::set<std::string> tried;
+  static constexpr std::string_view kAttribute = "[TryFunction]";
+  static constexpr std::string_view kKeyword = "procedure";
+  for (std::size_t at = source.find(kAttribute); at != std::string_view::npos;
+       at = source.find(kAttribute, at + kAttribute.size())) {
+    const std::size_t keyword = source.find(kKeyword, at);
+    if (keyword == std::string_view::npos) { break; }
+    std::size_t cursor = keyword + kKeyword.size();
+    while (cursor < source.size() &&
+           std::isspace(static_cast<unsigned char>(source[cursor])) != 0) {
+      ++cursor;
+    }
+    std::string named;
+    if (cursor < source.size() && source[cursor] == '"') {
+      const std::size_t close = source.find('"', cursor + 1);
+      if (close == std::string_view::npos) { continue; }
+      named = std::string(source.substr(cursor + 1, close - cursor - 1));
+    } else {
+      std::size_t end = cursor;
+      while (end < source.size() &&
+             (std::isalnum(static_cast<unsigned char>(source[end])) != 0 || source[end] == '_')) {
+        ++end;
+      }
+      named = std::string(source.substr(cursor, end - cursor));
+    }
+    if (!named.empty()) { tried.insert(agiru::gen::LowerKey(named)); }
+  }
+  return tried;
+}
+
 std::string TableHeaderPath(const agiru::al::TableObject &table) {
   return agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
          agiru::gen::Identifier(table.name) + ".h";
@@ -1575,7 +1618,8 @@ Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
           .dataItems = {},
           .requestFields = {},
           .columnSources = {},
-          .interfaceReturns = {}};
+          .interfaceReturns = {},
+          .tryFunctions = TryFunctionsOf(table.procedures)};
       objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
       objects.tables.insert_or_assign(std::to_string(table.id), ref);
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -1807,7 +1851,8 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
             .dataItems = {},
             .requestFields = {},
             .columnSources = {},
-            .interfaceReturns = InterfaceReturns(source)});
+            .interfaceReturns = InterfaceReturns(source),
+            .tryFunctions = DeclaredTryFunctions(source)});
   }
 }
 
@@ -1850,7 +1895,8 @@ Pages IndexReports(Run &run, agiru::gen::Objects &objects) {
             .dataItems = std::move(dataItems),
             .requestFields = {},
             .columnSources = {},
-            .interfaceReturns = {}});
+            .interfaceReturns = {},
+            .tryFunctions = {}});
     if (parsed.has_value()) {
       reports.paths.push_back(std::filesystem::relative(path, run.root).string());
       reports.objects.push_back(std::move(*parsed));
@@ -1902,7 +1948,8 @@ Pages IndexXmlPorts(Run &run, agiru::gen::Objects &objects) {
             .dataItems = {},
             .requestFields = {},
             .columnSources = {},
-            .interfaceReturns = {}});
+            .interfaceReturns = {},
+            .tryFunctions = {}});
     if (parsed.has_value()) {
       ports.paths.push_back(std::filesystem::relative(path, run.root).string());
       ports.objects.push_back(std::move(*parsed));
@@ -1947,7 +1994,8 @@ Queries IndexQueries(Run &run, agiru::gen::Objects &objects) {
             .columnSources = parsed.has_value()
                                  ? agiru::gen::QueryColumnSources(*parsed)
                                  : std::map<std::string, std::pair<std::string, std::string>>{},
-            .interfaceReturns = {}});
+            .interfaceReturns = {},
+            .tryFunctions = {}});
     if (parsed.has_value()) {
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(*parsed));

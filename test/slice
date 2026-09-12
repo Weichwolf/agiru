@@ -819,6 +819,7 @@ base/cost_accounting/reports/report/CostAcctgStatement.cpp
 base/cost_accounting/reports/report/CostAcctgStatement.def.cpp
 base/cost_accounting/reports/report/CostAcctgStmtPerPeriod.cpp
 base/cost_accounting/reports/report/CostAcctgStmtPerPeriod.def.cpp
+base/costaccounting/reports/report/CostAllocations.cpp
 base/costaccounting/reports/report/CostAllocations.def.cpp
 base/cost_accounting/reports/report/CostRegister.cpp
 base/cost_accounting/reports/report/CostRegister.def.cpp
@@ -1801,6 +1802,7 @@ base/finance/currency/page/ExchRateAdjmtLedgEntries.cpp
 base/finance/currency/page/ExchRateAdjmtLedgEntries.def.cpp
 base/finance/currency/report/ExchRateAdjustment.cpp
 base/finance/currency/report/ExchRateAdjustment.def.cpp
+base/finance/currency/report/GLCurrencyRevaluation.cpp
 base/finance/currency/report/GLCurrencyRevaluation.def.cpp
 base/finance/currency/table/AdjustExchangeRateBuffer.cpp
 base/finance/currency/table/AdjustExchangeRateBuffer.def.cpp
@@ -2147,6 +2149,7 @@ base/finance/financial_reports/page/TrialBalanceSetup.cpp
 base/finance/financial_reports/page/TrialBalanceSetup.def.cpp
 base/finance/financial_reports/query/AccSchedLineDescCount.cpp
 base/finance/financial_reports/query/ColmLaytColmHeaderCount.cpp
+base/finance/financial_reports/report/AccountSchedule.cpp
 base/finance/financial_reports/report/AccountSchedule.def.cpp
 base/finance/financial_reports/report/BalanceSheet.cpp
 base/finance/financial_reports/report/BalanceSheet.def.cpp
@@ -2451,6 +2454,7 @@ base/finance/general_ledger/reports/report/GeneralJournalTest.cpp
 base/finance/general_ledger/reports/report/GeneralJournalTest.def.cpp
 base/finance/general_ledger/reports/report/GLDocumentNos.cpp
 base/finance/general_ledger/reports/report/GLDocumentNos.def.cpp
+base/finance/general_ledger/reports/report/GLRegister.cpp
 base/finance/general_ledger/reports/report/GLRegister.def.cpp
 base/finance/general_ledger/reports/report/ReceivablesPayables.cpp
 base/finance/general_ledger/reports/report/ReceivablesPayables.def.cpp
@@ -2846,6 +2850,7 @@ base/finance/vat/reporting/report/VATReportSuggestLines.cpp
 base/finance/vat/reporting/report/VATReportSuggestLines.def.cpp
 base/finance/vat/reporting/report/VATStatement.cpp
 base/finance/vat/reporting/report/VATStatement.def.cpp
+base/finance/vat/reporting/report/VATVIESDeclarationDisk.cpp
 base/finance/vat/reporting/report/VATVIESDeclarationDisk.def.cpp
 base/finance/vat/reporting/report/VATVIESDeclarationTaxAuth.cpp
 base/finance/vat/reporting/report/VATVIESDeclarationTaxAuth.def.cpp
@@ -5536,6 +5541,7 @@ base/inventory/reports/report/InventoryTransactionDetail.cpp
 base/inventory/reports/report/InventoryTransactionDetail.def.cpp
 base/inventory/reports/report/InventoryValuation.cpp
 base/inventory/reports/report/InventoryValuation.def.cpp
+base/inventory/reports/report/InventoryValuationWIP.cpp
 base/inventory/reports/report/InventoryValuationWIP.def.cpp
 base/inventory/reports/report/InventoryVendorPurchases.cpp
 base/inventory/reports/report/InventoryVendorPurchases.def.cpp
@@ -6083,7 +6089,9 @@ base/manufacturing/document/report/ProdOrderList.cpp
 base/manufacturing/document/report/ProdOrderList.def.cpp
 base/manufacturing/document/report/ProdOrderMatRequisition.cpp
 base/manufacturing/document/report/ProdOrderMatRequisition.def.cpp
+base/manufacturing/document/report/RefreshProductionOrder.cpp
 base/manufacturing/document/report/RefreshProductionOrder.def.cpp
+base/manufacturing/document/report/ReplanProductionOrder.cpp
 base/manufacturing/document/report/ReplanProductionOrder.def.cpp
 base/manufacturing/document/report/UpdateUnitCost.cpp
 base/manufacturing/document/report/UpdateUnitCost.def.cpp
@@ -7434,12 +7442,15 @@ base/purchases/history/page/ReturnShipmentLines.cpp
 base/purchases/history/page/ReturnShipmentLines.def.cpp
 base/purchases/history/page/ReturnShipmentStatistics.cpp
 base/purchases/history/page/ReturnShipmentStatistics.def.cpp
+base/purchases/history/report/PurchaseCreditMemo.cpp
 base/purchases/history/report/PurchaseCreditMemo.def.cpp
+base/purchases/history/report/PurchaseInvoice.cpp
 base/purchases/history/report/PurchaseInvoice.def.cpp
 base/purchases/history/report/PurchaseReceipt.cpp
 base/purchases/history/report/PurchaseReceipt.def.cpp
 base/purchases/history/report/PurchaseReturnShipment.cpp
 base/purchases/history/report/PurchaseReturnShipment.def.cpp
+base/purchases/history/report/SelfBillingInvoice.cpp
 base/purchases/history/report/SelfBillingInvoice.def.cpp
 base/purchases/history/table/PurchCrMemoHdr.cpp
 base/purchases/history/table/PurchCrMemoHdr.def.cpp
@@ -8071,6 +8082,7 @@ base/sales/document/report/BlanketSalesOrder.cpp
 base/sales/document/report/BlanketSalesOrder.def.cpp
 base/sales/document/report/CombineReturnReceipts.cpp
 base/sales/document/report/CombineReturnReceipts.def.cpp
+base/sales/document/report/CombineShipments.cpp
 base/sales/document/report/CombineShipments.def.cpp
 base/sales/document/report/CopySalesDocument.cpp
 base/sales/document/report/CopySalesDocument.def.cpp
@@ -8608,6 +8620,7 @@ base/sales/reports/report/CustomerDetailedAging.cpp
 base/sales/reports/report/CustomerDetailedAging.def.cpp
 base/sales/reports/report/CustomerDetailTrialBal.cpp
 base/sales/reports/report/CustomerDetailTrialBal.def.cpp
+base/sales/reports/report/CustomerItemSales.cpp
 base/sales/reports/report/CustomerItemSales.def.cpp
 base/sales/reports/report/CustomerLabels.cpp
 base/sales/reports/report/CustomerLabels.def.cpp
@@ -8828,6 +8841,7 @@ base/service/contract/report/ChangeCustomerInContract.cpp
 base/service/contract/report/ChangeCustomerInContract.def.cpp
 base/service/contract/report/CreateContractInvoices.cpp
 base/service/contract/report/CreateContractInvoices.def.cpp
+base/service/contract/report/CreateContractServiceOrders.cpp
 base/service/contract/report/CreateContractServiceOrders.def.cpp
 base/service/contract/report/GetPrepaidContractEntries.cpp
 base/service/contract/report/GetPrepaidContractEntries.def.cpp
@@ -9079,6 +9093,7 @@ base/service/history/page/ServiceShipmentStatistics.def.cpp
 base/service/history/query/ServiceInvoicesByOrder.cpp
 base/service/history/report/ServiceCreditMemo.cpp
 base/service/history/report/ServiceCreditMemo.def.cpp
+base/service/history/report/ServiceInvoice.cpp
 base/service/history/report/ServiceInvoice.def.cpp
 base/service/history/report/ServiceShipment.cpp
 base/service/history/report/ServiceShipment.def.cpp
@@ -9701,6 +9716,7 @@ base/system/diagnostics/page/MonitoredFieldsWorksheet.cpp
 base/system/diagnostics/page/MonitoredFieldsWorksheet.def.cpp
 base/system/diagnostics/page/MonitorFieldSetupWizard.cpp
 base/system/diagnostics/page/MonitorFieldSetupWizard.def.cpp
+base/system/diagnostics/report/ChangeLogDelete.cpp
 base/system/diagnostics/report/ChangeLogDelete.def.cpp
 base/system/diagnostics/report/ChangeLogEntries.cpp
 base/system/diagnostics/report/ChangeLogEntries.def.cpp
@@ -9821,6 +9837,7 @@ base/system/environment/configuration/page/ReportSettings.def.cpp
 base/system/environment/configuration/page/SentNotificationEntries.cpp
 base/system/environment/configuration/page/SentNotificationEntries.def.cpp
 base/system/environment/configuration/query/UserIDsByNotificationType.cpp
+base/system/environment/configuration/report/CopyCompany.cpp
 base/system/environment/configuration/report/CopyCompany.def.cpp
 base/system/environment/configuration/report/NotificationEmail.cpp
 base/system/environment/configuration/report/NotificationEmail.def.cpp

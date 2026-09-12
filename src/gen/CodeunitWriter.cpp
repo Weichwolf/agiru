@@ -201,6 +201,17 @@ bool IsTryFunction(const al::ProcedureDecl &procedure) {
   });
 }
 
+bool IsTryFunctionOf(const Objects &objects, const al::VarDecl *declared, std::string_view name) {
+  if (declared == nullptr) { return false; }
+  const std::string type = TypeName(declared->type);
+  const TableIndex *index = nullptr;
+  if (SameName(type, "Record")) { index = &objects.tables; }
+  if (SameName(type, "Codeunit")) { index = &objects.codeunits; }
+  if (index == nullptr) { return false; }
+  const auto found = index->find(LowerKey(declared->subtype));
+  return found != index->end() && found->second.tryFunctions.contains(LowerKey(std::string(name)));
+}
+
 bool DefaultsToTrue(const al::ProcedureDecl &procedure) {
   const std::string name = LowerKey(procedure.name);
   return name == "onqueryclosepage" || name == "oninsertrecord" || name == "onmodifyrecord" ||
@@ -1189,6 +1200,11 @@ public:
     return where == nullptr ? std::string{} : TypeName(where->type);
   }
 
+  [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
+                                     std::string_view name) const override {
+    return ::agiru::gen::IsTryFunctionOf(objects_, Declaration(variable), name);
+  }
+
   [[nodiscard]] std::vector<std::string> ParameterTypes(std::string_view name) const override {
     for (const al::ProcedureDecl &procedure : unit_.procedures) {
       if (!SameName(procedure.name, name)) { continue; }
@@ -1423,6 +1439,15 @@ public:
     return declared->subtype;
   }
 
+  [[nodiscard]] bool HiddenByALocal(const std::string &identifier) const {
+    for (const std::vector<al::VarDecl> *group : {&procedure_.variables, &procedure_.parameters}) {
+      for (const al::VarDecl &declared : *group) {
+        if (Identifier(declared.name) == identifier) { return true; }
+      }
+    }
+    return !procedure_.returnName.empty() && Identifier(procedure_.returnName) == identifier;
+  }
+
   [[nodiscard]] const al::VarDecl *Local(std::string_view name) const {
     const auto same = [&name](const al::VarDecl &declared) {
       return SameName(declared.name, name);
@@ -1488,13 +1513,19 @@ public:
       if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::VarDecl &declared : unit_.variables) {
-      if (SameName(declared.name, name)) { return Identifier(declared.name); }
+      if (SameName(declared.name, name)) {
+        const std::string spelled = Identifier(declared.name);
+        return HiddenByALocal(spelled) ? "this->" + spelled : spelled;
+      }
     }
     for (const al::LabelDecl &label : unit_.labels) {
       if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &other : unit_.procedures) {
-      if (SameName(other.name, name)) { return Identifier(other.name); }
+      if (SameName(other.name, name)) {
+        const std::string spelled = Identifier(other.name);
+        return HiddenByALocal(spelled) ? "this->" + spelled : spelled;
+      }
     }
     if (LowerKey(std::string(name)) == "rec" && al::Find(unit_.properties, "TableNo") != nullptr) {
       return "Rec";
@@ -2041,7 +2072,8 @@ TableIndex PlatformTables() {
                        .dataItems = {},
                        .requestFields = {},
                        .columnSources = {},
-                       .interfaceReturns = {}};
+                       .interfaceReturns = {},
+                       .tryFunctions = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };

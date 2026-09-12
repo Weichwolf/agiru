@@ -1,6 +1,12 @@
 #pragma once
 
+#include <cstdint>
+
 namespace agiru::detail {
+
+/// \brief How a Newtonsoft token travels in a `Variant`: which of the rebuilt `JObject` family
+///        the variable that put it there was. \see dotnet::JToken
+enum class JsonKind : std::uint8_t { Token, Object, Array, Value, Property };
 
 /// \brief One JSON document, owned by reference count: every AL JSON value that refers into it
 ///        holds one count, and the document is freed with the last of them.

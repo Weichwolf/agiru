@@ -22,7 +22,8 @@ agiru::gen::Objects Tables() {
                            .dataItems = {},
                            .requestFields = {},
                            .columnSources = {},
-                           .interfaceReturns = {}});
+                           .interfaceReturns = {},
+                           .tryFunctions = {}});
   objects.tables.insert_or_assign(
       "workflow step",
       agiru::gen::TableRef{.identifier = "::agiru::System::Automation::WorkflowStep_Table",
@@ -36,7 +37,8 @@ agiru::gen::Objects Tables() {
                            .dataItems = {},
                            .requestFields = {},
                            .columnSources = {},
-                           .interfaceReturns = {}});
+                           .interfaceReturns = {},
+                           .tryFunctions = {}});
   return objects;
 }
 
@@ -173,7 +175,8 @@ query 50001 "Open Steps"
                            .dataItems = {},
                            .requestFields = {},
                            .columnSources = {},
-                           .interfaceReturns = {}});
+                           .interfaceReturns = {},
+                           .tryFunctions = {}});
   const std::string unit = R"(codeunit 50002 "Some Walker"
 {
     procedure Walk()

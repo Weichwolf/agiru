@@ -19,6 +19,8 @@
 #include "type/Text.h"
 #include "type/Time.h"
 
+#include "JsonEngine.h"
+
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -28,11 +30,6 @@
 
 namespace agiru::detail {
 
-struct JsonTree {
-  nlohmann::json root;
-  long uses = 1;
-};
-
 void JsonRetain(JsonTree *tree) noexcept {
   if (tree != nullptr) { ++tree->uses; }
 }
@@ -41,25 +38,32 @@ void JsonRelease(JsonTree *tree) noexcept {
   if (tree != nullptr && --tree->uses == 0) { delete tree; }
 }
 
-namespace {
-
-JsonHandle Made(nlohmann::json value) {
+JsonHandle JsonHandleMade(nlohmann::json value) {
   auto *tree = new JsonTree{.root = std::move(value), .uses = 0};
   return JsonHandle{tree, &tree->root};
 }
 
+nlohmann::json &JsonNodeOf(const JsonHandle &handle) {
+  if (handle.node == nullptr) {
+    throw Error("this JSON value refers to nothing -- nothing has been read into it");
+  }
+  return *static_cast<nlohmann::json *>(handle.node);
+}
+
+JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::json &node) {
+  return JsonHandle{tree.tree, &node};
 }
 
 JsonHandle NewJsonObject() {
-  return Made(nlohmann::json::object());
+  return JsonHandleMade(nlohmann::json::object());
 }
 
 JsonHandle NewJsonArray() {
-  return Made(nlohmann::json::array());
+  return JsonHandleMade(nlohmann::json::array());
 }
 
 JsonHandle NewJsonValue() {
-  return Made(nlohmann::json());
+  return JsonHandleMade(nlohmann::json());
 }
 
 }
@@ -71,10 +75,7 @@ namespace {
 using Json = nlohmann::json;
 
 Json &Node(const detail::JsonHandle &handle) {
-  if (handle.node == nullptr) {
-    throw Error("this JSON value refers to nothing -- nothing has been read into it");
-  }
-  return *static_cast<Json *>(handle.node);
+  return detail::JsonNodeOf(handle);
 }
 
 Json FromDecimal(const Decimal &value) {

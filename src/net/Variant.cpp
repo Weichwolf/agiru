@@ -51,6 +51,8 @@ std::string_view Variant::HeldName() const {
           return "RecordRef";
         } else if constexpr (std::same_as<Held, CodeunitInVariant>) {
           return "Codeunit";
+        } else if constexpr (std::same_as<Held, JsonInVariant>) {
+          return "Json";
         } else {
           return "Xml";
         }

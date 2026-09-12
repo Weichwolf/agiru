@@ -142,14 +142,20 @@ namespace agiru {
 ///       is one (board:0035).
 ::agiru::ClientType CurrentClientType();
 
-/// \brief AL `Session.ApplicationArea(Text)`. Gets or sets the application areas for the current
-///        session.
-/// \param ApplicationArea The areas to set, `#Basic,#Suite` style; empty reads without setting.
-/// \return The areas that were current before the call.
+/// \brief AL `Session.ApplicationArea()`. Gets the application areas for the current session.
+/// \return The areas, `#Basic,#Suite` style.
 /// \note PER SESSION, held with the session's other per-thread state; a test that sets
 ///       `ApplicationArea('#Basic')` and reads it back sees its own value (12 UT cases,
 ///       2026-09-09). Nothing here decides what an area SHOWS -- that is the page renderer's.
-std::string ApplicationArea(std::string_view ApplicationArea = {});
+std::string ApplicationArea();
+
+/// \brief AL `Session.ApplicationArea(Text)`. Sets the application areas for the current session.
+/// \param ApplicationArea The areas to set, `#Basic,#Suite` style.
+/// \return The areas that were current before the call.
+/// \note AN EMPTY TEXT SETS THE AREA TO NOTHING. `ApplicationArea('')` is what BC's test runner
+///       does before every test method (`ALTestRunner Reset Environment`), and a setter that
+///       treated the empty text as a read left the previous test's area standing.
+std::string ApplicationArea(std::string_view ApplicationArea);
 
 /// \brief AL `System.ClosingDate(Date)`. The closing date of a normal date: after every posting
 ///        of that day and before the next day (`date-data-type.md`).
@@ -695,11 +701,16 @@ MemberOrdinalOf(std::span<const EnumValueDef> members, std::string_view text) {
 /// \return Whether the text spelled a Boolean.
 template <typename T>
 [[nodiscard]] ::agiru::Boolean EvaluatedBoolean(T &into, std::string_view text) {
-  if (text == "1" || text == "true" || text == "Yes" || text == "yes") {
+  std::string folded;
+  folded.reserve(text.size());
+  for (const char c : text) {
+    folded += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  if (folded == "1" || folded == "true" || folded == "yes") {
     into = true;
     return true;
   }
-  if (text == "0" || text == "false" || text == "No" || text == "no" || text.empty()) {
+  if (folded == "0" || folded == "false" || folded == "no" || folded.empty()) {
     into = false;
     return true;
   }

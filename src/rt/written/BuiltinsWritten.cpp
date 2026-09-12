@@ -1,6 +1,7 @@
 #include "BuiltinsWritten.h"
 
 #include "Builtins.h"
+#include "dotnet/JObject.h"
 #include "meta/EnumDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Error.h"
@@ -148,6 +149,13 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
     return held->id.ToText();
   }
   if (Value.Is<Blob>()) { return {}; }
+  if (const ::agiru::JsonInVariant *held = Value.JsonHeld(); held != nullptr) {
+    if (held->kind == ::agiru::detail::JsonKind::Property) {
+      return std::string(
+          std::string_view(::agiru::dotnet::JProperty::Of(held->owner, held->name).ToString()));
+    }
+    return std::string(std::string_view(::agiru::dotnet::JToken{held->handle}.ToString()));
+  }
   throw Error(std::string("Format: a Variant holding ") + Value.HeldName() +
               " has no text form yet");
 }
@@ -519,10 +527,23 @@ void LogAuditMessage(std::string_view SecurityAuditDescription,
   return ::agiru::ClientType::Web;
 }
 
-std::string ApplicationArea(std::string_view ApplicationArea) {
+namespace {
+
+std::string &CurrentApplicationArea() {
   thread_local std::string current;
+  return current;
+}
+
+}
+
+std::string ApplicationArea() {
+  return CurrentApplicationArea();
+}
+
+std::string ApplicationArea(std::string_view ApplicationArea) {
+  std::string &current = CurrentApplicationArea();
   const std::string was = current;
-  if (!ApplicationArea.empty()) { current = std::string(ApplicationArea); }
+  current = std::string(ApplicationArea);
   return was;
 }
 

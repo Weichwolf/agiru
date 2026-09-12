@@ -11,6 +11,7 @@
 
 #include "BuiltinsWritten.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <iterator>
 #include <string>
@@ -192,6 +193,10 @@ bool TrapPending(std::int32_t page) {
 
 void ClearTraps() {
   Traps().clear();
+}
+
+void WithdrawTraps(const void *harness) {
+  std::erase_if(Traps(), [harness](const PageTrap &trap) { return trap.harness == harness; });
 }
 
 }

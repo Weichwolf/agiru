@@ -138,6 +138,11 @@ void TrapPage(std::int32_t page,
 /// \brief Forgets every trap; the runner does this between cases.
 void ClearTraps();
 
+/// \brief Forgets the traps one harness set, which its destructor does: a trap that outlived its
+///        `TestPage` variable adopted a page into freed memory.
+/// \param harness The harness.
+void WithdrawTraps(const void *harness);
+
 }
 
 }

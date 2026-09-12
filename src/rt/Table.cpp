@@ -934,8 +934,18 @@ void CheckRelation(const void *record, const TableDef &table, FieldNo no) {
               std::string(other.caption.empty() ? other.name : other.caption) + ").");
 }
 
+std::size_t &ImagesTaken() {
+  static thread_local std::size_t taken = 0;
+  return taken;
+}
+
 void PushBefore(const void *record, const void *owner) {
+  ++ImagesTaken();
   BeforeStack().push_back({record, owner});
+}
+
+std::size_t BeforeImagesTaken() {
+  return ImagesTaken();
 }
 
 void PopBefore() {

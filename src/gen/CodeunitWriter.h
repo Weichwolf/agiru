@@ -32,6 +32,8 @@ struct TableRef {
   std::map<std::string, std::pair<std::string, std::string>> columnSources;
 
   std::set<std::string> interfaceReturns;
+
+  std::set<std::string> tryFunctions;
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -67,6 +69,9 @@ struct Objects {
 };
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);
+
+[[nodiscard]] bool
+IsTryFunctionOf(const Objects &objects, const al::VarDecl *declared, std::string_view name);
 
 std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &procedures,
                                           std::string_view name,

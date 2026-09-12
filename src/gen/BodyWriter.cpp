@@ -653,11 +653,17 @@ private:
                : BuiltinSpelling(builtin);
   }
 
+  [[nodiscard]] bool IsTriedCall(const al::Expr &callee) const {
+    if (callee.kind == al::ExprKind::Name) { return scope_.IsTryFunction(callee.text); }
+    return callee.kind == al::ExprKind::Binary && callee.text == "." &&
+           callee.children.size() == 2 && callee.children[0].kind == al::ExprKind::Name &&
+           callee.children[1].kind == al::ExprKind::Name &&
+           scope_.IsTryFunctionOf(callee.children[0].text, callee.children[1].text);
+  }
+
   std::string Tried(const al::Expr &expression) {
     const al::Expr &callee = expression.children.front();
-    if (discarded_ || callee.kind != al::ExprKind::Name || !scope_.IsTryFunction(callee.text)) {
-      return {};
-    }
+    if (discarded_ || !IsTriedCall(callee)) { return {}; }
     const bool was = discarded_;
     discarded_ = true;
     const std::string inner = Call(expression);
@@ -1785,6 +1791,13 @@ public:
     return nullptr;
   }
 
+  [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
+                                     std::string_view name) const override {
+    const al::VarDecl *local = Local(variable);
+    return ::agiru::gen::IsTryFunctionOf(
+        objects_, local != nullptr ? local : Global(variable), name);
+  }
+
   [[nodiscard]] bool LocalLabel(std::string_view name) const {
     return running_ != nullptr &&
            std::ranges::any_of(running_->labels, [name](const al::LabelDecl &label) {
@@ -2095,17 +2108,31 @@ public:
     return {};
   }
 
+  [[nodiscard]] bool HiddenByALocal(const std::string &identifier) const {
+    if (running_ == nullptr) { return false; }
+    for (const std::vector<al::VarDecl> *group : {&running_->variables, &running_->parameters}) {
+      for (const al::VarDecl &declared : *group) {
+        if (Identifier(declared.name) == identifier) { return true; }
+      }
+    }
+    return !running_->returnName.empty() && Identifier(running_->returnName) == identifier;
+  }
+
   [[nodiscard]] std::string GlobalSpelling(std::string_view name) const {
     for (const al::VarDecl &declared : page_.variables) {
       if (LowerKey(declared.name) == LowerKey(std::string(name))) {
-        return PageVariableIdentifier(page_, declared.name);
+        const std::string spelled = PageVariableIdentifier(page_, declared.name);
+        return HiddenByALocal(spelled) ? "this->" + spelled : spelled;
       }
     }
     for (const al::LabelDecl &label : page_.labels) {
       if (SameName(label.name, name)) { return Identifier(label.name); }
     }
     for (const al::ProcedureDecl &procedure : page_.procedures) {
-      if (SameName(procedure.name, name)) { return Identifier(procedure.name); }
+      if (SameName(procedure.name, name)) {
+        const std::string spelled = Identifier(procedure.name);
+        return HiddenByALocal(spelled) ? "this->" + spelled : spelled;
+      }
     }
     return {};
   }
@@ -2272,6 +2299,11 @@ public:
   [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
     const al::VarDecl *where = DeclarationOf(variable);
     return where == nullptr ? std::string{} : TypeName(where->type);
+  }
+
+  [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
+                                     std::string_view name) const override {
+    return ::agiru::gen::IsTryFunctionOf(objects_, DeclarationOf(variable), name);
   }
 
   [[nodiscard]] std::vector<std::string> ParameterTypes(std::string_view name) const override {
@@ -2702,10 +2734,12 @@ void ControlTriggerBody(std::string &out,
       return;
     }
   }
-  const std::string alias = dataItem == nullptr ? std::string{}
-                                                : "  [[maybe_unused]] auto &Rec = *" +
-                                                      PageVariableIdentifier(page, dataItem->name) +
-                                                      ".operator->();\n";
+  const std::string alias = dataItem == nullptr
+                                ? std::string{}
+                                : "  [[maybe_unused]] auto &Rec = *" +
+                                      PageNames(page, source, objects, &trigger, dataItem)
+                                          .GlobalSpelling(dataItem->name) +
+                                      ".operator->();\n";
   const std::string body =
       alias +
       WriteStatements(PageNames(page, source, objects, &trigger, dataItem), trigger.body, 2) +
