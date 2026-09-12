@@ -264,3 +264,26 @@ FUNCTIONAL item-tracking-quantity cluster. The image fix must still land WITH en
 cluster to clear the -7 (SCM 28 -> at least 35). That is multi-round item-tracking work; the fix
 stays staged ($S/*.staged) and the qty is the next shape. batch213/218 codegen unblock the moment
 the fix lands net-positive.
+
+## comment (2026-09-13, part 8) -- the QUANTITY bug is the keystone: codegen costs -7 until it is fixed
+
+Measured the NumberStyles/Decimal.TryParse rebuild (the 13 PEPPOL cases' first blocker) TOGETHER
+with the image-lifetime fix, run 143 = 2197 vs run 139 = 2204: A/B -7 / +0. The -7 is the seven SCM
+Pick cases (the image fix makes SCM deterministic 28/49 where the UAF's luck gave 35), and the
+NumberStyles work flipped 0 -- PEPPOL has DEEPER blockers behind NumberStyles (traced: 9x "Get: the
+RecordId names no record", 5x vendor Account-No. mapping, VAT-amount-0 mismatches, an unsupported
+Invoice-22 namespace).
+
+The structural lesson: a CODEGEN change (Door.cpp map, batch213/218, the NumberStyles registration)
+tips this corpse, and closing the UAF with the image fix then EXPOSES the deterministic quantity bug
+-- so every codegen change costs -7 through SCM whether it crashes (UAF) or runs (image fix). That
+makes the item-tracking QUANTITY the true keystone, not the UAF: the UAF is understood and its fix is
+staged (ASan-clean), but until "Qty. to Handle (Base) ... is 4, must be 10" is fixed so SCM holds its
+count, the image fix is -7 and nothing that touches codegen can land net-positive.
+
+NEXT (the one thing that unblocks the rest): fix the SCM item-tracking quantity. It is FUNCTIONAL
+(ASan-clean with the image fix), in AssignSerialNoBatch / ItemTrackingDataCollection /
+Reservation Entry. Once SCM holds its count with the image fix applied, the image fix lands
+net-neutral, codegen is free, and NumberStyles+the PEPPOL chain (+13), batch213/218, and the gated
+metadata fixes all follow. Staged: image fix ($S/*.staged), NumberStyles/Decimal
+($S/numberstyles.h.staged, $S/dotnet_decimal.h.staged) + Door.cpp map entries after CultureInfo.
