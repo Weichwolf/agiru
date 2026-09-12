@@ -164,3 +164,78 @@ A SEPARATE real bug found on the way, kept for later: `Table<Derived>::CaptureIm
 copies nothing, so the image (xRec) wrongly retained a deep-copied state with a temp handle. The fix
 is to update the image record IN PLACE (a stable pointer) with a blank state -- staged in the
 scratchpad; it does NOT fix this corpse (the garbage is upstream in Rec) and waits with the rest.
+
+## comment (2026-09-12, part 5) -- ASan built and run: it is a clean UAF of the before-image, and the fix is -7
+
+The box now carries an AddressSanitizer build (`build-asan`, `-fsanitize=address -fno-omit-frame-
+pointer -O1`). Run over `SCM Available to Pick UT` it named the corpse EXACTLY, and corrects part 4:
+it is NOT a raw overwrite of `Rec.State_Block`. It is a `heap-use-after-free`, READ in
+`StateHandle::StateHandle(const&)` (RecordState.h:376), of the 1248-byte BEFORE-IMAGE record (the
+`HeldImage`'s `record_`, a `Tracking Specification`). Two paths free+reallocate that record while a
+generated body holds a reference into it:
+
+- A generated procedure binds the before-image ONCE: `auto &XRec = Rec.StoredImage();` at the top of
+  `AssignSerialNoBatch`, then loops.
+- Free path 1: `Rec.Copy(...)` -> `CopyStateFrom` replaced the whole state and freed the old image
+  (ASan's named free: `TestTempSpecificationExists` -> `Copy` -> `CopyStateFrom`).
+- Free path 2: `Rec.Insert()/Modify()/Read()/Next()` -> `CaptureImage` did `image.Hold(new Derived)`
+  and `Hold()` `Reset()`s (frees) the old record. The loop `Insert`s each pass, so the next pass's
+  `OnAfterAssignNewTrackingNo(Rec, XRec, ...)` copies a freed `XRec`. (This DISPROVES part 4's aside
+  that the CaptureImage realloc "does not fix this corpse" -- it is one of the two frees.)
+
+The retry harness masked it as 0 LOST while the codeunit still SIGSEGV'd standalone (EXIT 139).
+
+FIX TRIED (both free paths): make the image record's address STABLE for the variable's life --
+`CopyStateFrom` preserves the destination's `HeldImage` by move (Copy never brings xRec:
+record-copy-method.md), and `CaptureImage`/`BlankImage` go through a new `EnsureImageRecord()` that
+holds one blank record and overwrites its FIELDS in place (never reallocates). This also fixes part
+4's separate `State_Block = StateHandle{}` no-op (the image now starts blank and stays blank-stated).
+
+RESULT, measured: the CRASH IS GONE and SCM is DETERMINISTIC -- 28 of 49 on three standalone runs,
+0 crash markers. But run 140 (whole milestone) was 2197 of 2310 vs run 139's 2204: A/B is -7 / +0,
+every one an item-tracking Pick case (`PickPositive/Negative/Partial`, `PickAndShipment{Pos,Neg,
+Partial}`, `DirectedPutAwayPickSimpleScenarioNotAllowBreakbulk`) now throwing
+"Qty. to Handle (Base) ... is currently 4. It must be 10." So the "4 vs 10" is a COUPLED item-
+tracking quantity bug the UAF's luck was masking (a lucky read of the pre-loop image yielded 10);
+stabilizing the image makes it deterministically wrong. TAKEN BACK (an undo is a result): the
+image-lifetime fix is reverted from the tree, staged at `$S/recordstate_copystatefrom_fix.h.staged`
+and `$S/table_captureimage_fix.h.staged`, and the ASan report at `$S/board0718_asan_report.txt`.
+
+So the earlier "gates every codegen" framing is now precise: the MEMORY-SAFETY root (image lifetime)
+IS understood and fixable runtime-only, but it must land WITH the "4 vs 10" quantity fix or it is
+-7. The remaining root is the AL semantic of `xRec` during a page batch-insert loop (is it the
+fresh per-`Insert` before-image, or the pre-loop snapshot?) and how the item-tracking qty is summed
+from it -- under investigation. batch213/218 stay shelved until the image fix can land net-positive.
+
+## comment (2026-09-12, part 6) -- the image-lifetime fix is CORRECT; the qty root is the next measurement
+
+An `al-semantics` pass (documentation + AL source + both boards) settled the xRec question and
+narrowed the qty root:
+
+- **The image-lifetime fix must be KEPT, not reverted for its own sake.** `xRec` is the record
+  variable's OWN before-image, refreshed after every successful `Get`/`Find`/`Next`/`Insert`/
+  `Modify` THROUGH that variable (`devenv-al-variables.md`; openerp WI-1156 refresh-after-Insert,
+  WI-1078 not-a-mirror, WI-1242 frozen only across a nested Validate cascade, WI-781; agiru already
+  chose this in board:0042/0526). So `xRec` updating on each `Rec.Insert()` in AssignSerialNoBatch
+  is the DOCUMENTED behaviour, and the stable-address fix (EnsureImageRecord + CopyStateFrom
+  preserve) is a correct close of a real dangling-reference UAF that 2 482 `StoredImage()` sites and
+  1 209 `.Copy(` sites in `apps/` depend on. It is reverted from the tree ONLY because it is -7
+  without the qty fix; it is staged and lands WITH that fix.
+- **`OnAfterAssignNewTrackingNo` has ZERO subscribers in BCApps** and its `xRec` param is by value,
+  so xRec's value there is read by nothing -- not the qty cause.
+- **The qty label** "Qty. to Handle (Base) ... is currently N. It must be M." is
+  `TrackingSpecification.Table.al:562` (`WrongQtyForItemErr`), raised via `TestFieldError` from
+  `CheckItemTrackingByType:1150-1194` off `ReservationEntry.CalcSums("Qty. to Handle (Base)")`. It is
+  also hand-declared as a Label in ~15 test codeunits, so the raising stack must be read live.
+- **openerp is no reference here**: its page `xrec` is a permanent blank stand-in (page.py:342-368),
+  and the identical qty cluster is openerp board 452/456, status OPEN, 49 tests, never root-caused.
+- **DECISIVE NEXT (this box now has ASan):** rebuild `build-asan` WITH the image-lifetime fix applied
+  and run `SCM Available to Pick UT` twice. My first ASan run halted at the first error (the before-
+  image UAF); with that closed, ASan either (a) reports NOTHING more -> "4 vs 10" is a functional
+  quantity bug in the CheckItemTrackingByType/CalcSums path, debuggable normally, or (b) reports a
+  SECOND write landing garbage at offset 0 of the page `Rec` -> part 4's "upstream overwrite" is
+  real and is the qty root. Either way the answer is one ASan run, not more source-reading.
+- A gate defending the image fix (write it when the fix lands): bind `auto &XRec = Rec.StoredImage()`,
+  loop `Validate`+`Insert` through the same variable with an intervening `Rec.Copy(other)`, assert
+  `XRec` stays valid and shows iteration k-1's values after iteration k's `Insert`. A "4 vs 10" gate
+  would be BLIND while the codeunit is non-deterministic.
