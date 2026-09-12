@@ -941,9 +941,15 @@ void WriteInterfaces(Run &run,
   }
 }
 
+struct EnumOwner {
+  std::string app;
+  std::string path;
+};
+
 struct Extensions {
   std::map<std::string, std::vector<agiru::al::TableExtensionObject>> tables;
   std::map<std::string, std::vector<agiru::al::EnumExtensionObject>> enums;
+  std::map<std::string, EnumOwner> enumOwners;
   std::map<std::string, std::vector<agiru::al::PageExtensionObject>> pages;
   std::map<std::string, std::vector<agiru::al::PageExtensionObject>> reports;
   mutable std::map<std::string, std::size_t> held;
@@ -1009,22 +1015,32 @@ Extensions ReadExtensions(Run &run,
   for (const agiru::gen::App &app : apps) {
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
-    const auto read = [&](std::string_view suffix, auto parse, auto &into) {
+    const auto read = [&](std::string_view suffix, auto parse, auto &into, auto note) {
       for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
         try {
           auto extension = parse(Read(path));
           ++counts.parsed;
+          note(extension, path);
           into[agiru::gen::LowerKey(extension.extends)].push_back(std::move(extension));
         } catch (const std::exception &e) {
           if (Note(run, path, e)) { --counts.files; }
         }
       }
     };
-    read(".TableExt.al", agiru::al::ParseTableExtension, store.tables);
-    read(".EnumExt.al", agiru::al::ParseEnumExtension, store.enums);
-    read(".PageExt.al", agiru::al::ParsePageExtension, store.pages);
-    read(".ReportExt.al", agiru::al::ParseReportExtension, store.reports);
+    const auto unnoted = [](const auto &, const std::filesystem::path &) {};
+    read(".TableExt.al", agiru::al::ParseTableExtension, store.tables, unnoted);
+    read(".EnumExt.al",
+         agiru::al::ParseEnumExtension,
+         store.enums,
+         [&](const agiru::al::EnumExtensionObject &extension, const std::filesystem::path &path) {
+           store.enumOwners.try_emplace(
+               agiru::gen::LowerKey(extension.name) + "|" + agiru::gen::LowerKey(extension.extends),
+               EnumOwner{.app = app.name,
+                         .path = std::filesystem::relative(path, run.root).string()});
+         });
+    read(".PageExt.al", agiru::al::ParsePageExtension, store.pages, unnoted);
+    read(".ReportExt.al", agiru::al::ParseReportExtension, store.reports, unnoted);
   }
   return store;
 }
@@ -1353,6 +1369,50 @@ void ScanEnums(
   if (run.output.empty()) { return; }
   held.objects = std::move(objects);
   held.paths = std::move(paths);
+}
+
+struct ForeignImplementations {
+  std::set<std::string> pending;
+  std::size_t registered = 0;
+};
+
+void NoteUnresolvedImplementations(const Run &run,
+                                   const Enums &held,
+                                   const agiru::gen::Objects &objects,
+                                   ForeignImplementations &foreign) {
+  if (run.output.empty()) { return; }
+  for (const agiru::al::EnumObject &object : held.objects) {
+    for (const agiru::gen::ForeignImplementationRef &ref :
+         agiru::gen::UnresolvedImplementations(object, objects)) {
+      foreign.pending.insert(agiru::gen::ImplementationKey(ref.enumName, ref.ordinal, ref.face));
+    }
+  }
+}
+
+void WriteEnumExtensions(Run &run,
+                         const std::string &appName,
+                         const Extensions &store,
+                         const agiru::gen::Objects &objects,
+                         ForeignImplementations &foreign) {
+  if (run.output.empty()) { return; }
+  for (const auto &[extends, list] : store.enums) {
+    for (const agiru::al::EnumExtensionObject &extension : list) {
+      const auto owner =
+          store.enumOwners.find(agiru::gen::LowerKey(extension.name) + "|" + extends);
+      if (owner == store.enumOwners.end() || owner->second.app != appName) { continue; }
+      std::vector<std::string> registered;
+      const std::string source = agiru::gen::WriteEnumExtensionSource(
+          extension, owner->second.path, foreign.pending, objects, registered);
+      if (source.empty()) { continue; }
+      Keep(run,
+           Output{.directory = run.output,
+                  .relative = agiru::gen::EnumExtensionSourcePath(extension)},
+           source);
+      ++run.written;
+      for (const std::string &key : registered) { foreign.pending.erase(key); }
+      foreign.registered += registered.size();
+    }
+  }
 }
 
 void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects) {
@@ -2389,6 +2449,7 @@ int Scan(const Job &job) {
   std::map<std::string, std::size_t> declaredOnly;
   QueryCounts queryCounts;
   ProfileCounts profileCounts;
+  ForeignImplementations foreignImplementations;
 
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
@@ -2478,6 +2539,8 @@ int Scan(const Job &job) {
       NoteObjectOptions(port, gathered.options);
     }
     WriteEnums(run, heldEnums, objects);
+    NoteUnresolvedImplementations(run, heldEnums, objects, foreignImplementations);
+    WriteEnumExtensions(run, app.name, store, objects, foreignImplementations);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
     for (agiru::al::PageObject &page : parsed.objects) {
@@ -2528,6 +2591,12 @@ int Scan(const Job &job) {
   Report("pages", allPages);
   Report("extensions", allExtensionsRead);
   std::println("merged     {} extension(s) into the objects they extend", allExtensions.emitted);
+  if (foreignImplementations.registered != 0 || !foreignImplementations.pending.empty()) {
+    std::println("registered {} enum-extension implementation(s) from the app that declares the "
+                 "codeunit; {} name a codeunit no app in this run carries",
+                 foreignImplementations.registered,
+                 foreignImplementations.pending.size());
+  }
   if (store.unplaced != 0) {
     std::println("unplaced   {} page-extension operation(s) name a control the base page does not "
                  "declare, and stay where they were written (board:0033)",

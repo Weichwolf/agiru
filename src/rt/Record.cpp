@@ -148,14 +148,15 @@ void FieldError(const void *record, const TableDef &table, FieldNo no, std::stri
   const std::string where =
       " in " + std::string(table.caption) + (key.empty() ? std::string{} : " " + key);
 
+  constexpr std::string_view kCode = "NCLCSRTS:TableErrorStr";
   if (!text.empty()) {
-    throw Error(std::string(def->caption) + " " + std::string(text) + where + ".");
+    throw Error(std::string(def->caption) + " " + std::string(text) + where + ".", kCode);
   }
   if (IsBlank(record, *def)) {
-    throw Error("You must specify " + std::string(def->caption) + where + ".");
+    throw Error("You must specify " + std::string(def->caption) + where + ".", kCode);
   }
   throw Error(std::string(def->caption) + " must not be " + FieldText(record, *def) + where + ".",
-              "TableErrorStr");
+              kCode);
 }
 
 namespace detail {

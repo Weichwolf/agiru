@@ -553,6 +553,13 @@ private:
         }
         return out + ")";
       }
+      if (kind == "pages" && (member == "Run" || member == "RunModal") &&
+          expression.children.size() == first) {
+        const std::string object = scope_.ObjectNamed(kind, named.text);
+        if (!object.starts_with("absent::")) {
+          return object + "::" + member + "(::agiru::kByNumber)";
+        }
+      }
       if (!kind.empty()) { subject = scope_.ObjectNamed(kind, named.text) + "{}"; }
     } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
                !platform.empty()) {
@@ -3068,13 +3075,18 @@ std::string ElementExport(const al::PageControl &control,
   const bool attribute = kind == "textattribute" || kind == "fieldattribute";
   if (kind == "textelement" || kind == "textattribute") {
     if (ContainerElement(control)) {
-      out += pad + "Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "try {\n";
+      if (declares(control, "OnBeforePassVariable")) {
+        out += pad + "  " + trigger(control, "OnBeforePassVariable") + "();\n";
+      }
+      out += pad + "  Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
       std::vector<const al::PageControl *> below = ancestors;
       below.push_back(&control);
       for (const al::PageControl &child : control.children) {
-        out += ElementExport(child, pageClass, page, objects, named, below, indent);
+        out += ElementExport(child, pageClass, page, objects, named, below, indent + 2);
       }
-      out += pad + "Out_().EndGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "  Out_().EndGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
       return out;
     }
     const bool unbound = ElementFlag(control, "Unbound", false);
@@ -3087,6 +3099,8 @@ std::string ElementExport(const al::PageControl &control,
            ", std::string(::agiru::Format(" + variable + ")), " + (attribute ? "true" : "false") +
            ", " + ElementWidth(control) + ");\n";
     out += pad + "  } catch (const ::agiru::XmlPortBreakUnbound &) { break; }\n";
+    out += pad + (unbound ? "    catch (const ::agiru::XmlPortSkip &) { continue; }\n"
+                          : "    catch (const ::agiru::XmlPortSkip &) { break; }\n");
     out += pad + (unbound ? "}\n" : "  break;\n" + pad + "}\n");
     return out;
   }
@@ -3105,7 +3119,7 @@ std::string ElementExport(const al::PageControl &control,
              page.name + " reads " + source.field + ", which " + declared->subtype +
              " does not declare (board:0065)\");\n";
     }
-    out += pad + "{\n";
+    out += pad + "try {\n";
     if (declares(control, "OnBeforePassField")) {
       out += pad + "  " + trigger(control, "OnBeforePassField") + "();\n";
     }
@@ -3115,7 +3129,7 @@ std::string ElementExport(const al::PageControl &control,
            ", 0, 9) : ::agiru::Format(" + PageVariableIdentifier(page, declared->name) + "->" +
            field->second + ")), " + (attribute ? "true" : "false") + ", " + ElementWidth(control) +
            ");\n";
-    out += pad + "}\n";
+    out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
     return out;
   }
   if (kind != "tableelement") { return out; }

@@ -103,6 +103,17 @@ void TheCodeNamesTheRaisingSite() {
   CHECK_TEXT("while a coded error keeps its own under a wrap",
              std::string(Error("x", "TestField").Coded("TableErrorStr").Code()),
              "TestField");
+  // FieldError is the platform's table error, spelled the way the Assert library compares it,
+  // and it keeps that code when a trigger raised it: `Gen. Journal Batch` raises one from
+  // `OnValidate` and ERM General Journal UT expects `TableErrorStr`.
+  ResourceCost inTrigger;
+  inTrigger.Type = ResourceCostType::All;
+  CHECK_TEXT("FieldError carries the table error code",
+             RaisedCode([&] { rec.FieldError(ResourceCost::Field_No::Code, "is wrong"); }),
+             "NCLCSRTS:TableErrorStr");
+  CHECK_TEXT("through a trigger too",
+             RaisedCode([&] { inTrigger.Validate(inTrigger.Code, agiru::Code<20>("R100")); }),
+             "NCLCSRTS:TableErrorStr");
 }
 
 void TestFieldOnABlankFieldSaysSo() {

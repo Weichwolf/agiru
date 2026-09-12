@@ -64,12 +64,16 @@ public:
   /// \param name          Its AL name.
   /// \param subscriptions Its subscriptions, in declaration order.
   /// \param manual        Whether its instance is `Manual`.
+  /// \param singleInstance Whether the codeunit is `SingleInstance`, so that the automatic
+  ///                      subscriber IS the session's one instance and not a second object with
+  ///                      state of its own (board:0471).
   /// \param make          Makes an instance, for the automatic kind.
   /// \param free          Frees one.
   SubscriptionCatalogue(CodeunitId id,
                         std::string_view name,
                         std::span<const Subscription> subscriptions,
                         bool manual,
+                        bool singleInstance,
                         void *(*make)(),
                         void (*free)(void *));
   SubscriptionCatalogue(const SubscriptionCatalogue &) = delete;
@@ -90,17 +94,27 @@ public:
   /// \return Whether its instance is `Manual`.
   [[nodiscard]] bool Manual() const { return manual_; }
 
+  /// \return Whether the codeunit is `SingleInstance`.
+  [[nodiscard]] bool SingleInstance() const { return singleInstance_; }
+
   /// \return A new instance of the codeunit.
   [[nodiscard]] void *Make() const { return make_(); }
 
   /// \param instance One `Make` made.
   void Free(void *instance) const { free_(instance); }
 
+  /// \return The function that makes an instance, for the session's single-instance table.
+  [[nodiscard]] auto Maker() const -> void *(*)() { return make_; }
+
+  /// \return The function that frees one, for the same table.
+  [[nodiscard]] auto Freer() const -> void (*)(void *) { return free_; }
+
 private:
   CodeunitId id_;
   std::string_view name_;
   std::span<const Subscription> subscriptions_;
   bool manual_;
+  bool singleInstance_;
   void *(*make_)();
   void (*free_)(void *);
 };

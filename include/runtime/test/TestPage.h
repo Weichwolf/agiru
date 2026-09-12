@@ -531,7 +531,9 @@ public:
         PageValidateEvent_("OnBeforeValidateEvent", def->name, before);
         Record_().ValidateText(def->field, text);
         if (text.empty() && Record_().FieldNotBlank(def->field)) {
-          Record_().TestField(def->field);
+          try {
+            Record_().TestField(def->field);
+          } catch (const Error &e) { throw Error(e.what(), "TestValidation"); }
         }
         RunTrigger_(control, ControlTriggerKind::Validate, true);
         PageValidateEvent_("OnAfterValidateEvent", def->name, before);
@@ -652,7 +654,25 @@ public:
     RunTrigger_(control, kind, kind == ControlTriggerKind::Action);
     if (kind == ControlTriggerKind::Action && page_ != nullptr) {
       detail::RaisePageRecordEvent(*page_, "OnAfterActionEvent", control);
+      if (ClosedItself_()) { return; }
       RereadAfterAction_();
+    }
+  }
+
+  /// `CurrPage.Close()` INSIDE A TRIGGER closes the page once the trigger returns: the close
+  /// triggers run and the harness lets go, so the next `OpenEdit` on this variable opens a fresh
+  /// page (`Purchase Journal.ClassicView` closes the simple view and runs the classic one; ERM
+  /// General Journal UT reopens the simple one afterwards, 2 cases, 2026-09-12).
+  bool ClosedItself_() {
+    if constexpr (requires { page_->Closed(); }) {
+      if (page_ == nullptr || !page_->Closed()) { return false; }
+      for (PageCore *part : parts_) { part->RowLeft(); }
+      edited_ = false;
+      detail::ClosePage(*page_);
+      Release_();
+      return true;
+    } else {
+      return false;
     }
   }
 
@@ -858,9 +878,7 @@ public:
   }
 
 private:
-  [[noreturn]] static void Unopened_() {
-    throw Error("a TestPage needs a running page (board:0030)");
-  }
+  [[noreturn]] static void Unopened_() { throw Error("The TestPage is not open."); }
 
   template <typename R> static typename std::remove_cvref_t<R>::Platform_Half &Platform_(R &rec) {
     return static_cast<typename std::remove_cvref_t<R>::Platform_Half &>(rec);

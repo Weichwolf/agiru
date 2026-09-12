@@ -232,6 +232,7 @@ const SubscriptionCatalogue kListenerCatalogue{
     CodeunitTraits<Listener_Codeunit>::kName,
     kListenerSubscriptions,
     true,
+    false,
     []() -> void * { return new Listener_Codeunit(); },
     [](void *instance) { delete static_cast<Listener_Codeunit *>(instance); }};
 
@@ -250,6 +251,7 @@ const SubscriptionCatalogue kMisnamedCatalogue{
     CodeunitTraits<Misnamed_Codeunit>::kName,
     kMisnamedSubscriptions,
     true,
+    false,
     []() -> void * { return new Misnamed_Codeunit(); },
     [](void *instance) { delete static_cast<Misnamed_Codeunit *>(instance); }};
 
@@ -268,6 +270,7 @@ const SubscriptionCatalogue kToldCatalogue{
     CodeunitTraits<Told_Codeunit>::kName,
     kToldSubscriptions,
     true,
+    false,
     []() -> void * { return new Told_Codeunit(); },
     [](void *instance) { delete static_cast<Told_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 2> kWantsNames{"Sender", "Amount"};
@@ -285,6 +288,7 @@ const SubscriptionCatalogue kUnsentCatalogue{
     CodeunitTraits<Unsent_Codeunit>::kName,
     kUnsentSubscriptions,
     true,
+    false,
     []() -> void * { return new Unsent_Codeunit(); },
     [](void *instance) { delete static_cast<Unsent_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 3> kValidatedNames{"Rec", "xRec", "CurrFieldNo"};
@@ -302,6 +306,7 @@ const SubscriptionCatalogue kEditedCatalogue{
     CodeunitTraits<Edited_Codeunit>::kName,
     kEditedSubscriptions,
     true,
+    false,
     []() -> void * { return new Edited_Codeunit(); },
     [](void *instance) { delete static_cast<Edited_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 3> kModifiedNames{"Rec", "xRec", "RunTrigger"};
@@ -319,6 +324,7 @@ const SubscriptionCatalogue kModifiedCatalogue{
     CodeunitTraits<Modified_Codeunit>::kName,
     kModifiedSubscriptions,
     true,
+    false,
     []() -> void * { return new Modified_Codeunit(); },
     [](void *instance) { delete static_cast<Modified_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 3> kRenamedNames{"Rec", "xRec", "RunTrigger"};
@@ -336,6 +342,7 @@ const SubscriptionCatalogue kRenamerCatalogue{
     CodeunitTraits<Renamer_Codeunit>::kName,
     kRenamerSubscriptions,
     true,
+    false,
     []() -> void * { return new Renamer_Codeunit(); },
     [](void *instance) { delete static_cast<Renamer_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
@@ -353,6 +360,7 @@ const SubscriptionCatalogue kWatcherCatalogue{
     CodeunitTraits<Watcher_Codeunit>::kName,
     kWatcherSubscriptions,
     true,
+    false,
     []() -> void * { return new Watcher_Codeunit(); },
     [](void *instance) { delete static_cast<Watcher_Codeunit *>(instance); }};
 

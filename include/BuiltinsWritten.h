@@ -1310,6 +1310,15 @@ template <std::same_as<::agiru::Duration> D>
 
 template <typename T> void Clear(T &Variable) {
   if constexpr (requires { Variable.operator->(); } && requires { *Variable; }) {
+    if constexpr (requires {
+                    { Variable.SharesASingleInstance() } -> std::convertible_to<bool>;
+                    Variable.Forget();
+                  }) {
+      if (Variable.SharesASingleInstance()) {
+        Variable.Forget();
+        return;
+      }
+    }
     Clear(*Variable);
   } else if constexpr (requires { ::agiru::TableTraits<T>::kTable; }) {
     ::agiru::detail::RuntimeClear(&Variable, ::agiru::TableTraits<T>::kTable);

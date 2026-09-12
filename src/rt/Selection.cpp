@@ -100,6 +100,12 @@ std::string Series(const RecordState *state, const TableDef &table) {
 
 void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
   if (state == nullptr) { return; }
+  std::string crossColumn;
+  const auto take = [&made, &crossColumn](const std::string &sql, int group) {
+    std::string &into = group == kCrossColumnGroup ? crossColumn : made.where;
+    if (!into.empty()) { into += group == kCrossColumnGroup ? " OR " : " AND "; }
+    into += sql;
+  };
   for (const FieldFilter &filter : state->filters) {
     const FieldDef &field = FieldOf(table, filter.field);
     if (field.fieldClass == FieldClass::FlowFilter) { continue; }
@@ -109,18 +115,19 @@ void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
       const Clause clause = Where(
           field, ParseFilter(filter.text), made.binds.size() + 1 + column.binds.size(), column.sql);
       if (clause.sql.empty()) { continue; }
-      if (!made.where.empty()) { made.where += " AND "; }
-      made.where += clause.sql;
+      take(clause.sql, filter.group);
       made.binds.insert(made.binds.end(), column.binds.begin(), column.binds.end());
       made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
       continue;
     }
     const Clause clause = Where(field, ParseFilter(filter.text), made.binds.size() + 1);
     if (clause.sql.empty()) { continue; }
-    if (!made.where.empty()) { made.where += " AND "; }
-    made.where += clause.sql;
+    take(clause.sql, filter.group);
     made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
   }
+  if (crossColumn.empty()) { return; }
+  if (!made.where.empty()) { made.where += " AND "; }
+  made.where += "(" + crossColumn + ")";
 }
 
 }

@@ -1,5 +1,8 @@
+#include "meta/CodeunitDef.h"
+#include "meta/Ids.h"
 #include "runtime/Codeunit.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <utility>
@@ -77,6 +80,63 @@ void AnUnusedHandleFreesNothing() {
 
 int Twice(Counted &counted) {
   return counted.Value() * 2;
+}
+
+constexpr agiru::CodeunitDef kSingleDef{
+    .id = agiru::CodeunitId{50999}, .name = "Single Counted", .singleInstance = true};
+
+/// A stand-in for a generated `SingleInstance = true` codeunit: the declaration is the descriptor
+/// the generated class carries as `kCodeunit`, and the object is assignable the way a generated
+/// codeunit is, since `Clear` on any other handle assigns a fresh one.
+struct SingleCounted {
+  static constexpr const agiru::CodeunitDef &kCodeunit = kSingleDef;
+  static int made;
+  static int gone;
+
+  SingleCounted() { ++made; }
+
+  SingleCounted(const SingleCounted &) = default;
+  SingleCounted(SingleCounted &&) = default;
+  SingleCounted &operator=(const SingleCounted &) = default;
+  SingleCounted &operator=(SingleCounted &&) = default;
+
+  ~SingleCounted() { ++gone; }
+
+  [[nodiscard]] int Value() const { return value_; }
+
+  void Value(int value) { value_ = value; }
+
+private:
+  int value_ = kInitial;
+};
+
+int SingleCounted::made = 0;
+int SingleCounted::gone = 0;
+
+/// A `SingleInstance` CODEUNIT IS ONE OBJECT PER SESSION (`devenv-singleinstance-property.md`:
+/// "all codeunit variables that use this codeunit use the same instance ... The codeunit remains
+/// instantiated until you close the company"). Two handles reach one object, a copy of a handle
+/// reaches the same one, `Clear` lets the reference go and the object keeps its state
+/// (`system-clear-joker-method.md`: "the content of the codeunit stays intact"), and the session's
+/// close frees it once. `Environment Information Impl.` holds the SaaS testability flag this way
+/// (board:0471).
+void ASingleInstanceCodeunitIsOneObjectPerSession() {
+  {
+    agiru::Instance<SingleCounted> one;
+    agiru::Instance<SingleCounted> other;
+    one->Value(kWritten);
+    CHECK_TRUE("the other handle reads what the first wrote", other->Value() == kWritten);
+    CHECK_TRUE("one object was made", SingleCounted::made == 1);
+    const agiru::Instance<SingleCounted> copied(one);
+    CHECK_TRUE("a copy reaches the same object", copied->Value() == kWritten);
+    CHECK_TRUE("and made none", SingleCounted::made == 1);
+    agiru::Clear(one);
+    CHECK_TRUE("Clear keeps the object's state", one->Value() == kWritten);
+    CHECK_TRUE("and frees nothing", SingleCounted::gone == 0);
+  }
+  CHECK_TRUE("the handles going out of scope free nothing either", SingleCounted::gone == 0);
+  agiru::detail::ReleaseSingleInstances();
+  CHECK_TRUE("the session's close frees it once", SingleCounted::gone == 1);
 }
 
 /// IT DISAPPEARS AT EVERY USE BUT THE ONE C++ CANNOT HIDE. The handle is how agiru DECLARES the
@@ -180,6 +240,7 @@ void AssigningKeepsTheVariablesOwnGlobals() {
 
 int main() {
   return gate::Run("Instance", [] {
+    ASingleInstanceCodeunitIsOneObjectPerSession();
     ACopyHoldsACopyOfWhatTheOtherMade();
     ACopyOfWhatCannotBeCopiedHoldsNothing();
     AHandleIsMadeOnFirstUse();

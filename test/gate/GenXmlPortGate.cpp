@@ -95,6 +95,14 @@ bool Has(const std::string &text, std::string_view piece) {
   return text.find(piece) != std::string::npos;
 }
 
+std::string Collapsed(const std::string &text) {
+  std::string out;
+  for (const char c : text) {
+    if (c != ' ' && c != '\n') { out += c; }
+  }
+  return out;
+}
+
 /// AN XMLPORT IS A PAGE WITH A SCHEMA (board:0065): the class derives from `XmlPort`, a table
 /// element is a record member and a text element a `Text` variable, an element's triggers stand
 /// on the enclosing table element's record as `Rec`, and the schema is walked out (`Export_`)
@@ -147,6 +155,19 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
   CHECK_TRUE("Skip leaves the record out and Break the loop",
              Has(source, "catch (const ::agiru::XmlPortSkip &) {}") &&
                  Has(source, "catch (const ::agiru::XmlPortBreak &) {}"));
+  // SKIP IN AN ELEMENT'S OWN TRIGGER LEAVES THAT ELEMENT OUT AND NOTHING ELSE: `Sales Invoice -
+  // PEPPOL BIS 3.0` skips a blank `Note` from `OnBeforePassVariable`, and the export lost every
+  // element after it -- the whole supplier, the lines, the totals (13 cases of Incoming Doc. To
+  // Data Exch.UT found no vendor and no currency, 2026-09-12). A field element's
+  // `OnBeforePassField` skips the same way, and an unbound element goes on to its next value.
+  CHECK_TRUE(
+      "Skip under OnBeforePassField leaves the field element out",
+      Has(Collapsed(source),
+          "try{OnBeforePassFieldAmount();Out_().Value(\"Amount\",std::string(FormatsAsXml_()?"
+          "::agiru::Format(SomeLine->Amount,0,9):::agiru::Format(SomeLine->Amount)),false,0);}"
+          "catch(const::agiru::XmlPortSkip&){}"));
+  CHECK_TRUE("and an unbound text element skips on to its next value",
+             Has(source, "catch (const ::agiru::XmlPortSkip &) { continue; }"));
   CHECK_TRUE("the import reads records under the same names",
              Has(source, "while (In_().Enter(\"SomeLine\")) {") &&
                  Has(source, "Item_Block.Init();"));

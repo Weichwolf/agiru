@@ -1,5 +1,6 @@
 #include "runtime/Session.h"
 
+#include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Events.h"
 #include "runtime/Transaction.h"
@@ -26,6 +27,7 @@ Session::Session(const std::string &connectionInfo)
 
 Session::~Session() {
   detail::ReleaseAutomaticInstances();
+  detail::ReleaseSingleInstances();
   g_current = previous_;
 }
 

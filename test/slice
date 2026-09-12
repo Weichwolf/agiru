@@ -9649,6 +9649,7 @@ base/system/data_administration/codeunit/RetenPolDocArchFltrng.cpp
 base/system/data_administration/codeunit/RetenPolInstallBaseApp.cpp
 base/system/data_administration/codeunit/RetenPolUpgradeBaseApp.cpp
 base/system/data_administration/codeunit/RetentionPolicyJQ.cpp
+base/system/data_administration/enum/RetenPolDocArchiveFltrng.cpp
 base/system/data_administration/page/DataAdministration.cpp
 base/system/data_administration/page/DataAdministration.def.cpp
 base/system/data_administration/page/DataAdministrationGuide.cpp
@@ -9763,6 +9764,7 @@ base/system/environment/configuration/codeunit/NotificationManagement.cpp
 base/system/environment/configuration/codeunit/ProfileHelper.cpp
 base/system/environment/configuration/codeunit/ServNotificationMgt.cpp
 base/system/environment/configuration/codeunit/WebserviceNotificationMgt.cpp
+base/system/environment/configuration/enum/FeatureToUpdateBaseApp.cpp
 base/system/environment/configuration/page/AADApplicationCard.cpp
 base/system/environment/configuration/page/AADApplicationCard.def.cpp
 base/system/environment/configuration/page/AADApplicationList.cpp
@@ -12410,6 +12412,7 @@ system_test_library/system/test_libraries/email/codeunit/TestEmailConnector.cpp
 system_test_library/system/test_libraries/email/codeunit/TestEmailConnectorV2.cpp
 system_test_library/system/test_libraries/email/codeunit/TestEmailConnectorV3.cpp
 system_test_library/system/test_libraries/email/codeunit/TestEmailConnectorV4.cpp
+system_test_library/system/test_libraries/email/enum/TestEmailConnector.cpp
 system_test_library/system/test_libraries/email/table/EmailRelatedRecordTest.cpp
 system_test_library/system/test_libraries/email/table/EmailRelatedRecordTest.def.cpp
 system_test_library/system/test_libraries/email/table/TestEmailAccount.cpp
@@ -13883,6 +13886,8 @@ tests/core/codeunit/WorkflowUserGroupTests.cpp
 tests/core/codeunit/WorkflowWithSubWorkflows.cpp
 tests/core/codeunit/XMLBufferTests.cpp
 tests/core/codeunit/XMLDOMManagementUT.cpp
+tests/core/enum/MockSourceTypeLocations.cpp
+tests/core/enum/PriceCalcHandlerTest.cpp
 tests/core/page/AmountAutoFormatTestPage.cpp
 tests/core/page/AmountAutoFormatTestPage.def.cpp
 tests/core/page/CaptionClassesTestPage.cpp

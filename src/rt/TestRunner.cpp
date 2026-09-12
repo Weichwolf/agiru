@@ -177,7 +177,9 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
         continue;
       }
     }
+    static const char *const only = std::getenv("AGIRU_TEST_PROCEDURE");
     for (const TestMethod &method : catalogue->Methods()) {
+      if (only != nullptr && method.name != only) { continue; }
       run.results.push_back(RunOne(*catalogue, method, driven.instance));
       if (run.results.back().passed) {
         ++run.passed;

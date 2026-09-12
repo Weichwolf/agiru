@@ -16,6 +16,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -286,9 +287,12 @@ std::string SubscriptionCatalogueOf(const al::CodeunitObject &unit, const std::s
   out += "}};\n\n";
   const al::Property *instance = al::Find(unit.properties, "EventSubscriberInstance");
   const bool manual = instance != nullptr && LowerKey(instance->text) == "manual";
+  const al::Property *single = al::Find(unit.properties, "SingleInstance");
+  const bool singleInstance = single != nullptr && LowerKey(single->text) == "true";
   out += "const SubscriptionCatalogue kSubscriptionCatalogue{\n    CodeunitTraits<" + identifier +
          ">::kId,\n    CodeunitTraits<" + identifier + ">::kName,\n    kSubscriptions,\n    " +
-         (manual ? "true" : "false") + ",\n    []() -> void * { return new " + identifier +
+         (manual ? "true" : "false") + ",\n    " + (singleInstance ? "true" : "false") +
+         ",\n    []() -> void * { return new " + identifier +
          "(); },\n    [](void *instance) { delete static_cast<" + identifier +
          " *>(instance); }};\n\n} // namespace " + identifier + "_subscriptions\n} // namespace\n";
   return out;
@@ -1738,7 +1742,12 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   if (!DeclaresClearAll(unit)) {
     out += "void " + unitClass + "::ClearAll() {\n";
-    for (const al::VarDecl &declared : unit.variables) {
+    const al::Property *single = al::Find(unit.properties, "SingleInstance");
+    const bool keepsItsVariables = single != nullptr && LowerKey(single->text) == "true";
+    const std::span<const al::VarDecl> cleared = keepsItsVariables
+                                                     ? std::span<const al::VarDecl>{}
+                                                     : std::span<const al::VarDecl>(unit.variables);
+    for (const al::VarDecl &declared : cleared) {
       const std::string named = Identifier(declared.name);
       if (TypeName(declared.type) == "Record") {
         out += "  ::agiru::Clear(" + named + ");\n";

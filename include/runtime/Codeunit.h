@@ -72,6 +72,28 @@ void RegisterCodeunitEntry(const CodeunitEntry *entry);
 /// \return The entry, or `nullptr` when this build carries no codeunit of that number.
 [[nodiscard]] const CodeunitEntry *FindCodeunit(CodeunitId id);
 
+namespace detail {
+
+/// \brief The ONE instance a `SingleInstance` codeunit has in this session, made on the first
+///        call and kept until the session closes (`devenv-singleinstance-property.md`: "all
+///        codeunit variables that use this codeunit use the same instance ... The codeunit
+///        remains instantiated until you close the company").
+/// \param id   The codeunit's number.
+/// \param make Makes the instance, when this call is the first.
+/// \param free Frees it, when the session closes.
+/// \return The instance.
+/// \note IT IS PER SESSION AND NEVER PER PROCESS: a session is a thread here, and a shared
+///       instance across 10 000 sessions is a data race with the answer as the prize
+///       (board:0471). `Environment Information Impl.` holds the SaaS testability flag this way,
+///       and a runtime that made one instance per variable answered `IsSaaS` from a fresh one
+///       (RapidStart Warning Page UT, Test OAuth 2.0 UT, 2026-09-12).
+[[nodiscard]] void *SingleInstanceOf(CodeunitId id, void *(*make)(), void (*free)(void *));
+
+/// \brief Frees every single instance this session made; the session's close calls it.
+void ReleaseSingleInstances();
+
+}
+
 /// \brief One codeunit held by another, created the first time it is used.
 ///
 /// \tparam T The generated codeunit class, which may be INCOMPLETE here.
@@ -236,9 +258,38 @@ public:
   ///       use but the one C++ cannot hide -- reaching through it, which is `->`.
   operator T &() { return *Made(); }
 
+  /// \brief Whether this handle reaches a `SingleInstance` codeunit, whose object every handle
+  ///        shares and none of them frees or clears.
+  /// \return True for a single-instance codeunit; false for anything else, a record included.
+  [[nodiscard]] static bool SharesASingleInstance() {
+    if constexpr (requires {
+                    { T::kCodeunit.singleInstance } -> std::convertible_to<bool>;
+                  }) {
+      return T::kCodeunit.singleInstance;
+    } else {
+      return false;
+    }
+  }
+
+  /// \brief Lets go of the instance: AL `Clear(Variable)` on a single-instance codeunit
+  ///        (`system-clear-joker-method.md`: "only the reference to the codeunit is deleted and
+  ///        not the codeunit itself ... the content of the codeunit stays intact").
+  void Forget() { Release(); }
+
 private:
   T *Made() {
     if (held_ == nullptr) {
+      if (SharesASingleInstance()) {
+        if constexpr (requires { T::kCodeunit.id; }) {
+          held_ = static_cast<T *>(detail::SingleInstanceOf(
+              T::kCodeunit.id,
+              []() -> void * { return new T(); },
+              [](void *held) { delete static_cast<T *>(held); }));
+          clone_ = [](const void *held) -> void * { return const_cast<void *>(held); };
+          free_ = [](void *) {};
+          return held_;
+        }
+      }
       held_ = new T();
       if constexpr (std::is_copy_constructible_v<T>) {
         clone_ = [](const void *held) -> void * { return new T(*static_cast<const T *>(held)); };

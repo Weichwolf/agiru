@@ -295,6 +295,23 @@ void AFilterNarrowsATemporaryWalk() {
   CHECK_TRUE("Reset widens it again", buffer.Count() == kFive);
 }
 
+/// FILTER GROUP -1 ORS ITS FIELDS OVER A TEMPORARY WALK TOO (`record-filtergroup-method.md`: the
+/// cross-column group is where "records only need to match at least one of the filters"), and the
+/// other groups still narrow it.
+void TheCrossColumnGroupOrsItsFieldsInATemporaryWalk() {
+  constexpr agiru::Integer kFive = 5;
+  constexpr agiru::Integer kForty = 40;
+  Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
+  buffer.FilterGroup(-1);
+  buffer.SetRange(buffer.OldLineNumber, 2);
+  buffer.SetRange(buffer.NewLineNumber, kForty);
+  buffer.FilterGroup(0);
+  CHECK_TRUE("either field admits a row", buffer.Count() == 2);
+  buffer.SetRange(buffer.OldLineNumber, 3, kFive);
+  CHECK_TRUE("and the other groups still narrow the OR", buffer.Count() == 1);
+  CHECK_TRUE("to the row both admit", buffer.FindFirst() && buffer.OldLineNumber == 4);
+}
+
 /// `MarkedOnly` OVER A TEMPORARY RECORD walks the marked rows and no other
 /// (`record-markedonly-method.md`; `Whse.-Create Source Document` marks the receipt headers it
 /// keeps and walks `MarkedOnly`, 34 UT cases refused with "not carried yet", 2026-09-12). The
@@ -431,6 +448,7 @@ int main() {
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
+    TheCrossColumnGroupOrsItsFieldsInATemporaryWalk();
     MarkedOnlyWalksTheMarkedTemporaryRows();
     ARecordRefOverATemporaryRecordSeesItsRows();
     AssigningOneHandleToAnotherKeepsTheRowsApart();

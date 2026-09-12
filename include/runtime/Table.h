@@ -742,7 +742,8 @@ public:
   Boolean Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
     if (!Insert_(RunTrigger, InsertWithSystemId)) {
       throw Error("The " + std::string(TableTraits<Derived>::kTable.caption) +
-                  " already exists. Identification fields and values: " + PrimaryKeyText());
+                      " already exists. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordExists");
     }
     return true;
   }
@@ -799,7 +800,8 @@ public:
     }
     if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
-                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
     }
     CaptureImage();
     TableEvent("OnAfterModifyEvent", RunTrigger, before);
@@ -826,7 +828,8 @@ public:
     }
     if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
-                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
     }
     TableEvent("OnAfterDeleteEvent", RunTrigger);
     return true;
@@ -1942,7 +1945,8 @@ public:
     if (!detail::RuntimeRename(Self(), &was, TableTraits<Derived>::kTable)) {
       static_cast<Derived &>(*this) = was;
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
-                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
     }
     TableEvent("OnAfterRenameEvent", true, was);
     CaptureImage();
@@ -2357,9 +2361,7 @@ private:
     if constexpr (requires { TableTraits<Derived>::kOnValidate; }) {
       for (const auto &[field, run] : TableTraits<Derived>::kOnValidate) {
         if (field == no) {
-          try {
-            run(static_cast<Derived &>(*this));
-          } catch (const Error &e) { throw e.Coded("TableErrorStr"); }
+          run(static_cast<Derived &>(*this));
           return;
         }
       }

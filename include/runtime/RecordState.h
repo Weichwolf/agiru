@@ -99,10 +99,16 @@ private:
   void *(*clone_)(const void *) = nullptr;
 };
 
+/// \brief The filter group whose fields OR together: `record-filtergroup-method.md` names -1 the
+///        cross-column group, "where records only need to match at least one of the filters", and
+///        `Find Record Management` puts the "contains" search on `No.`, `Description` and the unit
+///        of measure there at once (4 cases of Record Set UT found nothing, 2026-09-12).
+inline constexpr int kCrossColumnGroup = -1;
+
 /// \brief One field's filter, as the record variable carries it.
 struct FieldFilter {
   ::agiru::FieldNo field; ///< The field it narrows.
-  int group;              ///< The filter group it was set in; -1 is the one that ORs.
+  int group;              ///< The filter group it was set in; \see kCrossColumnGroup
   std::string text;       ///< The filter expression, in AL's own language.
 };
 

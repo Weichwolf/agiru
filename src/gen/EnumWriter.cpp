@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -168,9 +169,14 @@ std::string ImplementationBodies(const al::EnumObject &object,
       const auto unit = objects.codeunits.find(LowerKey(named));
       if (unit != objects.codeunits.end()) { fallback = unit->second.identifier; }
     }
-    out += fallback.empty() ? "    default: break;\n"
-                            : "    default: return new " + fallback + "{};\n";
-    out += "  }\n  throw agiru::Error(\"this value of ";
+    const std::string registered = "::agiru::detail::FindImplementation(" + Literal(object.name) +
+                                   ", static_cast<std::int32_t>(value), " + Literal(face) + ")";
+    out += "    default: break;\n  }\n";
+    out += "  if (const ::agiru::detail::ForeignImplementation *foreign = " + registered +
+           ";\n      foreign != nullptr) {\n    return static_cast<" + faceType +
+           " *>(foreign->make());\n  }\n";
+    if (!fallback.empty()) { out += "  return new " + fallback + "{};\n"; }
+    out += "  throw agiru::Error(\"this value of ";
     out += object.name;
     out += " names no implementation of ";
     out += face;
@@ -184,12 +190,86 @@ std::string ImplementationBodies(const al::EnumObject &object,
     for (const auto &[enumerator, unit] : cloneable) {
       out += "    case " + identifier + "::" + enumerator + ": return " + cloner(unit) + ";\n";
     }
-    out += fallback.empty() ? "    default: return nullptr;\n"
-                            : "    default: return " + cloner(fallback) + ";\n";
-    out += "  }\n}\n\n}\n";
+    out += "    default: break;\n  }\n";
+    out += "  if (" + registered + " != nullptr) {\n    return [](const " + faceType +
+           " *held) -> " + faceType + " * {\n      return static_cast<" + faceType +
+           " *>(::agiru::detail::CloneForeign(typeid(*held), " + Literal(face) +
+           ", held));\n    };\n  }\n";
+    out += fallback.empty() ? "  return nullptr;\n" : "  return " + cloner(fallback) + ";\n";
+    out += "}\n\n}\n";
   }
   return out;
 }
+}
+
+std::string ImplementationKey(std::string_view enumName, int ordinal, std::string_view face) {
+  return LowerKey(std::string(enumName)) + "|" + std::to_string(ordinal) + "|" +
+         LowerKey(std::string(face));
+}
+
+std::vector<ForeignImplementationRef> UnresolvedImplementations(const al::EnumObject &object,
+                                                                const Objects &objects) {
+  std::vector<ForeignImplementationRef> unresolved;
+  for (const std::string &face : object.implements) {
+    if (!objects.interfaces.contains(LowerKey(face))) { continue; }
+    for (const al::EnumValueDecl &value : object.values) {
+      const al::Property *bound = al::Find(value.properties, "Implementation");
+      if (bound == nullptr) { continue; }
+      const std::string named = ImplementationFor(bound->text, face);
+      if (named.empty() || objects.codeunits.contains(LowerKey(named))) { continue; }
+      unresolved.push_back(ForeignImplementationRef{
+          .enumName = object.name, .ordinal = value.ordinal, .face = face, .codeunit = named});
+    }
+  }
+  return unresolved;
+}
+
+std::string EnumExtensionSourcePath(const al::EnumExtensionObject &extension) {
+  return OutputDirectory(extension.nameSpace, ObjectKind::Enum) + "/" + Identifier(extension.name) +
+         ".cpp";
+}
+
+std::string WriteEnumExtensionSource(const al::EnumExtensionObject &extension,
+                                     const std::string &sourcePath,
+                                     const std::set<std::string> &pending,
+                                     const Objects &objects,
+                                     std::vector<std::string> &registered) {
+  std::string bodies;
+  for (const al::EnumValueDecl &value : extension.values) {
+    const al::Property *bound = al::Find(value.properties, "Implementation");
+    if (bound == nullptr) { continue; }
+    for (const auto &[faceKey, faceRef] : objects.interfaces) {
+      const std::string named = ImplementationFor(bound->text, faceKey);
+      if (named.empty()) { continue; }
+      const std::string key = ImplementationKey(extension.extends, value.ordinal, faceKey);
+      if (!pending.contains(key)) { continue; }
+      const auto unit = objects.codeunits.find(LowerKey(named));
+      if (unit == objects.codeunits.end()) { continue; }
+      const std::string &faceType = faceRef.identifier;
+      const std::string &unitType = unit->second.identifier;
+      bodies += "const ::agiru::detail::RegisterForeignImplementation k" +
+                EnumeratorName(value.name) + "_" +
+                Identifier(faceRef.name.empty() ? faceKey : faceRef.name) + "{\n";
+      bodies += "    " + Literal(extension.extends) + ",\n    " + std::to_string(value.ordinal) +
+                ",\n    " + Literal(faceRef.name.empty() ? faceKey : faceRef.name) +
+                ",\n    typeid(" + unitType + "),\n";
+      bodies += "    {.make = []() -> void * { return static_cast<" + faceType + " *>(new " +
+                unitType + "{}); },\n";
+      bodies += "     .clone = [](const void *held) -> void * {\n       return static_cast<" +
+                faceType + " *>(new " + unitType + "(*dynamic_cast<const " + unitType +
+                " *>(static_cast<const " + faceType + " *>(held))));\n     }}};\n\n";
+      registered.push_back(key);
+    }
+  }
+  if (bodies.empty()) { return {}; }
+  std::string out;
+  out += "// Generated from " + sourcePath + ". Do not edit.\n\n";
+  out += kDoorMarker;
+  out += BodyIncludes(bodies, objects);
+  out += "\n#include <typeinfo>\n\nnamespace {\n\n";
+  out += bodies;
+  out += "}\n";
+  return WithDoor(out, ObjectKind::Enum);
 }
 
 std::string WriteEnumSource(const al::EnumObject &object,

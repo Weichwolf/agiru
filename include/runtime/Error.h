@@ -36,11 +36,19 @@ public:
 
   /// \brief An error with the CODE `GetLastErrorCode()` reports beside its text.
   /// \param text The text.
-  /// \param code The code: `TestField`, `TableErrorStr`, `TestValidation`; empty reads `Dialog`.
-  /// \note THE CODE IS THE RAISING SITE, which is how `Assert.ExpectedErrorCode` reads it: an
-  ///       `Error(...)` in AL is `Dialog`, `TestField` is `TestField`, an error raised INSIDE a
-  ///       table trigger is `TableErrorStr`, and one raised under a `TestPage.SetValue` is
-  ///       `TestValidation` -- the UT suite expects those four, 53 times (measured 2026-09-09).
+  /// \param code The code: `TestField`, `NCLCSRTS:TableErrorStr`, `TestValidation`,
+  ///             `DB:RecordNotFound`, `DB:NothingInsideFilter`, `DB:RecordExists`; empty reads
+  ///             `Dialog`.
+  /// \note THE CODE IS THE RAISING STATEMENT, which is how `Assert.ExpectedErrorCode` reads it: an
+  ///       `Error(...)` in AL is `Dialog` WHEREVER IT STANDS -- `Workflow Step Argument` raises
+  ///       "The URI is not valid." from an `OnValidate` and the test expects `Dialog` (3 cases,
+  ///       2026-09-12) -- `TestField` is `TestField`, `FieldError` is `NCLCSRTS:TableErrorStr`
+  ///       (the Assert library compares that spelling EXACTLY in `ExpectedTestFieldError`), a value
+  ///       the client refuses -- `NotBlank`, `MinValue`, `MaxValue` under a `TestPage.SetValue` --
+  ///       is `TestValidation`, and the platform's own refusals carry `DB:` codes: a `Get` that
+  ///       finds nothing `DB:RecordNotFound`, a `FindFirst` as a statement
+  ///       `DB:NothingInsideFilter`, a duplicate `Insert` `DB:RecordExists`
+  ///       (`Assert.AssertNothingInsideFilter` and `ExpectedErrorCannotFind` read them).
   Error(std::string_view text, std::string_view code)
       : std::runtime_error(std::string(text)), code_(code) {}
 

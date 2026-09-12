@@ -4,13 +4,89 @@
 #include "type/Enum.h"
 
 #include <concepts>
+#include <cstdint>
 #include <string>
+#include <string_view>
+#include <typeinfo>
 #include <utility>
 
 /// \file
 /// \brief AL `Interface` -- a variable that holds whichever codeunit an enum value names.
 
 namespace agiru {
+
+namespace detail {
+
+/// \brief How another app makes the codeunit one of its `enumextension` values names.
+///
+/// \note AN ENUM EXTENSION LIVES IN THE EXTENDING APP, AND SO DOES ITS IMPLEMENTATION. `Mock
+///       Source Type - Locations` extends `Price Source Type` with `Test_Location`, implemented by
+///       `Mock Price Source - Location` -- a codeunit of the TEST app, which the Base Application's
+///       library may not name (an app is a library and the linker holds AL's direction). So the
+///       enum's own `ImplementationOf` switch carries what its app can see, and a value an
+///       extension declared is registered by the extension's app when it loads, the way a table
+///       registers itself in the catalogue. Both functions hand the instance as its INTERFACE
+///       pointer, cast to `void *`, because this registry names no interface type.
+struct ForeignImplementation {
+  void *(*make)();              ///< A new instance, as the interface pointer.
+  void *(*clone)(const void *); ///< A copy of one, handed and returned as the interface pointer.
+};
+
+/// \brief Puts an extension's implementation into the registry the enum's `default:` consults.
+/// \param enumName      The extended enum's AL name.
+/// \param ordinal       The value's ordinal.
+/// \param interfaceName The interface's AL name.
+/// \param held          The dynamic type of the codeunit, for the clone lookup.
+/// \param made          The two functions.
+void RegisterImplementation(std::string_view enumName,
+                            std::int32_t ordinal,
+                            std::string_view interfaceName,
+                            const std::type_info &held,
+                            ForeignImplementation made);
+
+/// \brief The implementation an extension registered for a value, or nothing.
+/// \param enumName      The enum's AL name, compared without regard to case.
+/// \param ordinal       The value's ordinal.
+/// \param interfaceName The interface's AL name, compared the same way.
+/// \return The registration, or `nullptr` when no app registered one.
+[[nodiscard]] const ForeignImplementation *
+FindImplementation(std::string_view enumName, std::int32_t ordinal, std::string_view interfaceName);
+
+/// \brief A copy of a registered implementation, found by the instance's dynamic type -- which is
+///        all a clone function of the interface's own signature has in hand.
+/// \param held          The dynamic type of the instance (`typeid(*pointer)`).
+/// \param interfaceName The interface's AL name.
+/// \param instance      The instance, as the interface pointer.
+/// \return The copy, as the interface pointer.
+/// \throws Error when no app registered that type for that interface.
+[[nodiscard]] void *
+CloneForeign(const std::type_info &held, std::string_view interfaceName, const void *instance);
+
+/// \brief Registers by existing, the way `RegisterTable` does: the generated source of an enum
+///        extension declares one per value and interface, and the app's load runs it.
+struct RegisterForeignImplementation {
+  /// \brief Registers.
+  /// \param enumName      The extended enum's AL name.
+  /// \param ordinal       The value's ordinal.
+  /// \param interfaceName The interface's AL name.
+  /// \param held          The codeunit's dynamic type.
+  /// \param made          The two functions.
+  RegisterForeignImplementation(std::string_view enumName,
+                                std::int32_t ordinal,
+                                std::string_view interfaceName,
+                                const std::type_info &held,
+                                ForeignImplementation made) {
+    RegisterImplementation(enumName, ordinal, interfaceName, held, made);
+  }
+
+  RegisterForeignImplementation(const RegisterForeignImplementation &) = delete;
+  RegisterForeignImplementation(RegisterForeignImplementation &&) = delete;
+  RegisterForeignImplementation &operator=(const RegisterForeignImplementation &) = delete;
+  RegisterForeignImplementation &operator=(RegisterForeignImplementation &&) = delete;
+  ~RegisterForeignImplementation() = default;
+};
+
+}
 
 /// \brief AL `Interface <I>` -- the codeunit an enum value bound to it.
 ///

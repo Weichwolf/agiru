@@ -146,6 +146,14 @@ template <typename P> struct ControlTrigger {
 ///       `.PAGE`. The part itself carries what the platform offers on a control (`Visible`,
 ///       `Editable`); everything on the other side of `.PAGE` is the sub-page's own surface, and
 ///       reaching it needs a running UI (board:0030).
+/// \brief The argument the generator hands `Page.Run(Page::X)` and `Page.RunModal(Page::X)` when
+///        AL passed no record: a run BY NUMBER, which the runtime tells apart from a page
+///        variable's own `Run()` because the two close differently. \see Page::CloseWith
+struct ByNumber {};
+
+/// \brief The one `ByNumber` the generated code passes.
+inline constexpr ByNumber kByNumber{};
+
 namespace detail {
 template <typename P> void OpenPage(P &page, bool editable, bool isNew);
 
@@ -430,6 +438,9 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
 /// \param page The page.
 /// \throws Error when `OnQueryClosePage` refuses.
 template <typename P> void ClosePage(P &page) {
+  if constexpr (requires { page.BeginClose(); }) {
+    if (!page.BeginClose()) { return; }
+  }
   if constexpr (requires(::agiru::Action action) {
                   { page.OnQueryClosePage(action) } -> std::convertible_to<bool>;
                 }) {
@@ -465,7 +476,6 @@ template <typename P, typename Record> void AdoptRecord(P &page, const Record &r
                        }) {
     using Source = std::remove_cvref_t<decltype(page.Rec)>;
     static_cast<typename Source::Platform_Half &>(page.Rec).Copy(record);
-    page.RunsOnRecord();
   } else {
     static_cast<void>(record);
   }
@@ -534,6 +544,7 @@ template <typename P, typename... Arguments>
 ::agiru::Action RunPage(bool modal, Arguments &&...arguments) {
   auto page = std::make_unique<P>();
   (AdoptRecord(*page, arguments), ...);
+  page->RunsByNumber();
   OpenPage(*page, true, false);
   const std::int32_t id = PageTraits<P>::kId.Value();
   if (!modal && ReleaseTrap(id, page.get(), true)) {
@@ -691,17 +702,20 @@ public:
   ///       GetRecord` with no `LookupMode` in sight, and `Price Source - Customer.IsLookupOK`
   ///       reads `Page.RunModal(Page::"Customer Lookup", Customer) = Action::LookupOK` the same
   ///       way (6 cases of `Price Source UT`, 2026-09-11). A Card closes with `OK`.
-  /// \note AND SO DOES A PAGE RUN MODALLY ON A RECORD -- `Page.RunModal(Page::X, Rec)` -- of any
-  ///       type: `Post Pmts and Rec. Bank Acc.` (a StandardDialog run on the reconciliation) reads
-  ///       `CloseAction::LookupOK` from its own OK and its caller compares with `LookupOK`;
-  ///       `devenv-use-ishandled-pattern.md` reads `Page.RunModal(Page::"Transfer Difference to
-  ///       Account", TempGenJnlLine)` against `LookupOK`; every Card the BaseApp runs on a record
-  ///       and compares with `OK` discards the answer (`then;`). A page VARIABLE's `RunModal()`
-  ///       with no record closes with `OK` -- `Price List Management` compares `SuggestPriceLines
-  ///       .RunModal()` with `Action::OK` and copies the lines only then (Suggest Price Lines UT,
-  ///       20 cases lost to a StandardDialog rule on 2026-09-12 and taken back the same day).
+  /// \note AND SO DOES A PAGE RUN MODALLY BY NUMBER -- `Page.RunModal(Page::X [, Rec])` -- of
+  ///       any type, with or without a record. The BaseApp compares that form with `LookupOK`
+  ///       229 times and with `OK` 7 times, and all 7 discard the answer (`then;`);
+  ///       `Payment Registration Mgt.` reads `PAGE.RunModal(PAGE::"Balancing Account Setup") =
+  ///       ACTION::LookupOK` with no record at all, and `Post Pmts and Rec. Bank Acc.` reads its
+  ///       own OK as `CloseAction::LookupOK`. A page VARIABLE's `RunModal()` closes with `OK`
+  ///       unless `LookupMode` says otherwise: `CopyItemPage.RunModal() <> ACTION::OK`,
+  ///       `SuggestPriceLines.RunModal() = Action::OK` (Suggest Price Lines UT, 20 cases lost to
+  ///       a StandardDialog rule on 2026-09-12), and of the 335 variables compared with `LookupOK`
+  ///       all but two set `LookupMode(true)` first (measured 2026-09-12). A rule on the record
+  ///       alone missed the setup dialogs run without one (Payment Registration UT
+  ///       `RunNextSetupWithPrompt`, run 127).
   void CloseWith(::agiru::Action action) {
-    bool lookup = static_cast<bool>(lookupMode_) || (modal_ && onRecord_);
+    bool lookup = static_cast<bool>(lookupMode_) || (modal_ && byNumber_);
     if constexpr (requires { PageTraits<Derived>::kPage.type; }) {
       lookup = lookup || (modal_ && !EntityOriented(PageTraits<Derived>::kPage.type));
     }
@@ -716,9 +730,9 @@ public:
   /// \brief Notes that the page runs modally, which is what makes a list a lookup window.
   void RunsModally() { modal_ = true; }
 
-  /// \brief The runner says `Page.Run(Number, Rec)` handed this page a record of its own table,
-  ///        which makes a modal run a lookup window. \see CloseWith
-  void RunsOnRecord() { onRecord_ = true; }
+  /// \brief The runner says this page runs BY NUMBER -- `Page.Run(Page::X, ...)` -- which makes
+  ///        a modal run a lookup window. \see CloseWith
+  void RunsByNumber() { byNumber_ = true; }
 
   /// \brief What `Page.RunModal` answers: the action the page closed with.
   /// \return The action; `OK` when nothing said otherwise.
@@ -860,8 +874,32 @@ public:
   }
 
   /// \brief AL `Page.Close()`. Closes the current page.
-  /// \throws Error until the UI runs (board:0030).
-  void Close() { throw Error("Page.Close() needs a running UI (board:0030)"); }
+  ///
+  /// \note THE PAGE CLOSES WHEN THE TRIGGER IT WAS CALLED FROM RETURNS, which is why this is a
+  ///       mark and not an act: `Purchase Journal.ClassicView` calls `CurrPage.Close()` and then
+  ///       runs the page again from the same trigger, and that second run has to happen.
+  ///       Whoever drives the page -- a `TestPage`, a handler's run -- reads `Closed()` after the
+  ///       trigger, runs `OnQueryClosePage` and `OnClosePage`
+  ///       (`devenv-onclosepage-page-trigger.md`: "or by the CurrPage.CLOSE being called") and
+  ///       lets go. The action it closed with is what stood before: `OK` unless an OK or a Cancel
+  ///       said otherwise, so a lookup window left through `CurrPage.Close()` does not answer
+  ///       `LookupOK` -- `Select Payment Service` leaves for the setup page that way and its
+  ///       caller takes the answer as no selection.
+  void Close() { closed_ = true; }
+
+  /// \brief Whether `Close()` was called on this page.
+  /// \return True after `CurrPage.Close()`.
+  [[nodiscard]] bool Closed() const { return closed_; }
+
+  /// \brief Claims the close: true the first time, so that `OnClosePage` runs ONCE however many
+  ///        drivers let go of the page -- the harness that saw `Closed()` and the handler's run
+  ///        that ends afterwards both close it.
+  /// \return Whether this call is the first.
+  bool BeginClose() {
+    const bool first = !closing_;
+    closing_ = true;
+    return first;
+  }
 
   /// \brief AL `Page.Editable(Boolean)`. Gets or sets the default editability of the page.
   /// \param NewEditable The AL `Boolean`.
@@ -1220,9 +1258,11 @@ public:
 private:
   bool editable_ = true;
   bool modal_ = false;
-  bool onRecord_ = false;
+  bool byNumber_ = false;
   bool edited_ = false;
   bool newRecord_ = false;
+  bool closed_ = false;
+  bool closing_ = false;
   ::agiru::Integer backgroundTasks_ = 0;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
   std::string caption_;

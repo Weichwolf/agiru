@@ -92,13 +92,22 @@ bool SameKeyAt(const TempTable &temp, const TableDef &table, std::size_t at, con
 }
 
 bool Passes(const void *row, const std::vector<FieldFilter> &filters, const TableDef &table) {
-  return std::ranges::all_of(filters, [row, &table](const FieldFilter &filter) {
+  bool crossColumn = false;
+  bool crossColumnHit = false;
+  for (const FieldFilter &filter : filters) {
     const FieldDef &def = FieldOf(table, filter.field);
-    if (def.fieldClass == FieldClass::FlowFilter) { return true; }
+    if (def.fieldClass == FieldClass::FlowFilter) { continue; }
     const std::string value =
         def.type == FieldType::RecordId ? StorageText(row, def) : FieldText(row, def);
-    return Matches(ParseFilter(filter.text), value, def);
-  });
+    const bool passes = Matches(ParseFilter(filter.text), value, def);
+    if (filter.group == kCrossColumnGroup) {
+      crossColumn = true;
+      crossColumnHit = crossColumnHit || passes;
+      continue;
+    }
+    if (!passes) { return false; }
+  }
+  return !crossColumn || crossColumnHit;
 }
 
 void Build(Held held, const TableDef &table) {

@@ -79,9 +79,11 @@ Found::~Found() noexcept(false) {
   TraceRefusal(table_);
   if (!key_.empty()) {
     throw Error("The " + std::string(table_) +
-                " does not exist. Identification fields and values: " + key_);
+                    " does not exist. Identification fields and values: " + key_,
+                "DB:RecordNotFound");
   }
-  throw Error("There is no " + std::string(table_) + " within the filter.");
+  throw Error("There is no " + std::string(table_) + " within the filter.",
+              "DB:NothingInsideFilter");
 }
 
 class ValueAccess {

@@ -692,6 +692,8 @@ void ProvisionInstalled(const Connection &into) {
       return platform::PageMetadataPageType::Card;
     }();
     row.SourceTable = entry->page->source.Value();
+    row.CardPageID = entry->page->cardPageId.Value();
+    row.SourceTableTemporary = entry->page->sourceTableTemporary;
     row.Editable = entry->page->editable.empty() || entry->page->editable != "false";
     row.InsertAllowed = entry->page->insertAllowed != "false";
     row.ModifyAllowed = entry->page->modifyAllowed != "false";

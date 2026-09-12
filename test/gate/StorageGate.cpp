@@ -318,6 +318,40 @@ void TransferFieldsLeavesTheSystemFieldsAlone() {
 
 } // namespace
 
+/// FILTER GROUP -1 ORS ITS FIELDS. `record-filtergroup-method.md`: "If you have filters on
+/// multiple fields in the same filter group, then only records matching all filters are visible.
+/// The only exception to this is filtergroup -1 where records only need to match at least one of
+/// the filters." `Find Record Management` puts its "contains" search on `No.`, `Description` and
+/// the unit of measure there at once, and 4 cases of Record Set UT found nothing while the group
+/// ANDed (2026-09-12). The other groups still narrow the OR.
+void TheCrossColumnGroupOrsItsFields() {
+  ResourceCost one = Sample();
+  one.Code = "cross-a";
+  one.WorkTypeCode = "x";
+  one.Insert();
+  ResourceCost two = Sample();
+  two.Code = "cross-b";
+  two.WorkTypeCode = "y";
+  two.Insert();
+  ResourceCost three = Sample();
+  three.Code = "cross-c";
+  three.WorkTypeCode = "z";
+  three.Insert();
+
+  ResourceCost found;
+  found.SetFilter(found.Code, "cross-*");
+  found.FilterGroup(-1);
+  found.SetRange(found.Code, agiru::Code<20>("cross-a"));
+  found.SetRange(found.WorkTypeCode, agiru::Code<10>("y"));
+  found.FilterGroup(0);
+  CHECK_TRUE("either field admits a row", found.Count() == 2);
+  found.SetRange(found.WorkTypeCode, agiru::Code<10>("x"));
+  CHECK_TRUE("and the other groups still narrow the OR", found.Count() == 1);
+  one.Delete();
+  two.Delete();
+  three.Delete();
+}
+
 int main() {
   // A GATE THAT CANNOT REACH ITS DATABASE IS RED, NOT SKIPPED. A skipped case reports green and
   // proves nothing, which is the first trap on CLAUDE.md's list -- so the handler is the shared one
@@ -336,6 +370,7 @@ int main() {
       ModifyLeavesTheIdentityAndTheCreationStampToThePlatform();
       TransferFieldsLeavesTheSystemFieldsAlone();
       ModifyAllAssignsWithoutValidating();
+      TheCrossColumnGroupOrsItsFields();
       DeleteRemovesIt();
     }
     ARecordOutsideASessionSaysSoRatherThanCrashing();

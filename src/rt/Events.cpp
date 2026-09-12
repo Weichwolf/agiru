@@ -1,6 +1,7 @@
 #include "runtime/Events.h"
 
 #include "meta/Ids.h"
+#include "runtime/Codeunit.h"
 #include "runtime/Error.h"
 #include "runtime/Transaction.h"
 
@@ -58,6 +59,9 @@ std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &Made() {
 }
 
 void *AutomaticInstance(const SubscriptionCatalogue &catalogue) {
+  if (catalogue.SingleInstance()) {
+    return ::agiru::detail::SingleInstanceOf(catalogue.Id(), catalogue.Maker(), catalogue.Freer());
+  }
   std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &made = Made();
   auto found = made.find(&catalogue);
   if (found == made.end()) {
@@ -120,12 +124,14 @@ SubscriptionCatalogue::SubscriptionCatalogue(CodeunitId id,
                                              std::string_view name,
                                              std::span<const Subscription> subscriptions,
                                              bool manual,
+                                             bool singleInstance,
                                              void *(*make)(),
                                              void (*free)(void *))
     : id_(id),
       name_(name),
       subscriptions_(subscriptions),
       manual_(manual),
+      singleInstance_(singleInstance),
       make_(make),
       free_(free) {
   Registered().push_back(this);
