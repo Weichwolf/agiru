@@ -261,11 +261,11 @@ public:
   /// \brief Whether this handle reaches a `SingleInstance` codeunit, whose object every handle
   ///        shares and none of them frees or clears.
   /// \return True for a single-instance codeunit; false for anything else, a record included.
-  [[nodiscard]] static bool SharesASingleInstance() {
+  [[nodiscard]] static constexpr bool SharesASingleInstance() {
     if constexpr (requires {
-                    { T::kCodeunit.singleInstance } -> std::convertible_to<bool>;
+                    { CodeunitTraits<T>::kSingleInstance } -> std::convertible_to<bool>;
                   }) {
-      return T::kCodeunit.singleInstance;
+      return CodeunitTraits<T>::kSingleInstance;
     } else {
       return false;
     }
@@ -279,10 +279,10 @@ public:
 private:
   T *Made() {
     if (held_ == nullptr) {
-      if (SharesASingleInstance()) {
-        if constexpr (requires { T::kCodeunit.id; }) {
+      if constexpr (SharesASingleInstance()) {
+        if constexpr (requires { CodeunitTraits<T>::kId; }) {
           held_ = static_cast<T *>(detail::SingleInstanceOf(
-              T::kCodeunit.id,
+              CodeunitTraits<T>::kId,
               []() -> void * { return new T(); },
               [](void *held) { delete static_cast<T *>(held); }));
           clone_ = [](const void *held) -> void * { return const_cast<void *>(held); };

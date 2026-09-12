@@ -3224,7 +3224,8 @@ std::string ElementImport(const al::PageControl &control,
                           const std::map<std::string, std::string> &named,
                           const al::PageControl *record,
                           bool validateByDefault,
-                          int indent) {
+                          int indent,
+                          std::vector<const al::PageControl *> ancestors = {}) {
   const std::string pad(static_cast<std::size_t>(indent), ' ');
   const std::string kind = LowerKey(control.kind);
   const auto trigger = [&named, &page](const al::PageControl &item, std::string_view name) {
@@ -3242,8 +3243,15 @@ std::string ElementImport(const al::PageControl &control,
     if (ContainerElement(control)) {
       out += pad + "if (In_().Enter(" + xmlName + ")) {\n";
       for (const al::PageControl &child : control.children) {
-        out += ElementImport(
-            child, pageClass, page, objects, named, record, validateByDefault, indent + 2);
+        out += ElementImport(child,
+                             pageClass,
+                             page,
+                             objects,
+                             named,
+                             record,
+                             validateByDefault,
+                             indent + 2,
+                             ancestors);
       }
       out += pad + "  In_().Leave();\n" + pad + "}\n";
       return out;
@@ -3316,13 +3324,41 @@ std::string ElementImport(const al::PageControl &control,
   out += pad + "  while (In_().Enter(" + xmlName + ")) {\n";
   out += pad + "    auto &Item_Block = *" + variable + ".operator->();\n";
   out += pad + "    Item_Block.Init();\n";
+  const std::vector<DataItemLink> links = LinksOfDataItem(control, "LinkFields");
+  if (!links.empty()) {
+    const al::PageControl *parent = record;
+    if (const al::Property *reference = al::Find(control.properties, "LinkTable");
+        reference != nullptr) {
+      for (const al::PageControl *ancestor : ancestors) {
+        if (LowerKey(ancestor->name) == LowerKey(reference->text)) { parent = ancestor; }
+      }
+    }
+    const al::VarDecl *parentDeclared =
+        parent == nullptr ? nullptr : DataItemVariable(page, parent->name);
+    const auto parentTable = parentDeclared == nullptr
+                                 ? objects.tables.end()
+                                 : objects.tables.find(LowerKey(parentDeclared->subtype));
+    if (parentTable != objects.tables.end()) {
+      for (const DataItemLink &link : links) {
+        const auto field = table->second.fields.find(LowerKey(link.field));
+        const auto ref = parentTable->second.fields.find(LowerKey(link.reference));
+        if (field == table->second.fields.end() || ref == parentTable->second.fields.end()) {
+          continue;
+        }
+        out += pad + "    Item_Block." + field->second + " = " +
+               PageVariableIdentifier(page, parentDeclared->name) + "->" + ref->second + ";\n";
+      }
+    }
+  }
   if (declares(control, "OnAfterInitRecord")) {
     out += pad + "    " + trigger(control, "OnAfterInitRecord") + "();\n";
   }
   out += pad + "    try {\n";
+  std::vector<const al::PageControl *> below = ancestors;
+  below.push_back(&control);
   for (const al::PageControl &child : control.children) {
     out += ElementImport(
-        child, pageClass, page, objects, named, &control, validateByDefault, indent + 6);
+        child, pageClass, page, objects, named, &control, validateByDefault, indent + 6, below);
   }
   if (declares(control, "OnBeforeInsertRecord")) {
     out += pad + "      " + trigger(control, "OnBeforeInsertRecord") + "();\n";

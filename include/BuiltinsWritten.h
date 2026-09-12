@@ -13,6 +13,7 @@
 #include "type/DataClassification.h"
 #include "type/Date.h"
 #include "type/DateFormula.h"
+#include "type/DateTime.h"
 #include "type/Decimal.h"
 #include "type/Dictionary.h"
 #include "type/Duration.h"
@@ -22,6 +23,7 @@
 #include "type/Integer.h"
 #include "type/List.h"
 #include "type/ObjectType.h"
+#include "type/Option.h"
 #include "type/SecretText.h"
 #include "type/SecurityOperationResult.h"
 #include "type/Stream.h"
@@ -732,9 +734,99 @@ template <typename T>
   return !into.IsUndefined();
 }
 
+/// \brief AL `Evaluate(Time, Text)` over the XML form `hh:mm:ss[.fff]` the runtime renders with
+///        `Format(Time, 0, 9)`.
+/// \param into Where the time lands.
+/// \param text The text; empty is the undefined time.
+/// \return Whether the text spelled a time.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedTime(::agiru::Time &into, std::string_view text) {
+  if (text.empty()) {
+    into = ::agiru::Time{};
+    return true;
+  }
+  constexpr std::size_t kNarrowest = 8;
+  constexpr std::size_t kHourAt = 0;
+  constexpr std::size_t kMinuteAt = 3;
+  constexpr std::size_t kSecondAt = 6;
+  constexpr std::size_t kPointAt = 8;
+  constexpr std::size_t kFractionAt = 9;
+  constexpr std::size_t kPartDigits = 2;
+  constexpr std::size_t kFractionDigits = 3;
+  if (text.size() < kNarrowest || text[kMinuteAt - 1] != ':' || text[kSecondAt - 1] != ':') {
+    return false;
+  }
+  const auto number = [text](std::size_t at, std::size_t digits) {
+    return static_cast<int>(
+        std::strtol(std::string(text.substr(at, digits)).c_str(), nullptr, kDecimal));
+  };
+  int millisecond = 0;
+  if (text.size() > kFractionAt && text[kPointAt] == '.') {
+    std::string fraction(text.substr(kFractionAt, kFractionDigits));
+    fraction.resize(kFractionDigits, '0');
+    millisecond = static_cast<int>(std::strtol(fraction.c_str(), nullptr, kDecimal));
+  }
+  into = ::agiru::Time::FromHms(number(kHourAt, kPartDigits),
+                                number(kMinuteAt, kPartDigits),
+                                number(kSecondAt, kPartDigits),
+                                millisecond);
+  return !into.IsUndefined();
+}
+
+/// \brief AL `Evaluate(DateTime, Text)` over the XML form `yyyy-mm-ddThh:mm:ss[.fff][Z]` that
+///        `Format(DateTime, 0, 9)` renders, and over the storage form with a space in place of
+///        the `T`. `Workflow - Record Change` writes a changed value with format 9 and reads it
+///        back with `Evaluate(DateTime, Value, 9)` (4 cases of Workflow Engine UT, 2026-09-12).
+/// \param into Where the instant lands.
+/// \param text The text; empty is the undefined instant.
+/// \return Whether the text spelled an instant.
+[[nodiscard]] inline ::agiru::Boolean EvaluatedDateTime(::agiru::DateTime &into,
+                                                        std::string_view text) {
+  if (text.empty()) {
+    into = ::agiru::DateTime{};
+    return true;
+  }
+  const std::size_t split = text.find_first_of("T ");
+  ::agiru::Date date;
+  if (!EvaluatedDate(date, text.substr(0, split))) { return false; }
+  ::agiru::Time time;
+  if (split != std::string_view::npos) {
+    std::string_view rest = text.substr(split + 1);
+    if (rest.ends_with('Z')) { rest.remove_suffix(1); }
+    if (!EvaluatedTime(time, rest)) { return false; }
+  }
+  into = ::agiru::DateTime::Create(date, time);
+  return true;
+}
+
 template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::string_view text) {
   if constexpr (std::is_same_v<T, ::agiru::Boolean> || std::is_same_v<T, bool>) {
     return EvaluatedBoolean(into, text);
+  } else if constexpr (std::is_same_v<T, ::agiru::Time>) {
+    return EvaluatedTime(into, text);
+  } else if constexpr (std::is_same_v<T, ::agiru::DateTime>) {
+    return EvaluatedDateTime(into, text);
+  } else if constexpr (std::is_same_v<T, ::agiru::Duration>) {
+    if (text.empty()) {
+      into = ::agiru::Duration{};
+      return true;
+    }
+    const std::string held(text);
+    char *end = nullptr;
+    const long long read = std::strtoll(held.c_str(), &end, kDecimal);
+    if (end == nullptr || *end != '\0') { return false; }
+    into = ::agiru::Duration{static_cast<std::int64_t>(read)};
+    return true;
+  } else if constexpr (std::is_same_v<T, ::agiru::Option<void>>) {
+    if (text.empty()) {
+      into = ::agiru::Option<void>::FromInteger(0);
+      return true;
+    }
+    const std::string held(text);
+    char *end = nullptr;
+    const long read = std::strtol(held.c_str(), &end, kDecimal);
+    if (end == nullptr || *end != '\0') { return false; }
+    into = ::agiru::Option<void>::FromInteger(static_cast<std::int32_t>(read));
+    return true;
   } else if constexpr (std::is_same_v<T, ::agiru::Guid>) {
     const std::expected<::agiru::Guid, ::agiru::Refusal> read = ::agiru::Guid::FromText(text);
     if (!read.has_value()) { return false; }

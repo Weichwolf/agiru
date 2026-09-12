@@ -309,7 +309,9 @@ std::string FieldRef::GetFilter() const {
   const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
   if (state == nullptr) { return {}; }
   for (const detail::FieldFilter &one : state->filters) {
-    if (one.field == Def_().no && one.group == state->group) { return one.text; }
+    if (one.field == Def_().no && one.group == state->group) {
+      return detail::ShownFilter(Def_(), one.text);
+    }
   }
   return {};
 }

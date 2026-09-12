@@ -658,6 +658,28 @@ template <typename... Arguments>
       record = const_cast<void *>(static_cast<const void *>(&argument));
       table = &TableTraits<A>::kTable;
       writable = !kConst;
+    } else if constexpr (std::is_same_v<A, ::agiru::RecordRef>) {
+      if (argument.IsOpen()) {
+        record = const_cast<void *>(argument.RecordPointer());
+        table = argument.TableDefinition();
+        writable = !kConst;
+      }
+    } else if constexpr (std::is_same_v<A, ::agiru::Variant>) {
+      if (argument.IsRecordRef()) {
+        const ::agiru::RecordRef &ref = argument;
+        if (ref.IsOpen()) {
+          record = const_cast<void *>(ref.RecordPointer());
+          table = ref.TableDefinition();
+          writable = true;
+        }
+      } else if (const RecordInVariant *held = argument.HeldRecord(); held != nullptr) {
+        const TableEntry *entry = FindTable(held->table);
+        if (entry != nullptr) {
+          record = held->record;
+          table = entry->table;
+          writable = true;
+        }
+      }
     }
   };
   (take(arguments), ...);

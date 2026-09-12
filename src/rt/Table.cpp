@@ -580,6 +580,9 @@ void RuntimeTransferFields(void *into,
     if (!withPrimaryKey && InPrimaryKey(table, target.no)) { continue; }
     const FieldDef *held = Field(source, target.no);
     if (held == nullptr) { continue; }
+    if (target.fieldClass != FieldClass::Normal || held->fieldClass != FieldClass::Normal) {
+      continue;
+    }
     if (!Convertible(target.type, held->type)) {
       if (skipMismatchingTypes) { continue; }
       throw Error("TransferFields: " + std::string(table.name) + "." + std::string(target.name) +
@@ -800,6 +803,16 @@ void RuntimeSetRecFilter(void *record, const TableDef &table) {
     if (def == nullptr) { continue; }
     Narrow(state, no, Literally(FieldText(record, *def)));
   }
+}
+
+std::string ShownFilter(const FieldDef &def, std::string_view text) {
+  if (def.type != FieldType::RecordId || text.size() < 2 || text.front() != '\'' ||
+      text.back() != '\'') {
+    return std::string(text);
+  }
+  const std::expected<RecordId, Refusal> held =
+      RecordId::FromStorageText(text.substr(1, text.size() - 2));
+  return held.has_value() ? held->ToText() : std::string(text);
 }
 
 std::string FiltersText(const RecordState *state, const TableDef &table) {

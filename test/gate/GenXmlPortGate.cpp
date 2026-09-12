@@ -72,6 +72,15 @@ xmlport 50001 "Export Some Lines"
                             currXMLport.BreakUnbound();
                     end;
                 }
+                tableelement(Detail; "Cust. Ledger Entry")
+                {
+                    LinkFields = "Customer No." = field("Customer No.");
+                    LinkTable = "Some Line";
+                    XmlName = 'Detail';
+                    fieldelement(DetailAmount; Detail.Amount)
+                    {
+                    }
+                }
 
                 trigger OnAfterGetRecord()
                 begin
@@ -171,6 +180,12 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
   CHECK_TRUE("the import reads records under the same names",
              Has(source, "while (In_().Enter(\"SomeLine\")) {") &&
                  Has(source, "Item_Block.Init();"));
+  // A CHILD ELEMENT'S LinkFields ARE FILLED FROM ITS PARENT ON IMPORT: the XML carries no
+  // `DataExchDefCode` on a `DataExchColumnDef`, the link says whose it is, and `Imp / Exp Data
+  // Exch Def & Map` inserted column definitions with a blank key without it (Data Exch. Def UT
+  // `CheckLineTypesImport`, 2026-09-12).
+  CHECK_TRUE("a linked child takes its parent's key on import",
+             Has(source, "Item_Block.CustomerNo = SomeLine->CustomerNo;"));
   CHECK_TRUE("a field with FieldValidate = no is assigned, the other validated",
              Has(source, "SomeLine->EntryNo = Value_Block;") &&
                  Has(source, "SomeLine->Validate(SomeLine->Amount, Value_Block);"));

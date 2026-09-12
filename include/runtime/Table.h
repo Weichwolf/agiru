@@ -580,6 +580,16 @@ void RuntimeSetRecFilter(void *record, const TableDef &table);
 /// \return The text; empty when nothing is filtered.
 [[nodiscard]] std::string FiltersText(const RecordState *state, const TableDef &table);
 
+/// \brief The filter on one field as `GetFilter` SHOWS it: a RecordId filter is held in the
+///        stored form the column compares (`RecordId::ToStorageText`, \see AsFilterText) and
+///        read back as `Format(RecordId)` -- `Caption: key` -- which is what `Activity Log.Filter
+///        .GetFilter("Record ID")` is compared with (Test OAuth 2.0 UT `UI_HttpLog`, 2026-09-12).
+///        Every other field's filter is shown as it was written.
+/// \param def  The field.
+/// \param text The filter as the state holds it.
+/// \return The text `GetFilter` answers.
+[[nodiscard]] std::string ShownFilter(const FieldDef &def, std::string_view text);
+
 /// \brief AL `Record.GetBySystemId(SystemId)`: the row whose `SystemId` this is, filters ignored.
 /// \param record   The record, which receives the row.
 /// \param table    The declaration.
@@ -1559,7 +1569,10 @@ public:
     if (state == nullptr) { return {}; }
     const ::agiru::FieldNo no = NumberOf(&member);
     for (const detail::FieldFilter &one : state->filters) {
-      if (one.field == no && one.group == state->group) { return one.text; }
+      if (one.field == no && one.group == state->group) {
+        const FieldDef *def = ::agiru::Field(TableTraits<Derived>::kTable, no);
+        return def == nullptr ? std::string(one.text) : detail::ShownFilter(*def, one.text);
+      }
     }
     return {};
   }

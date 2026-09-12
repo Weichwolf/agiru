@@ -1,4 +1,3 @@
-#include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
 
@@ -82,14 +81,12 @@ int Twice(Counted &counted) {
   return counted.Value() * 2;
 }
 
-constexpr agiru::CodeunitDef kSingleDef{
-    .id = agiru::CodeunitId{50999}, .name = "Single Counted", .singleInstance = true};
-
-/// A stand-in for a generated `SingleInstance = true` codeunit: the declaration is the descriptor
-/// the generated class carries as `kCodeunit`, and the object is assignable the way a generated
+/// A stand-in for a generated `SingleInstance = true` codeunit: the bit is the generated
+/// `CodeunitTraits<T>::kSingleInstance` (a first cut read it off the class itself and never fired
+/// on a generated codeunit; a second read the descriptor, a DATA symbol the slice does not carry
+/// for every codeunit it names, 2026-09-12), and the object is assignable the way a generated
 /// codeunit is, since `Clear` on any other handle assigns a fresh one.
 struct SingleCounted {
-  static constexpr const agiru::CodeunitDef &kCodeunit = kSingleDef;
   static int made;
   static int gone;
 
@@ -112,6 +109,15 @@ private:
 
 int SingleCounted::made = 0;
 int SingleCounted::gone = 0;
+
+}
+
+template <> struct agiru::CodeunitTraits<SingleCounted> {
+  static constexpr agiru::CodeunitId kId{50999};
+  static constexpr bool kSingleInstance = true;
+};
+
+namespace {
 
 /// A `SingleInstance` CODEUNIT IS ONE OBJECT PER SESSION (`devenv-singleinstance-property.md`:
 /// "all codeunit variables that use this codeunit use the same instance ... The codeunit remains

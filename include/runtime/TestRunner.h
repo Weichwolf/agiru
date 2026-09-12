@@ -101,6 +101,13 @@ template <typename Codeunit, void (Codeunit::*Method)()> void InvokeTest(void *i
 /// \note THE THUNK IS THE ONLY PLACE THE SIGNATURE IS KNOWN. `TestHandler::invoke` is a `void *`
 ///       because AL's thirteen handler kinds have thirteen signatures; the caller casts it back to
 ///       the one its kind states, and this template is what it points at (board:0054).
+/// \note A RAW-PAGE `[ModalPageHandler]` -- `(var Page: Page X; var Response: Action)` -- is
+///       handed `Response` as `None`, and what it writes is what `RunModal` answers
+///       (`devenv-modalpagehandler-attribute.md`: "the action that the user took on the page").
+///       A handler that writes nothing has taken no action: with `OK` as the start a lookup page
+///       answered `LookupOK` for an empty handler and `Item Availability by Periods` ran its
+///       LookupOK path into a `GetRecord` of another table (SCM Available to Pick UT,
+///       2026-09-12); openerp WI-1239 measured the same default at no loss.
 namespace detail {
 
 /// \brief The first parameter of a handler method, for a `[PageHandler]`'s `var TestPage`.
@@ -182,7 +189,7 @@ template <typename Codeunit, auto Method> void InvokeHandler(std::string_view te
     static_cast<void>(text);
     using Handled = std::remove_cvref_t<decltype(detail::FirstParameterOf(Method))>;
     auto *page = static_cast<Handled *>(reply);
-    ::agiru::Action response = ::agiru::Action::OK;
+    ::agiru::Action response = ::agiru::Action::None;
     (codeunit.*Method)(*page, response);
     page->CloseWith(response);
   } else if constexpr (requires(::agiru::RecordRef &record) {

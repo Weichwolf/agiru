@@ -691,7 +691,10 @@ public:
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
       if (state == nullptr) { return {}; }
       for (const detail::FieldFilter &one : state->filters) {
-        if (one.field == no && one.group == state->group) { return one.text; }
+        if (one.field == no && one.group == state->group) {
+          const FieldDef *shown = ::agiru::Field(RecordTraits_().kTable, no);
+          return shown == nullptr ? std::string(one.text) : detail::ShownFilter(*shown, one.text);
+        }
       }
       return {};
     } else {

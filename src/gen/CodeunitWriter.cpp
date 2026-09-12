@@ -2314,6 +2314,9 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   out += "  static constexpr CodeunitId kId{" + std::to_string(unit.id) + "};\n";
   out += "  static constexpr std::string_view kName{" + Literal(unit.name) + "};\n";
   out += "  static constexpr Subtype kSubtype{Subtype::" + SubtypeOf(unit) + "};\n";
+  const al::Property *single = al::Find(unit.properties, "SingleInstance");
+  out += std::string("  static constexpr bool kSingleInstance = ") +
+         (single != nullptr && LowerKey(single->text) == "true" ? "true" : "false") + ";\n";
   out += "  static constexpr const CodeunitDef &kCodeunit = " + space + "::k" + identifier +
          "Codeunit;\n";
   out += "};\n";
