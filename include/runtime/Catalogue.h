@@ -39,6 +39,10 @@ struct TableEntry {
   bool (*modify)(void *record, bool runTrigger);
   /// \brief `Record.Delete(RunTrigger)`, the same way. \see insert
   bool (*remove)(void *record, bool runTrigger);
+  /// \brief `Record.Rename(...)` once the new key stands in the record, with the old image
+  ///        beside it (`Table::RenameFrom`), so that `RecordRef.Rename` runs the trigger, the
+  ///        events and the cascade.
+  bool (*rename)(void *record, const void *before);
 };
 
 /// \brief Makes an empty record.
@@ -83,6 +87,11 @@ inline constexpr TableEntry kTableEntry{
     .remove =
         [](void *record, bool runTrigger) {
           return static_cast<bool>(static_cast<T *>(record)->Delete(runTrigger));
+        },
+    .rename =
+        [](void *record, const void *before) {
+          return static_cast<bool>(
+              static_cast<T *>(record)->RenameFrom(*static_cast<const T *>(before)));
         }};
 
 /// \brief Adds one table to the catalogue.

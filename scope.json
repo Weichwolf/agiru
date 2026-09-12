@@ -76,11 +76,10 @@
     "System.Test.Integration.PowerBI",
     "System.Test.Integration.Graph"
   ],
-  "_area_doc": "A file that declares NO namespace is decided by the top-level folder it sits in instead. W1's test suite is 91 % namespace-less, so the folder is the only signal it has. `CRM integration` is Dataverse sync and goes; the real CRM tests live under ERM and Marketing and stay. A `-Internal` suffix marks a test of the test framework.",
+  "_area_doc": "A file that declares NO namespace is decided by the top-level folder it sits in instead. W1's test suite is 91 % namespace-less, so the folder is the only signal it has. `CRM integration` is Dataverse sync and goes; the real CRM tests live under ERM and Marketing and stay. A `-Internal` suffix marks a test of the test framework. `Graph` STAYS (2026-09-12): its two UT codeunits -- Graph Collect Mgt Item UT and O365 Integration Record UT -- test `Microsoft.Integration.Graph` objects that are in scope and are counted in the milestone's 78, and a codeunit that is counted has to run.",
   "area_exclude": [
     "Azure AI",
     "CRM integration",
-    "Graph",
     "Integration",
     "BCPT-SampleTests"
   ],

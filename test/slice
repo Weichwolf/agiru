@@ -3924,6 +3924,7 @@ base/integration/d365_sales/table/CRMUom.def.cpp
 base/integration/d365_sales/table/CRMUomschedule.cpp
 base/integration/d365_sales/table/CRMUomschedule.def.cpp
 base/integration/dataverse/codeunit/CDSEnvironment.cpp
+base/integration/dataverse/codeunit/CDSIntegrationImpl.cpp
 base/integration/dataverse/codeunit/CDSIntegrationMgt.cpp
 base/integration/dataverse/codeunit/CDSIntOptionCouple.cpp
 base/integration/dataverse/codeunit/CDSIntTableCouple.cpp
@@ -5194,6 +5195,7 @@ base/inventory/item/page/MyItems.cpp
 base/inventory/item/page/MyItems.def.cpp
 base/inventory/item/page/SelectItemTemplList.cpp
 base/inventory/item/page/SelectItemTemplList.def.cpp
+base/inventory/item/picture/codeunit/ItemFromPicture.cpp
 base/inventory/item/picture/page/ItemFromPictureAttribPart.cpp
 base/inventory/item/picture/page/ItemFromPictureAttribPart.def.cpp
 base/inventory/item/picture/page/ItemFromPicture.cpp
@@ -12608,6 +12610,7 @@ tests/core/codeunit/ADCSTests.cpp
 tests/core/codeunit/AllocAccJounralE2ETests.cpp
 tests/core/codeunit/AllocAccountSalesE2ETests.cpp
 tests/core/codeunit/AllocAccPurchE2ETests.cpp
+tests/core/codeunit/AllProfileV2Test.cpp
 tests/core/codeunit/AltCustVATDocTests.cpp
 tests/core/codeunit/AltCustVATRegCheckTests.cpp
 tests/core/codeunit/AltCustVATRegSetupTests.cpp
@@ -12732,6 +12735,7 @@ tests/core/codeunit/DeltaAssert.cpp
 tests/core/codeunit/DeviceCardTest.cpp
 tests/core/codeunit/DimensionCorrectionTests.cpp
 tests/core/codeunit/DimensionFilterScenarioTest.cpp
+tests/core/codeunit/DimFilterUnitTests.cpp
 tests/core/codeunit/DiscountSetupNotifications.cpp
 tests/core/codeunit/DocAddressPropagationTest.cpp
 tests/core/codeunit/DocAppSetupWizardTests.cpp
@@ -12807,6 +12811,7 @@ tests/core/codeunit/ERMCopyNameToLedgEntries.cpp
 tests/core/codeunit/ERMCopyPurchSalesDoc.cpp
 tests/core/codeunit/ERMCostAccAllocations.cpp
 tests/core/codeunit/ERMCostAccountingCodeunit.cpp
+tests/core/codeunit/ERMCostAccountingPages.cpp
 tests/core/codeunit/ERMCostAccountingPagesII.cpp
 tests/core/codeunit/ERMCostAccountingRepTest.cpp
 tests/core/codeunit/ERMCostAccountingSetup.cpp
@@ -12820,6 +12825,7 @@ tests/core/codeunit/ERMCustomerApplRounding.cpp
 tests/core/codeunit/ERMCustomerBalanceManlAppl.cpp
 tests/core/codeunit/ERMCustomerDateCompression.cpp
 tests/core/codeunit/ERMCustomerReversalMessage.cpp
+tests/core/codeunit/ERMCustomerStatistics.cpp
 tests/core/codeunit/ERMDateCompressionFA.cpp
 tests/core/codeunit/ERMDateCompressionGLBudget.cpp
 tests/core/codeunit/ERMDeleteDocuments.cpp
@@ -12877,6 +12883,7 @@ tests/core/codeunit/ERMGLAccountWhereUsed.cpp
 tests/core/codeunit/ERMGLCurrencyRevaluation.cpp
 tests/core/codeunit/ERMIncomingDocuments.cpp
 tests/core/codeunit/ERMIncrementBatchNameTests.cpp
+tests/core/codeunit/ERMInsertStdPurchLines.cpp
 tests/core/codeunit/ERMInsertStdSalesLines.cpp
 tests/core/codeunit/ERMInsuranceReports.cpp
 tests/core/codeunit/ERMIntercompany.cpp
@@ -12912,6 +12919,7 @@ tests/core/codeunit/ERMPaymentToleranceVendor.cpp
 tests/core/codeunit/ERMPmtDiscAndVATCustVend.cpp
 tests/core/codeunit/ERMPmtDiscForCustVendor.cpp
 tests/core/codeunit/ERMPmtToleranceVATAppln.cpp
+tests/core/codeunit/ERMPmtTolMultiDocCustomer.cpp
 tests/core/codeunit/ERMPostedGenJournalLine.cpp
 tests/core/codeunit/ERMPostingOutsideDate.cpp
 tests/core/codeunit/ERMPostingRounding.cpp
@@ -12976,11 +12984,13 @@ tests/core/codeunit/ERMRSProcessData.cpp
 tests/core/codeunit/ERMRSQuestionnaire.cpp
 tests/core/codeunit/ERMRSRoleCenter.cpp
 tests/core/codeunit/ERMRSValidateAndApply.cpp
+tests/core/codeunit/ERMRSWizardWorksheet.cpp
 tests/core/codeunit/ERMSalesBatchPosting.cpp
 tests/core/codeunit/ERMSalesBlanketOrder.cpp
 tests/core/codeunit/ERMSalesCrMemoAggrUT.cpp
 tests/core/codeunit/ERMSalesDocReports.cpp
 tests/core/codeunit/ERMSalesDocument.cpp
+tests/core/codeunit/ERMSalesDocumentsII.cpp
 tests/core/codeunit/ERMSalesDocumentsIII.cpp
 tests/core/codeunit/ERMSalesFullPrepmtRounding.cpp
 tests/core/codeunit/ERMSalesInvoiceAggregateUT.cpp
@@ -13022,6 +13032,7 @@ tests/core/codeunit/ERMVATRegNoValidityCheck.cpp
 tests/core/codeunit/ERMVATReportLineRelation.cpp
 tests/core/codeunit/ERMVATReportReopenRelease.cpp
 tests/core/codeunit/ERMVATReportsArchive.cpp
+tests/core/codeunit/ERMVATSalesPurchase.cpp
 tests/core/codeunit/ERMVATServCharge.cpp
 tests/core/codeunit/ERMVATSettlementWithApply.cpp
 tests/core/codeunit/ERMVATSetup.cpp
@@ -13037,6 +13048,7 @@ tests/core/codeunit/ERMVATVIESLookupUT.cpp
 tests/core/codeunit/ERMVATWithPaymentDiscount.cpp
 tests/core/codeunit/ERMVendDateCompressManual.cpp
 tests/core/codeunit/ERMVendorDateCompression.cpp
+tests/core/codeunit/ERMVendorPmtTolWithWrning.cpp
 tests/core/codeunit/ERMVendorReversalMessage.cpp
 tests/core/codeunit/ERMVendorStatistics.cpp
 tests/core/codeunit/ErrorMessageHandling.cpp
@@ -13063,6 +13075,7 @@ tests/core/codeunit/GLAcctCategoriesPageTests.cpp
 tests/core/codeunit/GLAcctCategoryDemoData.cpp
 tests/core/codeunit/GLReportUT.cpp
 tests/core/codeunit/GLVATReconAdjustSubs.cpp
+tests/core/codeunit/GraphCollectMgtItemUT.cpp
 tests/core/codeunit/HttpWebReqMgtTests.cpp
 tests/core/codeunit/HybridDeploymentTest.cpp
 tests/core/codeunit/ImpIncDocAttachmentTests.cpp
@@ -13116,6 +13129,7 @@ tests/core/codeunit/JobReservation.cpp
 tests/core/codeunit/JOBs60SP1Scripts.cpp
 tests/core/codeunit/JobsAssembleToOrder.cpp
 tests/core/codeunit/JobsMultipleCustomers.cpp
+tests/core/codeunit/JobsStockout.cpp
 tests/core/codeunit/JournalManagementTests.cpp
 tests/core/codeunit/JSONBufferTests.cpp
 tests/core/codeunit/JsonTextReaderWriterTest.cpp
@@ -13300,6 +13314,7 @@ tests/core/codeunit/O365CustomerStatistics.cpp
 tests/core/codeunit/O365EmailAsPDFUT.cpp
 tests/core/codeunit/O365ExtendedTexts.cpp
 tests/core/codeunit/O365GenericChartPageTests.cpp
+tests/core/codeunit/O365IntegrationRecordUT.cpp
 tests/core/codeunit/O365InvItemAvailability.cpp
 tests/core/codeunit/O365ItemPriceIncludingVAT.cpp
 tests/core/codeunit/O365ItemPrices.cpp
@@ -13317,10 +13332,12 @@ tests/core/codeunit/O365POrdTypeLookupTest.cpp
 tests/core/codeunit/O365PostedDocumentSubtype.cpp
 tests/core/codeunit/O365PurchaseInvoiceStat.cpp
 tests/core/codeunit/O365PurchCalcDiscByType.cpp
+tests/core/codeunit/O365PurchCodeTypeLkupTest.cpp
 tests/core/codeunit/O365PurchItemChargeTests.cpp
 tests/core/codeunit/O365RetDocTypeLookupTest.cpp
 tests/core/codeunit/O365RoleCenterNotifications.cpp
 tests/core/codeunit/O365SalesCalcDiscByType.cpp
+tests/core/codeunit/O365SalesCodeTypeLkupTest.cpp
 tests/core/codeunit/O365SalesInvoiceStatus.cpp
 tests/core/codeunit/O365SalesItemChargeTests.cpp
 tests/core/codeunit/O365SalesTotalsInvoiceCrM.cpp
@@ -13335,6 +13352,7 @@ tests/core/codeunit/O365ShipToAddrPQ.cpp
 tests/core/codeunit/O365ShipToAddrPRO.cpp
 tests/core/codeunit/O365SimplifyUIPurchCrMemo.cpp
 tests/core/codeunit/O365SimplifyUISalesCrMemo.cpp
+tests/core/codeunit/O365SimplifyUISalesInvoice.cpp
 tests/core/codeunit/O365SOrdTypeLookupTest.cpp
 tests/core/codeunit/O365SQuoteTypeLookupTest.cpp
 tests/core/codeunit/O365StandardDocumentReports.cpp
@@ -13360,8 +13378,10 @@ tests/core/codeunit/PaymentReconE2ETests2.cpp
 tests/core/codeunit/PaymentReconE2ETestsPerf.cpp
 tests/core/codeunit/PaymentRegistrationUT.cpp
 tests/core/codeunit/PaymentServiceExtensionMock.cpp
+tests/core/codeunit/PaymentServicesTest.cpp
 tests/core/codeunit/PaymentsUsingCreditorNumber.cpp
 tests/core/codeunit/PayrollExtensionSupportTest.cpp
+tests/core/codeunit/PayrollImportGenJnlTest.cpp
 tests/core/codeunit/PayrollServiceExtensionMock.cpp
 tests/core/codeunit/PEPPOLManagementTests.cpp
 tests/core/codeunit/PerformanceTest1001.cpp
@@ -13419,6 +13439,7 @@ tests/core/codeunit/REDTestUnitForSalesPurDoc2.cpp
 tests/core/codeunit/ReminderAddFeeSetup.cpp
 tests/core/codeunit/ReminderAddLineFee.cpp
 tests/core/codeunit/ReminderAutomationMock.cpp
+tests/core/codeunit/ReminderAutomationTests.cpp
 tests/core/codeunit/ReminderLineFeeOnReports.cpp
 tests/core/codeunit/RemittancePurchSalesUT.cpp
 tests/core/codeunit/RemittanceREPCheckUT.cpp
@@ -13426,6 +13447,7 @@ tests/core/codeunit/RemovedTablesDataSetup.cpp
 tests/core/codeunit/ReportCaptionSubscriber.cpp
 tests/core/codeunit/ReportCatalogTests.cpp
 tests/core/codeunit/ReportLayout.cpp
+tests/core/codeunit/ReportLayoutsTest.cpp
 tests/core/codeunit/ReportLayoutTest.cpp
 tests/core/codeunit/ReportSettings.cpp
 tests/core/codeunit/ReportVisibilityTest.cpp
@@ -13458,6 +13480,7 @@ tests/core/codeunit/SalesCorrectCrMemo.cpp
 tests/core/codeunit/SalesDocumentPostingErrors.cpp
 tests/core/codeunit/SalesE2E.cpp
 tests/core/codeunit/SalesOrderWhseValidateLine.cpp
+tests/core/codeunit/SalesStockout.cpp
 tests/core/codeunit/SalesTax.cpp
 tests/core/codeunit/SCMAbleToMakeReport.cpp
 tests/core/codeunit/SCMAdjmtOfExpectedCost.cpp
@@ -13555,6 +13578,7 @@ tests/core/codeunit/SCMOnlineAdjustment.cpp
 tests/core/codeunit/SCMOrderPlanningI.cpp
 tests/core/codeunit/SCMOrderPlanningII.cpp
 tests/core/codeunit/SCMOrderPlanningIII.cpp
+tests/core/codeunit/SCMOrderPromising.cpp
 tests/core/codeunit/SCMOrderPromisingII.cpp
 tests/core/codeunit/SCMOrderReports.cpp
 tests/core/codeunit/SCMOrdersIV.cpp
@@ -13587,6 +13611,7 @@ tests/core/codeunit/SCMPurchasesPayables.cpp
 tests/core/codeunit/SCMPutAwayBinPolicy.cpp
 tests/core/codeunit/SCMQtyOnCombInvoice.cpp
 tests/core/codeunit/SCMReports.cpp
+tests/core/codeunit/SCMReservation.cpp
 tests/core/codeunit/SCMReservationII.cpp
 tests/core/codeunit/SCMReservationIII.cpp
 tests/core/codeunit/SCMReservationIV.cpp
@@ -13632,6 +13657,7 @@ tests/core/codeunit/SCMWarehouseUOM.cpp
 tests/core/codeunit/SCMWarehouseUT.cpp
 tests/core/codeunit/SCMWarehouseV.cpp
 tests/core/codeunit/SCMWarehouseVI.cpp
+tests/core/codeunit/SCMWarehouseVII.cpp
 tests/core/codeunit/SCMWhseGetSourceInbound.cpp
 tests/core/codeunit/SCMWhseUOMRndingUT.cpp
 tests/core/codeunit/SCMWIPCostingAddnlCurrency.cpp
@@ -13643,6 +13669,7 @@ tests/core/codeunit/SelectionFilterManagementTest.cpp
 tests/core/codeunit/SendEmailMock.cpp
 tests/core/codeunit/SendJobToCalendar.cpp
 tests/core/codeunit/SEPACTGenJnlLineErrors.cpp
+tests/core/codeunit/ServiceMgmtPlanBasedE2E.cpp
 tests/core/codeunit/ServiceReports.cpp
 tests/core/codeunit/ServiceReportsII.cpp
 tests/core/codeunit/SessionManagement.cpp
@@ -13698,6 +13725,7 @@ tests/core/codeunit/TestLibrariesSaaSInstall.cpp
 tests/core/codeunit/TestLibraryInitialize.cpp
 tests/core/codeunit/TestManualRelease.cpp
 tests/core/codeunit/TestMemoryMappedFile.cpp
+tests/core/codeunit/TestMergeDuplicates.cpp
 tests/core/codeunit/TestMyPlatformNotifications.cpp
 tests/core/codeunit/TestMySettings.cpp
 tests/core/codeunit/TestOAuth20UT.cpp
@@ -13757,6 +13785,7 @@ tests/core/codeunit/UserAccessInSaaSTests.cpp
 tests/core/codeunit/UserCardTest.cpp
 tests/core/codeunit/UserFactboxesTest.cpp
 tests/core/codeunit/UserListTests.cpp
+tests/core/codeunit/UserRoleTest.cpp
 tests/core/codeunit/UTCancellation.cpp
 tests/core/codeunit/UTCCopyJob.cpp
 tests/core/codeunit/UTContactTable.cpp
@@ -14051,6 +14080,7 @@ tests/manufacturing/test/codeunit/SCMManufLowLevelCode.cpp
 tests/manufacturing/test/codeunit/SCMPlanningAndManufacturing.cpp
 tests/manufacturing/test/codeunit/SCMProductionJournal.cpp
 tests/manufacturing/test/codeunit/SCMProductionOrderIII.cpp
+tests/manufacturing/test/codeunit/SCMProductionOrders.cpp
 tests/manufacturing/test/codeunit/SCMProductionOrdersIV.cpp
 tests/manufacturing/test/codeunit/SCMProductionOrdersV.cpp
 tests/manufacturing/test/codeunit/SCMProdWhseHandling.cpp
@@ -14075,6 +14105,7 @@ tests/service/test/codeunit/ServiceContract.cpp
 tests/service/test/codeunit/ServiceContractsII.cpp
 tests/service/test/codeunit/ServiceDemandOverview.cpp
 tests/service/test/codeunit/ServiceInvoicesDelete.cpp
+tests/service/test/codeunit/ServiceItemAvailability.cpp
 tests/service/test/codeunit/ServiceItemBlocked.cpp
 tests/service/test/codeunit/ServiceItemReference.cpp
 tests/service/test/codeunit/ServiceItems.cpp
@@ -14085,8 +14116,10 @@ tests/service/test/codeunit/ServiceMatrixManagement.cpp
 tests/service/test/codeunit/ServiceNavigateForm.cpp
 tests/service/test/codeunit/ServiceOrderArchive.cpp
 tests/service/test/codeunit/ServiceOrderCheck.cpp
+tests/service/test/codeunit/ServiceOrderManagement.cpp
 tests/service/test/codeunit/ServiceOrderRelease.cpp
 tests/service/test/codeunit/ServiceOrderReleaseValidate.cpp
+tests/service/test/codeunit/ServiceOrders.cpp
 tests/service/test/codeunit/ServiceOrderTracking.cpp
 tests/service/test/codeunit/ServiceOrderWarehouseOrange.cpp
 tests/service/test/codeunit/ServiceOrderWarehousePick.cpp
@@ -14110,6 +14143,7 @@ tests/service/test/codeunit/ServiceResourceSkill.cpp
 tests/service/test/codeunit/ServiceResponseTime.cpp
 tests/service/test/codeunit/ServiceStandardCodes.cpp
 tests/service/test/codeunit/ServiceStatistics.cpp
+tests/service/test/codeunit/ServiceStockout.cpp
 tests/service/test/codeunit/ServiceTableFieldsUT.cpp
 tests/service/test/codeunit/ServiceTimesheetPostingUT.cpp
 tests/service/test/codeunit/ServiceTimeSheetsUT.cpp
@@ -14155,35 +14189,3 @@ tests/system/test/tooling/codeunit/BCPTWarehouseTasks.cpp
 tests/test/foundation/no_series/codeunit/NoSeriesCheckTests.cpp
 # THE SLICE: the generated sources that compile and are LINKED INTO `agiru`, so that
 # whole point of naming them rather than globbing whatever happens to work.
-base/integration/dataverse/codeunit/CDSIntegrationImpl.cpp
-tests/core/codeunit/AllProfileV2Test.cpp
-tests/core/codeunit/DimFilterUnitTests.cpp
-tests/core/codeunit/ERMCostAccountingPages.cpp
-tests/core/codeunit/ERMCustomerStatistics.cpp
-tests/core/codeunit/ERMInsertStdPurchLines.cpp
-tests/core/codeunit/ERMPmtTolMultiDocCustomer.cpp
-tests/core/codeunit/ERMRSWizardWorksheet.cpp
-tests/core/codeunit/ERMSalesDocumentsII.cpp
-tests/core/codeunit/ERMVATSalesPurchase.cpp
-tests/core/codeunit/ERMVendorPmtTolWithWrning.cpp
-tests/core/codeunit/JobsStockout.cpp
-tests/core/codeunit/O365PurchCodeTypeLkupTest.cpp
-tests/core/codeunit/O365SalesCodeTypeLkupTest.cpp
-tests/core/codeunit/O365SimplifyUISalesInvoice.cpp
-tests/core/codeunit/PaymentServicesTest.cpp
-tests/core/codeunit/PayrollImportGenJnlTest.cpp
-tests/core/codeunit/ReminderAutomationTests.cpp
-tests/core/codeunit/ReportLayoutsTest.cpp
-tests/core/codeunit/SalesStockout.cpp
-tests/core/codeunit/SCMOrderPromising.cpp
-tests/core/codeunit/SCMReservation.cpp
-tests/core/codeunit/SCMWarehouseVII.cpp
-tests/core/codeunit/ServiceMgmtPlanBasedE2E.cpp
-tests/core/codeunit/TestMergeDuplicates.cpp
-tests/core/codeunit/UserRoleTest.cpp
-tests/manufacturing/test/codeunit/SCMProductionOrders.cpp
-tests/service/test/codeunit/ServiceItemAvailability.cpp
-tests/service/test/codeunit/ServiceOrderManagement.cpp
-tests/service/test/codeunit/ServiceOrders.cpp
-tests/service/test/codeunit/ServiceStockout.cpp
-base/inventory/item/picture/codeunit/ItemFromPicture.cpp

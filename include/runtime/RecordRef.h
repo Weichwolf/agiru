@@ -15,6 +15,8 @@
 #include "type/SecurityFilter.h"
 #include "type/Variant.h"
 
+#include <array>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -954,29 +956,31 @@ public:
 
   /// \brief AL `RecordRef.Find(Text)`. Finds a record in a table based on the values stored in the
   /// key fields.
-  /// \param Which The AL `Text`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean Find(std::string_view Which = {});
+  /// \param Which The AL `Text`: `=`, `-`, `+`, `>` or `<`; `=` when empty.
+  /// \return Whether a row was read. AS A STATEMENT IT RAISES when none was, the way `Record.Find`
+  ///         does (`recordref-find-method.md`: "If you omit this optional return value and the
+  ///         operation does not execute successfully, a runtime error will occur") -- `Library -
+  ///         Setup Storage.Save` writes `RecRef.Find()` on a blank key and its test expects the
+  ///         `does not exist` error (2026-09-12). `=` names the key it looked for; the walking
+  ///         forms say "within the filter".
+  detail::Found Find(std::string_view Which = {});
 
   /// \brief AL `RecordRef.FindFirst()`. Finds the first record in a table based on the current key
   /// and filter.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindFirst();
+  /// \return Whether a row was read; as a statement it raises when none was. \see Find
+  detail::Found FindFirst();
 
   /// \brief AL `RecordRef.FindLast()`. Finds the last record in a table based on the current key
   /// and filter.
-  /// \return True when a row was read.
-  ::agiru::Boolean FindLast();
+  /// \return Whether a row was read; as a statement it raises when none was. \see Find
+  detail::Found FindLast();
 
   /// \brief AL `RecordRef.FindSet(Boolean, Boolean)`. Finds a set of records in a table based on
   /// the current key and filter. FindSet can only retrieve records in ascending order.
   /// \param ForUpdate The AL `Boolean`.
   /// \param UpdateKey The AL `Boolean`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindSet(::agiru::Boolean ForUpdate, ::agiru::Boolean UpdateKey) {
+  /// \return Whether a row was read; as a statement it raises when none was. \see Find
+  detail::Found FindSet(::agiru::Boolean ForUpdate, ::agiru::Boolean UpdateKey) {
     static_cast<void>(ForUpdate);
     static_cast<void>(UpdateKey);
     return FindSet();
@@ -985,16 +989,15 @@ public:
   /// \brief AL `RecordRef.FindSet(Boolean)`. Finds a set of records in a table based on the current
   /// key and filter. FINDSET can only retrieve records in ascending order.
   /// \param ForUpdate The AL `Boolean`.
-  /// \return The AL `Boolean`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  ::agiru::Boolean FindSet(::agiru::Boolean ForUpdate) {
+  /// \return Whether a row was read; as a statement it raises when none was. \see Find
+  detail::Found FindSet(::agiru::Boolean ForUpdate) {
     static_cast<void>(ForUpdate);
     return FindSet();
   }
 
   /// \brief AL `RecordRef.FindSet()`. Finds a set of rows, the way `Record.FindSet` does.
-  /// \return Whether a row was found.
-  ::agiru::Boolean FindSet();
+  /// \return Whether a row was read; as a statement it raises when none was. \see Find
+  detail::Found FindSet();
 
   /// \brief AL `RecordRef.FullyQualifiedName()`. Identifies the fully qualified name of the table.
   /// \return The AL `Text`.
@@ -1221,9 +1224,8 @@ public:
   ///          fields (`devenv-table-keys.md`), so a fixed two refused what AL accepts.
   template <typename... More>
   ::agiru::Boolean Rename(const ::agiru::Variant &Value1, const More &...more) {
-    static_cast<void>(Value1);
-    (static_cast<void>(more), ...);
-    throw Error("RecordRef.Rename(Any) is declared and not implemented yet (board:0035)");
+    const std::array<::agiru::Variant, 1 + sizeof...(More)> keys{Value1, ::agiru::Variant(more)...};
+    return RenameKeys_(keys);
   }
 
   /// \brief AL `RecordRef.Reset()`. Removes all filters, including any special filters set by the
@@ -1439,6 +1441,8 @@ public:
 private:
   friend class KeyRef;
   friend class FieldRef;
+
+  ::agiru::Boolean RenameKeys_(std::span<const ::agiru::Variant> keys);
 
   RecordRef(void *record, const TableDef &table) : state_(new detail::RecordRefState{}) {
     state_->record = record;

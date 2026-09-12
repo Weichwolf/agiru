@@ -129,6 +129,33 @@ std::string ColumnZero(const FieldDef &def) {
 }
 }
 
+namespace detail {
+
+std::string SequenceName(const TableDef &table, const FieldDef &field) {
+  return std::string(table.name) + "$" + std::string(field.name);
+}
+
+bool DrawsFromSequence(const FieldDef &field) {
+  return field.autoIncrement && field.fieldClass == FieldClass::Normal &&
+         (field.type == FieldType::Integer || field.type == FieldType::BigInteger);
+}
+
+}
+
+namespace {
+
+void EnsureSequences(const Connection &connection, const TableDef &table) {
+  for (const FieldDef &field : table.fields) {
+    if (!detail::DrawsFromSequence(field)) { continue; }
+    const std::string sequence = Quoted(detail::SequenceName(table, field));
+    connection.Run("CREATE SEQUENCE IF NOT EXISTS " + sequence);
+    connection.Run("SELECT setval('" + sequence + "', (SELECT COALESCE(MAX(" + Quoted(field.name) +
+                   "), 0) FROM " + Quoted(table.name) + ") + 1, false)");
+  }
+}
+
+}
+
 void CreateTable(const Connection &connection, const TableDef &table) {
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
   bool written = false;
@@ -166,10 +193,15 @@ void CreateTable(const Connection &connection, const TableDef &table) {
     index += ")";
     connection.Run(index);
   }
+  EnsureSequences(connection, table);
 }
 
 void DropTable(const Connection &connection, const TableDef &table) {
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
+  for (const FieldDef &field : table.fields) {
+    if (!detail::DrawsFromSequence(field)) { continue; }
+    connection.Run("DROP SEQUENCE IF EXISTS " + Quoted(detail::SequenceName(table, field)));
+  }
 }
 
 namespace {
@@ -394,6 +426,7 @@ void ProvisionInstalled(const Connection &into) {
   for (const TableEntry *entry : InstalledTables()) {
     if (there.contains(std::string(entry->table->name))) {
       widened += AddMissingColumns(into, *entry->table);
+      EnsureSequences(into, *entry->table);
       continue;
     }
     CreateTable(into, *entry->table);

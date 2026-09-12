@@ -1270,6 +1270,16 @@ void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Ob
       }
     }
     if (!linked && link != nullptr) { continue; }
+    const al::Property *onRec = al::Find(control.properties, "RunPageOnRec");
+    const bool runsOnRec = onRec != nullptr && LowerKey(onRec->text) == "true";
+    if (runsOnRec && linked) {
+      std::vector<al::Token> assigned;
+      assigned.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
+      assigned.push_back(Mark(":="));
+      assigned.push_back(Word(al::TokenKind::Identifier, "Rec"));
+      assigned.push_back(Mark(";"));
+      tokens.insert(tokens.begin(), assigned.begin(), assigned.end());
+    }
     tokens.push_back(Word(al::TokenKind::Identifier, "PAGE"));
     tokens.push_back(Mark("."));
     tokens.push_back(Word(al::TokenKind::Identifier, "Run"));
@@ -1278,6 +1288,9 @@ void SynthesizeRunObjectActions(std::vector<al::PageControl> &controls, const Ob
     if (linked) {
       tokens.push_back(Mark(","));
       tokens.push_back(Word(al::TokenKind::Identifier, "RunObjectRec"));
+    } else if (runsOnRec) {
+      tokens.push_back(Mark(","));
+      tokens.push_back(Word(al::TokenKind::Identifier, "Rec"));
     }
     tokens.push_back(Mark(")"));
     tokens.push_back(Mark(";"));

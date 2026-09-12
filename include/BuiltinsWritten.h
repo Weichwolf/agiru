@@ -773,12 +773,17 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
     return true;
   } else if constexpr (requires {
                          typename T::Traits;
-                         { T::FromInteger(std::int32_t{}) } -> std::same_as<T>;
+                         T::Traits::kValues;
+                         T::FromInteger(std::int32_t{});
                        }) {
     const std::optional<std::int32_t> ordinal =
         MemberOrdinalOf(std::span<const EnumValueDef>(T::Traits::kValues), text);
     if (!ordinal.has_value()) { return false; }
-    into = T::FromInteger(*ordinal);
+    if constexpr (std::same_as<decltype(T::FromInteger(std::int32_t{})), T>) {
+      into = T::FromInteger(*ordinal);
+    } else {
+      into = T(*ordinal);
+    }
     return true;
   } else {
     static_cast<void>(into);

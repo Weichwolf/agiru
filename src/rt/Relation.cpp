@@ -205,9 +205,9 @@ RelationBranch DeclaredTargetOf(std::string_view text, std::vector<RelationTerm>
       tableName = head.substr(0, closeQuote + 1);
       fieldName = head.substr(closeQuote + 2);
     }
-  } else if (const std::size_t dot = head.find('.'); dot != std::string_view::npos) {
+  } else if (const std::size_t dot = head.find(" . "); dot != std::string_view::npos) {
     tableName = head.substr(0, dot);
-    fieldName = head.substr(dot + 1);
+    fieldName = head.substr(dot + 3);
   }
   out.table = std::string(Unquoted(tableName));
   out.field = std::string(Unquoted(fieldName));
@@ -238,9 +238,9 @@ ResolvedRelation TargetOf(std::string_view text, const void *record, const Table
       tableName = head.substr(0, closeQuote + 1);
       fieldName = head.substr(closeQuote + 2);
     }
-  } else if (const std::size_t dot = head.find('.'); dot != std::string_view::npos) {
+  } else if (const std::size_t dot = head.find(" . "); dot != std::string_view::npos) {
     tableName = head.substr(0, dot);
-    fieldName = head.substr(dot + 1);
+    fieldName = head.substr(dot + 3);
   }
   out.table = std::string(Unquoted(tableName));
   out.field = std::string(Unquoted(fieldName));

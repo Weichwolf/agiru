@@ -51,3 +51,19 @@ procedures, `Option := Variant`, `SetFilter` with a value, `Text` out of `GetFil
 | `non-const lvalue reference ... unrelated type` | 47 -> 12 |
 
 Suite: 1 788 -> 1 800.
+
+**Two named causes read on 2026-09-12 while the UT list pointed at units outside the slice
+(`RefreshProductionOrder`, `Serv. Integration Mgt.`):**
+
+- **A quoted dataitem name and a bare local collapse to one C++ identifier.** AL tells
+  `"Production Order"` (the report's dataitem, an `Instance<>` member reached with `->`) from
+  `ProductionOrder` (a `Record` local of the dataitem's own `OnAfterGetRecord`) by the quotes;
+  `Identifier()` folds both to `ProductionOrder`, the local shadows the member, and the body reads
+  `ProductionOrder->VariantCode` on a plain record (5 UT cases wait behind that one report). The
+  shape of the fix is the page variables' `_Var` rule applied to LOCALS AND PARAMETERS: a
+  local whose identifier is a control's or dataitem's is spelled with the suffix, in
+  `Locals(...)` and in `PageNames::LocalSpelling` alike, since the two must agree.
+- **A namespace-qualified type in an expression.** `case
+  Microsoft.Foundation.Enums."Supply Document Type".FromInteger(DocumentType) of` -- the
+  namespace path is read as member access on an identifier `Microsoft`. A dotted path whose last
+  quoted segment names a known enum (or table, codeunit) is that object; one site in W1.

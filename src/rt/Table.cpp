@@ -668,11 +668,12 @@ namespace {
 
 void AutoIncrement(void *record, const TableDef &table) {
   for (const FieldDef &def : table.fields) {
-    if (!def.autoIncrement || def.fieldClass != FieldClass::Normal) { continue; }
-    if (def.type != FieldType::Integer && def.type != FieldType::BigInteger) { continue; }
+    if (!DrawsFromSequence(def)) { continue; }
     if (!IsBlank(record, def)) { continue; }
+    const std::string sequence = "'" + Quoted(SequenceName(table, def)) + "'";
     const Result next = Session::Current().Database().Execute(
-        "SELECT COALESCE(MAX(" + Quoted(def.name) + "), 0) + 1 FROM " + Name(table));
+        "SELECT setval(" + sequence + ", GREATEST(nextval(" + sequence +
+        "), (SELECT COALESCE(MAX(" + Quoted(def.name) + "), 0) FROM " + Name(table) + ") + 1))");
     const std::optional<std::string_view> value = next.Value(0, 0);
     detail::SetFieldText(record, def, value.has_value() ? std::string(*value) : "1");
   }

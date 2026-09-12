@@ -148,6 +148,16 @@ void TheAtSignIsAModifier() {
   CHECK_TRUE("and a filter with no @ compares text without case either, as AL does",
              Passes("*ltd*", "Acme LTD Co", TextField()));
   CHECK_TRUE("an @ on its own value still compares", Passes("@acme", "ACME", TextField()));
+  // INSIDE QUOTES THE @ STILL ASKS, AND THE WILDCARDS BEHIND IT STILL STAND: `Find Record
+  // Management.FindRecordByDescriptionAndView` filters `'@' + Text + '*'` in quotes, so that the
+  // text's own `&`, `|` and parentheses are literal while the star is a star (Record Set UT,
+  // 3 cases, 2026-09-12). Quoted WITHOUT the @, the star stays a character (the case below).
+  CHECK_TRUE("@ inside quotes is the modifier", Passes("'@cxy?*'", "CXYDXY", TextField()));
+  CHECK_TRUE("and its wildcards stand", Passes("'@*ltd*'", "Acme LTD Co", TextField()));
+  CHECK_TRUE("while an ampersand inside them is still literal",
+             Passes("'@a&b*'", "A&B Ltd", TextField()));
+  CHECK_TRUE("and what the pattern does not cover fails",
+             !Passes("'@cxy?'", "CXYDXY", TextField()));
 }
 
 /// A RANGE IS TWO OPERANDS AND EITHER END MAY BE OPEN.
@@ -406,7 +416,8 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
   agiru::detail::RecordState bounded;
   bounded.filters.push_back(agiru::detail::FieldFilter{
       .field = agiru::platform::Integer::Field_No::Number, .group = 0, .text = "1..5"});
-  const agiru::detail::Selection five = agiru::detail::Select(&bounded, agiru::platform::kIntegerTable);
+  const agiru::detail::Selection five =
+      agiru::detail::Select(&bounded, agiru::platform::kIntegerTable);
   CHECK_TRUE("and a bounded one is exactly its rows",
              five.from.find("generate_series(1, 5)") != std::string::npos);
   agiru::detail::RecordState unfiltered;
@@ -425,13 +436,15 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                       .caption = "Code",
                       .no = agiru::FieldNo{1},
                       .type = agiru::FieldType::Code},
-      agiru::FieldDef{.offset = 32,
-                      .name = "Table Rows",
-                      .caption = "Table Rows",
-                      .calcFormula = "count(\"Resource Cost\" where(Type = const(Database::\"Resource Cost\")))",
-                      .no = agiru::FieldNo{2},
-                      .fieldClass = agiru::FieldClass::FlowField,
-                      .type = agiru::FieldType::Integer},
+      agiru::FieldDef{
+          .offset = 32,
+          .name = "Table Rows",
+          .caption = "Table Rows",
+          .calcFormula =
+              "count(\"Resource Cost\" where(Type = const(Database::\"Resource Cost\")))",
+          .no = agiru::FieldNo{2},
+          .fieldClass = agiru::FieldClass::FlowField,
+          .type = agiru::FieldType::Integer},
   }};
   static constexpr agiru::TableDef kNumbers{.id = agiru::TableId{50003},
                                             .name = "Flow Numbers",
@@ -443,7 +456,8 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
       agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "1"});
   const agiru::detail::Selection tableRows = agiru::detail::Select(&numbered, kNumbers);
   CHECK_TRUE("Database::X binds the table's number",
-             tableRows.binds.size() == 2 && tableRows.binds[0].has_value() && *tableRows.binds[0] == "202");
+             tableRows.binds.size() == 2 && tableRows.binds[0].has_value() &&
+                 *tableRows.binds[0] == "202");
   // `MarkedOnly` OVER A DATABASE RECORD IS A CLAUSE OVER THE MARKED KEYS
   // (`record-markedonly-method.md`): each mark is one primary key, the clause ORs them, and no
   // mark at all selects nothing rather than everything.

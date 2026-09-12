@@ -138,7 +138,9 @@ Atom ReadAtom(std::string_view text) {
 
   Atom atom;
   atom.value = Unquote(text);
-  const bool wild = HasWildcard(atom.value) && Trim(text).front() != '\'';
+  const bool insensitive = atom.value.starts_with("@");
+  if (insensitive) { atom.value.erase(0, 1); }
+  const bool wild = HasWildcard(atom.value) && (insensitive || Trim(text).front() != '\'');
   if (given == Compare::Equal) {
     atom.compare = wild ? Compare::Like : Compare::Equal;
   } else if (given == Compare::NotEqual) {

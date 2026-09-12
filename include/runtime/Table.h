@@ -1917,21 +1917,34 @@ public:
   template <typename... Keys> Boolean Rename(const Keys &...keys) {
     static_assert(sizeof...(Keys) > 0, "Rename takes the new primary key");
     Derived before = static_cast<const Derived &>(*this);
-    TableEvent("OnBeforeRenameEvent", true, before);
     std::size_t position = 0;
     (AssignKey(TableTraits<Derived>::kTable, position++, keys), ...);
+    return RenameFrom(before);
+  }
+
+  /// \brief The rename once the NEW key stands in the record: `OnBeforeRenameEvent` with `Rec`
+  ///        on the new key and `xRec` on the old (board:0250), the table's `OnRename`, the row
+  ///        operation with its cascade, `OnAfterRenameEvent`. `Rename(Keys...)` assigns the key
+  ///        and comes here; a `RecordRef.Rename` does the same through the catalogue, which is
+  ///        why it is public.
+  /// \param before The record as it was, old key and all.
+  /// \return True.
+  /// \throws Error when no row carries the old key; the record is as it was then.
+  Boolean RenameFrom(const Derived &before) {
+    Derived was = before;
+    TableEvent("OnBeforeRenameEvent", true, was);
     {
-      detail::BeforeImage image(&before, Self());
+      detail::BeforeImage image(&was, Self());
       if constexpr (requires(Derived &record) { record.OnRename(); }) {
         static_cast<Derived *>(this)->OnRename();
       }
     }
-    if (!detail::RuntimeRename(Self(), &before, TableTraits<Derived>::kTable)) {
-      static_cast<Derived &>(*this) = before;
+    if (!detail::RuntimeRename(Self(), &was, TableTraits<Derived>::kTable)) {
+      static_cast<Derived &>(*this) = was;
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
                   " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
-    TableEvent("OnAfterRenameEvent", true, before);
+    TableEvent("OnAfterRenameEvent", true, was);
     CaptureImage();
     return true;
   }

@@ -121,8 +121,30 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
   return detail::RuntimeCount(State().record, Table());
 }
 
-::agiru::Boolean RecordRef::Find(std::string_view Which) {
-  return detail::RuntimeFind(State().record, Table(), Which.empty() ? "=" : Which);
+namespace {
+
+std::string KeyTextOf(const void *record, const TableDef &table) {
+  if (table.keys.empty()) { return {}; }
+  std::string out;
+  for (const FieldNo no : table.keys[0].fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    if (!out.empty()) { out += ", "; }
+    out += std::string(def->caption) + "='" + ::agiru::FieldText(record, *def) + "'";
+  }
+  return out;
+}
+
+}
+
+detail::Found RecordRef::Find(std::string_view Which) {
+  const std::string_view which = Which.empty() ? "=" : Which;
+  const bool found = detail::RuntimeFind(State().record, Table(), which);
+  if (which == "=") {
+    return detail::Found{
+        found, Table().name, found ? std::string{} : KeyTextOf(State().record, Table())};
+  }
+  return detail::Found{found, Table().name};
 }
 
 ::agiru::Boolean RecordRef::Get(::agiru::RecordId RecordID) {
@@ -151,8 +173,8 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
   return detail::RuntimeNext(State().record, Table(), Steps == 0 ? 1 : Steps);
 }
 
-::agiru::Boolean RecordRef::FindSet() {
-  return detail::RuntimeFindSet(State().record, Table());
+detail::Found RecordRef::FindSet() {
+  return detail::Found{detail::RuntimeFindSet(State().record, Table()), Table().name};
 }
 
 void RecordRef::Reset() {
@@ -164,8 +186,8 @@ void RecordRef::SetRecFilter() {
   detail::RuntimeSetRecFilter(State().record, Table());
 }
 
-::agiru::Boolean RecordRef::FindFirst() {
-  return detail::RuntimeFind(State().record, Table(), "-");
+detail::Found RecordRef::FindFirst() {
+  return detail::Found{detail::RuntimeFind(State().record, Table(), "-"), Table().name};
 }
 
 std::string FieldRef::ToText() const {
@@ -173,8 +195,8 @@ std::string FieldRef::ToText() const {
   return ::agiru::FieldText(record_, Def_());
 }
 
-::agiru::Boolean RecordRef::FindLast() {
-  return detail::RuntimeFind(State().record, Table(), "+");
+detail::Found RecordRef::FindLast() {
+  return detail::Found{detail::RuntimeFind(State().record, Table(), "+"), Table().name};
 }
 
 ::agiru::RecordId RecordRef::RecordId() const {
@@ -253,6 +275,31 @@ std::string RecordRef::GetFilters() const {
     throw Error("The " + std::string(Table().name) + " does not exist");
   }
   return true;
+}
+
+::agiru::Boolean RecordRef::RenameKeys_(std::span<const ::agiru::Variant> keys) {
+  const TableDef &table = Table();
+  if (table.keys.empty() || keys.size() != table.keys[0].fields.size()) {
+    throw Error("RecordRef.Rename: " + std::string(table.name) + " has a primary key of " +
+                std::to_string(table.keys.empty() ? 0 : table.keys[0].fields.size()) +
+                " field(s), and " + std::to_string(keys.size()) + " value(s) were given");
+  }
+  const TableEntry *entry = FindTable(table.id);
+  if (entry == nullptr || entry->rename == nullptr || entry->copy == nullptr) {
+    throw Error("RecordRef.Rename: this installation carries no " + std::string(table.name));
+  }
+  void *before = entry->make();
+  try {
+    entry->copy(before, State().record);
+    std::size_t position = 0;
+    for (const FieldNo no : table.keys[0].fields) { Field(no.Value()).Value(keys[position++]); }
+    const bool renamed = entry->rename(State().record, before);
+    entry->free(before);
+    return renamed;
+  } catch (...) {
+    entry->free(before);
+    throw;
+  }
 }
 
 constexpr ::agiru::Integer kInvariantFormat = 9;

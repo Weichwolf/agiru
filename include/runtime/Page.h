@@ -465,6 +465,7 @@ template <typename P, typename Record> void AdoptRecord(P &page, const Record &r
                        }) {
     using Source = std::remove_cvref_t<decltype(page.Rec)>;
     static_cast<typename Source::Platform_Half &>(page.Rec).Copy(record);
+    page.RunsOnRecord();
   } else {
     static_cast<void>(record);
   }
@@ -689,9 +690,18 @@ public:
   ///       documentation's own example is `SetRecord; if RunModal = Action::LookupOK then
   ///       GetRecord` with no `LookupMode` in sight, and `Price Source - Customer.IsLookupOK`
   ///       reads `Page.RunModal(Page::"Customer Lookup", Customer) = Action::LookupOK` the same
-  ///       way (6 cases of `Price Source UT`, 2026-09-11). A Card or a dialog closes with `OK`.
+  ///       way (6 cases of `Price Source UT`, 2026-09-11). A Card closes with `OK`.
+  /// \note AND SO DOES A PAGE RUN MODALLY ON A RECORD -- `Page.RunModal(Page::X, Rec)` -- of any
+  ///       type: `Post Pmts and Rec. Bank Acc.` (a StandardDialog run on the reconciliation) reads
+  ///       `CloseAction::LookupOK` from its own OK and its caller compares with `LookupOK`;
+  ///       `devenv-use-ishandled-pattern.md` reads `Page.RunModal(Page::"Transfer Difference to
+  ///       Account", TempGenJnlLine)` against `LookupOK`; every Card the BaseApp runs on a record
+  ///       and compares with `OK` discards the answer (`then;`). A page VARIABLE's `RunModal()`
+  ///       with no record closes with `OK` -- `Price List Management` compares `SuggestPriceLines
+  ///       .RunModal()` with `Action::OK` and copies the lines only then (Suggest Price Lines UT,
+  ///       20 cases lost to a StandardDialog rule on 2026-09-12 and taken back the same day).
   void CloseWith(::agiru::Action action) {
-    bool lookup = static_cast<bool>(lookupMode_);
+    bool lookup = static_cast<bool>(lookupMode_) || (modal_ && onRecord_);
     if constexpr (requires { PageTraits<Derived>::kPage.type; }) {
       lookup = lookup || (modal_ && !EntityOriented(PageTraits<Derived>::kPage.type));
     }
@@ -705,6 +715,10 @@ public:
 
   /// \brief Notes that the page runs modally, which is what makes a list a lookup window.
   void RunsModally() { modal_ = true; }
+
+  /// \brief The runner says `Page.Run(Number, Rec)` handed this page a record of its own table,
+  ///        which makes a modal run a lookup window. \see CloseWith
+  void RunsOnRecord() { onRecord_ = true; }
 
   /// \brief What `Page.RunModal` answers: the action the page closed with.
   /// \return The action; `OK` when nothing said otherwise.
@@ -982,27 +996,112 @@ public:
   ///       way of the copy that followed (`Suggest Price Lines UT`, 12 cases; board:0705).
   /// \brief AL `Page.SaveRecord()`. Saves the current record as if performed by the client. If the
   /// record does not exist it is inserted, otherwise it is modified.
-  /// \throws Error until the UI runs (board:0030).
+  /// \throws Error when the page has no source table.
+  ///
+  /// \note "AS IF PERFORMED BY THE CLIENT" IS THE WHOLE RULE (board:0713). An existing row goes
+  ///       through `OnModifyRecord` and `OnModifyRecordEvent`; a new row through `OnInsertRecord`
+  ///       and `OnInsertRecordEvent` -- and a new row on a `DelayedInsert` page is NOT written
+  ///       here, because the client inserts it when the row is left and the BaseApp's own insert
+  ///       path (`OnInsertRecord -> ValidateAndInsert`, starting with `if Rec."Entry No." <> 0 then
+  ///       exit(false)`) breaks if the row is written earlier (openerp WI-1395, measured).
   void SaveRecord() {
     if constexpr (requires {
                     static_cast<Derived &>(*this).Rec.Insert(true);
                     typename std::remove_cvref_t<
                         decltype(static_cast<Derived &>(*this).Rec)>::Platform_Half;
                   }) {
+      if (!edited_) { return; }
       auto &rec = static_cast<Derived &>(*this).Rec;
       using Source = std::remove_cvref_t<decltype(rec)>;
       Source probe = rec;
       if (static_cast<typename Source::Platform_Half &>(probe).Find("=")) {
-        rec.Modify(true);
+        static_cast<void>(ModifyRecord());
         return;
       }
       if (!newRecord_) { return; }
-      rec.Insert(true);
-      newRecord_ = false;
+      if constexpr (requires { PageTraits<Derived>::kPage.delayedInsert; }) {
+        if (PageTraits<Derived>::kPage.delayedInsert) { return; }
+      }
+      static_cast<void>(InsertNewRecord());
     } else {
       throw Error("Page.SaveRecord(): the page has no source table");
     }
   }
+
+  /// \brief The client's insert of the NEW record the page stands on: `OnInsertRecord` (false
+  ///        means the trigger wrote the row itself, `devenv-oninsertrecord-page-trigger.md`),
+  ///        `OnInsertRecordEvent` with `AllowInsert`, then `Insert(true)`.
+  /// \return True when the row was written here; false when the page stands on no new record or
+  ///         the trigger wrote it itself.
+  bool InsertNewRecord() {
+    if constexpr (requires {
+                    static_cast<Derived &>(*this).Rec.Insert(true);
+                    typename std::remove_cvref_t<
+                        decltype(static_cast<Derived &>(*this).Rec)>::Platform_Half;
+                  }) {
+      if (!newRecord_) { return false; }
+      newRecord_ = false;
+      auto &page = static_cast<Derived &>(*this);
+      using Source = std::remove_cvref_t<decltype(page.Rec)>;
+      auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
+      ::agiru::Boolean allowInsert = true;
+      if constexpr (requires { page.OnInsertRecord(::agiru::Boolean{}); }) {
+        allowInsert = page.OnInsertRecord(false);
+      }
+      {
+        static constexpr std::array<std::string_view, 4> kNames{
+            "Rec", "BelowxRec", "xRec", "AllowInsert"};
+        ::agiru::Boolean below = false;
+        auto &before = page.Rec.StoredImage();
+        detail::RaisePageEvent(
+            page, "OnInsertRecordEvent", {}, kNames, page.Rec, below, before, allowInsert);
+      }
+      edited_ = false;
+      if (!allowInsert) { return false; }
+      static_cast<void>(platform.Insert(true));
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /// \brief The client's write of the EXISTING record the page stands on: `OnModifyRecord`
+  ///        (false means the trigger wrote the row itself), `OnModifyRecordEvent` with
+  ///        `AllowModify`, then `Modify(true)`.
+  /// \return True when the row was written here.
+  bool ModifyRecord() {
+    if constexpr (requires {
+                    static_cast<Derived &>(*this).Rec.Insert(true);
+                    typename std::remove_cvref_t<
+                        decltype(static_cast<Derived &>(*this).Rec)>::Platform_Half;
+                  }) {
+      auto &page = static_cast<Derived &>(*this);
+      using Source = std::remove_cvref_t<decltype(page.Rec)>;
+      auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
+      ::agiru::Boolean allowModify = true;
+      if constexpr (requires { page.OnModifyRecord(); }) { allowModify = page.OnModifyRecord(); }
+      {
+        static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "AllowModify"};
+        auto &before = page.Rec.StoredImage();
+        detail::RaisePageEvent(
+            page, "OnModifyRecordEvent", {}, kNames, page.Rec, before, allowModify);
+      }
+      edited_ = false;
+      if (!allowModify) { return false; }
+      static_cast<void>(platform.Modify(true));
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  /// \brief The harness says the user changed a field of the current record, which is what
+  ///        `SaveRecord` and `CurrPage.Update(true)` write; nothing else is.
+  void MarkEdited() { edited_ = true; }
+
+  /// \brief Whether the user changed the current record since it was last written.
+  /// \return True when a save has something to write.
+  [[nodiscard]] bool Edited() const { return edited_; }
 
   /// \brief The runner says the page stands on a NEW record -- `OnNewRecord` is about to run --
   ///        which is the one `SaveRecord` inserts.
@@ -1097,11 +1196,22 @@ public:
   ///        controls on the page" (`page-update-method.md`).
   /// \param SaveRecord Whether the current record is saved first.
   ///
-  /// \note HEADLESS, THE CONTROLS ARE THE RECORD, so refreshing them is nothing to do; and the
-  ///       SAVE is the harness's row-leave, which board:0030 still owes -- until it exists,
-  ///       `SaveRecord` is carried and acted on by nothing rather than refused (15 cases stopped
-  ///       here on 2026-09-09, each in a page trigger the test drove through a `TestPage`).
-  void Update(::agiru::Boolean SaveRecord = true) { static_cast<void>(SaveRecord); }
+  /// \note HEADLESS, THE CONTROLS ARE THE RECORD, so refreshing them is nothing to do -- and the
+  ///       predecessor MEASURED the refresh half as net negative (openerp WI-1401, -3 +1: the
+  ///       Document Totals refresh cleared its totals between the clearing and the recalculation).
+  ///       The SAVE half is `SaveRecord()`, which `page-update-method.md` puts first: "Saves the
+  ///       current record and then updates the controls on the page" (board:0713). Its default is
+  ///       true on a page with a source table and nothing on one without.
+  void Update(::agiru::Boolean SaveRecord = true) {
+    if (!SaveRecord) { return; }
+    if constexpr (requires {
+                    static_cast<Derived &>(*this).Rec.Insert(true);
+                    typename std::remove_cvref_t<
+                        decltype(static_cast<Derived &>(*this).Rec)>::Platform_Half;
+                  }) {
+      this->SaveRecord();
+    }
+  }
 
   /// \note NO PROTECTED DESTRUCTOR AND NO PRIVATE CONSTRUCTOR, for the reason `Table` gives: a
   ///       generated class has no user-declared constructor, so `pages::X P{}` is aggregate
@@ -1110,6 +1220,8 @@ public:
 private:
   bool editable_ = true;
   bool modal_ = false;
+  bool onRecord_ = false;
+  bool edited_ = false;
   bool newRecord_ = false;
   ::agiru::Integer backgroundTasks_ = 0;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;

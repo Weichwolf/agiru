@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstdint>
+#include <exception>
 #include <optional>
 #include <span>
 #include <string>
@@ -138,12 +140,7 @@ public:
   void OpenView() { Open_(false, false); }
 
   /// \brief AL `TestPage.Close()` -- runs `OnQueryClosePage` and `OnClosePage`, then lets go.
-  void Close() {
-    if (page_ == nullptr) { return; }
-    SaveEditedNewRecord_();
-    detail::ClosePage(*page_);
-    Release_();
-  }
+  void Close() { Close_(true); }
 
   /// \brief AL `TestPage.First()`.
   /// \return Whether there is a first record.
@@ -154,7 +151,9 @@ public:
   /// \brief AL `TestPage.Next()`.
   /// \return Whether there is a next record.
   Boolean Next() {
-    return Landed_([](auto &rec) { return Platform_(rec).Next() != 0; });
+    const Boolean moved = Landed_([](auto &rec) { return Platform_(rec).Next() != 0; });
+    if (!moved) { PresentNewRow_(); }
+    return moved;
   }
 
   /// \brief AL `TestPage.Previous()`.
@@ -179,14 +178,117 @@ public:
       static_cast<void>(Page_());
       SaveEditedNewRecord_();
       Relink_();
+      const std::optional<std::int64_t> follows = StandingKey_();
       Platform_(Record_()).Init();
       detail::SeedFromFilters(
           static_cast<void *>(&Record_()), RecordTraits_().kTable, PopulateAllFields_());
+      SplitKey_(follows);
       newRecord_ = true;
       detail::StartNewRecord(Page_(), false);
       detail::AfterGetRecord(Page_());
     } else {
       Unopened_();
+    }
+  }
+
+  /// STEPPING PAST THE LAST ROW OF AN EDITABLE LIST LANDS ON THE BLANK ROW the client carries
+  /// there, which is how `Lines.Last(); Lines.Next(); Lines."No.".SetValue(...)` adds a line
+  /// (the aggregate codeunits' `CreateLineThroughTestPage`, 2026-09-12). Without it the `SetValue`
+  /// edited the last existing line. The row is numbered like `New()`'s and is written when it is
+  /// left, edited; a page that cannot insert stays where it is.
+  void PresentNewRow_() {
+    if constexpr (kHasRecord) {
+      if (page_ == nullptr || newRecord_ || !Editable_()) { return; }
+      if constexpr (requires { page_->OpenedEditable(); }) {
+        if (!page_->OpenedEditable()) { return; }
+      }
+      const std::optional<std::int64_t> follows = StandingKey_();
+      Platform_(Record_()).Init();
+      detail::SeedFromFilters(
+          static_cast<void *>(&Record_()), RecordTraits_().kTable, PopulateAllFields_());
+      SplitKey_(follows);
+      newRecord_ = true;
+      detail::StartNewRecord(Page_(), true);
+      detail::AfterGetRecord(Page_());
+    }
+  }
+
+  /// The last primary-key field of the page's table when `AutoSplitKey` can number it -- an
+  /// Integer or BigInteger (`devenv-autosplitkey-property.md` allows Guid and Decimal too, which
+  /// wait for a case) -- or nothing.
+  [[nodiscard]] static const FieldDef *SplitField_() {
+    if constexpr (kHasRecord && requires { PageTraits<P>::kPage.autoSplitKey; }) {
+      if (!PageTraits<P>::kPage.autoSplitKey) { return nullptr; }
+      const TableDef &table = RecordTraits_().kTable;
+      if (table.keys.empty() || table.keys[0].fields.empty()) { return nullptr; }
+      const FieldDef *last = Field(table, table.keys[0].fields.back());
+      if (last == nullptr ||
+          (last->type != FieldType::Integer && last->type != FieldType::BigInteger)) {
+        return nullptr;
+      }
+      return last;
+    } else {
+      return nullptr;
+    }
+  }
+
+  /// The split key of the row the page stands on, when it stands on a saved one.
+  [[nodiscard]] std::optional<std::int64_t> StandingKey_() {
+    if constexpr (kHasRecord) {
+      const FieldDef *last = SplitField_();
+      if (last == nullptr || newRecord_) { return std::nullopt; }
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr || !state->positioned) { return std::nullopt; }
+      return KeyOf_(Record_(), *last);
+    } else {
+      return std::nullopt;
+    }
+  }
+
+  template <typename R>
+  [[nodiscard]] static std::optional<std::int64_t> KeyOf_(const R &rec, const FieldDef &last) {
+    const std::string text = ::agiru::FieldText(static_cast<const void *>(&rec), last);
+    if (text.empty()) { return 0; }
+    try {
+      return std::stoll(text);
+    } catch (const std::exception &) { return std::nullopt; }
+  }
+
+  /// `AutoSplitKey` (`devenv-autosplitkey-property.md`, board:0354): "a value is automatically
+  /// calculated for the last field of the primary key when a new record is inserted between two
+  /// existing records. The new key value is set to a value halfway between the keys of the
+  /// surrounding records"; past the last row it is that row's key plus ten thousand, and on an
+  /// empty list ten thousand -- BC's document lines run 10000, 20000, 30000 for exactly this
+  /// reason. Two lines added through a TestPage both took the key the filters seeded, 0, and the
+  /// second could not be written (the aggregate codeunits, 2026-09-12).
+  void SplitKey_(const std::optional<std::int64_t> &follows) {
+    if constexpr (kHasRecord) {
+      const FieldDef *last = SplitField_();
+      if (last == nullptr) { return; }
+      constexpr std::int64_t kStep = 10000;
+      auto &rec = Record_();
+      using Source = std::remove_cvref_t<decltype(rec)>;
+      Source probe;
+      static_cast<typename Source::Platform_Half &>(probe).Copy(rec);
+      auto &walk = static_cast<typename Source::Platform_Half &>(probe);
+      std::optional<std::int64_t> before = follows;
+      std::optional<std::int64_t> after;
+      if (before.has_value()) {
+        ::agiru::detail::SetFieldText(static_cast<void *>(&probe), *last, std::to_string(*before));
+        if (static_cast<bool>(walk.Find(">"))) { after = KeyOf_(probe, *last); }
+      } else if (static_cast<bool>(walk.FindLast())) {
+        before = KeyOf_(probe, *last);
+      }
+      std::int64_t value = kStep;
+      if (before.has_value() && after.has_value()) {
+        value = *after - *before >= 2 ? *before + (*after - *before) / 2 : *before + 1;
+      } else if (before.has_value()) {
+        value = *before + kStep;
+      }
+      ::agiru::detail::SetFieldText(static_cast<void *>(&rec), *last, std::to_string(value));
+    } else {
+      static_cast<void>(follows);
     }
   }
 
@@ -423,6 +525,7 @@ public:
       RereadBeforeEdit_();
       const detail::ValidatingField editing(def->field);
       auto before = Record_();
+      if constexpr (requires { page_->MarkEdited(); }) { page_->MarkEdited(); }
       try {
         Record_().CheckEntryRange(def->field, text);
         PageValidateEvent_("OnBeforeValidateEvent", def->name, before);
@@ -456,18 +559,9 @@ public:
       const detail::RecordState *state =
           reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
       if (state == nullptr || !state->positioned) { return; }
-      Boolean allowModify = true;
-      if constexpr (requires { page_->OnModifyRecord(); }) {
-        allowModify = page_->OnModifyRecord();
+      if constexpr (requires { page_->ModifyRecord(); }) {
+        static_cast<void>(page_->ModifyRecord());
       }
-      {
-        static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "AllowModify"};
-        auto &before = page_->Rec.StoredImage();
-        detail::RaisePageEvent(
-            *page_, "OnModifyRecordEvent", {}, kNames, page_->Rec, before, allowModify);
-      }
-      if (!allowModify) { return; }
-      static_cast<void>(Platform_(Record_()).Modify(true));
     }
   }
 
@@ -830,25 +924,9 @@ private:
       if (!newRecord_ || page_ == nullptr) { return; }
       newRecord_ = false;
       edited_ = false;
-      if constexpr (requires { page_->StandsOnNewRecord(); }) {
-        if (!page_->StandsOnNewRecord()) { return; }
+      if constexpr (requires { page_->InsertNewRecord(); }) {
+        static_cast<void>(page_->InsertNewRecord());
       }
-      using Source = std::remove_cvref_t<decltype(page_->Rec)>;
-      auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
-      Boolean allowInsert = true;
-      if constexpr (requires { page_->OnInsertRecord(Boolean{}); }) {
-        allowInsert = page_->OnInsertRecord(false);
-      }
-      {
-        static constexpr std::array<std::string_view, 4> kNames{
-            "Rec", "BelowxRec", "xRec", "AllowInsert"};
-        Boolean below = false;
-        auto &before = page_->Rec.StoredImage();
-        detail::RaisePageEvent(
-            *page_, "OnInsertRecordEvent", {}, kNames, page_->Rec, below, before, allowInsert);
-      }
-      if (!allowInsert) { return; }
-      static_cast<void>(platform.Insert(true));
     }
   }
 
@@ -886,6 +964,7 @@ private:
         }
         detail::SeedFromFilters(
             static_cast<void *>(&page_->Rec), RecordTraits_().kTable, PopulateAllFields_());
+        SplitKey_(std::nullopt);
         newRecord_ = true;
         detail::StartNewRecord(*page_, false);
       }
@@ -931,13 +1010,30 @@ private:
       page_ = new P();
       owned_ = true;
       Bind_();
-      detail::OpenPage(*page_, editable, isNew);
+      try {
+        detail::OpenPage(*page_, editable, isNew);
+      } catch (...) {
+        Release_();
+        throw;
+      }
       newRecord_ = isNew;
     } else {
       static_cast<void>(editable);
       static_cast<void>(isNew);
       Unopened_();
     }
+  }
+
+  void Close_(bool save) {
+    if (page_ == nullptr) { return; }
+    if (save) {
+      SaveEditedNewRecord_();
+    } else {
+      for (PageCore *part : parts_) { part->RowLeft(); }
+      edited_ = false;
+    }
+    detail::ClosePage(*page_);
+    Release_();
   }
 
   void Take_(TestPage &o) {
@@ -1040,7 +1136,10 @@ private:
       if (!SameWord_(control, name)) { continue; }
       if (ControlNamed_(control) != nullptr) { return false; }
       if constexpr (requires(P &page) { page.CloseWith(action); }) { Page_().CloseWith(action); }
-      if (owned_) { Close(); }
+      if (owned_) {
+        Close_(action != ::agiru::Action::Cancel && action != ::agiru::Action::No &&
+               action != ::agiru::Action::LookupCancel);
+      }
       return true;
     }
     return false;

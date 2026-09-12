@@ -94,6 +94,7 @@ bool SameKeyAt(const TempTable &temp, const TableDef &table, std::size_t at, con
 bool Passes(const void *row, const std::vector<FieldFilter> &filters, const TableDef &table) {
   return std::ranges::all_of(filters, [row, &table](const FieldFilter &filter) {
     const FieldDef &def = FieldOf(table, filter.field);
+    if (def.fieldClass == FieldClass::FlowFilter) { return true; }
     const std::string value =
         def.type == FieldType::RecordId ? StorageText(row, def) : FieldText(row, def);
     return Matches(ParseFilter(filter.text), value, def);

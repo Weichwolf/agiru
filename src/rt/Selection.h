@@ -29,4 +29,8 @@ struct Selection {
 
 [[nodiscard]] std::string Quoted(std::string_view identifier);
 
+[[nodiscard]] std::string SequenceName(const TableDef &table, const FieldDef &field);
+
+[[nodiscard]] bool DrawsFromSequence(const FieldDef &field);
+
 }
