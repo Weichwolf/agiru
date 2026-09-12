@@ -377,6 +377,25 @@ template <typename P> void StartNewRecord(P &page, bool belowXRec) {
   }
 }
 
+/// \brief Whether a page of this type, opened for editing on NO record, shows a new one.
+///        `devenv-onnewrecord-page-trigger.md`: "For pages of the type Card, List, ListPlus,
+///        Document, or Worksheet, the OnNewRecord trigger is called more than once if the page is
+///        opened in the edit mode and does not have any records to display" -- so such a page
+///        stands on a new record after `OpenEdit`, and `OnAfterGetCurrRecord` has run on it
+///        (`Sales Price List` computes `PriceListIsEditable` there; Suggest Price Lines UT T211,
+///        2026-09-12). A part, a dialog and a role center show nothing.
+/// \tparam P The generated page class.
+/// \return True for the five types the page names.
+template <typename P> [[nodiscard]] constexpr bool StartsBlankWhenEmpty() {
+  if constexpr (requires { PageTraits<P>::kPage.type; }) {
+    const PageType type = PageTraits<P>::kPage.type;
+    return type == PageType::Card || type == PageType::List || type == PageType::ListPlus ||
+           type == PageType::Document || type == PageType::Worksheet;
+  } else {
+    return false;
+  }
+}
+
 /// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
 ///        with `OnNewRecord`), `OnOpenPage`, then the after-get triggers.
 /// \note THE RECORD `Page.Run(Rec)` PASSED IS THE ONE SHOWN, when it exists in the set:
@@ -422,15 +441,27 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
   }
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
   RaisePageRecordEvent(page, "OnOpenPageEvent");
+  bool blank = false;
   if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
     if (!isNew) {
       using Source = std::remove_cvref_t<decltype(page.Rec)>;
       auto &platform = static_cast<typename Source::Platform_Half &>(page.Rec);
       found = static_cast<bool>(platform.Find("=")) || static_cast<bool>(platform.FindFirst());
+      if (!found && opensEditable && StartsBlankWhenEmpty<P>()) {
+        platform.Init();
+        if constexpr (requires { PageTraits<P>::kPage; }) {
+          detail::SeedNewPageRecord(static_cast<void *>(&page.Rec),
+                                    TableTraits<Source>::kTable,
+                                    PageTraits<P>::kPage.sourceTableView,
+                                    true);
+        }
+        StartNewRecord(page, false);
+        blank = true;
+      }
     }
   }
   if (found) { page.LandedOnRecord(); }
-  if (found || isNew) { AfterGetRecord(page); }
+  if (found || isNew || blank) { AfterGetRecord(page); }
 }
 
 /// \brief Closes a page the way the platform does: `OnQueryClosePage`, then `OnClosePage`.

@@ -186,10 +186,6 @@ std::string TemporaryPath() {
   RefuseDoor("System.Variant2Time(Variant)");
 }
 
-::agiru::Integer WindowsLanguage() {
-  RefuseDoor("System.WindowsLanguage()");
-}
-
 void AlterKey(const ::agiru::KeyRef &KeyRef, ::agiru::Boolean Enable) {
   static_cast<void>(KeyRef);
   static_cast<void>(Enable);

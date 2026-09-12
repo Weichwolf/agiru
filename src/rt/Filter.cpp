@@ -130,8 +130,8 @@ Atom ReadAtom(std::string_view text) {
       range.compare = Compare::Between;
       range.value = Unquote(text.substr(0, dots));
       range.upper = Unquote(text.substr(dots + 2));
-      range.openLower = range.value.empty();
-      range.openUpper = range.upper.empty();
+      range.openLower = Trim(text.substr(0, dots)).empty();
+      range.openUpper = Trim(text.substr(dots + 2)).empty();
       return range;
     }
   }

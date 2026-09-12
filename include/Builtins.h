@@ -266,11 +266,6 @@ std::string TemporaryPath();
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
 ::agiru::Time Variant2Time(const ::agiru::Variant &Variant);
 
-/// \brief AL `System.WindowsLanguage()`. Gets the current Windows language setting.
-/// \return The AL `Integer`.
-/// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-::agiru::Integer WindowsLanguage();
-
 /// \brief AL `Database.AlterKey(KeyRef, Boolean)`. Alter a table's key in SQL, either disabling or
 /// enabling it. Any alteration only pertains to the current transaction and will be reverted at the
 /// end of the current transaction. Any alteration will fail if it's called on System or non-SQL

@@ -3,6 +3,7 @@
 #include "runtime/Storage.h"
 #include "runtime/TestRunner.h"
 #include "runtime/test/RunnerDatabase.h"
+#include "type/Date.h"
 
 #include <algorithm>
 #include <array>
@@ -30,6 +31,7 @@ struct Options {
   bool fresh = false;
   bool list = false;
   bool isolate = false;
+  std::string workDate;
   std::string self;
 };
 
@@ -43,7 +45,11 @@ void Usage() {
   std::println("agiru -- Business Central, translated to C++");
   std::println("");
   std::println("  agiru run-tests [--suite <name>] [--codeunit <name>] [--scratch <db>]\n          "
-               "       [--database <dsn>] [--fresh] [--list]");
+               "       [--database <dsn>] [--fresh] [--list] [--work-date <yyyy-mm-dd>]");
+  std::println("      --work-date is the date the session posts under; Today when omitted. The");
+  std::println("      demo data's own period is where a BC container's tests run (its demo is");
+  std::println("      generated around the build's date), so the milestone passes the 25th of");
+  std::println("      January of the fiscal year the seeded ledgers sit in.");
   std::println("      Run the transpiled [Test] procedures through the AL test runner.");
   std::println("      With no filter, the whole installed test population.");
   std::println("      --list says which test codeunits this binary carries.");
@@ -54,6 +60,20 @@ void Usage() {
   std::println("");
   std::println("  agiru version");
   std::println("      What this binary is.");
+}
+
+agiru::Date WorkDateOf(std::string_view text) {
+  int year = 0;
+  unsigned month = 0;
+  unsigned day = 0;
+  if (std::sscanf(std::string(text).c_str(), "%d-%u-%u", &year, &month, &day) != 3) {
+    throw agiru::Error("--work-date wants yyyy-mm-dd, not " + std::string(text));
+  }
+  const agiru::Date date = agiru::Date::FromYmd(year, month, day);
+  if (date.IsUndefined()) {
+    throw agiru::Error("--work-date " + std::string(text) + " is not a day");
+  }
+  return date;
 }
 
 std::string ValueOf(std::span<const std::string_view> arguments, std::size_t &at) {
@@ -84,6 +104,8 @@ Options Read(std::span<const std::string_view> arguments) {
       options.list = true;
     } else if (argument == "--isolate") {
       options.isolate = true;
+    } else if (argument == "--work-date") {
+      options.workDate = ValueOf(arguments, at);
     } else {
       throw agiru::Error("unknown option " + std::string(argument));
     }
@@ -112,6 +134,7 @@ int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *co
     std::string command = Quoted(options.self) + " run-tests --codeunit " +
                           Quoted(codeunit->Name()) + " --scratch " + Quoted(options.scratch);
     if (!options.database.empty()) { command += " --database " + Quoted(options.database); }
+    if (!options.workDate.empty()) { command += " --work-date " + Quoted(options.workDate); }
     command += " 2>&1";
     std::FILE *child = popen(command.c_str(), "r");
     if (child == nullptr) {
@@ -178,6 +201,7 @@ int RunTests(const Options &options) {
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
   agiru::Session session(runner.Dsn());
   session.CompanyName(kTestCompany);
+  if (!options.workDate.empty()) { session.WorkDate(WorkDateOf(options.workDate)); }
   agiru::ProvisionInstalled(session.Database());
   session.OpenCompany();
   const agiru::TestRun run =

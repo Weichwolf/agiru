@@ -227,6 +227,9 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
              Has(source, "SomeLine->EntryNo = Value_Block;") &&
                  Has(source, "SomeLine->Validate(SomeLine->Amount, Value_Block);"));
   CHECK_TRUE("AutoSave inserts", Has(source, "static_cast<void>(Item_Block.Insert(true));"));
+  CHECK_TRUE("and the record is written BEFORE its nested table elements, whose triggers read it",
+             source.find("static_cast<void>(Item_Block.Insert(true));") <
+                 source.find("while (In_().Enter(\"Detail\"))"));
 
   const std::string definitions = agiru::gen::WriteDefinitions(
       port, "Inventory/Counting/ExportSomeLines.XmlPort.al", objects, nullptr);

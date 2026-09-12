@@ -2966,7 +2966,8 @@ std::string DataItemWalk(const al::PageControl &control,
                ", and one of them is not a field this build knows (board:0063)\");\n}\n\n";
         return out;
       }
-      out += "  Item_Block.SetRange(Item_Block." + field->second + ", " +
+      out += "  ::agiru::detail::LinkDataItem(Item_Block, Item_Block." + field->second + ", *" +
+             PageVariableIdentifier(page, parentDeclared->name) + ".operator->(), " +
              PageVariableIdentifier(page, parentDeclared->name) + "->" + reference->second + ");\n";
     }
     out += "  Item_Block.FilterGroup(0);\n";
@@ -3060,6 +3061,12 @@ bool ElementFlag(const al::PageControl &control, std::string_view property, bool
 std::string ElementWidth(const al::PageControl &control) {
   const al::Property *width = al::Find(control.properties, "Width");
   return width == nullptr || width->text.empty() ? std::string("0") : width->text;
+}
+
+bool HoldsATableElement(const al::PageControl &control) {
+  if (LowerKey(control.kind) == "tableelement") { return true; }
+  return std::ranges::any_of(
+      control.children, [](const al::PageControl &child) { return HoldsATableElement(child); });
 }
 
 bool ContainerElement(const al::PageControl &control) {
@@ -3430,6 +3437,7 @@ std::string ElementImport(const al::PageControl &control,
   std::vector<const al::PageControl *> below = ancestors;
   below.push_back(&control);
   for (const al::PageControl &child : control.children) {
+    if (HoldsATableElement(child)) { continue; }
     out += ElementImport(
         child, pageClass, page, objects, named, &control, validateByDefault, indent + 6, below);
   }
@@ -3448,6 +3456,11 @@ std::string ElementImport(const al::PageControl &control,
     if (declares(control, "OnAfterInsertRecord")) {
       out += pad + "      " + trigger(control, "OnAfterInsertRecord") + "();\n";
     }
+  }
+  for (const al::PageControl &child : control.children) {
+    if (!HoldsATableElement(child)) { continue; }
+    out += ElementImport(
+        child, pageClass, page, objects, named, &control, validateByDefault, indent + 6, below);
   }
   out += pad + "    } catch (const ::agiru::XmlPortSkip &) {}\n";
   out += pad + "    In_().Leave();\n";

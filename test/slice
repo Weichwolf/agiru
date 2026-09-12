@@ -12283,6 +12283,7 @@ system/system/telemetry/table/FeatureUptake.def.cpp
 system/system/text/codeunit/AutoFormat.cpp
 system/system/text/codeunit/AutoFormatImpl.cpp
 system/system/text/codeunit/Base64Convert.cpp
+system/system/text/codeunit/Base64ConvertImpl.cpp
 system/system/text/codeunit/CaptionClass.cpp
 system/system/text/codeunit/CaptionClassImpl.cpp
 system/system/text/codeunit/Dynamics2DProvider.cpp

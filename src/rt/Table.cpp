@@ -1244,9 +1244,26 @@ std::optional<std::string> FilterOn(const detail::RecordState *state, FieldNo no
   return joined;
 }
 
-std::string UpperOf(std::string_view text) {
-  const std::size_t dots = text.find("..");
-  return std::string(dots == std::string_view::npos ? text : text.substr(dots + 2));
+std::optional<std::string> UpperOf(std::string_view text) {
+  std::optional<std::string> upper;
+  for (const detail::All &all : detail::ParseFilter(text)) {
+    for (const detail::Atom &atom : all) {
+      switch (atom.compare) {
+        case detail::Compare::Equal:
+        case detail::Compare::Less:
+        case detail::Compare::LessOrEqual: upper = atom.value; break;
+        case detail::Compare::Between:
+          if (!atom.openUpper) { upper = atom.upper; }
+          break;
+        case detail::Compare::NotEqual:
+        case detail::Compare::Greater:
+        case detail::Compare::GreaterEqual:
+        case detail::Compare::Like:
+        case detail::Compare::NotLike: break;
+      }
+    }
+  }
+  return upper;
 }
 
 struct Predicate {
@@ -1353,8 +1370,8 @@ Predicate PredicateOf(const FlowFormula &formula,
         if (!text.has_value()) { break; }
         if (term.how == FlowTerm::How::FieldUpperLimit ||
             term.how == FlowTerm::How::FieldUpperLimitFilter) {
-          const std::string upper = UpperOf(*text);
-          if (!upper.empty()) { Add(made, TermClause(target, *at, AtMost(upper), first)); }
+          const std::optional<std::string> upper = UpperOf(*text);
+          if (upper.has_value()) { Add(made, TermClause(target, *at, AtMost(*upper), first)); }
         } else if (fromFilter) {
           Add(made, TermClause(target, *at, detail::ParseFilter(*text), first));
         } else {
@@ -1497,8 +1514,8 @@ Predicate CorrelatedPredicateOf(const FlowFormula &formula,
           if (!text.has_value()) { break; }
           if (term.how == FlowTerm::How::FieldUpperLimitFilter ||
               term.how == FlowTerm::How::FieldUpperLimit) {
-            const std::string upper = UpperOf(*text);
-            if (!upper.empty()) { Add(made, TermClause(target, *at, AtMost(upper), next)); }
+            const std::optional<std::string> upper = UpperOf(*text);
+            if (upper.has_value()) { Add(made, TermClause(target, *at, AtMost(*upper), next)); }
           } else {
             Add(made, TermClause(target, *at, detail::ParseFilter(*text), next));
           }

@@ -10,7 +10,16 @@
 # codeunit at all is an ABORT and not a pass.
 #
 #   scripts/ut-milestone.sh <out.log> [workers=4] [dsn=postgresql://agiru:agiru@localhost:5433/agiru_seeded]
+#
+# THE SESSION POSTS INSIDE THE DEMO'S PERIOD. A BC container's tests run under Today with a demo
+# generated around the build's own date; the 28.4 demo this tree seeds from carries its open
+# ledgers from 2027-12-05 to 2028-01-27 (measured on `Cust. Ledger Entry`, 2026-09-12), and a
+# session posting under a Today before them applies "to an entry with an earlier posting date"
+# and refuses. So the runner is handed the 25th of January of that fiscal year, BC's convention
+# for a demo's working date (openerp WI-847 measured the same anchor); AGIRU_WORK_DATE overrides
+# it, and an empty value hands the runner nothing.
 set -u
+WORK_DATE="${AGIRU_WORK_DATE-2028-01-25}"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT" || exit 2
 out="$1"; workers="${2:-4}"; dsn="${3:-postgresql://agiru:agiru@localhost:5433/agiru_seeded}"
@@ -27,7 +36,7 @@ fi
 one() {
   name="$1"; scratch="agiru_ut_$$"
   log=$(timeout 900 ./build/agiru run-tests --database "$DSN" --fresh --scratch "$scratch" \
-        --codeunit "$name" 2>&1)
+        --codeunit "$name" ${WORK_DATE:+--work-date "$WORK_DATE"} 2>&1)
   status=$?
   podman exec agiru-pg psql -U agiru -tAc "DROP DATABASE IF EXISTS \"$scratch\"" >/dev/null 2>&1
   key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9' '_')
@@ -38,7 +47,7 @@ one() {
     mkdir -p "$OUT.lost" && printf '%s\n' "$log" > "$OUT.lost/$key.log"
   fi
 }
-export -f one; export PARTS="$parts" DSN="$dsn" OUT="$out"
+export -f one; export PARTS="$parts" DSN="$dsn" OUT="$out" WORK_DATE
 start=$(date +%s)
 xargs -P "$workers" -I{} bash -c 'one "$@"' _ {} < "$list"
 : > "$out"

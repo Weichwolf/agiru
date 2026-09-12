@@ -74,3 +74,13 @@ Suite: 1 788 -> 1 800.
   Microsoft.Foundation.Enums."Supply Document Type".FromInteger(DocumentType) of` -- the
   namespace path is read as member access on an identifier `Microsoft`. A dotted path whose last
   quoted segment names a known enum (or table, codeunit) is that object; one site in W1.
+
+**A third named cause, 2026-09-12:** AL passes a `Variant` VARIABLE to a `var Text` (or any `var`
+simple-type) parameter -- `JsonMgt.GetStringPropertyValueFromJObjectByName(ParentObject,
+PropertyName, ComplexTxtVar)` with `ComplexTxtVar: Variant` (`Library - Graph Mgt`, which keeps
+ERM General Journal UT's `TestCreateGenJnlBatchPostWebService` out) -- and the platform boxes
+on the way in and writes back on the way out. The generator emits `Variant &` where the callee
+wants `Text<0> &`; the shape is a scoped temporary: `{ Text<0> Tmp{Variant-as-text}; call(...,
+Tmp); ComplexTxtVar = Tmp; }`, decided where the argument's declared type is `Variant` and the
+parameter's is a `var` of another type. It is the census's `non-const lvalue reference ...
+unrelated type` class.

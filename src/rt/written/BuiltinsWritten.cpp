@@ -440,6 +440,11 @@ constexpr ::agiru::Integer kThirdPart = 3;
   return was;
 }
 
+::agiru::Integer WindowsLanguage() {
+  constexpr ::agiru::Integer kEnglishUnitedStates = 1033;
+  return kEnglishUnitedStates;
+}
+
 ::agiru::Date ClosingDate(::agiru::Date Date) {
   return Date.IsUndefined() || Date.IsClosing() ? Date : Date.Closing();
 }

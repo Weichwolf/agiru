@@ -126,6 +126,21 @@ Result Connection::Execute(std::string_view sql,
     PQclear(result);
     throw DatabaseError(message + "statement: " + std::string(sql));
   }
+  static const bool answered = [] {
+    const char *level = std::getenv("AGIRU_TRACE_SQL");
+    return level != nullptr && std::string_view(level) == "2";
+  }();
+  if (answered && status == PGRES_TUPLES_OK) {
+    std::string line = "  -> " + std::to_string(PQntuples(result)) + " row(s)";
+    if (PQntuples(result) > 0) {
+      for (int column = 0; column < PQnfields(result); ++column) {
+        line += column == 0 ? ": " : " | ";
+        line += PQgetisnull(result, 0, column) != 0 ? "NULL" : PQgetvalue(result, 0, column);
+      }
+    }
+    line += "\n";
+    std::fputs(line.c_str(), stderr);
+  }
   return Result(result);
 }
 

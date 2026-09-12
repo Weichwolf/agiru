@@ -1,3 +1,4 @@
+#include "type/Char.h"
 #include "type/TextBuilder.h"
 
 #include "Check.h"
@@ -37,7 +38,9 @@ void AppendingGrowsTheText() {
   builder.AppendLine(" two");
   builder.Append("three");
   CHECK_TEXT("AppendLine ends the line it appends", builder.ToText(), "one two\nthree");
-  CHECK_TRUE("and the length counts what is there", builder.Length() == 13);
+  builder.Append(agiru::Char{'!'});
+  CHECK_TEXT("a Char is appended as its text", builder.ToText(), "one two\nthree!");
+  CHECK_TRUE("and the length counts what is there", builder.Length() == 14);
   builder.Clear();
   CHECK_TEXT("Clear empties it", builder.ToText(), "");
 }

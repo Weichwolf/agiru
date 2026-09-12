@@ -118,6 +118,15 @@ namespace agiru {
 ///       one process, so a global here would be one session answering for every other.
 ::agiru::Integer GlobalLanguage(::agiru::Integer NewLanguageID = {});
 
+/// \brief AL `System.WindowsLanguage()`. Gets the current Windows language setting.
+/// \return 1033, `en-US`: the one Windows language a session has here.
+/// \note IT IS NOT `GlobalLanguage`. In BC the Windows language is the user's regional setting --
+///       what formats a date -- and the global language is what captions are shown in; the two
+///       differ only through a user's `User Personalization`, which this tier does not hold, so
+///       every session answers the demo's own language. `Business Chart Impl.` hands it to
+///       `CultureInfo` for a `DataTable`'s locale (Service Time Sheets UT, 5 cases, 2026-09-12).
+[[nodiscard]] ::agiru::Integer WindowsLanguage();
+
 /// \brief AL `System.CalcDate(DateFormula)`. Calculates a new date from the current system date.
 ///
 /// \param DateExpression The formula.

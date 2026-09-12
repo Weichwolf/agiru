@@ -185,7 +185,9 @@ void TheGeneratorWritesTheReportAsAPageWithADatasetWalk() {
       Has(source, "::agiru::detail::ApplyDataItemView(Item_Block, \"sorting(\\\"No.\\\")where("));
   CHECK_TRUE("the link narrows the child in the link group",
              Has(source, "Item_Block.FilterGroup(::agiru::detail::kLinkFilterGroup);") &&
-                 Has(source, "Item_Block.SetRange(Item_Block.CustomerNo, Customer->No);"));
+                 Has(source,
+                     "::agiru::detail::LinkDataItem(Item_Block, Item_Block.CustomerNo, "
+                     "*Customer.operator->(), Customer->No);"));
   CHECK_TRUE("MaxIteration stops the loop",
              Has(source, "if (++Iterations_Block >= ::agiru::Integer{100}) { break; }"));
   CHECK_TRUE("Break ends the dataitem and Skip the record",

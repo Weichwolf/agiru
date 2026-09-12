@@ -361,6 +361,67 @@ void ARangeHasTwoEndsAndAnythingElseIsNotARange() {
 /// on a journal batch, whose field is `lookup("Item Journal Template".Type where(Name =
 /// field("Journal Template Name")))`, reached PostgreSQL as a column that does not exist. The
 /// subquery evaluates the CalcFormula per outer row, the way the platform does.
+/// `UPPERLIMIT("Date Filter")` IS READ OFF THE PARSED FILTER, AND A BLANK BOUND IS THE BLANK
+/// DATE. `SetFilter("Date Filter", '..%1', 0D)` writes `..''`, and `Bank Account."Balance at
+/// Date"` sums `where("Posting Date" = field(upperlimit("Date Filter")))`; the bound cut off the
+/// text after the dots -- `'')` once the group's parentheses were on -- and the database refused
+/// the literal (Autom. Payment Registration.UT, Currency UT, 2026-09-12). An open upper end sets
+/// no bound at all.
+void AnUpperLimitOfABlankBoundIsTheBlankDate() {
+  static constexpr std::array<agiru::FieldDef, 3> kFields{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "No.",
+                      .caption = "No.",
+                      .no = agiru::FieldNo{1},
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = 32,
+                      .name = "Balance at Date",
+                      .caption = "Balance at Date",
+                      .calcFormula = "sum(Date.\"Period No.\" where(\"Period Start\" = "
+                                     "field(upperlimit(\"Date Filter\"))))",
+                      .no = agiru::FieldNo{2},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Decimal},
+      agiru::FieldDef{.offset = 48,
+                      .name = "Date Filter",
+                      .caption = "Date Filter",
+                      .no = agiru::FieldNo{3},
+                      .fieldClass = agiru::FieldClass::FlowFilter,
+                      .type = agiru::FieldType::Date},
+  }};
+  static constexpr std::array<agiru::FieldNo, 1> kKey{{agiru::FieldNo{1}}};
+  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
+      agiru::KeyDef{.name = "Key1", .fields = kKey, .clustered = true},
+  }};
+  static constexpr agiru::TableDef kBank{.id = agiru::TableId{50001},
+                                         .name = "Flow Bank",
+                                         .caption = "Flow Bank",
+                                         .fields = kFields,
+                                         .keys = kKeys};
+  agiru::detail::RecordState blank;
+  blank.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{3}, .group = 0, .text = "..''"});
+  blank.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "<>0"});
+  const agiru::detail::Selection made = agiru::detail::Select(&blank, kBank);
+  CHECK_TRUE("the upper limit is compared with <=",
+             made.where.find("\"Period Start\" <= $") != std::string::npos);
+  CHECK_TRUE("and a blank bound binds the blank date",
+             !made.binds.empty() && made.binds.front() == "1753-01-01 00:00:00");
+  agiru::detail::RecordState open;
+  open.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{3}, .group = 0, .text = "01.01.26.."});
+  open.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "<>0"});
+  const agiru::detail::Selection unbounded = agiru::detail::Select(&open, kBank);
+  CHECK_TRUE("an open upper end sets no bound",
+             unbounded.where.find("\"Period Start\"") == std::string::npos);
+  CHECK_TRUE("a quoted blank bound is a bound, not an open end: a date is above it",
+             !agiru::detail::Matches(agiru::detail::ParseFilter("..''"), "2026-01-01", kFields[2]));
+  CHECK_TRUE("and an open end takes it",
+             agiru::detail::Matches(agiru::detail::ParseFilter(".."), "2026-01-01", kFields[2]));
+}
+
 void AFlowFieldFilterBecomesACorrelatedSubquery() {
   static constexpr std::array<agiru::FieldDef, 2> kFields{{
       agiru::FieldDef{.offset = 0,
@@ -625,6 +686,7 @@ void ANewRowTakesTheKeyItsFiltersFix() {
 int main() {
   return gate::Run("Filter", [] {
     ANewRowTakesTheKeyItsFiltersFix();
+    AnUpperLimitOfABlankBoundIsTheBlankDate();
     AFlowFieldFilterBecomesACorrelatedSubquery();
     AFilterOverIntegersIsASetOfIntervals();
     ASetCountsItselfWithoutCountingRows();

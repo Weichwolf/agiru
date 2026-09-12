@@ -184,6 +184,35 @@ template <typename R> void ApplyDataItemView(R &record, std::string_view view) {
   ApplyDataItemView(static_cast<void *>(&record), TableTraits<R>::kTable, view);
 }
 
+/// \brief One pair of a `DataItemLink`, `Field = field(ReferenceField)`: the child is narrowed
+///        to the parent's current row.
+/// \tparam Child The child dataitem's table. \tparam ChildField The child field's type.
+/// \tparam Parent The parent dataitem's table. \tparam ParentField The reference field's type.
+/// \param child The child record. \param field Its linked field. \param parent The parent
+///        record. \param reference The parent field the link names.
+///
+/// \note A FLOWFILTER REFERENCE FIELD HAS NO VALUE, ONLY A FILTER, and the link copies THAT.
+///       `"Date Filter" = field("Date Filter")` is how 28 reports hand the request page's date
+///       filter down to their bank accounts, customers and vendors; set as a range on the
+///       parent's (always blank) field value it became `"Posting Date" <= ''` and the database
+///       refused the literal (Currency UT, openerp WI-1245 measured the same leak). A parent
+///       FlowFilter that carries no filter sets nothing, the way an empty filter is no filter.
+template <typename Child, typename ChildField, typename Parent, typename ParentField>
+void LinkDataItem(Child &child,
+                  ChildField &field,
+                  const Parent &parent,
+                  const ParentField &reference) {
+  const auto offset = static_cast<std::size_t>(reinterpret_cast<const std::byte *>(&reference) -
+                                               reinterpret_cast<const std::byte *>(&parent));
+  const FieldDef *def = FieldAtOffset(TableTraits<Parent>::kTable, offset);
+  if (def != nullptr && def->fieldClass == ::agiru::FieldClass::FlowFilter) {
+    if (std::string_view(parent.GetFilter(reference)).empty()) { return; }
+    parent.CopyFilter(reference, child, field);
+    return;
+  }
+  child.SetRange(field, reference);
+}
+
 /// \brief `SetTableView(Record)` and the record `Report.Run(Number, ..., Record)` hands in: the
 ///        record's filters join the dataitem's in the groups the caller set them, which is
 ///        where the request page shows them; the `DataItemTableView` alone owns filter group 2,

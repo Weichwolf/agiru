@@ -48,6 +48,19 @@ public:
     return Append(std::string_view(Text.ToText()));
   }
 
+  /// \brief AL `TextBuilder.Append(Text)` given a `Char`, which is what `foreach Ch in Text`
+  ///        yields and `Base64 Convert Impl.RemoveUrlUnsafeChars` appends one at a time (the unit
+  ///        was outside the slice on that one call, and `Test OAuth 2.0 UT` refused on it,
+  ///        2026-09-12). The character goes in as its UTF-8 text.
+  /// \tparam C The `Char`, and only that -- a string literal must still be the text overload.
+  /// \param Character The character.
+  /// \return True.
+  template <typename C>
+    requires(std::same_as<std::remove_cvref_t<C>, ::agiru::Char>)::agiru::Boolean
+  Append(const C &Character) {
+    return Append(std::string_view(::agiru::Variant(Character)));
+  }
+
   /// \brief AL `TextBuilder.AppendLine(Text)`. Appends a copy of the specified string followed by
   /// the default line terminator to the end of the current TextBuilder object. If this parameter is
   /// omitted, only the line terminator will be appended.

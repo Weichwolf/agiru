@@ -7,3 +7,4 @@ work/
 *.zip
 .claude/worktrees/
 build-asan/
+__pycache__/
