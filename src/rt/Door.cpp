@@ -1500,7 +1500,7 @@ std::string ProductName::Short() {
 }
 
 std::string SessionInformation::Callstack() {
-  RefuseDoor("SessionInformation.Callstack()");
+  return {};
 }
 
 ::agiru::BigInteger SessionInformation::SqlRowsRead() {

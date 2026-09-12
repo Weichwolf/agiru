@@ -1006,6 +1006,13 @@ public:
   /// \brief The runner says the page landed on an existing record.
   void LandedOnRecord() { newRecord_ = false; }
 
+  /// \brief Whether the page still stands on a record nothing has inserted: false once
+  ///        `SaveRecord` wrote it, so the test harness does not write it a second time
+  ///        (`Price List Line UT`, a line inserted by `CurrPage.SaveRecord()` and again on leaving
+  ///        the row, 2026-09-12).
+  /// \return True while the record is new.
+  [[nodiscard]] bool StandsOnNewRecord() const { return newRecord_; }
+
   /// \brief AL `Page.SetBackgroundTaskResult(Dictionary of [Text, Text])`. Sets the page background
   /// task result as a dictionary. When the task is completed, the OnPageBackgroundCompleted trigger
   /// will be invoked on the page with this result dictionary.

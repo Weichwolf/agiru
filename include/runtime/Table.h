@@ -779,7 +779,8 @@ public:
   /// \throws Error when no row carries this primary key, and whatever the trigger raises.
   /// \see Insert(Boolean) for why the trigger runs first and how it is found.
   Boolean Modify(Boolean RunTrigger) {
-    TableEvent("OnBeforeModifyEvent", RunTrigger);
+    Derived before = StoredImage();
+    TableEvent("OnBeforeModifyEvent", RunTrigger, before);
     if (RunTrigger) {
       if constexpr (requires(Derived &record) { record.OnModify(); }) {
         static_cast<Derived *>(this)->OnModify();
@@ -790,7 +791,7 @@ public:
                   " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
     CaptureImage();
-    TableEvent("OnAfterModifyEvent", RunTrigger);
+    TableEvent("OnAfterModifyEvent", RunTrigger, before);
     return true;
   }
 

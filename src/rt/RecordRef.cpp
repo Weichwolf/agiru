@@ -225,12 +225,19 @@ std::string RecordRef::GetFilters() const {
 }
 
 ::agiru::Boolean RecordRef::Insert(::agiru::Boolean RunTrigger) {
-  static_cast<void>(RunTrigger);
-  return Insert();
+  const TableEntry *entry = FindTable(Table().id);
+  if (entry == nullptr || entry->insert == nullptr) { return Insert(); }
+  if (!entry->insert(State().record, static_cast<bool>(RunTrigger))) {
+    throw Error("The " + std::string(Table().caption) + " already exists.");
+  }
+  return true;
 }
 
 ::agiru::Boolean RecordRef::Modify(::agiru::Boolean RunTrigger) {
-  static_cast<void>(RunTrigger);
+  const TableEntry *entry = FindTable(Table().id);
+  if (entry != nullptr && entry->modify != nullptr) {
+    return entry->modify(State().record, static_cast<bool>(RunTrigger));
+  }
   if (!detail::RuntimeModify(State().record, Table())) {
     throw Error("The " + std::string(Table().name) + " does not exist");
   }
@@ -238,7 +245,10 @@ std::string RecordRef::GetFilters() const {
 }
 
 ::agiru::Boolean RecordRef::Delete(::agiru::Boolean RunTrigger) {
-  static_cast<void>(RunTrigger);
+  const TableEntry *entry = FindTable(Table().id);
+  if (entry != nullptr && entry->remove != nullptr) {
+    return entry->remove(State().record, static_cast<bool>(RunTrigger));
+  }
   if (!detail::RuntimeDelete(State().record, Table())) {
     throw Error("The " + std::string(Table().name) + " does not exist");
   }

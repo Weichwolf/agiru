@@ -63,8 +63,14 @@ public:
   /// \return The filter standing on it.
   /// \throws Error until a page runs (board:0030).
   template <typename Field> [[nodiscard]] Text<0> GetFilter(const Field &field) const {
-    static_cast<void>(field);
-    Unfiltered();
+    if (core_ == nullptr) { Unfiltered(); }
+    if constexpr (requires { field.Name(); }) {
+      return Text<0>{core_->ControlFilterText(field.Name())};
+    } else if constexpr (std::convertible_to<const Field &, std::string_view>) {
+      return Text<0>{core_->ControlFilterText(std::string_view(field))};
+    } else {
+      throw Error("TestFilter.GetFilter names a page control, not a value (board:0030)");
+    }
   }
 
   /// \brief AL `TestFilter.SetCurrentKey(...)`.

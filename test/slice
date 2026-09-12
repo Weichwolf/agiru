@@ -14186,3 +14186,4 @@ tests/service/test/codeunit/ServiceItemAvailability.cpp
 tests/service/test/codeunit/ServiceOrderManagement.cpp
 tests/service/test/codeunit/ServiceOrders.cpp
 tests/service/test/codeunit/ServiceStockout.cpp
+base/inventory/item/picture/codeunit/ItemFromPicture.cpp

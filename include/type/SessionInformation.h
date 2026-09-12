@@ -38,8 +38,14 @@ public:
   static ::agiru::BigInteger AITokensUsed();
 
   /// \brief AL `SessionInformation.Callstack()`. Gets the current callstack.
-  /// \return The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \return The empty text.
+  ///
+  /// \note IT IS EMPTY, AND THAT IS A HOLE WITH A NAME rather than a refusal: the platform renders
+  ///       its AL frames (`"Error Message Management"(CodeUnit 28).GetCurrCallStack line 5 ...`),
+  ///       and this runtime keeps no AL frame table (board:0035). The BaseApp only LOGS the text
+  ///       -- `Error Message Management.GetCurrCallStack` trims it and stores it beside an error
+  ///       message -- and refusing stopped every error-message path that logs one (Incoming Doc.
+  ///       To Data Exch.UT, 18 cases, 2026-09-12).
   static std::string Callstack();
 
   /// \brief AL `SessionInformation.SqlRowsRead()`. Gets the amount of SQL rows read on the session,

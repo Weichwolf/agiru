@@ -94,6 +94,10 @@ public:
 
   /// \brief AL `TestField.AsInteger()`. \return The value as an Integer. \throws Error as Value
   /// does.
+  /// \note AN OPTION OR ENUM CONTROL ANSWERS ITS ORDINAL, the way `Enum.AsInteger()` does and
+  ///       the way `SCM Available to Pick UT` compares `"Source Document".AsInteger()` against
+  ///       `SourceDocument.AsInteger()` (15 cases, 2026-09-12); a text control that spells no
+  ///       Integer refuses.
   [[nodiscard]] Integer AsInteger() const;
 
   /// \brief AL `TestField.AsBoolean()`. \return The value as a Boolean. \throws Error as Value

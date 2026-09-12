@@ -31,6 +31,14 @@ struct TableEntry {
   /// \brief Copies one record of this table into another, fields and filters, for a `RecordRef`
   ///        that takes a record it does not know the type of and must OWN it.
   void (*copy)(void *to, const void *from);
+  /// \brief `Record.Insert(RunTrigger)` on the record, type-erased, so that a `RecordRef` write
+  ///        runs the table's `OnInsert` and raises its events (board:0711). False when the row
+  ///        exists.
+  bool (*insert)(void *record, bool runTrigger);
+  /// \brief `Record.Modify(RunTrigger)`, the same way. \see insert
+  bool (*modify)(void *record, bool runTrigger);
+  /// \brief `Record.Delete(RunTrigger)`, the same way. \see insert
+  bool (*remove)(void *record, bool runTrigger);
 };
 
 /// \brief Makes an empty record.
@@ -63,7 +71,19 @@ inline constexpr TableEntry kTableEntry{
                    FieldNo no,
                    std::string_view text) { static_cast<T *>(record)->ValidateText(no, text); },
     .copy = [](void *to,
-               const void *from) { static_cast<T *>(to)->Copy(*static_cast<const T *>(from)); }};
+               const void *from) { static_cast<T *>(to)->Copy(*static_cast<const T *>(from)); },
+    .insert =
+        [](void *record, bool runTrigger) {
+          return static_cast<bool>(static_cast<T *>(record)->Ok_Insert(runTrigger));
+        },
+    .modify =
+        [](void *record, bool runTrigger) {
+          return static_cast<bool>(static_cast<T *>(record)->Modify(runTrigger));
+        },
+    .remove =
+        [](void *record, bool runTrigger) {
+          return static_cast<bool>(static_cast<T *>(record)->Delete(runTrigger));
+        }};
 
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.

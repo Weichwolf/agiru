@@ -505,6 +505,11 @@ private:
 /// \throws Error when the record is not from the table the codeunit's `TableNo` names --
 ///         `codeunit-run-integer-table-method.md`: "If you run the codeunit with a record from a
 ///         table other than the one it is associated with, a run-time error occurs."
+/// \note A CODEUNIT WITH NO `TableNo` TAKES A RECORD AND DROPS IT. `codeunit-run-integer-table-
+///       method.md` refuses only "a record from a table other than the one it is associated
+///       with"; a codeunit associated with none has nothing to compare, and `VAT Report Mgt.
+///       GetSubmittedVATReturns` runs the setup's `Receive Submitted Return CU ID` with the period
+///       whatever that codeunit declares (VAT Return Period UT, 2 cases, 2026-09-12).
 template <typename T> bool RunCodeunitEntry(void *record, TableId table, bool value) {
   T unit{};
   if constexpr (!requires { unit.OnRun(); }) {
@@ -521,9 +526,11 @@ template <typename T> bool RunCodeunitEntry(void *record, TableId table, bool va
     }
   }
   if constexpr (requires { unit.OnRun(); }) {
-    if (record != nullptr) {
-      throw Error("Codeunit.Run(" + std::to_string(CodeunitTraits<T>::kId.Value()) +
-                  "): the record is not from the table the codeunit is associated with");
+    if constexpr (requires(T &held) { held.Rec; }) {
+      if (record != nullptr) {
+        throw Error("Codeunit.Run(" + std::to_string(CodeunitTraits<T>::kId.Value()) +
+                    "): the record is not from the table the codeunit is associated with");
+      }
     }
     return value ? unit.Ok_Run() : unit.Run();
   }

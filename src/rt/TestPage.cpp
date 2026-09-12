@@ -55,6 +55,8 @@ void TestField::AssertEqualsText(std::string_view expected) const {
 
 Integer TestField::AsInteger() const {
   Integer value{};
+  const std::string ordinal = core_->ControlOrdinal(name_);
+  if (!ordinal.empty() && detail::Evaluated(value, ordinal)) { return value; }
   if (!detail::Evaluated(value, Value())) {
     throw Error("the control '" + std::string(name_) + "' does not hold an Integer");
   }

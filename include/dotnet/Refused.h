@@ -228,6 +228,8 @@ public:
   static Refused IsInline;
   /// \brief The chained member `ToXmlString`, which a body reaches on the RESULT of a refused call.
   static Refused ToXmlString;
+  /// \brief The chained member `IsEmpty`, which a body reaches on the RESULT of a refused call.
+  static Refused IsEmpty;
 
   /// \brief Refuses to become a value of any type.
   /// \tparam T The type the caller wants.
@@ -841,6 +843,7 @@ inline Refused Refused::Columns{{.type = "<result>", .member = "Columns"}};
 inline Refused Refused::TryGetValue{{.type = "<result>", .member = "TryGetValue"}};
 inline Refused Refused::IsInline{{.type = "<result>", .member = "IsInline"}};
 inline Refused Refused::ToXmlString{{.type = "<result>", .member = "ToXmlString"}};
+inline Refused Refused::IsEmpty{{.type = "<result>", .member = "IsEmpty"}};
 
 template <typename... Arguments> Refused Refused::operator()(Arguments &&...arguments) const {
   (static_cast<void>(arguments), ...);

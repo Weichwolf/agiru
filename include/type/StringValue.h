@@ -249,6 +249,50 @@ public:
   /// \return The stored text.
   [[nodiscard]] std::string_view Value() const { return value_; }
 
+  /// \brief One step of AL `foreach Ch in Text`: the characters, one code point each, the way
+  ///        `Text[i]` counts them and never the bytes (`Base64 Convert Impl.RemoveUrlUnsafeChars`
+  ///        walks a text this way, 2026-09-12).
+  class CharIterator {
+  public:
+    /// \brief The iterator at a byte position. \param text The text. \param at The byte.
+    CharIterator(std::string_view text, std::size_t at) : text_(text), at_(at) { Decode_(); }
+
+    /// \brief The character under the iterator. \return It, as a reference the loop may bind.
+    [[nodiscard]] Char &operator*() { return current_; }
+
+    /// \brief Steps to the next character. \return This iterator.
+    CharIterator &operator++() {
+      at_ += width_;
+      Decode_();
+      return *this;
+    }
+
+    /// \brief Two iterators over one text compare by position. \param o The other.
+    /// \return Whether they differ.
+    [[nodiscard]] bool operator!=(const CharIterator &o) const { return at_ != o.at_; }
+
+  private:
+    void Decode_() {
+      width_ = 0;
+      if (at_ >= text_.size()) { return; }
+      const auto lead = static_cast<unsigned char>(text_[at_]);
+      width_ = lead < 0x80U ? 1 : (lead & 0xE0U) == 0xC0U ? 2 : (lead & 0xF0U) == 0xE0U ? 3 : 4;
+      if (at_ + width_ > text_.size()) { width_ = text_.size() - at_; }
+      current_ = Char{text_.substr(at_, width_)};
+    }
+
+    std::string_view text_;
+    std::size_t at_ = 0;
+    std::size_t width_ = 0;
+    Char current_{};
+  };
+
+  /// \brief AL `foreach Ch in Text`: the first character. \return The iterator.
+  [[nodiscard]] CharIterator begin() const { return CharIterator{value_, 0}; }
+
+  /// \brief AL `foreach Ch in Text`: past the last character. \return The iterator.
+  [[nodiscard]] CharIterator end() const { return CharIterator{value_, value_.size()}; }
+
   /// \return True when the field holds the empty string.
   [[nodiscard]] bool IsEmpty() const { return value_.empty(); }
 

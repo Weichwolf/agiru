@@ -309,13 +309,30 @@ public:
   /// \return False; rows do not nest here yet.
   [[nodiscard]] Boolean IsExpanded() const { return false; }
 
-  /// \brief AL `TestPage.GetValidationError()`.
-  /// \return The last validation error's text; empty, because a validation error THROWS here.
-  [[nodiscard]] Text<0> GetValidationError() const { return Text<0>{}; }
+  /// \brief AL `TestPage.GetValidationError([Index])` -- what a row's write refused with
+  ///        (`testpage-getvalidationerror-method.md`: "the list of all validation errors that
+  ///        occurred on a test page").
+  /// \param Index One-based; the last error when omitted.
+  /// \return The error's text, empty when there is none.
+  ///
+  /// \note AN ERROR RAISED WHILE THE USER LEAVES A ROW IS THE PAGE'S, NOT THE TEST'S: the client
+  ///       shows it beside the row and the test goes on to its own assertion. `VAT Return Period
+  ///       List.OnInsertRecord` refuses a manual row with `Error('')`, and the test asserts
+  ///       afterwards that no row exists (`UI_ManualInsert_TypedManualReceiveCU`, 2026-09-12); the
+  ///       predecessor checked the W1 suite for the opposite expectation and found none -- every
+  ///       `asserterror Close()`/`New()` there expects the test FRAMEWORK's own message. A
+  ///       `SetValue`'s validation error still throws, coded `TestValidation`, as before.
+  [[nodiscard]] Text<0> GetValidationError(Integer Index = 0) const {
+    if (validationErrors_.empty()) { return Text<0>{}; }
+    const std::size_t at =
+        Index <= 0 ? validationErrors_.size() - 1 : static_cast<std::size_t>(Index) - 1;
+    return at < validationErrors_.size() ? Text<0>{validationErrors_[at]} : Text<0>{};
+  }
 
-  /// \brief AL `TestPage.ValidationErrorCount()`.
-  /// \return Zero, for the same reason.
-  [[nodiscard]] Integer ValidationErrorCount() const { return 0; }
+  /// \brief AL `TestPage.ValidationErrorCount()`. \return How many rows' writes were refused.
+  [[nodiscard]] Integer ValidationErrorCount() const {
+    return static_cast<Integer>(validationErrors_.size());
+  }
 
   /// \brief AL `TestPage.FindFirstField(Field, Value)` -- the first row whose control shows it.
   /// \tparam V The value's type.
@@ -403,6 +420,7 @@ public:
       throw Error("the control '" + std::string(control) + "' shows no field to set");
     }
     if constexpr (kHasRecord) {
+      RereadBeforeEdit_();
       const detail::ValidatingField editing(def->field);
       auto before = Record_();
       try {
@@ -450,6 +468,29 @@ public:
       }
       if (!allowModify) { return; }
       static_cast<void>(Platform_(Record_()).Modify(true));
+    }
+  }
+
+  /// THE READ HALF BEFORE AN INPUT (openerp WI-1113, the finding itself): the server reads the
+  /// record, applies the input, validates, saves -- so a page never keeps a copy across a round
+  /// trip. `Sales Cr. Memo Subform` writes `Invoice Discount Calculation := Amount` on the header
+  /// through a record variable of its own, and the header page's next `SetValue` decided on its
+  /// stale copy that the discount was a percentage (the API aggregate codeunits, 7 cases,
+  /// 2026-09-12). The rows come back and the FlowFields the page shows are calculated; the page's
+  /// triggers do not run again, which is the predecessor's measured line. A new record has nothing
+  /// to re-read and a temporary one keeps what the page put in it.
+  void RereadBeforeEdit_() {
+    if constexpr (kHasRecord) {
+      if (newRecord_ || page_ == nullptr) { return; }
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr || !state->positioned) { return; }
+      if (detail::RuntimeIsTemporary(&Record_())) { return; }
+      if (!static_cast<bool>(Platform_(Record_()).Find("="))) { return; }
+      if constexpr (requires { PageTraits<P>::kPage.layout; }) {
+        detail::CalcShownFlowFields(
+            static_cast<void *>(&Record_()), RecordTraits_().kTable, PageTraits<P>::kPage.layout);
+      }
     }
   }
 
@@ -521,6 +562,30 @@ public:
     }
   }
 
+  [[nodiscard]] std::string ControlFilterText(std::string_view control) const override {
+    if constexpr (kHasRecord) {
+      if (page_ == nullptr) { return {}; }
+      const ControlDef *def = ControlNamed_(control);
+      ::agiru::FieldNo no = def != nullptr ? def->field : ::agiru::FieldNo{};
+      if (no.Value() == 0) {
+        for (const FieldDef &field : RecordTraits_().kTable.fields) {
+          if (SameWord_(field.name, control)) { no = field.no; }
+        }
+      }
+      if (no.Value() == 0) { return {}; }
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr) { return {}; }
+      for (const detail::FieldFilter &one : state->filters) {
+        if (one.field == no && one.group == state->group) { return one.text; }
+      }
+      return {};
+    } else {
+      static_cast<void>(control);
+      return {};
+    }
+  }
+
   void SetControlFilter(std::string_view control, std::string_view filter) override {
     if constexpr (kHasRecord) {
       const ControlDef *def = ControlNamed_(control);
@@ -573,22 +638,53 @@ public:
     return def == nullptr || !SameWord_(def->visible, "false");
   }
 
+  /// A CONTROL IS EDITABLE WHEN IT IS AND EVERY CONTAINER ABOVE IT IS, the way `Visible` already
+  /// walks the tree: `VAT Return Period List` puts `Editable = IsEditable` on its repeater and
+  /// nothing on the fields, and every field answered editable (3 UT cases, 2026-09-12). The
+  /// same holds for `Enabled`.
   [[nodiscard]] Boolean ControlEditable(std::string_view control) const override {
     AttachedForReading_();
-    if (const auto computed = Computed_(control, &ControlTrigger<P>::editable); computed) {
-      return Editable() && *computed;
+    if (!Editable()) { return false; }
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      const int within = StateWithin_(PageTraits<P>::kPage.layout, control, true);
+      if (within >= 0) { return within == 1; }
     }
-    const ControlDef *def = ControlNamed_(control);
-    return Editable() && (def == nullptr || !SameWord_(def->editable, "false"));
+    return OwnState_(control, ControlNamed_(control), true);
   }
 
   [[nodiscard]] Boolean ControlEnabled(std::string_view control) const override {
     AttachedForReading_();
-    if (const auto computed = Computed_(control, &ControlTrigger<P>::enabled); computed) {
-      return *computed;
+    if constexpr (requires { PageTraits<P>::kPage; }) {
+      const int within = StateWithin_(PageTraits<P>::kPage.layout, control, false);
+      if (within >= 0) { return within == 1; }
+      const int action = StateWithin_(PageTraits<P>::kPage.actions, control, false);
+      if (action >= 0) { return action == 1; }
     }
-    const ControlDef *def = ControlNamed_(control);
-    return def == nullptr || !SameWord_(def->enabled, "false");
+    return OwnState_(control, ControlNamed_(control), false);
+  }
+
+  /// Returns 1 for editable (enabled), 0 for not, -1 when the name is not in this tree.
+  [[nodiscard]] int
+  StateWithin_(std::span<const ControlDef> controls, std::string_view name, bool editable) const {
+    for (const ControlDef &control : controls) {
+      if (SameWord_(control.name, name)) {
+        return OwnState_(control.name, &control, editable) ? 1 : 0;
+      }
+      const int below = StateWithin_(control.children, name, editable);
+      if (below < 0) { continue; }
+      if (below == 0) { return 0; }
+      return OwnState_(control.name, &control, editable) ? 1 : 0;
+    }
+    return -1;
+  }
+
+  [[nodiscard]] bool OwnState_(std::string_view name, const ControlDef *def, bool editable) const {
+    if (const auto computed =
+            Computed_(name, editable ? &ControlTrigger<P>::editable : &ControlTrigger<P>::enabled);
+        computed) {
+      return static_cast<bool>(*computed);
+    }
+    return def == nullptr || !SameWord_(editable ? def->editable : def->enabled, "false");
   }
 
   [[nodiscard]] std::optional<Boolean>
@@ -724,7 +820,9 @@ private:
     for (PageCore *part : parts_) { part->RowLeft(); }
     if (!edited_) { return; }
     edited_ = false;
-    SaveNewRecord_();
+    try {
+      SaveNewRecord_();
+    } catch (const Error &e) { validationErrors_.emplace_back(e.what()); }
   }
 
   void SaveNewRecord_() {
@@ -732,6 +830,9 @@ private:
       if (!newRecord_ || page_ == nullptr) { return; }
       newRecord_ = false;
       edited_ = false;
+      if constexpr (requires { page_->StandsOnNewRecord(); }) {
+        if (!page_->StandsOnNewRecord()) { return; }
+      }
       using Source = std::remove_cvref_t<decltype(page_->Rec)>;
       auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
       Boolean allowInsert = true;
@@ -1088,6 +1189,7 @@ private:
   bool newRecord_ = false;
   bool edited_ = false;
   std::vector<PageCore *> parts_;
+  std::vector<std::string> validationErrors_;
   PageCore *parent_ = nullptr;
   std::string partName_;
 };

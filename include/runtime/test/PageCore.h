@@ -63,6 +63,12 @@ public:
   /// \param filter  The filter expression.
   virtual void SetControlFilter(std::string_view control, std::string_view filter) = 0;
 
+  /// \brief AL `TestPage.Filter.GetFilter(Field)`: the filter standing on the control's field in
+  ///        the page's record, in the record's own filter group.
+  /// \param control The control's AL name.
+  /// \return The filter text, empty for none.
+  [[nodiscard]] virtual std::string ControlFilterText(std::string_view control) const = 0;
+
   /// \brief AL `TestField.Visible()`.
   /// \param control The control's AL name.
   /// \return What the control's `Visible` property says; true when it says nothing.
