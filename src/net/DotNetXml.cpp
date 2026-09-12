@@ -10,6 +10,7 @@
 #include "XmlEngine.h"
 
 #include <cstddef>
+#include <fstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -447,6 +448,14 @@ void XmlDocument::LoadXml(std::string_view text) {
 void XmlDocument::Save(const ::agiru::OutStream &stream) {
   if (handle_.Empty()) { throw Error("XmlDocument.Save: the document was never loaded"); }
   const_cast<::agiru::OutStream &>(stream).WriteBytes(::agiru::detail::Dump(handle_));
+}
+
+void XmlDocument::Save(std::string_view filename) {
+  if (handle_.Empty()) { throw Error("XmlDocument.Save: the document was never loaded"); }
+  const std::string bytes = ::agiru::detail::Dump(handle_);
+  std::ofstream file{std::string(filename), std::ios::binary | std::ios::trunc};
+  if (!file) { throw Error("XmlDocument.Save: the file could not be opened for writing"); }
+  file.write(bytes.data(), static_cast<std::streamsize>(bytes.size()));
 }
 
 XmlElement XmlDocument::DocumentElement() const {

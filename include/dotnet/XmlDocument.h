@@ -296,11 +296,12 @@ public:
         "XmlDocument.Save over a .NET Stream is declared and not implemented yet (board:0035)");
   }
 
-  /// \brief `XmlDocument.Save(filename)`, which this runtime does not write (board:0035).
-  /// \throws Error always.
-  void Save(std::string_view) {
-    throw Error("XmlDocument.Save(filename) is declared and not implemented yet (board:0035)");
-  }
+  /// \brief `XmlDocument.Save(filename)` -- serialises the document to the named server file, the
+  ///        same bytes `Save(stream)` writes (the DTD included), so a round trip through a file
+  ///        keeps the `<!DOCTYPE>` a `DtdProcessing.Parse` load preserved.
+  /// \param filename The server file path to write.
+  /// \throws Error when the document was never loaded or the file cannot be written.
+  void Save(std::string_view filename);
 
   /// \brief `XmlDocument.DocumentElement`. \return The root, or null.
   [[nodiscard]] XmlElement DocumentElement() const;
