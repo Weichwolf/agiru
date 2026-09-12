@@ -90,3 +90,22 @@ targets -- `Vendor.Name`, `Balance + Overdue` -- are field access and arithmetic
 213's footprint on the item-tracking page and stops running a side-effecting function on every
 control read. It is a mitigation, not the fix; the fix is finding the premature free, which needs a
 sanitizer build this box does not yet carry.
+
+## comment (2026-09-12, part 2) -- the ShareTable sites, and why reading is not enough
+
+The `Item Tracking Lines` page shares its `Rec` temp table into locals with `Copy(Rec, true)` in at
+least three places (`ItemTrackingLines.Page.al:957` `CountLinesWithQtyZero`, `:1444`, `:1500`), and
+`ContinuousItemTracking`/`ContinuousScanningLine` share it into `Rec` the other way. Every one of
+these was traced by hand against `RuntimeShareTemporary` and `TempHandle`'s assignment: the local
+default-constructs its own table, `Copy(_, true)` releases that (refcount 0 -> delete) and acquires
+the page's (refcount 2), and the local's destructor releases it back to 1 -- balanced. The same
+holds for `Forget`, `kTempOps::insert/load`, `StateHandle`'s copy/assign, and `Record::Copy`'s
+`CopyStateFrom`. So the premature free is NOT in any refcount path a reader can see; every one is
+correct.
+
+That is the signal to stop reading and measure: the next step is a sanitizer build (`-fsanitize=
+address`) of `src/` + the `SCM Available to Pick UT` slice run under the codeunit, which names the
+allocation and the free with stacks. This box does not carry that build yet; standing it up (a
+separate CMake config, ASan-instrumented libc++), is the work that closes this. Until then the
+milestone retry keeps the measure honest and 213 (`OnSourceText`) stays shelved because its page-code
+growth is what tips the corpse from a caught exception onto an unmapped page.
