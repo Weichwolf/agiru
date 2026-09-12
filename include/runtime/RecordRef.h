@@ -1252,12 +1252,13 @@ public:
 
   /// \brief AL `RecordRef.SetPosition(Text)`. Sets the fields in a primary key on a record to the
   /// values specified in the String parameter. The remaining fields are not changed.
-  /// \param String The AL `Text`.
-  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
-  void SetPosition(std::string_view String) {
-    static_cast<void>(String);
-    throw Error("RecordRef.SetPosition(Text) is declared and not implemented yet (board:0035)");
-  }
+  /// \param String The AL `Text`, as `GetPosition` wrote it.
+  /// \throws Error when the reference is not open, or a part names a field the table lacks.
+  /// \note IT IS THE WAY BACK FROM `GetPosition` and reads the same text (`detail::TakePosition`,
+  ///       which `Record.SetPosition` uses): `Bin Content` pages hand a position through a
+  ///       `RecordRef` to reopen it (SCM - Warehouse UT, 3 cases, and ERM VAT Tool - UT, 1;
+  ///       2026-09-12).
+  void SetPosition(std::string_view String) { detail::TakePosition(State().record, Table(), String); }
 
   /// \brief AL `RecordRef.SetRecFilter()`. Sets a filter on a record that is referred to by a
   /// RecordRef.

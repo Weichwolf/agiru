@@ -313,6 +313,7 @@ struct RecordState {
   ///       enter the door.
   std::set<std::string> marks;
   bool markedOnly = false; ///< `MarkedOnly(true)`.
+  std::size_t viewMarks = 0; ///< How many marks the temporary view was built over (\see view).
 
   /// \brief AL `xRec` -- the record as it was last READ, INSERTED or MODIFIED.
   ///

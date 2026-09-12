@@ -456,6 +456,15 @@ template <typename Source> [[nodiscard]] const void *RecordAddress(const Source 
 /// \return The position text.
 [[nodiscard]] std::string PositionText(const void *record, const TableDef &table, bool useNames);
 
+/// \brief The key a MARK is kept under (`record-mark-method.md`): the primary key's values, each
+///        as `FieldText` renders it, separated by the unit separator so that a value carrying a
+///        comma cannot collide with two values. `Mark`, `MarkedOnly` over a temporary record and
+///        the marked-only clause over a database read all key on it.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return The key text.
+[[nodiscard]] std::string MarkKey(const void *record, const TableDef &table);
+
 /// \brief AL `Record.SetPosition(Position)` -- the primary key from text.
 /// \param record   The record.
 /// \param table    Its declaration.
@@ -754,16 +763,16 @@ public:
   ///         told apart from a real database failure, and the SQL layer does not do that yet.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
+  /// \note IT RAISES `OnBeforeModifyEvent` AND `OnAfterModifyEvent` WITH `RunTrigger` FALSE, the
+  ///       way `Insert()` raises its two: the event's page carries `RunTrigger` as a PARAMETER,
+  ///       so the event fires either way and the subscriber reads the flag. `API Update
+  ///       Referenced Fields` assigns a customer's `Payment Terms Id` from `OnBeforeModifyEvent`,
+  ///       and `Customer.Modify()` left it blank (API Setup UT, 4 cases, 2026-09-12). `Delete()`
+  ///       raises its two the same way; `DeleteAll()` without a trigger stays the set-based
+  ///       statement it is, which is the predecessor's line too.
   /// \note Not `const`, for the reason Insert() gives: SystemModifiedAt and SystemModifiedBy are
   ///       written by the platform on every modify.
-  Boolean Modify() {
-    if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
-                  " does not exist. Identification fields and values: " + PrimaryKeyText());
-    }
-    CaptureImage();
-    return true;
-  }
+  Boolean Modify() { return Modify(false); }
 
   /// \brief AL `Record.Modify(RunTrigger)`.
   /// \param RunTrigger True to run the table's `OnModify` trigger first.
@@ -776,21 +785,19 @@ public:
         static_cast<Derived *>(this)->OnModify();
       }
     }
-    const Boolean done = Modify();
+    if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+    }
+    CaptureImage();
     TableEvent("OnAfterModifyEvent", RunTrigger);
-    return done;
+    return true;
   }
 
   /// \brief AL `Record.Delete()`.
   /// \throws Error when no row carries this primary key.
   /// \see Insert() for why the statement form raises.
-  Boolean Delete() {
-    if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
-                  " does not exist. Identification fields and values: " + PrimaryKeyText());
-    }
-    return true;
-  }
+  Boolean Delete() { return Delete(false); }
 
   /// \brief AL `Record.Delete(RunTrigger)`.
   /// \param RunTrigger True to run the table's `OnDelete` trigger first.
@@ -805,9 +812,12 @@ public:
         static_cast<Derived *>(this)->OnDelete();
       }
     }
-    const Boolean done = Delete();
+    if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                  " does not exist. Identification fields and values: " + PrimaryKeyText());
+    }
     TableEvent("OnAfterDeleteEvent", RunTrigger);
-    return done;
+    return true;
   }
 
   /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.
@@ -1710,7 +1720,7 @@ public:
   [[nodiscard]] Boolean Mark() const {
     const detail::RecordState *state = Filtered();
     if (state == nullptr) { return false; }
-    return state->marks.contains(PrimaryKeyText());
+    return state->marks.contains(detail::MarkKey(Self(), TableTraits<Derived>::kTable));
   }
 
   /// \brief AL `Record.Mark(Boolean)` -- marks or unmarks the record the variable stands on.
@@ -1723,7 +1733,7 @@ public:
   ///       key that is remembered, because that is what identifies the row again after a `Find`.
   void Mark(Boolean mark) {
     detail::RecordState &state = State();
-    const std::string key = PrimaryKeyText();
+    const std::string key = detail::MarkKey(Self(), TableTraits<Derived>::kTable);
     if (mark) {
       state.marks.insert(key);
     } else {

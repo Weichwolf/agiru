@@ -205,6 +205,15 @@ std::vector<XmlHandle> Attributes(const XmlHandle &of) {
   for (xmlAttrPtr attribute = node->properties; attribute != nullptr; attribute = attribute->next) {
     out.emplace_back(of.tree, attribute);
   }
+  for (xmlNsPtr ns = node->nsDef; ns != nullptr; ns = ns->next) {
+    const std::string name =
+        ns->prefix == nullptr ? std::string("xmlns") : "xmlns:" + Text(ns->prefix);
+    xmlDocPtr doc = xmlNewDoc(Bytes("1.0"));
+    xmlNodePtr holder = xmlNewDocNode(doc, nullptr, Bytes("xmlns-holder"), nullptr);
+    xmlDocSetRootElement(doc, holder);
+    xmlAttrPtr made = xmlNewProp(holder, Bytes(name), ns->href);
+    out.emplace_back(NewTree(doc), reinterpret_cast<xmlNodePtr>(made));
+  }
   return out;
 }
 

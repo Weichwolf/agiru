@@ -1168,7 +1168,38 @@ public:
         return ordinal->ordinal;
       }
     }
+    if constexpr (std::is_same_v<T, Integer> || std::is_same_v<T, Boolean>) {
+      T converted{};
+      if (ConvertsTo_(converted)) {
+        held_ = converted;
+        return *std::get_if<T>(&held_);
+      }
+    }
     Refuse(typeid(T).name());
+  }
+
+  /// \brief What AL converts on the way out of a Variant into an `Integer` or a `Boolean`: a
+  ///        text that spells one (`LibraryVariableStorage.DequeueInteger` of a control's `Value`),
+  ///        a WHOLE Decimal (`Enqueue(WarehouseJournalLine.Quantity)` read back with
+  ///        `DequeueInteger`, SCM Available to Pick UT), a BigInteger in range. A Decimal with
+  ///        places is not an Integer and still refuses.
+  /// \tparam T `Integer` or `Boolean`.
+  /// \param into Where the converted value lands.
+  /// \return Whether the held value converts.
+  template <typename T> [[nodiscard]] bool ConvertsTo_(T &into) const {
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return detail::TextSpells(*text, into);
+    }
+    if constexpr (std::is_same_v<T, Integer>) {
+      if (const Decimal *number = std::get_if<Decimal>(&held_); number != nullptr) {
+        const Decimal whole = number->Trimmed();
+        return whole.Scale() == 0 && detail::TextSpells(whole.ToInvariantString(), into);
+      }
+      if (const BigInteger *wide = std::get_if<BigInteger>(&held_); wide != nullptr) {
+        return detail::TextSpells(std::to_string(*wide), into);
+      }
+    }
+    return false;
   }
 
   /// \brief AL `Proc(var Typed: T)` given a Variant: the alternative it already holds, by
@@ -1236,6 +1267,10 @@ public:
         T evaluated{};
         if (detail::TextSpells(*text, evaluated)) { return evaluated; }
       }
+    }
+    if constexpr (std::is_same_v<T, Integer>) {
+      T converted{};
+      if (ConvertsTo_(converted)) { return converted; }
     }
     Refuse("that type");
   }

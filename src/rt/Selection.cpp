@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -149,6 +150,37 @@ Selection Select(const RecordState *state, const TableDef &table) {
     if (!series.empty()) { made.from = series; }
   }
   Narrow(made, state, table);
+  if (state != nullptr && state->markedOnly) {
+    std::string marked;
+    const std::span<const FieldNo> key =
+        table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
+    for (const std::string &mark : state->marks) {
+      std::vector<std::string> values;
+      std::size_t start = 0;
+      for (std::size_t at = mark.find('\x1f'); at != std::string::npos; at = mark.find('\x1f', start)) {
+        values.push_back(mark.substr(start, at - start));
+        start = at + 1;
+      }
+      values.push_back(mark.substr(start));
+      if (values.size() != key.size()) { continue; }
+      std::string one;
+      for (std::size_t i = 0; i < key.size(); ++i) {
+        Atom atom;
+        atom.value = values[i];
+        const Clause clause =
+            Where(FieldOf(table, key[i]), Expression{All{atom}}, made.binds.size() + 1);
+        if (clause.sql.empty()) { continue; }
+        if (!one.empty()) { one += " AND "; }
+        one += clause.sql;
+        made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
+      }
+      if (one.empty()) { continue; }
+      if (!marked.empty()) { marked += " OR "; }
+      marked += "(" + one + ")";
+    }
+    if (!made.where.empty()) { made.where += " AND "; }
+    made.where += marked.empty() ? std::string("FALSE") : "(" + marked + ")";
+  }
   made.sorted = OrderedBy(state, table);
   for (const FieldNo no : made.sorted) {
     if (!made.order.empty()) { made.order += ", "; }

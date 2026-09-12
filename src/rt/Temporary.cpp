@@ -102,15 +102,12 @@ bool Passes(const void *row, const std::vector<FieldFilter> &filters, const Tabl
 
 void Build(Held held, const TableDef &table) {
   RecordState &state = *held.state;
-  if (state.markedOnly) {
-    throw Error("Record.MarkedOnly over a temporary record is not carried yet (board:0583)");
-  }
   state.view.clear();
   const std::size_t count = held.temp->ops->count(held.temp->rows);
   for (std::size_t index = 0; index < count; ++index) {
-    if (Passes(held.temp->ops->at(held.temp->rows, index), state.viewFilters, table)) {
-      state.view.push_back(index);
-    }
+    const void *row = held.temp->ops->at(held.temp->rows, index);
+    if (state.markedOnly && !state.marks.contains(MarkKey(row, table))) { continue; }
+    if (Passes(row, state.viewFilters, table)) { state.view.push_back(index); }
   }
   const std::vector<FieldNo> by = OrderOf(state.viewKey, table);
   std::ranges::stable_sort(state.view, [&](std::size_t a, std::size_t b) {
@@ -123,6 +120,7 @@ void Build(Held held, const TableDef &table) {
 
 void Snapshot(Held held, const TableDef &table) {
   RecordState &state = *held.state;
+  state.viewMarks = state.marks.size();
   state.viewFilters = state.filters;
   state.viewKey = state.key;
   state.viewAscending = state.ascending;
@@ -136,7 +134,11 @@ void Land(Held held, void *record, std::size_t at) {
 }
 
 void Refresh(Held held, const TableDef &table, const void *record) {
-  if (held.state->viewVersion == held.temp->version) { return; }
+  if (held.state->viewVersion == held.temp->version &&
+      held.state->viewMarks == held.state->marks.size()) {
+    return;
+  }
+  held.state->viewMarks = held.state->marks.size();
   Build(held, table);
   const std::vector<FieldNo> by = OrderOf(held.state->viewKey, table);
   std::size_t at = 0;

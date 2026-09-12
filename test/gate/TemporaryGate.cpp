@@ -276,6 +276,37 @@ void AFilterNarrowsATemporaryWalk() {
   CHECK_TRUE("Reset widens it again", buffer.Count() == kFive);
 }
 
+/// `MarkedOnly` OVER A TEMPORARY RECORD walks the marked rows and no other
+/// (`record-markedonly-method.md`; `Whse.-Create Source Document` marks the receipt headers it
+/// keeps and walks `MarkedOnly`, 34 UT cases refused with "not carried yet", 2026-09-12). The
+/// marks are the VARIABLE's (`record-mark-method.md`), so a copy taken with `Copy` carries them
+/// and a plain assignment does not.
+void MarkedOnlyWalksTheMarkedTemporaryRows() {
+  constexpr agiru::Integer kFive = 5;
+  Temporary<LineNumberBuffer> buffer = With({1, 2, 3, 4, kFive});
+  static_cast<void>(buffer.Get(2));
+  buffer.Mark(true);
+  static_cast<void>(buffer.Get(4));
+  buffer.Mark(true);
+  buffer.MarkedOnly(true);
+  CHECK_TRUE("Count sees the marks", buffer.Count() == 2);
+  std::string walked;
+  for (bool more = buffer.FindSet(); more; more = buffer.Next() != 0) {
+    walked += std::to_string(buffer.OldLineNumber) + " ";
+  }
+  CHECK_TEXT("and the walk keeps only the marked rows", walked, "2 4 ");
+  static_cast<void>(buffer.Get(4));
+  buffer.Mark(false);
+  CHECK_TRUE("unmarking takes a row out of the walk", buffer.Count() == 1);
+  buffer.MarkedOnly(false);
+  CHECK_TRUE("MarkedOnly(false) widens it again", buffer.Count() == kFive);
+  // THE NEGATIVE CONTROL: MarkedOnly with nothing marked walks nothing, which a filter that was
+  // quietly dropped would answer with every row.
+  buffer.ClearMarks();
+  buffer.MarkedOnly(true);
+  CHECK_TRUE("no marks, no rows", buffer.Count() == 0 && !buffer.FindFirst());
+}
+
 /// THE SHAPES THE BASEAPP SHARES WITH, which board:0620 counts at 141 UT failures: a global
 /// reached through an `Instance`, a temporary handed on BY VALUE, and a `var` parameter whose
 /// declared type is the base table and whose argument is a temporary.
@@ -381,6 +412,7 @@ int main() {
     SharedFromAGlobalMadeInTheCall();
     ABaseReferenceKeepsATemporaryTemporary();
     AFilterNarrowsATemporaryWalk();
+    MarkedOnlyWalksTheMarkedTemporaryRows();
     ARecordRefOverATemporaryRecordSeesItsRows();
     AssigningOneHandleToAnotherKeepsTheRowsApart();
     AnOptionAndADecimalFilterATemporaryRowByValue();

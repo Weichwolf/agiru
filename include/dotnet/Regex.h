@@ -396,6 +396,11 @@ public:
   /// \param pattern The pattern. \return The first match.
   [[nodiscard]] static class Match Match(std::string_view input, std::string_view pattern);
 
+  /// \brief The static `Regex.Matches(input, pattern)`, which `Office Line Generation` calls to
+  ///        walk the words of a sanitised mail body. \param input The text.
+  /// \param pattern The pattern. \return Every match, left to right.
+  [[nodiscard]] static MatchCollection Matches(std::string_view input, std::string_view pattern);
+
   /// \brief The static `Regex.Replace(input, pattern, replacement)`. \param input The text.
   /// \param pattern The pattern. \param replacement What replaces each match. \return The text.
   [[nodiscard]] static ::agiru::Text<0>

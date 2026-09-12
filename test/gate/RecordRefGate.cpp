@@ -16,6 +16,7 @@
 
 #include "Check.h"
 #include "ResourceCost.h"
+#include "Selection.h"
 
 #include <array>
 #include <cstddef>
@@ -122,6 +123,34 @@ void AFieldIsReachedByNumberAndByPosition() {
     (void)ref.FieldIndex(0);
   } catch (const Error &e) { said = e.what(); }
   CHECK_TRUE("and index 0 is outside the list, not the first field", !said.empty());
+}
+
+/// `SetPosition` IS THE WAY BACK FROM `GetPosition` (`recordref-setposition-method.md`): the key
+/// fields take the values the text carries and nothing else moves. `Bin Content` hands a position
+/// through a `RecordRef` to reopen a row (SCM - Warehouse UT, 3 cases refused, 2026-09-12).
+void APositionRoundTripsThroughARecordRef() {
+  ResourceCost rec;
+  rec.Type = ResourceCostType::Resource;
+  rec.Code = "R-1";
+  rec.WorkTypeCode = "WT";
+  RecordRef ref;
+  ref.GetTable(rec);
+  const std::string position = ref.GetPosition();
+  ResourceCost other;
+  other.WorkTypeCode = "ELSE";
+  RecordRef back;
+  back.GetTable(other);
+  back.SetPosition(position);
+  back.SetTable(other);
+  CHECK_TEXT("the code comes back", std::string(std::string_view(other.Code)), "R-1");
+  CHECK_TEXT("and so does the work type", std::string(std::string_view(other.WorkTypeCode)), "WT");
+  CHECK_TRUE("and the type", other.Type == ResourceCostType::Resource);
+  // THE NEGATIVE CONTROL: a part naming a field the table lacks refuses rather than being dropped.
+  std::string said;
+  try {
+    back.SetPosition("9999='x'");
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_TRUE("a position over an unknown field refuses", !said.empty());
 }
 
 /// A FIELD'S VALUE CARRIES ITS TYPE OUT OF THE RECORD. This is why a Variant had to tell a Duration
@@ -319,6 +348,49 @@ void AFieldAnswersTheClassItsTableDeclared() {
              ref.Field(1).Class() == agiru::FieldClass::Normal);
 }
 
+/// A CALCFORMULA TERM OVER THE TARGET'S OWN FLOWFIELD IS A CORRELATED SUBQUERY, the way a filter on
+/// a FlowField is: `Service Header."No. of Unallocated Items"` counts the item lines whose
+/// `"No. of Active/Finished Allocs" = const(0)`, itself a count, and reading that term as a column
+/// failed the statement ("column does not exist", ERM VAT Tool - UT and Payment Registration UT,
+/// 3 cases, 2026-09-12). `Painted` is the target here: its `Painted Count` is a FlowField.
+void AFormulaTermOverAFlowFieldIsASubquery() {
+  static constexpr std::array<agiru::FieldDef, 2> kFields{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "Code",
+                      .caption = "Code",
+                      .no = agiru::FieldNo{1},
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = 32,
+                      .name = "Unpainted",
+                      .caption = "Unpainted",
+                      .calcFormula = "count(\"Painted\" where(\"Painted Count\" = const(0)))",
+                      .no = agiru::FieldNo{2},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Integer},
+  }};
+  static constexpr std::array<agiru::FieldNo, 1> kKey{{agiru::FieldNo{1}}};
+  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
+      agiru::KeyDef{.name = "Key1", .fields = kKey, .clustered = true},
+  }};
+  static constexpr agiru::TableDef kOver{.id = agiru::TableId{50004},
+                                         .name = "Flow Over Painted",
+                                         .caption = "Flow Over Painted",
+                                         .fields = kFields,
+                                         .keys = kKeys};
+  agiru::detail::RecordState state;
+  state.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "1"});
+  const agiru::detail::Selection made = agiru::detail::Select(&state, kOver);
+  CHECK_TRUE("the term is the FlowField's own subquery",
+             made.where.find("(SELECT count(*) FROM \"Painted\")") != std::string::npos ||
+                 made.where.find("(SELECT COUNT(*) FROM \"Painted\")") != std::string::npos);
+  CHECK_TRUE("and never the FlowField's name as a column",
+             made.where.find("\"Painted Count\" =") == std::string::npos);
+  CHECK_TRUE("the constant is bound after the subquery",
+             made.binds.size() == 2 && made.binds[0].has_value() && *made.binds[0] == "0" &&
+                 made.binds[1].has_value() && *made.binds[1] == "1");
+}
+
 /// THE FIELD TYPE'S NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. AL compares the result of
 /// `FieldRef.Type()` against `Field.Type::Code` directly, so a dense 0, 1, 2 ... of this tree's own
 /// invention would make every such comparison quietly false -- the silent-wrong-data class, and one
@@ -360,10 +432,12 @@ int main() {
     ItReachesTheTableWithoutNamingIt();
     OneThatIsNotOpenRefusesRatherThanAnsweringZero();
     AFieldIsReachedByNumberAndByPosition();
+    APositionRoundTripsThroughARecordRef();
     AValueCarriesItsType();
     AnEnumFieldReportsOption();
     TheFieldTypeCarriesThePlatformsOwnNumbers();
     TheEnumAccessorsAnswerByPositionAndByOrdinal();
     AFieldAnswersTheClassItsTableDeclared();
+    AFormulaTermOverAFlowFieldIsASubquery();
   });
 }

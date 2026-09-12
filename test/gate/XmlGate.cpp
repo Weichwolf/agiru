@@ -159,6 +159,20 @@ void DotNetClassesWalkTheSameTree() {
   CHECK_TEXT("an attribute is read by name",
              root.SelectSingleNode("a").Attributes().GetNamedItem("id").Value(),
              "1");
+  // A NAMESPACE DECLARATION IS AN ATTRIBUTE IN .NET (`xmlns:p` sits in `Attributes` with the
+  // uri as its value), and `XML DOM Management.AddNamespaces` reads the prefixes off the root
+  // element's attributes that way; libxml2 keeps them apart, and without them here every
+  // prefixed XPath of the PEPPOL import found nothing (Incoming Doc. To Data Exch.UT, 3 cases,
+  // 2026-09-12).
+  agiru::dotnet::XmlAttributeCollection declared = root.Attributes();
+  CHECK_TRUE("the root's namespace declaration counts as an attribute", declared.Count() == 1);
+  CHECK_TEXT("named xmlns:prefix", declared.Item(0).Name(), "xmlns:p");
+  CHECK_TEXT("with the uri as its value", declared.GetNamedItem("xmlns:p").Value(), "urn:p");
+  int named = 0;
+  for (auto &attribute : declared) {
+    if (std::string_view(attribute.Name()).starts_with("xmlns:")) { ++named; }
+  }
+  CHECK_TRUE("and foreach walks it", named == 1);
   agiru::dotnet::XmlNode declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "");
   static_cast<void>(document.InsertBefore(declaration, document.DocumentElement()));
   static_cast<void>(document.AppendChild(declaration));

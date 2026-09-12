@@ -133,11 +133,31 @@ void ALessGeneralNumberReadsAsAMoreGeneralOne() {
   const Variant big{agiru::BigInteger{7}};
   const agiru::Decimal fromBig = big;
   CHECK_TRUE("a BigInteger reads as a Decimal", fromBig == agiru::Decimal{7});
-  // THE WAY DOWN IS NOT A CONVERSION, it is `Round`, and reading a Decimal as an Integer would
-  // decide a rounding rule the caller never asked for.
-  CHECK_TRUE("a Decimal does not read as an Integer", Raises([] {
-               const Variant fraction{agiru::Decimal{7}};
+  // THE WAY DOWN IS A CONVERSION ONLY WHERE NOTHING IS LOST: a WHOLE Decimal reads as the
+  // Integer it is (`LibraryVariableStorage.Enqueue(WarehouseJournalLine.Quantity)` read back with
+  // `DequeueInteger`, SCM Available to Pick UT, 2026-09-12), and a Decimal with places refuses,
+  // because rounding it would decide a rule the caller never asked for.
+  const Variant wholeDecimal{agiru::Decimal::FromInvariantString("7.00")};
+  CHECK_TRUE("a whole Decimal reads as an Integer",
+             static_cast<agiru::Integer>(wholeDecimal) == agiru::Integer{7});
+  CHECK_TRUE("a Decimal with places does not", Raises([] {
+               const Variant fraction{agiru::Decimal::FromInvariantString("7.5")};
                return static_cast<agiru::Integer>(fraction);
+             }));
+  // AND THE REFERENCE FORM CONVERTS THE SAME WAY, in place: `exit(Variant)` into an Integer
+  // return goes through it on a non-const Variant (`DequeueInteger` of a control's text `Value`,
+  // VAT Return Period UT, 2026-09-12).
+  Variant spelled{std::string("42")};
+  agiru::Integer &inPlace = spelled;
+  CHECK_TRUE("a text that spells an Integer reads as one by reference", inPlace == 42);
+  CHECK_TRUE("and the Variant now holds the Integer", spelled.IsInteger());
+  Variant yes{std::string("Yes")};
+  agiru::Boolean &flagged = yes;
+  CHECK_TRUE("a text that spells a Boolean reads as one by reference", flagged);
+  CHECK_TRUE("a text that spells nothing of the kind still refuses", Raises([] {
+               Variant word{std::string("seven")};
+               agiru::Integer &none = word;
+               return none;
              }));
   CHECK_TRUE("and a Boolean is not a number at all", Raises([] {
                const Variant flag{true};

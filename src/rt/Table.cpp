@@ -462,6 +462,18 @@ bool InPrimaryKey(const TableDef &table, FieldNo no) {
 }
 }
 
+std::string MarkKey(const void *record, const TableDef &table) {
+  std::string out;
+  if (table.keys.empty()) { return out; }
+  for (const FieldNo no : table.keys[0].fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    if (!out.empty()) { out += '\x1f'; }
+    out += FieldText(record, *def);
+  }
+  return out;
+}
+
 std::string PositionText(const void *record, const TableDef &table, bool useNames) {
   std::string out;
   if (table.keys.empty()) { return out; }
@@ -1165,6 +1177,39 @@ void Add(Predicate &into, const detail::Clause &clause) {
   into.binds.insert(into.binds.end(), clause.binds.begin(), clause.binds.end());
 }
 
+std::string TableNumberOrValue(std::string_view value) {
+  std::string joined;
+  for (const char c : value) {
+    if (std::isspace(static_cast<unsigned char>(c)) == 0) { joined += c; }
+  }
+  static constexpr std::string_view kDatabase = "database::";
+  std::string lowered = joined;
+  for (char &c : lowered) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+  if (!lowered.starts_with(kDatabase)) { return std::string(value); }
+  std::string named = joined.substr(kDatabase.size());
+  if (named.size() >= 2 && named.front() == '"' && named.back() == '"') {
+    named = named.substr(1, named.size() - 2);
+  }
+  const TableEntry *entry = FindTable(std::string_view(named));
+  if (entry == nullptr) {
+    throw Error("a CalcFormula names the table " + named + ", which this build does not carry");
+  }
+  return std::to_string(entry->table->id.Value());
+}
+
+detail::Clause TermClause(const TableDef &target,
+                          const FieldDef &at,
+                          const detail::Expression &expression,
+                          std::size_t first) {
+  if (at.fieldClass != FieldClass::FlowField) { return detail::Where(at, expression, first); }
+  const detail::Clause column = detail::FlowFieldColumn(target, at, nullptr, first);
+  if (column.sql.empty()) { return {}; }
+  detail::Clause clause = detail::Where(at, expression, first + column.binds.size(), column.sql);
+  if (clause.sql.empty()) { return {}; }
+  clause.binds.insert(clause.binds.begin(), column.binds.begin(), column.binds.end());
+  return clause;
+}
+
 detail::Expression Equal(std::string value) {
   detail::Atom atom;
   atom.compare = detail::Compare::Equal;
@@ -1194,9 +1239,11 @@ Predicate PredicateOf(const FlowFormula &formula,
     }
     const std::size_t first = made.binds.size() + 1;
     switch (term.how) {
-      case FlowTerm::How::Const: Add(made, detail::Where(*at, Equal(term.value), first)); break;
+      case FlowTerm::How::Const:
+        Add(made, TermClause(target, *at, Equal(TableNumberOrValue(term.value)), first));
+        break;
       case FlowTerm::How::Filter:
-        Add(made, detail::Where(*at, detail::ParseFilter(term.value), first));
+        Add(made, TermClause(target, *at, detail::ParseFilter(term.value), first));
         break;
       default: {
         const FieldDef *source = FieldNamed(table, term.value);
@@ -1214,11 +1261,11 @@ Predicate PredicateOf(const FlowFormula &formula,
         if (term.how == FlowTerm::How::FieldUpperLimit ||
             term.how == FlowTerm::How::FieldUpperLimitFilter) {
           const std::string upper = UpperOf(*text);
-          if (!upper.empty()) { Add(made, detail::Where(*at, AtMost(upper), first)); }
+          if (!upper.empty()) { Add(made, TermClause(target, *at, AtMost(upper), first)); }
         } else if (fromFilter) {
-          Add(made, detail::Where(*at, detail::ParseFilter(*text), first));
+          Add(made, TermClause(target, *at, detail::ParseFilter(*text), first));
         } else {
-          Add(made, detail::Where(*at, Equal(*text), first));
+          Add(made, TermClause(target, *at, Equal(*text), first));
         }
       }
     }
@@ -1337,9 +1384,11 @@ Predicate CorrelatedPredicateOf(const FlowFormula &formula,
     }
     const std::size_t next = first + made.binds.size();
     switch (term.how) {
-      case FlowTerm::How::Const: Add(made, detail::Where(*at, Equal(term.value), next)); break;
+      case FlowTerm::How::Const:
+        Add(made, TermClause(target, *at, Equal(TableNumberOrValue(term.value)), next));
+        break;
       case FlowTerm::How::Filter:
-        Add(made, detail::Where(*at, detail::ParseFilter(term.value), next));
+        Add(made, TermClause(target, *at, detail::ParseFilter(term.value), next));
         break;
       default: {
         const FieldDef *source = FieldNamed(table, term.value);
@@ -1356,9 +1405,9 @@ Predicate CorrelatedPredicateOf(const FlowFormula &formula,
           if (term.how == FlowTerm::How::FieldUpperLimitFilter ||
               term.how == FlowTerm::How::FieldUpperLimit) {
             const std::string upper = UpperOf(*text);
-            if (!upper.empty()) { Add(made, detail::Where(*at, AtMost(upper), next)); }
+            if (!upper.empty()) { Add(made, TermClause(target, *at, AtMost(upper), next)); }
           } else {
-            Add(made, detail::Where(*at, detail::ParseFilter(*text), next));
+            Add(made, TermClause(target, *at, detail::ParseFilter(*text), next));
           }
           break;
         }

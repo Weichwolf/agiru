@@ -389,6 +389,56 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
              made.binds.size() == 2 && made.binds[0] == "10" && made.binds[1] == "20");
   CHECK_TRUE("and the range compares the subquery, not a column",
              made.where.find(" LIMIT 1) BETWEEN $1 AND $2") != std::string::npos);
+  // A `const(Database::X)` IN A CALCFORMULA IS THE TABLE'S NUMBER, the way `Query.cpp` reads a
+  // DataItemTableFilter: `Price List Line."Asset Type"`-style lookups filter on
+  // `"Table ID" = const(Database::"Item Unit of Measure")`, and binding the words put "Database ::
+  // Resource" into an integer column (ERM VAT Tool - UT, Price List Line UT, Price Source UT: 6
+  // cases, 2026-09-12). The term over the target's own FlowField is RecordRefGate's case.
+  static constexpr std::array<agiru::FieldDef, 2> kNumbered{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "Code",
+                      .caption = "Code",
+                      .no = agiru::FieldNo{1},
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = 32,
+                      .name = "Table Rows",
+                      .caption = "Table Rows",
+                      .calcFormula = "count(\"Resource Cost\" where(Type = const(Database::\"Resource Cost\")))",
+                      .no = agiru::FieldNo{2},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Integer},
+  }};
+  static constexpr agiru::TableDef kNumbers{.id = agiru::TableId{50003},
+                                            .name = "Flow Numbers",
+                                            .caption = "Flow Numbers",
+                                            .fields = kNumbered,
+                                            .keys = kKeys};
+  agiru::detail::RecordState numbered;
+  numbered.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "1"});
+  const agiru::detail::Selection tableRows = agiru::detail::Select(&numbered, kNumbers);
+  CHECK_TRUE("Database::X binds the table's number",
+             tableRows.binds.size() == 2 && tableRows.binds[0].has_value() && *tableRows.binds[0] == "202");
+  // `MarkedOnly` OVER A DATABASE RECORD IS A CLAUSE OVER THE MARKED KEYS
+  // (`record-markedonly-method.md`): each mark is one primary key, the clause ORs them, and no
+  // mark at all selects nothing rather than everything.
+  agiru::detail::RecordState marked;
+  marked.markedOnly = true;
+  marked.marks.insert("A");
+  marked.marks.insert("B");
+  const agiru::detail::Selection onlyMarked = agiru::detail::Select(&marked, kOuter);
+  CHECK_TRUE("two marks are two keys ORed",
+             onlyMarked.where.find("(\"Code\" = $1) OR (\"Code\" = $2)") != std::string::npos ||
+                 onlyMarked.where.find("(\"Code\" = $2) OR (\"Code\" = $1)") != std::string::npos);
+  CHECK_TRUE("and both keys are bound",
+             onlyMarked.binds.size() == 2 && onlyMarked.binds[0].has_value() &&
+                 onlyMarked.binds[1].has_value() &&
+                 ((*onlyMarked.binds[0] == "A" && *onlyMarked.binds[1] == "B") ||
+                  (*onlyMarked.binds[0] == "B" && *onlyMarked.binds[1] == "A")));
+  agiru::detail::RecordState unmarked;
+  unmarked.markedOnly = true;
+  const agiru::detail::Selection nothing = agiru::detail::Select(&unmarked, kOuter);
+  CHECK_TRUE("no marks select nothing", nothing.where == "FALSE");
   // A LEADING `-` REVERSES `Exist` (`devenv-calcformula-property.md`: `[-]Exist(...)`): `Sales
   // Invoice Header.Closed` is `-exist("Cust. Ledger Entry" where(... Open = filter(true)))`, true
   // when NO open entry is left. Read as a plain EXISTS it said "paid" of every invoice that still

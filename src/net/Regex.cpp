@@ -361,6 +361,10 @@ Array Regex::Split(std::string_view input, std::string_view pattern) {
   return Regex::Binder{}(pattern).Split(input);
 }
 
+MatchCollection Regex::Matches(std::string_view input, std::string_view pattern) {
+  return Regex::Binder{}(pattern).Matches(input);
+}
+
 Array Regex::Split(std::string_view input, std::string_view pattern, const RegexOptions &options) {
   return Regex::Binder{}(pattern, options).Split(input);
 }

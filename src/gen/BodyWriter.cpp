@@ -270,8 +270,15 @@ private:
         const std::string element = Expression(statement.expression, 0);
         const std::string over = Expression(statement.labels.front(), 0);
         const std::string enumeration = scope_.DeclaredEnum(statement.expression.text);
-        if (enumeration.empty() && scope_.IsVariable(statement.expression.text) &&
-            LowerKey(scope_.DeclaredType(statement.expression.text)) == "dotnet") {
+        const al::Expr &root = RootOf(statement.labels.front());
+        const std::string elementType =
+            scope_.IsVariable(statement.expression.text)
+                ? LowerKey(scope_.DeclaredType(statement.expression.text))
+                : std::string{};
+        const bool overDotNet = root.kind == al::ExprKind::Name && scope_.IsVariable(root.text) &&
+                                LowerKey(scope_.DeclaredType(root.text)) == "dotnet";
+        const bool textElement = elementType == "text" || elementType == "code";
+        if (enumeration.empty() && (elementType == "dotnet" || (overDotNet && textElement))) {
           out = Pad(indent) + "for (auto &&Element_Block : " + over + ") {\n" + Pad(indent + 2) +
                 element + " = Element_Block;\n" + Statements(statement.body, indent + 2) +
                 Pad(indent) + "}\n";
@@ -315,6 +322,19 @@ private:
       }
     }
     return out;
+  }
+
+  static const al::Expr &RootOf(const al::Expr &expression) {
+    const al::Expr *at = &expression;
+    for (;;) {
+      if ((at->kind == al::ExprKind::Call || at->kind == al::ExprKind::Index ||
+           (at->kind == al::ExprKind::Binary && at->text == ".")) &&
+          !at->children.empty()) {
+        at = &at->children.front();
+        continue;
+      }
+      return *at;
+    }
   }
 
   static bool NamesATableNumber(std::string_view base) { return SameName(base, "Database"); }
