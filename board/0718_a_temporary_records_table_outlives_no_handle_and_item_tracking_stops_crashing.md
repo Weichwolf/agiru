@@ -67,3 +67,26 @@ stored by value past its owner's life. The store is the ItemTrackingDataCollecti
 call that lets the page outlive it is what this item closes. Until then the milestone runner should
 count a LOST codeunit against the full text denominator and re-attempt a codeunit whose process
 died, so one corpse does not abort the whole measurement (a run with any LOST is still an ABORT).
+
+## comment (2026-09-12) -- the base is stable, and the bisection has a shape
+
+Reverting 213/214/215 and rebuilding 202-212 restored a DETERMINISTIC SCM Available to Pick UT:
+two standalone runs, 35 of 49 both times, the SAME 14 failures, no crash. Milestone run 135 over
+that build finished 2 200 of 2 310, 80 codeunits, 0 LOST -- the retry the runner grew this round
+carried the flaky codeunit across the occasional dead read without a single lost codeunit.
+
+The bisection of what tips the corpse is narrowing by construction, not yet by measurement: only
+213 (`OnSourceText`) regenerates the `Item Tracking Lines` page -- it gives its expression controls
+`AvailabilitySerialNo`/`AvailabilityLotNo` (source `TrackingAvailable(Rec, ...)`) an `OnSourceText`
+method, growing the page object and shifting where the freed table's memory lands. 214 (AlArray
+guard) and 215 (packed/localized DateFormula) change no item-tracking app source -- `Tracking
+Specification` has no DateFormula field -- so the same-round build B (202-212 + 214 + 215) is the
+test of whether a runtime-only heap shift is enough to tip it, or whether 213's page-code growth is
+the trigger. Either way the free is board:0718's and predates all three.
+
+A mitigation for 213 when it returns: synthesize `OnSourceText` only for a source that is NOT a
+top-level function call (114 of the 477 expression-source field controls call a function; the board
+targets -- `Vendor.Name`, `Balance + Overdue` -- are field access and arithmetic). That both shrinks
+213's footprint on the item-tracking page and stops running a side-effecting function on every
+control read. It is a mitigation, not the fix; the fix is finding the premature free, which needs a
+sanitizer build this box does not yet carry.

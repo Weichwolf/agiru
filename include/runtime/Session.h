@@ -8,6 +8,7 @@
 #include "type/Date.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/Language.h"
 
 #include <string>
 
@@ -88,7 +89,10 @@ public:
   ///       `system-globallanguage-method.md` calls it "the current global language setting", and a
   ///       service tier runs ten thousand sessions in one process. A global here would be one
   ///       session's language answering for every other.
-  void Language(::agiru::Integer id) { language_ = id; }
+  void Language(::agiru::Integer id) {
+    language_ = id;
+    ::agiru::Language::MakeCurrent(id);
+  }
 
   /// \brief AL `UserId()`.
   ///

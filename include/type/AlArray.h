@@ -275,6 +275,12 @@ private:
   ///          length. The declared size is the storage for the ordinary case and costs no heap.
   template <typename Source> void Take(const Source &other) {
     const auto length = static_cast<std::size_t>(other.Length());
+    if (length > kLargestDeclared) {
+      throw Error("an array of " + std::to_string(length) +
+                  " elements is being copied: the "
+                  "source's length is not a length, it is a view over storage that is gone "
+                  "(board:0633)");
+    }
     T *into = held_.data();
     if (length > N) {
       T *fresh = new T[length];
@@ -291,6 +297,12 @@ private:
     first_ = into;
     this->Refer(this, length, &Element_<T>);
   }
+
+  /// \brief The largest array any AL declaration in the corpus asks for is `array[2000]`
+  ///        (measured 2026-09-12 over `~/Git/BCApps/src`); a length beyond five hundred times that
+  ///        was a `std::bad_array_new_length` out of a view whose storage had died, with no name
+  ///        on it (SCM Available to Pick UT).
+  static constexpr std::size_t kLargestDeclared = 1'000'000;
 
   std::array<T, N> held_{};
   T *spill_ = nullptr;

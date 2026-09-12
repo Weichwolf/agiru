@@ -101,8 +101,9 @@ bool Passes(const void *row, const std::vector<FieldFilter> &filters, const Tabl
   for (const FieldFilter &filter : filters) {
     const FieldDef &def = FieldOf(table, filter.field);
     if (def.fieldClass == FieldClass::FlowFilter) { continue; }
-    const std::string value =
-        def.type == FieldType::RecordId ? StorageText(row, def) : FieldText(row, def);
+    const std::string value = def.type == FieldType::RecordId || def.type == FieldType::DateFormula
+                                  ? StorageText(row, def)
+                                  : FieldText(row, def);
     const bool passes = Matches(ParseFilter(filter.text), value, def);
     if (filter.group == kCrossColumnGroup) {
       crossColumn = true;

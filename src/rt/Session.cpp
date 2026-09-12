@@ -23,12 +23,15 @@ thread_local Session *g_current = nullptr;
 Session::Session(const std::string &connectionInfo)
     : connection_(connectionInfo), boundaries_(), previous_(g_current) {
   g_current = this;
+  ::agiru::Language::MakeCurrent(language_);
 }
 
 Session::~Session() {
   detail::ReleaseAutomaticInstances();
   detail::ReleaseSingleInstances();
   g_current = previous_;
+  ::agiru::Language::MakeCurrent(previous_ != nullptr ? previous_->language_
+                                                      : ::agiru::Language::kEnglishUnitedStates);
 }
 
 Session &Session::Current() {

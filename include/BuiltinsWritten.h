@@ -286,9 +286,9 @@ void LogAuditMessage(
 /// \param DateExpression The formula, as text.
 /// \return The date the formula reaches from today.
 ///
-/// \note THE TEXT IS READ IN THE INVARIANT FORM. `DateFormula::FromText` takes the formula with
-///       or without its angle brackets and refuses a language-dependent spelling by answering an
-///       empty formula, which moves the date nowhere.
+/// \note THE TEXT IS READ THE WAY A USER WRITES IT: `DateFormula::FromText` takes the formula in
+///       the session's language without its angle brackets and in the invariant letters with them
+///       (`system-calcdate-string-date-method.md`), and a text that is neither is an error.
 ::agiru::Date CalcDate(std::string_view DateExpression);
 
 /// \brief AL `System.CalcDate(Text, Date)`. Calculates a new date from a reference date.

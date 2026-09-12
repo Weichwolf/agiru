@@ -1,5 +1,6 @@
 #include "type/Date.h"
 #include "type/DateFormula.h"
+#include "type/Language.h"
 
 #include "Check.h"
 
@@ -102,6 +103,84 @@ void AnUnsetFormulaMovesNothingAndSaysSo() {
              "CM+10D");
 }
 
+/// `D15` IS THE 15TH OF THE MONTH THE DATE IS IN, which `dateformula-data-type.md` lists beside
+/// `30D` and `CM+10D` ("On the 15th of each month"), and a day past the month's end clamps.
+void TheDaySelectorPicksADayOfTheMonth() {
+  CHECK_TEXT("<D15> from 21 May is 15 May", Reached("<D15>"), "1996-05-15");
+  CHECK_TEXT(
+      "<D31> in February clamps",
+      DateFormula::FromText("<D31>")->CalcDate(Date::FromYmd(1996, 2, 10)).ToInvariantString(),
+      "1996-02-29");
+  CHECK_TRUE("<D15> and <15D> are not the same formula", Reached("<D15>") != Reached("<15D>"));
+}
+
+/// THE COLUMN HOLDS BC'S PACKED FORM: the digits and signs as ASCII and each unit as one control
+/// byte, `C` 1, `D` 2, `WD` 3, `W` 4, `M` 5, `Q` 6, `Y` 7. Every DateFormula column of the CRONUS
+/// load is in it -- 63 columns of 42 tables carry a control byte (`agiru_seeded`, 2026-09-12) --
+/// and read as text they were refused and silently empty: every payment term's due date
+/// calculation, every lead and shipping time. The predecessor decoded the same bytes from the
+/// same hex dump (openerp WI-1077).
+void TheStoredFormIsBCsPackedOne() {
+  CHECK_TEXT("10\x02 is 10D", DateFormula::FromText("10\x02")->InvariantText(), "10D");
+  CHECK_TEXT("\x01\x05 is CM", DateFormula::FromText("\x01\x05")->InvariantText(), "CM");
+  CHECK_TEXT("\x01\x07-1\x07+1\x02 is CY-1Y+1D",
+             DateFormula::FromText("\x01\x07-1\x07+1\x02")->InvariantText(),
+             "CY-1Y+1D");
+  CHECK_TEXT("and a packed 10D moves ten days",
+             DateFormula::FromText("10\x02")->CalcDate(Base()).ToInvariantString(),
+             "1996-05-31");
+  CHECK_TEXT("the formula is written back packed",
+             DateFormula::FromText("<CM-1M>")->ToStorageText(),
+             "\x01\x05-1\x05");
+  CHECK_TEXT("a weekday is one byte and its number",
+             DateFormula::FromText("<-WD2>")->ToStorageText(),
+             "-\x03"
+             "2");
+  CHECK_TEXT("an empty formula is an empty column", DateFormula{}.ToStorageText(), "");
+  CHECK_TRUE("and the packed form reads back as the same formula",
+             *DateFormula::FromText(DateFormula::FromText("<CQ+1M-10D>")->ToStorageText()) ==
+                 *DateFormula::FromText("<CQ+1M-10D>"));
+}
+
+/// A FORMULA SHOWS AND READS IN THE SESSION'S LANGUAGE (`dateformula-data-type.md`: stored
+/// language-independently, "converted to a valid date conversion string for the currently selected
+/// language" when shown). German is anchored by ERM General Journal UT, which reads a yearly
+/// Recurring Frequency back as `1J` under `GlobalLanguage(1031)`; French and Spanish by the
+/// platform page's own `1W+1D` -- `1S+1J` and `1S+1D`.
+void AFormulaShowsAndReadsInTheSessionsLanguage() {
+  constexpr agiru::Integer kGerman = 1031;
+  constexpr agiru::Integer kDanish = 1030;
+  constexpr agiru::Integer kFrench = 1036;
+  CHECK_TRUE("a thread formats in en-US until a session says otherwise",
+             agiru::Language::Current() == agiru::Language::kEnglishUnitedStates);
+  CHECK_TEXT("under English 1Y is 1Y", DateFormula::FromText("<1Y>")->ToText(), "1Y");
+  CHECK_TRUE("and 1J is not a formula", !DateFormula::FromText("1J").has_value());
+  agiru::Language::MakeCurrent(kGerman);
+  CHECK_TEXT(
+      "under German the same formula shows 1J", DateFormula::FromText("<1Y>")->ToText(), "1J");
+  CHECK_TEXT(
+      "and the invariant text is still 1Y", DateFormula::FromText("<1Y>")->InvariantText(), "1Y");
+  CHECK_TEXT("CM+10D shows LM+10T", DateFormula::FromText("<CM+10D>")->ToText(), "LM+10T");
+  CHECK_TEXT("and a weekday is WT", DateFormula::FromText("<-WD2>")->ToText(), "-WT2");
+  CHECK_TEXT("a German 1J reads as a year", DateFormula::FromText("1J")->InvariantText(), "1Y");
+  CHECK_TEXT("LM+10T reads as CM+10D", DateFormula::FromText("lm+10t")->InvariantText(), "CM+10D");
+  CHECK_TEXT("the invariant letters still read, because none of them clashes",
+             DateFormula::FromText("1Y")->InvariantText(),
+             "1Y");
+  CHECK_TRUE("but inside the brackets only the invariant letters are a formula",
+             !DateFormula::FromText("<1J>").has_value());
+  agiru::Language::MakeCurrent(kFrench);
+  CHECK_TEXT("under French 1W+1D is 1S+1J, as the platform page says",
+             DateFormula::FromText("<1W+1D>")->ToText(),
+             "1S+1J");
+  agiru::Language::MakeCurrent(kDanish);
+  CHECK_TEXT("under Danish a year is Å", DateFormula::FromText("<1Y>")->ToText(), "1Å");
+  CHECK_TEXT("and a lowercase å reads as one", DateFormula::FromText("1å")->InvariantText(), "1Y");
+  agiru::Language::MakeCurrent(agiru::Language::kEnglishUnitedStates);
+  CHECK_TEXT(
+      "and back under English it is 1Y again", DateFormula::FromText("<1Y>")->ToText(), "1Y");
+}
+
 } // namespace
 
 int main() {
@@ -112,5 +191,8 @@ int main() {
     PlainQuantitiesMoveByTheirUnit();
     TheWeekSelectorIsNotAWeekQuantity();
     AnUnsetFormulaMovesNothingAndSaysSo();
+    TheDaySelectorPicksADayOfTheMonth();
+    TheStoredFormIsBCsPackedOne();
+    AFormulaShowsAndReadsInTheSessionsLanguage();
   });
 }

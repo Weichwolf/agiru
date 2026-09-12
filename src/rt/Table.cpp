@@ -176,6 +176,9 @@ DateTime DateTimeFromStorageText(std::string_view text) {
 
 std::string StorageText(const void *record, const FieldDef &def) {
   switch (def.type) {
+    case FieldType::DateFormula:
+      return reinterpret_cast<const DateFormula *>(At(const_cast<void *>(record), def))
+          ->ToStorageText();
     case FieldType::Option:
     case FieldType::Enum:
       return std::to_string(reinterpret_cast<const OrdinalValue *>(

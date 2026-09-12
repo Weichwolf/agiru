@@ -80,6 +80,44 @@ void CompressArrayMovesTheFullEntriesForward() {
   CHECK_TRUE("an empty one answers zero", agiru::CompressArray(empty) == 0);
 }
 
+Integer &AccessInteger(void *storage, std::size_t index) {
+  return static_cast<Integer *>(storage)[index];
+}
+
+/// A stand-in for a view whose length no longer matches its storage -- the door keeps the
+/// `(storage, count, accessor)` constructor protected so a client cannot build one, and only a
+/// dead read (board:0718) produces one at run time, so the gate reaches it through a subclass.
+struct View : AlArray<Integer, 0> {
+  View(void *storage, std::size_t count) : AlArray<Integer, 0>(storage, count, &AccessInteger) {}
+};
+
+/// A VIEW THAT CLAIMS MORE ELEMENTS THAN ANY AL ARRAY DECLARES is a view over storage that is gone
+/// (board:0633, board:0718): copying it is refused BY NAME, not left to die in
+/// `std::bad_array_new_length` or to read the dead bytes. The largest declared array in the corpus
+/// is `array[2000]`; the guard is 1 000 000. It is a diagnostic, not the fix -- the dead view
+/// itself is board:0718.
+void ADeadViewIsRefusedByName() {
+  Integer buffer[3] = {1, 2, 3};
+  const View deadView(buffer, 2'000'000);
+  std::string said;
+  try {
+    const AlArray<Integer, 2> copy(deadView);
+    (void)copy;
+  } catch (const Error &e) { said = e.what(); }
+  CHECK_TRUE("a view claiming two million elements over a buffer of three is refused",
+             said.find("view over storage that is gone") != std::string::npos);
+
+  // THE NEGATIVE CONTROL: a view of a length an array really has copies without a word, so the
+  // guard is refusing the impossible length and not every copy.
+  const View liveView(buffer, 3);
+  std::string ok;
+  try {
+    const AlArray<Integer, 3> copy(liveView);
+    CHECK_TRUE("and a real view's elements come across", copy[1] == 1 && copy[3] == 3);
+  } catch (const Error &e) { ok = e.what(); }
+  CHECK_TRUE("a view of a real length copies without refusing", ok.empty());
+}
+
 } // namespace
 
 int main() {
@@ -87,5 +125,6 @@ int main() {
     CompressArrayMovesTheFullEntriesForward();
     AParameterKeepsTheArgumentsLength();
     TwoDimensionsConvertRowByRow();
+    ADeadViewIsRefusedByName();
   });
 }
