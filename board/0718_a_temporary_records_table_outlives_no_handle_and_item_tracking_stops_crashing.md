@@ -131,3 +131,36 @@ same corpse.
 
 The fix needs a sanitizer build. Runtime-only fixes (214, 215) do NOT tip it -- they keep the
 build-B layout -- so work that does not change codegen can still ship while this is open.
+
+## comment (2026-09-12, part 4) -- diagnosed with a live-set tracer: Rec's StateHandle is CORRUPTED
+
+Built a `thread_local` live-set / freed-map tracer of `TempTable` (env `AGIRU_TRACE_TEMPFREE`,
+hooks in `TempTable` ctor/dtor and `TempHandle::Acquire`) plus a `StoredImage` branch log and
+`PushBefore`/`PopBefore` logging. It CAUGHT the bad access and localised it precisely:
+
+- The dead `Acquire` fires while copying a `Tracking Specification` in
+  `ItemTrackingLines.AssignSerialNoBatch`, at the `OnAfterAssignNewTrackingNo(Rec, xRec, ...)` raise
+  whose 2nd (`xRec`) parameter is BY VALUE, so `xRec` is copied.
+- `xRec` came from `StoredImage()`'s `OutermostBefore` branch -- a live before-image
+  (`Derived before = *this` in a `Rec.Validate("Lot No.", ...)` inside `AssignNewLotNo`), pushed and
+  not yet popped, at a stack address. So the before-image is NOT dangling; it is a faithful copy of
+  `Rec`.
+- Therefore `Rec` ITSELF -- the page's `Temporary<Tracking Specification>` member -- has a
+  `StateHandle::state_` that is a GARBAGE non-null pointer (value seen: 0x20, 0x7f4...): `new
+  RecordState(*Rec.state_)` reads junk, and its `temporary.table_` is "never born" (not a real
+  `TempTable`, not a freed one). Every temp-handle path (`Acquire`/copy/assign/move/`Forget`/
+  `RuntimeShareTemporary`/`kTempOps::load`/`CopyStateFrom`) was traced by hand and sets `state_` only
+  to null or a valid pointer -- so the garbage arrives by a RAW MEMORY OVERWRITE into the page Rec's
+  first bytes (State_Block is at offset 0), data-dependent (only some item-tracking cases; the
+  codeunit still reaches 35/49). No `memcpy`/`memset` in `src/rt` touches a record, so the write is
+  in generated code or a field/array write overrunning into offset 0.
+
+**This needs a sanitizer or a hardware watchpoint on `&Rec.State_Block` -- the one tool this box
+lacks.** The tracer stays as `$S/tempdiag.py` + `$S/TempTableDiagnostic.cpp` for the ASan session:
+build `-fsanitize=address`, run `SCM Available to Pick UT`, and the redzone write is named.
+
+A SEPARATE real bug found on the way, kept for later: `Table<Derived>::CaptureImage` did
+`copy->State_Block = detail::StateHandle{}` to blank the image's state, but `StateHandle::operator=`
+copies nothing, so the image (xRec) wrongly retained a deep-copied state with a temp handle. The fix
+is to update the image record IN PLACE (a stable pointer) with a blank state -- staged in the
+scratchpad; it does NOT fix this corpse (the garbage is upstream in Rec) and waits with the rest.
