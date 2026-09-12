@@ -128,6 +128,13 @@ void RecordRefFromVariant(RecordRef &into, const Variant &held);
 /// \param def The field, or nothing.
 /// \return The table number.
 [[nodiscard]] ::agiru::Integer RelationTableNo(const FieldDef *def);
+
+/// \brief AL `Field."RelationFieldNo"`: the number of the field a plain `TableRelation` names
+///        (`Customer.Name` -> 2), 0 for the primary key or no relation. `Library - Tables UT
+///        .AssertTableRelation` reads it (ERM Table Fields UT, 2 cases, 2026-09-12).
+/// \param def The field.
+/// \return The related field's number.
+[[nodiscard]] ::agiru::Integer RelationFieldNo(const FieldDef *def);
 }
 }
 

@@ -1,6 +1,7 @@
 #include "meta/EnumDef.h"
 #include "type/Option.h"
 
+#include "BuiltinsWritten.h"
 #include "Check.h"
 
 #include <array>
@@ -83,6 +84,23 @@ void OptionsOrderByOrdinal() {
   CHECK_TRUE("equality follows the ordinal", Type{2} == Type{ResourceCostType::All});
 }
 
+/// EVALUATE READS A MEMBER BY NAME, BY CAPTION OR BY ORDINAL, and refuses what names none. A
+/// TestPage sets a page variable of an option or enum type by rendering the value it was given
+/// and evaluating the text back, so a reader that took only digits left the variable at its
+/// default (Price List Line UT, 5 lookup cases, 2026-09-12).
+void EvaluateReadsAMemberByNameCaptionOrOrdinal() {
+  Type held;
+  CHECK_TRUE("the AL name is read", static_cast<bool>(agiru::Evaluate(held, "Group(Resource)")));
+  CHECK_TRUE("into its ordinal", held.AsInteger() == 1);
+  CHECK_TRUE("and without regard to case", static_cast<bool>(agiru::Evaluate(held, "all")));
+  CHECK_TRUE("into that member", held == ResourceCostType::All);
+  CHECK_TRUE("digits are the ordinal", static_cast<bool>(agiru::Evaluate(held, "0")));
+  CHECK_TRUE("and land as it", held == ResourceCostType::Resource);
+  // THE NEGATIVE CONTROL: a text that names no member is refused and the value stays.
+  CHECK_TRUE("a stranger is refused", !static_cast<bool>(agiru::Evaluate(held, "Elsewhere")));
+  CHECK_TRUE("and the value stays where it was", held == ResourceCostType::Resource);
+}
+
 } // namespace
 
 int main() {
@@ -92,5 +110,6 @@ int main() {
     TheNameKeepsTheAlSpelling();
     AnUndeclaredOrdinalIsHeldRatherThanRefused();
     OptionsOrderByOrdinal();
+    EvaluateReadsAMemberByNameCaptionOrOrdinal();
   });
 }

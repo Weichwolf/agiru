@@ -33,9 +33,13 @@
 #include "type/Variant.h"
 #include "type/Verbosity.h"
 
+#include <algorithm>
+#include <cctype>
 #include <concepts>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -644,6 +648,44 @@ namespace detail {
 ///
 /// \note EVERY READER HERE IS THE ONE THE DATABASE ALREADY USES for that type, which is what
 ///       keeps `Evaluate` one function instead of a table of parsers.
+/// \brief AL `Evaluate(Enum, Text)` and `Evaluate(Option, Text)`: the member NAMED by the text,
+///        or the one whose CAPTION it is, matched without regard to case, or the ordinal as
+///        digits; blank names the blank member.
+///
+/// \note A TESTPAGE SETS A PAGE VARIABLE THIS WAY. `SalesPriceList.Lines.JobSourceType.SetValue(
+///       "Price Source Type"::"Job Task")` renders the value as its caption and the control's
+///       `set` reads it back through `Evaluate`; with no member reading, the variable stayed at
+///       its default and the line's source type never became `Job Task` (Price List Line UT, 5
+///       lookup cases, 2026-09-12).
+/// \param members The declared members.
+/// \param text    The text.
+/// \return The ordinal, or nothing when the text names no member.
+[[nodiscard]] inline std::optional<std::int32_t>
+MemberOrdinalOf(std::span<const EnumValueDef> members, std::string_view text) {
+  const auto same = [](std::string_view a, std::string_view b) {
+    return a.size() == b.size() && std::ranges::equal(a, b, [](unsigned char x, unsigned char y) {
+             return std::tolower(x) == std::tolower(y);
+           });
+  };
+  if (text.find_first_not_of(' ') == std::string_view::npos) {
+    for (const EnumValueDef &member : members) {
+      if (member.name.find_first_not_of(' ') == std::string_view::npos) { return member.ordinal; }
+    }
+    return std::nullopt;
+  }
+  if (text.find_first_not_of("-0123456789") == std::string_view::npos) {
+    const std::string held(text);
+    return static_cast<std::int32_t>(std::strtol(held.c_str(), nullptr, 10));
+  }
+  for (const EnumValueDef &member : members) {
+    if (same(member.name, text)) { return member.ordinal; }
+  }
+  for (const EnumValueDef &member : members) {
+    if (same(member.caption, text)) { return member.ordinal; }
+  }
+  return std::nullopt;
+}
+
 /// \brief AL `Evaluate(Boolean, Text)`: the spellings AL accepts for a Boolean.
 /// \tparam T `Boolean` or `bool`.
 /// \param into Where the value lands.
@@ -728,6 +770,15 @@ template <typename T> [[nodiscard]] ::agiru::Boolean Evaluated(T &into, std::str
     return true;
   } else if constexpr (std::derived_from<T, ::agiru::StringValue>) {
     into = text;
+    return true;
+  } else if constexpr (requires {
+                         typename T::Traits;
+                         { T::FromInteger(std::int32_t{}) } -> std::same_as<T>;
+                       }) {
+    const std::optional<std::int32_t> ordinal =
+        MemberOrdinalOf(std::span<const EnumValueDef>(T::Traits::kValues), text);
+    if (!ordinal.has_value()) { return false; }
+    into = T::FromInteger(*ordinal);
     return true;
   } else {
     static_cast<void>(into);

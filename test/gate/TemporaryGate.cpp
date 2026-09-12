@@ -36,6 +36,25 @@ Temporary<LineNumberBuffer> With(const std::vector<agiru::Integer> &numbers) {
   return buffer;
 }
 
+/// A TEMPORARY ROW GETS A SystemId TOO, and keeps one it was given. `devenv-temporary-tables.md`:
+/// "Temporary tables retain system fields, like SystemID and data audit fields" -- a row copied in
+/// with `Temp := Real` keeps the real row's identity, so `GetBySystemId` finds the way back, and a
+/// row built from nothing gets a fresh one the way a real insert does (openerp WI-1149, measured).
+void ATemporaryInsertGivesASystemIdAndKeepsOne() {
+  Temporary<ResourceCost> buffer;
+  buffer.Code = "first";
+  buffer.Insert();
+  CHECK_TRUE("a temporary insert fills a blank SystemId", !buffer.SystemId.IsNull());
+  CHECK_TRUE("and stamps the creation instant", !buffer.SystemCreatedAt.IsUndefined());
+
+  const agiru::Guid given = *agiru::Guid::FromText("{B9999999-F5A2-E911-8180-001DD8B7338E}");
+  buffer.Code = "second";
+  buffer.SystemId = given;
+  buffer.Insert();
+  CHECK_TRUE("and keeps one it was given", buffer.SystemId == given);
+  CHECK_TRUE("with both rows in the store", buffer.Count() == 2);
+}
+
 /// A KEY IS ORDERED BY ITS TYPE AND NEVER BY ITS TEXT, and this case is the one that catches the
 /// difference: rendered as strings, 10 sorts before 9. Every buffer keyed on an entry number walks
 /// in this order, and both orders look right until the numbers reach ten.
@@ -416,6 +435,7 @@ int main() {
     ARecordRefOverATemporaryRecordSeesItsRows();
     AssigningOneHandleToAnotherKeepsTheRowsApart();
     AnOptionAndADecimalFilterATemporaryRowByValue();
+    ATemporaryInsertGivesASystemIdAndKeepsOne();
     RowsWalkInPrimaryKeyOrder();
     ADuplicateKeyIsRefused();
     GetsRowFinds();

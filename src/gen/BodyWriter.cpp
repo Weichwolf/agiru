@@ -2987,7 +2987,26 @@ std::string DataItemWalk(const al::PageControl &control,
 std::string XmlNameOf(const al::PageControl &control) {
   const al::Property *named = al::Find(control.properties, "XmlName");
   if (named == nullptr) { named = al::Find(control.properties, "XMLName"); }
-  return named == nullptr || named->text.empty() ? control.name : named->text;
+  const std::string name = named == nullptr || named->text.empty() ? control.name : named->text;
+  const al::Property *prefixed = al::Find(control.properties, "NamespacePrefix");
+  if (prefixed == nullptr || prefixed->text.empty()) { return name; }
+  return prefixed->text + ":" + name;
+}
+
+std::vector<std::pair<std::string, std::string>> NamespacesOf(const al::Property *declared) {
+  std::vector<std::pair<std::string, std::string>> spaces;
+  if (declared == nullptr) { return spaces; }
+  const std::vector<al::Token> &tokens = declared->value;
+  for (std::size_t i = 0; i + 1 < tokens.size(); ++i) {
+    if (tokens[i].text != "=") { continue; }
+    std::string prefix = i == 0 ? std::string{} : tokens[i - 1].text;
+    if (prefix.size() >= 2 && prefix.front() == '"' && prefix.back() == '"') {
+      prefix = prefix.substr(1, prefix.size() - 2);
+    }
+    if (prefix == ",") { prefix.clear(); }
+    spaces.emplace_back(prefix, tokens[i + 1].text);
+  }
+  return spaces;
 }
 
 bool ElementFlag(const al::PageControl &control, std::string_view property, bool absent) {
@@ -3488,7 +3507,19 @@ std::string WriteDefinitions(const al::PageObject &page,
                                      : LowerKey(text("Encoding", "UTF8"));
     const std::string rootName =
         page.dataset.empty() ? std::string{} : XmlNameOf(page.dataset.front());
-    out += "namespace " + space + " {\n\nconstexpr XmlPortDef k" + identifier + "XmlPort{\n";
+    out += "namespace " + space + " {\n\n";
+    const std::vector<std::pair<std::string, std::string>> namespaces =
+        NamespacesOf(al::Find(page.properties, "Namespaces"));
+    if (!namespaces.empty()) {
+      out += "constexpr std::array<XmlNamespaceDef, " + std::to_string(namespaces.size()) + "> k" +
+             identifier + "Namespaces{{\n";
+      for (const auto &[prefix, uri] : namespaces) {
+        out += "    XmlNamespaceDef{.prefix = " + Literal(prefix) + ", .uri = " + Literal(uri) +
+               "},\n";
+      }
+      out += "}};\n\n";
+    }
+    out += "constexpr XmlPortDef k" + identifier + "XmlPort{\n";
     out += "    .id = XmlPortId{" + std::to_string(page.id) + "},\n";
     out += "    .name = " + ClassName(identifier, PageKind(page)) + "::kName,\n";
     out += "    .format = XmlPortFormat::" +
@@ -3519,6 +3550,14 @@ std::string WriteDefinitions(const al::PageObject &page,
            std::string(LowerKey(text("FormatEvaluate", "Legacy")) == "xml" ? "true" : "false") +
            ",\n";
     out += "    .rootName = " + Literal(rootName) + ",\n";
+    if (const std::string defaultNamespace = text("DefaultNamespace", "");
+        !defaultNamespace.empty()) {
+      out += "    .defaultNamespace = " + Literal(defaultNamespace) + ",\n";
+    }
+    if (LowerKey(text("UseDefaultNamespace", "false")) == "true") {
+      out += "    .useDefaultNamespace = true,\n";
+    }
+    if (!namespaces.empty()) { out += "    .namespaces = k" + identifier + "Namespaces,\n"; }
     out += "};\n\n} // namespace " + space + "\n\n";
   }
   out += "namespace " + space + " {\n\nnamespace {\nnamespace " + identifier + "_unit {\nconst " +

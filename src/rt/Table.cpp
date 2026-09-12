@@ -30,6 +30,7 @@
 
 #include "BuiltinsWritten.h"
 #include "Filter.h"
+#include "RenameCascade.h"
 #include "Rows.h"
 #include "Selection.h"
 #include "Temporary.h"
@@ -398,10 +399,11 @@ void StampModified(void *record, const TableDef &table, const DateTime &now, con
   }
 }
 
-void StampInserted(void *record, const TableDef &table) {
+void StampInserted(void *record, const TableDef &table, bool withSystemId) {
   const DateTime now = CurrentDateTime();
   const Guid &user = Session::Current().UserSecurityId();
-  if (auto *id = SystemField<Guid>(record, table, SystemFieldNumbers::SystemId); id != nullptr) {
+  if (auto *id = SystemField<Guid>(record, table, SystemFieldNumbers::SystemId);
+      id != nullptr && (!withSystemId || id->IsNull())) {
     *id = Guid::Create();
   }
   if (auto *at = SystemField<DateTime>(record, table, SystemFieldNumbers::SystemCreatedAt);
@@ -413,6 +415,31 @@ void StampInserted(void *record, const TableDef &table) {
     *by = user;
   }
   StampModified(record, table, now, user);
+}
+
+void StampTemporaryInserted(void *record, const TableDef &table) {
+  if (auto *id = SystemField<Guid>(record, table, SystemFieldNumbers::SystemId);
+      id != nullptr && id->IsNull()) {
+    *id = Guid::Create();
+  }
+  const DateTime now = CurrentDateTime();
+  const Guid user = Session::HasCurrent() ? Session::Current().UserSecurityId() : Guid{};
+  if (auto *at = SystemField<DateTime>(record, table, SystemFieldNumbers::SystemCreatedAt);
+      at != nullptr && *at == DateTime{}) {
+    *at = now;
+  }
+  if (auto *by = SystemField<Guid>(record, table, SystemFieldNumbers::SystemCreatedBy);
+      by != nullptr && by->IsNull()) {
+    *by = user;
+  }
+  if (auto *at = SystemField<DateTime>(record, table, SystemFieldNumbers::SystemModifiedAt);
+      at != nullptr && *at == DateTime{}) {
+    *at = now;
+  }
+  if (auto *by = SystemField<Guid>(record, table, SystemFieldNumbers::SystemModifiedBy);
+      by != nullptr && by->IsNull()) {
+    *by = user;
+  }
 }
 
 }
@@ -547,6 +574,7 @@ void RuntimeTransferFields(void *into,
                            bool withPrimaryKey,
                            bool skipMismatchingTypes) {
   for (const FieldDef &target : table.fields) {
+    if (target.no.Value() >= kSystemFields.front().no.Value()) { continue; }
     if (!withPrimaryKey && InPrimaryKey(table, target.no)) { continue; }
     const FieldDef *held = Field(source, target.no);
     if (held == nullptr) { continue; }
@@ -653,12 +681,37 @@ void AutoIncrement(void *record, const TableDef &table) {
 }
 
 bool RuntimeInsert(void *record, const TableDef &table) {
-  if (TempOf(record) != nullptr) { return TempInsert(record, table); }
+  return RuntimeInsert(record, table, false);
+}
 
-  StampInserted(record, table);
+bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId) {
+  if (TempOf(record) != nullptr) {
+    StampTemporaryInserted(record, table);
+    return TempInsert(record, table);
+  }
+
+  StampInserted(record, table, withSystemId);
   AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
   return InsertRow(Session::Current().Database(), table, values);
+}
+
+namespace {
+
+bool TakePlatformOwned(void *record,
+                       const TableDef &table,
+                       const std::optional<FieldValues> &owned) {
+  if (!owned.has_value()) { return false; }
+  std::size_t column = 0;
+  for (const FieldDef &def : table.fields) {
+    if (!Stored(def) || !PlatformOwned(def)) { continue; }
+    if (column >= owned->size()) { break; }
+    SetFieldText(record, def, Required((*owned)[column], def));
+    ++column;
+  }
+  return true;
+}
+
 }
 
 bool RuntimeModify(void *record, const TableDef &table) {
@@ -666,7 +719,7 @@ bool RuntimeModify(void *record, const TableDef &table) {
 
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
-  return ModifyRow(Session::Current().Database(), table, values);
+  return TakePlatformOwned(record, table, ModifyRow(Session::Current().Database(), table, values));
 }
 
 bool RuntimeRename(void *record, const void *before, const TableDef &table) {
@@ -677,7 +730,12 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   const FieldValues oldKey = KeyOf(before, table);
-  return RenameRow(Session::Current().Database(), table, values, oldKey);
+  if (!TakePlatformOwned(
+          record, table, RenameRow(Session::Current().Database(), table, values, oldKey))) {
+    return false;
+  }
+  CascadeRename(record, before, table);
+  return true;
 }
 
 bool RuntimeDelete(const void *record, const TableDef &table) {

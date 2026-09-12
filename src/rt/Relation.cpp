@@ -1,10 +1,12 @@
 #include "runtime/Relation.h"
 
-#include "Filter.h"
 #include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+
+#include "Filter.h"
+#include "RelationBranches.h"
 
 #include <algorithm>
 #include <cctype>
@@ -16,6 +18,12 @@
 
 namespace agiru::detail {
 
+bool SameName(std::string_view a, std::string_view b) {
+  return a.size() == b.size() && std::ranges::equal(a, b, [](unsigned char x, unsigned char y) {
+           return std::tolower(x) == std::tolower(y);
+         });
+}
+
 namespace {
 
 std::string_view Trim(std::string_view text) {
@@ -26,12 +34,6 @@ std::string_view Trim(std::string_view text) {
     text.remove_suffix(1);
   }
   return text;
-}
-
-bool SameName(std::string_view a, std::string_view b) {
-  return a.size() == b.size() && std::ranges::equal(a, b, [](unsigned char x, unsigned char y) {
-           return std::tolower(x) == std::tolower(y);
-         });
 }
 
 std::string_view Unquoted(std::string_view text) {
@@ -127,9 +129,7 @@ std::optional<Term> TermOf(std::string_view clause) {
 }
 
 std::string FilterTextOf(const Term &term, const void *record, const TableDef &table) {
-  if (term.kind.empty() || SameName(term.kind, "const")) {
-    return Literally(Unquoted(term.inner));
-  }
+  if (term.kind.empty() || SameName(term.kind, "const")) { return Literally(Unquoted(term.inner)); }
   if (SameName(term.kind, "filter")) { return std::string(term.inner); }
   if (SameName(term.kind, "field")) {
     const FieldDef *source = FieldNamed(table, term.inner);
@@ -159,6 +159,60 @@ bool Satisfies(std::string_view conditions, const void *record, const TableDef &
     }
   }
   return true;
+}
+
+RelationTerm DeclaredTerm(const Term &term) {
+  return RelationTerm{.field = std::string(Unquoted(term.field)),
+                      .kind = std::string(term.kind),
+                      .inner = std::string(Unquoted(term.inner))};
+}
+
+std::vector<RelationTerm> DeclaredTerms(std::string_view clauses, std::string_view what) {
+  std::vector<RelationTerm> terms;
+  for (const std::string_view clause : SplitTop(clauses, ',')) {
+    if (Trim(clause).empty()) { continue; }
+    const std::optional<Term> term = TermOf(clause);
+    if (!term.has_value()) {
+      throw Error("TableRelation: the " + std::string(what) + " `" + std::string(Trim(clause)) +
+                  "` has no '='");
+    }
+    terms.push_back(DeclaredTerm(*term));
+  }
+  return terms;
+}
+
+RelationBranch DeclaredTargetOf(std::string_view text, std::vector<RelationTerm> conditions) {
+  RelationBranch out;
+  out.conditions = std::move(conditions);
+  std::string_view head = Trim(text);
+  const std::size_t where = TopLevelWord(head, "where", 0);
+  std::string_view filters;
+  if (where != std::string_view::npos) {
+    const std::size_t open = head.find('(', where);
+    const std::size_t close = open == std::string_view::npos ? open : MatchingClose(head, open);
+    if (close == std::string_view::npos) {
+      throw Error("TableRelation: the where clause in `" + std::string(head) + "` is not closed");
+    }
+    filters = head.substr(open + 1, close - open - 1);
+    head = Trim(head.substr(0, where));
+  }
+  std::string_view tableName = head;
+  std::string_view fieldName;
+  if (!head.empty() && head.front() == '"') {
+    const std::size_t closeQuote = head.find('"', 1);
+    if (closeQuote != std::string_view::npos && closeQuote + 1 < head.size() &&
+        head[closeQuote + 1] == '.') {
+      tableName = head.substr(0, closeQuote + 1);
+      fieldName = head.substr(closeQuote + 2);
+    }
+  } else if (const std::size_t dot = head.find('.'); dot != std::string_view::npos) {
+    tableName = head.substr(0, dot);
+    fieldName = head.substr(dot + 1);
+  }
+  out.table = std::string(Unquoted(tableName));
+  out.field = std::string(Unquoted(fieldName));
+  out.filters = DeclaredTerms(filters, "where term");
+  return out;
 }
 
 ResolvedRelation TargetOf(std::string_view text, const void *record, const TableDef &table) {
@@ -202,6 +256,40 @@ ResolvedRelation TargetOf(std::string_view text, const void *record, const Table
   return out;
 }
 
+}
+
+std::vector<RelationBranch> RelationBranches(const FieldDef &def) {
+  std::vector<RelationBranch> branches;
+  if (def.relation.empty()) {
+    if (def.relationTable.empty()) { return branches; }
+    branches.push_back(RelationBranch{.conditions = {},
+                                      .table = std::string(def.relationTable),
+                                      .field = std::string(def.relationField),
+                                      .filters = {}});
+    return branches;
+  }
+  std::string_view rest = Trim(def.relation);
+  while (!rest.empty()) {
+    if (StartsWithWord(rest, "if")) {
+      const std::size_t open = rest.find('(');
+      const std::size_t close = open == std::string_view::npos ? open : MatchingClose(rest, open);
+      if (close == std::string_view::npos) {
+        throw Error("TableRelation: the condition in `" + std::string(rest) + "` is not closed");
+      }
+      const std::string_view conditions = rest.substr(open + 1, close - open - 1);
+      std::string_view after = Trim(rest.substr(close + 1));
+      const std::size_t elseAt = TopLevelWord(after, "else", 0);
+      const std::string_view target =
+          elseAt == std::string_view::npos ? after : Trim(after.substr(0, elseAt));
+      branches.push_back(DeclaredTargetOf(target, DeclaredTerms(conditions, "condition")));
+      if (elseAt == std::string_view::npos) { return branches; }
+      rest = Trim(after.substr(elseAt + 4));
+      continue;
+    }
+    branches.push_back(DeclaredTargetOf(rest, {}));
+    return branches;
+  }
+  return branches;
 }
 
 std::optional<ResolvedRelation>

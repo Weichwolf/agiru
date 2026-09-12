@@ -1,5 +1,6 @@
 #include "runtime/Storage.h"
 
+#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/AllObj.h"
@@ -248,55 +249,84 @@ std::optional<FieldValues> GetRowWhere(const Connection &connection,
   return RowOf(result, 0);
 }
 
-bool ModifyRow(const Connection &connection,
-               const TableDef &table,
-               std::span<const std::optional<std::string>> values) {
+bool PlatformOwned(const FieldDef &field) {
+  return field.no == SystemFieldNumbers::SystemId ||
+         field.no == SystemFieldNumbers::SystemCreatedAt ||
+         field.no == SystemFieldNumbers::SystemCreatedBy;
+}
+
+namespace {
+
+std::string WrittenAssignments(const TableDef &table,
+                               std::span<const std::optional<std::string>> values,
+                               FieldValues &bound) {
+  std::string assignments;
+  std::size_t column = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    const std::size_t index = column++;
+    if (PlatformOwned(field)) { continue; }
+    if (!bound.empty()) { assignments += ", "; }
+    bound.push_back(values[index]);
+    assignments += Quoted(field.name) + " = " + Placeholder(bound.size());
+  }
+  return assignments;
+}
+
+std::string OwnedColumns(const TableDef &table) {
+  std::string columns;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field) || !PlatformOwned(field)) { continue; }
+    if (!columns.empty()) { columns += ", "; }
+    columns += Quoted(field.name);
+  }
+  return columns.empty() ? std::string("1") : columns;
+}
+
+std::optional<FieldValues> Updated(const Connection &connection,
+                                   const TableDef &table,
+                                   const std::string &assignments,
+                                   std::size_t keyAt,
+                                   const FieldValues &bound) {
+  const Result result =
+      connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
+                             KeyPredicate(table, keyAt) + " RETURNING " + OwnedColumns(table),
+                         bound);
+  if (result.Rows() == 0) { return std::nullopt; }
+  return RowOf(result, 0);
+}
+
+}
+
+std::optional<FieldValues> ModifyRow(const Connection &connection,
+                                     const TableDef &table,
+                                     std::span<const std::optional<std::string>> values) {
   if (values.size() != StoredCount(table)) {
     throw Error("Modify: the value count does not match the declaration");
   }
-  std::string assignments;
-  std::size_t at = 0;
-  for (const FieldDef &field : table.fields) {
-    if (!Stored(field)) { continue; }
-    if (at != 0) { assignments += ", "; }
-    assignments += Quoted(field.name) + " = " + Placeholder(at + 1);
-    ++at;
-  }
-
-  FieldValues bound(values.begin(), values.end());
+  FieldValues bound;
+  bound.reserve(values.size() + table.keys[0].fields.size());
+  const std::string assignments = WrittenAssignments(table, values, bound);
+  const std::size_t keyAt = bound.size() + 1;
   for (const FieldNo no : table.keys[0].fields) {
     bound.push_back(values[StoredIndexOf(table, no)]);
   }
-
-  const Result result =
-      connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
-                             KeyPredicate(table, values.size() + 1) + " RETURNING 1",
-                         bound);
-  return result.Rows() != 0;
+  return Updated(connection, table, assignments, keyAt, bound);
 }
 
-bool RenameRow(const Connection &connection,
-               const TableDef &table,
-               std::span<const std::optional<std::string>> values,
-               std::span<const std::optional<std::string>> oldKey) {
+std::optional<FieldValues> RenameRow(const Connection &connection,
+                                     const TableDef &table,
+                                     std::span<const std::optional<std::string>> values,
+                                     std::span<const std::optional<std::string>> oldKey) {
   if (values.size() != StoredCount(table)) {
     throw Error("Rename: the value count does not match the declaration");
   }
-  std::string assignments;
-  std::size_t at = 0;
-  for (const FieldDef &field : table.fields) {
-    if (!Stored(field)) { continue; }
-    if (at != 0) { assignments += ", "; }
-    assignments += Quoted(field.name) + " = " + Placeholder(at + 1);
-    ++at;
-  }
-  FieldValues bound(values.begin(), values.end());
+  FieldValues bound;
+  bound.reserve(values.size() + oldKey.size());
+  const std::string assignments = WrittenAssignments(table, values, bound);
+  const std::size_t keyAt = bound.size() + 1;
   bound.insert(bound.end(), oldKey.begin(), oldKey.end());
-  const Result result =
-      connection.Execute("UPDATE " + Quoted(table.name) + " SET " + assignments + " WHERE " +
-                             KeyPredicate(table, values.size() + 1) + " RETURNING 1",
-                         bound);
-  return result.Rows() != 0;
+  return Updated(connection, table, assignments, keyAt, bound);
 }
 
 bool DeleteRow(const Connection &connection,
@@ -582,6 +612,7 @@ void ProvisionInstalled(const Connection &into) {
         row.Len = static_cast<::agiru::Integer>(field.length);
         row.Class = field.fieldClass;
         row.RelationTableNo = ::agiru::detail::RelationTableNo(&field);
+        row.RelationFieldNo = ::agiru::detail::RelationFieldNo(&field);
         row.ObsoleteState = platform::ObsoleteState::No;
         row.FieldCaption = Fitted(field.caption.empty() ? field.name : field.caption,
                                   platform::Field::kCaptionLength);

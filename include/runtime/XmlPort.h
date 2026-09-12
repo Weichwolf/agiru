@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -55,6 +56,13 @@ enum class XmlPortDirection : std::uint8_t {
   Export, ///< `Export`.
 };
 
+/// \brief One `Namespaces` declaration of an xmlport: `prefix = 'uri'`, an empty prefix being
+///        the default namespace (`devenv-namespaces-property.md`).
+struct XmlNamespaceDef {
+  std::string_view prefix{}; ///< The prefix, empty for the default namespace.
+  std::string_view uri{};    ///< The namespace name.
+};
+
 /// \brief What an xmlport declares, `constexpr` in the generated definitions unit.
 struct XmlPortDef {
   XmlPortId id{};                                         ///< The AL number.
@@ -69,6 +77,13 @@ struct XmlPortDef {
   bool useRequestPage = true;                             ///< `UseRequestPage`.
   bool formatEvaluateXml = false;                         ///< `FormatEvaluate = Xml`.
   std::string_view rootName{};                            ///< The root element's `XmlName`.
+  /// \brief `DefaultNamespace`, written as `xmlns` on the root when `useDefaultNamespace`.
+  std::string_view defaultNamespace{};
+  bool useDefaultNamespace = false; ///< `UseDefaultNamespace`.
+  /// \brief `Namespaces`: every declaration is written on the root element, and only there
+  ///        (`devenv-namespaces-property.md`: "the namespaces declarations are only supported in
+  ///        the root element"); an element's `NamespacePrefix` is part of its XmlName.
+  std::span<const XmlNamespaceDef> namespaces{};
 };
 
 /// \brief `currXMLport.Break()` in flight: ends the current table element's loop.

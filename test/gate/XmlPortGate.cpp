@@ -7,6 +7,7 @@
 
 #include "Check.h"
 
+#include <array>
 #include <string>
 #include <string_view>
 
@@ -21,7 +22,9 @@ using agiru::XmlPortOutput;
 /// and `FieldSeparator('')` at run time overrides it (board:0065).
 void SeparatorTextReadsThePlaceholders() {
   CHECK_TEXT("a tab", agiru::detail::SeparatorText("<TAB>"), "\t");
-  CHECK_TEXT("a new line is CR LF, what the platform writes", agiru::detail::SeparatorText("<NewLine>"), "\r\n");
+  CHECK_TEXT("a new line is CR LF, what the platform writes",
+             agiru::detail::SeparatorText("<NewLine>"),
+             "\r\n");
   CHECK_TEXT("two new lines", agiru::detail::SeparatorText("<NewLine><NewLine>"), "\r\n\r\n");
   CHECK_TEXT("none is nothing", agiru::detail::SeparatorText("<None>"), "");
   CHECK_TEXT("a character in brackets is itself", agiru::detail::SeparatorText("<,>"), ",");
@@ -32,7 +35,8 @@ void SeparatorTextReadsThePlaceholders() {
 /// separator, each wrapped in the delimiter; FIXED TEXT: each value padded to its `Width`;
 /// XML: the element tree with attributes and escaping (`devenv-format-property.md`).
 void TheOutputWritesTheThreeFormats() {
-  XmlPortDef variable{.id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
+  XmlPortDef variable{
+      .id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
   XmlPortOutput out;
   out.Start(variable, ";", "\r\n", "\"", "\r\n\r\n");
   out.BeginGroup("Root");
@@ -73,7 +77,8 @@ void TheOutputWritesTheThreeFormats() {
 /// THE INPUT IS ONE CURSOR FOR ALL FORMATS: `Enter` the root, `Enter` a record, `Enter` its
 /// fields in order -- a text format serves lines and fields under the same names.
 void TheInputWalksTextAndXmlAlike() {
-  XmlPortDef variable{.id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
+  XmlPortDef variable{
+      .id = agiru::XmlPortId{1}, .name = "V", .format = XmlPortFormat::VariableText};
   XmlPortInput in;
   in.Load("\"one\";\"two;three\"\r\nfour;five\r\n", variable, ";", "\r\n", "\"");
   CHECK_TRUE("the root opens", in.Enter("Root"));
@@ -97,7 +102,10 @@ void TheInputWalksTextAndXmlAlike() {
   XmlPortDef xml{.id = agiru::XmlPortId{3}, .name = "X", .format = XmlPortFormat::Xml};
   XmlPortInput xmlIn;
   xmlIn.Load("<Root><Line id=\"7\"><Name>A &amp; B</Name></Line><Line><Name>C</Name></Line></Root>",
-             xml, "", "", "");
+             xml,
+             "",
+             "",
+             "");
   CHECK_TRUE("the xml root", xmlIn.Enter("root"));
   CHECK_TRUE("the first record", xmlIn.Enter("Line"));
   CHECK_TEXT("an attribute", xmlIn.Attribute("id"), "7");
@@ -109,6 +117,64 @@ void TheInputWalksTextAndXmlAlike() {
   CHECK_TEXT("no attribute is empty", xmlIn.Attribute("id"), "");
   xmlIn.Leave();
   CHECK_TRUE("no third", !xmlIn.Enter("Line"));
+}
+
+/// THE NAMESPACES ARE DECLARED ON THE ROOT AND NOWHERE ELSE. `devenv-namespaces-property.md`: "the
+/// namespaces declarations are only supported in the root element ... `<Root xmlns:mybcprefix=
+/// "mybcnamespace" xmlns="urn:bc:schema:all">`"; an element's `NamespacePrefix` is part of its
+/// name, and on the way back in a prefixed name is matched by its local part, because the parsed
+/// tree carries local names. `Sales Invoice - PEPPOL 3.0` exports `<Invoice xmlns="urn:oasis:...
+/// Invoice-2" ...>`, and `Data Exch. Line Def.ValidateNamespace` reads that namespace back from
+/// the root (Incoming Doc. To Data Exch. UT, 13 cases, 2026-09-12).
+void TheNamespacesAreDeclaredOnTheRoot() {
+  static constexpr std::array<agiru::XmlNamespaceDef, 2> kSpaces{{
+      agiru::XmlNamespaceDef{.prefix = "", .uri = "urn:bc:schema:all"},
+      agiru::XmlNamespaceDef{.prefix = "cbc", .uri = "urn:bc:basic"},
+  }};
+  XmlPortDef xml{.id = agiru::XmlPortId{4},
+                 .name = "N",
+                 .format = XmlPortFormat::Xml,
+                 .rootName = "Root",
+                 .namespaces = kSpaces};
+  XmlPortOutput out;
+  out.Start(xml, "\t", "\r\n", "", "");
+  out.BeginRecord("Root");
+  out.Value("cbc:ID", "7", false, 0);
+  out.BeginGroup("Line");
+  out.Value("cbc:Name", "A", false, 0);
+  out.EndGroup("Line");
+  out.EndRecord("Root");
+  const std::string written = out.Finish();
+  CHECK_TEXT("the root carries every declaration and the prefixed names stay prefixed",
+             written,
+             "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
+             "<Root xmlns=\"urn:bc:schema:all\" xmlns:cbc=\"urn:bc:basic\"><cbc:ID>7</cbc:ID>"
+             "<Line><cbc:Name>A</cbc:Name></Line></Root>");
+
+  XmlPortDef plain{.id = agiru::XmlPortId{5},
+                   .name = "D",
+                   .format = XmlPortFormat::Xml,
+                   .rootName = "Root",
+                   .defaultNamespace = "urn:bc:default",
+                   .useDefaultNamespace = true};
+  XmlPortOutput defaulted;
+  defaulted.Start(plain, "\t", "\r\n", "", "");
+  defaulted.BeginRecord("Root");
+  defaulted.EndRecord("Root");
+  CHECK_TEXT("UseDefaultNamespace writes DefaultNamespace as xmlns",
+             defaulted.Finish(),
+             "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
+             "<Root xmlns=\"urn:bc:default\" />");
+
+  XmlPortInput in;
+  in.Load(written, xml, "", "", "");
+  CHECK_TRUE("the root reads back", in.Enter("Root"));
+  CHECK_TRUE("and a prefixed name finds the element by its local part", in.Enter("cbc:ID"));
+  CHECK_TEXT("with its text", in.Text(), "7");
+  in.Leave();
+  CHECK_TRUE("the group", in.Enter("Line"));
+  CHECK_TRUE("and its prefixed child", in.Enter("cbc:Name"));
+  CHECK_TEXT("holds A", in.Text(), "A");
 }
 
 /// `Xmlport.Export(Number, ...)` resolves through the catalogue; a number this build carries no
@@ -124,7 +190,9 @@ void AnUnknownNumberRefusesByName() {
   CHECK_TRUE("the refusal names the number",
              message.find("Xmlport.Export(999999)") != std::string::npos);
   CHECK_TEXT("an encoding round trip keeps the text",
-             agiru::detail::DecodeForXmlPort(agiru::detail::EncodeForXmlPort("Ärger", agiru::TextEncoding::Windows), agiru::TextEncoding::Windows),
+             agiru::detail::DecodeForXmlPort(
+                 agiru::detail::EncodeForXmlPort("Ärger", agiru::TextEncoding::Windows),
+                 agiru::TextEncoding::Windows),
              "Ärger");
 }
 
@@ -135,6 +203,7 @@ int main() {
     SeparatorTextReadsThePlaceholders();
     TheOutputWritesTheThreeFormats();
     TheInputWalksTextAndXmlAlike();
+    TheNamespacesAreDeclaredOnTheRoot();
     AnUnknownNumberRefusesByName();
   });
 }

@@ -231,6 +231,27 @@ void AKeyThatSeparatesNothingStillOrdersByThePrimaryKey() {
   DropTable(Session::Current().Database(), agiru::TableTraits<ResourceCost>::kTable);
 }
 
+/// A COPY STANDS WHERE THE ORIGINAL STOOD. `record-copy-method.md`: "copies the current record's
+/// field values, filters, sorting, marks ..."; the BaseApp asks "does the filter select more than
+/// this row?" as `Search.Copy(Rec); if Search.Next() <> 0 then Error(...)` (`Graph Mgt - Purch.
+/// Cr. Memo.VerifyCRUDIsPossibleForLine`), and a copy that stood nowhere answered no every time.
+void ACopyStepsFromTheCopiedRow() {
+  Fill();
+  ResourceCost first;
+  CHECK_TRUE("the first row is found", static_cast<bool>(first.FindFirst()));
+  ResourceCost search;
+  search.Copy(first);
+  CHECK_TRUE("Next on the copy steps from the copied row", search.Next() != 0);
+  CHECK_TEXT("to the second row in key order", std::string(search.Code.Value()), "R02");
+  CHECK_TEXT("and the original has not moved", std::string(first.Code.Value()), "R00");
+
+  // THE NEGATIVE CONTROL: a copy of a record that stands nowhere stands nowhere.
+  ResourceCost unfound;
+  ResourceCost copied;
+  copied.Copy(unfound);
+  CHECK_TRUE("a copy of an unpositioned record has no next row", copied.Next() == 0);
+}
+
 } // namespace
 
 int main() {
@@ -246,6 +267,7 @@ int main() {
       MinusAndPlusRefuseToBeCombined();
       TheCurrentKeyDecidesWhichRowIsFirst();
       AKeyThatSeparatesNothingStillOrdersByThePrimaryKey();
+      ACopyStepsFromTheCopiedRow();
     } catch (const Error &e) { CHECK_TEXT("the gate needs a database", e.what(), "a database"); }
   });
 }

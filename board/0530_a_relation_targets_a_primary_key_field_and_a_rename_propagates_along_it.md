@@ -99,3 +99,13 @@ transaction; a `TableRelation` to a non-key field fails to transpile.
 **The negative control is a table that does NOT declare the relation but holds the same value** -- it
 must be untouched. An implementation that rewrites by column NAME rather than by declared relation
 corrupts unrelated tables, and every gate that only checks the related ones passes.
+
+## Standing (2026-09-12): the propagation runs from a run-time index; the `static_assert` does not
+
+The rename cascade is in (board:0231, `src/rt/Rename.cpp`), reading the reverse relation index
+built once per process from the catalogue rather than the `constexpr` per-table index this item
+chose: the run-time walk is 1 609 tables' field lists parsed once (`RelationBranches`), which is
+milliseconds, and the generator-emitted form is the optimisation to take when a measurement asks
+for it. What this item still owes is the first half: the `static_assert` that a relation's target
+field is a member of the target's primary key, and the reading of `SystemId` as the documented
+exception.

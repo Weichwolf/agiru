@@ -816,11 +816,10 @@ public:
 
   /// \brief AL `Page.CancelBackgroundTask(Integer)`. Attempt to cancel a page background task.
   /// \param TaskId The AL `Integer`.
-  /// \return The AL `Boolean`.
-  /// \throws Error until the UI runs (board:0030).
+  /// \return True when the task was queued here and had not run, which a queued task never has.
+  /// \see EnqueueBackgroundTask for why a task is queued and not run.
   ::agiru::Boolean CancelBackgroundTask(::agiru::Integer TaskId) {
-    static_cast<void>(TaskId);
-    throw Error("Page.CancelBackgroundTask(Integer) needs a running UI (board:0030)");
+    return TaskId > 0 && TaskId <= backgroundTasks_;
   }
 
   /// \brief AL `Page.Caption()` -- the READING form, which the documentation's syntax block
@@ -877,8 +876,15 @@ public:
   /// \param Parameters The AL `Dictionary of [Text, Text]`.
   /// \param Timeout The AL `Integer`.
   /// \param ErrorLevel The AL `PageBackgroundTaskErrorLevel`.
-  /// \return The AL `Boolean`.
-  /// \throws Error until the UI runs (board:0030).
+  /// \return True: the task is queued.
+  ///
+  /// \note THE TASK IS QUEUED AND NEVER RUN, which is what a test session does with it: a page
+  ///       background task runs in a child session the client owns, and the test framework runs
+  ///       one only through `TestPage.RunPageBackgroundTask` (`devenv-page-background-tasks.md`,
+  ///       "Testing page background tasks"). So the task gets its number and its completion
+  ///       triggers do not fire, the way an unfinished task's do not; the `Customer Card`
+  ///       enqueues its calculations from `OnAfterGetCurrRecord` and three VIES cases stopped on
+  ///       the refusal (2026-09-12). A UI that runs the child session is board:0030.
   ::agiru::Boolean
   EnqueueBackgroundTask(::agiru::Integer &TaskId,
                         ::agiru::Integer CodeunitId,
@@ -886,13 +892,12 @@ public:
                         ::agiru::Integer Timeout = {},
                         const ::agiru::PageBackgroundTaskErrorLevel &ErrorLevel =
                             ::agiru::PageBackgroundTaskErrorLevel{}) {
-    static_cast<void>(TaskId);
     static_cast<void>(CodeunitId);
     static_cast<void>(Parameters);
     static_cast<void>(Timeout);
     static_cast<void>(ErrorLevel);
-    throw Error("Page.EnqueueBackgroundTask(Integer, Integer, Dictionary of [Text, Text], Integer, "
-                "PageBackgroundTaskErrorLevel) needs a running UI (board:0030)");
+    TaskId = ++backgroundTasks_;
+    return true;
   }
 
   /// \brief AL `Page.GetBackgroundParameters()`. Gets the page background task input parameters.
@@ -1106,6 +1111,7 @@ private:
   bool editable_ = true;
   bool modal_ = false;
   bool newRecord_ = false;
+  ::agiru::Integer backgroundTasks_ = 0;
   ::agiru::Action closeAction_ = ::agiru::Action::OK;
   std::string caption_;
   ::agiru::Boolean lookupMode_ = false;

@@ -214,6 +214,108 @@ void AnAssignedSystemIdDoesNotSurviveAPlainInsert() {
   rec.Delete();
 }
 
+/// MODIFYALL ASSIGNS AND NEVER VALIDATES. `record-modifyall-method.md`: "The OnValidate field
+/// trigger is never run when ModifyAll is used" -- `RunTrigger` is `OnModify` alone. `Resource
+/// Cost."Cost Type"` validates as `TestField("Cost Type", Fixed)` when the work type is blank, so
+/// a validating ModifyAll could not set `% Extra` on such a row, and the negative control shows
+/// that `Validate` still refuses it.
+void ModifyAllAssignsWithoutValidating() {
+  ResourceCost rec = Sample();
+  rec.Code = "bulk";
+  rec.WorkTypeCode = "";
+  rec.CostType = ResourceCostCostType::Fixed;
+  rec.Insert();
+
+  ResourceCost all;
+  all.SetRange(all.Code, agiru::Code<20>("bulk"));
+  all.ModifyAll(all.CostType, ResourceCostCostType::PercentExtra, true);
+  ResourceCost read;
+  CHECK_TRUE("the row is found", read.Get(rec.Type, rec.Code, rec.WorkTypeCode));
+  CHECK_TRUE("and carries the assigned cost type",
+             read.CostType == ResourceCostCostType::PercentExtra);
+
+  bool refused = false;
+  try {
+    read.Validate(read.CostType, ResourceCostCostType::LCYExtra);
+  } catch (const Error &) { refused = true; }
+  CHECK_TRUE("while Validate on the same row runs the trigger and refuses", refused);
+  rec.Delete();
+}
+
+/// THE OTHER OVERLOAD KEEPS WHAT WAS ASSIGNED. `record-insert-boolean-boolean-method.md`: "If this
+/// parameter is true, the SystemId field of the record is given a value that you explicitly assign.
+/// If a value is not assigned, then the platform assigns one." `Sales-Post` writes a posted line
+/// with the sales line's SystemId this way, and the aggregate buffers find it again by that id.
+void AnAssignedSystemIdSurvivesInsertWithSystemId() {
+  const agiru::Guid chosen = *agiru::Guid::FromText("{B7777777-F5A2-E911-8180-001DD8B7338E}");
+  ResourceCost rec = Sample();
+  rec.Code = "kept";
+  rec.SystemId = chosen;
+  rec.Insert(true, true);
+  CHECK_TRUE("Insert(true, true) keeps the chosen SystemId", rec.SystemId == chosen);
+  ResourceCost read;
+  CHECK_TRUE("the row is found", read.Get(rec.Type, rec.Code, rec.WorkTypeCode));
+  CHECK_TRUE("and the row carries it", read.SystemId == chosen);
+  rec.Delete();
+
+  ResourceCost blank = Sample();
+  blank.Code = "unassigned";
+  blank.Insert(false, true);
+  CHECK_TRUE("and a blank one is still filled by the platform", !blank.SystemId.IsNull());
+  blank.Delete();
+}
+
+/// THE ROW'S IDENTITY AND ITS CREATION STAMP ARE THE PLATFORM'S, WHATEVER THE RECORD SAYS.
+/// `devenv-table-system-fields.md`: "You can assign the values, but the values written to the
+/// database are always provided by the platform" and "The $systemCreatedBy and $systemCreatedAt
+/// fields won't change after this point." A Modify after `TransferFields` from another table's row
+/// would otherwise write that row's SystemId over this one's.
+void ModifyLeavesTheIdentityAndTheCreationStampToThePlatform() {
+  ResourceCost rec = Sample();
+  rec.Code = "owned";
+  rec.Insert();
+  const agiru::Guid identity = rec.SystemId;
+  const agiru::DateTime created = rec.SystemCreatedAt;
+  const agiru::Guid createdBy = rec.SystemCreatedBy;
+
+  rec.SystemId = *agiru::Guid::FromText("{B8888888-F5A2-E911-8180-001DD8B7338E}");
+  rec.SystemCreatedAt = agiru::DateTime{};
+  rec.SystemCreatedBy = agiru::Guid{};
+  rec.UnitCost = Decimal::FromInvariantString("8.00");
+  rec.Modify();
+  CHECK_TRUE("after Modify the record carries the row's SystemId again", rec.SystemId == identity);
+  CHECK_TRUE("and the row's creation instant", rec.SystemCreatedAt == created);
+  CHECK_TRUE("and the row's creator", rec.SystemCreatedBy == createdBy);
+
+  ResourceCost read;
+  CHECK_TRUE("the row is found by its key", read.Get(rec.Type, rec.Code, rec.WorkTypeCode));
+  CHECK_TRUE("with its identity intact", read.SystemId == identity);
+  CHECK_TRUE("its creation instant intact", read.SystemCreatedAt == created);
+  CHECK_TRUE("and the new value written", read.UnitCost == Decimal::FromInvariantString("8.00"));
+  rec.Delete();
+}
+
+/// TRANSFERFIELDS COPIES THE DECLARED FIELDS AND NOT THE SYSTEM FIELDS. The BaseApp says so nine
+/// times over by assigning `SystemId` right after a `TransferFields` (`GraphMgtSalCrMemoBuf
+/// .LoadSalesCreditMemoLines` and its siblings), and `OnBeforeSalesCrMemoHeaderInsert` reads the
+/// posted header's SystemId BEFORE its insert to tell it from the draft's -- a copied one would
+/// have made the two equal and the draft buffer would never be renamed (ERM Sales Cr. Memo Aggr.
+/// UT, 2026-09-12).
+void TransferFieldsLeavesTheSystemFieldsAlone() {
+  ResourceCost source = Sample();
+  source.Code = "source";
+  source.Insert();
+  CHECK_TRUE("the source has an identity", !source.SystemId.IsNull());
+
+  ResourceCost target;
+  target.TransferFields(source);
+  CHECK_TRUE("TransferFields copies a declared field", target.UnitCost == source.UnitCost);
+  CHECK_TRUE("and the primary key", target.Code == source.Code);
+  CHECK_TRUE("but not the SystemId", target.SystemId.IsNull());
+  CHECK_TRUE("nor the creation instant", target.SystemCreatedAt.IsUndefined());
+  source.Delete();
+}
+
 } // namespace
 
 int main() {
@@ -230,6 +332,10 @@ int main() {
       TheKeyIsEnforcedByTheDatabase();
       ThePlatformStampsWhatItWrites();
       AnAssignedSystemIdDoesNotSurviveAPlainInsert();
+      AnAssignedSystemIdSurvivesInsertWithSystemId();
+      ModifyLeavesTheIdentityAndTheCreationStampToThePlatform();
+      TransferFieldsLeavesTheSystemFieldsAlone();
+      ModifyAllAssignsWithoutValidating();
       DeleteRemovesIt();
     }
     ARecordOutsideASessionSaysSoRatherThanCrashing();

@@ -312,7 +312,7 @@ struct RecordState {
   ///       answered that with a linear walk written out by hand, because `<algorithm>` may not
   ///       enter the door.
   std::set<std::string> marks;
-  bool markedOnly = false; ///< `MarkedOnly(true)`.
+  bool markedOnly = false;   ///< `MarkedOnly(true)`.
   std::size_t viewMarks = 0; ///< How many marks the temporary view was built over (\see view).
 
   /// \brief AL `xRec` -- the record as it was last READ, INSERTED or MODIFIED.
@@ -398,6 +398,15 @@ public:
   ///        do not. A temporary record keeps its own rows, and a database record copied from a
   ///        temporary one stays a database record; only `Copy(From, true)` shares
   ///        (`record-copy-method.md`).
+  ///
+  /// \note THE POSITION COMES ACROSS BETWEEN TWO DATABASE RECORDS, so that `Search.Copy(Rec);
+  ///       if Search.Next() <> 0 then Error(...)` -- the BaseApp's way of asking whether a filter
+  ///       selects more than the row it found -- steps from the copied row and not from nowhere
+  ///       (`Graph Mgt - Purch. Cr. Memo.VerifyCRUDIsPossibleForLine`, 3 asserterror cases,
+  ///       2026-09-12). The cursor itself is not shared, so the step is a `Find('>')` from the
+  ///       copied key. `record-copy-method.md` says a copy between a temporary and a database
+  ///       record invalidates the enumerator, and a temporary one's rows do not come across, so
+  ///       those start unpositioned.
   /// \param o The other.
   void CopyStateFrom(const StateHandle &o) {
     if (this == &o) { return; }
@@ -406,9 +415,10 @@ public:
     Swap(copy);
     if (state_ != nullptr || keep != nullptr) {
       RecordState &mine = Ensure();
+      const bool positioned = mine.positioned && mine.temporary == nullptr && keep == nullptr;
       mine.temporary = std::move(keep);
       mine.view.clear();
-      mine.positioned = false;
+      mine.positioned = positioned;
     }
   }
 

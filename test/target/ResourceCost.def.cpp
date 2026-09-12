@@ -18,10 +18,12 @@ constexpr auto kResourceCostFields = WithSystemFields<ResourceCost>(std::array<F
         offsetof(ResourceCost, Code),
         Declared{.relation = "if (Type = const(Resource)) Resource else if (Type = "
                              "const(\"Group(Resource)\")) \"Resource Group\""}),
-    Declare<&ResourceCost::WorkTypeCode>(ResourceCost::Field_No::WorkTypeCode,
-                                         "Work Type Code",
-                                         "Work Type Code",
-                                         offsetof(ResourceCost, WorkTypeCode)),
+    Declare<&ResourceCost::WorkTypeCode>(
+        ResourceCost::Field_No::WorkTypeCode,
+        "Work Type Code",
+        "Work Type Code",
+        offsetof(ResourceCost, WorkTypeCode),
+        Declared{.relationTable = "Work Type", .relation = "Work Type"}),
     Declare<&ResourceCost::CostType>(ResourceCost::Field_No::CostType,
                                      "Cost Type",
                                      "Cost Type",

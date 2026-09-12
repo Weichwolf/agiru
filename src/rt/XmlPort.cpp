@@ -199,7 +199,27 @@ void XmlPortOutput::Serialize(const Node &node, std::string &into, int depth) co
 std::string XmlPortOutput::Finish() const {
   if (def_.format != XmlPortFormat::Xml) { return lines_; }
   std::string out = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>";
-  for (const Node &child : root_.children) { Serialize(child, out, 0); }
+  bool first = true;
+  for (const Node &child : root_.children) {
+    if (first && (def_.useDefaultNamespace || !def_.namespaces.empty())) {
+      Node declared = child;
+      std::vector<std::pair<std::string, std::string>> declarations;
+      if (def_.useDefaultNamespace && !def_.defaultNamespace.empty()) {
+        declarations.emplace_back("xmlns", std::string(def_.defaultNamespace));
+      }
+      for (const XmlNamespaceDef &space : def_.namespaces) {
+        declarations.emplace_back(space.prefix.empty() ? std::string("xmlns")
+                                                       : "xmlns:" + std::string(space.prefix),
+                                  std::string(space.uri));
+      }
+      declared.attributes.insert(
+          declared.attributes.begin(), declarations.begin(), declarations.end());
+      Serialize(declared, out, 0);
+    } else {
+      Serialize(child, out, 0);
+    }
+    first = false;
+  }
   return out;
 }
 
@@ -314,6 +334,9 @@ bool XmlPortInput::Enter(std::string_view name) {
   }
   const Node *parent = levels_.empty() ? &root_ : levels_.back().node;
   std::size_t &next = levels_.empty() ? field_ : levels_.back().next;
+  if (const std::size_t colon = name.find(':'); colon != std::string_view::npos) {
+    name = name.substr(colon + 1);
+  }
   for (std::size_t i = next; i < parent->children.size(); ++i) {
     if (SameWord(parent->children[i].name, name)) {
       next = i + 1;
@@ -347,6 +370,9 @@ std::string XmlPortInput::Text() const {
 
 std::string XmlPortInput::Attribute(std::string_view name) const {
   if (textFormat_ || levels_.empty()) { return {}; }
+  if (const std::size_t colon = name.find(':'); colon != std::string_view::npos) {
+    name = name.substr(colon + 1);
+  }
   for (const auto &[key, value] : levels_.back().node->attributes) {
     if (SameWord(key, name)) { return value; }
   }

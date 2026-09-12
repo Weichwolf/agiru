@@ -607,6 +607,23 @@ namespace detail {
   return entry == nullptr ? 0 : entry->table->id.Value();
 }
 
+::agiru::Integer RelationFieldNo(const FieldDef *def) {
+  if (def == nullptr || def->relationTable.empty() || def->relationField.empty()) { return 0; }
+  const TableEntry *entry = FindTable(def->relationTable);
+  if (entry == nullptr) { return 0; }
+  for (const FieldDef &field : entry->table->fields) {
+    if (field.name.size() == def->relationField.size() &&
+        std::equal(
+            field.name.begin(),
+            field.name.end(),
+            def->relationField.begin(),
+            [](unsigned char a, unsigned char b) { return std::tolower(a) == std::tolower(b); })) {
+      return field.no.Value();
+    }
+  }
+  return 0;
+}
+
 void RecordRefFromVariant(RecordRef &into, const Variant &held) {
   if (held.IsRecordRef()) {
     into.Copy(static_cast<const RecordRef &>(held));
