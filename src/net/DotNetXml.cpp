@@ -128,9 +128,15 @@ XmlDocument XmlNode::OwnerDocument() const {
 }
 
 ::agiru::Text<0> XmlNode::InnerText(std::string_view text) {
-  if (NodeOf(handle_) != nullptr) {
+  xmlNodePtr node = NodeOf(handle_);
+  if (node != nullptr) {
+    while (node->children != nullptr) {
+      xmlNodePtr child = node->children;
+      xmlUnlinkNode(child);
+      xmlFreeNode(child);
+    }
     const std::string held(text);
-    xmlNodeSetContent(NodeOf(handle_), Bytes(held));
+    if (xmlNodePtr made = xmlNewText(Bytes(held)); made != nullptr) { xmlAddChild(node, made); }
   }
   return std::string(text);
 }
