@@ -710,7 +710,7 @@ private:
       if (i != first) { whole += "."; }
       whole += names[i];
     }
-    return "::agiru::RefusedControl(\"" + whole + "\")";
+    return "::agiru::AbsentControl(\"" + whole + "\")";
   }
 
   static bool ScopesThroughItsSubtype(std::string_view type) {

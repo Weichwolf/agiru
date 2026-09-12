@@ -27,24 +27,12 @@ namespace agiru {
 ///       primary key values separated by commas. A blank RecordId formats to the empty string,
 ///       which `CalcItemAvailability` and `ServiceConnection` both test for.
 ///
-/// \note `GetRecord()` IS ABSENT. It returns a RecordRef, and there is no RecordRef in this runtime
-///       yet; writing it would mean inventing a return the platform documents as something else.
+/// \note `GetRecord()` ANSWERS A TOKEN, NOT A `RecordRef`: `RecordRef` is built on the record base
+///       this header sits under, and naming it here would turn the door's direction around. The
+///       token carries the id, and `RecordRef::operator=` takes it -- so `RecRef := Id.GetRecord()`
+///       reads as AL and lands where AL lands.
 namespace detail {
-
-/// \brief What `RecordId.GetRecord()` hands back: a value that refuses to become a row.
-///
-/// \note IT IS A REFUSAL AND NOT A `RecordRef`, because the id has no way to READ the row until
-///       the catalogue can find a table by number (board:0025).
-struct RefusedRow {
-  /// \brief Refuses to become a value of any type.
-  /// \tparam T The type the caller wants.
-  /// \return Never.
-  /// \throws Error always.
-  template <typename T> operator T() const {
-    throw Error("RecordId.GetRecord() needs the table catalogue (board:0025)");
-  }
-};
-
+struct RefusedRow;
 }
 
 class RecordId {
@@ -82,14 +70,11 @@ public:
   ///       cases of `Inc Doc Attachment Overview UT` the moment notifications ran (2026-09-11).
   [[nodiscard]] Integer TableNo() const;
 
-  /// \brief AL `RecordId.GetRecord()` -- the row this id names
-  ///        (`recordid-getrecord-method.md`).
-  /// \return A value that refuses to become anything, because reading a row by its id needs the
-  ///         catalogue (board:0025).
-  ///
-  /// \note IT REFUSES THE CONVERSION rather than naming `RecordRef`, which is built ON the record
-  ///       base this header sits under: a return type here would turn the door's direction around.
-  static detail::RefusedRow GetRecord() { return detail::RefusedRow{}; }
+  /// \brief AL `RecordId.GetRecord()` -- a `RecordRef` on the table this id names, with the
+  ///        primary key set from the id and NOTHING READ (`recordid-getrecord-method.md`: "No data
+  ///        is read from the database ... no other fields in the record are set ... no filters").
+  /// \return The token `RecordRef::operator=` takes; anything else that reads it refuses.
+  [[nodiscard]] detail::RefusedRow GetRecord() const;
 
   /// \brief The form a COLUMN holds, which round-trips and is not the one a message shows.
   ///
@@ -130,5 +115,27 @@ private:
   std::string caption_;
   std::vector<std::string> key_;
 };
+
+namespace detail {
+
+/// \brief What `RecordId.GetRecord()` hands back: the id, for `RecordRef::operator=` to open and
+///        key; read as anything else it refuses, because only a `RecordRef` is what AL declares.
+struct RefusedRow {
+  RecordId id; ///< The id the `RecordRef` will stand on.
+
+  /// \brief Refuses to become a value of any other type.
+  /// \tparam T The type the caller wants.
+  /// \return Never.
+  /// \throws Error always.
+  template <typename T> operator T() const {
+    throw Error("RecordId.GetRecord() answers a RecordRef and nothing else");
+  }
+};
+
+}
+
+inline detail::RefusedRow RecordId::GetRecord() const {
+  return detail::RefusedRow{.id = *this};
+}
 
 }

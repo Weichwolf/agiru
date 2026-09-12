@@ -79,10 +79,16 @@ std::string Series(const RecordState *state, const TableDef &table) {
     if (!one.has_value()) { return {}; }
     admitted = Both(admitted, *one);
   }
-  if (admitted.empty() || CountOf(admitted) > kSeriesLimit) { return {}; }
-  for (const Interval &one : admitted) {
-    if (one.low == kSeriesDomain.low || one.high == kSeriesDomain.high) { return {}; }
+  if (admitted.empty()) { return {}; }
+  Intervals capped;
+  std::int64_t left = kSeriesLimit;
+  for (Interval one : admitted) {
+    if (left <= 0) { break; }
+    if (one.high - one.low + 1 > left) { one.high = one.low + left - 1; }
+    left -= one.high - one.low + 1;
+    capped.push_back(one);
   }
+  admitted = capped;
   std::string series;
   for (const Interval &one : admitted) {
     if (!series.empty()) { series += " UNION ALL "; }
@@ -157,7 +163,8 @@ Selection Select(const RecordState *state, const TableDef &table) {
     for (const std::string &mark : state->marks) {
       std::vector<std::string> values;
       std::size_t start = 0;
-      for (std::size_t at = mark.find('\x1f'); at != std::string::npos; at = mark.find('\x1f', start)) {
+      for (std::size_t at = mark.find('\x1f'); at != std::string::npos;
+           at = mark.find('\x1f', start)) {
         values.push_back(mark.substr(start, at - start));
         start = at + 1;
       }

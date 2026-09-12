@@ -558,6 +558,33 @@ public:
   /// \brief Takes over the handle.
   RecordRef(RecordRef &&o) noexcept : state_(o.state_) { o.state_ = nullptr; }
 
+  /// \brief AL `RecRef := RecordId.GetRecord()`: this reference opens the id's table and takes
+  ///        the primary key from the id, reading nothing (`recordid-getrecord-method.md`). The
+  ///        BaseApp follows it with `RecRef.SetTable(Rec)` and a `Find`; `Inc Doc Attachment
+  ///        Overview UT.TestFactBoxLoadFromPostedDocument` reached it through `Incoming Document
+  ///        Attachment.LoadDataFromRecord` (2026-09-12).
+  /// \param row The token `GetRecord` answered.
+  /// \return This reference.
+  /// \throws Error when the id names no table this build carries, or its key does not fit.
+  RecordRef &operator=(const ::agiru::detail::RefusedRow &row) {
+    Open(row.id.TableNo());
+    const TableDef &table = Table();
+    const std::span<const std::string> values = row.id.KeyValues();
+    if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
+      throw Error("RecordId.GetRecord: the RecordId carries " + std::to_string(values.size()) +
+                  " key value(s) and the primary key has " +
+                  std::to_string(table.keys.empty() ? 0 : table.keys[0].fields.size()));
+    }
+    for (std::size_t at = 0; at < values.size(); ++at) {
+      const FieldDef *def = agiru::Field(table, table.keys[0].fields[at]);
+      if (def == nullptr) {
+        throw Error("RecordId.GetRecord: the primary key names a field the table lacks");
+      }
+      detail::SetFieldText(State().record, *def, values[at]);
+    }
+    return *this;
+  }
+
   /// \brief Points this handle at the other's object, the way `RecRef2 := RecRef1` does in AL.
   RecordRef &operator=(const RecordRef &o) {
     if (this != &o) {
@@ -1258,7 +1285,9 @@ public:
   ///       which `Record.SetPosition` uses): `Bin Content` pages hand a position through a
   ///       `RecordRef` to reopen it (SCM - Warehouse UT, 3 cases, and ERM VAT Tool - UT, 1;
   ///       2026-09-12).
-  void SetPosition(std::string_view String) { detail::TakePosition(State().record, Table(), String); }
+  void SetPosition(std::string_view String) {
+    detail::TakePosition(State().record, Table(), String);
+  }
 
   /// \brief AL `RecordRef.SetRecFilter()`. Sets a filter on a record that is referred to by a
   /// RecordRef.

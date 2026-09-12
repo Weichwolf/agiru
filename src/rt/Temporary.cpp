@@ -283,7 +283,9 @@ std::int32_t TempCount(void *record, const TableDef &table) {
   std::int32_t count = 0;
   const std::size_t rows = held.temp->ops->count(held.temp->rows);
   for (std::size_t index = 0; index < rows; ++index) {
-    if (Passes(held.temp->ops->at(held.temp->rows, index), held.state->filters, table)) { ++count; }
+    const void *row = held.temp->ops->at(held.temp->rows, index);
+    if (held.state->markedOnly && !held.state->marks.contains(MarkKey(row, table))) { continue; }
+    if (Passes(row, held.state->filters, table)) { ++count; }
   }
   return count;
 }

@@ -54,6 +54,42 @@ template <typename T> struct PageTraits;
               "(board:0034)");
 }
 
+/// \brief What a call through a control with nothing behind it answers when the call is NOT
+///        refused: nothing, and the caller's default wherever a value is read.
+///
+/// \note A `usercontrol` RUNS IN THE CLIENT, and a headless session has none: BC's own test
+///       framework runs an add-in method as a no-op (`BarcodeControl.RequestBarcodeAsync`,
+///       `BusinessChart.SetValue`), so refusing it stopped a page every test of that table needs.
+///       A PART WHOSE PAGE IS CARVED OUT OF THE SCOPE (`scope.json`, a decision: `Power BI
+///       Embedded Report Part` sits in the excluded `System.Integration.PowerBI`) is treated the
+///       same -- a part with nothing behind it shows nothing, and `Job List.OnOpenPage`'s
+///       `SetPageContext` on it did nothing worth stopping 9 UT cases for (2026-09-12). The
+///       predecessor answered the same with its `_NilValue` sentinel.
+class AbsentControlValue {
+public:
+  /// \brief The default of whatever type reads it. \tparam T The type. \return `T{}`.
+  template <typename T>
+    requires(!std::is_same_v<T, std::string> && !std::is_same_v<T, std::string_view>)
+  operator T() const {
+    return T{};
+  }
+
+  /// \brief A call chained on the answer answers the same. \tparam A The arguments.
+  /// \return Another absent answer.
+  template <typename... A> AbsentControlValue operator()(const A &...) const { return {}; }
+
+  /// \brief AL `if Control.X() then`: false. \return False.
+  explicit operator bool() const { return false; }
+};
+
+/// \brief A call through a control with nothing behind it: a no-op, see `AbsentControlValue`.
+/// \param what The call as AL wrote it, `Part.Page().Method`, for a trace.
+/// \return An absent answer.
+inline AbsentControlValue AbsentControl(std::string_view what) {
+  static_cast<void>(what);
+  return {};
+}
+
 /// \brief One control's triggers, as a page's `PageTraits` tabulates them.
 ///
 /// \tparam P The generated page class.

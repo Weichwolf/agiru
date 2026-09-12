@@ -1178,15 +1178,24 @@ void Add(Predicate &into, const detail::Clause &clause) {
 }
 
 std::string TableNumberOrValue(std::string_view value) {
-  std::string joined;
-  for (const char c : value) {
-    if (std::isspace(static_cast<unsigned char>(c)) == 0) { joined += c; }
-  }
-  static constexpr std::string_view kDatabase = "database::";
-  std::string lowered = joined;
-  for (char &c : lowered) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
-  if (!lowered.starts_with(kDatabase)) { return std::string(value); }
-  std::string named = joined.substr(kDatabase.size());
+  const auto trimmed = [](std::string_view text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
+      text.remove_prefix(1);
+    }
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
+      text.remove_suffix(1);
+    }
+    return text;
+  };
+  static constexpr std::string_view kDatabase = "database";
+  std::string_view rest = trimmed(value);
+  if (rest.size() < kDatabase.size()) { return std::string(value); }
+  std::string head(rest.substr(0, kDatabase.size()));
+  for (char &c : head) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
+  if (head != kDatabase) { return std::string(value); }
+  rest = trimmed(rest.substr(kDatabase.size()));
+  if (!rest.starts_with("::")) { return std::string(value); }
+  std::string named(trimmed(rest.substr(2)));
   if (named.size() >= 2 && named.front() == '"' && named.back() == '"') {
     named = named.substr(1, named.size() - 2);
   }

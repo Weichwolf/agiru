@@ -1,5 +1,6 @@
 #include "meta/EnumDef.h"
 #include "meta/TableDef.h"
+#include "platform/Integer.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
@@ -389,6 +390,30 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
              made.binds.size() == 2 && made.binds[0] == "10" && made.binds[1] == "20");
   CHECK_TRUE("and the range compares the subquery, not a column",
              made.where.find(" LIMIT 1) BETWEEN $1 AND $2") != std::string::npos);
+  // THE `Integer` VIRTUAL TABLE IS A SERIES, ALSO OVER AN OPEN RANGE: `Number = filter(1..)` is
+  // how the PEPPOL xmlports and 176 BaseApp loops drive it, breaking out when their own iterator
+  // runs dry, and a range with an open end fell back to the physical table, which is empty --
+  // every such export wrote its XML declaration and nothing else (Incoming Doc. To Data Exch.UT,
+  // 19 cases, 2026-09-12). The series is capped at a million rows from the low end, the way no
+  // AL loop ever reaches the platform's own -1e9..1e9.
+  agiru::detail::RecordState open;
+  open.filters.push_back(agiru::detail::FieldFilter{
+      .field = agiru::platform::Integer::Field_No::Number, .group = 2, .text = "1.."});
+  const agiru::detail::Selection series =
+      agiru::detail::Select(&open, agiru::platform::kIntegerTable);
+  CHECK_TRUE("an open range is a series from its low end",
+             series.from.find("generate_series(1, 1000000)") != std::string::npos);
+  agiru::detail::RecordState bounded;
+  bounded.filters.push_back(agiru::detail::FieldFilter{
+      .field = agiru::platform::Integer::Field_No::Number, .group = 0, .text = "1..5"});
+  const agiru::detail::Selection five = agiru::detail::Select(&bounded, agiru::platform::kIntegerTable);
+  CHECK_TRUE("and a bounded one is exactly its rows",
+             five.from.find("generate_series(1, 5)") != std::string::npos);
+  agiru::detail::RecordState unfiltered;
+  const agiru::detail::Selection whole =
+      agiru::detail::Select(&unfiltered, agiru::platform::kIntegerTable);
+  CHECK_TRUE("and no filter at all starts at the platform's own low end",
+             whole.from.find("generate_series(-1000000000, -999000001)") != std::string::npos);
   // A `const(Database::X)` IN A CALCFORMULA IS THE TABLE'S NUMBER, the way `Query.cpp` reads a
   // DataItemTableFilter: `Price List Line."Asset Type"`-style lookups filter on
   // `"Table ID" = const(Database::"Item Unit of Measure")`, and binding the words put "Database ::
@@ -428,8 +453,9 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
   marked.marks.insert("B");
   const agiru::detail::Selection onlyMarked = agiru::detail::Select(&marked, kOuter);
   CHECK_TRUE("two marks are two keys ORed",
-             onlyMarked.where.find("(\"Code\" = $1) OR (\"Code\" = $2)") != std::string::npos ||
-                 onlyMarked.where.find("(\"Code\" = $2) OR (\"Code\" = $1)") != std::string::npos);
+             onlyMarked.where.find("\"Code\" = $1") != std::string::npos &&
+                 onlyMarked.where.find(" OR ") != std::string::npos &&
+                 onlyMarked.where.find("\"Code\" = $2") != std::string::npos);
   CHECK_TRUE("and both keys are bound",
              onlyMarked.binds.size() == 2 && onlyMarked.binds[0].has_value() &&
                  onlyMarked.binds[1].has_value() &&

@@ -25,6 +25,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 /// \file
 /// \brief AL `TestPage` -- a page driven without a screen.
@@ -139,6 +140,7 @@ public:
   /// \brief AL `TestPage.Close()` -- runs `OnQueryClosePage` and `OnClosePage`, then lets go.
   void Close() {
     if (page_ == nullptr) { return; }
+    SaveEditedNewRecord_();
     detail::ClosePage(*page_);
     Release_();
   }
@@ -175,6 +177,7 @@ public:
   void New() {
     if constexpr (kHasRecord) {
       static_cast<void>(Page_());
+      SaveEditedNewRecord_();
       Relink_();
       Platform_(Record_()).Init();
       detail::SeedFromFilters(
@@ -387,6 +390,7 @@ public:
     if (def != nullptr && def->field.Value() == 0) {
       if (const ControlTrigger<P> *row = TriggerRow_(control);
           row != nullptr && row->set != nullptr) {
+        SaveEditedNewRecord_();
         try {
           detail::CheckEntryRange(text, def->minValue, def->maxValue);
         } catch (const Error &e) { throw e.Coded("TestValidation"); }
@@ -414,6 +418,7 @@ public:
         Record_() = before;
         throw e.Coded("TestValidation");
       }
+      edited_ = true;
       SaveExistingRecord_();
     } else {
       static_cast<void>(text);
@@ -506,6 +511,7 @@ public:
     if (kind == ControlTriggerKind::Action && CloseAction_(control)) { return; }
     if (kind == ControlTriggerKind::Action && ModeAction_(control)) { return; }
     if (kind == ControlTriggerKind::Action && page_ != nullptr) {
+      SaveEditedNewRecord_();
       detail::RaisePageRecordEvent(*page_, "OnBeforeActionEvent", control);
     }
     RunTrigger_(control, kind, kind == ControlTriggerKind::Action);
@@ -611,6 +617,7 @@ public:
     partName_ = std::string(name);
     page_ = nullptr;
     owned_ = false;
+    parent.AttachPart(*this);
     Bind_();
   }
 
@@ -620,6 +627,15 @@ public:
     } else {
       return nullptr;
     }
+  }
+
+  void RowLeft() override { SaveEditedNewRecord_(); }
+
+  void AttachPart(PageCore &part) override {
+    for (PageCore *held : parts_) {
+      if (held == &part) { return; }
+    }
+    parts_.push_back(&part);
   }
 
   void LinkPart(std::string_view control, void *subRecord, const TableDef &subTable) override {
@@ -698,10 +714,24 @@ private:
   /// \note IT IS THE PLATFORM'S SAVE AND NOT AN INSERT THE TEST ASKED FOR. `OnInsert` runs, so
   ///       the No. Series assigns the number the lines key on; a page that inserts nothing (a
   ///       list on a temporary table) simply has nothing to save.
+  /// A NEW ROW THE USER EDITED IS INSERTED WHEN THE ROW IS LEFT
+  /// (`devenv-delayedinsert-property.md`: the record is inserted "when the user leaves the row"),
+  /// and a new row nobody edited is dropped the way the client drops it. Leaving is: setting a
+  /// control that is not a field of the row (`Sales Invoice Subform."Invoice Discount Amount"`
+  /// after the line's `Quantity`, 12 UT cases of the aggregate codeunits, 2026-09-12), another row,
+  /// an action, `New`, `Close`.
+  void SaveEditedNewRecord_() {
+    for (PageCore *part : parts_) { part->RowLeft(); }
+    if (!edited_) { return; }
+    edited_ = false;
+    SaveNewRecord_();
+  }
+
   void SaveNewRecord_() {
     if constexpr (kHasRecord) {
       if (!newRecord_ || page_ == nullptr) { return; }
       newRecord_ = false;
+      edited_ = false;
       using Source = std::remove_cvref_t<decltype(page_->Rec)>;
       auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
       Boolean allowInsert = true;
@@ -853,6 +883,7 @@ private:
   template <typename Step> Boolean Landed_(Step step) {
     if constexpr (kHasRecord) {
       static_cast<void>(Page_());
+      SaveEditedNewRecord_();
       Relink_();
       newRecord_ = false;
       const bool found = step(Record_());
@@ -1055,6 +1086,8 @@ private:
   P *page_ = nullptr;
   bool owned_ = false;
   bool newRecord_ = false;
+  bool edited_ = false;
+  std::vector<PageCore *> parts_;
   PageCore *parent_ = nullptr;
   std::string partName_;
 };

@@ -1902,8 +1902,8 @@ public:
   ///          (board:0231).
   template <typename... Keys> Boolean Rename(const Keys &...keys) {
     static_assert(sizeof...(Keys) > 0, "Rename takes the new primary key");
-    const Derived before = static_cast<const Derived &>(*this);
-    TableEvent("OnBeforeRenameEvent", true);
+    Derived before = static_cast<const Derived &>(*this);
+    TableEvent("OnBeforeRenameEvent", true, before);
     std::size_t position = 0;
     (AssignKey(TableTraits<Derived>::kTable, position++, keys), ...);
     {
@@ -1917,7 +1917,7 @@ public:
       throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
                   " does not exist. Identification fields and values: " + PrimaryKeyText());
     }
-    TableEvent("OnAfterRenameEvent", true);
+    TableEvent("OnAfterRenameEvent", true, before);
     CaptureImage();
     return true;
   }
@@ -2455,7 +2455,16 @@ private:
                          currFieldNo);
   }
 
+  /// THE EVENT'S `xRec` IS THE RECORD AS IT WAS: the stored image for a modify, the row under
+  /// the old key for a rename (`devenv-onafterrenameevent-table-trigger.md` declares
+  /// `var xRec`). Handing `Rec` twice made `Price Helper V16.AfterRenameItem` rename the
+  /// price lines from the NEW number to itself, and `Item.Rename` left every price line on the
+  /// old one (Price Worksheet Line UT and Price List Line UT, 14 cases, 2026-09-12).
   void TableEvent(std::string_view event, Boolean RunTrigger) {
+    TableEvent(event, RunTrigger, StoredImage());
+  }
+
+  void TableEvent(std::string_view event, Boolean RunTrigger, Derived &before) {
     static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
     auto &rec = static_cast<Derived &>(*this);
     detail::RaiseEventFrom(static_cast<void *>(&rec),
@@ -2466,7 +2475,7 @@ private:
                            {},
                            kNames,
                            rec,
-                           rec,
+                           before,
                            RunTrigger);
   }
 

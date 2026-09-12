@@ -34,7 +34,19 @@ class Watcher_Codeunit;
 class Edited_Codeunit;
 class Told_Codeunit;
 class Unsent_Codeunit;
+class Renamer_Codeunit;
+class Modified_Codeunit;
 } // namespace
+
+template <> struct agiru::CodeunitTraits<Modified_Codeunit> {
+  static constexpr CodeunitId kId{50108};
+  static constexpr std::string_view kName{"Event Gate Modified"};
+};
+
+template <> struct agiru::CodeunitTraits<Renamer_Codeunit> {
+  static constexpr CodeunitId kId{50107};
+  static constexpr std::string_view kName{"Event Gate Renamer"};
+};
 
 template <> struct agiru::CodeunitTraits<Publisher_Codeunit> {
   static constexpr CodeunitId kId{50100};
@@ -115,6 +127,45 @@ public:
 
   int seen = 0;
   Boolean sawRunTrigger = false;
+};
+
+/// AL: `[EventSubscriber(ObjectType::Table, Database::"Line Number Buffer", 'OnAfterRenameEvent',
+/// '', false, false)] local procedure Renamed(var Rec; var xRec; RunTrigger: Boolean)` -- the
+/// shape `Price Helper V16.AfterRenameItem` has, reading the OLD number off `xRec`.
+class Renamer_Codeunit : public Codeunit<Renamer_Codeunit> {
+public:
+  void Renamed(agiru::app::tables::LineNumberBuffer &Rec,
+               agiru::app::tables::LineNumberBuffer &xRec,
+               Boolean RunTrigger) {
+    static_cast<void>(RunTrigger);
+    oldNumber = xRec.OldLineNumber;
+    newNumber = Rec.OldLineNumber;
+    ++renamed;
+  }
+
+  int renamed = 0;
+  Integer oldNumber = -1;
+  Integer newNumber = -1;
+};
+
+/// AL: `[EventSubscriber(ObjectType::Table, Database::"Line Number Buffer", 'OnAfterModifyEvent',
+/// '', false, false)] local procedure Modified(var Rec; var xRec; RunTrigger: Boolean)` -- the
+/// shape `API Update Referenced Fields` subscribes with, for a `Modify()` without a trigger.
+class Modified_Codeunit : public Codeunit<Modified_Codeunit> {
+public:
+  void Modified(agiru::app::tables::LineNumberBuffer &Rec,
+                agiru::app::tables::LineNumberBuffer &xRec,
+                Boolean RunTrigger) {
+    before = xRec.NewLineNumber;
+    after = Rec.NewLineNumber;
+    sawRunTrigger = RunTrigger;
+    ++modified;
+  }
+
+  int modified = 0;
+  Integer before = -1;
+  Integer after = -1;
+  Boolean sawRunTrigger = true;
 };
 
 // `CurrFieldNo` IN A VALIDATE EVENT IS THE SYSTEM VARIABLE: the field the user is editing, and 0
@@ -253,6 +304,40 @@ const SubscriptionCatalogue kEditedCatalogue{
     true,
     []() -> void * { return new Edited_Codeunit(); },
     [](void *instance) { delete static_cast<Edited_Codeunit *>(instance); }};
+constexpr std::array<std::string_view, 3> kModifiedNames{"Rec", "xRec", "RunTrigger"};
+constexpr std::array<Subscription, 1> kModifiedSubscriptions{{
+    {.kind = EventObject::Table,
+     .objectId = 0,
+     .objectName = "Line Number Buffer",
+     .event = "OnAfterModifyEvent",
+     .element = "",
+     .parameters = kModifiedNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Modified_Codeunit, &Modified_Codeunit::Modified>},
+}};
+const SubscriptionCatalogue kModifiedCatalogue{
+    CodeunitTraits<Modified_Codeunit>::kId,
+    CodeunitTraits<Modified_Codeunit>::kName,
+    kModifiedSubscriptions,
+    true,
+    []() -> void * { return new Modified_Codeunit(); },
+    [](void *instance) { delete static_cast<Modified_Codeunit *>(instance); }};
+constexpr std::array<std::string_view, 3> kRenamedNames{"Rec", "xRec", "RunTrigger"};
+constexpr std::array<Subscription, 1> kRenamerSubscriptions{{
+    {.kind = EventObject::Table,
+     .objectId = 0,
+     .objectName = "Line Number Buffer",
+     .event = "OnAfterRenameEvent",
+     .element = "",
+     .parameters = kRenamedNames,
+     .invoke = &agiru::detail::InvokeSubscriber<Renamer_Codeunit, &Renamer_Codeunit::Renamed>},
+}};
+const SubscriptionCatalogue kRenamerCatalogue{
+    CodeunitTraits<Renamer_Codeunit>::kId,
+    CodeunitTraits<Renamer_Codeunit>::kName,
+    kRenamerSubscriptions,
+    true,
+    []() -> void * { return new Renamer_Codeunit(); },
+    [](void *instance) { delete static_cast<Renamer_Codeunit *>(instance); }};
 constexpr std::array<std::string_view, 2> kSeenNames{"Rec", "RunTrigger"};
 constexpr std::array<Subscription, 1> kWatcherSubscriptions{{
     {.kind = EventObject::Table,
@@ -299,6 +384,53 @@ void ASubscriberNamedSenderReceivesTheRaisingRecord() {
   CHECK_TRUE("a Sender on a raise without one refuses",
              said.find("names a parameter Sender") != std::string::npos);
   static_cast<void>(agiru::UnbindSubscription(unsent));
+}
+
+/// A TABLE EVENT'S `xRec` IS THE RECORD AS IT WAS: for a rename the row under the OLD key
+/// (`devenv-onafterrenameevent-table-trigger.md` declares `var xRec`). The events handed `Rec`
+/// twice, so `Price Helper V16.AfterRenameItem` renamed the price lines from the new number to
+/// itself and `Item.Rename` left every price line on the old one (Price Worksheet Line UT and
+/// Price List Line UT, 14 cases, 2026-09-12).
+/// `Modify()` WITHOUT A TRIGGER RAISES ITS EVENTS ALL THE SAME, with `RunTrigger` false for the
+/// subscriber to read (`devenv-onaftermodifyevent-table-trigger.md` carries `RunTrigger` as a
+/// parameter), and `xRec` is the record as it was read: `API Update Referenced Fields` assigns a
+/// customer's ids from `OnBeforeModifyEvent`, and `Customer.Modify()` raised nothing (API Setup
+/// UT, 4 cases, board:0711, 2026-09-12).
+void AModifyWithoutATriggerRaisesItsEvents() {
+  Modified_Codeunit modified;
+  static_cast<void>(agiru::BindSubscription(modified));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  constexpr agiru::Integer kLine = 3;
+  constexpr agiru::Integer kFirst = 30;
+  constexpr agiru::Integer kSecond = 31;
+  buffer.OldLineNumber = kLine;
+  buffer.NewLineNumber = kFirst;
+  buffer.Insert();
+  static_cast<void>(buffer.Get(kLine));
+  buffer.NewLineNumber = kSecond;
+  buffer.Modify();
+  CHECK_TRUE("Modify() raised OnAfterModifyEvent once", modified.modified == 1);
+  CHECK_TRUE("with RunTrigger false", !modified.sawRunTrigger);
+  CHECK_TRUE("xRec as read and Rec as written",
+             modified.before == kFirst && modified.after == kSecond);
+  static_cast<void>(agiru::UnbindSubscription(modified));
+}
+
+void ARenameEventsXRecCarriesTheOldKey() {
+  Renamer_Codeunit renamer;
+  static_cast<void>(agiru::BindSubscription(renamer));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  constexpr agiru::Integer kOldLine = 7;
+  constexpr agiru::Integer kNewLine = 9;
+  buffer.OldLineNumber = kOldLine;
+  buffer.Insert();
+  static_cast<void>(buffer.Rename(kNewLine));
+  CHECK_TRUE("Rename raised OnAfterRenameEvent once", renamer.renamed == 1);
+  CHECK_TRUE("with xRec under the old key", renamer.oldNumber == kOldLine);
+  // THE NEGATIVE CONTROL: Rec carries the new key, so the two are told apart and a runtime that
+  // handed the same record twice cannot pass both checks.
+  CHECK_TRUE("and Rec under the new one", renamer.newNumber == kNewLine);
+  static_cast<void>(agiru::UnbindSubscription(renamer));
 }
 
 void ATableTriggerEventReachesASubscriber() {
@@ -379,6 +511,8 @@ int main() {
     CurrFieldNoIsTheUsersFieldAndZeroFromCode();
     ASubscriberNamingAnUnpublishedParameterIsRefused();
     ATableTriggerEventReachesASubscriber();
+    ARenameEventsXRecCarriesTheOldKey();
+    AModifyWithoutATriggerRaisesItsEvents();
     ASubscriberNamedSenderReceivesTheRaisingRecord();
   });
 }

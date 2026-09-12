@@ -94,6 +94,15 @@ public:
   /// \param subRecord The subpage's record.
   /// \param subTable Its declaration.
   virtual void LinkPart(std::string_view control, void *subRecord, const TableDef &subTable) = 0;
+
+  /// \brief The row the page stands on is LEFT -- focus went to another row, another control,
+  ///        an action, the parent, or the page closed -- so a new row the user edited is inserted
+  ///        (`devenv-delayedinsert-property.md`) and one nobody edited is dropped.
+  virtual void RowLeft() = 0;
+
+  /// \brief A part attaches to this page, so that leaving the page leaves the part's row too.
+  /// \param part The part's harness, which outlives this page's use of it.
+  virtual void AttachPart(PageCore &part) = 0;
 };
 
 namespace detail {
