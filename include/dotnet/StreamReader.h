@@ -42,16 +42,21 @@ public:
 
     /// \brief `new StreamReader(x [, ...])` over anything else AL hands it -- a .NET stream this
     ///        runtime does not rebuild, most of all.
-    /// \tparam Arguments Whatever AL passed.
-    /// \param arguments The arguments, read only to be discarded.
+    /// \tparam First The stream. \tparam Rest Whatever follows it.
+    /// \param first The stream, read only to be discarded. \param rest The rest, likewise.
     /// \return Never.
     /// \throws Error always (board:0035).
-    template <typename... Arguments>
-      requires(sizeof...(Arguments) >= 1 &&
-               !(std::convertible_to<Arguments &, InStream &> && ...) &&
-               !(std::convertible_to<Arguments, std::string_view> && ...))
-    [[nodiscard]] class StreamReader operator()(Arguments &&...arguments) const {
-      (static_cast<void>(arguments), ...);
+    /// \note IT IS THE FIRST ARGUMENT THAT DECIDES. A constraint folded over ALL the arguments
+    ///       let `StreamReader(InStream, Encoding.GetEncoding(0))` fall through to this refusal,
+    ///       because the Encoding is neither a stream nor a path and an exact-match template
+    ///       beats the `const Encoding &` overload (Payment Export XMLPort UT, 3 cases,
+    ///       2026-09-12).
+    template <typename First, typename... Rest>
+      requires(!std::convertible_to<First &, InStream &> &&
+               !std::convertible_to<First, std::string_view>)
+    [[nodiscard]] class StreamReader operator()(First &&first, Rest &&...rest) const {
+      static_cast<void>(first);
+      (static_cast<void>(rest), ...);
       throw ::agiru::Error(
           "StreamReader(...): the stream it was handed is a .NET type this runtime does not "
           "rebuild (board:0035)");

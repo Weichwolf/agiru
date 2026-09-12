@@ -3114,6 +3114,9 @@ std::string ElementExport(const al::PageControl &control,
         out += pad + "  " + trigger(control, "OnBeforePassVariable") + "();\n";
       }
       out += pad + "  Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "  Out_().Content(" + Literal(XmlNameOf(control)) +
+             ", std::string(::agiru::Format(" + PageVariableIdentifier(page, control.name) +
+             ")), " + ElementWidth(control) + ");\n";
       std::vector<const al::PageControl *> below = ancestors;
       below.push_back(&control);
       for (const al::PageControl &child : control.children) {
@@ -3153,16 +3156,30 @@ std::string ElementExport(const al::PageControl &control,
              page.name + " reads " + source.field + ", which " + declared->subtype +
              " does not declare (board:0065)\");\n";
     }
+    const std::string formatted = "std::string(FormatsAsXml_() ? ::agiru::Format(" +
+                                  PageVariableIdentifier(page, declared->name) + "->" +
+                                  field->second + ", 0, 9) : ::agiru::Format(" +
+                                  PageVariableIdentifier(page, declared->name) + "->" +
+                                  field->second + "))";
     out += pad + "try {\n";
     if (declares(control, "OnBeforePassField")) {
       out += pad + "  " + trigger(control, "OnBeforePassField") + "();\n";
     }
-    out += pad + "  Out_().Value(" + Literal(XmlNameOf(control)) +
-           ", std::string(FormatsAsXml_() ? ::agiru::Format(" +
-           PageVariableIdentifier(page, declared->name) + "->" + field->second +
-           ", 0, 9) : ::agiru::Format(" + PageVariableIdentifier(page, declared->name) + "->" +
-           field->second + ")), " + (attribute ? "true" : "false") + ", " + ElementWidth(control) +
-           ");\n";
+    if (ContainerElement(control)) {
+      out += pad + "  Out_().BeginGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "  Out_().Content(" + Literal(XmlNameOf(control)) + ", " + formatted + ", " +
+             ElementWidth(control) + ");\n";
+      std::vector<const al::PageControl *> below = ancestors;
+      below.push_back(&control);
+      for (const al::PageControl &child : control.children) {
+        out += ElementExport(child, pageClass, page, objects, named, below, indent + 2);
+      }
+      out += pad + "  Out_().EndGroup(" + Literal(XmlNameOf(control)) + ");\n";
+      out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
+      return out;
+    }
+    out += pad + "  Out_().Value(" + Literal(XmlNameOf(control)) + ", " + formatted + ", " +
+           (attribute ? "true" : "false") + ", " + ElementWidth(control) + ");\n";
     out += pad + "} catch (const ::agiru::XmlPortSkip &) {}\n";
     return out;
   }
@@ -3287,6 +3304,15 @@ std::string ElementImport(const al::PageControl &control,
                              indent + 2,
                              ancestors);
       }
+      if (!attribute) {
+        out += pad + "  if (FormatsAsXml_()) {\n";
+        out += pad + "    static_cast<void>(::agiru::Evaluate(" +
+               PageVariableIdentifier(page, control.name) + ", In_().Text()));\n";
+        out += pad + "  }\n";
+        if (declares(control, "OnAfterAssignVariable")) {
+          out += pad + "  " + trigger(control, "OnAfterAssignVariable") + "();\n";
+        }
+      }
       out += pad + "  In_().Leave();\n" + pad + "}\n";
       return out;
     }
@@ -3325,6 +3351,19 @@ std::string ElementImport(const al::PageControl &control,
     const bool validate = ElementFlag(control, "FieldValidate", validateByDefault);
     const std::string text = attribute ? "In_().Attribute(" + xmlName + ")" : "In_().Text()";
     out += pad + (attribute ? "{\n" : "if (In_().Enter(" + xmlName + ")) {\n");
+    if (!attribute && ContainerElement(control)) {
+      for (const al::PageControl &child : control.children) {
+        out += ElementImport(child,
+                             pageClass,
+                             page,
+                             objects,
+                             named,
+                             record,
+                             validateByDefault,
+                             indent + 2,
+                             ancestors);
+      }
+    }
     out += pad + "  {\n" + pad + "    auto Value_Block = " + owner + "->" + field->second + ";\n";
     out += pad + "    static_cast<void>(::agiru::Evaluate(Value_Block, " + text +
            (control.kind.empty() ? "" : "") + "));\n";

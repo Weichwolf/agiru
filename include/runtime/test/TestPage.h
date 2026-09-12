@@ -505,6 +505,12 @@ public:
   /// \brief AL `TestPage.Filter` -- the page's filter pane, bound when the page opens.
   TestFilter Filter{}; // NOLINT(misc-non-private-member-variables-in-classes)
 
+  /// A READ-ONLY CONTROL THAT SHOWS AN EXPRESSION TAKES A `SetValue` AND DOES NOTHING WITH IT:
+  /// `field("Price Line Filter"; GetReadablePriceLineFilter()) { Editable = false; }` has no
+  /// field and no variable to write, and BC's own suite sets it inside a `[ModalPageHandler]`
+  /// and goes on (Suggest Price Lines UT `T005`, 2026-09-12) -- the client would have shown no
+  /// editor at all. An EDITABLE expression control still refuses, because there the value has to
+  /// go somewhere and the page has not said where.
   void SetControlText(std::string_view control, std::string_view text) override {
     static_cast<void>(Page_());
     Relink_();
@@ -521,6 +527,9 @@ public:
             [this, control] { RunTrigger_(control, ControlTriggerKind::Validate, true); });
         return;
       }
+    }
+    if (def != nullptr && def->field.Value() == 0 && !static_cast<bool>(ControlEditable(control))) {
+      return;
     }
     if (def == nullptr || def->field.Value() == 0) {
       throw Error("the control '" + std::string(control) + "' shows no field to set");

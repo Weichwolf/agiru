@@ -72,6 +72,31 @@ void TheOutputWritesTheThreeFormats() {
              xmlOut.Finish(),
              "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
              "<Root><Line id=\"7\"><Name>A &amp; B &lt;C&gt;</Name></Line></Root>");
+
+  XmlPortOutput amounts;
+  amounts.Start(xml, "\t", "\r\n", "", "");
+  amounts.BeginGroup("Total");
+  amounts.BeginGroup("Amt");
+  amounts.Content("Amt", "12.50", 0);
+  amounts.Value("Ccy", "EUR", true, 0);
+  amounts.EndGroup("Amt");
+  amounts.EndGroup("Total");
+  CHECK_TEXT("an element opened for its attributes still carries its own text",
+             amounts.Finish(),
+             "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>"
+             "<Total><Amt Ccy=\"EUR\">12.50</Amt></Total>");
+
+  XmlPortOutput fields;
+  fields.Start(variable, ";", "\r\n", "\"", "\r\n\r\n");
+  fields.BeginRecord("Line");
+  fields.BeginGroup("Amt");
+  fields.Content("Amt", "12.50", 0);
+  fields.EndGroup("Amt");
+  fields.Value("A", "one", false, 0);
+  fields.EndRecord("Line");
+  CHECK_TEXT("and in a text format an element with children is structure, not a field",
+             fields.Finish(),
+             "\"one\"\r\n");
 }
 
 /// THE INPUT IS ONE CURSOR FOR ALL FORMATS: `Enter` the root, `Enter` a record, `Enter` its

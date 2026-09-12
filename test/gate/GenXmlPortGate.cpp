@@ -82,6 +82,19 @@ xmlport 50001 "Export Some Lines"
                     {
                     }
                 }
+                textelement(PayableAmount)
+                {
+                    textattribute(payablecurrency)
+                    {
+                        XmlName = 'currencyID';
+                    }
+                }
+                fieldelement(InstdAmt; "Some Line".Amount)
+                {
+                    fieldattribute(Ccy; "Some Line"."Customer No.")
+                    {
+                    }
+                }
 
                 trigger OnAfterGetRecord()
                 begin
@@ -159,6 +172,29 @@ void TheGeneratorWritesTheXmlPortAsAPageWithASchemaWalk() {
                  "Out_().Value(\"EntryNo\", std::string(FormatsAsXml_() ? "
                  "::agiru::Format(SomeLine->EntryNo, 0, 9) : ::agiru::Format(SomeLine->EntryNo)), "
                  "false, 0);"));
+  CHECK_TRUE("a text element with an attribute is a group that carries its own value",
+             Has(Collapsed(source),
+                 Collapsed("Out_().BeginGroup(\"PayableAmount\");\n"
+                           "Out_().Content(\"PayableAmount\", "
+                           "std::string(::agiru::Format(PayableAmount)), 0);")) &&
+                 Has(source,
+                     "Out_().Value(\"currencyID\", "
+                     "std::string(::agiru::Format(Payablecurrency)), true, 0);"));
+  CHECK_TRUE("a field element with an attribute is one too, around the field's value",
+             Has(Collapsed(source),
+                 Collapsed("Out_().BeginGroup(\"InstdAmt\");\n"
+                           "Out_().Content(\"InstdAmt\", std::string(FormatsAsXml_() ? "
+                           "::agiru::Format(SomeLine->Amount, 0, 9) : "
+                           "::agiru::Format(SomeLine->Amount)), 0);")) &&
+                 Has(source,
+                     "Out_().Value(\"Ccy\", std::string(FormatsAsXml_() ? "
+                     "::agiru::Format(SomeLine->CustomerNo, 0, 9) : "
+                     "::agiru::Format(SomeLine->CustomerNo)), true, 0);"));
+  CHECK_TRUE(
+      "and the import reads the value beside the attribute, for both",
+      Has(source, "::agiru::Evaluate(PayableAmount, In_().Text())") &&
+          Has(source, "::agiru::Evaluate(Payablecurrency, In_().Attribute(\"currencyID\"))") &&
+          Has(source, "::agiru::Evaluate(Value_Block, In_().Attribute(\"Ccy\"))"));
   CHECK_TRUE("an unbound text element loops until BreakUnbound",
              Has(source, "OnBeforePassVariableNote();") &&
                  Has(source, "catch (const ::agiru::XmlPortBreakUnbound &) { break; }"));

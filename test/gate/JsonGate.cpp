@@ -51,7 +51,11 @@ void AnObjectHoldsWhatWasAddedToIt() {
              static_cast<bool>(object.Replace("count", agiru::Integer{8})));
   agiru::Text<0> written;
   CHECK_TRUE("WriteTo renders the document", static_cast<bool>(object.WriteTo(written)));
-  CHECK_TEXT("as JSON", std::string(std::string_view(written)), R"({"count":8,"name":"Widget"})");
+  CHECK_TEXT(
+      "as JSON, in the order the members were added -- which is BC's order and Newtonsoft's, "
+      "not the alphabet's",
+      std::string(std::string_view(written)),
+      R"({"name":"Widget","count":8})");
 
   agiru::JsonToken token;
   CHECK_TRUE("Get finds the key", static_cast<bool>(object.Get("count", token)));

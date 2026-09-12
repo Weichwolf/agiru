@@ -622,8 +622,8 @@ std::string FilterPageBuilder::PageCaption(std::string_view PageCaption) {
   const TestHandler *handler = HandlerTable::For(HandlerKind::FilterPage);
   if (handler == nullptr || controls_.empty()) { return false; }
   FilterPageAnswer answer{.record = controls_.front().record, .accepted = false};
-  handler->invoke(pageCaption_, &answer);
   HandlerTable::Ran(*handler);
+  handler->invoke(pageCaption_, &answer);
   return answer.accepted;
 }
 

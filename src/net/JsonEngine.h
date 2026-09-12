@@ -7,14 +7,14 @@
 namespace agiru::detail {
 
 struct JsonTree {
-  nlohmann::json root;
+  nlohmann::ordered_json root;
   long uses = 1;
 };
 
-[[nodiscard]] nlohmann::json &JsonNodeOf(const JsonHandle &handle);
+[[nodiscard]] nlohmann::ordered_json &JsonNodeOf(const JsonHandle &handle);
 
-[[nodiscard]] JsonHandle JsonHandleMade(nlohmann::json value);
+[[nodiscard]] JsonHandle JsonHandleMade(nlohmann::ordered_json value);
 
-[[nodiscard]] JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::json &node);
+[[nodiscard]] JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::ordered_json &node);
 
 }

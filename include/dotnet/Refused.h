@@ -224,6 +224,8 @@ public:
   static Refused Columns;
   /// \brief The chained member `TryGetValue`, which a body reaches on the RESULT of a refused call.
   static Refused TryGetValue;
+  /// \brief The chained member `GetValue`, which a body reaches on the RESULT of a refused call.
+  static Refused GetValue;
   /// \brief The chained member `IsInline`, which a body reaches on the RESULT of a refused call.
   static Refused IsInline;
   /// \brief The chained member `ToXmlString`, which a body reaches on the RESULT of a refused call.
@@ -841,6 +843,7 @@ inline Refused Refused::Contains{{.type = "<result>", .member = "Contains"}};
 inline Refused Refused::Rows{{.type = "<result>", .member = "Rows"}};
 inline Refused Refused::Columns{{.type = "<result>", .member = "Columns"}};
 inline Refused Refused::TryGetValue{{.type = "<result>", .member = "TryGetValue"}};
+inline Refused Refused::GetValue{{.type = "<result>", .member = "GetValue"}};
 inline Refused Refused::IsInline{{.type = "<result>", .member = "IsInline"}};
 inline Refused Refused::ToXmlString{{.type = "<result>", .member = "ToXmlString"}};
 inline Refused Refused::IsEmpty{{.type = "<result>", .member = "IsEmpty"}};

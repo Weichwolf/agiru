@@ -180,6 +180,15 @@ void XmlPortOutput::Value(std::string_view name,
   lines_ += recordSeparator_;
 }
 
+void XmlPortOutput::Content(std::string_view name, std::string_view text, std::int32_t width) {
+  static_cast<void>(name);
+  static_cast<void>(width);
+  if (def_.format != XmlPortFormat::Xml) { return; }
+  Node *open = Open_();
+  open->text = std::string(text);
+  open->hasText = true;
+}
+
 void XmlPortOutput::Serialize(const Node &node, std::string &into, int depth) const {
   static_cast<void>(depth);
   into += "<" + node.name;

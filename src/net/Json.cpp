@@ -38,32 +38,32 @@ void JsonRelease(JsonTree *tree) noexcept {
   if (tree != nullptr && --tree->uses == 0) { delete tree; }
 }
 
-JsonHandle JsonHandleMade(nlohmann::json value) {
+JsonHandle JsonHandleMade(nlohmann::ordered_json value) {
   auto *tree = new JsonTree{.root = std::move(value), .uses = 0};
   return JsonHandle{tree, &tree->root};
 }
 
-nlohmann::json &JsonNodeOf(const JsonHandle &handle) {
+nlohmann::ordered_json &JsonNodeOf(const JsonHandle &handle) {
   if (handle.node == nullptr) {
     throw Error("this JSON value refers to nothing -- nothing has been read into it");
   }
-  return *static_cast<nlohmann::json *>(handle.node);
+  return *static_cast<nlohmann::ordered_json *>(handle.node);
 }
 
-JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::json &node) {
+JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::ordered_json &node) {
   return JsonHandle{tree.tree, &node};
 }
 
 JsonHandle NewJsonObject() {
-  return JsonHandleMade(nlohmann::json::object());
+  return JsonHandleMade(nlohmann::ordered_json::object());
 }
 
 JsonHandle NewJsonArray() {
-  return JsonHandleMade(nlohmann::json::array());
+  return JsonHandleMade(nlohmann::ordered_json::array());
 }
 
 JsonHandle NewJsonValue() {
-  return JsonHandleMade(nlohmann::json());
+  return JsonHandleMade(nlohmann::ordered_json());
 }
 
 }
@@ -72,7 +72,7 @@ namespace agiru {
 
 namespace {
 
-using Json = nlohmann::json;
+using Json = nlohmann::ordered_json;
 
 Json &Node(const detail::JsonHandle &handle) {
   return detail::JsonNodeOf(handle);

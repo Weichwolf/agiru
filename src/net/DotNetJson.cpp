@@ -1,6 +1,5 @@
-#include "dotnet/JObject.h"
-
 #include "dotnet/Generic.h"
+#include "dotnet/JObject.h"
 #include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
@@ -10,6 +9,8 @@
 #include "type/Text.h"
 #include "type/Variant.h"
 
+#include "JsonEngine.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -18,13 +19,11 @@
 #include <utility>
 #include <vector>
 
-#include "JsonEngine.h"
-
 namespace agiru::dotnet {
 
 namespace {
 
-using Json = nlohmann::json;
+using Json = nlohmann::ordered_json;
 
 constexpr int kIndent = 2;
 
@@ -214,7 +213,9 @@ GenericIEnumerable1 JToken::SelectTokens(std::string_view path,
     }
     return ::agiru::Variant(static_cast<BigInteger>(whole));
   }
-  if (node.is_number_float()) { return ::agiru::Variant(Decimal::FromInvariantString(node.dump())); }
+  if (node.is_number_float()) {
+    return ::agiru::Variant(Decimal::FromInvariantString(node.dump()));
+  }
   if (node.is_null()) { return {}; }
   return Carried(*this);
 }
@@ -455,15 +456,16 @@ void JObject::Add(std::string_view name, const ::agiru::Variant &value) {
   if (!object.is_object()) { throw Error("JObject.Add: the node is not an object"); }
   const std::string key(name);
   if (object.contains(key)) {
-    throw Error("Can not add property " + key + " to Newtonsoft.Json.Linq.JObject. Property with the same name already exists on object.");
+    throw Error(
+        "Can not add property " + key +
+        " to Newtonsoft.Json.Linq.JObject. Property with the same name already exists on object.");
   }
   object[key] = FromVariant(value);
 }
 
 void JObject::Add(const JProperty &property) {
-  Add(std::string_view(property.Name()), property.Value().IsNullObject()
-                                              ? ::agiru::Variant{}
-                                              : Carried(property.Value()));
+  Add(std::string_view(property.Name()),
+      property.Value().IsNullObject() ? ::agiru::Variant{} : Carried(property.Value()));
 }
 
 JProperty JObject::Property(std::string_view name) const {

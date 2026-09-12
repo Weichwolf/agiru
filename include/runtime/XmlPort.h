@@ -127,6 +127,17 @@ public:
   ///        `FixedText`, 0 for none.
   void Value(std::string_view name, std::string_view text, bool attribute, std::int32_t width);
 
+  /// \brief The open element's OWN value. A `textelement` or `fieldelement` that carries
+  ///        attributes is opened as a group for them and still has its text --
+  ///        `<cbc:PayableAmount currencyID="GBP">123.45</cbc:PayableAmount>` -- and a port that
+  ///        wrote only the attribute exported every amount of a PEPPOL invoice as an empty
+  ///        element (56 such text elements and 8 such field elements in the corpus, 2026-09-12).
+  /// \param name  The XmlName.
+  /// \param text  The value.
+  /// \param width The `Width`, which only the text formats read -- and there an element with
+  ///              children is structure and writes no field of its own.
+  void Content(std::string_view name, std::string_view text, std::int32_t width);
+
   /// \brief The whole output, in the port's encoding. \return The bytes.
   [[nodiscard]] std::string Finish() const;
 
@@ -550,8 +561,8 @@ public:
         const TestHandler *handler = HandlerTable::For(HandlerKind::RequestPage, Id().Value());
         if (handler == nullptr) { throw Error("Unhandled UI: RequestPage " + std::string(Name())); }
         this->CloseWith(::agiru::Action::None);
-        handler->invoke(Name(), &self);
         HandlerTable::Ran(*handler);
+        handler->invoke(Name(), &self);
         detail::ClosePage(self);
         if (this->ClosedWith() != ::agiru::Action::OK) { return; }
       }

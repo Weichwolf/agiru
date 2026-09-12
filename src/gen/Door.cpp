@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 144> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 154> kElsewhere{{
     {"dotnet::String", "dotnet/String.h"},
     {"dotnet::Uri", "dotnet/Uri.h"},
     {"dotnet::UriPartial", "dotnet/Uri.h"},
@@ -298,6 +298,16 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 144> kElsewh
     {"dotnet::JProperty", "dotnet/JObject.h"},
     {"dotnet::JValue", "dotnet/JObject.h"},
     {"dotnet::JsonConvert", "dotnet/JObject.h"},
+    {"dotnet::Queue", "dotnet/Queue.h"},
+    {"dotnet::Type", "dotnet/Type.h"},
+    {"dotnet::CultureInfo", "dotnet/CultureInfo.h"},
+    {"dotnet::DataTable", "dotnet/DataTable.h"},
+    {"dotnet::DataColumn", "dotnet/DataTable.h"},
+    {"dotnet::DataRow", "dotnet/DataTable.h"},
+    {"dotnet::DataColumnCollection", "dotnet/DataTable.h"},
+    {"dotnet::DataRowCollection", "dotnet/DataTable.h"},
+    {"dotnet::DataMeasureType", "dotnet/BusinessChart.h"},
+    {"dotnet::BusinessChartData", "dotnet/BusinessChart.h"},
     {"Materialised", "runtime/Events.h"},
     {"Subscription", "runtime/Events.h"},
     {"SubscriptionCatalogue", "runtime/Events.h"},

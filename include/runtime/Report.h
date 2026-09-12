@@ -670,8 +670,8 @@ public:
     const std::int32_t id = Id().Value();
     if (const TestHandler *handler = HandlerTable::For(HandlerKind::Report, id);
         handler != nullptr) {
-      handler->invoke(Name(), &self);
       HandlerTable::Ran(*handler);
+      handler->invoke(Name(), &self);
       return;
     }
     try {
@@ -681,8 +681,8 @@ public:
         const TestHandler *handler = HandlerTable::For(HandlerKind::RequestPage, id);
         if (handler == nullptr) { throw Error("Unhandled UI: RequestPage " + std::string(Name())); }
         this->CloseWith(::agiru::Action::None);
-        handler->invoke(Name(), &self);
         HandlerTable::Ran(*handler);
+        handler->invoke(Name(), &self);
         detail::ClosePage(self);
         if (this->ClosedWith() != ::agiru::Action::OK) { return; }
         if (request.requestPageOnly) {

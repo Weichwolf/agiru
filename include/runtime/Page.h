@@ -525,6 +525,11 @@ template <typename P, typename Record> void GiveBackRecord(P &page, Record &reco
 /// \param modal Whether it is `RunModal`.
 /// \return The action the page closed with.
 /// \throws Error "Unhandled UI: ModalPage X" when no handler is installed, which is BC's wording.
+/// \note A HANDLER THAT RAISED STILL RAN. The handler is marked before it is invoked, because a
+///       `[ModalPageHandler]` that asserts inside itself -- `Assert.IsTrue(List.First(),
+///       CannotFindDocErr)` under an `asserterror` in the test -- is BC's way of testing a lookup
+///       that must find nothing, and one marked only on a normal return was reported as never
+///       having run (Suggest Price Lines UT, 5 cases, 2026-09-12).
 template <typename P>::agiru::Action RunHandled(P &page, bool modal) {
   const std::int32_t id = PageTraits<P>::kId.Value();
   const TestHandler *handler =
@@ -534,8 +539,8 @@ template <typename P>::agiru::Action RunHandled(P &page, bool modal) {
                 std::string(PageTraits<P>::kName));
   }
   if (modal) { page.RunsModally(); }
-  handler->invoke(PageTraits<P>::kName, &page);
   HandlerTable::Ran(*handler);
+  handler->invoke(PageTraits<P>::kName, &page);
   ClosePage(page);
   return page.ClosedWith();
 }
