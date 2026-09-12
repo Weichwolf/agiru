@@ -43,7 +43,7 @@ public:
     requires std::constructible_from<TKey, const K &> && std::constructible_from<TValue, const V &>
   Boolean Add(const K &key, const V &value) {
     if (!entries_.try_emplace(TKey(key), TValue(value)).second) {
-      throw Error("the dictionary already holds that key");
+      throw Error("An item with the same key has already been added.");
     }
     return true;
   }
@@ -87,7 +87,7 @@ public:
   /// \throws Error when the dictionary does not hold the key.
   [[nodiscard]] const TValue &Get(const TKey &key) const {
     const auto at = entries_.find(key);
-    if (at == entries_.end()) { throw Error("the dictionary holds no such key"); }
+    if (at == entries_.end()) { throw Error("The given key was not present in the dictionary."); }
     return at->second;
   }
 
