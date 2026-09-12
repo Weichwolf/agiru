@@ -102,27 +102,37 @@ class Encoding Encoding::Binder::operator()() const {
 
 class Encoding Encoding::UTF8() {
   return Made(kUtf8, true);
+
 }
 
-class Encoding Encoding::Unicode() {
+class Encoding
+Encoding::Unicode() {
+
   return Made(kUtf16, true);
 }
 
 class Encoding Encoding::ASCII() {
   return Made(kAscii, false);
+
 }
 
-class Encoding Encoding::Default() {
+class Encoding
+Encoding::Default() {
+
   return Made(kUtf8, false);
 }
 
 class Encoding Encoding::UTF32() {
   return Made(kUtf32, true);
+
 }
 
-class Encoding Encoding::GetEncoding(Integer codePage) {
+class Encoding
+Encoding::GetEncoding(Integer codePage) {
+
   const std::int32_t page = codePage;
-  if (page == kDefault || page == kUtf8) { return Made(kUtf8, false); }
+  if (page == kDefault) { return Made(kWindows1252, false); }
+  if (page == kUtf8) { return Made(kUtf8, false); }
   if (page == kUtf16) { return Made(kUtf16, true); }
   if (page == kUtf32) { return Made(kUtf32, true); }
   return Made(page, false);
@@ -188,7 +198,8 @@ std::string Encoding::Decode(std::string_view bytes) const {
     for (std::size_t i = 0; i + 3 < bytes.size(); i += 4) {
       std::int32_t code = 0;
       for (int k = 3; k >= 0; --k) {
-        code = (code << kBits8) | static_cast<unsigned char>(bytes[i + static_cast<std::size_t>(k)]);
+        code =
+            (code << kBits8) | static_cast<unsigned char>(bytes[i + static_cast<std::size_t>(k)]);
       }
       AppendUtf8(out, code);
     }

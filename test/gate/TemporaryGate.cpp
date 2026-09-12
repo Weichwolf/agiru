@@ -244,6 +244,13 @@ void AnOptionAndADecimalFilterATemporaryRowByValue() {
   CHECK_TRUE("a decimal <>0 keeps the non-zero rows", costs.Count() == 2);
   costs.SetRange(costs.UnitCost, Decimal{2});
   CHECK_TRUE("and a decimal SetRange finds its row", costs.FindFirst() && costs.Code == "R02");
+  costs.Reset();
+  costs.CalcSums(costs.UnitCost);
+  CHECK_TRUE("CalcSums over a temporary record sums ITS rows, not the table's",
+             costs.UnitCost == Decimal{3});
+  costs.SetRange(costs.Type, ResourceCostType::Resource);
+  costs.CalcSums(costs.UnitCost);
+  CHECK_TRUE("and only the rows its filters select", costs.UnitCost == Decimal{2});
 }
 
 /// TWO TEMPORARY GLOBALS HELD BY HANDLE ARE TWO STORES AFTER `A := B`. `Gen. Jnl.-Post Line`

@@ -18,8 +18,13 @@ namespace agiru::dotnet {
 ///        below 256 and `?` above it.
 ///
 /// \note A BYTE ARRAY IS A `dotnet::Array` OF INTEGERS 0..255, the way AL reads a `byte[]` back
-///       (`Array.GetValue(i)` is an Integer there too). `GetEncoding(0)` is the process default,
-///       which is UTF-8 on .NET Core and here.
+///       (`Array.GetValue(i)` is an Integer there too).
+/// \note `GetEncoding(0)` IS THE SERVER'S ANSI CODE PAGE, 1252, NOT UTF-8. BC's service tier runs
+///       on Windows with the code-page provider registered, and there code page 0 is the
+///       system's ANSI page; the BaseApp writes the pair `TextEncoding = WINDOWS` on an xmlport
+///       and `StreamReader(InStream, Encoding.GetEncoding(0))` on the reader (Payment Export
+///       XMLPort UT, whose `æøå` came back as three question marks under UTF-8, 2026-09-12).
+///       `Encoding.Default` stays UTF-8, which is what .NET Core defines it as.
 class Encoding {
 public:
   /// \brief The binder behind `E := E.Encoding()`, which AL never calls with arguments.
@@ -116,12 +121,12 @@ public:
   /// \brief The text of some bytes. \param bytes The bytes. \return The text, UTF-8.
   [[nodiscard]] std::string Decode(std::string_view bytes) const;
 
-  static constexpr std::int32_t kUtf8 = 65001;    ///< The UTF-8 code page.
-  static constexpr std::int32_t kUtf16 = 1200;    ///< The UTF-16 little-endian code page.
-  static constexpr std::int32_t kAscii = 20127;   ///< The ASCII code page.
-  static constexpr std::int32_t kDefault = 0;     ///< `GetEncoding(0)`, the default.
+  static constexpr std::int32_t kUtf8 = 65001;       ///< The UTF-8 code page.
+  static constexpr std::int32_t kUtf16 = 1200;       ///< The UTF-16 little-endian code page.
+  static constexpr std::int32_t kAscii = 20127;      ///< The ASCII code page.
+  static constexpr std::int32_t kDefault = 0;        ///< `GetEncoding(0)`, the default.
   static constexpr std::int32_t kWindows1252 = 1252; ///< The Western European single-byte page.
-  static constexpr std::int32_t kUtf32 = 12000;   ///< The UTF-32 little-endian code page.
+  static constexpr std::int32_t kUtf32 = 12000;      ///< The UTF-32 little-endian code page.
 
   /// \brief An encoding by code page, the factory every named one goes through.
   /// \param codePage The code page. \param preamble Whether `GetPreamble` answers a mark.

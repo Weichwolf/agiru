@@ -640,9 +640,9 @@ void LogMessage(std::string_view EventId,
                 const ::agiru::DataClassification &DataClassification,
                 const ::agiru::TelemetryScope &TelemetryScope,
                 std::string_view Dimension1,
-                std::string_view Value1,
+                const ::agiru::Variant &Value1,
                 std::string_view Dimension2,
-                std::string_view Value2) {
+                const ::agiru::Variant &Value2) {
   static_cast<void>(EventId);
   static_cast<void>(Message);
   static_cast<void>(Verbosity);

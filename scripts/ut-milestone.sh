@@ -34,18 +34,25 @@ if [ ! -s "$list" ]; then
   exit 1
 fi
 one() {
-  name="$1"; scratch="agiru_ut_$$"
-  log=$(timeout 900 ./build/agiru run-tests --database "$DSN" --fresh --scratch "$scratch" \
-        --codeunit "$name" ${WORK_DATE:+--work-date "$WORK_DATE"} 2>&1)
-  status=$?
-  podman exec agiru-pg psql -U agiru -tAc "DROP DATABASE IF EXISTS \"$scratch\"" >/dev/null 2>&1
-  key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9' '_')
-  if printf '%s\n' "$log" | grep -qE "^[0-9]+ of [0-9]+ passed"; then
-    printf '%s\n' "$log" > "$PARTS/$key.log"
-  else
-    printf 'LOST %s (exit %d)\n' "$name" "$status" > "$PARTS/$key.log"
-    mkdir -p "$OUT.lost" && printf '%s\n' "$log" > "$OUT.lost/$key.log"
-  fi
+  name="$1"; key=$(printf '%s' "$name" | tr -c 'A-Za-z0-9' '_')
+  attempt=0
+  while [ "$attempt" -lt 3 ]; do
+    attempt=$((attempt + 1))
+    scratch="agiru_ut_${$}_${attempt}"
+    log=$(timeout 900 ./build/agiru run-tests --database "$DSN" --fresh --scratch "$scratch" \
+          --codeunit "$name" ${WORK_DATE:+--work-date "$WORK_DATE"} 2>&1)
+    status=$?
+    podman exec agiru-pg psql -U agiru -tAc "DROP DATABASE IF EXISTS \"$scratch\"" >/dev/null 2>&1
+    if printf '%s\n' "$log" | grep -qE "^[0-9]+ of [0-9]+ passed"; then
+      printf '%s\n' "$log" > "$PARTS/$key.log"
+      return
+    fi
+  done
+  # A codeunit whose process died on every attempt is LOST -- a transient corruption
+  # (board:0718), and a run with any LOST is an ABORT, not a pass. It STAYS in the denominator
+  # at its text [Test] count so a corpse cannot shrink the measure (CLAUDE.md).
+  printf 'LOST %s (exit %d after %d attempts)\n' "$name" "$status" "$attempt" > "$PARTS/$key.log"
+  mkdir -p "$OUT.lost" && printf '%s\n' "$log" > "$OUT.lost/$key.log"
 }
 export -f one; export PARTS="$parts" DSN="$dsn" OUT="$out" WORK_DATE
 start=$(date +%s)
@@ -57,6 +64,9 @@ while IFS= read -r name; do
   f="$parts/$key.log"
   if [ ! -f "$f" ] || grep -q '^LOST ' "$f"; then
     { [ -f "$f" ] && cat "$f" || printf 'LOST %s (exit ?)\n' "$name"; } >> "$out"
+    cf=$(grep -rlZ "Subtype = Test" "$TESTS" --include='*.Codeunit.al' \
+         | xargs -0 grep -lZ -m1 -F "\"$name\"" 2>/dev/null | head -z -n1 | tr -d '\0')
+    if [ -n "$cf" ]; then total=$((total + $(grep -cE '^[[:space:]]*\[Test\]' "$cf"))); fi
     lost=$((lost + 1)); continue
   fi
   line=$(grep -E "^[0-9]+ of [0-9]+ passed" "$f" | tail -1)

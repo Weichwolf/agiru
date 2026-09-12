@@ -1223,6 +1223,12 @@ public:
   /// \note IT USES THE CURRENT FILTERS and never the current row: `SetRange` first, then
   ///       `CalcSums`, and the record's own values are not among what is summed
   ///       (`devenv-calcfields-calcsums-...-methods.md`).
+  /// \note A TEMPORARY RECORD SUMS ITS OWN ROWS. `Create Pick` keeps the pick lines it is building
+  ///       in `TempWarehouseActivityLine` and asks `CalcSums("Qty. (Base)")` over them to learn
+  ///       what this run has already assigned; a sum that went to the database instead counted the
+  ///       pick already registered from the same bin, and every second pick found nothing to
+  ///       handle (SCM Available to Pick UT, 2026-09-12). The rows summed are the ones the
+  ///       record's filters and marks select, the same set `Count` counts (TemporaryGate).
   template <typename... Fields> Boolean CalcSums(Fields &...members) {
     (detail::CalcSum(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
     return true;

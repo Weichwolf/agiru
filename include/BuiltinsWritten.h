@@ -1313,7 +1313,9 @@ void LogMessage(std::string_view EventId,
 /// \param DataClassification What kind of data it carries.
 /// \param TelemetryScope Who sees it.
 /// \param Dimension1 The first custom dimension's name.
-/// \param Value1 Its value.
+/// \param Value1 Its value -- a text, or whatever AL hands a `Text` parameter: `Mail Management`
+///        passes the message's `Guid` and `Email Dispatcher` the same (both units were outside
+///        the slice on that one call, 2026-09-12).
 /// \param Dimension2 The second dimension's name, if there is one.
 /// \param Value2 Its value.
 /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
@@ -1326,9 +1328,9 @@ void LogMessage(std::string_view EventId,
                 const ::agiru::DataClassification &DataClassification,
                 const ::agiru::TelemetryScope &TelemetryScope,
                 std::string_view Dimension1,
-                std::string_view Value1,
+                const ::agiru::Variant &Value1,
                 std::string_view Dimension2 = {},
-                std::string_view Value2 = {});
+                const ::agiru::Variant &Value2 = {});
 
 /// \brief AL `Session.BindSubscription(Codeunit)`. Binds a codeunit's `[EventSubscriber]`
 /// methods so the events they subscribe to reach them.

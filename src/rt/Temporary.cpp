@@ -6,6 +6,10 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/BigInteger.h"
+#include "type/Decimal.h"
+#include "type/Duration.h"
+#include "type/Integer.h"
 
 #include "Filter.h"
 
@@ -302,6 +306,42 @@ std::int32_t TempCount(void *record, const TableDef &table) {
 
 bool TempIsEmpty(void *record, const TableDef &table) {
   return TempCount(record, table) == 0;
+}
+
+void TempCalcSum(void *record, const TableDef &table, const FieldDef &def) {
+  const Held held = Reach(record);
+  const auto at = [&def](const void *row) {
+    return static_cast<const std::byte *>(row) + def.offset;
+  };
+  Decimal decimal{};
+  std::int64_t whole = 0;
+  const std::size_t rows = held.temp->ops->count(held.temp->rows);
+  for (std::size_t index = 0; index < rows; ++index) {
+    const void *row = held.temp->ops->at(held.temp->rows, index);
+    if (held.state->markedOnly && !held.state->marks.contains(MarkKey(row, table))) { continue; }
+    if (!Passes(row, held.state->filters, table)) { continue; }
+    switch (def.type) {
+      case FieldType::Decimal:
+        decimal = decimal + *reinterpret_cast<const Decimal *>(at(row));
+        break;
+      case FieldType::Integer: whole += *reinterpret_cast<const Integer *>(at(row)); break;
+      case FieldType::BigInteger: whole += *reinterpret_cast<const BigInteger *>(at(row)); break;
+      case FieldType::Duration:
+        whole += reinterpret_cast<const Duration *>(at(row))->Milliseconds();
+        break;
+      default: break;
+    }
+  }
+  std::byte *into = static_cast<std::byte *>(record) + def.offset;
+  switch (def.type) {
+    case FieldType::Decimal: *reinterpret_cast<Decimal *>(into) = decimal; break;
+    case FieldType::Integer:
+      *reinterpret_cast<Integer *>(into) = static_cast<Integer>(whole);
+      break;
+    case FieldType::BigInteger: *reinterpret_cast<BigInteger *>(into) = whole; break;
+    case FieldType::Duration: *reinterpret_cast<Duration *>(into) = Duration{whole}; break;
+    default: break;
+  }
 }
 
 bool TempFindSet(void *record, const TableDef &table) {

@@ -1670,6 +1670,10 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
       def->type != FieldType::BigInteger && def->type != FieldType::Duration) {
     throw Error("CalcSums over " + std::string(def->name) + " needs a numeric field");
   }
+  if (TempOf(record) != nullptr) {
+    TempCalcSum(record, table, *def);
+    return;
+  }
   const Selection selection = Select(state, table);
   const std::string sql = "SELECT COALESCE(SUM(" + Quoted(def->name) + "), 0) FROM " + Name(table) +
                           (selection.where.empty() ? std::string{} : " WHERE " + selection.where);

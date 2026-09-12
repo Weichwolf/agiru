@@ -17,6 +17,7 @@ bool TempModify(void *record, const TableDef &table);
 bool TempDelete(void *record, const TableDef &table);
 std::int32_t TempDeleteAll(void *record, const TableDef &table);
 std::int32_t TempCount(void *record, const TableDef &table);
+void TempCalcSum(void *record, const TableDef &table, const FieldDef &def);
 bool TempIsEmpty(void *record, const TableDef &table);
 bool TempFindSet(void *record, const TableDef &table);
 bool TempFind(void *record, const TableDef &table, std::string_view which);

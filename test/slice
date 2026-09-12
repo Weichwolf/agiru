@@ -9738,6 +9738,7 @@ base/system/email/codeunit/EmailFeature.cpp
 base/system/email/codeunit/EmailScenarioMapping.cpp
 base/system/email/codeunit/JobQueueActivities.cpp
 base/system/email/codeunit/Mail.cpp
+base/system/email/codeunit/MailManagement.cpp
 base/system/email/codeunit/MapEmailSource.cpp
 base/system/email/table/EmailItem.cpp
 base/system/email/table/EmailItem.def.cpp
@@ -11703,6 +11704,7 @@ system/system/email/codeunit/EmailAddressLookupImpl.cpp
 system/system/email/codeunit/EmailAttachmentsImpl.cpp
 system/system/email/codeunit/EmailAttachmentUpgrade.cpp
 system/system/email/codeunit/Email.cpp
+system/system/email/codeunit/EmailDispatcher.cpp
 system/system/email/codeunit/EmailErrorHandler.cpp
 system/system/email/codeunit/EmailImpl.cpp
 system/system/email/codeunit/EmailInstaller.cpp
