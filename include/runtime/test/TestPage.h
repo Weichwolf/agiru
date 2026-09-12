@@ -253,12 +253,36 @@ public:
   /// \return The action, to `Invoke`.
   TestAction View() { return Bound_("View"); }
 
-  /// \brief AL `TestPage.Caption()`.
-  /// \return The page's caption, or its name.
+  /// \brief AL `TestPage.Caption()` -- what the title bar shows: the page's caption, and after
+  ///        ` - ` its data caption where it has one.
+  /// \return The caption.
+  ///
+  /// \note THE DATA CAPTION IS `DataCaptionExpression` WHERE THE PAGE DECLARES ONE and otherwise
+  ///       what `DataCaptionFields` composes (`detail::PageDataCaption`). The shape is BC's own,
+  ///       read off the tests that compare it whole: `ERM Sales/Purchase Application` expects
+  ///       `'%1 - %2-%3'` of `Sales Journals`, the batch name and its description, which is the
+  ///       page caption, ` - ` and `Rec.DataCaption()`. `CurrPage.Caption(...)` set at run time
+  ///       replaces the caption half.
   [[nodiscard]] Text<0> Caption() const {
     if constexpr (requires { PageTraits<P>::kPage; }) {
-      return Text<0>{PageTraits<P>::kPage.caption.empty() ? PageTraits<P>::kName
-                                                          : PageTraits<P>::kPage.caption};
+      std::string caption =
+          page_ != nullptr ? static_cast<const Page<P> &>(*page_).Caption() : std::string{};
+      if (caption.empty()) {
+        caption = std::string(PageTraits<P>::kPage.caption.empty() ? PageTraits<P>::kName
+                                                                   : PageTraits<P>::kPage.caption);
+      }
+      std::string data;
+      if (page_ != nullptr) {
+        if constexpr (requires { page_->OnDataCaptionExpression(); }) {
+          data = std::string(std::string_view(page_->OnDataCaptionExpression()));
+        } else if constexpr (kHasRecord) {
+          data = detail::PageDataCaption(static_cast<const void *>(&Record_()),
+                                         RecordTraits_().kTable,
+                                         PageTraits<P>::kPage.type,
+                                         PageTraits<P>::kPage.dataCaptionFields);
+        }
+      }
+      return Text<0>{data.empty() ? caption : caption + " - " + data};
     } else {
       Unopened_();
     }
@@ -376,9 +400,9 @@ public:
     }
     if constexpr (kHasRecord) {
       const detail::ValidatingField editing(def->field);
+      auto before = Record_();
       try {
         Record_().CheckEntryRange(def->field, text);
-        auto before = Record_();
         PageValidateEvent_("OnBeforeValidateEvent", def->name, before);
         Record_().ValidateText(def->field, text);
         if (text.empty() && Record_().FieldNotBlank(def->field)) {
@@ -386,10 +410,56 @@ public:
         }
         RunTrigger_(control, ControlTriggerKind::Validate, true);
         PageValidateEvent_("OnAfterValidateEvent", def->name, before);
-      } catch (const Error &e) { throw e.Coded("TestValidation"); }
+      } catch (const Error &e) {
+        Record_() = before;
+        throw e.Coded("TestValidation");
+      }
+      SaveExistingRecord_();
     } else {
       static_cast<void>(text);
       Unopened_();
+    }
+  }
+
+  /// THE WRITE HALF OF A `SetValue` ROUND TRIP. The client saves a record's change as soon as the
+  /// user leaves the field (`teams-faq.md`: "automatically saves changes you make to any field as
+  /// soon as you leave the field"), and a `TestField.SetValue` is that entry and that leave: the
+  /// page's `OnModifyRecord` first, which may decline the platform's write by answering false,
+  /// then `Modify(true)`. A NEW record waits for `SaveNewRecord_`, and a page standing on no
+  /// record has nothing to save. Openerp WI-1113 measured the round trip at +17.
+  void SaveExistingRecord_() {
+    if constexpr (kHasRecord) {
+      if (newRecord_ || page_ == nullptr) { return; }
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr || !state->positioned) { return; }
+      Boolean allowModify = true;
+      if constexpr (requires { page_->OnModifyRecord(); }) {
+        allowModify = page_->OnModifyRecord();
+      }
+      {
+        static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "AllowModify"};
+        auto &before = page_->Rec.StoredImage();
+        detail::RaisePageEvent(
+            *page_, "OnModifyRecordEvent", {}, kNames, page_->Rec, before, allowModify);
+      }
+      if (!allowModify) { return; }
+      static_cast<void>(Platform_(Record_()).Modify(true));
+    }
+  }
+
+  /// THE READ HALF AFTER AN ACTION: the page re-reads the record it stands on, because the action
+  /// may have written it through a variable of its own (`VAT Return Period Card`'s "Create VAT
+  /// Return" writes the period's return number that way and the card showed the old one, 6 UT
+  /// cases), and the after-get triggers run again the way the refreshed page runs them. A record
+  /// the action deleted stays as it was, the way the client keeps showing it.
+  void RereadAfterAction_() {
+    if constexpr (kHasRecord) {
+      if (newRecord_ || page_ == nullptr) { return; }
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr || !state->positioned) { return; }
+      if (static_cast<bool>(Platform_(Record_()).Find("="))) { detail::AfterGetRecord(*page_); }
     }
   }
 
@@ -435,7 +505,14 @@ public:
   void RunControlTrigger(std::string_view control, ControlTriggerKind kind) override {
     if (kind == ControlTriggerKind::Action && CloseAction_(control)) { return; }
     if (kind == ControlTriggerKind::Action && ModeAction_(control)) { return; }
+    if (kind == ControlTriggerKind::Action && page_ != nullptr) {
+      detail::RaisePageRecordEvent(*page_, "OnBeforeActionEvent", control);
+    }
     RunTrigger_(control, kind, kind == ControlTriggerKind::Action);
+    if (kind == ControlTriggerKind::Action && page_ != nullptr) {
+      detail::RaisePageRecordEvent(*page_, "OnAfterActionEvent", control);
+      RereadAfterAction_();
+    }
   }
 
   void SetControlFilter(std::string_view control, std::string_view filter) override {
@@ -627,9 +704,19 @@ private:
       newRecord_ = false;
       using Source = std::remove_cvref_t<decltype(page_->Rec)>;
       auto &platform = static_cast<typename Source::Platform_Half &>(page_->Rec);
+      Boolean allowInsert = true;
       if constexpr (requires { page_->OnInsertRecord(Boolean{}); }) {
-        if (!static_cast<bool>(page_->OnInsertRecord(false))) { return; }
+        allowInsert = page_->OnInsertRecord(false);
       }
+      {
+        static constexpr std::array<std::string_view, 4> kNames{
+            "Rec", "BelowxRec", "xRec", "AllowInsert"};
+        Boolean below = false;
+        auto &before = page_->Rec.StoredImage();
+        detail::RaisePageEvent(
+            *page_, "OnInsertRecordEvent", {}, kNames, page_->Rec, below, before, allowInsert);
+      }
+      if (!allowInsert) { return; }
       static_cast<void>(platform.Insert(true));
     }
   }

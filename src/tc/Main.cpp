@@ -2482,6 +2482,7 @@ int Scan(const Job &job) {
     WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
     for (agiru::al::PageObject &page : parsed.objects) {
       agiru::gen::SynthesizeRunObjectActions(page, objects);
+      agiru::gen::SynthesizeDataCaption(page);
     }
     WritePages(run, parsed, objects, gathered, everyTable);
     WritePages(run, parsedReports, objects, gathered, everyTable);

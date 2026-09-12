@@ -39,6 +39,8 @@ WithElements(std::map<std::string, std::string> named, const al::PageObject &por
 
 void SynthesizeRunObjectActions(al::PageObject &page, const Objects &objects);
 
+void SynthesizeDataCaption(al::PageObject &page);
+
 std::string
 PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source);
 

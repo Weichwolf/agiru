@@ -1302,6 +1302,33 @@ void SynthesizeRunObjectActions(al::PageObject &page, const Objects &objects) {
   SynthesizeRunObjectActions(page.layout, objects);
 }
 
+void SynthesizeDataCaption(al::PageObject &page) {
+  if (page.report || page.xmlport) { return; }
+  const al::Property *expression = al::Find(page.properties, "DataCaptionExpression");
+  if (expression == nullptr || expression->value.empty()) { return; }
+  for (const al::ProcedureDecl &procedure : page.procedures) {
+    if (procedure.name == "OnDataCaptionExpression") { return; }
+  }
+  al::ProcedureDecl trigger;
+  trigger.isTrigger = true;
+  trigger.name = "OnDataCaptionExpression";
+  trigger.returnType = "Text";
+  trigger.returned.type = "Text";
+  std::vector<al::Token> &tokens = trigger.tokens;
+  tokens.push_back(Word(al::TokenKind::Identifier, "exit"));
+  tokens.push_back(Mark("("));
+  tokens.insert(tokens.end(), expression->value.begin(), expression->value.end());
+  tokens.push_back(Mark(")"));
+  tokens.push_back(Mark(";"));
+  try {
+    trigger.body = al::ParseStatements(tokens);
+  } catch (const std::exception &e) {
+    throw std::runtime_error("the DataCaptionExpression of " + page.name + " reads `" +
+                             expression->text + "` and does not parse: " + e.what());
+  }
+  page.procedures.push_back(std::move(trigger));
+}
+
 namespace {
 
 std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {

@@ -889,7 +889,7 @@ const FieldDef *FieldNamed(const TableDef &table, std::string_view name) {
   return nullptr;
 }
 
-const TableDef &TableNamed(std::string_view name, const FieldDef &asked) {
+const TableDef *TableCarried(std::string_view name) {
   static std::once_flag once;
   static std::map<std::string, const TableDef *> byName;
   std::call_once(once, [] {
@@ -902,11 +902,16 @@ const TableDef &TableNamed(std::string_view name, const FieldDef &asked) {
   std::string key(name);
   for (char &c : key) { c = static_cast<char>(std::tolower(static_cast<unsigned char>(c))); }
   const auto found = byName.find(key);
-  if (found == byName.end()) {
+  return found == byName.end() ? nullptr : found->second;
+}
+
+const TableDef &TableNamed(std::string_view name, const FieldDef &asked) {
+  const TableDef *found = TableCarried(name);
+  if (found == nullptr) {
     throw Error("the CalcFormula of " + std::string(asked.name) + " names the table " +
                 std::string(name) + ", which this build does not carry");
   }
-  return *found->second;
+  return *found;
 }
 
 struct FlowTerm {
@@ -1275,6 +1280,17 @@ void Store(void *record, const FieldDef &def, const std::optional<std::string_vi
 
 namespace detail {
 
+bool CalcFieldIfCarried(void *record, const TableDef &table, const RecordState *state, FieldNo no) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr || def->fieldClass != FieldClass::FlowField || def->calcFormula.empty()) {
+    return false;
+  }
+  const FlowFormula formula = FormulaReader(def->calcFormula, *def).Read();
+  if (TableCarried(formula.table) == nullptr) { return false; }
+  CalcField(record, table, state, no);
+  return true;
+}
+
 void CalcField(void *record, const TableDef &table, const RecordState *state, FieldNo no) {
   const FieldDef *def = Field(table, no);
   if (def == nullptr) { throw Error("CalcFields names a field the table lacks"); }
@@ -1294,7 +1310,8 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
   const std::string where = predicate.sql.empty() ? std::string{} : " WHERE " + predicate.sql;
   std::string sql;
   if (formula.kind == FlowFormula::Kind::Exist) {
-    sql = "SELECT EXISTS(SELECT 1 FROM " + Name(target) + where + ")";
+    sql = std::string("SELECT ") + (formula.reverseSign ? "NOT " : "") + "EXISTS(SELECT 1 FROM " +
+          Name(target) + where + ")";
   } else if (formula.kind == FlowFormula::Kind::Lookup) {
     sql = "SELECT " + column + " FROM " + Name(target) + where + OrderByPrimaryKey(target) +
           " LIMIT 1";
@@ -1377,7 +1394,8 @@ Clause FlowFieldColumn(const TableDef &table,
   const std::string from = " FROM " + Name(target);
   Clause made;
   if (formula.kind == FlowFormula::Kind::Exist) {
-    made.sql = "EXISTS(SELECT 1" + from + where + ")";
+    made.sql =
+        std::string(formula.reverseSign ? "NOT " : "") + "EXISTS(SELECT 1" + from + where + ")";
   } else if (formula.kind == FlowFormula::Kind::Lookup) {
     made.sql = "(SELECT " + column + from + where + OrderByPrimaryKey(target) + " LIMIT 1)";
   } else {

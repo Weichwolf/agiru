@@ -389,6 +389,49 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
              made.binds.size() == 2 && made.binds[0] == "10" && made.binds[1] == "20");
   CHECK_TRUE("and the range compares the subquery, not a column",
              made.where.find(" LIMIT 1) BETWEEN $1 AND $2") != std::string::npos);
+  // A LEADING `-` REVERSES `Exist` (`devenv-calcformula-property.md`: `[-]Exist(...)`): `Sales
+  // Invoice Header.Closed` is `-exist("Cust. Ledger Entry" where(... Open = filter(true)))`, true
+  // when NO open entry is left. Read as a plain EXISTS it said "paid" of every invoice that still
+  // had its open entry (ERM Sales Invoice Aggregate UT, 5 cases, 2026-09-12).
+  static constexpr std::array<agiru::FieldDef, 3> kExisting{{
+      agiru::FieldDef{.offset = 0,
+                      .name = "Code",
+                      .caption = "Code",
+                      .no = agiru::FieldNo{1},
+                      .type = agiru::FieldType::Code},
+      agiru::FieldDef{.offset = 32,
+                      .name = "Settled",
+                      .caption = "Settled",
+                      .calcFormula = "-exist(\"Resource Cost\" where(Code = field(Code)))",
+                      .no = agiru::FieldNo{2},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Boolean},
+      agiru::FieldDef{.offset = 33,
+                      .name = "Costed",
+                      .caption = "Costed",
+                      .calcFormula = "exist(\"Resource Cost\" where(Code = field(Code)))",
+                      .no = agiru::FieldNo{3},
+                      .fieldClass = agiru::FieldClass::FlowField,
+                      .type = agiru::FieldType::Boolean},
+  }};
+  static constexpr agiru::TableDef kExists{.id = agiru::TableId{50002},
+                                           .name = "Flow Exists",
+                                           .caption = "Flow Exists",
+                                           .fields = kExisting,
+                                           .keys = kKeys};
+  agiru::detail::RecordState reversed;
+  reversed.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "Yes"});
+  const agiru::detail::Selection settled = agiru::detail::Select(&reversed, kExists);
+  CHECK_TRUE("-exist filters on NOT EXISTS",
+             settled.where.find("NOT EXISTS(SELECT 1 FROM \"Resource Cost\"") != std::string::npos);
+  agiru::detail::RecordState plain;
+  plain.filters.push_back(
+      agiru::detail::FieldFilter{.field = agiru::FieldNo{3}, .group = 0, .text = "Yes"});
+  const agiru::detail::Selection costed = agiru::detail::Select(&plain, kExists);
+  CHECK_TRUE("and the negative control: a plain exist keeps its EXISTS",
+             costed.where.find("EXISTS(SELECT 1 FROM \"Resource Cost\"") != std::string::npos &&
+                 costed.where.find("NOT EXISTS") == std::string::npos);
   // THE NEGATIVE CONTROL: a FlowField whose formula names a table the catalogue lacks refuses,
   // naming the field, rather than dropping the filter.
   static constexpr std::array<agiru::FieldDef, 1> kOrphan{{

@@ -2499,7 +2499,8 @@ bool MentionsXRec(const std::string &body) {
 std::string BindsBefore(const std::string &body, const std::string &qualified, bool ownTable) {
   if (!MentionsXRec(body)) { return {}; }
   const std::string from = ownTable ? "this->StoredImage()" : "Rec.StoredImage()";
-  return "  " + qualified + " &XRec = " + from + ";\n\n";
+  const std::string type = qualified.empty() ? std::string("auto") : qualified;
+  return "  " + type + " &XRec = " + from + ";\n\n";
 }
 
 std::string SourceOfPage(const al::TableObject *source, const Objects &objects) {

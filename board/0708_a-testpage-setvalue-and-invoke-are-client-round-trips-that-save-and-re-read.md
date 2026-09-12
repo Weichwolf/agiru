@@ -40,3 +40,12 @@ every use (`Relink_`), which is the predecessor's second half.
 **Class: activation.** `Modify(true)` after every `SetValue` on an existing record runs every
 table's `OnModify` where nothing ran before; the A/B is over the whole suite (run 121 against run
 120), and on a loss the list names the deeper roots and the save is split from the re-read.
+
+**Measured (run 121 against run 120, 2026-09-12):** 1 909 -> 1 926 of 2 296, GAINED 29, LOST 12.
+The round trip, the page events (`OnOpenPageEvent`, `OnAfterGetCurrRecordEvent` and the rest),
+the caption, `-Exist`, `Editable = false` and the FlowField calculation landed together. Of the
+12 lost, 9 are the FlowField calculation at landing reaching two formula gaps it had never reached
+-- `const(Database::X)` bound as words, and a term over the target's own FlowField read as a
+column -- and 1 (`TestDeletingAllLinesUpdatesTotalsDiscountPct`) passes when the codeunit runs
+alone (a "Shipment Date before work date" message keyed on the date the run crossed); both gaps
+are fixed in the round that follows, with gate cases. Kept.

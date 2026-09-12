@@ -221,6 +221,18 @@ struct RecordState;
 ///       index that makes that statement fast, not a second code path.
 void CalcField(void *record, const TableDef &table, const RecordState *state, FieldNo no);
 
+/// \brief `CalcField` the way a PAGE calculates what it shows: a stored field, or a FlowField whose
+///        formula names a table this build does not carry, is left alone rather than refused --
+///        the page shows the field whether or not a test reads it, and a refusal there would stop
+///        every landing on the page.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param state  Its filters, for the formula's `FIELD(FILTER(...))` terms.
+/// \param no     The field.
+/// \return Whether the field was calculated.
+/// \throws Error what `CalcField` throws for a formula this runtime cannot read.
+bool CalcFieldIfCarried(void *record, const TableDef &table, const RecordState *state, FieldNo no);
+
 /// \brief AL `Record.CalcSums(Field)` for ONE field: the sum of that column over the rows the
 ///        record's filters select.
 ///

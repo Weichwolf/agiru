@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
+#include "meta/PageDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Error.h"
@@ -19,9 +20,11 @@
 #include "type/Text.h"
 #include "type/Variant.h"
 
+#include <array>
 #include <concepts>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -109,6 +112,96 @@ template <typename P> struct ControlTrigger {
 ///       reaching it needs a running UI (board:0030).
 namespace detail {
 template <typename P> void OpenPage(P &page, bool editable, bool isNew);
+
+/// \brief Calculates the FlowFields a page's controls show, the way the platform does BEFORE the
+///        record's `OnAfterGetRecord` runs: a page trigger reads `Rec.Balance` calculated, and a
+///        test's `AssertEquals` on that control reads the value and not zero.
+/// \param record   The page's record, positioned.
+/// \param table    Its declaration.
+/// \param controls The page's layout, walked through every container.
+/// \note A FORMULA OVER A TABLE OUTSIDE THE BUILD IS LEFT ALONE (`CalcFieldIfCarried`): the page
+///       shows the field whether or not a test reads it, and refusing there would stop every
+///       landing on the page.
+void CalcShownFlowFields(void *record, const TableDef &table, std::span<const ControlDef> controls);
+
+/// \brief The data caption a page composes from its record
+/// (`devenv-datacaptionfields-property.md`):
+///        a CARD takes the table's `DataCaptionFields` (its primary key when it declares none) from
+///        the current record; a TABULAR page shows one only where a filter on a field the page
+///        lists fixes a single value -- through the field's `TableRelation` to the related table's
+///        own `DataCaptionFields`, or the value itself where there is no relation.
+/// \param record The page's record.
+/// \param table  Its declaration.
+/// \param type   The page's `PageType`.
+/// \param fields The page's `DataCaptionFields` property as AL wrote it, empty for none.
+/// \return The data caption, empty when nothing composes one.
+std::string
+PageDataCaption(const void *record, const TableDef &table, PageType type, std::string_view fields);
+
+/// \brief Raises one of the PAGE'S PLATFORM EVENTS (`devenv-event-types.md`, the page table):
+///        `OnOpenPageEvent`, `OnAfterGetRecordEvent`, `OnAfterGetCurrRecordEvent`,
+///        `OnNewRecordEvent`, `OnInsertRecordEvent`, `OnModifyRecordEvent`, `OnDeleteRecordEvent`,
+///        `OnQueryClosePageEvent`, `OnClosePageEvent`, `OnBeforeActionEvent`,
+///        `OnAfterActionEvent`. The runtime raises them, never the generated page, because they
+///        fire whether or not the page declares the trigger -- `VAT Report Mgt.` sends its
+///        notification from `VAT Return Period List`'s `OnOpenPageEvent`, `OAuth 2.0 Mgt.` from
+///        `OAuth 2.0 Setup`'s `OnAfterGetCurrRecordEvent`, and neither page has the trigger
+///        (4 UT cases, "Queue underflow", 2026-09-12). The BaseApp subscribes 38 times to
+///        `OnModifyRecordEvent`, 20 to `OnOpenPageEvent`, 17 each to insert and delete.
+/// \tparam P      The generated page class.
+/// \tparam Values The event's argument types, `Rec` first.
+/// \param page    The page, for its number and name.
+/// \param event   The event's name.
+/// \param element The action's name for the action events, empty otherwise.
+/// \param names   The event's parameter names, the way the table documents them.
+/// \param values  The arguments.
+template <typename P, typename... Values>
+void RaisePageEvent(P &page,
+                    std::string_view event,
+                    std::string_view element,
+                    std::span<const std::string_view> names,
+                    Values &...values) {
+  static_cast<void>(page);
+  if constexpr (requires {
+                  PageTraits<P>::kId.Value();
+                  PageTraits<P>::kName;
+                }) {
+    ::agiru::detail::RaiseEventOn(EventObject::Page,
+                                  PageTraits<P>::kId.Value(),
+                                  PageTraits<P>::kName,
+                                  event,
+                                  element,
+                                  names,
+                                  values...);
+  }
+}
+
+/// \brief `RaisePageEvent` for the events that carry only `var Rec`.
+/// \tparam P The generated page class.
+/// \param page    The page.
+/// \param event   The event's name.
+/// \param element The action's name for the action events, empty otherwise.
+template <typename P>
+void RaisePageRecordEvent(P &page, std::string_view event, std::string_view element = {}) {
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    static constexpr std::array<std::string_view, 1> kNames{"Rec"};
+    RaisePageEvent(page, event, element, kNames, page.Rec);
+  }
+}
+
+/// \brief Whether a property's text says `false`, case folded the way AL reads it.
+/// \param property The property text, empty where AL declares none.
+/// \return True only for `false`.
+[[nodiscard]] constexpr bool SaysFalse(std::string_view property) {
+  if (property.size() != 5) { return false; }
+  constexpr std::string_view kFalse = "false";
+  for (std::size_t i = 0; i < kFalse.size(); ++i) {
+    const char c = property[i];
+    const char lower = c >= 'A' && c <= 'Z' ? static_cast<char>(c - 'A' + 'a') : c;
+    if (lower != kFalse[i]) { return false; }
+  }
+  return true;
+}
 
 /// \brief Puts a page's `SourceTableView` on its record, as FILTER GROUP 2.
 ///
@@ -210,8 +303,18 @@ namespace detail {
 /// \tparam P The generated page class.
 /// \param page The page.
 template <typename P> void AfterGetRecord(P &page) {
+  if constexpr (requires {
+                  PageTraits<P>::kPage.layout;
+                  page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{});
+                }) {
+    using Source = std::remove_cvref_t<decltype(page.Rec)>;
+    detail::CalcShownFlowFields(
+        static_cast<void *>(&page.Rec), TableTraits<Source>::kTable, PageTraits<P>::kPage.layout);
+  }
   if constexpr (requires { page.OnAfterGetRecord(); }) { page.OnAfterGetRecord(); }
+  RaisePageRecordEvent(page, "OnAfterGetRecordEvent");
   if constexpr (requires { page.OnAfterGetCurrRecord(); }) { page.OnAfterGetCurrRecord(); }
+  RaisePageRecordEvent(page, "OnAfterGetCurrRecordEvent");
 }
 
 /// \brief Starts a new record on a page the way the platform does: the page notes it, then
@@ -222,6 +325,12 @@ template <typename P> void AfterGetRecord(P &page) {
 template <typename P> void StartNewRecord(P &page, bool belowXRec) {
   page.StartedNewRecord();
   if constexpr (requires { page.OnNewRecord(::agiru::Boolean{}); }) { page.OnNewRecord(belowXRec); }
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "BelowxRec", "xRec"};
+    ::agiru::Boolean below = belowXRec;
+    auto &before = page.Rec.StoredImage();
+    RaisePageEvent(page, "OnNewRecordEvent", {}, kNames, page.Rec, below, before);
+  }
 }
 
 /// \brief Opens a page the way the platform does: `OnInit`, the record positioned (or a new one
@@ -234,10 +343,17 @@ template <typename P> void StartNewRecord(P &page, bool belowXRec) {
 ///       the third period drilled down into the first one before (24 UT cases, 2026-09-09).
 /// \tparam P The generated page class.
 /// \param page     The page.
-/// \param editable Whether it opens for editing.
+/// \param editable Whether it opens for editing; a page whose `Editable` property is `false`
+///                 opens for viewing whatever the caller asked (`devenv-editable-property.md`), so
+///                 `TestPage.Editable()`, every control's `Editable()` and `CurrPage.Editable`
+///                 answer false on `VAT Return Period Card` (5 UT cases, 2026-09-12).
 /// \param isNew    Whether it opens on a new record (`OpenNew`).
 template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
-  page.OpenedAs(editable);
+  bool opensEditable = editable;
+  if constexpr (requires { PageTraits<P>::kPage.editable; }) {
+    opensEditable = editable && !detail::SaysFalse(PageTraits<P>::kPage.editable);
+  }
+  page.OpenedAs(opensEditable);
   if constexpr (requires { page.OnInit(); }) { page.OnInit(); }
   bool found = false;
   if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
@@ -261,6 +377,7 @@ template <typename P> void OpenPage(P &page, bool editable, bool isNew) {
     }
   }
   if constexpr (requires { page.OnOpenPage(); }) { page.OnOpenPage(); }
+  RaisePageRecordEvent(page, "OnOpenPageEvent");
   if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
     if (!isNew) {
       using Source = std::remove_cvref_t<decltype(page.Rec)>;
@@ -284,7 +401,14 @@ template <typename P> void ClosePage(P &page) {
       throw Error("the page refused to close (OnQueryClosePage)");
     }
   }
+  if constexpr (requires { page.Rec.ValidateText(::agiru::FieldNo{}, std::string_view{}); }) {
+    static constexpr std::array<std::string_view, 2> kNames{"Rec", "AllowClose"};
+    ::agiru::Boolean allowClose = true;
+    RaisePageEvent(page, "OnQueryClosePageEvent", {}, kNames, page.Rec, allowClose);
+    if (!allowClose) { throw Error("the page refused to close (OnQueryClosePageEvent)"); }
+  }
   if constexpr (requires { page.OnClosePage(); }) { page.OnClosePage(); }
+  RaisePageRecordEvent(page, "OnClosePageEvent");
 }
 
 /// \brief Hands the record a `Page.Run(Rec)` names to the page: its filters, and its position.
