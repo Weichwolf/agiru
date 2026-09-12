@@ -109,3 +109,25 @@ allocation and the free with stacks. This box does not carry that build yet; sta
 separate CMake config, ASan-instrumented libc++), is the work that closes this. Until then the
 milestone retry keeps the measure honest and 213 (`OnSourceText`) stays shelved because its page-code
 growth is what tips the corpse from a caught exception onto an unmapped page.
+
+## comment (2026-09-12, part 3) -- it gates EVERY codegen change, not just 213
+
+board:0718 was taken to be 213-shaped (213 regenerates the item-tracking page). It is worse than
+that. batch218 (a generic transpiler fix: a table's/page's own `[TryFunction]` called `if not X()`
+is wrapped in `Tried`) touches 175 generated units and NONE of them is `ItemTrackingLines` -- yet
+build C (202-212+214+215+218) SEGFAULTs `SCM Available to Pick UT` on BOTH standalone runs, where
+build B (202-212+214+215, runtime-only) was a deterministic 35 of 49 on both. Milestone run 137
+finished 2 194 of 2 310 only because the retry carried the crash; the A/B is -7 / +0, and every one
+of the seven is an item-tracking Pick case (`PickPositive`, `PickAndShipment*`, the breakbulk
+summary) failing on `Qty. to Handle ... is 4, must be 10` -- the dead read handing back a partial
+quantity.
+
+So ANY change that shifts the heap -- a codegen change to unrelated objects is enough -- tips this
+corpse from the lucky layout (build B, 35) to a crash. That makes board:0718 the gate on all
+transpiler work, not a side issue: 213 and 218 are both correct and both unshippable until the
+premature free is found. batch218 is taken back (reverted on the tree, kept as `$S/batch218.py`) and
+waits on this; batch213 the same. The measurement stands: two correct fixes, both -7 through the
+same corpse.
+
+The fix needs a sanitizer build. Runtime-only fixes (214, 215) do NOT tip it -- they keep the
+build-B layout -- so work that does not change codegen can still ship while this is open.
