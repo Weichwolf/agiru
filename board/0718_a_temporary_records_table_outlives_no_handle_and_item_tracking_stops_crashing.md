@@ -239,3 +239,28 @@ narrowed the qty root:
   loop `Validate`+`Insert` through the same variable with an intervening `Rec.Copy(other)`, assert
   `XRec` stays valid and shows iteration k-1's values after iteration k's `Insert`. A "4 vs 10" gate
   would be BLIND while the codeunit is non-deterministic.
+
+## comment (2026-09-12, part 7) -- ASan WITH the fix is CLEAN: the UAF is closed, the rest is functional
+
+Rebuilt build-asan WITH the image-lifetime fix and ran SCM Available to Pick UT under it: 0
+AddressSanitizer errors, deterministic 28/49. So the fix fully closes the before-image
+use-after-free -- part 4's "raw overwrite upstream" and the al-semantics pass's "second corruption"
+are both DISPROVEN; there is no residual memory corruption. The image-lifetime fix
+(EnsureImageRecord + CopyStateFrom preserve) is correct and complete for memory safety.
+
+The remaining 21 SCM failures are therefore all FUNCTIONAL (debuggable normally), in these shapes:
+- ~9  item-tracking QUANTITY: "Qty. to Handle (Base) ... is 4. It must be 10" / "...125",
+      "Item tracking lines ... must account for the same quantity. Expected: 10, Tracking total: 0"
+- 7   "Nothing to handle." (the pick's available-to-pick finds nothing)
+- 2   ".NET member EntityText.ReadPermission is named by AL and not rebuilt (board:0035)"
+- 2   asserterror text gap: BC's "Nothing to handle." carries a hint suffix
+      '\Try the "Show Summary (Directed Put-away and Pick)" option when creating pick to inspect
+      the error.' that agiru omits
+- 1   "ConfirmHandlerTrue named and never ran (board:0054)"
+- 1   "Quantity (Base) must be 0 or 1 when Serial No. is stated."
+
+So board:0718 splits: the MEMORY root is solved (fix staged, ASan-clean), and what remains is a
+FUNCTIONAL item-tracking-quantity cluster. The image fix must still land WITH enough of that
+cluster to clear the -7 (SCM 28 -> at least 35). That is multi-round item-tracking work; the fix
+stays staged ($S/*.staged) and the qty is the next shape. batch213/218 codegen unblock the moment
+the fix lands net-positive.
