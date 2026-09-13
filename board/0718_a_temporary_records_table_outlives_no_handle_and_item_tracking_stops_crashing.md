@@ -306,3 +306,196 @@ image fix. NEXT: instrument ItemTrackingDataCollection's undefined-qty (UpdateTr
 empty-state image drops it to 4, and either fix that computation or refine the image fix to preserve
 what the data collection reads (without reintroducing the UAF or the self-referential state copy).
 This is the one thing that makes the image fix net-neutral and unblocks all codegen.
+
+## comment (2026-09-13, part 10) -- the "4" is CONSTANT, so the image fix INTRODUCES it (reframe corrected)
+
+Read the actual failures in one deterministic image-fix run (scmstate.log, the CaptureImage-in-place
+variant, 28/49):
+- PickAndShipmentPositive/Negative/Partial: "Qty. to Handle (Base) ... is currently 4. It must be 10."
+- DirectedPutAwayPickSimpleScenarioNotAllowBreakbulkSummaryPage: "... is currently 4. It must be 125."
+- DirectedPutAwayPickNoPicksForMultiItem...: "Quantity (Base) must be 0 or 1 when Serial No. is stated."
+
+The ACTUAL is ALWAYS 4, whatever the expected (10, 10, 10, 125). A genuine functional undefined-qty
+bug would TRACK the input (10->x, 125->y); a CONSTANT 4 that ignores the input means the image fix
+CORRUPTS the item-tracking write path -- it does NOT expose a pre-existing deterministic qty bug.
+=> The earlier "reframe" (qty=4 is the true deterministic answer, 10 was UAF luck) is WRONG. Committed
+code gives the correct value (lucky). The in-place image mechanism itself introduces a fixed-4.
+
+Where 4 can come from (found by reading ItemTrackingLines.Page.al):
+- CalculateSums(): `xTrackingSpec.Copy(Rec); Rec.Reset(); Rec.CalcSums("Quantity (Base)",...);
+  TotalTrackingSpecification := Rec; Rec.Copy(xTrackingSpec)` over the TEMPORARY "Tracking
+  Specification" (Rec). UndefinedQtyArray[1] = SourceQuantityArray[1] - Total."Quantity (Base)".
+- AssignSerialNoBatch loop: each SN row does `Rec.Validate("Quantity (Base)", QtySignFactor())` (=1),
+  `Rec."Entry No." := NextEntryNo()` (plain LastEntryNo+1, cannot stick), `Rec.Insert()`.
+- The "Quantity (Base) must be 0 or 1 when Serial No. is stated" case is decisive: a row was Inserted
+  with Serial No. set AND Quantity(Base) NOT in {0,1} -- i.e. the in-place image/Copy corrupts Rec's
+  field values between Validate(=1) and Insert. So the fix's `*image = *this` (Derived copy-assign,
+  which also copies the StateHandle base) plus AdoptTemporaryOf plausibly aliases image<->Rec's temp
+  rows and writes a stale/shared value back.
+
+Ruled out by reading: TempCalcSum (correct, sums all rows honoring filters), NextEntryNo (plain
+increment), TestTempSpecificationExists (only checks entries <= pre-loop LastEntryNo, cannot fire
+mid-loop). Static analysis is exhausted (matches parts 5-9).
+
+ACTION TAKEN: env-gated runtime trace AGIRU_TRACE_ITT added to src/rt/Temporary.cpp (TempInsert /
+TempDelete / TempDeleteAll / TempCalcSum), logging table "Tracking Specification"'s row count and each
+row's Entry No./Serial No./Lot No./Quantity (Base)/Qty. to Handle/Buffer Status, plus each CalcSum's
+field/rows/sum/per-row values. Built with the staged image fix applied; running the SCM codeunit under
+the trace to see (a) whether inserts cap at 4 rows or (b) rows carry a wrong Quantity(Base), and where
+the value diverges. Fix the fix so it is memory-safe AND does not touch the written values.
+
+## comment (2026-09-13, part 11) -- ROOT REDIRECT: it is Reservation Entry tracking on an UNTRACKED item, NOT AssignSerialNoBatch
+
+al-semantics agent + source reading settled the paradox in parts 9/10. The seven image-fix-regressed
+tests (PickPositive/Negative/Partial, PickAndShipmentPositive/Negative/Partial, SimpleScenario) use
+`LibraryInventory.CreateItem` -- which assigns NO Item Tracking Code. The item is UNTRACKED. The Pick
+procedure (SCMAvailabletoPickUT.Codeunit.al:2758) has NO OpenItemTrackingLines, NO AssignSerialNo, NO
+serial numbers: just CreateItem + purchase + AutoReserveSalesLine (reservation, not tracking) +
+CreateInvtPutPickSalesOrder + CheckPick. So AssignSerialNoBatch / the "always 4" count is a RED
+HERRING -- the earlier parts chased the wrong procedure.
+
+The real throw path (all in TrackingSpecification.Table.al):
+- WhseActivityPost / SalesPost call `CheckItemTrackingQuantity(TableNo, ...)` (:1113).
+- It filters `ReservationEntry.SetSourceFilter(...)` then `ReservationEntry.SetFilter("Item Tracking",
+  serial-types...)` and calls `CheckItemTrackingByType` (:1150).
+- CheckItemTrackingByType: `ReservationEntry.CalcSums("Qty. to Handle (Base)")` -> HandleQtyBase; if
+  `Abs(HandleQtyBase) > Abs(QtyToHandleBase)` it FindLast + TransferFields + TestFieldError, which
+  throws WrongQtyForItemErr "currently <HandleQtyBase> must be <QtyToHandleBase>  ... serial number
+  <ReservationEntry."Serial No.">".
+
+DECISIVE: `"Item Tracking"` is a STORED field on Reservation Entry, set by GetItemTrackingEntryType()
+from Serial/Lot/Package No. For an UNTRACKED item every reservation entry is Serial No.='' ->
+"Item Tracking" = None, so the SetFilter(serial-types) matches NOTHING -> HandleQtyBase = 0 -> Abs(0)
+> Abs(qty) is false -> the check is INERT. That is why committed code passes (lucky). The error names
+"serial number GL00000118" (POPULATED) -> agiru's reservation entries carry a non-blank Serial No.
+for an untracked item, so the serial-types filter matches them and the sum path activates.
+
+=> ROOT: the board:0718 image fix corrupts a field copy during AutoReserveSalesLine / reservation-
+entry creation, writing a garbage Serial No. (and thus "Item Tracking" != None) into Reservation
+Entry (table 337). This is an ACTIVATION bug (a tracking check dead for untracked items now runs),
+consistent with the platform note (devenv-system-defined-variables.md): xRec MAY share underlying
+state with Rec and changes can propagate to Rec -- and the uncommitted fix makes xRec share Rec's
+TempHandle (AdoptTemporaryOf). Related open item: board:0507 (CalcSums + current key over the
+"Item Tracking" SumIndexField).
+
+NEXT: trace must move to Reservation Entry (337), not Tracking Specification (336). Add a trace to the
+SQL CalcSum path (src/rt/Table.cpp) + the reservation-entry write path logging "Serial No." and
+"Item Tracking"; run PickPositive; find where the garbage Serial No. is written during reservation.
+Editing only Table.cpp/Temporary.cpp (not the door headers, already built) is a fast relink.
+
+## comment (2026-09-13, part 12) -- CONFIRMED via runtime trace: leftover committed serials leak into later postings
+
+Env-gated trace (AGIRU_TRACE_ITT) over Tracking Specification (336) + Reservation Entry (337),
+built on the image fix. Findings:
+
+1. Tracking Specification serial assignment is CORRECT: tracked tests insert 5 serial rows (GL00000117
+   -0121, each Qty=1), CalcSums("Quantity (Base)")=5. No "4" here.
+2. The CheckItemTrackingByType SQL CalcSums("Qty. to Handle (Base)") over Reservation Entry (337)
+   returns 0 (47x) or 5 (1x) -- NEVER 4. So that is NOT the thrower.
+3. The "currently 4" is the OTHER thrower: ItemJnlPostLine.SetupSplitJnlLine (ItemJnlPostLine.
+   Codeunit.al:3978) does `TempTrackingSpecification.CalcSums("Qty. to Handle (Base)",...)` then
+   `TestFieldError(..., SignFactor * ItemJnlLine2."Quantity (Base)")`. The trace shows, right before
+   each failing test's error, a Tracking Specification temp CLEARED (deleteall n=0) then populated
+   with exactly 4 rows -- Entry No. 1-4, Serial No. GL00000118, GL00000119, GL00000120, GL00000121,
+   each Qty. to Handle=1 -> CalcSums=4 -> TestFieldError(4, 10 or 125) -> WrongQtyForItemErr.
+4. GL00000118-0121 are 4 of the 5 serials the FIRST-running test (DirectedPutAwayPickNoPicksForMultiItem,
+   line 2155) created (117-121). That test itself FAILS ("Quantity (Base) must be 0 or 1"), but it
+   posts a warehouse receipt (Commit) BEFORE failing, so the serial reservation/tracking entries are
+   made durable. Every LATER untracked test's item-journal posting (put-away registration) then
+   retrieves these leftover serials into its posting TempTrackingSpecification, even though its own
+   item is untracked -- and the error reports GL00000115 (MultiItem's item), not the current test's.
+
+So the -7 is: the image fix (correctly) lets MultiItem run far enough to Commit serials; those leak
+into 7 later postings. Committed code CRASHED MultiItem (UAF) before it created serials, so no leak ->
+those 7 passed (lucky). The leak is a GENUINE agiru bug the fix exposes (activation).
+
+OPEN QUESTION being measured now: is it (B) an UNSCOPED retrieval -- agiru reads leftover Reservation/
+Tracking entries not belonging to the current document because a SetRange/SetCurrentKey/CalcSums-key
+filter is not applied (board:0507: "CalcSums needs its key to be current, and both use the filters") --
+or (A) a TEST-ISOLATION gap -- BC rolls back per-test INCLUDING commits (devenv-testisolation-property:
+"all database changes are rolled back, including changes explicitly committed"), agiru's RunOne does
+scope.Keep()/Discard per method and never undoes a Commit. Querying a kept scratch DB for the leftover
+serials' Source IDs + whether item numbers increment decides A vs B.
+
+## comment (2026-09-13, part 13) -- FIX FOUND & SCM-VALIDATED: test isolation (Commit is a no-op during a test)
+
+Root, fully resolved: the contamination is a TEST-ISOLATION gap, not the image mechanism and not a
+filter bug.
+
+- The board:0718 image fix (CopyStateFrom preserves the before-image by move + CaptureImage reuses a
+  stable in-place image record) is CORRECT and ASan-clean. It is an ACTIVATION: the first-running
+  DirectedPutAwayPickNoPicksForMultiItem test used to CRASH (UAF) before it created serials; with the
+  fix it runs far enough to assign 5 serials (GL00000117-0121) to a purchase line and Commit them (the
+  warehouse-receipt posting commits), then FAILS ("Quantity (Base) must be 0 or 1").
+- agiru's Commit() is DURABLE (Boundaries::Commit releases+recreates savepoints; the invariant
+  "a Commit makes prior work survive a later rollback"). So when MultiItem fails, its RunOne
+  scope.Discard rolls back the uncommitted part (incl. number-series increments) but the COMMITTED
+  serials persist -> an inconsistent leftover. Every later untracked test reuses the rolled-back
+  journal template/line numbers, so RetrieveItemTrackingFromReservEntry (ItemJnlPostLine:176 ->
+  SetupSplitJnlLine:3978 TempTrackingSpecification.CalcSums("Qty. to Handle (Base)")) matches the 4
+  surviving serials -> CalcSums=4 -> TestFieldError(4, put-away qty) -> WrongQtyForItemErr
+  "currently 4 ... serial GL00000118". Committed code never leaked because MultiItem crashed first.
+- BC's platform rolls this back: devenv-testisolation-property.md -- "all database changes are rolled
+  back, INCLUDING changes explicitly committed to the database by using the Commit Method." So under
+  BC test isolation a test's Commit is not truly durable; a failing test leaves NOTHING.
+
+FIX (generic, uses existing machinery): RunOne (src/rt/TestRunner.cpp) now wraps each test in
+`const CommitScope isolate{CommitBehavior::Ignore};` (agiru already had CommitScope for
+[CommitBehavior(Ignore)]). Commit() becomes a no-op for the test's duration, so:
+  - PASS -> scope.Keep() persists everything (unchanged: passing tests Keep either way; identical end
+    state, since a durable Commit + Keep and an ignored Commit + Keep both release the same savepoint).
+  - FAIL -> scope.Discard() rolls back EVERYTHING incl. would-be-commits -> no inconsistent leftover.
+  asserterror keeps its own inner savepoint, so Commit-boundary tests are unaffected.
+
+MEASURED (SCM Available to Pick UT, --fresh --scratch, work-date 2028-01-25):
+  committed (lucky UAF) = 35/49 ; image fix only = 28/49 (-7 contamination) ;
+  image fix + CommitScope(Ignore) = 35/49  <- the 7 recovered, deterministically, memory-safe.
+
+Full-suite A/B (candidate = image fix + iso fix) RUNNING to confirm net >= 2204 across all 78
+codeunits (the iso fix is global: it may recover contamination elsewhere, or expose Commit-durability
+/ multi-session tests). If net >= 2204 and make test holds the 7-red gate, LAND image fix + iso fix
+together (remove the AGIRU_TRACE_ITT diagnostics first) -- this also unblocks codegen (PEPPOL +13,
+batch213/218, metadata), which was -7 only through this same SCM contamination.
+
+## comment (2026-09-13, part 14) -- crude iso TAKEN BACK (-15); refined to a SAVEPOINT FLOOR
+
+Full-suite A/B of the crude fix (CommitScope(Ignore) per test): image fix + crude iso = 2189/2310 --
+a NET LOSS of 15 vs committed 2204. A/B vs image-only (f140=2197): fixed 7 (the SCM cluster), BROKE
+15 -- 14 in "Payment Export Validation UT" (all "Assert.IsFalse failed. Expected Error message cannot
+be found.") + 1 "Price Worksheet Line UT". So CommitScope(Ignore) is too crude: those tests rely on
+Commit to PERSIST an error log across an INNER rollback (a Codeunit.Run around the validation), then
+read it back; making Commit a no-op loses the log. An undo is a result -- taken back.
+
+REFINED FIX (the correct BC-matching semantics): a SAVEPOINT FLOOR, not a Commit no-op.
+- Boundaries gains `isolationFloor_` + `SetIsolationFloor(depth)`; `Commit` releases/recreates only
+  savepoints ABOVE the floor (floor=0 -> byte-identical to before, so postings are unchanged).
+- A new RAII `detail::TestIsolation` (opened in RunOne after the test's Scope) raises the floor to the
+  test's own savepoint depth for the test's duration.
+Effect: a Commit inside a test still shields its writes from an INNER rollback (its work merges down
+only to the TEST boundary, not to depth 0), so error-log-across-Codeunit.Run patterns keep working;
+but the test's Scope savepoint SURVIVES the Commit, so on failure scope.Discard rolls the test back
+past even its commits -- exactly devenv-testisolation-property ("all database changes are rolled back,
+including changes explicitly committed"). PASS keeps everything (unchanged); FAIL leaves nothing.
+
+Predicted: SCM stays 35/49 (leftover gone), Payment Export + Price Worksheet recover (Commit-across-
+inner-rollback preserved), net >= 2204. Building + validating on those 3 codeunits, then the full
+suite. If net >= 2204 and make test holds the 7-red gate, LAND image fix + floor iso together and
+remove the AGIRU_TRACE_ITT diagnostics.
+
+## comment (2026-09-13, part 15) -- status: fix specified & SCM-validated; HELD BACK from main pending full-suite A/B
+
+The complete fix is specified above (part 13 image fix + part 14 savepoint-floor test isolation) and
+was implemented and compiling. Measured so far: image fix + iso = SCM 35/49 (recovers the -7). The
+crude CommitScope(Ignore) iso was full-suite-measured at 2189 (-15, broke Payment Export) and taken
+back; the refined savepoint-floor version was built but NOT yet full-suite-validated.
+
+It is deliberately NOT landed on main here: the floor changes core Boundaries::Commit (used by every
+posting), so it must clear a full-suite A/B (>= 2204) + make test (7-red) before landing, to protect
+the posting all-or-nothing invariant. This commit keeps main's CODE at the known-good state and
+records the finished diagnosis + fix design in this WI.
+
+TO LAND (next session): re-apply parts 13-14 (image fix to RecordState.h/Table.h; SetIsolationFloor +
+TestIsolation to Transaction.h/cpp; TestIsolation guard in RunOne), `make`, then
+`scripts/ut-milestone.sh` full A/B -- expect SCM +7, Payment Export/Price Worksheet unbroken (floor
+preserves Commit-across-inner-rollback), net >= 2204. If green, land; this also removes the codegen -7
+tax (PEPPOL +13, batch213/218, metadata were negative only through this SCM contamination).
