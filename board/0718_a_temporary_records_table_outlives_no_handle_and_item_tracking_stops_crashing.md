@@ -287,3 +287,22 @@ Reservation Entry. Once SCM holds its count with the image fix applied, the imag
 net-neutral, codegen is free, and NumberStyles+the PEPPOL chain (+13), batch213/218, and the gated
 metadata fixes all follow. Staged: image fix ($S/*.staged), NumberStyles/Decimal
 ($S/numberstyles.h.staged, $S/dotnet_decimal.h.staged) + Door.cpp map entries after CultureInfo.
+
+## comment (2026-09-13, part 9) -- the qty "4" is UndefinedQtyArray[1] from the data collection
+
+Traced the count: AssignSerialNo (ItemTrackingLines.Page.al) computes
+`QtyToCreate := UndefinedQtyArray[1] * QtySignFactor()`, round-trips it through the "Enter Quantity
+to Create" page (SetFields -> RunModal(handler only sets CreateSNInfo, not the qty) -> GetFields),
+and passes it to AssignSerialNoBatch. So the "is 4, must be 10" is UndefinedQtyArray[1] = 4 where 10
+is expected -- the UNDEFINED (still-to-assign) quantity that the Item Tracking Data Collection
+computes. That collection is the one place the image-lifetime fix's Copy/Capture changes bite (it
+uses Copy(Rec,true)/temp records heavily), so the fresh/empty-state image perturbs the undefined-qty
+math from 10 to 4.
+
+So the keystone fix is NOT in AssignSerialNoBatch and NOT in the page round-trip -- it is that the
+Item Tracking Data Collection's undefined-quantity must stay 10 under the (correct, memory-safe)
+image fix. NEXT: instrument ItemTrackingDataCollection's undefined-qty (UpdateTrackingDataSetWithChange
+/ the SumUp of undefined) with the image fix applied, find where a Copy/Capture with the stable
+empty-state image drops it to 4, and either fix that computation or refine the image fix to preserve
+what the data collection reads (without reintroducing the UAF or the self-referential state copy).
+This is the one thing that makes the image fix net-neutral and unblocks all codegen.
