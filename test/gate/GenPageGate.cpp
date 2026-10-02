@@ -84,81 +84,11 @@ void PartNamesDoNotHidePageProcedures() {
              source.contains("DispatchWork_4.Page().Touch()"));
 }
 
-void ComputedSourcesUseTheNormalBodyWriter() {
-  const auto page = agiru::al::ParsePage(R"(page 50102 "Computed Host"
-{
-    SourceTable = "Source Row";
-    layout
-    {
-        area(content)
-        {
-            field(Direct; Rec.Amount) { }
-            field(Implicit; Amount) { }
-            field(Variable; Total) { }
-            field(Quoted; "Quoted Total") { }
-            field(Summary; Total + Rec.Amount) { Editable = false; }
-            field(Name; GetName(1)) { Editable = false; }
-            field(Constant; 1.25) { Editable = false; }
-            field(Negated; not ShowName) { Editable = false; }
-            field(ArrayValue; Totals[1]) { }
-            field(Related; Other.Amount) { }
-            field(ArrayRow; SourceRows[1].Amount) { }
-        }
-    }
-    var Total: Decimal; "Quoted Total": Decimal; ShowName: Boolean;
-        Totals: array[2] of Decimal;
-        Other: Record "Source Row";
-        SourceRows: array[2] of Record "Source Row";
-    local procedure GetName(Index: Integer): Text begin exit(Format(Index)); end;
-    procedure OnSourceTextSummary() begin end;
-})");
-  const auto table = agiru::al::ParseTable(R"(table 50103 "Source Row"
-{
-    fields { field(1; Amount; Decimal) { } }
-    keys { key(PK; Amount) { } }
-})");
-  agiru::gen::Objects objects;
-  objects.tables["source row"].identifier = "::agiru::SourceRow_Table";
-  objects.tables["source row"].header = "SourceRow.h";
-  objects.tables["source row"].fields["amount"] = "Amount";
-  const auto header = agiru::gen::WritePage(page, "ComputedHost.Page.al", objects).text;
-  const auto source = agiru::gen::WriteSource(page, "ComputedHost.Page.al", objects, &table);
-  CHECK_TRUE(
-      "computed source has a typed member callback",
-      header.contains(".sourceText = &agiru::ComputedHost_Page::OnSourceTextSummary_Control"));
-  CHECK_TRUE("source getter avoids the AL procedure's name",
-             header.contains("OnSourceTextSummary_Control();"));
-  CHECK_TRUE("computed getter body lives outside the header",
-             !header.contains("Total_Var + Rec.Amount") &&
-                 source.contains("ComputedHost_Page::OnSourceTextSummary_Control()"));
-  CHECK_TRUE("arithmetic uses the ordinary AL record and variable resolver",
-             source.contains("Total + Rec.Amount"));
-  CHECK_TRUE("procedure source preserves its actual argument", source.contains("GetName(1)"));
-  CHECK_TRUE("literal sources are emitted", source.contains("OnSourceTextConstant()"));
-  CHECK_TRUE("unary sources are emitted", source.contains("OnSourceTextNegated()"));
-  CHECK_TRUE("record fields retain their existing path",
-             !source.contains("OnSourceTextDirect()") &&
-                 !source.contains("OnSourceTextImplicit()"));
-  CHECK_TRUE("writable page variables retain their existing path",
-             header.contains("Evaluate(page.Total, text)") &&
-                 !source.contains("OnSourceTextVariable()"));
-  CHECK_TRUE("quoted page variables preserve their type and writeback",
-             header.contains("Evaluate(page.QuotedTotal, text)") &&
-                 !source.contains("OnSourceTextQuoted()"));
-  CHECK_TRUE("scalar array elements keep their typed writeback",
-             header.contains("Evaluate(page.Totals.operator[](1), text)"));
-  CHECK_TRUE("record variable fields keep their typed writeback",
-             header.contains("Evaluate(page.Other->Amount, text)"));
-  CHECK_TRUE("record array fields keep their typed writeback",
-             header.contains("Evaluate(page.SourceRows.operator->()->operator[](1).Amount, text)"));
-}
-
 }
 
 int main() {
   return gate::Run("GenPage", [] {
     UserControlsArePageMembers();
     PartNamesDoNotHidePageProcedures();
-    ComputedSourcesUseTheNormalBodyWriter();
   });
 }

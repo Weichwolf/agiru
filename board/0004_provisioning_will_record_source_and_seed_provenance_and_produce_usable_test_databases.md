@@ -8,7 +8,6 @@ Depends on: 0013 schema contract; 0589 reproducible inputs.
 - Integrated scratch guards reject source/maintenance/template targets, unmarked databases, foreign owners, stale handles and identifier truncation. Acquisition is serialized in PostgreSQL. Clang: 80 local gate cases green; GCC: ConnectionInfo 16/16, ScratchGuard 18/18, RunnerDatabase 12/12. Legacy negative control: 4 red; all newly created fixture databases/roles were removed.
 - Changed-code analysis: 164/180 available units, 161 failed. New nullable-access and argument-identity findings were repaired; targeted RunnerDatabase/ScratchGuard checks now report only the pre-existing common Error.h finding. Full frozen integration of the scratch patch is pending; the live snapshot predates it.
 - `agiru_seeded`: template=true, connections allowed, no provenance row (2026-09-28 inspection). It supports a diagnostic rerun, not a sealed-seed A/B.
-- Read-only September 30 inspection: legacy User Personalization has nine columns, including wrongly stored User ID; complete symbols declare nineteen fields and five system fields. Correct declaration requires thirteen Normal columns plus five system fields; six lookups are not stored. Generic AddMissingColumns widens disposable clones, but does not validate old types/keys/defaults or remove the legacy FlowField column. Do not mutate or relabel the seed as complete.
 - `seed_demo.py` records building/complete identity and checks both transfer processes. `provision.sh` still ends with the obsolete transfer-not-implemented message.
 
 ## Implementation
@@ -18,7 +17,6 @@ Depends on: 0013 schema contract; 0589 reproducible inputs.
    Include System.app package identity/runtime/symbol hash separately from the demo version and BCApps commit. Validate field/enum/schema compatibility rather than assuming all version strings coincide.
 3. Support provenance inspection through maintenance metadata when template connections are disabled; clone only a complete sealed identity. Do not retrofit identity onto the legacy seed.
 4. Make provisioning resume by checked stages. Populate AllObj, Field and Page Metadata independently; an existing AllObj row must not skip the others. Record work-date policy.
-   Supply deployment tenant facts and the versioned platform feature catalogue through one provenance-bearing PostgreSQL authority. Do not guess tenant IDs from a database name, invent AAD identifiers, or seed every feature disabled. 0006 owns session selection, 0035 native setting signatures, 0034 declarations and 0044 virtual-table access; no second mutable configuration store.
 
 ## Acceptance
 

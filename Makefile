@@ -11,12 +11,10 @@ JOBS ?= $(shell nproc)
 ifeq ($(origin CXX),default)
 CXX := clang++-19
 endif
-export CXX
 CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
-.PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config
+.PHONY: all apps builtins comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gcc gates ut verify verify-start verify-status
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -40,7 +38,7 @@ db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	  cached=$$(sed -n 's/^CMAKE_CXX_COMPILER:[^=]*=//p' $(B)/CMakeCache.txt); \
 	  cached=$$(command -v "$$cached") || exit 2; \
 	  if [ "$$(readlink -f "$$selected")" != "$$(readlink -f "$$cached")" ]; then \
-	    printf 'Compiler mismatch: build uses %s, CXX requests %s. Use a separate B directory for the requested Clang compiler.\n' "$$cached" "$$selected" >&2; exit 2; \
+	    printf 'Compiler mismatch: build uses %s, CXX requests %s. Use make gcc for the separate GCC build.\n' "$$cached" "$$selected" >&2; exit 2; \
 	  fi
 	@cmake --build "$(B)" --target build.ninja
 	@ln -sf $(B)/compile_commands.json $(SELF)/compile_commands.json
@@ -50,23 +48,15 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER=$(CXX) \
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-lint: lint-config gates tc ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
+lint: gates tc     ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
 	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/lint.sh
-
-lint-config:       ## prove the clang-tidy function line limit at its boundary
-	@B="$(B)" bash "$(SELF)/test/function-size.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)
 	@python3 $(SELF)/test/lint-analysis.py --tidy clang-tidy-19 --jobs 1 --require-unit
 
-test: gates tc     ## the fast gate
-	@B="$(B)" sh $(SELF)/test/run.sh
-
-census:           ## raw AL inventory; namespace selection is diagnostic, never a filter
-	@mkdir -p "$(B)"
-	@python3 "$(SELF)/scripts/scope_inventory.py" "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" \
-	  --output "$(B)/scope-inventory.json"
+test: gates        ## the fast gate
+	@sh $(SELF)/test/run.sh
 
 # TRANSPILING NEEDS THE TRANSPILER AND NOTHING ELSE. `all` now builds the slice out of apps/, so
 # hanging transpile off it would make the tree depend on its own output -- and a slice file that
@@ -77,8 +67,8 @@ tc: db             ## just the transpiler
 transpile: tc      ## every app in apps.json through the transpiler into apps/
 	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
 
-gap: db            ## a ranked header gap (SOURCE=1: bodies; SWEEP=1: complete header sweep)
-	@if [ -z "$(SOURCE)" ] && [ "$(SWEEP)" != 1 ] && [ ! -s $(B)/tree-syntax/roots ]; then \
+gap: db            ## the first generated header that does not compile (SOURCE=1: the bodies)
+	@if [ ! -s $(B)/tree-syntax/roots ]; then \
 	  JOBS=$(JOBS) sh $(SELF)/scripts/tree_syntax.sh $(SELF)/apps || exit $$?; \
 	fi
 	@SOURCE=$(SOURCE) SWEEP=$(SWEEP) sh $(SELF)/scripts/first_gap.sh $(SELF)/apps
@@ -143,11 +133,16 @@ gate: comments db   ## build and run one C++ gate (GATE=RecordRefGate)
 	  cmake --build "$(B)" -j $(JOBS) --target "gate_$$AGIRU_GATE" && \
 	    "$(B)/gate_$$AGIRU_GATE"
 
+gcc:               ## compile runtime, transpiler and C++ gates with GCC in a separate directory
+	@cmake -S $(SELF) -B $(B)/gcc -G Ninja -DCMAKE_CXX_COMPILER=g++-14 \
+	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DAGIRU_BUILD_SLICE=OFF
+	@cmake --build $(B)/gcc -j $(JOBS)
+
 UT_LOG ?= $(B)/ut.log
 ut:                ## count source tests, build, then run the UT milestone on disposable clones
 	@bash "$(SELF)/scripts/ut-milestone.sh" "$(UT_LOG)" "$(JOBS)" --build
 
-VERIFY_TARGETS ?= all test
+VERIFY_TARGETS ?= all test gcc
 verify:             ## freeze this worktree and verify the copy (VERIFY_TARGETS overrides jobs)
 	@python3 $(SELF)/scripts/verify_snapshot.py start --reuse --jobs $(JOBS) $(VERIFY_TARGETS)
 

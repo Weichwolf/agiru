@@ -39,10 +39,18 @@ template <> struct agiru::OptionTraits<agiru::platform::FeatureKeyEnabled> {
 
 namespace agiru::platform {
 
-/// \brief AL platform table `Feature Key` (2000000211).
-/// \note The ten fields and primary key come from System.app's
-///       `Virtual Tables/FeatureKey.Table.al`, not the incomplete application buffer.
-///       This declaration does not supply a feature catalogue or activation policy.
+/// \brief AL table `Feature Key` (2000000211), a platform table with no `.al` source.
+///
+/// \note THE FIELD IMAGE IS `Feature Key Buffer` (table 2609) WORD FOR WORD, fields 1 to 8: the
+///       System Application's buffer copies the platform table one to one, which is what makes
+///       the image a reading and not a guess (openerp WI-1391, board:0636).
+///
+/// \note EMPTY, IT IS BEHAVIOUR-NEUTRAL. `Feature Management Impl.` reads a missing key as
+///       `Enabled::None`, and `IsEnabled` answers false -- which is what a refused `Get` also
+///       answered, except that the refusal stopped the test. Which features are on is DATA:
+///       BC's `CreateDemonstrationData.EnableNewFeatures` writes the rows when it builds CRONUS,
+///       and here they belong to the seed. A feature name in the runtime would be an AL object
+///       name in generic code.
 class FeatureKey_Table : public Table<FeatureKey_Table> {
 public:
   /// \brief The table number.
@@ -53,7 +61,7 @@ public:
   detail::StateHandle State_Block;
   /// \brief `ID` is `Text[50]`.
   static constexpr std::size_t kIdLength = 50;
-  /// \brief The descriptive texts are `Text[2048]` in the System declaration.
+  /// \brief The three descriptive texts are `Text[2048]`.
   static constexpr std::size_t kTextLength = 2048;
   /// \brief The feature's id, the primary key.
   Text<kIdLength> ID;
@@ -71,10 +79,6 @@ public:
   Boolean IsOneWay{};
   /// \brief Whether enabling it updates data.
   Boolean DataUpdateRequired{};
-  /// \brief The approximate software version when the feature becomes mandatory.
-  Text<kTextLength> MandatoryByVersion;
-  /// \brief The feature description in English.
-  Text<kTextLength> DescriptionInEnglish;
 
   /// \brief AL `FeatureKey.SystemId`.
   Guid SystemId;
@@ -97,8 +101,6 @@ public:
     static constexpr ::agiru::FieldNo CanTry{6};
     static constexpr ::agiru::FieldNo IsOneWay{7};
     static constexpr ::agiru::FieldNo DataUpdateRequired{8};
-    static constexpr ::agiru::FieldNo MandatoryByVersion{9};
-    static constexpr ::agiru::FieldNo DescriptionInEnglish{10};
   };
 
   /// \brief The primary key.
@@ -109,7 +111,7 @@ public:
 using FeatureKey = FeatureKey_Table;
 
 /// \brief The field table.
-inline constexpr std::array<FieldDef, 10> kFeatureKeyFields{{
+inline constexpr std::array<FieldDef, 8> kFeatureKeyFields{{
     Declare<&FeatureKey::ID>(FeatureKey::Field_No::ID, "ID", "ID", offsetof(FeatureKey, ID)),
     Declare<&FeatureKey::Enabled>(
         FeatureKey::Field_No::Enabled, "Enabled", "Enabled", offsetof(FeatureKey, Enabled)),
@@ -133,14 +135,6 @@ inline constexpr std::array<FieldDef, 10> kFeatureKeyFields{{
                                              "Data Update Required",
                                              "Data Update Required",
                                              offsetof(FeatureKey, DataUpdateRequired)),
-    Declare<&FeatureKey::MandatoryByVersion>(FeatureKey::Field_No::MandatoryByVersion,
-                                             "Mandatory By Version",
-                                             "Approximate mandatory version",
-                                             offsetof(FeatureKey, MandatoryByVersion)),
-    Declare<&FeatureKey::DescriptionInEnglish>(FeatureKey::Field_No::DescriptionInEnglish,
-                                               "Description In English",
-                                               "Description In English",
-                                               offsetof(FeatureKey, DescriptionInEnglish)),
 }};
 
 /// \brief The keys.

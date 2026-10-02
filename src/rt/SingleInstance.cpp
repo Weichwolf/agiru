@@ -1,6 +1,6 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 
 #include "SessionState.h"
