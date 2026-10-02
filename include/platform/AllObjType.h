@@ -14,7 +14,6 @@
 
 namespace agiru::platform {
 
-/// \brief Source ordinal identities shared by both object catalogues.
 enum class AllObjType : std::int32_t {
   TableData = 0,
   Table = 1,
@@ -43,9 +42,7 @@ enum class AllObjType : std::int32_t {
 
 }
 
-/// \brief Source option names and captions, including empty reserved positions.
 template <> struct agiru::OptionTraits<agiru::platform::AllObjType> {
-  /// \brief All 23 System-source positions in their declared order.
   static constexpr std::array<agiru::EnumValueDef, 23> kValues{{
       {.ordinal = 0, .name = "TableData", .caption = "TableData"},
       {.ordinal = 1, .name = "Table", .caption = "Table"},

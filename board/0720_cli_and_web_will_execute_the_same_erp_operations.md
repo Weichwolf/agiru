@@ -6,7 +6,6 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 ## Evidence
 
 - `src/cli/Main.cpp` exposes run-tests/version only. No HTTP server or test/ui directory exists. TestPage success is not client parity.
-- Predecessor page smoke reached 2,517/2,653 open/render cases, not business parity. Its thin-client experiment exposed two transferable requirements: modal AL execution needs an answer/resume protocol, and lookup targets must come from runtime metadata rather than hard-coded field-name maps. Do not copy its thread/ContextVar machinery or start clients before G1.
 
 ## Implementation
 
@@ -20,7 +19,6 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 6. Place exhaustive operation/codec/authorization parity fixtures and workflow scenarios in test/ui/. Replay identical commands through CLI JSON and htmx HTTP endpoints on equivalent fresh clones; compare normalized transcripts and independently queried ledger effects.
 7. Browser sampling only: list/card/document+part, modal lookup, failed validation, posting, upload/download, report, keyboard/focus and reconnect. Retest affected samples on renderer changes; all business regression runs use the CLI.
    Reject stale/out-of-order DOM patches by page revision; preserve focus and unsaved control text across partial refreshes. Use stable control/row IDs in HTML, not caption selectors.
-8. Classify page-open failures into expected AL refusals, runtime defects and transport/render defects; opening a page is not an operation-parity pass. Test modal answer/resume while its caller remains suspended and reject client-local table/field lookup maps.
 
 ## Acceptance
 
@@ -35,6 +33,4 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 
 Code: `src/cli/Main.cpp`, `include/meta/PageDef.h`, `include/runtime/test/PageCore.h`, `src/gen/PageWriter.cpp`; extract production lifecycle under 0030. Platform: `devenv-testing-pages.md`, TransactionModel attribute and page/control methods. Predecessor: WI-1113/1401/1411; do not replay load triggers indiscriminately. New ID: all-history maximum 0719 checked on 2026-09-28.
 
-Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/Linux x86_64/aarch64 builds, bounded executor and cancellation before adoption.
-
-Browser-only demo delivery is owned by 0724; both targets share the production dispatcher and typed operation contract above.
+Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/GCC/aarch64 builds, bounded executor and cancellation before adoption.

@@ -118,6 +118,7 @@ inline constexpr TableDef kCompanyTable{
     .caption = Company::kName,
     .fields = kCompanyFields,
     .keys = kCompanyKeys,
+    .dataPerCompany = false,
 };
 
 static_assert(FieldsAreSorted(kCompanyTable), "the field table is searched by number");
