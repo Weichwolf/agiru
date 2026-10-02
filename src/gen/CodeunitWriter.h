@@ -38,6 +38,8 @@ struct TableRef {
 
   std::vector<al::ProcedureDecl> procedureDeclarations;
   std::vector<std::string> interfaceBases{};
+  std::string declarationAssertions{};
+  bool native = false;
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -108,6 +110,10 @@ std::string OptionTypeName(const std::string &owner,
                            const std::vector<al::ProcedureDecl> &procedures);
 
 [[nodiscard]] TableIndex PlatformTables();
+[[nodiscard]] bool NeedsNativeDefinition(const TableRef &binding);
+[[nodiscard]] TableIndex PlatformTables(std::span<const al::TableObject> declarations);
+[[nodiscard]] FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations,
+                                            const TableIndex &tables);
 
 [[nodiscard]] bool NamesAbsentType(const al::VarDecl &declared);
 

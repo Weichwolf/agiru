@@ -352,7 +352,7 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
   }
   const TableRef *ref = ReachObject(declared, objects);
   if (ref == nullptr || ref->header.empty()) { return; }
-  if (complete || declared.temporary) {
+  if (complete || declared.temporary || NeedsNativeDefinition(*ref)) {
     reached.headers.insert(ref->header);
     return;
   }
@@ -826,7 +826,12 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
                              (page.xmlport  ? "XmlPort"
                               : page.report ? "Report"
                                             : "");
-  std::string out = "namespace " + space + " {\n\n";
+  std::string out;
+  if (source != nullptr) {
+    const auto bound = objects.tables.find(std::to_string(source->id));
+    if (bound != objects.tables.end()) { out += bound->second.declarationAssertions; }
+  }
+  out += "namespace " + space + " {\n\n";
   out += ReportLayoutDefinitions(page);
   int counter = 0;
   const std::string layout =
