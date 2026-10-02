@@ -148,6 +148,7 @@ CheckOptions:
   # SHAPE RATHER THAN CORRECTNESS -- the only guard here that measures FORM. The default is 25 and
   # it stays. A generator emitter above it is one function that wants to be three.
   readability-function-cognitive-complexity.Threshold: 25
+  readability-function-size.LineThreshold: 120
 
   # CLAUDE.md: every number carries its origin. What stays allowed are the numbers that CANNOT have
   # an origin, because they are the identities of arithmetic.

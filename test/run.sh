@@ -1,32 +1,29 @@
 #!/bin/sh
-# `make test` -- the fast gate. Every case is its own program; a crash takes only its own case down,
-# not the run.
-#
-# AN EMPTY GATE REPORTS RED. A runner that says green at zero cases is the first trap on CLAUDE.md's
-# list -- a gate blind to its own path.
+# The source manifest is authoritative: a missing executable must not shrink the gate.
 set -eu
 cd "$(dirname "$0")/.."
-B=build
-
-cmake --build "$B" -j "$(nproc)" >/dev/null
-
-cases=$(find "$B" -maxdepth 1 -name 'gate_*' -type f -perm -u+x | sort)
-if [ -z "$cases" ]; then
-  printf 'test: the gate is EMPTY (0 cases under test/gate/). It therefore reports red.\n' >&2
-  exit 1
-fi
-
+B=${B:-build}
 red=0
 n=0
-for c in $cases; do
+for source in test/gate/*.cpp; do
+  [ -f "$source" ] || { echo 'test: no gate sources found' >&2; exit 2; }
+  name=$(basename "$source" .cpp)
+  case="$B/gate_$name"
   n=$((n + 1))
-  if ! "$c"; then red=$((red + 1)); fi
+  if [ ! -x "$case" ]; then
+    printf 'test: missing executable %s; run make\n' "$case" >&2
+    red=$((red + 1))
+  elif ! "$case"; then
+    red=$((red + 1))
+  fi
 done
-
-# THE DOOR'S GENERATOR IS A CASE TOO, and it is a script rather than a binary because what it
-# asserts is about FILES: that running the generator leaves them as they are.
+for script in test/door-reproduces.sh test/one-definition.sh; do
+  n=$((n + 1))
+  if ! sh "$script"; then red=$((red + 1)); fi
+done
 n=$((n + 1))
-if ! sh "$(dirname "$0")/door-reproduces.sh"; then red=$((red + 1)); fi
-if ! sh "$(dirname "$0")/one-definition.sh"; then red=$((red + 1)); fi
+if ! B="$B" bash test/function-size.sh; then red=$((red + 1)); fi
+n=$((n + 1))
+if ! B="$B" python3 test/toolchain.py; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]
