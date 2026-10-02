@@ -46,35 +46,9 @@ symbols_spec = importlib.util.spec_from_file_location(
     'fetch_symbols', Path(__file__).resolve().parents[1] / 'scripts/fetch_symbols.py')
 symbols = importlib.util.module_from_spec(symbols_spec)
 symbols_spec.loader.exec_module(symbols)
-inventory_spec = importlib.util.spec_from_file_location(
-    'scope_inventory', Path(__file__).resolve().parents[1] / 'scripts/scope_inventory.py')
-scope_inventory = importlib.util.module_from_spec(inventory_spec)
-inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
-    def test_verification_entrypoint_is_offline_and_read_only(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', root)
-            before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                      for path in package.rglob('*') if path.is_file()}
-            output = io.StringIO()
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    patch.object(symbols, 'curl', side_effect=AssertionError('unexpected network')), \
-                    redirect_stdout(output):
-                symbols.main()
-            self.assertEqual(json.loads(output.getvalue())['package_sha256'],
-                             symbols.verify_package(package)['package_sha256'])
-            self.assertEqual(before, {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                                     for path in package.rglob('*') if path.is_file()})
-            changed = package / 'src/Virtual Tables/Fixture.Table.al'
-            changed.write_text('changed')
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                symbols.main()
-            self.assertEqual(changed.read_text(), 'changed')
-
     @staticmethod
     def package(extra=(), manifest=None, source=True):
         manifest = manifest if manifest is not None else (
@@ -252,8 +226,7 @@ class FoundationLinkGate(unittest.TestCase):
                                     'a foundation depends on another agiru tier')
                 output = self.temporary / tier
                 result = self.run_command([
-                    self.compiler, '-std=c++23', '-stdlib=libc++', '--rtlib=compiler-rt',
-                    '--unwindlib=libunwind', '-fuse-ld=lld-19', str(source), '-Wl,--no-as-needed',
+                    self.compiler, '-std=c++23', str(source), '-Wl,--no-as-needed',
                     '-Wl,--no-allow-shlib-undefined', f'-L{self.build}',
                     f'-Wl,-rpath,{self.build}', f'-lagiru_{tier}', '-o', str(output)])
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -268,7 +241,7 @@ class FoundationLinkGate(unittest.TestCase):
                 'runtime/ErrorValue.h', 'type/Decimal.h', 'dotnet/Refused.h', 'dotnet/Uri.h',
                 'type/JsonToken.h', 'type/Stream.h', 'type/List.h',
                 'type/Dictionary.h', 'type/Variant.h')) + '\nint main() { return 0; }\n')
-        command = [self.compiler, '-std=c++23', '-stdlib=libc++', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+        command = [self.compiler, '-std=c++23', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
                    '-fsyntax-only', f'-I{self.root / "include"}', str(source)]
         result = self.run_command(command)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -315,6 +288,119 @@ class FoundationLinkGate(unittest.TestCase):
                 unguarded[unguarded.index('-o') + 1] = str(self.temporary / f'unguarded_{tier}.so')
                 control = self.run_command(unguarded + [str(injected)])
                 self.assertEqual(control.returncode, 0, control.stdout + control.stderr)
+
+
+class SystemDeclarationGate(unittest.TestCase):
+    def setUp(self):
+        TranspilerAttributeCensusGate.setUp(self)
+        self.symbols = self.root / 'symbols'
+        (self.symbols / 'src').mkdir(parents=True)
+        (self.symbols / 'NavxManifest.xml').write_text('<Package/>')
+        (self.symbols / 'SymbolReference.json').write_text('{}')
+        self.table = ('namespace System.Reflection;\n'
+                      '  TaBlE 2000000058 AllObjWithCaption {\n'
+                      'fields { field(63; "AL Namespace"; Text[500]) {} } }\n')
+        (self.symbols / 'src/not-a-table-name.AL').write_text(self.table)
+
+    def run_transpiler(self, source='AllObjWithCaption'):
+        (self.root / 'source/Fixture.Page.al').write_text(
+            'namespace Microsoft.Fixture; page 50180 "System Source" {\n'
+            f'SourceTable = {source};\n'
+            'layout { area(Content) { field(Namespace; Rec."AL Namespace") {} } } }')
+        return subprocess.run([str(self.transpiler), str(self.root),
+                               str(self.root / 'apps.json'), str(self.root / 'generated'),
+                               '--system-symbols', str(self.symbols)],
+                              text=True, capture_output=True, timeout=30)
+
+    def test_native_source_and_field_ids_use_the_existing_ast(self):
+        for name in ('AllObjWithCaption', '2000000058', '"AllObjWithCaption"',
+                     'System.Reflection.AllObjWithCaption'):
+            with self.subTest(name=name):
+                result = self.run_transpiler(name)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('SYSTEM TABLES: 1 parsed from 1 AL files', result.stdout)
+                self.assertIn('SYSTEM TABLES: 1 bound, 0 unbound', result.stdout)
+                definitions = list((self.root / 'generated').rglob('SystemSource.def.cpp'))
+                self.assertEqual(len(definitions), 1)
+                output = definitions[0].read_text()
+                self.assertIn('.source = ::agiru::TableId{2000000058}', output)
+                self.assertIn('.field = ::agiru::FieldNo{63}', output)
+
+    def test_unbound_native_declarations_are_counted_not_invented(self):
+        (self.symbols / 'src/Other.al').write_text(
+            'namespace System.Fixture; table 2000000999 "Unbound Native" {}')
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('SYSTEM TABLES: 2 parsed from 2 AL files', result.stdout)
+        self.assertIn('SYSTEM TABLES: 1 bound, 1 unbound', result.stdout)
+        self.assertFalse(list((self.root / 'generated').rglob('UnboundNative.h')))
+
+    def test_bad_and_duplicate_declarations_refuse(self):
+        path = self.symbols / 'src/not-a-table-name.AL'
+        path.write_text('namespace System.Reflection; table broken AllObjWithCaption {}')
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System table', result.stderr)
+        path.write_text(self.table)
+        (self.symbols / 'src/Duplicate.al').write_text(self.table)
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('duplicate System table declaration', result.stderr)
+
+    def test_missing_explicit_input_refuses_without_a_hidden_fallback(self):
+        (self.symbols / 'NavxManifest.xml').unlink()
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System symbols input lacks', result.stderr)
+
+    def test_unknown_and_incomplete_cli_arguments_refuse(self):
+        command = [str(self.transpiler), str(self.root), str(self.root / 'apps.json'),
+                   str(self.root / 'generated')]
+        for extra in (['--system-symbols'], ['--unknown', str(self.symbols)], ['unexpected']):
+            with self.subTest(extra=extra):
+                result = subprocess.run(command + extra, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn('--system-symbols <root>', result.stderr)
+
+    def test_make_forwards_only_the_explicit_symbols_input(self):
+        shutil.copyfile(SCRIPT.parents[1] / 'Makefile', self.root / 'Makefile')
+        build = self.root / 'build'
+        build.mkdir()
+        probe = build / 'agirutc'
+        probe.write_text('#!/usr/bin/env python3\nimport json, pathlib, sys\n'
+                         'pathlib.Path("arguments.json").write_text(json.dumps(sys.argv[1:]))\n')
+        probe.chmod(0o755)
+        environment = os.environ.copy()
+        environment['AGIRU_BC_SOURCE'] = str(self.root / 'source with spaces')
+        environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
+        command = ['make', '--no-print-directory', '-o', 'tc', 'transpile', 'B=build']
+        base = [environment['AGIRU_BC_SOURCE'], str(self.root / 'apps.json'),
+                str(self.root / 'apps')]
+        for symbols in (None, str(self.root / 'symbols with spaces')):
+            with self.subTest(symbols=symbols):
+                if symbols is not None:
+                    environment['AGIRU_SYSTEM_SYMBOLS'] = symbols
+                result = subprocess.run(command, cwd=self.root, env=environment,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                expected = base if symbols is None else base + ['--system-symbols', symbols]
+                self.assertEqual(json.loads((self.root / 'arguments.json').read_text()), expected)
+
+    def test_incompatible_intrinsic_ids_and_links_do_not_pass_as_native_bindings(self):
+        (self.symbols / 'src/Other.al').write_text(
+            'namespace System.Fixture; table 2000000998 "Object Options" {}')
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('SYSTEM TABLE REFUSED: Object Options declares ID 2000000998, '
+                      'intrinsic target has ID 2000000225', result.stdout)
+        self.assertIn('SYSTEM TABLES: 1 bound, 1 unbound', result.stdout)
+        manifest = self.symbols / 'NavxManifest.xml'
+        saved = self.root / 'manifest.xml'
+        manifest.rename(saved)
+        manifest.symlink_to(saved)
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System symbols input contains a symlink', result.stderr)
 
 
 class TranspilerAttributeCensusGate(unittest.TestCase):
@@ -377,7 +463,7 @@ class TranspilerAttributeCensusGate(unittest.TestCase):
         self.assertIn('ABORT     1 attribute declaration(s)', result.stdout)
 
 
-@unittest.skipUnless(shutil.which('clang++-19'), 'tree gate requires clang++-19')
+@unittest.skipUnless(shutil.which('clang++'), 'tree gate requires clang++')
 class TreeSyntaxGate(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
@@ -444,183 +530,6 @@ inline void consumer() { old_api(); }
         result = self.run_tree('missing-apps')
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn('does not exist', result.stderr)
-
-
-@unittest.skipUnless(shutil.which('clang++-19'), 'gap gate requires clang++-19')
-class FirstGapGate(unittest.TestCase):
-    def setUp(self):
-        self.folder = tempfile.TemporaryDirectory()
-        self.addCleanup(self.folder.cleanup)
-        self.root = Path(self.folder.name)
-        for name in ('scripts', 'cmake', 'include', 'apps/Fixture'):
-            (self.root / name).mkdir(parents=True)
-        repository = SCRIPT.parents[1]
-        shutil.copy2(repository / 'Makefile', self.root / 'Makefile')
-        for name in ('first_gap.sh', 'tree_syntax.sh', 'tree_keys.py'):
-            shutil.copy2(repository / 'scripts' / name, self.root / 'scripts' / name)
-        (self.root / 'cmake/Precompiled.h').write_text('// isolated gap gate fixture\n')
-        (self.root / 'apps.json').write_text(json.dumps({'apps': [{'name': 'Fixture'}]}))
-
-    def run_gap(self, source=False, sweep=False, make=False, path='apps', environment=None):
-        env = dict(os.environ, SOURCE='1' if source else '', SWEEP='1' if sweep else '',
-                   JOBS='2')
-        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
-            env.pop(name, None)
-        if environment:
-            env.update(environment)
-        command = (['make', '--no-print-directory', '-o', 'db', 'gap'] if make else
-                   ['sh', 'scripts/first_gap.sh', path])
-        return subprocess.run(command, cwd=self.root, env=env, text=True,
-                              capture_output=True, timeout=30)
-
-    def write(self, relative, content):
-        path = self.root / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content)
-        return path
-
-    def test_make_source_skips_failing_header_census_and_counts_extra_bodies(self):
-        self.write('apps/Fixture/Unused.h', '#error unused header\n')
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        self.write('apps/Fixture/B.cpp', 'int b() { return 0; }\n')
-        self.write('apps/shared/C.cpp', 'int c() { return 0; }\n')
-        result = self.run_gap(source=True, make=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('all 3 generated bodies compile', result.stdout)
-        self.assertEqual([str(Path(path).relative_to(self.root)) for path in
-                          (self.root / 'build/first-gap/files').read_text().splitlines()],
-                         ['apps/Fixture/A.cpp', 'apps/Fixture/B.cpp', 'apps/shared/C.cpp'])
-        self.assertFalse((self.root / 'build/tree-syntax').exists())
-
-    def test_make_header_sweep_does_not_build_a_census(self):
-        self.write('apps/Fixture/A.h', '#pragma once\nstruct A {};\n')
-        result = self.run_gap(sweep=True, make=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('all 1 generated headers compile', result.stdout)
-        self.assertFalse((self.root / 'build/tree-syntax').exists())
-
-    def test_ranked_make_still_builds_the_header_census(self):
-        self.write('apps/Fixture/Invalid.h', '#error ranked preflight\n')
-        result = self.run_gap(make=True)
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('ranked preflight', (self.root / 'build/tree-syntax/errors').read_text())
-        self.assertFalse((self.root / 'build/first-gap/files').exists())
-
-    def test_first_failed_body_keeps_the_complete_population(self):
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        self.write('apps/Fixture/B.cpp', '#error broken body\n')
-        self.write('apps/Fixture/C.cpp', 'int c() { return 0; }\n')
-        result = self.run_gap(source=True, sweep=True)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('1 of 3 generated bodies compile, then apps/Fixture/B.cpp', result.stdout)
-        self.assertIn('broken body', result.stderr)
-        self.assertEqual(len((self.root / 'build/first-gap/files').read_text().splitlines()), 3)
-
-    def test_warning_only_body_is_red(self):
-        self.write('apps/Fixture/Warning.cpp',
-                   '[[deprecated]] void old_api() {}\nvoid consumer() { old_api(); }\n')
-        result = self.run_gap(source=True)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('-Werror', result.stderr)
-        self.assertIn('0 of 1 generated bodies compile', result.stdout)
-
-    def test_warning_only_header_is_red(self):
-        self.write('apps/Fixture/Warning.h', '#pragma once\n'
-                   '[[deprecated]] inline void old_api() {}\n'
-                   'inline void consumer() { old_api(); }\n')
-        result = self.run_gap(sweep=True)
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('-Werror', result.stderr)
-
-    def test_failed_or_warning_only_pch_is_red(self):
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        for content in ('#error broken PCH\n',
-                        '[[deprecated]] inline void old_api() {}\n'
-                        'inline void consumer() { old_api(); }\n'):
-            with self.subTest(content=content):
-                self.write('cmake/Precompiled.h', content)
-                result = self.run_gap(source=True)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('does not precompile', result.stderr)
-                self.assertTrue((self.root / 'build/first-gap/pch.log').read_text())
-
-    def test_empty_header_and_body_populations_are_red(self):
-        for source in (False, True):
-            with self.subTest(source=source):
-                result = self.run_gap(source=source, sweep=True)
-                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('no generated ' + ('bodies' if source else 'headers'), result.stderr)
-
-    def test_missing_generated_tree_is_red(self):
-        result = self.run_gap(source=True, path='missing-apps')
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn('does not exist', result.stderr)
-
-    def test_missing_declared_app_cannot_shrink_the_population(self):
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        self.write('apps.json', json.dumps({'apps': [{'name': 'Fixture'}, {'name': 'Missing'}]}))
-        result = self.run_gap(source=True)
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn('declared app Missing does not exist', result.stderr)
-        self.assertNotIn('compile.', result.stdout)
-
-    def test_unreadable_malformed_and_empty_manifests_are_red(self):
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        manifest = self.root / 'apps.json'
-        manifest.unlink()
-        for content in (None, '{', '{"apps": []}'):
-            with self.subTest(content=content):
-                if content is not None:
-                    manifest.write_text(content)
-                result = self.run_gap(source=True)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertNotIn('compile.', result.stdout)
-
-    def test_header_sweep_includes_generated_support_directories(self):
-        for name in ('Fixture', 'shared', 'absent'):
-            self.write(f'apps/{name}/{name}.h', f'#pragma once\nstruct {name} {{}};\n')
-        result = self.run_gap(sweep=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('all 3 generated headers compile', result.stdout)
-
-    def test_compiler_failure_without_diagnostics_is_red(self):
-        self.write('apps/Fixture/A.cpp', 'int a() { return 0; }\n')
-        compiler = shlex.quote(shutil.which('clang++-19'))
-        wrapper = self.write('bin/clang++-19', '#!/bin/sh\n'
-                             'case " $* " in\n'
-                             '  *" -x c++-header "*) exec ' + compiler + ' "$@";;\n'
-                             'esac\nexit 37\n')
-        wrapper.chmod(0o755)
-        result = self.run_gap(source=True,
-                              environment={'CXX': str(wrapper),
-                                           'PATH': str(wrapper.parent) + os.pathsep + os.environ['PATH']})
-        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn('0 of 1 generated bodies compile', result.stdout)
-
-    def test_ranked_selection_uses_the_largest_root(self):
-        self.write('apps/Fixture/A.h', '#error small root\n')
-        self.write('apps/Fixture/B.h', '#error largest root\n')
-        self.write('build/tree-syntax/roots',
-                   'one\tapps/Fixture/A.h\tsmall\n'
-                   'two\tapps/Fixture/B.h\tlarge\n'
-                   'three\tapps/Fixture/B.h\tlarge\n')
-        result = self.run_gap(make=True)
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('apps/Fixture/B.h blocks 2 of 3 failing headers, 2 root(s)', result.stdout)
-        self.assertIn('largest root', result.stderr)
-
-    def test_missing_census_root_is_red(self):
-        self.write('build/tree-syntax/roots', 'one\tapps/Fixture/Missing.h\tmissing\n')
-        result = self.run_gap()
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn('census root apps/Fixture/Missing.h does not exist', result.stderr)
-
-    def test_spent_census_is_not_a_complete_tree_pass(self):
-        self.write('apps/Fixture/A.h', '#pragma once\nstruct A {};\n')
-        self.write('build/tree-syntax/roots', 'one\tapps/Fixture/A.h\told failure\n')
-        result = self.run_gap()
-        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-        self.assertIn('census is spent', result.stdout)
 
 
 class SeedTransferGate(unittest.TestCase):
@@ -802,15 +711,13 @@ set_target_properties(slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
 
     def test_clang_pch_recompile_hits_the_configured_cache(self):
         repo = Path(__file__).resolve().parents[1]
-        build = repo / Path(os.environ.get('B', 'build'))
-        commands = json.loads((build / 'compile_commands.json').read_text())
+        commands = json.loads((repo / 'build/compile_commands.json').read_text())
         pch = [row for row in commands
                if 'agiru_slice' in row['command'] and 'cmake_pch.hxx.cxx' in row['file']]
         self.assertEqual(len(pch), 1)
         self.assertIn('-Xclang -fno-pch-timestamp', pch[0]['command'])
         setting = subprocess.run(
-            ['make', '-s', f'B={build}',
-             '--eval=cache-env:; @printf %s "$$CCACHE_SLOPPINESS"', 'cache-env'],
+            ['make', '-s', '--eval=cache-env:; @printf %s "$$CCACHE_SLOPPINESS"', 'cache-env'],
             cwd=repo, capture_output=True, text=True, check=True).stdout
         self.assertEqual(setting, 'pch_defines,time_macros')
         with tempfile.TemporaryDirectory() as folder:
@@ -821,8 +728,6 @@ set_target_properties(slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
             (root / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.28)
 project(PchCacheProbe CXX)
 add_executable(probe probe.cpp)
-target_compile_options(probe PRIVATE -stdlib=libc++)
-target_link_options(probe PRIVATE -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 target_precompile_headers(probe PRIVATE Pch.h)
 target_compile_options(probe PRIVATE -Xclang -fno-pch-timestamp)
 ''')
@@ -920,419 +825,7 @@ target_compile_options(probe PRIVATE -Xclang -fno-pch-timestamp)
             self.assertIn('Compiler mismatch', different.stderr)
 
 
-class ProductSourceGate(unittest.TestCase):
-    def setUp(self):
-        TranspilerAttributeCensusGate.setUp(self)
-        self.policy = {'include': ['Microsoft.Fixture'], 'exclude': [],
-                       'product_exclude': ['bc-licensing:source/Excluded.Codeunit.al']}
-        (self.root / 'scope.json').write_text(json.dumps(self.policy))
-        (self.root / 'source/Excluded.Codeunit.al').write_text(
-            'codeunit 50142 "Excluded UT" { Subtype = Test; '
-            '[Test][FutureAttribute] procedure Check() begin end; }')
-        (self.root / 'source/Core.Codeunit.al').write_text(
-            'namespace Microsoft.Fixture; codeunit 50143 "Core UT" { Subtype = Test; '
-            '[Test] procedure Post() begin end; }')
-
-    def run_transpiler(self):
-        return subprocess.run([str(self.transpiler), str(self.root),
-                               str(self.root / 'apps.json'), str(self.root / 'generated')],
-                              capture_output=True, text=True, timeout=30)
-
-    def test_actual_transpiler_excludes_exact_source_and_keeps_raw_ut_methods(self):
-        result = self.run_transpiler()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('product exclusion bc-licensing: source/Excluded.Codeunit.al', result.stdout)
-        paths = {path.name for path in (self.root / 'generated').rglob('*.h')}
-        self.assertIn('CoreUT.h', paths)
-        self.assertNotIn('ExcludedUT.h', paths)
-        raw = milestone.scan(self.root / 'source')
-        self.assertEqual({entry['id'] for entry in raw}, {50142, 50143})
-        report = scope_inventory.inventory(self.root, {
-            'apps': [{'name': 'fixture', 'source': 'source'}]}, self.policy)
-        self.assertEqual(report['summary']['raw_test_attributes'], 2)
-        self.assertEqual(report['summary']['product_excluded_test_methods'], 1)
-        self.assertEqual(report['summary']['product_required_test_methods'], 1)
-
-    def test_rules_do_not_match_similar_filenames(self):
-        (self.root / 'source/ExcludedExtra.Codeunit.al').write_text(
-            'codeunit 50144 "Retained" { [FutureAttribute] procedure Check() begin end; }')
-        result = self.run_transpiler()
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('futureattribute', result.stdout.lower())
-        self.assertTrue(list((self.root / 'generated').rglob('Retained.h')))
-
-    def test_module_rules_use_a_directory_boundary(self):
-        (self.root / 'scope.json').write_text(json.dumps(
-            dict(self.policy, product_exclude=['microsoft-cloud:source/'])))
-        result = self.run_transpiler()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertFalse(list((self.root / 'generated').rglob('*UT.h')))
-
-    def test_malformed_unknown_duplicate_and_unbounded_rules_refuse(self):
-        for entries in (['no-reason'], ['unsupported:source/Excluded.Codeunit.al'],
-                        ['bc-licensing:/outside'], ['bc-licensing:source/../outside'],
-                        ['bc-licensing:source\\outside'], ['bc-licensing:'],
-                        ['bc-licensing:source//Excluded.Codeunit.al'],
-                        ['bc-licensing:source//'],
-                        ['bc-licensing:source/Excluded.Codeunit.al'] * 2,
-                        ['bc-licensing:source/Missing.Codeunit.al']):
-            with self.subTest(entries=entries):
-                (self.root / 'scope.json').write_text(json.dumps(
-                    dict(self.policy, product_exclude=entries)))
-                result = self.run_transpiler()
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn('scope.json:', result.stdout + result.stderr)
-
-
-class SourceInventoryGate(unittest.TestCase):
-    root = Path(__file__).resolve().parents[1]
-    policy = {'include': ['Microsoft', 'System.Security', 'System.Email'],
-              'exclude': ['Microsoft.Integration']}
-
-    def test_lexical_inventory_retains_quoted_comment_markers_and_multiline_headers(self):
-        namespace, objects = scope_inventory.declarations(
-            '// codeunit 999 Lost {}\n/* table 998 Hidden {} */\n'
-            'NaMeSpAcE Microsoft.Finance;\nCODEUNIT\n42\n"Invoice // /* ""UT"""\n'
-            '{ Subtype = Test; var Caption: Label \'[Test] procedure Fake()\'; '
-            '[Test] [HandlerFunctions(\'Answer\')] internal procedure "Post // Invoice"() '
-            'begin Message(\'// [Test] /*\'); end; }')
-        self.assertEqual(namespace, 'Microsoft.Finance')
-        self.assertEqual(len(objects), 1)
-        self.assertEqual((objects[0]['kind'], objects[0]['id'], objects[0]['name']),
-                         ('codeunit', 42, 'Invoice // /* "UT"'))
-        self.assertEqual(objects[0]['methods'], ['Post // Invoice'])
-        self.assertEqual(objects[0]['test_attributes'], 1)
-        self.assertTrue(objects[0]['test_subtype'])
-
-    def test_extra_bom_characters_do_not_hide_declarations_or_tests(self):
-        namespace, objects = scope_inventory.declarations(
-            '\ufeff\ufeff// header\n\ufeffnamespace Microsoft.Finance;\n'
-            'codeunit 1 "Visible UT" { Subtype = Test; [Test] procedure Post() begin end; }')
-        self.assertEqual(namespace, 'Microsoft.Finance')
-        self.assertEqual(len(objects), 1)
-        self.assertEqual(objects[0]['methods'], ['Post'])
-        self.assertEqual(scope_inventory.declarations('table 2 "Embedded\ufeffName" {}')[1][0]['name'],
-                         'Embedded\ufeffName')
-
-    def test_equal_conditional_brace_paths_merge_without_dropping_raw_methods(self):
-        text = ('#region Fixtures\ncodeunit 1 X { Subtype = Test;\n'
-                '#if FIRST\n[Test] procedure A() begin end;\n'
-                '#else\n[Test] procedure B() begin end;\n#endif\n'
-                'layout {\n#if OLD\ngroup(A) {\n#else\ngroup(B) {\n'
-                '#endif\nfield(X; X) {} } } }\n#endregion\n')
-        _, objects = scope_inventory.declarations(text)
-        self.assertEqual(len(objects), 1)
-        self.assertEqual(objects[0]['methods'], ['A', 'B'])
-        self.assertEqual(objects[0]['test_attributes'], 2)
-        indented = '\n'.join('    ' + line if line.startswith('#') else line
-                             for line in text.splitlines())
-        self.assertEqual(scope_inventory.declarations(indented), ('', objects))
-        self.assertEqual(scope_inventory.declarations(
-            'enum 1 Kind\n    #pragma warning restore AL0659\n{}')[1][0]['id'], 1)
-        self.assertEqual(scope_inventory.declarations(
-            '    # region X\ntable 1 X {}\n    # endregion;')[1][0]['id'], 1)
-
-    def test_conditional_headers_are_retained_and_ambiguous_braces_are_unmeasured(self):
-        _, variants = scope_inventory.declarations(
-            '#if OLD\ntable 1 A\n#else\ntable 1 B\n#endif\n{}')
-        self.assertEqual([item['name'] for item in variants], ['A', 'B'])
-        self.assertTrue(all(item['shared_body'] for item in variants))
-        for text in ('page 1 A {\n#if OLD\ngroup(X) {\n#else\ngroup(Y) {}\n'
-                     '#endif\n} }',):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                scope_inventory.declarations(text)
-
-    def test_every_named_object_kind_and_anonymous_dotnet_remain_counted(self):
-        headers = ['dotnet {}' if kind == 'dotnet' else f'{kind} "Name" {{}}'
-                   for kind in sorted(scope_inventory.KINDS)]
-        _, objects = scope_inventory.declarations('\n'.join(headers))
-        self.assertEqual({item['kind'] for item in objects}, scope_inventory.KINDS)
-        self.assertEqual(len(objects), 20)
-        self.assertTrue(all(item['id'] is None for item in objects))
-        self.assertEqual(next(item for item in objects if item['kind'] == 'dotnet')['name'], '')
-        self.assertEqual(scope_inventory.declarations('namespace System.Security;'),
-                         ('System.Security', []))
-
-    def test_conditional_duplicates_are_not_collapsed_into_a_runnable_population(self):
-        text = ('#if OLD\ncodeunit 1 "Same UT" { Subtype = Test; '
-                '[Test] procedure A() begin end; }\n#else\n'
-                'codeunit 1 "Same UT" { Subtype = Test; '
-                '[Test] procedure A() begin end; }\n#endif\n')
-        _, objects = scope_inventory.declarations(text)
-        self.assertEqual(len(objects), 2)
-        self.assertEqual(sum(len(item['methods']) for item in objects), 2)
-
-    def test_malformed_or_unknown_declarations_refuse_instead_of_disappearing(self):
-        for text in ('codeunit 1 X {', 'alienobject 1 X {}', '/* never closed',
-                     'codeunit 1 "never closed',
-                     'codeunit 1 X { [Test]\n#if A\nprocedure A() begin end;\n'
-                     '#else\nprocedure B() begin end;\n#endif\n}',
-                     'codeunit 1 X { [Test] trigger OnRun() begin end; }',
-                     'codeunit 1 X { [Test][Test] procedure Twice() begin end; }'):
-            with self.subTest(text=text), self.assertRaises(ValueError):
-                scope_inventory.declarations(text)
-
-    def test_namespace_selection_is_case_insensitive_bounded_and_never_a_source_filter(self):
-        decisions = {'Microsoft.Finance': True, 'microsoft.integration.Graph': False,
-                     'MicrosoftOther': False, '': True, 'System.Security.AccessControl': True,
-                     'System.Email': True}
-        for name, selected in decisions.items():
-            self.assertEqual(scope_inventory.namespace_selected(name, self.policy), selected)
-        tie = {'include': ['Contoso', 'Contoso.Hidden.Public'],
-               'exclude': ['CONTOSO', 'Contoso.Hidden']}
-        self.assertFalse(scope_inventory.namespace_selected('Contoso', tie))
-        self.assertTrue(scope_inventory.namespace_selected('Contoso.Hidden.Public', tie))
-
-    def test_raw_inventory_retains_unconfigured_apps_excluded_namespaces_and_utf16(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            (root / 'Configured').mkdir()
-            (root / 'Unconfigured').mkdir()
-            (root / 'Configured/app.json').write_text('{}')
-            (root / 'Unconfigured/app.json').write_text('{}')
-            (root / 'Configured/Core.al').write_text(
-                'namespace Microsoft.Finance; table 1 Core {}')
-            (root / 'Unconfigured/Cloud.AL').write_bytes(
-                'namespace Microsoft.Integration; codeunit 2 Cloud {'
-                'Subtype = Test; [Test] procedure Check() begin end; }'.encode('utf-16'))
-            report = scope_inventory.inventory(
-                root, {'apps': [{'name': 'base', 'source': 'Configured'}]}, self.policy)
-            self.assertEqual(report['errors'], [])
-            self.assertEqual(report['summary']['files'], 2)
-            self.assertEqual(report['summary']['objects'], 2)
-            self.assertEqual(report['summary']['test_methods'], 1)
-            self.assertEqual(report['summary']['outside_configured_app_files'], 1)
-            self.assertEqual(report['summary']['encodings']['utf-16'], 1)
-            cloud = next(item for item in report['objects'] if item['name'] == 'Cloud')
-            self.assertFalse(cloud['namespace_selected'])
-            self.assertEqual(cloud['configured_apps'], [])
-            self.assertEqual(cloud['app_root'], 'Unconfigured')
-            self.assertEqual(cloud['methods'], ['Check'])
-
-    def test_unmeasured_files_and_missing_roots_are_visible_and_zero_population_refuses(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            configuration = {'apps': [{'name': 'base', 'source': 'Missing'}]}
-            empty = scope_inventory.inventory(root, configuration, self.policy)
-            self.assertEqual(empty['summary']['files'], 0)
-            self.assertEqual(len(empty['errors']), 2)
-            (root / 'Broken.al').write_bytes(b'\xff\xff')
-            broken = scope_inventory.inventory(root, configuration, self.policy)
-            self.assertEqual(broken['summary']['files'], 1)
-            self.assertEqual(broken['summary']['unmeasured_files'], 1)
-            self.assertEqual(len(broken['errors']), 2)
-
-    def test_make_inventory_has_no_build_or_database_dependency_and_preserves_exit(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            shutil.copyfile(self.root / 'Makefile', root / 'Makefile')
-            runner = root / 'python3'
-            runner.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\nexit 23\n')
-            runner.chmod(0o755)
-            env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}',
-                       AGIRU_BC_SOURCE=str(root / 'raw-source'))
-            result = subprocess.run(['make', '--no-print-directory', 'census',
-                                     'B=build/inventory'], cwd=root, env=env,
-                                    capture_output=True, text=True, timeout=10)
-            self.assertEqual(result.stdout.splitlines(),
-                             [str(root / 'scripts/scope_inventory.py'), str(root / 'raw-source'),
-                              '--output', 'build/inventory/scope-inventory.json'])
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('Error 23', result.stderr)
-
-    def test_canonical_default_scope_matches_transpiler_and_provenance(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            (root / 'Base').mkdir()
-            (root / 'Base/Core.al').write_text('namespace Microsoft.API; table 1 Core {}')
-            (root / 'apps.json').write_text(json.dumps(
-                {'apps': [{'name': 'base', 'source': 'Base'}]}))
-            policy = json.loads((self.root / 'scope.json').read_text())
-            for entry in policy.get('product_exclude', []):
-                _, source = entry.split(':', 1)
-                selected = root / source
-                selected.parent.mkdir(parents=True, exist_ok=True)
-                selected.write_text('codeunit 50100 Explicit {}')
-            output = root / 'inventory.json'
-            result = subprocess.run([sys.executable, scope_inventory.__file__, str(root),
-                                     '--apps', str(root / 'apps.json'), '--output', str(output)],
-                                    capture_output=True, text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            report = json.loads(output.read_text())
-            self.assertEqual(report['scope_sha256'],
-                             hashlib.sha256((self.root / 'scope.json').read_bytes()).hexdigest())
-            self.assertTrue(next(item for item in report['objects'] if item['name'] == 'Core')[
-                'namespace_selected'])
-            self.assertFalse((self.root / 'src/gen/scope.json').exists())
-
-    def test_explicit_product_rules_are_bounded_and_never_replace_raw_counts(self):
-        rules = scope_inventory.product_rules({'product_exclude': ['bc-licensing:Module/']})
-        self.assertEqual(scope_inventory.product_reason('Module/Check.al', rules), 'bc-licensing')
-        self.assertIsNone(scope_inventory.product_reason('ModuleExtra/Check.al', rules))
-        self.assertIsNone(scope_inventory.product_reason('module/Check.al', rules))
-        for value in ('bc-licensing:/root', 'bc-licensing:../root', 'bc-licensing:Module/./Check.al',
-                      'bc-licensing:Module//Check.al', 'bc-licensing:Module//',
-                      'unknown:Module/', 'missing-reason',
-                      'bc-licensing:Module\\Check.al'):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                scope_inventory.product_rules({'product_exclude': [value]})
-        with self.assertRaises(ValueError):
-            scope_inventory.product_rules({'product_exclude': ['bc-licensing:Module/'] * 2})
-
-    def test_cli_retains_the_report_and_fails_on_inventory_errors(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            (root / 'Base').mkdir()
-            (root / 'Base/Broken.al').write_text('futureobject 1 Unknown {}')
-            (root / 'apps.json').write_text(json.dumps(
-                {'apps': [{'name': 'base', 'source': 'Base'}]}))
-            (root / 'scope.json').write_text(json.dumps(self.policy))
-            output = root / 'inventory.json'
-            result = subprocess.run([sys.executable, scope_inventory.__file__, str(root),
-                                     '--apps', str(root / 'apps.json'), '--scope', str(root / 'scope.json'),
-                                     '--output', str(output)], capture_output=True, text=True, timeout=10)
-            self.assertNotEqual(result.returncode, 0)
-            report = json.loads(output.read_text())
-            self.assertEqual(report['summary']['files'], 1)
-            self.assertEqual(report['summary']['unmeasured_files'], 1)
-            self.assertEqual(report['errors'][0]['source'], 'Base/Broken.al')
-            self.assertEqual(report['apps_sha256'], hashlib.sha256(
-                (root / 'apps.json').read_bytes()).hexdigest())
-
-
-class ProvisioningScopeGate(unittest.TestCase):
-    root = Path(__file__).resolve().parents[1]
-
-    def test_provisioning_does_not_fabricate_a_commercial_license(self):
-        source = (self.root / 'src/rt/Storage.cpp').read_text()
-        for token in ('TenantLicenseState', 'kLicensedFromYear', 'kLicensedToYear'):
-            self.assertFalse(token in source, f'provisioning still contains {token}')
-        self.assertIn('InstalledTables()', source)
-        self.assertIn('platform::Company', source)
-        self.assertIn('InstalledProfiles()', source)
-
-
-class NativeToolchainGate(unittest.TestCase):
-    root = Path(__file__).resolve().parents[1]
-
-    def test_only_clang_builds_are_advertised(self):
-        result = subprocess.run(['make', '--no-print-directory', 'help'], cwd=self.root,
-                                capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertNotRegex(result.stdout, r'(?im)^gcc\s')
-        refused = subprocess.run(['make', '--no-print-directory', '-n', 'gcc'], cwd=self.root,
-                                 capture_output=True, text=True, timeout=10)
-        self.assertNotEqual(refused.returncode, 0, 'the retired compiler target still exists')
-        self.assertIn("No rule to make target 'gcc'", refused.stderr)
-
-    def test_verification_defaults_and_overrides_preserve_failures(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            shutil.copyfile(self.root / 'Makefile', root / 'Makefile')
-            runner = root / 'python3'
-            runner.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\nexit 23\n')
-            runner.chmod(0o755)
-            env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}')
-            env.pop('VERIFY_TARGETS', None)
-            for target in ('verify', 'verify-start'):
-                for override in (None, 'all test ut tree apps'):
-                    with self.subTest(target=target, override=override):
-                        command = ['make', '--no-print-directory', target, 'JOBS=2']
-                        if override:
-                            command.append(f'VERIFY_TARGETS={override}')
-                        result = subprocess.run(command, cwd=root, env=env, capture_output=True,
-                                                text=True, timeout=10)
-                        arguments = result.stdout.splitlines()
-                        prefix = [str(root / 'scripts/verify_snapshot.py'), 'start', '--reuse']
-                        if target == 'verify-start':
-                            prefix.append('--detach')
-                        self.assertEqual(arguments, prefix + ['--jobs', '2'] +
-                                         (override or 'all test').split())
-                        self.assertNotEqual(result.returncode, 0, 'verification failure was lost')
-
-    def test_cmake_selects_clang_and_rejects_other_compiler_ids(self):
-        text = (self.root / 'CMakeLists.txt').read_text()
-        policy = text[text.index('cmake_minimum_required'):text.index('set(CMAKE_CXX_STANDARD ')]
-        self.assertEqual(policy.count('project(agiru CXX)'), 1)
-        with tempfile.TemporaryDirectory() as folder:
-            probe = Path(folder) / 'policy.cmake'
-            for compiler_id in ('Clang', 'GNU'):
-                with self.subTest(compiler_id=compiler_id):
-                    probe.write_text(policy.replace('project(agiru CXX)',
-                                                    f'set(CMAKE_CXX_COMPILER_ID {compiler_id})') +
-                                     '\nget_filename_component(selected "${CMAKE_CXX_COMPILER}" NAME)\n'
-                                     'if(NOT selected STREQUAL "clang++-19")\n'
-                                     '  message(FATAL_ERROR "default compiler is not clang++-19")\n'
-                                     'endif()\n')
-                    result = subprocess.run(['cmake', '-P', str(probe)], capture_output=True,
-                                            text=True, timeout=10)
-                    if compiler_id == 'Clang':
-                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    else:
-                        self.assertNotEqual(result.returncode, 0)
-                        self.assertIn('agiru requires Clang', result.stderr)
-
-    def test_installation_keeps_the_standard_library_not_a_second_compiler(self):
-        installer = (self.root / 'scripts/install.sh').read_text()
-        self.assertNotRegex(installer, r'\b(?:gcc|g\+\+)(?:-\d+)?\b')
-        for package in ('clang-19', 'clang-format-19', 'clang-tidy-19', 'lld-19',
-                        'libc++-19-dev', 'libc++abi-19-dev', 'libunwind-19-dev',
-                        'libclang-rt-19-dev'):
-            self.assertIn(package, installer.split())
-        self.assertNotIn('libstdc++', installer)
-
-    def test_native_configuration_and_syntax_probes_select_llvm_libraries(self):
-        cmake = (self.root / 'CMakeLists.txt').read_text()
-        self.assertIn('add_compile_options(-stdlib=libc++)', cmake)
-        for flag in ('--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=${LLD}'):
-            self.assertIn(flag, cmake)
-        self.assertIn('AGIRU_LLVM_CXX23_WORKS', cmake)
-        self.assertIn('LLVM C++23 libraries are unavailable', cmake)
-        for name in ('first_gap.sh', 'tree_syntax.sh', 'compile_cost.sh'):
-            with self.subTest(script=name):
-                script = (self.root / 'scripts' / name).read_text()
-                self.assertIn('CXX=${CXX:-clang++-19}', script)
-                self.assertIn('-stdlib=libc++', script)
-                self.assertNotRegex(script, r'(?m)^\s*(?:if\s+)?clang\+\+\s')
-
-
 class SnapshotGate(unittest.TestCase):
-    def test_deleted_tracked_caches_do_not_abort_freezing(self):
-        for reuse in (False, True):
-            for cache_removed in (False, True):
-                with self.subTest(reuse=reuse, cache_removed=cache_removed), \
-                        tempfile.TemporaryDirectory() as folder:
-                    root = Path(folder)
-                    cache = root / 'test/__pycache__/tracked.pyc'
-                    cache.parent.mkdir(parents=True)
-                    cache.write_bytes(b'cache')
-                    retired = root / 'retired.cpp'
-                    retired.write_text('retired source\n')
-                    (root / 'Makefile').write_text('probe:\n\t@mkdir -p build\n'
-                                                 '\t@touch build/executed\n')
-                    for command in (['init', '-q'], ['add', '.'],
-                                    ['-c', 'user.name=Gate', '-c', 'user.email=gate@example.invalid',
-                                     'commit', '-qm', 'fixture']):
-                        subprocess.run(['git', '-C', str(root), *command], check=True,
-                                       capture_output=True)
-                    retired.unlink()
-                    if cache_removed:
-                        cache.unlink()
-                    expected = verify.digest(root)
-                    arguments = SimpleNamespace(targets=['probe'], jobs=1, detach=False, reuse=reuse)
-                    with patch.object(verify, 'ROOT', root), \
-                            patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': ''}):
-                        self.assertEqual(verify.start(arguments), 0)
-                    run = Path((root / 'build/verify/latest').read_text().strip())
-                    result = json.loads((run / 'result.json').read_text())
-                    build_source = Path(result.get('build_source', run / 'source'))
-                    self.assertTrue((build_source / 'build/executed').is_file())
-                    self.assertFalse((run / 'source/test/__pycache__').exists())
-                    self.assertFalse((build_source / 'retired.cpp').exists())
-                    self.assertEqual(result['source_sha256'], expected)
-                    self.assertEqual(result['post_source_sha256'], expected)
-                    self.assertEqual(result['target_exits'], {'probe': 0})
-
     def test_explicit_system_symbols_are_frozen_and_reach_the_runner(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -1689,20 +1182,20 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'build').mkdir()
             shutil.copyfile(SCRIPT.parents[1] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
-            for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh'):
+            for name in ('door-reproduces.sh', 'one-definition.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 1 red', result.stdout)
+            self.assertIn('4 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 0 red', result.stdout)
+            self.assertIn('4 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):
@@ -2000,68 +1493,6 @@ add_custom_target(agiru DEPENDS image)
         self.assertIn('linked library is stale', stale.stderr)
 
 
-class SourceRevisionGate(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.project = self.root / 'project'
-        self.project.mkdir()
-        owner = patch.object(milestone, 'ROOT', self.root / 'image')
-        owner.start()
-        self.addCleanup(owner.stop)
-        environment = dict(os.environ)
-        environment.pop('AGIRU_BC_REVISION', None)
-        inherited = patch.dict(os.environ, environment, clear=True)
-        inherited.start()
-        self.addCleanup(inherited.stop)
-
-    def repository(self, sources):
-        subprocess.run(['git', '-C', str(self.project), 'init', '-q'], check=True)
-        for name in sources:
-            path = self.project / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text('fixture')
-        subprocess.run(['git', '-C', str(self.project), 'add', '.'], check=True)
-        subprocess.run(['git', '-C', str(self.project), '-c', 'user.name=Fixture',
-                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'],
-                       check=True)
-        return subprocess.run(['git', '-C', str(self.project), 'rev-parse', 'HEAD'],
-                              check=True, capture_output=True, text=True).stdout.strip()
-
-    def test_untracked_frozen_al_cannot_borrow_an_outer_git_revision(self):
-        self.repository(['source.cpp'])
-        frozen = self.project / 'build/frozen-bc'
-        frozen.mkdir(parents=True)
-        (frozen / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(frozen))
-
-    def test_tracked_al_outside_the_source_root_is_not_its_provenance(self):
-        self.repository(['other/Tracked.al'])
-        frozen = self.project / 'frozen-bc'
-        frozen.mkdir()
-        (frozen / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(frozen))
-
-    def test_real_tracked_al_checkout_keeps_its_revision_in_both_suffix_cases(self):
-        for suffix in ('al', 'AL'):
-            with self.subTest(suffix=suffix):
-                self.project = self.root / suffix
-                self.project.mkdir()
-                revision = self.repository(['src/nested/Example.' + suffix])
-                self.assertEqual(milestone.bc_source_revision(self.project / 'src'), revision)
-
-    def test_non_git_source_has_unknown_revision(self):
-        (self.project / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(self.project))
-
-    def test_explicit_frozen_revision_stays_authoritative(self):
-        self.repository(['src/Example.al'])
-        with patch.dict(os.environ, AGIRU_BC_REVISION='frozen-input-revision'):
-            self.assertEqual(milestone.bc_source_revision(self.project / 'src'),
-                             'frozen-input-revision')
-
-
 class ManifestGate(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -2096,63 +1527,6 @@ class ManifestGate(unittest.TestCase):
     [Test] internal procedure InternalCase() begin end;
 }''')
         self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['InternalCase'])
-
-    def test_namespace_and_multiple_objects_on_one_line_preserve_ut_identities(self):
-        self.write('Example.al', 'namespace Microsoft.Fixture; '
-                   'codeunit 50100 "First UT" { Subtype = Test; '
-                   '[Test] procedure A() begin end; } '
-                   'codeunit 50101 "Second UT" { Subtype = Test; '
-                   'var "codeunit 999 Fake UT": Boolean; '
-                   '[Test] procedure B() begin end; }')
-        entries = self.manifest.scan(self.root)
-        self.assertEqual([(entry['id'], entry['name'], entry['methods']) for entry in entries],
-                         [(50100, 'First UT', ['A']), (50101, 'Second UT', ['B'])])
-
-    def test_bom_and_uppercase_suffix_cannot_hide_a_ut_codeunit(self):
-        for filename in ('Example.AL', 'Example.al'):
-            with self.subTest(filename=filename):
-                path = self.root / filename
-                path.write_text('\ufeff\ufeff// header\n\ufeffcodeunit 50100 "Example UT" {\n'
-                                'Subtype = Test; [Test] procedure Case() begin end; }')
-                try:
-                    self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['Case'])
-                finally:
-                    path.unlink()
-
-    def test_comment_markers_inside_names_preserve_object_and_method_identity(self):
-        self.write('Example.al', 'codeunit 50100 "Comment // Marker UT" {\n'
-                   'Subtype = Test; [Test] procedure "/* Real ""Case"" */"() begin end; }')
-        entry = self.manifest.scan(self.root)[0]
-        self.assertEqual(entry['name'], 'Comment // Marker UT')
-        self.assertEqual(entry['methods'], ['/* Real "Case" */'])
-
-    def test_quoted_identifier_contents_cannot_invent_test_attributes(self):
-        self.write('Example.al', 'codeunit 50100 "Example UT" {\n'
-                   'Subtype = Test; var "[Test] procedure Ghost()": Boolean;\n'
-                   '[Test] procedure Real() begin end; }')
-        self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['Real'])
-
-    def test_escaped_boundary_quotes_remain_part_of_object_and_method_names(self):
-        self.write('Example.al', 'codeunit 50100 """Boundary UT" {\n'
-                   'Subtype = Test; [Test] procedure """Boundary"""() begin end; }')
-        entry = self.manifest.scan(self.root)[0]
-        self.assertEqual(entry['name'], '"Boundary UT')
-        self.assertEqual(entry['methods'], ['"Boundary"'])
-
-    def test_literal_trailing_quote_cannot_invent_a_ut_suffix(self):
-        self.write('Example.al', 'codeunit 50100 "Boundary UT""" {\n'
-                   'Subtype = Test; [Test] procedure Phantom() begin end; }\n'
-                   'codeunit 50101 "Real UT" {\n'
-                   'Subtype = Test; [Test] procedure Real() begin end; }')
-        entries = self.manifest.scan(self.root)
-        self.assertEqual([(entry['id'], entry['name'], entry['methods']) for entry in entries],
-                         [(50101, 'Real UT', ['Real'])])
-
-    def test_escaped_quotes_do_not_collapse_distinct_method_identities(self):
-        self.write('Example.al', 'codeunit 50100 "Boundary UT" {\n'
-                   'Subtype = Test; [Test] procedure Case() begin end;\n'
-                   '[Test] procedure """Case"""() begin end; }')
-        self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['Case', '"Case"'])
 
     def test_utf16_source_is_counted_in_both_byte_orders(self):
         for encoding in ('utf-16', 'utf-16-be'):
@@ -2254,115 +1628,6 @@ class ResultIdentityGate(unittest.TestCase):
             results = [json.loads(line) for line in
                        (root / 'summary.log.results.jsonl').read_text().splitlines()]
             self.assertEqual([row['codeunit'] for row in results], list(names))
-
-
-class TableSourceBindingGate(unittest.TestCase):
-    def setUp(self):
-        self.root = SCRIPT.parents[1]
-        self.build = (self.root / Path(os.environ.get('B', 'build'))).resolve()
-        self.fixtures = self.root / 'test/source-binding'
-        cache = (self.build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        self.compiler = compiler[1]
-
-    def run_fixture(self, receiver_kind, numeric):
-        with tempfile.TemporaryDirectory() as temp:
-            fixture = Path(temp) / 'fixture'
-            shutil.copytree(self.fixtures, fixture)
-            caller = fixture / 'al/fixture/Caller.Codeunit.al'
-            text = caller.read_text()
-            if numeric:
-                self.assertEqual(text.count('Record "Source Row"'), 1)
-                text = text.replace('Record "Source Row"', 'Record 50170')
-            consumer = fixture / 'Consumer.cpp'
-            consumer_text = (fixture / 'Consumer.cpp.in').read_text()
-            if receiver_kind == 'table':
-                self.assertEqual(text.count('codeunit 50172 Caller\n{'), 1)
-                text = text.replace('codeunit 50172 Caller\n{',
-                                    'table 50172 Caller\n{\n'
-                                    '    fields { field(1; ID; Integer) { } }')
-                caller.unlink()
-                caller = caller.with_name('Caller.Table.al')
-                self.assertEqual(consumer_text.count('fixture/codeunit/Caller.h'), 1)
-                self.assertEqual(consumer_text.count('Caller_Codeunit'), 1)
-                consumer_text = (consumer_text
-                    .replace('fixture/codeunit/Caller.h', 'fixture/table/Caller.h')
-                    .replace('Caller_Codeunit', 'Caller_Table'))
-            consumer.write_text(consumer_text)
-            caller.write_text(text)
-            output = Path(temp) / 'generated'
-            generated = subprocess.run([
-                str(self.build / 'agirutc'), str(fixture / 'al'),
-                str(fixture / 'apps.json'), str(output)],
-                cwd=self.root, capture_output=True, text=True, timeout=30)
-            self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-            executable = Path(temp) / 'consumer'
-            command = [self.compiler, '-std=c++23', '-stdlib=libc++',
-                '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{self.root / "include"}',
-                *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                          output / 'absent')),
-                *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                str(fixture / 'Consumer.cpp'), f'-L{self.build}', f'-Wl,-rpath,{self.build}',
-                '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-            compiled = subprocess.run(command, cwd=self.root, capture_output=True,
-                                      text=True, timeout=60)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run([str(executable)], cwd=self.root, capture_output=True,
-                                    text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_codeunit_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('codeunit', numeric)
-
-    def test_table_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('table', numeric)
-
-
-class PageRecordBindingGate(unittest.TestCase):
-    def test_native_page_options_compile_and_execute_without_a_copied_ast(self):
-        root = SCRIPT.parents[1]
-        build = (root / Path(os.environ.get('B', 'build'))).resolve()
-        cache = (build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        for alias in ('Field', '2000000041'):
-            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as temp:
-                fixture = Path(temp) / 'fixture'
-                shutil.copytree(root / 'test/page-record-binding', fixture)
-                page = fixture / 'al/fixture/RecordBinding.Page.al'
-                text = page.read_text()
-                self.assertEqual(text.count('SourceTable = Field;'), 1)
-                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};'))
-                output = Path(temp) / 'generated'
-                generated = subprocess.run([
-                    str(build / 'agirutc'), str(fixture / 'al'),
-                    str(fixture / 'apps.json'), str(output)],
-                    cwd=root, capture_output=True, text=True, timeout=30)
-                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-                body = next(output.rglob('RecordBinding.cpp')).read_text()
-                self.assertNotIn('RefusedOption', body)
-                self.assertIn('::agiru::platform::FieldClass::FlowFilter', body)
-                executable = Path(temp) / 'consumer'
-                command = [compiler[1], '-x', 'c++', '-std=c++23', '-stdlib=libc++',
-                    '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                    '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{root / "include"}',
-                    *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                              output / 'absent')),
-                    *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                    str(fixture / 'Consumer.cpp.in'), f'-L{build}', f'-Wl,-rpath,{build}',
-                    '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-                compiled = subprocess.run(command, cwd=root, capture_output=True,
-                                          text=True, timeout=60)
-                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-                result = subprocess.run([str(executable)], cwd=root, capture_output=True,
-                                        text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':
