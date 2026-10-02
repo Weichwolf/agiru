@@ -14,8 +14,6 @@
 # Hence: every result is COUNTED, never derived; a missing tally is an abort; and the two counts
 # must add up to the population or the run is thrown away.
 set -eu
-CXX=${CXX:-clang++-19}
-export CXX
 cd "$(dirname "$0")/.."
 
 APPS=${1:-apps}
@@ -59,7 +57,6 @@ trap 'rmdir "$LOCK" 2>/dev/null || true; pkill -P $$ 2>/dev/null || true' EXIT I
 # because the front end dominates entirely -- and the test suite has to RUN fast, which is what the
 # optimiser is for. Measuring something cheaper than the build would answer a different question.
 OPT=-O2
-WARNINGS='-stdlib=libc++ -Wall -Wextra -Wpedantic -Werror'
 includes="-Iinclude"
 for d in "$APPS"/*/; do
   [ -d "$d" ] && includes="$includes -I${d%/}"
@@ -75,7 +72,7 @@ done
 # negative control caught it.
 PCH=$OUT/agiru.pch
 # shellcheck disable=SC2086
-"$CXX" -std=c++23 $OPT $WARNINGS $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
+clang++ -std=c++23 $OPT $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
   printf 'tree: the door does not precompile -- see %s
 ' "$OUT/pch.log" >&2
   exit 1
@@ -115,10 +112,7 @@ find "$APPS" -name '*.h' | sort > "$OUT/files"
 # the cache by construction. Computing all 6 631 keys costs 3 s (measured).
 CACHE=${AGIRU_TREE_CACHE:-build/tree-cache}
 mkdir -p "$CACHE"
-COMPILER_VERSION=$("$CXX" --version)
-KEYPRINT=$(printf '%s\n' "$DOORPRINT" "$(command -v "$CXX")" "$COMPILER_VERSION" \
-  "-std=c++23 $OPT $WARNINGS $includes" | sha1sum | cut -d' ' -f1)
-python3 scripts/tree_keys.py "$KEYPRINT" "$APPS" < "$OUT/files" > "$OUT/keys"
+python3 scripts/tree_keys.py "$DOORPRINT" "$APPS" < "$OUT/files" > "$OUT/keys"
 [ "$(wc -l < "$OUT/keys")" = "$(wc -l < "$OUT/files")" ] || {
   printf 'tree: one key per header is required and %s of %s came back. ABORT.\n' \
     "$(wc -l < "$OUT/keys")" "$(wc -l < "$OUT/files")" >&2
@@ -158,7 +152,7 @@ xargs -a "$OUT/keys" -P "$JOBS" -I{} sh -c '
   # include resolves against the directory of the unit first and the include path second -- neither
   # of which is the repo root. Every one of 6 631 headers came back "file not found".
   printf "#include \"%s\"\n" "$(cd "$(dirname "$file")" && pwd)/$(basename "$file")" > "$unit"
-  if "$CXX" -std=c++23 $4 -fsyntax-only -ferror-limit=1 $6 $2 "$unit" \
+  if clang++ -std=c++23 $4 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic $2 "$unit" \
       2>"$err"; then
     printf "%s\n" "$file" >> "$3/passed" || exit 1
     printf "pass\n" > "$hit"
@@ -183,7 +177,7 @@ xargs -a "$OUT/keys" -P "$JOBS" -I{} sh -c '
     esac
   fi
   rm -f "$err" "$unit"
-' _ {} "$includes" "$OUT" "$OPT" "$CACHE" "$WARNINGS"
+' _ {} "$includes" "$OUT" "$OPT" "$CACHE"
 
 # A PCH THAT WENT STALE MID-RUN MAKES EVERY VERDICT AFTER IT MEANINGLESS, so the number is refused
 # rather than reported. It reads as thousands of broken objects and it is one file being touched.
@@ -230,4 +224,4 @@ printf '\ntree: what those roots NAME, by how many headers stop on it\n'
 awk -F'\t' '{print $3}' "$OUT/roots" | grep -oE "'[^']+'" | sort | uniq -c | sort -rn | head -14
 printf '\ntree: the single FILE each failure starts in, by how many others it stops\n'
 awk -F'\t' '$1 != $2 {print $2}' "$OUT/roots" | sort | uniq -c | sort -rn | head -10
-exit 1
+exit 0

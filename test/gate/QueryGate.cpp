@@ -1,6 +1,6 @@
 #include "meta/Ids.h"
 #include "meta/QueryDef.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Query.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"

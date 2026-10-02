@@ -2,7 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
@@ -202,23 +202,11 @@ void RuntimeReset(void *record) {
   if (keep != nullptr) { StateOf(record)->temporary = std::move(keep); }
 }
 
-Integer RuntimeFilterGroup(const void *record) {
-  const RecordState *state = PeekOf(record);
-  return state == nullptr ? 0 : state->group;
-}
-
 Integer RuntimeFilterGroup(void *record, Integer group) {
-  const Integer was = RuntimeFilterGroup(record);
-  if (group <= kMaximumFilterGroup && group != was) { StateOf(record)->group = group; }
+  RecordState &state = *StateOf(record);
+  const Integer was = state.group;
+  state.group = group;
   return was;
-}
-
-bool RuntimeHasFilter(const void *record) {
-  const RecordState *state = PeekOf(record);
-  return state != nullptr &&
-         std::ranges::any_of(state->filters, [state](const FieldFilter &filter) {
-           return filter.group == state->group && !filter.text.empty();
-         });
 }
 
 bool RuntimeIsTemporary(const void *record) {
@@ -428,19 +416,18 @@ std::int32_t TempNext(void *record, const TableDef &table, std::int32_t steps) {
   Refresh(held, table, record);
   const std::int32_t wanted = steps;
   const std::int32_t way = wanted > 0 ? 1 : -1;
-  const std::int64_t count = wanted < 0 ? -std::int64_t{wanted} : wanted;
-  std::int64_t taken = 0;
+  std::int32_t taken = 0;
   std::size_t at = held.state->at;
-  for (std::int64_t step = 0; step < count; ++step) {
+  for (std::int32_t step = 0; step < (wanted > 0 ? wanted : -wanted); ++step) {
     if (way > 0 ? at + 1 >= held.state->view.size() : at == 0) {
-      if (taken != 0) { Land(held, record, at); }
-      return static_cast<std::int32_t>(taken);
+      held.state->positioned = false;
+      return taken;
     }
     at = way > 0 ? at + 1 : at - 1;
     taken += way;
   }
   Land(held, record, at);
-  return static_cast<std::int32_t>(taken);
+  return taken;
 }
 
 }

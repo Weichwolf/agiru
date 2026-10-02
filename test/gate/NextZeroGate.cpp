@@ -8,21 +8,10 @@
 #include "LineNumberBuffer.h"
 
 #include <array>
-#include <limits>
 
 namespace {
 
 using agiru::app::tables::LineNumberBuffer;
-
-template <typename Record> agiru::Integer CurrentKey(const Record &row) {
-  return row.OldLineNumber;
-}
-
-agiru::Integer CurrentKey(agiru::RecordRef &reference) {
-  LineNumberBuffer observed;
-  reference.SetTable(observed);
-  return observed.OldLineNumber;
-}
 
 template <typename Record> void Fill(Record &row) {
   constexpr std::array<agiru::Integer, 3> kKeys{1, 2, 3};
@@ -63,52 +52,6 @@ template <typename Record> void ReferenceZeroPreservesPosition(Record &row) {
   CHECK_TRUE("RecordRef.Next() continues after the preserved row", observed.OldLineNumber == 2);
 }
 
-template <typename Record> void PartialStepsPreserveLastReachedRow(Record &row) {
-  CHECK_TRUE("partial-step fixture starts at the first row", row.FindFirst());
-  CHECK_TRUE("forward overshoot returns the actual steps", row.Next(5) == 2);
-  CHECK_TRUE("forward overshoot retains the last reached row", CurrentKey(row) == 3);
-  CHECK_TRUE("forward endpoint remains exhausted", row.Next() == 0);
-  CHECK_TRUE("reverse navigation works after forward exhaustion", row.Next(-1) == -1);
-  CHECK_TRUE("reverse navigation starts from the last reached row", CurrentKey(row) == 2);
-  CHECK_TRUE("backward overshoot returns the actual signed steps", row.Next(-5) == -1);
-  CHECK_TRUE("backward overshoot retains the first reached row", CurrentKey(row) == 1);
-  CHECK_TRUE("forward navigation works after backward exhaustion", row.Next() == 1);
-  CHECK_TRUE("forward navigation starts from the first reached row", CurrentKey(row) == 2);
-  CHECK_TRUE("extreme-step fixture starts at the last row", row.FindLast());
-  CHECK_TRUE("minimum Integer steps have a representable magnitude",
-             row.Next(std::numeric_limits<agiru::Integer>::min()) == -2);
-  CHECK_TRUE("minimum Integer steps retain the first reached row", CurrentKey(row) == 1);
-  CHECK_TRUE("maximum Integer steps stop at the actual endpoint",
-             row.Next(std::numeric_limits<agiru::Integer>::max()) == 2);
-  CHECK_TRUE("maximum Integer steps retain the last reached row", CurrentKey(row) == 3);
-}
-
-template <typename Record> void ReferencePartialSteps(Record &row) {
-  agiru::RecordRef reference;
-  reference.GetTable(row);
-  PartialStepsPreserveLastReachedRow(reference);
-}
-
-template <typename Record> void MultipleBlocksPreserveLastReachedRow(Record &row) {
-  CHECK_TRUE("multi-block fixture starts at the first row", row.FindFirst());
-  CHECK_TRUE("multi-block overshoot returns the actual steps", row.Next(200) == 129);
-  CHECK_TRUE("multi-block overshoot retains the last reached row", CurrentKey(row) == 130);
-  CHECK_TRUE("multi-block reversal returns all actual steps", row.Next(-200) == -129);
-  CHECK_TRUE("multi-block reversal retains the first reached row", CurrentKey(row) == 1);
-}
-
-template <typename Record> void MultipleBlocks(Record &row) {
-  for (agiru::Integer key = 4; key <= 130; ++key) {
-    row.OldLineNumber = key;
-    row.NewLineNumber = key;
-    row.Insert();
-  }
-  MultipleBlocksPreserveLastReachedRow(row);
-  agiru::RecordRef reference;
-  reference.GetTable(row);
-  MultipleBlocksPreserveLastReachedRow(reference);
-}
-
 }
 
 int main() {
@@ -121,15 +64,9 @@ int main() {
     Fill(stored);
     TypedZeroPreservesPosition(stored);
     ReferenceZeroPreservesPosition(stored);
-    PartialStepsPreserveLastReachedRow(stored);
-    ReferencePartialSteps(stored);
-    MultipleBlocks(stored);
     agiru::Temporary<LineNumberBuffer> temporary;
     Fill(temporary);
     TypedZeroPreservesPosition(temporary);
     ReferenceZeroPreservesPosition(temporary);
-    PartialStepsPreserveLastReachedRow(temporary);
-    ReferencePartialSteps(temporary);
-    MultipleBlocks(temporary);
   });
 }

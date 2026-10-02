@@ -1,8 +1,7 @@
 #include "Filter.h"
 
-#include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Decimal.h"
@@ -16,7 +15,6 @@
 #include <exception>
 #include <optional>
 #include <ranges>
-#include <span>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -421,7 +419,6 @@ std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper) {
       }
     }
   }
-  if (text.empty()) { throw Error("There is no filter on field " + std::to_string(no.Value())); }
   return RangeBoundOf(text, upper);
 }
 
