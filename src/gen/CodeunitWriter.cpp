@@ -5,6 +5,7 @@
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "ObjectKind.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
 #include "Token.h"
@@ -806,7 +807,7 @@ bool HandleMember(const al::VarDecl &declared) {
   return NamesAnObject(declared);
 }
 
-std::string DoorMemberSpelling(std::string_view field) {
+std::string RuntimeMemberSpelling(std::string_view field) {
   const std::string plain = Identifier(field);
   const std::string spelled = RuntimeSpelling(plain);
   return RuntimeCallable(field) && !IsAlTypeName(spelled) ? spelled : plain;
@@ -1372,7 +1373,7 @@ public:
     if (!platform.empty()) { return platform; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
-      return DoorMemberSpelling(member.field);
+      return RuntimeMemberSpelling(member.field);
     }
     const auto field = table->second.fields.find(LowerKey(std::string(member.field)));
     if (field != table->second.fields.end()) { return field->second; }

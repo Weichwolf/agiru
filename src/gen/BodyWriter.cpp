@@ -5,6 +5,7 @@
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "ObjectKind.h"
 #include "PageWriter.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
@@ -1011,7 +1012,7 @@ private:
     return out;
   }
 
-  [[nodiscard]] bool YieldsADoorType(const al::Expr &call) const {
+  [[nodiscard]] bool YieldsRuntimeType(const al::Expr &call) const {
     if (call.children.empty()) { return false; }
     const al::Expr &callee = call.children.front();
     if (callee.kind != al::ExprKind::Binary || callee.text != "." || callee.children.size() != 2) {
@@ -1032,7 +1033,7 @@ private:
           scope_.MembersAreCalls(base.children[1].text)) {
         return Parens::First;
       }
-      if (YieldsADoorType(base)) { return Parens::First; }
+      if (YieldsRuntimeType(base)) { return Parens::First; }
       if (last.kind == al::ExprKind::Name && RuntimeCallable(last.text)) { return Parens::Last; }
       return Parens::None;
     }
