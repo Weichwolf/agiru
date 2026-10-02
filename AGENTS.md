@@ -117,7 +117,7 @@ what a file names; no master header or macros. Measure build cost before widenin
   object/test identities, conditional variants, omitted app roots and unmeasured files.
   Namespace selection is diagnostic only; this is not an executable test manifest.
   An incomplete census fails while preserving the report. Use 0725 for product exclusions.
-- Hot loop on an agent's own worktree: `make gate GATE=RecordRefGate JOBS=2`
+- Hot loop in the development tree: `make gate GATE=RecordRefGate JOBS=2`
   builds and runs one affected C++ gate. Use `B=build/sanitizers` for an already
   configured sanitizer build. Run `make test JOBS=2` for the complete local gates,
   `make tc JOBS=2` for generator edits, then `make gap` for one generated root.
@@ -148,8 +148,10 @@ Make exports the installed ccache PCH settings; Clang slice/app builds disable P
 timestamps. Keep compile-time date/time macros out of cached sources, and measure
 per-run cache hits before attributing a build-time change to the cache.
 
-Each agent gets its own worktree and build directory. Editable worktrees stay outside
-`build/`; source copies there are frozen verification inputs, never development trees.
+Use one editable development tree. Bundle coherent fixes and features, freeze the
+batch, compile/test it, inspect the results and repeat. Separate development worktrees
+are optional and require a concrete isolation need; keep them outside `build/`.
+Source copies under `build/` are frozen verification inputs, never development trees.
 Build/test results identify the frozen Git HEAD and content hashes; development may
 continue in the editable tree after freezing. On this six-core host, run at
 most one six-job integration build at a time; use two jobs for local gates while
