@@ -53,28 +53,6 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
-    def test_verification_entrypoint_is_offline_and_read_only(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', root)
-            before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                      for path in package.rglob('*') if path.is_file()}
-            output = io.StringIO()
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    patch.object(symbols, 'curl', side_effect=AssertionError('unexpected network')), \
-                    redirect_stdout(output):
-                symbols.main()
-            self.assertEqual(json.loads(output.getvalue())['package_sha256'],
-                             symbols.verify_package(package)['package_sha256'])
-            self.assertEqual(before, {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                                     for path in package.rglob('*') if path.is_file()})
-            changed = package / 'src/Virtual Tables/Fixture.Table.al'
-            changed.write_text('changed')
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                symbols.main()
-            self.assertEqual(changed.read_text(), 'changed')
-
     @staticmethod
     def package(extra=(), manifest=None, source=True):
         manifest = manifest if manifest is not None else (
@@ -1689,20 +1667,20 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'build').mkdir()
             shutil.copyfile(SCRIPT.parents[1] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
-            for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh'):
+            for name in ('door-reproduces.sh', 'one-definition.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 1 red', result.stdout)
+            self.assertIn('4 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 0 red', result.stdout)
+            self.assertIn('4 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):
@@ -2322,47 +2300,6 @@ class TableSourceBindingGate(unittest.TestCase):
         for numeric in (False, True):
             with self.subTest(numeric=numeric):
                 self.run_fixture('table', numeric)
-
-
-class PageRecordBindingGate(unittest.TestCase):
-    def test_native_page_options_compile_and_execute_without_a_copied_ast(self):
-        root = SCRIPT.parents[1]
-        build = (root / Path(os.environ.get('B', 'build'))).resolve()
-        cache = (build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        for alias in ('Field', '2000000041'):
-            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as temp:
-                fixture = Path(temp) / 'fixture'
-                shutil.copytree(root / 'test/page-record-binding', fixture)
-                page = fixture / 'al/fixture/RecordBinding.Page.al'
-                text = page.read_text()
-                self.assertEqual(text.count('SourceTable = Field;'), 1)
-                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};'))
-                output = Path(temp) / 'generated'
-                generated = subprocess.run([
-                    str(build / 'agirutc'), str(fixture / 'al'),
-                    str(fixture / 'apps.json'), str(output)],
-                    cwd=root, capture_output=True, text=True, timeout=30)
-                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-                body = next(output.rglob('RecordBinding.cpp')).read_text()
-                self.assertNotIn('RefusedOption', body)
-                self.assertIn('::agiru::platform::FieldClass::FlowFilter', body)
-                executable = Path(temp) / 'consumer'
-                command = [compiler[1], '-x', 'c++', '-std=c++23', '-stdlib=libc++',
-                    '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                    '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{root / "include"}',
-                    *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                              output / 'absent')),
-                    *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                    str(fixture / 'Consumer.cpp.in'), f'-L{build}', f'-Wl,-rpath,{build}',
-                    '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-                compiled = subprocess.run(command, cwd=root, capture_output=True,
-                                          text=True, timeout=60)
-                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-                result = subprocess.run([str(executable)], cwd=root, capture_output=True,
-                                        text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':

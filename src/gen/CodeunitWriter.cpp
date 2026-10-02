@@ -2396,15 +2396,10 @@ std::string QueryColumnEnumeration(const Objects &objects,
   if (query == objects.queries.end()) { return {}; }
   const auto source = query->second.columnSources.find(LowerKey(std::string(member)));
   if (source == query->second.columnSources.end()) { return {}; }
-  return FieldEnumerationOf(objects, source->second.first, source->second.second);
-}
-
-std::string
-FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field) {
-  const auto declared = objects.fieldEnums.find(LowerKey(std::string(table)));
-  if (declared == objects.fieldEnums.end()) { return {}; }
-  const auto found = declared->second.find(LowerKey(std::string(field)));
-  return found == declared->second.end() ? std::string{} : found->second;
+  const auto table = objects.fieldEnums.find(LowerKey(source->second.first));
+  if (table == objects.fieldEnums.end()) { return {}; }
+  const auto found = table->second.find(LowerKey(source->second.second));
+  return found == table->second.end() ? std::string{} : found->second;
 }
 
 void NoteObjectNames(const Objects &objects) {
