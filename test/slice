@@ -12637,7 +12637,7 @@ tests/core/codeunit/AllProfileV2Test.cpp
 tests/core/codeunit/AltCustVATDocTests.cpp
 tests/core/codeunit/AltCustVATRegCheckTests.cpp
 tests/core/codeunit/AltCustVATRegSetupTests.cpp
-tests/core/codeunit/AmountAutoFormatCurrency.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrFCYCodeAft.cpp
 tests/core/codeunit/AnalysisReportsChart.cpp
 tests/core/codeunit/AnalysisViewTableUT.cpp
 tests/core/codeunit/APIMockEvents.cpp
@@ -14219,3 +14219,11 @@ tests/core/codeunit/LibraryXMLRead.cpp
 tests/core/codeunit/LibraryGraphMgt.cpp
 foundation/foundation/no_series/codeunit/NoSeriesCopilotImpl.cpp
 base/purchases/vendor/page/AgedAccPayableChart.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrFCYCodeBef.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrFCYSymAft.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrFCYSymBef.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrLCYCodeBef.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYCdAft.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYSymAf.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYSymBf.cpp
+tests/finance/test/codeunit/AmtAutoFormatCurrNeverShow.cpp
