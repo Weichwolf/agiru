@@ -1233,7 +1233,8 @@ class NativeToolchainGate(unittest.TestCase):
             runner.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\nexit 23\n')
             runner.chmod(0o755)
             env = dict(os.environ, PATH=f'{root}:{os.environ["PATH"]}')
-            env.pop('VERIFY_TARGETS', None)
+            for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'VERIFY_TARGETS'):
+                env.pop(name, None)
             for target in ('verify', 'verify-start'):
                 for override in (None, 'all test ut tree apps'):
                     with self.subTest(target=target, override=override):
