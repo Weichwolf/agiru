@@ -14,13 +14,18 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <charconv>
 #include <cstddef>
+#include <format>
 #include <functional>
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -622,6 +627,215 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
                                                           .body = {}});
   }
   return ref;
+}
+
+namespace {
+
+struct KeyFlags {
+  bool clustered;
+  bool enabled;
+  bool maintainSiftIndex;
+  bool maintainSqlIndex;
+  bool unique;
+};
+
+bool KeyBoolean(const al::TableObject &table,
+                const al::KeyDecl &key,
+                std::string_view name,
+                bool absent) {
+  const auto *property = Find(key.properties, name);
+  if (property == nullptr) { return absent; }
+  if (property->value.size() == 1 && property->value.front().kind == al::TokenKind::Identifier) {
+    const std::string value = LowerKey(property->value.front().text);
+    if (value == "true") { return true; }
+    if (value == "false") { return false; }
+  }
+  throw std::runtime_error("invalid Boolean key property: " + table.name + "." + key.name + "." +
+                           std::string(name));
+}
+
+std::vector<KeyFlags> KeyFlagsOf(const al::TableObject &table) {
+  std::vector<KeyFlags> flags;
+  flags.reserve(table.keys.size());
+  const bool selected = std::ranges::any_of(table.keys, [&](const al::KeyDecl &key) {
+    return KeyBoolean(table, key, "Clustered", false);
+  });
+  std::size_t clustered = 0;
+  for (const auto &key : table.keys) {
+    if (Find(key.properties, "SqlIndex") != nullptr) {
+      throw std::runtime_error("unrepresented key property: " + table.name + "." + key.name +
+                               ".SqlIndex");
+    }
+    flags.push_back(KeyFlags{
+        .clustered = KeyBoolean(table, key, "Clustered", flags.empty() && !selected),
+        .enabled = KeyBoolean(table, key, "Enabled", true),
+        .maintainSiftIndex = KeyBoolean(table, key, "MaintainSiftIndex", true),
+        .maintainSqlIndex = KeyBoolean(table, key, "MaintainSqlIndex", true),
+        .unique = KeyBoolean(table, key, "Unique", false),
+    });
+    clustered += flags.back().clustered ? 1 : 0;
+  }
+  if (clustered > 1) { throw std::runtime_error("multiple clustered keys: " + table.name); }
+  return flags;
+}
+
+std::vector<int> NativeOptionOrdinals(const OptionField &option) {
+  const auto *property = Find(option.field->properties, "OptionOrdinalValues");
+  const auto declared = property == nullptr ? std::vector<std::string>{} : ListValue(*property);
+  if (property != nullptr && declared.size() != option.members.size()) {
+    throw std::runtime_error("native OptionOrdinalValues count mismatch: " + option.field->name);
+  }
+  std::vector<int> ordinals;
+  ordinals.reserve(option.members.size());
+  for (std::size_t i = 0; i < option.members.size(); ++i) {
+    int value = static_cast<int>(i);
+    if (property != nullptr) {
+      const auto &text = declared[i];
+      const auto parsed = std::from_chars(text.data(), text.data() + text.size(), value);
+      if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size()) {
+        throw std::runtime_error("invalid native OptionOrdinalValues: " + option.field->name);
+      }
+    }
+    if (value < 0 || (!ordinals.empty() && ordinals.back() >= value)) {
+      throw std::runtime_error("native option ordinals must be nonnegative and sorted: " +
+                               option.field->name);
+    }
+    ordinals.push_back(value);
+  }
+  return ordinals;
+}
+
+std::string NativeFieldAssertion(const al::TableObject &table,
+                                 const al::FieldDecl &field,
+                                 const TableRef &binding,
+                                 const OptionField *option) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string body = "  const auto *field = ::agiru::Field(" + metadata + ", ::agiru::FieldNo{" +
+                     std::to_string(field.number) + "});\n";
+  body += "  if (field == nullptr || field->name != " + Literal(field.name) +
+          " || field->caption != " + Literal(Caption(field)) +
+          " || field->type != ::agiru::FieldType::" + TypeName(field.type) +
+          " || field->length != " + std::to_string(field.length) + ") { return false; }\n";
+  if (option != nullptr) {
+    const auto ordinals = NativeOptionOrdinals(*option);
+    body += "  if (field->values.size() != " + std::to_string(option->members.size()) +
+            ") { return false; }\n";
+    for (std::size_t i = 0; i < option->members.size(); ++i) {
+      const std::string value = "field->values[" + std::to_string(i) + "]";
+      body += std::format("  if ({0}.ordinal != {1} || {0}.name != {2} || {0}.caption != {3}) "
+                          "{{ return false; }}\n",
+                          value,
+                          ordinals[i],
+                          Literal(option->members[i]),
+                          Literal(option->captions[i]));
+    }
+  }
+  body += "  return true;\n";
+  return "static_assert([] {\n" + body + "}(), " +
+         Literal("native field declaration mismatch: " + table.name + "." + field.name) + ");\n";
+}
+
+std::string NativeFieldNumbers(const al::TableObject &table,
+                               std::span<const std::string> names,
+                               const std::string &access) {
+  std::string condition = std::format("{}.size() == {}", access, names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    const auto found = std::ranges::find_if(table.fields, [&](const al::FieldDecl &field) {
+      return LowerKey(field.name) == LowerKey(names[i]);
+    });
+    if (found == table.fields.end()) {
+      throw std::runtime_error("native key names an absent field: " + table.name + "." + names[i]);
+    }
+    condition += std::format(" && {}[{}] == ::agiru::FieldNo{{{}}}", access, i, found->number);
+  }
+  return condition;
+}
+
+std::string
+NativeKeyProperties(const al::KeyDecl &key, const KeyFlags &flags, const std::string &access) {
+  std::string condition = std::format("{0}.clustered == {1} && {0}.enabled == {2} && "
+                                      "{0}.maintainSiftIndex == {3} && "
+                                      "{0}.maintainSqlIndex == {4} && {0}.unique == {5}",
+                                      access,
+                                      flags.clustered,
+                                      flags.enabled,
+                                      flags.maintainSiftIndex,
+                                      flags.maintainSqlIndex,
+                                      flags.unique);
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"IncludedFields", "includedFields"},
+        std::pair<std::string_view, std::string_view>{"Description", "description"},
+        std::pair<std::string_view, std::string_view>{"ObsoleteState", "obsoleteState"}}) {
+    const auto *property = Find(key.properties, name);
+    condition += std::format(
+        " && {}.{} == {}", access, member, Literal(property == nullptr ? "" : property->text));
+  }
+  return condition;
+}
+
+std::string NativeKeyAssertions(const al::TableObject &declared, const std::string &metadata) {
+  const al::TableObject &table = declared;
+  if (table.keys.empty()) {
+    return "static_assert(false, " +
+           Literal("native implicit primary key is unrepresented: " + table.name) + ");\n";
+  }
+  const auto flags = KeyFlagsOf(table);
+  std::string out = "static_assert(" + metadata +
+                    ".keys.size() == " + std::to_string(table.keys.size()) + ", " +
+                    Literal("native key count mismatch: " + table.name) + ");\n";
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    const auto &key = table.keys[i];
+    const std::string access = metadata + ".keys[" + std::to_string(i) + "]";
+    std::string condition = std::format("{}.keys.size() > {} && {}.name == {} && {}",
+                                        metadata,
+                                        i,
+                                        access,
+                                        Literal(key.name),
+                                        NativeFieldNumbers(table, key.fields, access + ".fields"));
+    const auto *sums = Find(key.properties, "SumIndexFields");
+    const auto names =
+        sums == nullptr ? std::vector<std::string>{} : CommaSeparatedNames(sums->text);
+    condition += std::format(" && {} && {}",
+                             NativeKeyProperties(key, flags[i], access),
+                             NativeFieldNumbers(table, names, access + ".sumIndexFields"));
+    out += std::format("static_assert({}, {});\n",
+                       condition,
+                       Literal("native key declaration mismatch: " + table.name + "." + key.name));
+  }
+  return out;
+}
+
+}
+
+std::string NativeTableAssertions(const al::TableObject &table, const TableRef &binding) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string out = "#include \"" + binding.header + "\"\n";
+  out += "#include \"meta/Declare.h\"\n#include \"meta/Ids.h\"\n";
+  out += "#include \"meta/TableDef.h\"\n#include <cstddef>\n\n";
+  out += "static_assert(" + metadata + ".id == ::agiru::TableId{" + std::to_string(table.id) +
+         "} && " + metadata + ".name == " + Literal(table.name) + ", " +
+         Literal("native table identity mismatch: " + table.name) + ");\n";
+  out += "static_assert([] {\n  std::size_t declared = 0;\n  for (const auto &field : " + metadata +
+         ".fields) {\n    bool system = false;\n";
+  out += "    for (const auto &implicit : ::agiru::kSystemFields) {\n";
+  out += "      system = system || field.no == implicit.no;\n    }\n";
+  out += "    if (!system) { ++declared; }\n  }\n  return declared == " +
+         std::to_string(table.fields.size()) + ";\n}(), " +
+         Literal("native field count mismatch: " + table.name) + ");\n";
+  const auto options = OptionFields(table);
+  for (const auto &field : table.fields) {
+    out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
+  }
+  out += NativeKeyAssertions(table, metadata);
+  const auto *perCompany = al::Find(table.properties, "DataPerCompany");
+  if (perCompany != nullptr && LowerKey(perCompany->text) != "true" &&
+      LowerKey(perCompany->text) != "false") {
+    throw std::runtime_error("invalid native DataPerCompany: " + table.name);
+  }
+  const bool company = perCompany == nullptr || LowerKey(perCompany->text) == "true";
+  out += "static_assert(" + metadata + ".dataPerCompany == " + (company ? "true" : "false") + ", " +
+         Literal("native company scope mismatch: " + table.name) + ");\n";
+  return out + "\n";
 }
 
 namespace {

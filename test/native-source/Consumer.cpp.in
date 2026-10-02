@@ -1,0 +1,20 @@
+#include "fixture/system/tooling/page/PageFieldsSelectionList.h"
+#include "meta/Ids.h"
+#include "runtime/Page.h"
+#include "type/Option.h"
+
+int main() {
+  using P = agiru::System::Tooling::PageFieldsSelectionList_Page;
+  P page;
+  page.Rec.Caption = "caption from the source record";
+  page.Rec.Type = agiru::platform::PageTableFieldType::Text;
+  if (page.Rec.Type.AsInteger() != 31488) { return 1; }
+  const auto &definition = agiru::PageTraits<P>::kPage;
+  if (definition.source != agiru::TableId{2000000171}) { return 2; }
+  if (definition.layout[0].children[0].children[0].field != agiru::FieldNo{5}) { return 3; }
+  for (const auto &trigger : agiru::PageTraits<P>::kControlTriggers) {
+    if (trigger.sourceText != nullptr &&
+        (page.*trigger.sourceText)().Value() != "caption from the source record") { return 4; }
+  }
+  return page.Rec.Caption.Value() != "caption from the source record";
+}

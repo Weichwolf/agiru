@@ -351,7 +351,7 @@ void Named(Reached &reached, const al::VarDecl &declared, const Objects &objects
   }
   const TableRef *ref = ReachObject(declared, objects);
   if (ref == nullptr || ref->header.empty()) { return; }
-  if (complete || declared.temporary) {
+  if (complete || declared.temporary || NeedsNativeDefinition(*ref)) {
     reached.headers.insert(ref->header);
     return;
   }
@@ -815,6 +815,13 @@ std::string PageTypeOf(const al::PageObject &page) {
   return "Card";
 }
 
+std::string_view SourceDeclarationContract(const Objects &objects, const al::TableObject *source) {
+  if (source == nullptr) { return {}; }
+  const auto bound = objects.tables.find(std::to_string(source->id));
+  return bound == objects.tables.end() ? std::string_view{}
+                                       : std::string_view{bound->second.declarationAssertions};
+}
+
 }
 
 std::string
@@ -825,7 +832,8 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
                              (page.xmlport  ? "XmlPort"
                               : page.report ? "Report"
                                             : "");
-  std::string out = "namespace " + space + " {\n\n";
+  std::string out{SourceDeclarationContract(objects, source)};
+  out += "namespace " + space + " {\n\n";
   int counter = 0;
   const std::string layout =
       ControlArrays(page.layout, prefix, prefix + "Layout", objects, source, counter, out);

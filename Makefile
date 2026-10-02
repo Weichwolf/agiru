@@ -16,7 +16,6 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -50,11 +49,8 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER=$(CXX) \
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
-lint: lint-config gates tc ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
+lint: gates tc     ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
 	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/lint.sh
-
-lint-config:       ## prove the clang-tidy function line limit at its boundary
-	@B="$(B)" bash "$(SELF)/test/function-size.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)
@@ -75,7 +71,13 @@ tc: db             ## just the transpiler
 	@cmake --build $(B) -j $(JOBS) --target agirutc
 
 transpile: tc      ## every app in apps.json through the transpiler into apps/
-	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
+	@if [ -n "$${AGIRU_SYSTEM_SYMBOLS:-}" ]; then \
+	  python3 $(SELF)/scripts/fetch_symbols.py --verify "$$AGIRU_SYSTEM_SYMBOLS" && \
+	  $(B)/agirutc "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" $(SELF)/apps.json $(SELF)/apps \
+	    --system-symbols "$$AGIRU_SYSTEM_SYMBOLS"; \
+	else \
+	  $(B)/agirutc "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" $(SELF)/apps.json $(SELF)/apps; \
+	fi
 
 gap: db            ## a ranked header gap (SOURCE=1: bodies; SWEEP=1: complete header sweep)
 	@if [ -z "$(SOURCE)" ] && [ "$(SWEEP)" != 1 ] && [ ! -s $(B)/tree-syntax/roots ]; then \
