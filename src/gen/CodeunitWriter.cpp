@@ -7,6 +7,7 @@
 #include "Expr.h"
 #include "Names.h"
 #include "Scope.h"
+#include "TableWriter.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -840,10 +841,15 @@ void IndexedHeader(const Index &index, const std::string &subtype, std::set<std:
 
 std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
+  std::map<std::string, const TableRef *> declarations;
+  const auto include = [&](const TableRef *ref) {
+    if (ref == nullptr) { return; }
+    if (!ref->header.empty()) { headers.insert(ref->header); }
+    if (!ref->declarationAssertions.empty()) { declarations.emplace(ref->identifier, ref); }
+  };
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
-    const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+    include(Reach(declared, objects));
   };
   const auto reachInterface = [&](const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Interface") { return; }
@@ -865,8 +871,14 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
   }
+  const auto source = objects.tables.find(LowerKey(TableNoOf(unit)));
+  if (source != objects.tables.end()) { include(&source->second); }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  for (const auto &[identifier, ref] : declarations) {
+    static_cast<void>(identifier);
+    out += ref->declarationAssertions;
+  }
   return out;
 }
 
@@ -2070,6 +2082,7 @@ TableIndex PlatformTables() {
   const auto add = [&tables](std::string_view name, std::string_view number) {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = "platform/" + Identifier(name) + ".h",
+                       .id = std::stoi(std::string(number)),
                        .fields = {},
                        .procedures = {},
                        .parts = {},
@@ -2138,6 +2151,57 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000058"] = enums["allobjwithcaption"];
+  return enums;
+}
+
+TableIndex PlatformTables(std::span<const al::TableObject> declarations) {
+  const TableIndex bindings = PlatformTables();
+  TableIndex tables;
+  for (const al::TableObject &table : declarations) {
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end() || binding->second.id != table.id) { continue; }
+    TableRef ref = BindTable(table, binding->second.identifier, binding->second.header);
+    for (const auto &field : table.fields) {
+      const auto spelling =
+          PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});
+      if (!spelling.empty()) { ref.fields.insert_or_assign(LowerKey(field.name), spelling); }
+    }
+    ref.declarationAssertions = NativeTableAssertions(table, ref);
+    const std::string name = LowerKey(table.name);
+    if (!tables.emplace(name, ref).second ||
+        !tables.emplace(std::to_string(table.id), ref).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    if (!table.nameSpace.empty()) {
+      tables.emplace(LowerKey(table.nameSpace + "." + table.name), ref);
+    }
+  }
+  return tables;
+}
+
+FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations) {
+  const FieldEnums bindings = PlatformFieldEnums();
+  const TableIndex tables = PlatformTables(declarations);
+  FieldEnums enums;
+  for (const al::TableObject &table : declarations) {
+    if (!tables.contains(LowerKey(table.name))) { continue; }
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end()) { continue; }
+    auto &fields = enums[LowerKey(table.name)];
+    for (const al::FieldDecl &field : table.fields) {
+      const auto known = binding->second.find(LowerKey(field.name));
+      if (known == binding->second.end()) { continue; }
+      if (TypeName(field.type) != "Option" && TypeName(field.type) != "Enum") {
+        throw std::runtime_error("incompatible native option binding: " + table.name + "." +
+                                 field.name);
+      }
+      fields.emplace(known->first, known->second);
+    }
+    enums.emplace(std::to_string(table.id), fields);
+    if (!table.nameSpace.empty()) {
+      enums.emplace(LowerKey(table.nameSpace + "." + table.name), fields);
+    }
+  }
   return enums;
 }
 
@@ -2396,15 +2460,10 @@ std::string QueryColumnEnumeration(const Objects &objects,
   if (query == objects.queries.end()) { return {}; }
   const auto source = query->second.columnSources.find(LowerKey(std::string(member)));
   if (source == query->second.columnSources.end()) { return {}; }
-  return FieldEnumerationOf(objects, source->second.first, source->second.second);
-}
-
-std::string
-FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field) {
-  const auto declared = objects.fieldEnums.find(LowerKey(std::string(table)));
-  if (declared == objects.fieldEnums.end()) { return {}; }
-  const auto found = declared->second.find(LowerKey(std::string(field)));
-  return found == declared->second.end() ? std::string{} : found->second;
+  const auto table = objects.fieldEnums.find(LowerKey(source->second.first));
+  if (table == objects.fieldEnums.end()) { return {}; }
+  const auto found = table->second.find(LowerKey(source->second.second));
+  return found == table->second.end() ? std::string{} : found->second;
 }
 
 void NoteObjectNames(const Objects &objects) {
@@ -2465,17 +2524,12 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
 
 std::vector<std::string>
 MemberLentParametersOf(const Objects &objects, const al::VarDecl *receiver, std::string_view name) {
-  if (receiver == nullptr || receiver->subtype.empty()) { return {}; }
-  const std::string type = TypeName(receiver->type);
-  const TableIndex *index = nullptr;
-  if (type == "Codeunit") { index = &objects.codeunits; }
-  if (type == "Record") { index = &objects.tables; }
-  if (index == nullptr) { return {}; }
-  const auto found = index->find(LowerKey(receiver->subtype));
-  if (found == index->end()) { return {}; }
-  const TableRef &ref = found->second;
-  return LentParametersOf(
-      ref.procedureDeclarations, name, objects, ref.name.empty() ? receiver->subtype : ref.name);
+  if (receiver == nullptr || TypeName(receiver->type) != "Codeunit" || receiver->subtype.empty()) {
+    return {};
+  }
+  const auto unit = objects.codeunits.find(LowerKey(receiver->subtype));
+  if (unit == objects.codeunits.end()) { return {}; }
+  return LentParametersOf(unit->second.procedureDeclarations, name, objects, receiver->subtype);
 }
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects) {

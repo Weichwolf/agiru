@@ -151,6 +151,7 @@ inline constexpr TableDef kDateTable{
     .caption = Date::kName,
     .fields = kDateFields,
     .keys = kDateKeys,
+    .dataPerCompany = false,
 };
 
 static_assert(FieldsAreSorted(kDateTable), "the field table is searched by number");

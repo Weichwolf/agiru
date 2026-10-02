@@ -80,7 +80,7 @@ inline constexpr std::array<FieldDef, 1> kIntegerFields{{
 
 /// \brief The keys of the virtual `Integer` table.
 inline constexpr std::array<KeyDef, 1> kIntegerKeys{{
-    KeyDef{.name = "PK", .fields = Integer::kKey1, .clustered = true},
+    KeyDef{.name = "pk", .fields = Integer::kKey1, .clustered = true},
 }};
 
 /// \brief The declaration of the virtual `Integer` table.
@@ -90,6 +90,7 @@ inline constexpr TableDef kIntegerTable{
     .caption = Integer::kName,
     .fields = kIntegerFields,
     .keys = kIntegerKeys,
+    .dataPerCompany = false,
     .sequenceField = Integer::Field_No::Number,
 };
 
