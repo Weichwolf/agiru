@@ -175,7 +175,7 @@ def start(arguments):
         tracked = subprocess.check_output(['git', '-C', str(source), 'ls-files', '-z']).split(b'\0')
         for item in tracked:
             if item and not (ROOT / os.fsdecode(item)).exists():
-                (source / os.fsdecode(item)).unlink(missing_ok=True)
+                (source / os.fsdecode(item)).unlink()
         before = digest(ROOT)
         after = digest(source)
         if before != after:
