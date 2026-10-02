@@ -738,6 +738,10 @@ public:
   /// \brief An empty text.
   Text() = default;
 
+  /// \brief Takes ownership of an unbounded text result without copying its buffer.
+  /// \param value The owned characters; no length or Code normalization is imposed.
+  explicit(false) Text(std::string &&value) { Set(std::move(value)); }
+
   /// \brief Constructs from anything that reads as text.
   ///
   /// \tparam T The source, which must read as a `std::string_view`.
@@ -973,13 +977,23 @@ inline Text<0> StringValue::TrimEnd(std::string_view Chars) const {
 ///
 /// \param left  The left side.
 /// \param right The right side.
-/// \return The two joined, as a plain string: AL decides the LENGTH at the assignment, not here.
-///
-/// \note AL WRITES `Code + Code` AND MEANS TEXT. `NoSeries.Code + GenerateRandomCode(...)` is the
-///       shape, and what it produces is checked against the declared length of whatever it is
-///       assigned to -- which is where `Text` and `Code` already check it.
+/// \return The joined storage; this erased-string overload does not establish an AL result type.
 [[nodiscard]] inline std::string operator+(const StringValue &left, const StringValue &right) {
   return std::string(left.Value()) + std::string(right.Value());
+}
+
+/// \brief AL concatenation with at least one Text operand produces Text.
+/// \tparam Left The declared Text or Code type of the left operand.
+/// \tparam Right The declared Text or Code type of the right operand.
+/// \param left The left characters.
+/// \param right The right characters.
+/// \return Unbounded Text, preserving case and spaces; destination limits apply on assignment.
+/// \see `devenv-al-type-conversion-expressions.md`, example 2.
+template <typename Left, typename Right>
+  requires std::derived_from<Left, StringValue> && std::derived_from<Right, StringValue> &&
+           (std::derived_from<Left, Text<0>> || std::derived_from<Right, Text<0>>)
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(left.Value()) + std::string(right.Value())};
 }
 
 /// \brief AL `+` on text and a literal.
@@ -994,8 +1008,8 @@ inline Text<0> StringValue::TrimEnd(std::string_view Chars) const {
 ///       neither is chosen.
 template <typename T>
   requires std::convertible_to<const T &, std::string_view> && (!std::derived_from<T, StringValue>)
-[[nodiscard]] std::string operator+(const StringValue &left, const T &right) {
-  return std::string(left.Value()) + std::string(std::string_view(right));
+[[nodiscard]] Text<0> operator+(const StringValue &left, const T &right) {
+  return Text<0>{std::string(left.Value()) + std::string(std::string_view(right))};
 }
 
 /// \brief AL `+` on a literal and text.
@@ -1012,8 +1026,8 @@ template <typename T>
 template <typename Left, typename Right>
   requires std::convertible_to<const Left &, std::string_view> &&
            (!std::derived_from<Left, StringValue>) && std::derived_from<Right, StringValue>
-[[nodiscard]] std::string operator+(const Left &left, const Right &right) {
-  return std::string(std::string_view(left)) + std::string(right.Value());
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(std::string_view(left)) + std::string(right.Value())};
 }
 
 /// \brief AL `+` where NEITHER side is a `Text[N]` or `Code[N]` field.
@@ -1041,8 +1055,8 @@ template <typename Left, typename Right>
            (!std::derived_from<Left, StringValue>) && (!std::derived_from<Right, StringValue>) &&
            std::is_class_v<Left> && std::is_class_v<Right> &&
            (!std::same_as<Left, std::string> || !std::same_as<Right, std::string>)
-[[nodiscard]] std::string operator+(const Left &left, const Right &right) {
-  return std::string(std::string_view(left)) + std::string(std::string_view(right));
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(std::string_view(left)) + std::string(std::string_view(right))};
 }
 
 /// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a

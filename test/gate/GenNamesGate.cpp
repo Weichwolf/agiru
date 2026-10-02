@@ -1,6 +1,9 @@
 #include "Check.h"
 #include "Names.h"
+#include "Scope.h"
 
+#include <algorithm>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -101,6 +104,64 @@ void AGeneratorOwnedNameCannotCollideWithAnAlName() {
   CHECK_TEXT("a leading underscore is the only one", Identifier("3 Way Match"), "_3WayMatch");
 }
 
+void ObjectNamesAreAllocatedBeforeEmission() {
+  using agiru::gen::ObjectIdentifiers;
+  using agiru::gen::ObjectIdentity;
+  using agiru::gen::ObjectKind;
+  constexpr int kFirstId = 12;
+  constexpr int kSecondId = 34;
+  constexpr int kReservedId = 56;
+  constexpr int kOtherNamespaceId = 78;
+  std::vector<ObjectIdentity> objects{{.app = "base",
+                                       .nameSpace = "Microsoft.Fixture",
+                                       .kind = ObjectKind::Table,
+                                       .id = kFirstId,
+                                       .name = "ClashingValue"},
+                                      {.app = "system",
+                                       .nameSpace = "Microsoft.Fixture",
+                                       .kind = ObjectKind::Table,
+                                       .id = kSecondId,
+                                       .name = "Clashing Value"},
+                                      {.app = "base",
+                                       .nameSpace = "Microsoft.Fixture",
+                                       .kind = ObjectKind::Table,
+                                       .id = kReservedId,
+                                       .name = "ClashingValue_12"},
+                                      {.app = "base",
+                                       .nameSpace = "Microsoft.Other",
+                                       .kind = ObjectKind::Table,
+                                       .id = kOtherNamespaceId,
+                                       .name = "ClashingValue"},
+                                      {.app = "base",
+                                       .nameSpace = "Microsoft.Fixture",
+                                       .kind = ObjectKind::Codeunit,
+                                       .id = kFirstId,
+                                       .name = "ClashingValue"}};
+  const auto assigned = ObjectIdentifiers(objects);
+  CHECK_TEXT("an AL underscore spelling is reserved", assigned[0], "ClashingValue_12_2");
+  CHECK_TEXT("both colliding declarations get an ID suffix", assigned[1], "ClashingValue_34");
+  CHECK_TEXT("a noncolliding underscore name stays unchanged", assigned[2], "ClashingValue_12");
+  CHECK_TEXT("another namespace has its own realm", assigned[3], "ClashingValue");
+  CHECK_TEXT("another object kind has its own realm", assigned[4], "ClashingValue");
+  std::ranges::reverse(objects);
+  auto reversed = ObjectIdentifiers(objects);
+  std::ranges::reverse(reversed);
+  CHECK_TRUE("input and app order cannot change assigned names", reversed == assigned);
+  CHECK_TEXT("allocation retains original AL text", objects.back().name, "ClashingValue");
+  auto duplicate = objects.back();
+  duplicate.app = "BASE";
+  duplicate.nameSpace = "microsoft.fixture";
+  duplicate.name = "clashingvalue";
+  objects.push_back(duplicate);
+  bool refused = false;
+  try {
+    static_cast<void>(ObjectIdentifiers(objects));
+  } catch (const std::runtime_error &error) {
+    refused = std::string(error.what()).contains("duplicate object identity");
+  }
+  CHECK_TRUE("duplicate AL identities refuse instead of acquiring a suffix", refused);
+}
+
 } // namespace
 
 int main() {
@@ -111,5 +172,6 @@ int main() {
     AlTextSurvivesBecomingACppLiteral();
     CollidingEnumeratorsAreSeparatedByTheirOrdinal();
     AGeneratorOwnedNameCannotCollideWithAnAlName();
+    ObjectNamesAreAllocatedBeforeEmission();
   });
 }

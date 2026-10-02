@@ -25,6 +25,7 @@ using agiru::RecordRef;
 using agiru::Temporary;
 using agiru::platform::Field;
 using agiru::platform::FieldClass;
+using agiru::platform::FieldDataType;
 
 namespace {
 
@@ -46,30 +47,31 @@ struct TypeNameCase {
   FieldType type;
   std::uint16_t length;
   std::string_view name;
+  agiru::Integer ordinal;
 };
 
 constexpr std::array<TypeNameCase, 21> kTypeNames{{
-    {.type = FieldType::Boolean, .length = 0, .name = "Boolean"},
-    {.type = FieldType::Integer, .length = 0, .name = "Integer"},
-    {.type = FieldType::BigInteger, .length = 0, .name = "BigInteger"},
-    {.type = FieldType::Decimal, .length = 0, .name = "Decimal"},
-    {.type = FieldType::Option, .length = 0, .name = "Option"},
-    {.type = FieldType::Enum, .length = 0, .name = "Option"},
-    {.type = FieldType::Duration, .length = 0, .name = "Duration"},
-    {.type = FieldType::Code, .length = 20, .name = "Code20"},
-    {.type = FieldType::Text, .length = 100, .name = "Text100"},
-    {.type = FieldType::Code, .length = 0, .name = "Code0"},
-    {.type = FieldType::Text, .length = 2048, .name = "Text2048"},
-    {.type = FieldType::Date, .length = 0, .name = "Date"},
-    {.type = FieldType::Time, .length = 0, .name = "Time"},
-    {.type = FieldType::DateTime, .length = 0, .name = "DateTime"},
-    {.type = FieldType::Guid, .length = 0, .name = "GUID"},
-    {.type = FieldType::RecordId, .length = 0, .name = "RecordID"},
-    {.type = FieldType::DateFormula, .length = 0, .name = "DateFormula"},
-    {.type = FieldType::Blob, .length = 0, .name = "BLOB"},
-    {.type = FieldType::TableFilter, .length = 0, .name = "TableFilter"},
-    {.type = FieldType::MediaSet, .length = 0, .name = "MediaSet"},
-    {.type = FieldType::Media, .length = 0, .name = "Media"},
+    {.type = FieldType::Boolean, .length = 0, .name = "Boolean", .ordinal = 34047},
+    {.type = FieldType::Integer, .length = 0, .name = "Integer", .ordinal = 34559},
+    {.type = FieldType::BigInteger, .length = 0, .name = "BigInteger", .ordinal = 36095},
+    {.type = FieldType::Decimal, .length = 0, .name = "Decimal", .ordinal = 12799},
+    {.type = FieldType::Option, .length = 0, .name = "Option", .ordinal = 35583},
+    {.type = FieldType::Enum, .length = 0, .name = "Option", .ordinal = 35583},
+    {.type = FieldType::Duration, .length = 0, .name = "Duration", .ordinal = 36863},
+    {.type = FieldType::Code, .length = 20, .name = "Code20", .ordinal = 31489},
+    {.type = FieldType::Text, .length = 100, .name = "Text100", .ordinal = 31488},
+    {.type = FieldType::Code, .length = 0, .name = "Code0", .ordinal = 31489},
+    {.type = FieldType::Text, .length = 2048, .name = "Text2048", .ordinal = 31488},
+    {.type = FieldType::Date, .length = 0, .name = "Date", .ordinal = 11775},
+    {.type = FieldType::Time, .length = 0, .name = "Time", .ordinal = 11776},
+    {.type = FieldType::DateTime, .length = 0, .name = "DateTime", .ordinal = 37375},
+    {.type = FieldType::Guid, .length = 0, .name = "GUID", .ordinal = 37119},
+    {.type = FieldType::RecordId, .length = 0, .name = "RecordID", .ordinal = 4988},
+    {.type = FieldType::DateFormula, .length = 0, .name = "DateFormula", .ordinal = 11797},
+    {.type = FieldType::Blob, .length = 0, .name = "BLOB", .ordinal = 33793},
+    {.type = FieldType::TableFilter, .length = 0, .name = "TableFilter", .ordinal = 4912},
+    {.type = FieldType::MediaSet, .length = 0, .name = "MediaSet", .ordinal = 26208},
+    {.type = FieldType::Media, .length = 0, .name = "Media", .ordinal = 26207},
 }};
 constexpr agiru::Integer kUnknownTypeField = static_cast<agiru::Integer>(kTypeNames.size() + 1);
 
@@ -205,6 +207,8 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
     CHECK_TEXT("Type Name uses the native primitive spelling and length",
                ReadTypeName(row),
                kTypeNames[i].name);
+    CHECK_TRUE("Field.Type uses its native code, not an internal tag",
+               row.Type.AsInteger() == kTypeNames[i].ordinal);
   }
   CHECK_TEXT("an unknown primitive type refuses rather than returning blank",
              ReadMetadata(row, kUnknownTypeField, kTypeMetadataId),
@@ -256,7 +260,7 @@ void MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary() {
              ",,Alpha,,Omega,");
   CHECK_TRUE("an ordinary field is Normal", row.Class == FieldClass::Normal);
   CHECK_SILENT("an enum declaration is readable", ReadMetadata(row, 4));
-  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldType::Option);
+  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldDataType::Option);
   CHECK_TRUE("the reported type has a declared member", row.Type.IsDeclared());
   CHECK_TEXT("enum members retain declaration order", row.OptionString.Value(), "Zero,Ten");
   CHECK_SILENT("a scalar declaration is readable", ReadMetadata(row, 2));
@@ -298,14 +302,14 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   rows.TableNo = kItem;
   rows.No = kItemNo;
   rows.FieldName = "No.";
-  rows.Type = FieldType::Code;
+  rows.Type = FieldDataType::Code;
   rows.Len = kNoLength;
   rows.Insert();
 
   rows.TableNo = kItem;
   rows.No = kItemDescription;
   rows.FieldName = "Description";
-  rows.Type = FieldType::Text;
+  rows.Type = FieldDataType::Text;
   rows.Len = kDescriptionLength;
   rows.Insert();
 
@@ -315,7 +319,7 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   read.Copy(rows, true);
   CHECK_TRUE("a row is found by its primary key", read.Get(kItem, kItemNo));
   CHECK_TEXT("carrying its name", std::string(read.FieldName.Value()), "No.");
-  CHECK_TRUE("and its type", read.Type == FieldType::Code);
+  CHECK_TRUE("and its type", read.Type == FieldDataType::Code);
   CHECK_TRUE("a key that matches nothing answers false", !read.Get(kItem, agiru::Integer{2}));
 }
 
@@ -332,8 +336,8 @@ void ItIsTheTableTheBaseAppReadsFrom() {
   // `SystemId` in `FieldCount()`, `ApplicationAreaMgmt` read a Guid into a Boolean (214 cases,
   // commit 1b27053). The system fields exist all the same and AL reaches them BY NUMBER --
   // `Config. Package Management` writes `Field.FieldNo(SystemId)` -- which `FieldExist` answers.
-  CHECK_TRUE("eighteen declared fields, and not the five the platform adds",
-             ref.FieldCount() == 18);
+  CHECK_TRUE("twenty-four declared fields, and not the five the platform adds",
+             ref.FieldCount() == 24);
   CHECK_TRUE("while a system field is reachable by number",
              ref.FieldExist(agiru::kSystemFields.front().no.Value()));
   CHECK_TEXT("the field AL calls \"No.\" keeps its dot", std::string(ref.Field(2).Name()), "No.");
@@ -341,7 +345,7 @@ void ItIsTheTableTheBaseAppReadsFrom() {
       "and the caption field keeps its space", std::string(ref.Field(20).Name()), "Field Caption");
 }
 
-/// Current metadata-tag compatibility only; native Field.Type/FieldRef.Type remain board:0034.
+/// Internal metadata tags do not change when the native Field boundary is corrected.
 void TheCompatibilityTypeKeepsItsExistingOptionVocabulary() {
   const agiru::Option<FieldType> code{FieldType::Code};
   CHECK_TRUE("Code retains the current metadata tag 33", code.AsInteger() == 33);
@@ -363,10 +367,91 @@ void TheCompatibilityTypeKeepsItsExistingOptionVocabulary() {
   Field row;
   RecordRef ref;
   ref.GetTable(row);
-  CHECK_TRUE("FieldRef retains the same leading blank option members",
-             ref.Field(Field::Field_No::Type.Value())
-                 .OptionMembers()
-                 .starts_with(",,,Boolean,,Option,,Integer"));
+  CHECK_TRUE(
+      "FieldRef exposes the native option inventory without ordinal-gap padding",
+      ref.Field(Field::Field_No::Type.Value()).OptionMembers() ==
+          "TableFilter,RecordID,OemText,Date,Time,DateFormula,Decimal,Media,MediaSet,Text,"
+          "Code,Binary,BLOB,Boolean,Integer,OemCode,Option,BigInteger,Duration,GUID,DateTime");
+}
+
+void NativeCodesHaveCompactMetadataAndSurviveTemporaryRows() {
+  constexpr std::array<agiru::Integer, 21> codes{4912,  4988,  11519, 11775, 11776, 11797, 12799,
+                                                 26207, 26208, 31488, 31489, 33791, 33793, 34047,
+                                                 34559, 35071, 35583, 36095, 36863, 37119, 37375};
+  constexpr std::array<std::string_view, 21> names{
+      "TableFilter", "RecordID", "OemText", "Date",       "Time",     "DateFormula", "Decimal",
+      "Media",       "MediaSet", "Text",    "Code",       "Binary",   "BLOB",        "Boolean",
+      "Integer",     "OemCode",  "Option",  "BigInteger", "Duration", "GUID",        "DateTime"};
+  const auto *type = agiru::Field(agiru::platform::kFieldTable, agiru::FieldNo{5});
+  CHECK_TRUE("native type metadata has twenty-one entries",
+             type != nullptr && type->values.size() == 21);
+  if (type == nullptr || type->values.size() != codes.size()) { return; }
+  Temporary<Field> rows;
+  for (std::size_t i = 0; i < codes.size(); ++i) {
+    CHECK_TRUE("the native code is not a member position", type->values[i].ordinal == codes[i]);
+    CHECK_TEXT("the native member keeps its AL spelling", type->values[i].name, names[i]);
+    rows.TableNo = kItem;
+    rows.No = static_cast<agiru::Integer>(i + 1);
+    rows.Type = codes[i];
+    CHECK_TRUE("a coded value is declared", rows.Type.IsDeclared());
+    CHECK_TEXT("a coded option resolves its name", rows.Type.Name(), names[i]);
+    CHECK_TEXT("a coded option resolves its caption", rows.Type.Caption(), names[i]);
+    rows.Insert();
+  }
+  Temporary<Field> read;
+  read.Copy(rows, true);
+  for (std::size_t i = 0; i < codes.size(); ++i) {
+    CHECK_TRUE("a coded temporary row is found",
+               read.Get(kItem, static_cast<agiru::Integer>(i + 1)));
+    CHECK_TRUE("temporary storage preserves the native ordinal", read.Type.AsInteger() == codes[i]);
+  }
+  const agiru::Option<FieldDataType> gap{31490};
+  CHECK_TRUE("the FieldRef Code value is not declared by Field.Type", !gap.IsDeclared());
+  CHECK_TRUE("an undeclared native code has no guessed name", gap.Name().empty());
+  CHECK_TRUE("the zero default is unchanged and undeclared",
+             !agiru::Option<FieldDataType>{}.IsDeclared());
+}
+
+void NativeAddedFieldsHaveSourceNumbersAndTemporaryStorage() {
+  Temporary<Field> row;
+  row.TableNo = kItem;
+  row.No = kItemNo;
+  row.ExternalName = std::string(100, 'x');
+  row.SQLDataType = agiru::platform::FieldSQLDataType::BigInteger;
+  row.DataClassification = agiru::platform::FieldDataClassification::SystemMetadata;
+  row.AppPackageID = agiru::Guid{"6f918a07-c568-4fd1-bc15-184737e90b30"};
+  row.AppRuntimePackageID = agiru::Guid{"7936dfb2-3e4e-4acf-a5e0-71eb5d8a1eca"};
+  row.OptimizeForTextSearch = true;
+  row.Access = agiru::platform::FieldAccess::Protected;
+  row.IsAllowedInCustomizations = true;
+  row.Insert();
+  Temporary<Field> read;
+  read.Copy(row, true);
+  CHECK_TRUE("new fields survive a temporary Get", read.Get(kItem, kItemNo));
+  CHECK_TEXT("ExternalName retains all one hundred characters",
+             read.ExternalName.Value(),
+             std::string(100, 'x'));
+  CHECK_TRUE("SQLDataType keeps its native ordinal", read.SQLDataType.AsInteger() == 3);
+  CHECK_TRUE("DataClassification uses native order", read.DataClassification.AsInteger() == 6);
+  CHECK_TRUE("package ID is stored rather than inferred", read.AppPackageID == row.AppPackageID);
+  CHECK_TRUE("runtime package ID remains distinct",
+             read.AppRuntimePackageID == row.AppRuntimePackageID &&
+                 read.AppRuntimePackageID != read.AppPackageID);
+  CHECK_TRUE("text search is stored", read.OptimizeForTextSearch);
+  CHECK_TRUE("Access uses native order", read.Access.AsInteger() == 2);
+  CHECK_TRUE("customization availability is stored", read.IsAllowedInCustomizations);
+  RecordRef ref;
+  ref.GetTable(read);
+  CHECK_TRUE("ExternalName is field ten", ref.FieldExist(10) && ref.Field(10).Length() == 100);
+  CHECK_TRUE("the invented field twenty-nine is absent", !ref.FieldExist(29));
+  CHECK_TEXT("SQLDataType is field twenty-three", ref.Field(23).Name(), "SQLDataType");
+  CHECK_TEXT("package ID is field sixty", ref.Field(60).Name(), "App Package ID");
+  CHECK_TEXT(
+      "runtime package ID is field sixty-one", ref.Field(61).Name(), "App Runtime Package ID");
+  CHECK_TEXT("text search is field sixty-two", ref.Field(62).Name(), "OptimizeForTextSearch");
+  CHECK_TEXT("Access is field sixty-three", ref.Field(63).Name(), "Access");
+  CHECK_TEXT(
+      "customizations is field sixty-four", ref.Field(64).Name(), "IsAllowedInCustomizations");
 }
 
 } // namespace
@@ -384,5 +469,7 @@ int main() {
     MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary();
     MetadataLoadsRelationsAndRefusesUnknownStates();
     MetadataTypeNamesMatchTheNativePrimitiveContract();
+    NativeCodesHaveCompactMetadataAndSurviveTemporaryRows();
+    NativeAddedFieldsHaveSourceNumbersAndTemporaryStorage();
   });
 }

@@ -202,23 +202,11 @@ void RuntimeReset(void *record) {
   if (keep != nullptr) { StateOf(record)->temporary = std::move(keep); }
 }
 
-Integer RuntimeFilterGroup(const void *record) {
-  const RecordState *state = PeekOf(record);
-  return state == nullptr ? 0 : state->group;
-}
-
 Integer RuntimeFilterGroup(void *record, Integer group) {
-  const Integer was = RuntimeFilterGroup(record);
-  if (group <= kMaximumFilterGroup && group != was) { StateOf(record)->group = group; }
+  RecordState &state = *StateOf(record);
+  const Integer was = state.group;
+  state.group = group;
   return was;
-}
-
-bool RuntimeHasFilter(const void *record) {
-  const RecordState *state = PeekOf(record);
-  return state != nullptr &&
-         std::ranges::any_of(state->filters, [state](const FieldFilter &filter) {
-           return filter.group == state->group && !filter.text.empty();
-         });
 }
 
 bool RuntimeIsTemporary(const void *record) {
