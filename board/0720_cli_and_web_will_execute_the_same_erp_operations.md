@@ -37,4 +37,9 @@ Code: `src/cli/Main.cpp`, `include/meta/PageDef.h`, `include/runtime/test/PageCo
 
 Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/Linux x86_64/aarch64 builds, bounded executor and cancellation before adoption.
 
-Browser-only demo delivery is owned by 0724; both targets share the production dispatcher and typed operation contract above.
+## Optional browser demo — deferred beyond G2
+
+- Proposal, not a delivery promise: statically host the existing business runtime compiled with Emscripten and embedded PostgreSQL via [PGlite](https://pglite.dev/docs/about) on [GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages). Pages serves assets, not server processes. Run command dispatch in a Worker; keep business rules and typed results shared with production. Do not port the native HTTP listener into a fake browser server.
+- PGlite exposes a JS API, supports IndexedDB persistence and one exclusive database connection ([docs](https://pglite.dev/docs/)). Prove a narrow asynchronous database bridge; current native libpq transport is not automatically compatible. Preserve Decimal/Int64 text, transactions, Commit/error boundaries and database diagnostics. No SQL or ERP-semantic fork.
+- Start with one user/session and a bounded disposable demo seed. Measure download/startup/memory, persistence/reload and reset. Inventory unsupported native dependencies/extensions; keep refusals explicit. Browser results do not qualify PostgreSQL multi-user, production durability or the 2 TB/10,000-user target.
+- Prefer a single-threaded WASM Worker initially: [Emscripten pthreads](https://emscripten.org/docs/porting/pthreads.html) require COOP/COEP headers. Verify actual Pages hosting and assets/CSP rather than assuming those headers. Compare identical CLI/browser demo workflows and SQL effects before publishing; no implementation starts before G1/G2.

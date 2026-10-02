@@ -1,3 +1,5 @@
+#include "meta/Declare.h"
+
 #include "Apps.h"
 #include "Ast.h"
 #include "BodyWriter.h"
@@ -1438,6 +1440,16 @@ void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects)
   }
 }
 
+std::set<std::string> TryFunctionsOf(const std::vector<agiru::al::ProcedureDecl> &procedures) {
+  std::set<std::string> tried;
+  for (const agiru::al::ProcedureDecl &procedure : procedures) {
+    if (agiru::gen::IsTryFunction(procedure)) {
+      tried.insert(agiru::gen::LowerKey(procedure.name));
+    }
+  }
+  return tried;
+}
+
 std::set<std::string> DeclaredTryFunctions(std::string_view source) {
   std::set<std::string> tried;
   static constexpr std::string_view kAttribute = "[TryFunction]";
@@ -1508,16 +1520,16 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
-void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
+void RefreshFieldIndex(const Tables &tables, agiru::gen::Objects &objects) {
   for (const agiru::al::TableObject &table : tables.objects) {
-    const agiru::gen::TableRef ref =
-        agiru::gen::BindTable(table,
-                              "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
-                                  agiru::gen::ClassName(agiru::gen::Identifier(table.name),
-                                                        agiru::gen::ObjectKind::Table),
-                              TableHeaderPath(table));
-    objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
-    objects.tables.insert_or_assign(std::to_string(table.id), ref);
+    const auto found = objects.tables.find(agiru::gen::LowerKey(table.name));
+    if (found == objects.tables.end()) { continue; }
+    for (const agiru::al::FieldDecl &field : table.fields) {
+      found->second.fields.emplace(agiru::gen::LowerKey(field.name),
+                                   agiru::gen::FieldIdentifier(table, field.name));
+    }
+    const auto byId = objects.tables.find(std::to_string(table.id));
+    if (byId != objects.tables.end()) { byId->second.fields = found->second.fields; }
   }
 }
 
@@ -1576,7 +1588,7 @@ void NoteFieldEnums(const agiru::al::TableObject &table,
   }
 }
 
-Tables IndexTables(Run &run, Counts &counts) {
+Tables IndexTables(Run &run, Counts &counts, agiru::gen::Objects &objects) {
   Tables kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Table.al")) {
     ++counts.files;
@@ -1588,6 +1600,37 @@ Tables IndexTables(Run &run, Counts &counts) {
       }
       ++counts.parsed;
       counts.members += table.fields.size();
+      std::map<std::string, std::string> fieldNames;
+      for (const agiru::al::FieldDecl &field : table.fields) {
+        fieldNames.emplace(agiru::gen::LowerKey(field.name),
+                           agiru::gen::FieldIdentifier(table, field.name));
+      }
+      for (const agiru::SystemFieldDecl &field : agiru::kSystemFields) {
+        fieldNames.emplace(agiru::gen::LowerKey(std::string(field.name)), std::string(field.name));
+      }
+      std::map<std::string, std::string> procedureNames;
+      for (const agiru::al::ProcedureDecl &procedure : table.procedures) {
+        procedureNames.emplace(agiru::gen::LowerKey(procedure.name),
+                               agiru::gen::ProcedureIdentifier(table, procedure.name));
+      }
+      const agiru::gen::TableRef ref{
+          .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
+                        agiru::gen::ClassName(agiru::gen::Identifier(table.name),
+                                              agiru::gen::ObjectKind::Table),
+          .header = TableHeaderPath(table),
+          .fields = std::move(fieldNames),
+          .procedures = std::move(procedureNames),
+          .parts = {},
+          .name = {},
+          .dataItems = {},
+          .requestFields = {},
+          .columnSources = {},
+          .interfaceReturns = {},
+          .tryFunctions = TryFunctionsOf(table.procedures),
+          .procedureDeclarations = {}};
+      objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
+      objects.tables.insert_or_assign(std::to_string(table.id), ref);
+      NoteFieldEnums(table, objects.enums, objects.fieldEnums);
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(table));
     } catch (const std::exception &e) {
@@ -2534,9 +2577,9 @@ int Scan(const Job &job) {
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
-    Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
+    Tables &parsedTables = held.emplace_back(IndexTables(run, tables, objects));
     extensions.emitted += MergeExtensions(store, parsedTables);
-    RefreshTableIndex(parsedTables, objects);
+    RefreshFieldIndex(parsedTables, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }

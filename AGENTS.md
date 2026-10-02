@@ -2,25 +2,7 @@
 
 AL-to-C++23 transpiler and runtime for a standalone Business Central ERP backed by
 PostgreSQL. The target is complete BC business functionality, including all AL object
-kinds and extensions within the product scope below. Repository text, source,
-documentation and commits are English.
-
-## Product scope
-
-- agiru-owned code is MIT licensed. All implemented ERP features are available without
-  license keys, subscriptions, trials, paid tiers or license-based feature restrictions.
-  Preserve third-party notices and licenses; they are not relicensed by this policy.
-- BC licensing and entitlements as commercial feature gates, O365/Microsoft 365 and
-  integrations with other Microsoft cloud services are not product requirements.
-- User/company permissions, authentication, session isolation and generic protocols remain
-  required. Do not remove core ERP merely because an AL namespace starts with Microsoft
-  or a declaration has Scope=Cloud. Do not substitute always-success licensing stubs.
-- Inventory source objects and tests before filtering. Report raw population, selected
-  population and explicit excluded identities/reasons separately. Other unsupported
-  behaviour remains a gap, not an approved exclusion (board 0725).
-- Root `scope.json` is the single selection policy for the transpiler and independent
-  inventory. Product exclusions name bounded source paths and approved reasons;
-  namespace/area reachability is not a complete product classification.
+kinds and extensions. Repository text, source, documentation and commits are English.
 
 ## Delivery order
 
@@ -42,12 +24,6 @@ Historical pass counts are not current measurements. `board/README.md` gives the
 state and execution order. Do not trade the full target for a green subset.
 
 ## References before semantic changes
-
-Use the local BC source and developer/user documentation repositories under `~/Git/`
-before web search. Update their clean tracking branches with `git pull --ff-only` when
-current upstream evidence is needed; preserve local edits and never reset or force a
-merge. Record the revisions used, and keep frozen verification inputs unchanged.
-Use web search only when the required reference is missing locally or local access fails.
 
 Read the relevant overload, trigger or property in this order:
 
@@ -112,11 +88,6 @@ what a file names; no master header or macros. Measure build cost before widenin
 
 `make` is the entry point. Use `make help` for the current target list.
 
-- `make census` inventories the raw BCApps AL tree independently of the transpiler's
-  parser/linker, without filtering by namespace/app membership. `build/scope-inventory.json` retains source hashes,
-  object/test identities, conditional variants, omitted app roots and unmeasured files.
-  Namespace selection is diagnostic only; this is not an executable test manifest.
-  An incomplete census fails while preserving the report. Use 0725 for product exclusions.
 - Hot loop on an agent's own worktree: `make gate GATE=RecordRefGate JOBS=2`
   builds and runs one affected C++ gate. Use `B=build/sanitizers` for an already
   configured sanitizer build. Run `make test JOBS=2` for the complete local gates,

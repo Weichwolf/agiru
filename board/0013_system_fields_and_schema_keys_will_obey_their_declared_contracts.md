@@ -1,12 +1,11 @@
 # 0013 — System fields and schema keys will obey their declared contracts
 
-Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-02
+Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-01
 Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-population proof.
 
 ## Evidence
 
 - `Storage.cpp` generates keys and system fields, but writes lack observed-rowversion predicates. Field presence is not a uniqueness/audit/concurrency guarantee.
-- AllObj/AllObjWithCaption now retain their source sole pk and original field numbers (0034); this is declaration proof only. Retire the old invented name index and wrong caption/package columns through explicit populated-schema activation, not blind ProvisionInstalled. Scope/fieldgroups, system-field visibility and live read-only catalogue authority remain open; no SQL migration was run.
 - Own-only `build/implicit-key-20261001/source`: one AL completion rule supplies ordinary/native defaults before extension merging and system fields. No source keys means an implicit primary, not zero keys; preserve the lowest eligible field ID and original name. Table Metadata requires `ID`/field 1; never delete its key to satisfy the former checker. Unknown eligibility refuses.
 - GenKey 68/68 and generated execution 12/12 Clang/GCC; archived generator nine red over the same twelve execution checks. Lower extension IDs/secondary keys cannot replace the base default. Invalid defaults retain source/UT counts and fail translation (0589). All 24,350 paths retained, 79 changed; source UT 80/2,310 unchanged, unexecuted. Receipts: `build/implicit-key-20261001/{README.md,source-identity.json,artifacts/}`.
 - Existing shared key projection preserves declared flags, sums/order, IncludedFields and text. Duplicate clustered selections, invalid Boolean values and SqlIndex refuse. Integrated `Stored()` retains Removed Normal columns; reference restrictions and FlowFields/FlowFilters stay separate. Earlier controls are indexed in README. Current SQL verification is unavailable; no physical-clustering or production-activation claim.

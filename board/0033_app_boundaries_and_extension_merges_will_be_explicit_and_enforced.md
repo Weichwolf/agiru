@@ -1,11 +1,10 @@
 # 0033 — App boundaries and extension merges will be explicit and enforced
 
-Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-01
 Depends on: 0034 source identities.
 
 ## Evidence
 
-- Ordinary tables now bind once after extension merging, using the writer's field/procedure allocator. Four original generated AL cases prove post-merge procedure renaming, extension procedures and numeric/name aliases; the old transpiler fails all four. App/namespace ownership, duplicate identities and other object kinds remain open; README indexes current receipts.
 - `apps.json` declares dependencies; the slice shares all include roots and does not prove them.
 - Own Chart/header proof: `src/gen/{CodeunitWriter,PageWriter}.cpp` shares native alias dependency ownership; locals stay in sources. Door adds only missing owned directives. Six added native includes name their types; redundant directives fall 70,298→66,718, not zero. GenCodeunit retains all 37 checks; old owner control one red. `build/chart-20261001/artifacts/{declaration-proof,dependencies,native-headers,bodies,codeunit-owner-control}.json`; no PCH or full-app/G1 claim.
 - Own `build/xmlport-names-20261001/`: one allocator/binding for tables and XMLports; tables bind once after extension merge. Clang/GCC generated AL: tables 14/14, XMLports 15/15 in each single/dependent-app context; seven controls green, archived emitter six independent assertions red. Real TestTableC 132512/139063 compile and execute 20/20 temporary-storage checks each; no SQL/FlowField execution claim.
@@ -40,7 +39,7 @@ PermissionSetBuffer: same main, `System Application/App/Permission Sets/src/Perm
 
 XMLport/table merge: platform `devenv-{xmlport-object,table-ext-object,namespaces-overview}.md`; BCApps main `src/{Layers/W1/BaseApp/Modules/System/DevTools,Tools/Test Framework/Test Runner/src}/CodeCoverage/CodeCoverageDetailed.XmlPort.al`, `src/Apps/W1/{AutomaticAccountCodes/app/src/Tables/AutoAccGLAccount,AMCBanking365Fundamentals/app/Tables/AMCBankBankAccountExt}.TableExt.al`; user `business-central/about-export-data.md`. Earlier 953 rejects file-only suffixes; XMLport custom `var` metadata stays in 0073.
 
-Matcher contract: root `scope.json` plus predecessor `openerp/board/990_mem-scope-whitelist.md`; platform `devenv-namespaces-overview.md` establishes namespace hierarchy and distinct declaring identities, not agiru's selection policy. The stale generator-local policy is removed (0725). System.Integration.PowerBI/Graph remain excluded; legacy Microsoft.Integration.Graph includes local ERP/API helpers, so service retirement requires identity/reference classification rather than a whole-namespace exclusion.
+Matcher contract: existing `scope.json`/`src/gen/scope.json` plus predecessor `openerp/board/990_mem-scope-whitelist.md`; platform `devenv-namespaces-overview.md` establishes namespace hierarchy and distinct declaring identities, not agiru's selection policy. BCApps current main's System.Integration.PowerBI and System.Integration.Graph declarations remain explicit excluded-type dependency gaps; selection was not widened in this patch.
 
 Platform: devenv-json-files.md, namespace/access/extension and obsolete/preprocessor documentation. AL: apps.json inputs and extension declarations. Predecessor: WI-990 defines scope boundaries; do not widen them accidentally.
 
