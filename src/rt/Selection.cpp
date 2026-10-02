@@ -4,7 +4,6 @@
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
-#include "runtime/Storage.h"
 
 #include "Filter.h"
 #include "Where.h"
@@ -134,7 +133,6 @@ void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
 }
 
 std::string Name(const TableDef &table) {
-  RequireTableProvider(table);
   return Quoted(table.name);
 }
 
