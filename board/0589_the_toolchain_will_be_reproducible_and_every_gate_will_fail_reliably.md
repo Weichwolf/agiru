@@ -5,6 +5,8 @@ Depends on: none.
 
 ## Evidence
 
+- Frozen verification now writes each raw census to its own `artifacts/census/scope-inventory.json`, not the mutable reusable lane. Same-lane two-run regression retains both receipts and unchanged source hashes; the actual predecessor loses them and fails with FileNotFoundError. Current local replay: 98 cases/zero red, 146 toolchain tests, build/local-test-receipts.log. Complete frozen replay and native binding remain separate gates.
+
 - Verification probes now isolate `MAKEFLAGS`, `MFLAGS`, `MAKEOVERRIDES` and `VERIFY_TARGETS` in `test/toolchain.py`. Inherited target override negative control: unchanged source fails both default probes; corrected source passes while preserving explicit overrides and exit 23. Full frozen build/local tests/AL UT replay remains separate pending proof.
 
 - Stable native-prototype repeat regeneration exits zero and preserves all 24,348 file bytes/paths and its whole source hash, but rewrites seventeen mtimes. The stricter byte/mtime helper exits one; retain this failed gate. Reaches/absent/shared outputs and the three duplicate TestTableC outputs need unchanged-write/ownership repair with 0033, not a raised baseline. build/native-source-binding-integration-20261002/artifacts/{repeat-generation,final-identity}.json.

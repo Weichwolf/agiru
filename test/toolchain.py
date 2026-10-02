@@ -1531,6 +1531,27 @@ class SnapshotGate(unittest.TestCase):
             with patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': '/unfrozen/live/input'}):
                 self.assertEqual(verify.run_snapshot(run), 0)
 
+    def test_raw_census_receipts_survive_reusing_the_same_build_lane(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            lane = root / 'lane'
+            lane.mkdir()
+            (lane / 'Makefile').write_text(
+                'B := $(CURDIR)/build\ncensus:\n\t@mkdir -p "$(B)"\n'
+                '\t@printf "%s\\n" "$$CENSUS_MARKER" > "$(B)/scope-inventory.json"\n')
+            receipts = []
+            for marker in ('first', 'second'):
+                run = root / marker
+                run.mkdir()
+                (run / 'result.json').write_text(json.dumps({
+                    'status': 'queued', 'targets': ['census'], 'jobs': 1,
+                    'build_source': str(lane), 'source_sha256': verify.digest(lane)}))
+                with patch.dict(os.environ, CENSUS_MARKER=marker):
+                    self.assertEqual(verify.run_snapshot(run), 0)
+                receipts.append(run / 'artifacts/census/scope-inventory.json')
+            self.assertEqual([path.read_text().strip() for path in receipts], ['first', 'second'])
+            self.assertFalse((lane / 'build/scope-inventory.json').exists())
+
     def test_frozen_bc_revision_reaches_the_ut_runner(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)

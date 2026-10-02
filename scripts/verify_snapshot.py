@@ -277,6 +277,8 @@ def run_snapshot(run):
             command = ['make', '-C', str(build_source), f'JOBS={metadata["jobs"]}', target]
             if target == 'ut':
                 command.append(f'UT_LOG={run / "artifacts/ut.log"}')
+            elif target == 'census':
+                command.append(f'B={run / "artifacts/census"}')
             try:
                 outcomes[target] = subprocess.run(command, env=environment, stdout=output,
                                                    stderr=subprocess.STDOUT, check=False).returncode

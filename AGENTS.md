@@ -128,7 +128,7 @@ what a file names; no master header or macros. Measure build cost before widenin
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source
   files replace lane inputs, so unchanged build objects retain their timestamps.
-  `make verify-status` reports the latest result; `verify.log` holds diagnostics. AL manifests, provenance and method results stay in
+  `make verify-status` reports the latest result; `verify.log` holds diagnostics. Raw census reports, AL manifests, provenance and method results stay in
   the snapshot's `artifacts/` directory, independently of lane reuse.
   Use `VERIFY_TARGETS='all test ut'` when the AL milestone and its database are ready.
   The snapshot and lane content hashes must match; the snapshot records Git HEAD.

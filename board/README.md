@@ -14,7 +14,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 - Fresh frozen main `48650ab`, BCApps `6261b1c458`: `build/verify/20261002T095930Z-2357784/{result.json,verify.log}`. All/test/UT/census failed; source/System hashes unchanged. Root 785 still lacks native Page Table Field binding (0034), not database connectivity.
 - AL UT: 80 codeunits/2,314 methods, zero executed/all incomplete; four upstream additions are named in 0058. `artifacts/ut.log{,.manifest.json,.run.json}` retains every identity and build refusal. Seed acceptance was not reached.
-- Current local repair loop: 98 cases/zero red, 145 toolchain tests/zero skipped; `build/local-test-final.log`. Frozen replay of the corrections remains separate required proof.
+- Current local repair loop: 98 cases/zero red, 146 toolchain tests/zero skipped; `build/local-test-receipts.log`. Frozen replay of the corrections remains separate required proof. Per-run raw census receipts now survive reuse of the build lane (0589).
 - Raw inventory: 36,873 files/36,782 objects/113,005 Test methods; fifteen explicit exclusions, 112,990 required raw methods. No source/object/Test loss. GB report 208 is measured; seven CLEANSCHEMA assignments in three files remain red. `build/census-final/{scope-inventory.json,comparison.json}`; localization/compiler-symbol classification remains 0058, not an executable denominator.
 
 ## Release gates
