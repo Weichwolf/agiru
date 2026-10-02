@@ -16,7 +16,6 @@
 #include "type/Variant.h"
 
 #include <array>
-#include <new>
 #include <span>
 #include <string>
 #include <string_view>
@@ -41,18 +40,10 @@ public:
   SharedRecord() = default;
 
   /// \brief Takes ownership of a record.
-  /// \param record The record; ownership transfers on entry, including allocation failure.
-  /// \param free What unmakes it; must not throw.
-  /// \throws std::bad_alloc If the reference count cannot be allocated; the record is freed.
-  SharedRecord(void *record, void (*free)(void *)) : record_(record), free_(free) {
-    if (record_ == nullptr) { return; }
-    try {
-      uses_ = new long{1};
-    } catch (const std::bad_alloc &) {
-      if (free_ != nullptr) { free_(record_); }
-      throw;
-    }
-  }
+  /// \param record The record.
+  /// \param free   What unmakes it.
+  SharedRecord(void *record, void (*free)(void *))
+      : record_(record), free_(free), uses_(record == nullptr ? nullptr : new long{1}) {}
 
   /// \brief Shares another's record.
   /// \param o The other.
@@ -125,9 +116,6 @@ private:
 }
 
 namespace agiru {
-namespace detail {
-struct RecordRefState;
-}
 class RecordRef;
 class Variant;
 
@@ -168,22 +156,12 @@ public:
   ///       asked of it before the assignment refuses rather than reading a null.
   FieldRef() = default;
 
-  /// \brief Shares the record named by another field reference.
-  /// \param other The source reference.
-  FieldRef(const FieldRef &other);
-  /// \brief Takes another field reference's record handle.
-  /// \param other The source reference.
-  FieldRef(FieldRef &&other) noexcept;
-  /// \brief Shares another field reference's record.
-  /// \param other The source reference.
-  /// \return This reference.
-  FieldRef &operator=(const FieldRef &other);
-  /// \brief Takes another field reference's record handle.
-  /// \param other The source reference.
-  /// \return This reference.
-  FieldRef &operator=(FieldRef &&other) noexcept;
-  /// \brief Releases this field reference's record handle.
-  ~FieldRef();
+  /// \brief A FieldRef over one field of one record.
+  /// \param record The record.
+  /// \param table  Its declaration.
+  /// \param def    The field's declaration.
+  FieldRef(void *record, const TableDef &table, const FieldDef &def)
+      : record_(record), table_(&table), def_(&def) {}
 
   /// \brief AL `FieldRef.Number()`.
   /// \return The AL field number.
@@ -377,22 +355,15 @@ public:
   [[nodiscard]] std::string GetFilter() const;
 
 private:
-  friend class RecordRef;
-  friend class KeyRef;
-  FieldRef(detail::RecordRefState &state, const TableDef &table, const FieldDef &def);
-  [[nodiscard]] void *Record_() const;
-  void Release_() noexcept;
   [[nodiscard]] ::agiru::Variant RangeBound_(bool upper) const;
 
 public:
   /// \brief AL `FieldRef.GetRangeMax()`. The upper bound of the range standing on the field.
-  /// \return The bound as the field's value; blank for an open upper end of an applied range.
-  /// \throws Error when the field has no filter or the filter is not a single range.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it above.
   [[nodiscard]] ::agiru::Variant GetRangeMax() const { return RangeBound_(true); }
 
   /// \brief AL `FieldRef.GetRangeMin()`. The lower bound of the range standing on the field.
-  /// \return The bound as the field's value; blank for an open lower end of an applied range.
-  /// \throws Error when the field has no filter or the filter is not a single range.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it below.
   [[nodiscard]] ::agiru::Variant GetRangeMin() const { return RangeBound_(false); }
 
   /// \brief AL `FieldRef.IsOptimizedForTextSearch()`. Gets if the field is optimized for textual
@@ -548,15 +519,18 @@ private:
     return *table_;
   }
 
-  detail::RecordRefState *state_ = nullptr;
+  void *record_ = nullptr;
   const TableDef *table_ = nullptr;
   const FieldDef *def_ = nullptr;
 };
 
 /// \brief AL `RecordRef` -- a record reached without naming its table.
 ///
-/// \note Open creates an owned record buffer using the table catalogue. GetTable copies the
-///       source buffer and filters into an owned record; temporary table storage remains shared.
+/// \note IT DOES NOT OWN THE RECORD. `GetTable(Rec)` points a RecordRef at a record that already
+///       exists, which is how the BaseApp uses it: `RecRef.GetTable(SalesLine)` and then walk the
+///       fields. `Open(TableNo)` -- which makes a record out of a number alone -- needs a registry
+///       from table number to declaration that this runtime does not have yet, and refuses rather
+///       than handing back something empty.
 namespace detail {
 
 /// \brief What every copy of one AL `RecordRef` variable shares: the table it is open on, the
@@ -570,9 +544,6 @@ namespace detail {
 ///          the handle being shared. `Open`, `Close`, `GetTable` and `SetTable` therefore act on
 ///          this box, and `RecordRef.Copy(RecordRef)` is the one way to a second object.
 struct RecordRefState {
-  /// \brief Constructs a closed reference with one owner through the default member initializers.
-  RecordRefState() = default;
-
   /// \brief The record, or nothing when the reference is closed.
   void *record = nullptr;
   /// \brief The table it is open on, or nothing.
@@ -653,11 +624,11 @@ public:
   ///
   /// \note AL PASSES A RECORD THROUGH AN `Any` AND THE PLATFORM UNWRAPS IT.
   ///       `Assert.RecordIsEmpty(RecVariant)` is the shape, and the Variant carries the record's
-  ///       owned snapshot beside its table NUMBER -- which is what the catalogue looks the
-  ///       declaration up by when the caller cannot name the table either.
+  ///       address beside its table NUMBER -- which is what the catalogue looks the declaration up
+  ///       by when the caller cannot name the table either.
   void GetTable(Variant &rec);
 
-  /// \brief AL `RecordRef.GetTable(Record)` -- copies fields and state into an owned buffer.
+  /// \brief AL `RecordRef.GetTable(Record)` -- points at an existing record.
   /// \tparam T The generated table class.
   /// \param rec The record.
   template <typename T>
@@ -975,16 +946,13 @@ public:
   ///       the other alone.
   ::agiru::RecordRef Duplicate();
 
-  /// \brief AL `RecordRef.FilterGroup()`: reads the selected group without changing it.
-  /// \return The current filter group.
-  /// \throws Error when the RecordRef is not open.
-  [[nodiscard]] ::agiru::Integer FilterGroup() const;
-
-  /// \brief AL `RecordRef.FilterGroup(Integer)`: selects the group for subsequent filters.
-  /// \param NewGroup The group; values above 255 are ignored (`record-filtergroup-method.md`).
-  /// \return The group that was current.
-  /// \throws Error when the RecordRef is not open.
-  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup);
+  /// \brief AL `RecordRef.FilterGroup(Integer)`. Changes the filter group that is being applied to
+  /// the table. You can also use this method to return the number of the current filtergroup. You
+  /// cannot return the number of the filtergroup and set a new filtergroup at the same time.
+  /// \param NewGroup The AL `Integer`.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup = {});
 
   /// \brief AL `RecordRef.Find(Text)`. Finds a record in a table based on the values stored in the
   /// key fields.
@@ -1082,10 +1050,13 @@ public:
   /// \throws Error when the RecordRef is not open.
   [[nodiscard]] std::string GetView(::agiru::Boolean UseNames = true) const;
 
-  /// \brief AL `RecordRef.HasFilter()`: whether the current filter group contains a field filter.
-  /// \return True only when this group is filtered, just like `Record.HasFilter()`.
-  /// \throws Error when the RecordRef is not open.
-  [[nodiscard]] ::agiru::Boolean HasFilter() const;
+  /// \brief AL `RecordRef.HasFilter()`. Determines whether a filter has been applied to the table
+  /// that the RecordRef refers to.
+  /// \return The AL `Boolean`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean HasFilter() {
+    throw Error("RecordRef.HasFilter() is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `RecordRef.HasLinks()`. Determines whether a record contains any links.
   /// \return The AL `Boolean`.
@@ -1201,10 +1172,10 @@ public:
 
   /// \brief AL `RecordRef.Next(Integer)`. Steps through a specified number of records and retrieves
   /// a record.
-  /// \param Steps The signed number of steps; one when omitted, zero preserves the current row.
-  /// \return The signed number of steps actually taken.
-  /// \throws Error when the reference is closed or the database operation fails.
-  ::agiru::Integer Next(::agiru::Integer Steps = 1);
+  /// \param Steps The AL `Integer`.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer Next(::agiru::Integer Steps = {});
 
   /// \brief AL `RecordRef.ReadConsistency()`. Gets a value indicating whether read consistency is
   /// enabled.
@@ -1453,7 +1424,8 @@ public:
 
   /// \brief AL `RecordRef.Close()` -- lets go of the record it was opened on.
   ///
-  /// \note Releases the owned record created by Open or GetTable for all shared handles.
+  /// \note IT LETS GO OF A RECORD IT MADE AND OF ONE IT WAS GIVEN, and only the first is freed:
+  ///       `GetTable(Rec)` points a RecordRef at somebody else's record and `Open(18)` makes one.
   void Close() {
     detail::RecordRefState &box = State();
     box.record = nullptr;
@@ -1469,7 +1441,6 @@ public:
 private:
   friend class KeyRef;
   friend class FieldRef;
-  friend class RecordRefInVariant;
 
   ::agiru::Boolean RenameKeys_(std::span<const ::agiru::Variant> keys);
 
@@ -1477,8 +1448,6 @@ private:
     state_->record = record;
     state_->table = &table;
   }
-
-  explicit RecordRef(detail::RecordRefState &state) : state_(&state) { ++state.uses; }
 
   [[nodiscard]] const TableDef &Table() const;
 

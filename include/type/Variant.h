@@ -2,7 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -18,7 +18,6 @@
 #include "type/JsonHandle.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
-#include "type/Text.h"
 #include "type/Time.h"
 #include "type/XmlHandle.h"
 
@@ -173,83 +172,22 @@ private:
   void (*free_)(void *);
 };
 
-/// \brief An owned RecordRef handle sharing the original AL reference state.
-/// \warning The handle outlives the source variable. The underlying RecordRef's ownership
-/// rules still apply to its table buffer.
-class RecordRefInVariant {
-public:
-  /// \brief Retains a handle on the same AL RecordRef object.
-  /// \param ref The source handle, which may be local to the caller.
-  /// \throws std::bad_alloc If the retained handle cannot be allocated.
-  explicit RecordRefInVariant(const class RecordRef &ref);
-
-  /// \brief Copies the handle while sharing its AL reference state.
-  /// \param other The boxed handle.
-  /// \throws std::bad_alloc If the copied handle cannot be allocated.
-  RecordRefInVariant(const RecordRefInVariant &other)
-      : ref_(other.ref_ == nullptr ? nullptr : other.ops_->clone(other.ref_)), ops_(other.ops_) {}
-
-  /// \brief Transfers ownership of the handle.
-  /// \param other The boxed handle, empty afterwards.
-  RecordRefInVariant(RecordRefInVariant &&other) noexcept
-      : ref_(std::exchange(other.ref_, nullptr)), ops_(other.ops_) {}
-
-  /// \brief Replaces this handle with a copy of another.
-  /// \param other The source.
-  /// \return This box.
-  /// \throws std::bad_alloc If copying fails; this box keeps its previous handle.
-  RecordRefInVariant &operator=(const RecordRefInVariant &other) {
-    if (this != &other) {
-      RecordRefInVariant copy(other);
-      Swap(copy);
-    }
-    return *this;
-  }
-
-  /// \brief Transfers another handle, releasing the previous one.
-  /// \param other The source, empty afterwards.
-  /// \return This box.
-  RecordRefInVariant &operator=(RecordRefInVariant &&other) noexcept {
-    if (this != &other) {
-      RecordRefInVariant moved(std::move(other));
-      Swap(moved);
-    }
-    return *this;
-  }
-
-  /// \brief Releases this handle; other handles keep their shared AL object.
-  ~RecordRefInVariant() {
-    if (ref_ != nullptr) { ops_->free(ref_); }
-  }
-
-  /// \brief Accesses the owned handle without transferring ownership.
-  /// \return The handle, or null after a move.
-  [[nodiscard]] class RecordRef *Get() const { return ref_; }
-
-  /// \brief Compares the identity of the shared AL reference state.
-  /// \param a One box.
-  /// \param b The other box.
-  /// \return Whether both refer to the same AL object, or both are empty.
-  friend bool operator==(const RecordRefInVariant &a, const RecordRefInVariant &b) {
-    if (a.ref_ == nullptr || b.ref_ == nullptr) { return a.ref_ == b.ref_; }
-    return a.ops_->equal(a.ref_, b.ref_);
-  }
-
-private:
-  struct Ops {
-    class RecordRef *(*clone)(const class RecordRef *);
-    void (*free)(class RecordRef *);
-    bool (*equal)(const class RecordRef *, const class RecordRef *);
-  };
-
-  void Swap(RecordRefInVariant &other) noexcept {
-    std::swap(ref_, other.ref_);
-    std::swap(ops_, other.ops_);
-  }
-
-  class RecordRef *ref_;
-  const Ops *ops_;
+/// \brief Two record handles are equal when they refer to the same row of the same table.
+///
+/// \param a One handle.
+/// \param b The other.
+/// \return Whether they refer to the same record.
+///
+/// \brief A `RecordRef` a Variant refers to -- AL `Variant := RecRef` keeps the reference.
+struct RecordRefInVariant {
+  const class RecordRef *ref; ///< The RecordRef, which lives in the caller's variable.
 };
+
+/// \brief Compares two held RecordRefs by identity.
+/// \param a One. \param b The other. \return Whether they are the same RecordRef.
+[[nodiscard]] inline bool operator==(const RecordRefInVariant &a, const RecordRefInVariant &b) {
+  return a.ref == b.ref;
+}
 
 /// \note FREE AND NOT A MEMBER, so `RecordInVariant` stays an aggregate. A member `operator==`
 ///       makes it a class with behaviour, and its two data members then have to be private -- which
@@ -384,7 +322,7 @@ public:
                             Integer,
                             BigInteger,
                             Decimal,
-                            Text<0>,
+                            std::string,
                             Date,
                             Time,
                             DateTime,
@@ -531,7 +469,7 @@ public:
 
   /// \brief Holds a RecordRef by reference (`Variant := RecRef`).
   /// \param ref The RecordRef.
-  Variant(const class RecordRef &ref) : held_(RecordRefInVariant(ref)) {}
+  Variant(const class RecordRef &ref) : held_(RecordRefInVariant{.ref = &ref}) {}
 
   /// \brief AL `RecRef := Variant`: the RecordRef the Variant refers to.
   /// \tparam T `RecordRef`, deduced at the assignment.
@@ -562,10 +500,8 @@ public:
     requires std::same_as<std::remove_cv_t<T>, class RecordRef>
   operator T &() const {
     const auto *held = std::get_if<RecordRefInVariant>(&held_);
-    if (held == nullptr || held->Get() == nullptr) {
-      throw Error("this Variant holds no RecordRef");
-    }
-    return *held->Get();
+    if (held == nullptr) { throw Error("this Variant holds no RecordRef"); }
+    return const_cast<T &>(*held->ref); // NOLINT(cppcoreguidelines-pro-type-const-cast)
   }
 
   /// \brief Holds a record a codeunit keeps by handle (`Instance<T>`): the record behind it.
@@ -655,7 +591,7 @@ public:
   template <typename T>
     requires std::convertible_to<const T &, std::string_view> &&
              (!detail::InVariant<T, Held>::value)
-  Variant(const T &value) : held_(Text<0>(std::string_view(value))) {}
+  Variant(const T &value) : held_(std::string(std::string_view(value))) {}
 
   /// \brief Holds a number AL's `Any` takes and this Variant has no alternative for.
   /// \tparam T The number's type -- `Byte` and `Char` are the two.
@@ -756,12 +692,12 @@ public:
   [[nodiscard]] bool IsDecimal() const { return Is<Decimal>(); }
 
   /// \brief AL `Variant.IsText()`. \return True when it holds one.
-  [[nodiscard]] bool IsText() const { return Is<Text<0>>(); }
+  [[nodiscard]] bool IsText() const { return Is<std::string>(); }
 
   /// \brief AL `Variant.IsCode()`. \return True when it holds one.
   /// \note A Code and a Text are one alternative here, because AL's Code IS a Text with a
   ///       normalisation rule, and a Variant carries the VALUE rather than the rule.
-  [[nodiscard]] bool IsCode() const { return Is<Text<0>>(); }
+  [[nodiscard]] bool IsCode() const { return Is<std::string>(); }
 
   /// \brief AL `Variant.IsDate()`. \return True when it holds one.
   [[nodiscard]] bool IsDate() const { return Is<Date>(); }
@@ -1234,7 +1170,9 @@ public:
   ///       mismatch because AL's does: what it must not do is hand back an empty string for an
   ///       Integer, which is the wrong answer wearing the right type.
   operator std::string_view() const {
-    if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) { return *text; }
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return *text;
+    }
     return Rendered();
   }
 
@@ -1263,7 +1201,7 @@ public:
   ///          so the types that need widening do not come through one.
   template <typename T>
     requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Decimal>) &&
-             (!std::is_same_v<T, BigInteger>) && (!std::is_same_v<T, Text<0>>)
+             (!std::is_same_v<T, BigInteger>)
   operator T &() {
     T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
@@ -1291,7 +1229,7 @@ public:
   /// \param into Where the converted value lands.
   /// \return Whether the held value converts.
   template <typename T> [[nodiscard]] bool ConvertsTo_(T &into) const {
-    if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) {
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
       return detail::TextSpells(*text, into);
     }
     if constexpr (std::is_same_v<T, Integer>) {
@@ -1343,7 +1281,7 @@ public:
   ///       `"Qty. per Unit of Measure".Value` back as a Decimal that way (4 cases, 2026-09-11).
   ///       A text that does not spell the type still refuses.
   template <typename T>
-    requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Text<0>>)
+    requires detail::InVariant<T, Held>::value
   operator T() const {
     const T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
@@ -1367,7 +1305,7 @@ public:
     }
     if constexpr (std::is_same_v<T, Decimal> || std::is_same_v<T, Integer> ||
                   std::is_same_v<T, BigInteger> || std::is_same_v<T, Boolean>) {
-      if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) {
+      if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
         T evaluated{};
         if (detail::TextSpells(*text, evaluated)) { return evaluated; }
       }
@@ -1392,9 +1330,8 @@ public:
   /// \brief The `Char` a variant holds: a text's first code point, or an integer's value.
   /// \throws Error when it holds neither.
   operator ::agiru::Char() const {
-    if (const auto *text = std::get_if<Text<0>>(&held_); text != nullptr) {
-      const std::string_view value(*text);
-      return ::agiru::Char{value.empty() ? 0 : static_cast<unsigned char>(value.front())};
+    if (const auto *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return ::agiru::Char{text->empty() ? 0 : static_cast<unsigned char>(text->front())};
     }
     if (const auto *number = std::get_if<Integer>(&held_); number != nullptr) {
       return ::agiru::Char{static_cast<std::int32_t>(*number)};

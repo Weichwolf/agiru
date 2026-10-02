@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dotnet/Refused.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Stream.h"
 #include "type/Text.h"
 
