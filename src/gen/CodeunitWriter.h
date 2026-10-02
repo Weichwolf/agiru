@@ -97,9 +97,6 @@ QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_v
                                                  const al::VarDecl *declared,
                                                  std::string_view member);
 
-[[nodiscard]] std::string
-FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field);
-
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,
                            const al::VarDecl &declared,

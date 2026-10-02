@@ -34,13 +34,6 @@
 
 namespace agiru {
 
-void RequireTableProvider(const TableDef &table) {
-  if (!table.providerRefusal.empty()) {
-    throw Error("table " + std::string(table.name) + " (" + std::to_string(table.id.Value()) +
-                "): " + std::string(table.providerRefusal));
-  }
-}
-
 namespace {
 
 std::string Quoted(std::string_view identifier) {
@@ -165,7 +158,6 @@ void EnsureSequences(const Connection &connection, const TableDef &table) {
 }
 
 void CreateTable(const Connection &connection, const TableDef &table) {
-  RequireTableProvider(table);
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
   bool written = false;
   for (const FieldDef &field : table.fields) {
@@ -206,7 +198,6 @@ void CreateTable(const Connection &connection, const TableDef &table) {
 }
 
 void DropTable(const Connection &connection, const TableDef &table) {
-  RequireTableProvider(table);
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
   for (const FieldDef &field : table.fields) {
     if (!detail::DrawsFromSequence(field)) { continue; }
@@ -250,7 +241,6 @@ std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
 bool InsertRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Insert: the value count does not match the declaration");
   }
@@ -270,7 +260,6 @@ bool InsertRow(const Connection &connection,
 std::optional<FieldValues> GetRow(const Connection &connection,
                                   const TableDef &table,
                                   std::span<const std::optional<std::string>> key) {
-  RequireTableProvider(table);
   const std::string columns = StoredColumns(table);
   const Result result = connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) +
                                                " WHERE " + KeyPredicate(table, 1),
@@ -283,7 +272,6 @@ std::optional<FieldValues> GetRowWhere(const Connection &connection,
                                        const TableDef &table,
                                        const FieldDef &column,
                                        std::string_view value) {
-  RequireTableProvider(table);
   const std::string columns = StoredColumns(table);
   const std::optional<std::string> bound{std::string(value)};
   const Result result =
@@ -346,7 +334,6 @@ std::optional<FieldValues> Updated(const Connection &connection,
 std::optional<FieldValues> ModifyRow(const Connection &connection,
                                      const TableDef &table,
                                      std::span<const std::optional<std::string>> values) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Modify: the value count does not match the declaration");
   }
@@ -364,7 +351,6 @@ std::optional<FieldValues> RenameRow(const Connection &connection,
                                      const TableDef &table,
                                      std::span<const std::optional<std::string>> values,
                                      std::span<const std::optional<std::string>> oldKey) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Rename: the value count does not match the declaration");
   }
@@ -379,7 +365,6 @@ std::optional<FieldValues> RenameRow(const Connection &connection,
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> key) {
-  RequireTableProvider(table);
   const Result result = connection.Execute("DELETE FROM " + Quoted(table.name) + " WHERE " +
                                                KeyPredicate(table, 1) + " RETURNING 1",
                                            key);
@@ -429,9 +414,7 @@ std::size_t AddMissingColumns(const Connection &into, const TableDef &table) {
 
 }
 
-namespace {
-
-void ProvisionSchema(const Connection &into) {
+void ProvisionInstalled(const Connection &into) {
   const Result standing =
       into.Execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
   std::set<std::string> there;
@@ -442,11 +425,6 @@ void ProvisionSchema(const Connection &into) {
   std::size_t made = 0;
   std::size_t widened = 0;
   for (const TableEntry *entry : InstalledTables()) {
-    if (!entry->table->providerRefusal.empty()) {
-      std::println(
-          "TABLE PROVIDER REFUSED: {}: {}", entry->table->name, entry->table->providerRefusal);
-      continue;
-    }
     if (there.contains(std::string(entry->table->name))) {
       widened += AddMissingColumns(into, *entry->table);
       EnsureSequences(into, *entry->table);
@@ -459,12 +437,6 @@ void ProvisionSchema(const Connection &into) {
   if (widened != 0) {
     std::println("{} column(s) added to platform tables the database already had", widened);
   }
-}
-
-}
-
-void ProvisionInstalled(const Connection &into) {
-  ProvisionSchema(into);
   if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
   const std::string_view company = Session::Current().CompanyName();
   if (!company.empty()) {
