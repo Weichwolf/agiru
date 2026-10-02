@@ -86,10 +86,6 @@ public:
   ///       and a silent pass would hide a dialog that never appeared.
   [[nodiscard]] static std::vector<std::string_view> Uninstall();
 
-  /// \brief Detaches all handlers without allocating or collecting unused-handler diagnostics.
-  /// \warning For cleanup after an aborted method; normal completion must use Uninstall.
-  static void Reset() noexcept;
-
   /// \brief The handler that answers this kind, when one is installed and was declared.
   /// \param kind   The dialog kind.
   /// \param object The page or report number, 0 where the kind has none.

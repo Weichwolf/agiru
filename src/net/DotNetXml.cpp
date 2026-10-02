@@ -1,7 +1,7 @@
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
 #include "dotnet/XmlReader.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -432,14 +432,6 @@ void XmlDocument::Load(const ::agiru::InStream &stream) {
   LoadXml(input.ReadBytes(input.Length()));
 }
 
-void XmlDocument::Load(std::string_view filename) {
-  XmlHandle read;
-  if (!::agiru::detail::ParseLocation(filename, preserveWhitespace_, read)) {
-    throw Error("XmlDocument.Load: the file or URL cannot be loaded as XML");
-  }
-  handle_ = read;
-}
-
 void XmlDocument::Load(const XmlReader &reader) {
   LoadXml(reader.Source());
 }
@@ -602,31 +594,6 @@ XmlNodeList XmlDocument::GetElementsByTagName(std::string_view name) const {
   xmlNodePtr node = NodeOf(handle_);
   if (node == nullptr || node->type != XML_DTD_NODE) { return {}; }
   return ::agiru::detail::Text(reinterpret_cast<xmlDtdPtr>(node)->ExternalID);
-}
-
-::agiru::Text<0> XmlDeclaration::Version() const {
-  xmlDocPtr doc = DocOf(handle_);
-  if (doc == nullptr || NodeOf(handle_) != reinterpret_cast<xmlNodePtr>(doc)) {
-    throw Error("XmlDeclaration.Version: this node is not an XML declaration");
-  }
-  return ::agiru::detail::Text(doc->version);
-}
-
-::agiru::Text<0> XmlDeclaration::Encoding() const {
-  xmlDocPtr doc = DocOf(handle_);
-  if (doc == nullptr || NodeOf(handle_) != reinterpret_cast<xmlNodePtr>(doc)) {
-    throw Error("XmlDeclaration.Encoding: this node is not an XML declaration");
-  }
-  return ::agiru::detail::Text(doc->encoding);
-}
-
-::agiru::Text<0> XmlDeclaration::Standalone() const {
-  xmlDocPtr doc = DocOf(handle_);
-  if (doc == nullptr || NodeOf(handle_) != reinterpret_cast<xmlNodePtr>(doc)) {
-    throw Error("XmlDeclaration.Standalone: this node is not an XML declaration");
-  }
-  if (doc->standalone < 0) { return {}; }
-  return doc->standalone == 0 ? "no" : "yes";
 }
 
 ::agiru::Text<0> XmlDocumentType::SystemId() const {

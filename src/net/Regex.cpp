@@ -1,7 +1,7 @@
 #include "dotnet/Regex.h"
 
 #include "dotnet/TimeSpan.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"

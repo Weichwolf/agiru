@@ -27,8 +27,7 @@ public:
   /// \brief `T := GetDotNetType(X)`, whose answer AL hands over as an `Any`: the type of the
   ///        full name the Variant renders. \param variant The Variant.
   explicit(false) Type(const Variant &variant)
-      : fullName_(variant.IsText() ? std::string(std::string_view(variant.Get<::agiru::Text<0>>()))
-                                   : std::string{}) {}
+      : fullName_(variant.Is<std::string>() ? variant.Get<std::string>() : std::string{}) {}
 
   /// \brief `Type.GetType(name)`: the type of that full name. \param name `System.Int32` and the
   ///        like. \return A type carrying the name; nothing is loaded.
@@ -62,7 +61,7 @@ public:
   /// \brief `Type.Equals(Any)` over what `GetDotNetType` hands back. \param other The Variant.
   /// \return Whether it renders as this type's full name.
   [[nodiscard]] Boolean Equals(const Variant &other) const {
-    return other.IsText() && std::string_view(other.Get<::agiru::Text<0>>()) == fullName_;
+    return other.Is<std::string>() && other.Get<std::string>() == fullName_;
   }
 
   /// \brief `Type := AbsentObject.GetType()`: the call refused before the assignment.

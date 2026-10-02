@@ -1,7 +1,7 @@
 #include "Cursor.h"
 
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 
 #include <atomic>
@@ -10,7 +10,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace agiru::detail {
@@ -30,7 +29,7 @@ Cursor::Cursor(const Connection &connection,
     : connection_(&connection),
       name_(NextName()),
       depth_(Session::HasCurrent() ? Session::Current().Transaction().Depth() : 0),
-      epoch_(Session::HasCurrent() ? Session::Current().Transaction().CursorEpoch() : 0),
+      rollbacks_(Session::HasCurrent() ? Session::Current().Transaction().Rollbacks() : 0),
       block_(nullptr) {
   connection_->Run("DECLARE " + name_ + " NO SCROLL CURSOR FOR " + select, binds);
 }
@@ -38,7 +37,7 @@ Cursor::Cursor(const Connection &connection,
 Cursor::~Cursor() {
   if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
   if (Session::Current().Transaction().Depth() < depth_) { return; }
-  if (Session::Current().Transaction().CursorEpoch() != epoch_) { return; }
+  if (Session::Current().Transaction().Rollbacks() != rollbacks_ && depth_ > 0) { return; }
   if (connection_->InFailedTransaction()) { return; }
   try {
     connection_->Run("CLOSE " + name_);
@@ -48,22 +47,17 @@ Cursor::~Cursor() {
 }
 
 bool Cursor::Fetch() {
-  Result next =
-      connection_->Execute("FETCH FORWARD " + std::to_string(kFetchBlock) + " FROM " + name_);
-  spent_ = next.Rows() == 0;
-  if (spent_) { return false; }
-  block_ = std::move(next);
+  block_ = connection_->Execute("FETCH FORWARD " + std::to_string(kFetchBlock) + " FROM " + name_);
   row_ = 0;
-  return true;
+  spent_ = block_.Rows() == 0;
+  return !spent_;
 }
 
 bool Cursor::Step() {
   if (spent_) { return false; }
   if (block_.Rows() == 0) { return Fetch(); }
-  if (row_ + 1 < block_.Rows()) {
-    ++row_;
-    return true;
-  }
+  ++row_;
+  if (row_ < block_.Rows()) { return true; }
   return Fetch();
 }
 
