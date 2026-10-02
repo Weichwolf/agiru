@@ -34,8 +34,6 @@ struct TableRef {
   std::set<std::string> interfaceReturns;
 
   std::set<std::string> tryFunctions;
-
-  std::vector<al::ProcedureDecl> procedureDeclarations;
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -80,9 +78,6 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
                                           const Objects &objects,
                                           const std::string &owner);
 
-std::vector<std::string>
-MemberLentParametersOf(const Objects &objects, const al::VarDecl *receiver, std::string_view name);
-
 void NoteObjectNames(const Objects &objects);
 
 struct QueryColumn {
@@ -96,9 +91,6 @@ QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_v
 [[nodiscard]] std::string QueryColumnEnumeration(const Objects &objects,
                                                  const al::VarDecl *declared,
                                                  std::string_view member);
-
-[[nodiscard]] std::string
-FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field);
 
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,

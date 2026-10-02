@@ -2,52 +2,21 @@
 
 AL-to-C++23 transpiler and runtime for a standalone Business Central ERP backed by
 PostgreSQL. The target is complete BC business functionality, including all AL object
-kinds and extensions within the product scope below. Repository text, source,
-documentation and commits are English.
-
-## Product scope
-
-- agiru-owned code is MIT licensed. All implemented ERP features are available without
-  license keys, subscriptions, trials, paid tiers or license-based feature restrictions.
-  Preserve third-party notices and licenses; they are not relicensed by this policy.
-- BC licensing and entitlements as commercial feature gates, O365/Microsoft 365 and
-  integrations with other Microsoft cloud services are not product requirements.
-- User/company permissions, authentication, session isolation and generic protocols remain
-  required. Do not remove core ERP merely because an AL namespace starts with Microsoft
-  or a declaration has Scope=Cloud. Do not substitute always-success licensing stubs.
-- Inventory source objects and tests before filtering. Report raw population, selected
-  population and explicit excluded identities/reasons separately. Other unsupported
-  behaviour remains a gap, not an approved exclusion (board 0725).
-- Root `scope.json` is the single selection policy for the transpiler and independent
-  inventory. Product exclusions name bounded source paths and approved reasons;
-  namespace/area reachability is not a complete product classification.
+kinds and extensions. Repository text, source, documentation and commits are English.
 
 ## Delivery order
 
 1. Compile the complete in-scope AL tree and make the UT milestone pass through
    `agiru run-tests`. Count the denominator from AL source text, independently of parsing
    and linking. Report missing, refused and crashed cases; they never disappear from totals.
-2. After every UT is green, build the ERP CLI and real htmx HTTP UI over one production
-   page/command runtime and generated metadata. Prove operation parity under `test/ui/`:
-   messages, rows, typed values, permissions and database effects. Use the CLI for exhaustive
-   business workflows; verify the actual web client through representative browser samples.
-3. Run the complete AL test suite and CLI workflows; prove multi-user behaviour and complete
-   BC ERP functionality. Measure performance and resource use against equivalent BC workloads.
-4. After G2, deliver a browser-only, single-user Emscripten/WASM demo of agiru with embedded
-   PostgreSQL, served entirely as static assets from GitHub Pages. Reuse the production
-   business runtime and prove representative workflow/SQL parity; keep its bounds separate
-   from production multi-user and scale guarantees.
+2. Deliver the real HTTP UI using htmx and generated page metadata. Run TestPage cases
+   both directly and through HTTP under `test/ui/`; compare messages, rows and values.
+3. Run the complete AL test suite and prove multi-user behaviour.
 
 Historical pass counts are not current measurements. `board/README.md` gives the reviewed
 state and execution order. Do not trade the full target for a green subset.
 
 ## References before semantic changes
-
-Use the local BC source and developer/user documentation repositories under `~/Git/`
-before web search. Update their clean tracking branches with `git pull --ff-only` when
-current upstream evidence is needed; preserve local edits and never reset or force a
-merge. Record the revisions used, and keep frozen verification inputs unchanged.
-Use web search only when the required reference is missing locally or local access fails.
 
 Read the relevant overload, trigger or property in this order:
 
@@ -81,8 +50,7 @@ Dependency tiers are declared by `src/*/reaches`: `al`, `net` and `db` are found
 `gen` reaches `al`; `rt` reaches `net` and `db`; `cli` reaches `rt`. Generated apps see
 only the public headers and declared app dependencies. One BC app becomes one library.
 
-Production targets Linux on x86_64/aarch64, primarily deployed with Podman, 2 TB and
-10,000 users. The browser/WASM demo is a separate project target, not a production platform. Stream reads in
+The target is portable x86_64/aarch64 operation, 2 TB and 10,000 users. Stream reads in
 bounded blocks, index declared keys according to their properties, and borrow connections
 for transactions. Measure per-session memory and operation overhead against equivalent SQL.
 These are requirements, not claims that the current runtime meets them.
@@ -94,9 +62,8 @@ what a file names; no master header or macros. Measure build cost before widenin
 
 ## Implementation rules
 
-- C++23, `-Wall -Wextra -Wpedantic -Werror`. Clang 19 is the production compiler;
-  use libc++/libc++abi, compiler-rt, LLVM libunwind and LLD. No second compiler gate is
-  required. Architecture-specific operations require a portable path.
+- C++23, `-Wall -Wextra -Wpedantic -Werror`. Clang 19 is the reference; GCC 14 must also
+  compile. Architecture-specific operations require a portable path.
 - Prefer typed IDs, `span`, `string_view`, and explicit ownership. Private state is the
   default. Use exceptions for AL errors and `expected` when refusal is a returned value.
 - Public names in `include/` carry Doxygen contracts. `src/` carries no prose comments;
@@ -112,11 +79,6 @@ what a file names; no master header or macros. Measure build cost before widenin
 
 `make` is the entry point. Use `make help` for the current target list.
 
-- `make census` inventories the raw BCApps AL tree independently of the transpiler's
-  parser/linker, without filtering by namespace/app membership. `build/scope-inventory.json` retains source hashes,
-  object/test identities, conditional variants, omitted app roots and unmeasured files.
-  Namespace selection is diagnostic only; this is not an executable test manifest.
-  An incomplete census fails while preserving the report. Use 0725 for product exclusions.
 - Hot loop on an agent's own worktree: `make gate GATE=RecordRefGate JOBS=2`
   builds and runs one affected C++ gate. Use `B=build/sanitizers` for an already
   configured sanitizer build. Run `make test JOBS=2` for the complete local gates,
@@ -125,12 +87,12 @@ what a file names; no master header or macros. Measure build cost before widenin
   `build/lint/targeted.log`; `make lint` checks all changed handwritten code before
   integration. These targets do not rebuild the slice.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
-  generated inputs into `build/verify/<id>/source`, then runs `all test` in a
+  generated inputs into `build/verify/<id>/source`, then runs `all test gcc` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source
   files replace lane inputs, so unchanged build objects retain their timestamps.
   `make verify-status` reports the latest result; `verify.log` holds diagnostics. AL manifests, provenance and method results stay in
   the snapshot's `artifacts/` directory, independently of lane reuse.
-  Use `VERIFY_TARGETS='all test ut'` when the AL milestone and its database are ready.
+  Use `VERIFY_TARGETS='all test gcc ut'` when the AL milestone and its database are ready.
   The snapshot and lane content hashes must match; the snapshot records Git HEAD.
   Edits in the active tree may
   continue after snapshot creation. A changed source during copying refuses the run.
@@ -141,12 +103,9 @@ what a file names; no master header or macros. Measure build cost before widenin
   complete generated tree. `FULL=1 make lint` checks the whole handwritten surface.
 
 Append new entries to `test/slice` without sorting existing entries. Unity groups are
-content-addressed into 896 stable roots capped at 32 sources; only an overfull root
-splits. An insertion therefore changes its own Unity file without renumbering unrelated
-objects. Keep the slice monotonic so its history remains reviewable (WI 0589).
-Make exports the installed ccache PCH settings; Clang slice/app builds disable PCH
-timestamps. Keep compile-time date/time macros out of cached sources, and measure
-per-run cache hits before attributing a build-time change to the cache.
+currently numbered by order within each app/module; insertion in the middle shifts
+later groups and can rebuild hundreds of objects. Keep the slice monotonic, then
+replace this grouping with stable bounded groups under WI 0589.
 
 Each agent gets its own worktree and build directory. On this six-core host, run at
 most one six-job integration build at a time; use two jobs for local gates while
@@ -169,18 +128,14 @@ mutating tests against the demo source or a master template.
 `BC_VERSION` pins the demo artefact, not the BCApps source revision. Record both revisions
 and report schema/data mismatches. The imported CRONUS database uses company/system schemas;
 the current runner also has a flattened seeded database. Do not confuse those layouts.
-A seed used as A/B proof needs a `complete` provenance row and a sealed template; a legacy
-`null` identity or database size is only a hint.
 
 ## Work items
 
-`board/` holds open work only. Keep one concise WI per coherent outcome: evidence, priority,
-dependencies, source references, implementation steps and acceptance tests. Prefer short lists;
-remove narratives, repeated history and completed steps. Sol must be able to start from the
-named files without reconstructing a session transcript.
+`board/` holds open work only. Keep one concise WI per coherent outcome: current evidence,
+source references, concrete implementation steps, dependencies and acceptance tests. Sol must
+be able to start from the named files without reconstructing a session transcript.
 
 Keep existing IDs when consolidating. Allocate new IDs from all Git history, never from
 open files alone. Delete completed or superseded items; Git preserves their history. Record
 consolidation mappings in the board index. Do not claim ownership through stale `active` text.
-Keep only current build recipes in the working tree; Git preserves superseded instructions.
 Commit only when requested or otherwise authorized; this review does not require a commit.

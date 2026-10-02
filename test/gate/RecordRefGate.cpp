@@ -3,7 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
-#include <utility>
 
 using agiru::Error;
 using agiru::FieldRef;
@@ -158,38 +157,6 @@ void AFieldIsReachedByNumberAndByPosition() {
   CHECK_TRUE("and index 0 is outside the list, not the first field", !said.empty());
 }
 
-void FieldAndKeyReferencesKeepTheirRecordAlive() {
-  FieldRef field;
-  agiru::KeyRef key;
-  {
-    ResourceCost rec;
-    rec.Code = "KEPT";
-    RecordRef owner;
-    owner.GetTable(rec);
-    field = owner.Field(2);
-    key = owner.KeyIndex(1);
-  }
-  CHECK_TEXT("a FieldRef outlives the RecordRef variable that made it", field.ToText(), "KEPT");
-  const RecordRef fromField = field.Record();
-  CHECK_TEXT("FieldRef.Record keeps the same row alive", fromField.Field(2).ToText(), "KEPT");
-  const RecordRef fromKey = key.Record();
-  CHECK_TEXT("KeyRef.Record keeps the same row alive", fromKey.Field(2).ToText(), "KEPT");
-  FieldRef copied = field;
-  agiru::KeyRef moved = std::move(key);
-  CHECK_TEXT("a copied FieldRef shares the live row", copied.ToText(), "KEPT");
-  CHECK_TEXT("a moved KeyRef keeps the live row", moved.Record().Field(2).ToText(), "KEPT");
-  fromField.Field(2).Value("CHANGED");
-  CHECK_TEXT("FieldRef.Record changes reach the originating field", field.ToText(), "CHANGED");
-  CHECK_TEXT(
-      "KeyRef.Record observes the same changed row", moved.Record().Field(2).ToText(), "CHANGED");
-  copied.Record().Close();
-  std::string said;
-  try {
-    (void)field.ToText();
-  } catch (const Error &error) { said = error.what(); }
-  CHECK_TRUE("closing one shared handle invalidates every field handle safely", !said.empty());
-}
-
 /// `SetPosition` IS THE WAY BACK FROM `GetPosition` (`recordref-setposition-method.md`): the key
 /// fields take the values the text carries and nothing else moves. `Bin Content` hands a position
 /// through a `RecordRef` to reopen a row (SCM - Warehouse UT, 3 cases refused, 2026-09-12).
@@ -231,7 +198,7 @@ void AValueCarriesItsType() {
 
   const agiru::Variant code = ref.Field(2).Value();
   CHECK_TRUE("a Code comes out as text", code.IsText());
-  CHECK_TEXT("with its value", std::string_view(code.Get<agiru::Text<0>>()), "WELDER");
+  CHECK_TEXT("with its value", code.Get<std::string>(), "WELDER");
 
   const agiru::Variant cost = ref.Field(6).Value();
   CHECK_TRUE("a Decimal comes out as a Decimal", cost.IsDecimal());
@@ -498,7 +465,6 @@ int main() {
     ItReachesTheTableWithoutNamingIt();
     OneThatIsNotOpenRefusesRatherThanAnsweringZero();
     AFieldIsReachedByNumberAndByPosition();
-    FieldAndKeyReferencesKeepTheirRecordAlive();
     APositionRoundTripsThroughARecordRef();
     AValueCarriesItsType();
     AnEnumFieldReportsOption();
