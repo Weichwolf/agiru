@@ -1,8 +1,7 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Events.h"
-#include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
@@ -561,7 +560,6 @@ void ASubscriberNamingAnUnpublishedParameterIsRefused() {
 
 int main() {
   return gate::Run("Event", [] {
-    const agiru::Session session(AGIRU_TEST_DSN);
     AManualSubscriberHearsOnlyWhileBound();
     CurrFieldNoIsTheUsersFieldAndZeroFromCode();
     ASubscriberNamingAnUnpublishedParameterIsRefused();

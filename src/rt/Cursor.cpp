@@ -1,7 +1,7 @@
 #include "Cursor.h"
 
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 
 #include <atomic>
@@ -10,7 +10,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace agiru::detail {
@@ -48,22 +47,17 @@ Cursor::~Cursor() {
 }
 
 bool Cursor::Fetch() {
-  Result next =
-      connection_->Execute("FETCH FORWARD " + std::to_string(kFetchBlock) + " FROM " + name_);
-  spent_ = next.Rows() == 0;
-  if (spent_) { return false; }
-  block_ = std::move(next);
+  block_ = connection_->Execute("FETCH FORWARD " + std::to_string(kFetchBlock) + " FROM " + name_);
   row_ = 0;
-  return true;
+  spent_ = block_.Rows() == 0;
+  return !spent_;
 }
 
 bool Cursor::Step() {
   if (spent_) { return false; }
   if (block_.Rows() == 0) { return Fetch(); }
-  if (row_ + 1 < block_.Rows()) {
-    ++row_;
-    return true;
-  }
+  ++row_;
+  if (row_ < block_.Rows()) { return true; }
   return Fetch();
 }
 

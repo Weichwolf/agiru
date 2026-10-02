@@ -2,7 +2,6 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
-#include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageCore.h"
