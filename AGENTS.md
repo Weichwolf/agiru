@@ -43,6 +43,12 @@ state and execution order. Do not trade the full target for a green subset.
 
 ## References before semantic changes
 
+Use the local BC source and developer/user documentation repositories under `~/Git/`
+before web search. Update their clean tracking branches with `git pull --ff-only` when
+current upstream evidence is needed; preserve local edits and never reset or force a
+merge. Record the revisions used, and keep frozen verification inputs unchanged.
+Use web search only when the required reference is missing locally or local access fails.
+
 Read the relevant overload, trigger or property in this order:
 
 1. `~/Git/dynamics365smb-devitpro-pb/dev-itpro/developer/`: platform guarantees.
@@ -142,7 +148,10 @@ Make exports the installed ccache PCH settings; Clang slice/app builds disable P
 timestamps. Keep compile-time date/time macros out of cached sources, and measure
 per-run cache hits before attributing a build-time change to the cache.
 
-Each agent gets its own worktree and build directory. On this six-core host, run at
+Each agent gets its own worktree and build directory. Editable worktrees stay outside
+`build/`; source copies there are frozen verification inputs, never development trees.
+Build/test results identify the frozen Git HEAD and content hashes; development may
+continue in the editable tree after freezing. On this six-core host, run at
 most one six-job integration build at a time; use two jobs for local gates while
 one is active. Do not edit compiler inputs of a live build's source snapshot.
 Inspect `build/times.log` and snapshot results rather than historical timings.
