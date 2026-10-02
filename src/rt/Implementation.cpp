@@ -1,6 +1,6 @@
 #include "runtime/Implementation.h"
 
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 
 #include <cctype>
 #include <cstdint>
