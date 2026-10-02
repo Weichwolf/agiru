@@ -2,6 +2,8 @@
 #include "platform/Field.h"
 #include "type/Text.h"
 
+#include <array>
+#include <cstddef>
 #include <cstdio>
 #include <exception>
 
@@ -45,6 +47,22 @@ int main() {
       return 1;
     }
     if (first.LocalNameFilter().Value() != "Local" || first.ReadNameFilter().Value() != "Group zero") {
+      return 1;
+    }
+    constexpr std::array codes{4912, 4988, 11519, 11775, 11776, 11797, 12799,
+                              26207, 26208, 31488, 31489, 33791, 33793, 34047,
+                              34559, 35071, 35583, 36095, 36863, 37119, 37375};
+    for (std::size_t i = 0; i < codes.size(); ++i) {
+      if (first.NativeType(static_cast<int>(i)) != codes[i] ||
+          first.Rec.Type.AsInteger() != codes[i] || !first.Rec.Type.IsDeclared()) {
+        return 1;
+      }
+    }
+    if (first.NativeProperties() != 31503 || first.Rec.ExternalName.Value() != "native_external" ||
+        !first.Rec.OptimizeForTextSearch || !first.Rec.IsAllowedInCustomizations ||
+        first.Rec.DataClassification.AsInteger() != 0 ||
+        first.Rec.SQLDataType.AsInteger() != 3 || first.Rec.Access.AsInteger() != 3 ||
+        first.Rec.ObsoleteState.AsInteger() != 2 || second.Rec.Type.AsInteger() != 0) {
       return 1;
     }
     return 0;

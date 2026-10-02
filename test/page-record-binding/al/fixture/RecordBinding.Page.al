@@ -30,6 +30,52 @@ page 50179 "Record Binding"
         exit(Rec.Class);
     end;
 
+    procedure NativeType(Choice: Integer): Integer
+    begin
+        case Choice of
+            0: Rec.Type := Rec.Type::TableFilter;
+            1: Rec.Type := Rec.Type::RecordID;
+            2: Rec.Type := Rec.Type::OemText;
+            3: Rec.Type := Rec.Type::Date;
+            4: Rec.Type := Rec.Type::Time;
+            5: Rec.Type := Rec.Type::DateFormula;
+            6: Rec.Type := Rec.Type::Decimal;
+            7: Rec.Type := Rec.Type::Media;
+            8: Rec.Type := Rec.Type::MediaSet;
+            9: Rec.Type := Rec.Type::Text;
+            10: Rec.Type := Rec.Type::Code;
+            11: Rec.Type := Rec.Type::Binary;
+            12: Rec.Type := Rec.Type::BLOB;
+            13: Rec.Type := Rec.Type::Boolean;
+            14: Rec.Type := Rec.Type::Integer;
+            15: Rec.Type := Rec.Type::OemCode;
+            16: Rec.Type := Rec.Type::Option;
+            17: Rec.Type := Rec.Type::BigInteger;
+            18: Rec.Type := Rec.Type::Duration;
+            19: Rec.Type := Rec.Type::GUID;
+            20: Rec.Type := Rec.Type::DateTime;
+            else Error('Unknown native type');
+        end;
+        exit(Rec.Type);
+    end;
+
+    procedure NativeProperties(): Integer
+    var
+        Other: Record Field temporary;
+    begin
+        Rec.SQLDataType := Rec.SQLDataType::BigInteger;
+        Rec.Access := Rec.Access::Local;
+        Rec.DataClassification := Rec.DataClassification::CustomerContent;
+        Rec.ObsoleteState := Rec.ObsoleteState::Removed;
+        Other.DataClassification := Other.DataClassification::SystemMetadata;
+        Other.Type := Other.Type::Code;
+        Rec.ExternalName := 'native_external';
+        Rec.OptimizeForTextSearch := true;
+        Rec.IsAllowedInCustomizations := true;
+        exit(Other.Type + Other.DataClassification + Rec.SQLDataType + Rec.Access +
+             Rec.DataClassification + Rec.ObsoleteState);
+    end;
+
     procedure Read(var Target: Text)
     begin
         Target := Rec.TableName;

@@ -2575,7 +2575,8 @@ class PageRecordBindingGate(unittest.TestCase):
                 page = fixture / 'al/fixture/RecordBinding.Page.al'
                 text = page.read_text()
                 self.assertEqual(text.count('SourceTable = Field;'), 1)
-                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};'))
+                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};')
+                                .replace('Record Field temporary;', f'Record {alias} temporary;'))
                 output = Path(temp) / 'generated'
                 generated = subprocess.run([
                     str(build / 'agirutc'), str(fixture / 'al'),
@@ -2585,6 +2586,9 @@ class PageRecordBindingGate(unittest.TestCase):
                 body = next(output.rglob('RecordBinding.cpp')).read_text()
                 self.assertNotIn('RefusedOption', body)
                 self.assertIn('::agiru::platform::FieldClass::FlowFilter', body)
+                for vocabulary in ('FieldDataType', 'FieldDataClassification',
+                                   'FieldSQLDataType', 'FieldAccess', 'ObsoleteState'):
+                    self.assertIn(f'::agiru::platform::{vocabulary}::', body)
                 executable = Path(temp) / 'consumer'
                 command = [compiler[1], '-x', 'c++', '-std=c++23', '-stdlib=libc++',
                     '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
