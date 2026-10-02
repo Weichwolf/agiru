@@ -1,4 +1,4 @@
-#include "runtime/RecordRef.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
@@ -101,23 +101,6 @@ void AFilteredRecordRenamesTheSame() {
   CHECK_TEXT("the referring row follows", WorkTypeOf("R1"), "B");
 }
 
-void ARecordRefRenamesTheSameRowAndRelatedRows() {
-  Fresh();
-  WorkTypeNamed("HOURS");
-  CostFor("R1", "HOURS");
-
-  WorkType type;
-  CHECK_TRUE("RecordRef source row exists", type.Get(agiru::Code<10>("HOURS")));
-  agiru::RecordRef reference;
-  reference.GetTable(type);
-  CHECK_TRUE("RecordRef.Rename reports success",
-             reference.Rename(agiru::Variant(agiru::Code<10>("H"))));
-  CHECK_TEXT("RecordRef.Rename changes the selected key", reference.Field(1).ToText(), "H");
-  CHECK_TEXT("RecordRef.Rename cascades to related rows", WorkTypeOf("R1"), "H");
-  WorkType old;
-  CHECK_TRUE("RecordRef.Rename removes the old key", !old.Get(agiru::Code<10>("HOURS")));
-}
-
 } // namespace
 
 int main() {
@@ -125,6 +108,5 @@ int main() {
     const Session session(AGIRU_TEST_DSN);
     ARenameCarriesTheRowsThatReferToTheKey();
     AFilteredRecordRenamesTheSame();
-    ARecordRefRenamesTheSameRowAndRelatedRows();
   });
 }

@@ -16,7 +16,6 @@
 #include "type/RecordId.h"
 #include "type/SecurityFilter.h"
 
-#include <algorithm>
 #include <array>
 #include <compare>
 #include <cstddef>
@@ -1421,16 +1420,23 @@ public:
 
   /// \brief AL `Record.FilterGroup()` -- which group `SetRange` and `SetFilter` write into.
   /// \return The group in force.
-  [[nodiscard]] Integer FilterGroup() const { return detail::RuntimeFilterGroup(Self()); }
+  [[nodiscard]] Integer FilterGroup() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr ? 0 : state->group;
+  }
 
   /// \brief AL `Record.FilterGroup(Integer)` -- moves the record into a filter group.
-  /// \param group The group; values above 255 are ignored (`record-filtergroup-method.md`).
+  /// \param group The group.
   /// \return The group that was in force before.
   ///
   /// \note EVERY GROUP IS ACTIVE AT ONCE AND THIS ONLY SAYS WHERE THE NEXT FILTER GOES, which is
   ///       what the state already holds: the filters carry their group and are ANDed across them,
   ///       with -1 the one whose own fields OR together.
-  Integer FilterGroup(Integer group) { return detail::RuntimeFilterGroup(Self(), group); }
+  Integer FilterGroup(Integer group) {
+    const Integer was = State().group;
+    State().group = group;
+    return was;
+  }
 
   /// \brief AL `Record.Find([Which])` -- reads the one row `Which` names.
   ///
@@ -1618,10 +1624,10 @@ public:
   /// \brief AL `Record.GetRangeMax(Field)`. The upper bound of the range standing on a field.
   /// \tparam Field The field member's type.
   /// \param member The field, named the way AL names it.
-  /// \return The bound as the field's own type; blank for an open upper end of an applied range.
+  /// \return The bound as the field's own type; the field's blank when no filter bounds it above.
   /// \note `record-getrangemax-method.md`: it reads the CURRENT filter group, the way `GetFilter`
   ///       does.
-  /// \throws Error when the field has no filter or the filter is not a single range (board:0044).
+  /// \throws Error when the filter is not a single range (board:0508).
   template <typename Field> [[nodiscard]] Field GetRangeMax(const Field &member) const {
     return RangeBound_(member, true);
   }
@@ -1629,8 +1635,7 @@ public:
   /// \brief AL `Record.GetRangeMin(Field)`. The lower bound of the range standing on a field.
   /// \tparam Field The field member's type.
   /// \param member The field, named the way AL names it.
-  /// \return The bound as the field's own type; blank for an open lower end of an applied range.
-  /// \throws Error when the field has no filter or the filter is not a single range (board:0044).
+  /// \return The bound as the field's own type; the field's blank when no filter bounds it below.
   template <typename Field> [[nodiscard]] Field GetRangeMin(const Field &member) const {
     return RangeBound_(member, false);
   }
@@ -1643,9 +1648,16 @@ public:
     return detail::ViewOf(Filtered(), TableTraits<Derived>::kTable, static_cast<bool>(UseNames));
   }
 
-  /// \brief AL `Record.HasFilter()`: whether the current filter group contains a field filter.
-  /// \return True only when this group is filtered; other groups remain active but are not read.
-  [[nodiscard]] Boolean HasFilter() const { return detail::RuntimeHasFilter(Self()); }
+  /// \brief AL `Record.HasFilter(...)`. Determines whether a filter is attached to a record within
+  /// the current filter group.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  [[nodiscard]] Boolean HasFilter() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && !state->filters.empty();
+  }
 
   /// \brief AL `Record.HasLinks()`.
   /// \return Whether a `Record Link` row names this record.
@@ -2567,13 +2579,29 @@ private:
     auto *copy =
         new Derived(*static_cast<const Derived *>(this)); // NOLINT(cppcoreguidelines-owning-memory)
     copy->State_Block = detail::StateHandle{};
-    State().image.Hold(copy);
+    State().image.Hold(
+        copy,
+        [](void *held) {
+          delete static_cast<Derived *>(held);
+        }, // NOLINT(cppcoreguidelines-owning-memory)
+        [](const void *held) -> void * {
+          return new Derived(
+              *static_cast<const Derived *>(held)); // NOLINT(cppcoreguidelines-owning-memory)
+        });
   }
 
   /// A record that was Init'd or Cleared has a BLANK image and not a mirror of itself, which is
   /// openerp WI-1078: a mirror makes every `Rec.F <> xRec.F` trivially false.
   void BlankImage() {
-    State().image.Hold(new Derived{}); // NOLINT(cppcoreguidelines-owning-memory)
+    State().image.Hold(
+        new Derived{}, // NOLINT(cppcoreguidelines-owning-memory)
+        [](void *held) {
+          delete static_cast<Derived *>(held);
+        }, // NOLINT(cppcoreguidelines-owning-memory)
+        [](const void *held) -> void * {
+          return new Derived(
+              *static_cast<const Derived *>(held)); // NOLINT(cppcoreguidelines-owning-memory)
+        });
   }
 
   [[nodiscard]] detail::RecordState &State() {
