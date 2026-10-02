@@ -251,21 +251,11 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
 /// \return Whether a row was there to rename.
 bool RuntimeRename(void *record, const void *before, const TableDef &table);
 
-/// \brief AL `Record.FilterGroup()` on any record, without allocating or changing its state.
-/// \param record The record.
-/// \return The current group, or zero when the record has no state.
-Integer RuntimeFilterGroup(const void *record);
-
 /// \brief AL `Record.FilterGroup(NewGroup)` on any record: sets the group later filters land in.
 /// \param record The record.
-/// \param group The group; values above 255 are ignored (`record-filtergroup-method.md`).
+/// \param group  The group.
 /// \return The group that was current.
 Integer RuntimeFilterGroup(void *record, Integer group);
-
-/// \brief AL `Record.HasFilter()` on any record, limited to its current filter group.
-/// \param record The record.
-/// \return Whether that group contains a field filter, without allocating state.
-bool RuntimeHasFilter(const void *record);
 
 /// \brief AL `Record.GetRangeMax` / `GetRangeMin`: the bound of the filter standing on a field.
 /// \param state The record's filters, or `nullptr`.

@@ -1,11 +1,10 @@
 # 0033 — App boundaries and extension merges will be explicit and enforced
 
-Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-01
 Depends on: 0034 source identities.
 
 ## Evidence
 
-- Ordinary tables now bind once after extension merging, using the writer's field/procedure allocator. Four original generated AL cases prove post-merge procedure renaming, extension procedures and numeric/name aliases; the old transpiler fails all four. App/namespace ownership, duplicate identities and other object kinds remain open; README indexes current receipts.
 - `apps.json` declares dependencies; the slice shares all include roots and does not prove them.
 - Own Chart/header proof: `src/gen/{CodeunitWriter,PageWriter}.cpp` shares native alias dependency ownership; locals stay in sources. Door adds only missing owned directives. Six added native includes name their types; redundant directives fall 70,298→66,718, not zero. GenCodeunit retains all 37 checks; old owner control one red. `build/chart-20261001/artifacts/{declaration-proof,dependencies,native-headers,bodies,codeunit-owner-control}.json`; no PCH or full-app/G1 claim.
 - Own `build/xmlport-names-20261001/`: one allocator/binding for tables and XMLports; tables bind once after extension merge. Clang/GCC generated AL: tables 14/14, XMLports 15/15 in each single/dependent-app context; seven controls green, archived emitter six independent assertions red. Real TestTableC 132512/139063 compile and execute 20/20 temporary-storage checks each; no SQL/FlowField execution claim.
