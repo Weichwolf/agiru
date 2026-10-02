@@ -142,17 +142,6 @@ bool Parse(std::string_view text, bool preserveWhitespace, XmlHandle &into) {
   return true;
 }
 
-bool ParseLocation(std::string_view location, bool preserveWhitespace, XmlHandle &into) {
-  Silence();
-  int options = XML_PARSE_NOERROR | XML_PARSE_NOWARNING;
-  if (!preserveWhitespace) { options |= XML_PARSE_NOBLANKS; }
-  const std::string held(location);
-  xmlDocPtr doc = xmlReadFile(held.c_str(), nullptr, options);
-  if (doc == nullptr) { return false; }
-  into = XmlHandle(NewTree(doc), doc);
-  return true;
-}
-
 std::vector<XmlHandle> XPath(const XmlHandle &from,
                              std::string_view expression,
                              const std::vector<std::pair<std::string, std::string>> &namespaces) {
