@@ -2,7 +2,7 @@
 #include "dotnet/CultureInfo.h"
 #include "dotnet/DataTable.h"
 #include "dotnet/Type.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/Text.h"
@@ -130,7 +130,7 @@ void ChartDataHoldsTheShape() {
   CHECK_TEXT("the X dimension", T(data.XDimension()), "Month");
   CHECK_TRUE("two measures", data.Measures().size() == 2);
   CHECK_TRUE("the first drawn as the ordinal said", data.Measures()[0].type.AsInteger() == 5);
-  CHECK_TRUE("the second uses the declared Line value", data.Measures()[1].type.AsInteger() == 3);
+  CHECK_TRUE("the second as a line", data.Measures()[1].type.AsInteger() == 2);
   data.ShowChartCondensed(true);
   CHECK_TRUE("condensed", static_cast<bool>(data.ShowChartCondensed()));
   data.ClearMeasures();

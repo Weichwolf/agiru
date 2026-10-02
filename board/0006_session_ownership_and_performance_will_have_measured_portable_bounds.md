@@ -16,13 +16,11 @@ Depends on: 0012 transaction lease contract.
 
 1. Extend the existing private SessionState: move remaining maps/stacks from `Handlers.cpp`, `TestPage.cpp`, `Scopes.cpp`, `Table.cpp` and `BuiltinsWritten.cpp` into it, after checking each lifetime contract. Keep TLS only as a scoped current-session locator; preserve the completed SingleInstance and binding gates.
 2. Separate Session lifetime from worker activation. Serialize commands for one session; allow different sessions on reused workers. Restore parent state on nested activation; clear company-bound instances on company close.
-   TenantSettings: production facts come from one tenant-keyed PostgreSQL authority provisioned by 0004; session-local test overrides are an explicit separate policy. Keep session-dependent .NET bridges in rt (0589), not a callback/global map in net. Missing tenant context/provider refuses; configured empty facts remain distinct from missing infrastructure (0035).
 3. Lease a connection for each active transaction, including its live cursors; return it after commit/rollback and reset. Bound pool size independently of logged-in users; retain no transaction during user think time.
 
 ## Acceptance
 
 - Nested and sequential sessions never share subscribers, handlers, traps, language, random/error/validation state; parent instances survive child destruction.
-- Two sessions for one tenant read the same provisioned facts; a test override cannot alter another session or survive worker reuse. A missing provider cannot masquerade as an empty tenant identity.
 - Closed sessions release resources; idle users do not reserve DB connections. Memory grows with active session state and bounded blocks, not table size.
 
 ## References

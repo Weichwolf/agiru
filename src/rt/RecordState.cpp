@@ -2,7 +2,7 @@
 
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 
 #include <cctype>
 #include <cstddef>

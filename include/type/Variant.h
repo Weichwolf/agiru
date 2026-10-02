@@ -2,7 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
