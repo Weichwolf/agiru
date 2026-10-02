@@ -21,7 +21,7 @@ for script in test/door-reproduces.sh test/one-definition.sh; do
   n=$((n + 1))
   if ! sh "$script"; then red=$((red + 1)); fi
 done
-for script in test/function-size.sh test/platform-source.sh test/required-isolation.sh; do
+for script in test/function-size.sh test/platform-source.sh test/required-isolation.sh test/header-dependencies.sh; do
   n=$((n + 1))
   if ! B="$B" bash "$script"; then red=$((red + 1)); fi
 done

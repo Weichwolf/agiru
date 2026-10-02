@@ -8,6 +8,7 @@
 #include "type/Text.h"
 #include "type/Variant.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -19,6 +20,12 @@
 #include <vector>
 
 namespace agiru::dotnet {
+
+struct Regex::Compiled {
+  Compiled(const std::string &pattern, std::regex::flag_type flags) : expression(pattern, flags) {}
+
+  std::regex expression;
+};
 
 namespace {
 
@@ -260,7 +267,7 @@ class Regex Regex::Binder::operator()(std::string_view pattern,
   class Regex out;
   Translated translated = WithoutNamedGroups(pattern);
   try {
-    out.compiled_ = std::make_shared<const std::regex>(translated.pattern, FlagsOf(options));
+    out.compiled_ = std::make_shared<const Compiled>(translated.pattern, FlagsOf(options));
   } catch (const std::regex_error &e) {
     throw Error("Regex: the pattern '" + std::string(pattern) +
                 "' is not one this runtime reads: " + e.what());
@@ -281,7 +288,7 @@ Boolean Regex::IsMatch(std::string_view input, Integer startAt) const {
   const std::size_t from =
       startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
   const std::string rest(input.substr(from));
-  return std::regex_search(rest, *compiled_);
+  return std::regex_search(rest, compiled_->expression);
 }
 
 dotnet::Match Regex::Match(std::string_view input) const {
@@ -299,7 +306,7 @@ MatchCollection Regex::Matches(std::string_view input, Integer startAt) const {
       startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
   const std::string rest(input.substr(from));
   std::vector<dotnet::Match> found;
-  for (auto it = std::sregex_iterator(rest.begin(), rest.end(), *compiled_);
+  for (auto it = std::sregex_iterator(rest.begin(), rest.end(), compiled_->expression);
        it != std::sregex_iterator();
        ++it) {
     found.push_back(MatchOf(*it, from, groupNames_));

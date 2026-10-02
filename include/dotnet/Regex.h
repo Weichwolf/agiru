@@ -10,9 +10,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <regex>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::dotnet {
@@ -445,7 +445,8 @@ public:
 
 private:
   friend struct Binder;
-  std::shared_ptr<const std::regex> compiled_;
+  struct Compiled;
+  std::shared_ptr<const Compiled> compiled_;
   std::string pattern_;
   std::vector<std::string> groupNames_;
   RegexOptions options_;
