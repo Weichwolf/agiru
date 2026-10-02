@@ -1021,6 +1021,18 @@ void NoteTargets(const Extensions &store) {
   for (const auto &[name, list] : store.tables) { store.held["table " + name] += list.size(); }
   for (const auto &[name, list] : store.enums) { store.held["enum " + name] += list.size(); }
   for (const auto &[name, list] : store.pages) { store.held["page " + name] += list.size(); }
+  for (const auto &[name, list] : store.reports) { store.held["report " + name] += list.size(); }
+}
+
+std::string JsonValue(std::string_view text, std::string_view key);
+
+void NoteLayoutOwners(std::vector<agiru::al::ReportLayoutDecl> &layouts,
+                      std::string_view appId,
+                      const std::filesystem::path &source) {
+  for (auto &layout : layouts) {
+    layout.owner.appId = appId;
+    layout.owner.source = source.generic_string();
+  }
 }
 
 Extensions ReadExtensions(Run &run,
@@ -1031,6 +1043,10 @@ Extensions ReadExtensions(Run &run,
   for (const agiru::gen::App &app : apps) {
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
+    const auto manifest = run.root / "app.json";
+    const std::string appId = std::filesystem::is_regular_file(manifest)
+                                  ? JsonValue(Read(manifest), "id")
+                                  : std::string{};
     const auto read = [&](std::string_view suffix, auto parse, auto &into, auto note) {
       for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
@@ -1056,7 +1072,12 @@ Extensions ReadExtensions(Run &run,
                          .path = std::filesystem::relative(path, run.root).string()});
          });
     read(".PageExt.al", agiru::al::ParsePageExtension, store.pages, unnoted);
-    read(".ReportExt.al", agiru::al::ParseReportExtension, store.reports, unnoted);
+    read(".ReportExt.al",
+         agiru::al::ParseReportExtension,
+         store.reports,
+         [&](agiru::al::PageExtensionObject &extension, const std::filesystem::path &path) {
+           NoteLayoutOwners(extension.rendering, appId, std::filesystem::relative(path, source));
+         });
   }
   return store;
 }
@@ -1233,6 +1254,7 @@ std::size_t MergeReportExtensions(const Extensions &store, Pages &reports) {
       TakeProcedures(report.procedures, extension.procedures);
       TakeVariables(report.variables, extension.variables);
       take(report.labels, extension.labels);
+      take(report.rendering, extension.rendering);
       ++merged;
       ++store.consumed["report " + found->first];
     }
@@ -1839,6 +1861,9 @@ void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
 
 Pages IndexReports(Run &run, agiru::gen::Objects &objects) {
   Pages reports;
+  const auto manifest = run.root / "app.json";
+  const std::string appId =
+      std::filesystem::is_regular_file(manifest) ? JsonValue(Read(manifest), "id") : std::string{};
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Report.al")) {
     const std::string text = Read(path);
     const agiru::gen::ObjectDeclaration declared =
@@ -1880,6 +1905,7 @@ Pages IndexReports(Run &run, agiru::gen::Objects &objects) {
             .tryFunctions = {},
             .procedureDeclarations = {}});
     if (parsed.has_value()) {
+      NoteLayoutOwners(parsed->rendering, appId, std::filesystem::relative(path, run.sourceRoot));
       reports.paths.push_back(std::filesystem::relative(path, run.root).string());
       reports.objects.push_back(std::move(*parsed));
     }
@@ -2452,6 +2478,36 @@ void NoteProductExclusions(const Job &job, const agiru::gen::TranspileScope &sco
   }
 }
 
+struct LayoutCounts {
+  std::size_t reports = 0;
+  std::size_t bound = 0;
+};
+
+std::size_t CountLayouts(const Pages &reports) {
+  std::size_t total = 0;
+  for (const auto &report : reports.objects) { total += report.rendering.size(); }
+  return total;
+}
+
+void ReportLayouts(const Extensions &store, const LayoutCounts &counts) {
+  std::size_t extensionLayouts = 0;
+  std::size_t unresolvedLayouts = 0;
+  for (const auto &[name, extensions] : store.reports) {
+    for (const auto &extension : extensions) {
+      extensionLayouts += extension.rendering.size();
+      if (!store.consumed.contains("report " + name)) {
+        unresolvedLayouts += extension.rendering.size();
+      }
+    }
+  }
+  std::println("layouts   {} report / {} extension declarations; {} retained on bound AST "
+               "reports, {} on unresolved targets; not emitted, installed or rendered (board:0063)",
+               counts.reports,
+               extensionLayouts,
+               counts.bound,
+               unresolvedLayouts);
+}
+
 int Scan(const Job &job) {
   const std::vector<agiru::gen::App> apps = agiru::gen::ReadApps(job.apps);
   const agiru::gen::TranspileScope scope =
@@ -2478,6 +2534,7 @@ int Scan(const Job &job) {
   agiru::gen::EnumIndex index;
   agiru::gen::Objects objects;
   std::size_t allReports = 0;
+  LayoutCounts layouts;
   std::size_t allXmlPorts = 0;
   Counts allEnums;
   Counts allTables;
@@ -2536,7 +2593,9 @@ int Scan(const Job &job) {
     agiru::gen::FixDotNetSpellings();
     IndexCodeunits(run, objects);
     Pages parsedReports = IndexReports(run, objects);
+    layouts.reports += CountLayouts(parsedReports);
     extensions.emitted += MergeReportExtensions(store, parsedReports);
+    layouts.bound += CountLayouts(parsedReports);
     for (agiru::al::PageObject &report : parsedReports.objects) {
       agiru::gen::PrepareReport(report);
     }
@@ -2726,6 +2785,7 @@ int Scan(const Job &job) {
   std::println("reports   {} translated: the dataset walk and the request page, no renderer yet "
                "(board:0063)",
                allReports);
+  ReportLayouts(store, layouts);
   std::println(
       "xmlports  {} translated: the schema walked out and in over three formats (board:0065)",
       allXmlPorts);

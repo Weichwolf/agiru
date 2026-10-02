@@ -321,6 +321,17 @@ public:
         ParsePageBody(object);
         continue;
       }
+      if (AtKeyword("rendering")) {
+        Advance();
+        ParseRendering(object.rendering,
+                       {.id = object.id,
+                        .extension = false,
+                        .name = object.name,
+                        .nameSpace = object.nameSpace,
+                        .appId = {},
+                        .source = {}});
+        continue;
+      }
       if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
         Advance();
         SkipBracedBlock();
@@ -443,6 +454,17 @@ public:
         extension.variables.insert(
             extension.variables.end(), body.variables.begin(), body.variables.end());
         extension.labels.insert(extension.labels.end(), body.labels.begin(), body.labels.end());
+        continue;
+      }
+      if (AtKeyword("rendering")) {
+        Advance();
+        ParseRendering(extension.rendering,
+                       {.id = extension.id,
+                        .extension = true,
+                        .name = extension.name,
+                        .nameSpace = extension.nameSpace,
+                        .appId = {},
+                        .source = {}});
         continue;
       }
       if (Peek().kind == TokenKind::Identifier && IsPunctuation(Peek(1), "{")) {
@@ -606,6 +628,44 @@ public:
         continue;
       }
       object.properties.push_back(ParseProperty());
+    }
+    Expect("}");
+  }
+
+  void ValidateLayout(const ReportLayoutDecl &layout) {
+    const Property *type = Find(layout.properties, "Type");
+    const Property *file = Find(layout.properties, "LayoutFile");
+    if (type == nullptr || type->value.size() != 1 ||
+        type->value.front().kind != TokenKind::Identifier ||
+        !(SameName(type->text, "RDLC") || SameName(type->text, "Word") ||
+          SameName(type->text, "Excel") || SameName(type->text, "Custom"))) {
+      throw ParseError("report layout '" + layout.name + "' requires a valid Type");
+    }
+    if (file == nullptr || file->value.size() != 1 ||
+        file->value.front().kind != TokenKind::String || file->text.empty()) {
+      throw ParseError("report layout '" + layout.name + "' requires a nonempty LayoutFile");
+    }
+  }
+
+  void ParseRendering(std::vector<ReportLayoutDecl> &into, const ReportLayoutOwner &owner) {
+    Expect("{");
+    while (!AtPunctuation("}") && !AtEnd()) {
+      Expect("layout");
+      Expect("(");
+      ReportLayoutDecl layout;
+      layout.name = ExpectName();
+      layout.owner = owner;
+      Expect(")");
+      Expect("{");
+      while (!AtPunctuation("}") && !AtEnd()) { layout.properties.push_back(ParseProperty()); }
+      Expect("}");
+      ValidateLayout(layout);
+      if (std::ranges::any_of(into, [&layout](const ReportLayoutDecl &one) {
+            return SameName(one.name, layout.name);
+          })) {
+        throw ParseError("duplicate report layout '" + layout.name + "'");
+      }
+      into.push_back(std::move(layout));
     }
     Expect("}");
   }

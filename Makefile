@@ -16,7 +16,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -66,6 +66,11 @@ interface-defaults: comments db tc ## execute generated interface defaults and r
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_GenInterfaceGate
 	@"$(B)/gate_GenInterfaceGate"
 	@B="$(B)" bash "$(SELF)/test/interface-defaults.sh"
+
+report-layouts: comments db tc ## retain named report layouts, actual assets and extension counts
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReportLayoutGate
+	@"$(B)/gate_ReportLayoutGate"
+	@B="$(B)" bash "$(SELF)/test/report-layouts.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)

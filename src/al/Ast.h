@@ -114,6 +114,21 @@ struct PageControl {
   std::vector<PageControl> children;
 };
 
+struct ReportLayoutOwner {
+  int id = 0;
+  bool extension = false;
+  std::string name;
+  std::string nameSpace;
+  std::string appId;
+  std::string source;
+};
+
+struct ReportLayoutDecl {
+  std::string name;
+  std::vector<Property> properties;
+  ReportLayoutOwner owner;
+};
+
 struct PageObject {
   int id = 0;
   std::string name;
@@ -128,6 +143,7 @@ struct PageObject {
   bool report = false;
   bool xmlport = false;
   std::vector<PageControl> dataset;
+  std::vector<ReportLayoutDecl> rendering;
 };
 
 struct QueryObject {
@@ -158,6 +174,7 @@ struct PageExtensionObject {
   std::vector<ProcedureDecl> procedures;
   std::vector<VarDecl> variables;
   std::vector<LabelDecl> labels;
+  std::vector<ReportLayoutDecl> rendering;
 };
 
 struct EnumExtensionObject {
