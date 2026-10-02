@@ -383,6 +383,7 @@ constexpr std::string_view kTranslatedProperties[] = {
     std::string_view{"action.valuesallowed"},
     std::string_view{"codeunit.description"},
     std::string_view{"codeunit.testisolation"},
+    std::string_view{"codeunit.requiredtestisolation"},
     std::string_view{"codeunit.testtype"},
     std::string_view{"control.allowedfileextensions"},
     std::string_view{"control.allowmultiplefiles"},

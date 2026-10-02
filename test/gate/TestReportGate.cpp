@@ -1,3 +1,4 @@
+#include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
@@ -23,11 +24,12 @@ void Second([[maybe_unused]] void *instance) {
 
 // [SET] A gate-only codeunit ID; it is not part of the AL population.
 constexpr agiru::CodeunitId kFixtureId{950001};
+constexpr agiru::CodeunitDef kDefinition{
+    .id = kFixtureId, .name = "Report Fixture", .subtype = agiru::Subtype::Test};
 constexpr std::array kMethods{
     agiru::TestMethod{.name = "First", .invoke = First, .model = {}, .handlers = {}},
     agiru::TestMethod{.name = "Second", .invoke = Second, .model = {}, .handlers = {}}};
-const agiru::TestCatalogue kCatalogue{kFixtureId,
-                                      "Report Fixture",
+const agiru::TestCatalogue kCatalogue{kDefinition,
                                       agiru::MakeTestCodeunit<Fixture>,
                                       agiru::FreeTestCodeunit<Fixture>,
                                       nullptr,

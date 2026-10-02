@@ -1,3 +1,4 @@
+#include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
@@ -183,8 +184,13 @@ constexpr std::array<TestMethod, 3> kPolicyMethods{{
 void WhatOneMethodLeavesTheNextOneSees() {
   Db().Run("DROP TABLE IF EXISTS isolation_gate");
   Db().Run("CREATE TABLE isolation_gate (who text NOT NULL)");
-  const TestCatalogue registered{
-      CodeunitId{999999}, "Gate - Ordered UT", &MakeNothing, &FreeNothing, nullptr, kOrdered};
+  static constexpr agiru::CodeunitDef orderedDefinition{
+      .id = CodeunitId{999999}, .name = "Gate - Ordered UT", .subtype = agiru::Subtype::Test};
+  static constexpr agiru::CodeunitDef foreignDefinition{
+      .id = CodeunitId{999998}, .name = "Gate - Foreign UT", .subtype = agiru::Subtype::Test};
+  static constexpr agiru::CodeunitDef policyDefinition{
+      .id = CodeunitId{999997}, .name = "Gate - Policy UT", .subtype = agiru::Subtype::Test};
+  const TestCatalogue registered{orderedDefinition, &MakeNothing, &FreeNothing, nullptr, kOrdered};
   constexpr std::array<TestMethod, 1> foreignMethods{
       {{.name = "ForeignException",
         .invoke = &ForeignException,
@@ -192,9 +198,8 @@ void WhatOneMethodLeavesTheNextOneSees() {
         .handlers = {},
         .permissions = agiru::TestPermissions::Restrictive}}};
   const TestCatalogue foreign{
-      CodeunitId{999998}, "Gate - Foreign UT", &MakeNothing, &FreeNothing, nullptr, foreignMethods};
-  const TestCatalogue policy{
-      CodeunitId{999997}, "Gate - Policy UT", &MakeNothing, &FreeNothing, nullptr, kPolicyMethods};
+      foreignDefinition, &MakeNothing, &FreeNothing, nullptr, foreignMethods};
+  const TestCatalogue policy{policyDefinition, &MakeNothing, &FreeNothing, nullptr, kPolicyMethods};
   g_saw.clear();
   const agiru::TestRun run = agiru::RunRegisteredTests("Gate - Ordered UT");
   CHECK_TRUE("all seven methods ran", run.passed + run.failed == 7);

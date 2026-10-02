@@ -1825,20 +1825,20 @@ class DiscoveryGate(unittest.TestCase):
             shutil.copyfile(SCRIPT.parents[1] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
             for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh',
-                         'platform-source.sh'):
+                         'platform-source.sh', 'required-isolation.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('6 case(s), 1 red', result.stdout)
+            self.assertIn('7 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('6 case(s), 0 red', result.stdout)
+            self.assertIn('7 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):

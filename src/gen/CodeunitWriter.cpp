@@ -457,9 +457,7 @@ std::string TestCatalogueOf(const al::CodeunitObject &unit,
   }
   out += "}};\n\nconst TestCatalogue kTestCatalogue{CodeunitTraits<";
   out += identifier;
-  out += ">::kId,\n                                  CodeunitTraits<";
-  out += identifier;
-  out += ">::kName,\n                                  &MakeTestCodeunit<";
+  out += ">::kCodeunit,\n                                  &MakeTestCodeunit<";
   out += identifier;
   out += ">,\n                                  &FreeTestCodeunit<";
   out += identifier;

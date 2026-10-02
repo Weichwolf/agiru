@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta/CodeunitDef.h"
 #include "meta/Ids.h"
 #include "runtime/Error.h"
 #include "runtime/RecordRef.h"
@@ -215,15 +216,13 @@ class TestCatalogue {
 public:
   /// \brief Registers a test codeunit.
   ///
-  /// \param id      The codeunit's AL number.
-  /// \param name    Its AL name.
+  /// \param definition Immutable generated metadata; must outlive the catalogue and all runs.
   /// \param make    Makes the instance one codeunit run drives (`MakeTestCodeunit`).
   /// \param free    Unmakes it.
   /// \param onRun   Its `OnRun` trigger, which AL runs before the test procedures.
   /// \param methods Its `[Test]` procedures, in declaration order.
   /// \param handlers Its handler procedures.
-  TestCatalogue(CodeunitId id,
-                std::string_view name,
+  TestCatalogue(const CodeunitDef &definition,
                 void *(*make)(),
                 void (*free)(void *),
                 void (*onRun)(void *),
@@ -238,11 +237,15 @@ public:
 
   /// \brief The codeunit's AL number.
   /// \return The number.
-  [[nodiscard]] CodeunitId Id() const { return id_; }
+  [[nodiscard]] CodeunitId Id() const { return definition_.id; }
 
   /// \brief The codeunit's AL name.
   /// \return The name.
-  [[nodiscard]] std::string_view Name() const { return name_; }
+  [[nodiscard]] std::string_view Name() const { return definition_.name; }
+
+  /// \brief The source declaration, including RequiredTestIsolation.
+  /// \return Borrowed immutable metadata retained by this catalogue.
+  [[nodiscard]] const CodeunitDef &Def() const { return definition_; }
 
   /// \brief The codeunit's `OnRun` trigger.
   /// \return What calls it.
@@ -265,8 +268,7 @@ public:
   [[nodiscard]] std::span<const TestHandler> Handlers() const { return handlers_; }
 
 private:
-  CodeunitId id_;
-  std::string_view name_;
+  const CodeunitDef &definition_;
   void *(*make_)();
   void (*free_)(void *);
   void (*onRun_)(void *);
@@ -353,6 +355,9 @@ using ContextTestReport = void (*)(void *context, const TestResult &result);
 /// \return Results and counts for the selected procedures.
 /// \throws Error When the runner cannot establish a test boundary.
 /// \warning Exceptions from the callback propagate; output failure is not a successful run.
+/// \note An invalid or incompatible RequiredTestIsolation reports every named method as failed
+///       before constructing the test instance or invoking OnRun. None or an omitted requirement
+///       permits any valid runner policy; other values require an exact policy match.
 [[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit,
                                          void *context,
                                          ContextTestReport report,

@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <cstdlib>
 #include <exception>
@@ -198,6 +199,56 @@ void AppendResult(TestRun &run, TestResult result, void *context, ContextTestRep
   if (report != nullptr) { report(context, run.results.back()); }
 }
 
+std::string_view IsolationName(TestIsolation isolation) {
+  switch (isolation) {
+    case TestIsolation::Disabled: return "Disabled";
+    case TestIsolation::Codeunit: return "Codeunit";
+    case TestIsolation::Function: return "Function";
+  }
+  return {};
+}
+
+bool SameIsolationName(std::string_view left, std::string_view right) {
+  return std::ranges::equal(left, right, [](unsigned char a, unsigned char b) {
+    return std::tolower(a) == std::tolower(b);
+  });
+}
+
+std::string IsolationError(const TestCatalogue &catalogue, TestIsolation isolation) {
+  const std::string_view selected = IsolationName(isolation);
+  if (selected.empty()) { return "Invalid TestIsolation runner policy"; }
+  const std::string_view required = catalogue.Def().requiredTestIsolation;
+  if (required.empty() || SameIsolationName(required, "None") ||
+      SameIsolationName(required, selected)) {
+    return {};
+  }
+  constexpr std::array known{"Disabled", "Codeunit", "Function"};
+  if (!std::ranges::any_of(
+          known, [required](std::string_view name) { return SameIsolationName(required, name); })) {
+    return "Invalid RequiredTestIsolation: " + std::string(required);
+  }
+  return "RequiredTestIsolation " + std::string(required) + " is incompatible with TestIsolation " +
+         std::string(selected);
+}
+
+bool AcceptIsolation(const TestCatalogue &catalogue,
+                     TestIsolation isolationPolicy,
+                     TestRun &run,
+                     void *context,
+                     ContextTestReport report) {
+  const std::string refusal = IsolationError(catalogue, isolationPolicy);
+  if (refusal.empty()) { return true; }
+  for (const TestMethod &method : catalogue.Methods()) {
+    AppendResult(
+        run,
+        TestResult{
+            .codeunit = catalogue.Name(), .method = method.name, .passed = false, .error = refusal},
+        context,
+        report);
+  }
+  return false;
+}
+
 }
 
 void *CurrentTestInstance() {
@@ -208,15 +259,13 @@ void SetCurrentTestInstance(void *instance) {
   CurrentInstance() = instance;
 }
 
-TestCatalogue::TestCatalogue(CodeunitId id,
-                             std::string_view name,
+TestCatalogue::TestCatalogue(const CodeunitDef &definition,
                              void *(*make)(),
                              void (*free)(void *),
                              void (*onRun)(void *),
                              std::span<const TestMethod> methods,
                              std::span<const TestHandler> handlers)
-    : id_(id),
-      name_(name),
+    : definition_(definition),
       make_(make),
       free_(free),
       onRun_(onRun),
@@ -271,6 +320,7 @@ TestRun RunRegisteredTests(std::string_view codeunit,
   TestRun run;
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
+    if (!AcceptIsolation(*catalogue, isolationPolicy, run, context, report)) { continue; }
     std::optional<detail::Scope> isolation;
     std::optional<detail::IsolationFloor> floor;
     if (isolationPolicy == TestIsolation::Codeunit) {
