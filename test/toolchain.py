@@ -53,6 +53,46 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
+    def test_native_binding_audit_builds_runtime_and_compiler_before_the_fixture(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = os.environ.copy()
+        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+            environment.pop(name, None)
+        with tempfile.TemporaryDirectory() as folder:
+            result = subprocess.run(['make', '--no-print-directory', '-n', 'native-bindings',
+                                     f'B={folder}', 'JOBS=2'], cwd=root, env=environment,
+                                    text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runner = result.stdout.index('test/native-bindings.sh')
+        self.assertLess(result.stdout.index('--target agiru_rt'), runner)
+        self.assertLess(result.stdout.index('--target agirutc'), runner)
+
+    def test_native_binding_audit_requires_an_explicit_package(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = os.environ.copy()
+        environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
+        with tempfile.TemporaryDirectory() as folder:
+            environment['B'] = folder
+            result = subprocess.run(['bash', 'test/native-bindings.sh'], cwd=root,
+                                    env=environment, text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('explicit AGIRU_SYSTEM_SYMBOLS is required', result.stderr)
+
+    def test_native_binding_audit_refuses_changed_originals_before_compiling(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as folder:
+            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', Path(folder))
+            changed = package / 'src/Virtual Tables/Fixture.Table.al'
+            changed.write_text('changed')
+            environment = dict(os.environ, B=folder, AGIRU_SYSTEM_SYMBOLS=str(package),
+                               CXX='must-not-start-a-compiler')
+            result = subprocess.run(['bash', 'test/native-bindings.sh'], cwd=root,
+                                    env=environment, text=True, capture_output=True, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn('must-not-start-a-compiler', result.stderr)
+            self.assertEqual(changed.read_text(), 'changed')
+            self.assertFalse((Path(folder) / 'native-bindings.latest').exists())
+
     def test_native_report_fixture_builds_runtime_without_an_existing_build(self):
         root = Path(__file__).resolve().parents[1]
         environment = os.environ.copy()

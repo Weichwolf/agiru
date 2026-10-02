@@ -16,7 +16,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts number-sequences
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts native-bindings number-sequences
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -78,6 +78,10 @@ report-layout-metadata: ## compile all generated immutable layout declarations, 
 native-report-layouts: comments db tc ## prove native/extension declarations from explicit AGIRU_SYSTEM_SYMBOLS, not installation
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
 	@B="$(B)" bash "$(SELF)/test/native-report-layouts.sh"
+
+native-bindings: comments db tc ## audit every original native table binding; unbound/refused/mismatched stay red
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
+	@B="$(B)" bash "$(SELF)/test/native-bindings.sh"
 
 number-sequences: comments db ## prove atomic SQL reservations, process parity and negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_NumberSequenceGate
