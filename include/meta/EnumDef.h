@@ -78,9 +78,8 @@ struct EnumValueDef {
 ///
 /// This is what `option-data-type.md` promises of an Option -- "a zero-based enumerator type, which
 /// means that the option values are assigned to sequential numbers, starting with 0" -- and it is
-/// what lets an option resolve an ordinal by indexing instead of searching. `Option` asserts it at
-/// compile time, so an option that is not dense is a translation error rather than a lookup that
-/// quietly finds the wrong member.
+/// what lets an ordinary option resolve an ordinal by indexing instead of searching. `Option`
+/// asserts it unless a native vocabulary explicitly declares coded ordinals, as `Field.Type` does.
 ///
 /// \note An Enum makes no such promise: 103 of the 576 enum objects in the BaseApp are sparse
 ///       (measured 2026-09-01), and `enum 50130 YesNo { value(0; Yes) value(10; No) }` is the
@@ -115,9 +114,9 @@ struct EnumValueDef {
 /// \pre The values are sorted by ordinal. ValuesAreSorted() says so and the generator asserts it.
 ///
 /// A dense enumeration answers by indexing and never searches: that is the common case -- 473 of
-/// the BaseApp's 576 enum objects and every Option -- and it is on the path a rendered field takes.
-/// A sparse one falls back to a binary search, because ordinals reach 7 003 in the BaseApp and no
-/// index array can span that.
+/// the BaseApp's 576 enum objects and ordinary Options -- and it is on the path a rendered field
+/// takes. A sparse one falls back to a binary search, because ordinals reach 7 003 in the BaseApp
+/// and no index array can span that.
 [[nodiscard]] constexpr const EnumValueDef *ValueOf(std::span<const EnumValueDef> values,
                                                     std::int32_t ordinal) {
   if (ordinal < 0) { return nullptr; }

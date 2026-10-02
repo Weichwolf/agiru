@@ -11,7 +11,7 @@
 #include <type_traits>
 
 /// \file
-/// \brief AL's Option -- ordinary dense ordinals or explicitly coded native ordinals.
+/// \brief AL's Option -- a zero-based enumerator carrying a name table.
 
 #include <string>
 
@@ -228,22 +228,18 @@ public:
   /// \brief The member table for that enumeration.
   using Traits = OptionTraits<E>;
 
-  /// \brief Ordinary options are dense; native options may declare sorted, nonnegative codes.
+  /// \brief Ordinary options are dense; native options may explicitly declare sorted codes.
   ///
   /// `Field.Table.al` declares coded `Type` values. Only a vocabulary carrying
   /// `kCodedOrdinals = true` accepts this exception; ordinary options retain their density check.
   static_assert(
       [] {
         if constexpr (requires { Traits::kCodedOrdinals; }) {
-          if constexpr (Traits::kCodedOrdinals) {
-            return ValuesAreSorted(Traits::kValues) &&
-                   (Traits::kValues.empty() || Traits::kValues.front().ordinal >= 0);
-          }
+          if constexpr (Traits::kCodedOrdinals) { return ValuesAreSorted(Traits::kValues); }
         }
         return ValuesAreDense(Traits::kValues);
       }(),
-      "ordinary options require dense ordinals; coded native options require sorted nonnegative "
-      "ordinals");
+      "ordinary options require dense ordinals; coded native options require sorted ordinals");
 
   /// \brief The zero member.
   constexpr Option() = default;

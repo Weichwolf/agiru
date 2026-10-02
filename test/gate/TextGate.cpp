@@ -1,12 +1,19 @@
 #include "type/Code.h"
+#include "type/Guid.h"
+#include "type/SecretText.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
 
 #include "Check.h"
 
+#include <cstddef>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 using agiru::Code;
+using agiru::Guid;
 using agiru::MaxStrLen;
 using agiru::StringError;
 using agiru::StrLen;
@@ -87,6 +94,147 @@ void CodeOrdersNumericallyWhereBothSidesAreDigits() {
   CHECK_TRUE("but they still order", Code<20>("01") < Code<20>("2"));
 }
 
+void ConcatenationPreservesTextTypeAndAssignmentLimits() {
+  const Text<2> left{"ab"};
+  const Text<2> right{"cd"};
+  const Code<2> code{"xy"};
+  const auto joined = left + right;
+  CHECK_TRUE("Text plus Text retains Text", (std::is_same_v<decltype(left + right), Text<0>>));
+  CHECK_TRUE("Text plus Code retains Text", (std::is_same_v<decltype(left + code), Text<0>>));
+  CHECK_TRUE("Code plus Text retains Text", (std::is_same_v<decltype(code + right), Text<0>>));
+  CHECK_TRUE("Text plus literal retains Text", (std::is_same_v<decltype(left + " "), Text<0>>));
+  CHECK_TRUE("literal plus Text retains Text", (std::is_same_v<decltype(" " + left), Text<0>>));
+  CHECK_TRUE("Text plus string retains Text",
+             (std::is_same_v<decltype(left + std::string{}), Text<0>>));
+  CHECK_TRUE("string plus Text retains Text",
+             (std::is_same_v<decltype(std::string{} + left), Text<0>>));
+  CHECK_TRUE("nested joins retain Text", (std::is_same_v<decltype(left + code + right), Text<0>>));
+  CHECK_TRUE(
+      "caption storage joins retain Text",
+      (std::is_same_v<decltype(agiru::operator+(std::string_view{}, std::string{})), Text<0>>));
+  CHECK_TRUE("native string joins remain standard strings",
+             (std::is_same_v<decltype(std::string{} + std::string{}), std::string>));
+  CHECK_TEXT("joining sized inputs imposes no input limit on the result", joined, "abcd");
+  CHECK_TEXT("Code changes only its own input", left + code, "abXY");
+  CHECK_TEXT("case and spaces are retained", Text<0>{" lower "} + "Mixed ", " lower Mixed ");
+  CHECK_TEXT("caption storage retains case and spaces",
+             agiru::operator+(std::string_view{" lower "}, std::string{"Mixed "}),
+             " lower Mixed ");
+  CHECK_TEXT("Unicode is retained",
+             Text<0>{"\xc3\xa4"} + Text<0>{"\xf0\x9f\x92\xa1"},
+             "\xc3\xa4\xf0\x9f\x92\xa1");
+  bool overflow = false;
+  try {
+    const Text<3> limited{joined};
+  } catch (const StringError &) { overflow = true; }
+  CHECK_TRUE("Text destination still rejects overflow", overflow);
+  overflow = false;
+  try {
+    const Code<3> limited{joined};
+  } catch (const StringError &) { overflow = true; }
+  CHECK_TRUE("Code destination still rejects overflow", overflow);
+  CHECK_TEXT("a Code destination still normalizes", Code<4>{Text<0>{" ab "} + "c"}, "AB C");
+}
+
+void AnOwnedUnboundedResultTransfersItsBuffer() {
+  constexpr std::size_t kHeapFixtureLength = 4096;
+  std::string storage(kHeapFixtureLength, 'x');
+  const char *const allocation = storage.data();
+  const Text<0> owned{std::move(storage)};
+  CHECK_TRUE("an owned result is not copied", owned.Value().data() == allocation);
+  CHECK_TRUE("all owned bytes remain present", owned.Value().size() == kHeapFixtureLength);
+}
+
+constexpr int Selected(const Text<0> &) {
+  return 1;
+}
+
+constexpr int Selected(const std::string &) {
+  return 2;
+}
+
+constexpr int Selected(const Guid &) {
+  return 3;
+}
+
+constexpr int Selected(const agiru::SecretText &) {
+  return 4;
+}
+
+template <typename Left, typename Right>
+concept Joinable = requires(const Left &left, const Right &right) { left + right; };
+
+void GuidConcatenationPreservesTextAndNativeStorage() {
+  const Guid identity{"{aaaaaaaa-0000-1111-2222-bbbbbbbbbbbb}"};
+  const Text<2> bounded{" x"};
+  const Text<0> unbounded{"y "};
+  const Code<2> code{"ab"};
+  const std::string canonical = identity.ToText();
+  CHECK_TRUE("bounded Text plus Guid retains Text",
+             (std::is_same_v<decltype(bounded + identity), Text<0>>));
+  CHECK_TRUE("Guid plus bounded Text retains Text",
+             (std::is_same_v<decltype(identity + bounded), Text<0>>));
+  CHECK_TRUE("unbounded Text plus Guid retains Text",
+             (std::is_same_v<decltype(unbounded + identity), Text<0>>));
+  CHECK_TRUE("Guid plus unbounded Text retains Text",
+             (std::is_same_v<decltype(identity + unbounded), Text<0>>));
+  CHECK_TEXT("bounded Text imposes no result limit", bounded + identity, " x" + canonical);
+  CHECK_TEXT("Guid before bounded Text retains spaces", identity + bounded, canonical + " x");
+  CHECK_TEXT(
+      "unbounded Text retains case and trailing spaces", unbounded + identity, "y " + canonical);
+  CHECK_TEXT("Guid before unbounded Text retains case", identity + unbounded, canonical + "y ");
+  const auto chained = bounded + identity + unbounded + code;
+  CHECK_TRUE("Text Guid Code chain retains Text",
+             (std::is_same_v<decltype(chained), const Text<0>>));
+  CHECK_TEXT("Code normalization stays local to its operand", chained, " x" + canonical + "y AB");
+  CHECK_TEXT("Guid between temporary Text values owns its result",
+             Text<0>{"a"} + identity + Text<0>{"b"},
+             "a" + canonical + "b");
+  CHECK_TEXT("a null Guid uses the same formatter",
+             Text<0>{""} + Guid{},
+             "{00000000-0000-0000-0000-000000000000}");
+  const auto unicode = Text<3>{"\xc3\xa4\xf0\x9f\x92\xa1"} + identity;
+  CHECK_TEXT(
+      "Unicode survives Guid concatenation", unicode, "\xc3\xa4\xf0\x9f\x92\xa1" + canonical);
+  CHECK_TRUE("Unicode and Guid length counts UTF-16 units", StrLen(unicode) == 41);
+  CHECK_TRUE("a Text join selects the Text overload", Selected(bounded + identity) == 1);
+  CHECK_TRUE("the reverse Text join selects the Text overload", Selected(identity + bounded) == 1);
+  CHECK_TRUE("typed Guid still selects Guid", Selected(identity) == 3);
+  CHECK_TRUE("SecretText still selects SecretText", Selected(agiru::SecretText{"secret"}) == 4);
+  CHECK_TRUE("a secret cannot concatenate with Guid", (!Joinable<agiru::SecretText, Guid>));
+  CHECK_TRUE("Guid cannot concatenate with a secret", (!Joinable<Guid, agiru::SecretText>));
+  CHECK_TRUE("native string plus Guid stays native",
+             (std::is_same_v<decltype(std::string{} + identity), std::string>));
+  CHECK_TRUE("Guid plus native string stays native",
+             (std::is_same_v<decltype(identity + std::string{}), std::string>));
+  CHECK_TRUE("native Guid join selects the native overload",
+             Selected(std::string{"a"} + identity) == 2);
+  CHECK_TEXT(
+      "native prefix joins with the canonical Guid", std::string{"a"} + identity, "a" + canonical);
+  CHECK_TEXT(
+      "native suffix joins with the canonical Guid", identity + std::string{"b"}, canonical + "b");
+  CHECK_TEXT("native literal prefix stays supported", "a" + identity, "a" + canonical);
+  CHECK_TEXT("native literal suffix stays supported", identity + "b", canonical + "b");
+  CHECK_TEXT(
+      "native view prefix stays supported", std::string_view{"a"} + identity, "a" + canonical);
+  CHECK_TEXT(
+      "native view suffix stays supported", identity + std::string_view{"b"}, canonical + "b");
+  Text<3> destination{"old"};
+  std::string diagnostic;
+  try {
+    destination = bounded + identity;
+  } catch (const StringError &error) { diagnostic = error.what(); }
+  CHECK_TEXT("destination overflow keeps the BC diagnostic",
+             diagnostic.substr(0, diagnostic.find(". Value")),
+             "The length of the string is 40, but it must be less than or equal to 3 characters");
+  CHECK_TEXT("failed assignment preserves the destination", destination, "old");
+  bool overflow = false;
+  try {
+    const Code<3> limited{identity + bounded};
+  } catch (const StringError &) { overflow = true; }
+  CHECK_TRUE("Code destination also enforces its limit", overflow);
+}
+
 } // namespace
 
 int main() {
@@ -97,5 +245,8 @@ int main() {
     TextKeepsWhatCodeChanges();
     LengthCountsTheWayDotNetDoes();
     CodeOrdersNumericallyWhereBothSidesAreDigits();
+    ConcatenationPreservesTextTypeAndAssignmentLimits();
+    AnOwnedUnboundedResultTransfersItsBuffer();
+    GuidConcatenationPreservesTextAndNativeStorage();
   });
 }
