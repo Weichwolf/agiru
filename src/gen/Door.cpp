@@ -246,7 +246,7 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 157> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 154> kElsewhere{{
     {"dotnet::String", "dotnet/String.h"},
     {"dotnet::Uri", "dotnet/Uri.h"},
     {"dotnet::UriPartial", "dotnet/Uri.h"},
@@ -290,9 +290,6 @@ constexpr std::array<std::pair<std::string_view, std::string_view>, 157> kElsewh
     {"QueryDef", "meta/QueryDef.h"},
     {"GenericList1", "dotnet/Generic.h"},
     {"GenericDictionary2", "dotnet/Generic.h"},
-    {"GenericKeyValuePair2", "dotnet/Generic.h"},
-    {"dotnet::DesignerFieldProperty", "dotnet/DesignerFieldProperty.h"},
-    {"dotnet::DesignerFieldType", "dotnet/DesignerFieldType.h"},
     {"GenericIEnumerable1", "dotnet/Generic.h"},
     {"GenericIEnumerator1", "dotnet/Generic.h"},
     {"dotnet::JObject", "dotnet/JObject.h"},
@@ -519,12 +516,7 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
     headers.insert("BuiltinsWritten.h");
   }
   std::string out;
-  for (const std::string &header : headers) {
-    const std::string directive = "#include \"" + header + "\"\n";
-    if (!text.starts_with(directive) && text.find("\n" + directive) == std::string_view::npos) {
-      out += directive;
-    }
-  }
+  for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
   return out;
 }
 

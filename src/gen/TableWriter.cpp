@@ -15,10 +15,13 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <format>
 #include <functional>
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -259,6 +262,7 @@ bool IsSystemField(const al::FieldDecl &field) {
 }
 
 al::TableObject WithSystemFields(al::TableObject table) {
+  al::EnsurePrimaryKey(table);
   for (const SystemFieldDecl &system : kSystemFields) {
     table.fields.push_back(al::FieldDecl{.number = system.no.Value(),
                                          .name = std::string(system.name),
@@ -583,9 +587,13 @@ std::string ProcedureIdentifier(const al::TableObject &table, const std::string 
   return Disambiguated(Identifier(name), "_Proc", taken);
 }
 
-TableRef BindTable(const al::TableObject &table, std::string identifier, std::string header) {
+TableRef BindTable(const al::TableObject &table,
+                   std::string identifier,
+                   std::string header,
+                   std::string outputIdentifier) {
   TableRef ref{.identifier = std::move(identifier),
                .header = std::move(header),
+               .outputIdentifier = std::move(outputIdentifier),
                .id = table.id,
                .fields = {},
                .procedures = {},
@@ -603,7 +611,6 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
   for (const SystemFieldDecl &field : kSystemFields) {
     ref.fields.emplace(LowerKey(std::string(field.name)), std::string(field.name));
   }
-  ref.procedureDeclarations.reserve(table.procedures.size());
   for (const al::ProcedureDecl &procedure : table.procedures) {
     ref.procedures.emplace(LowerKey(procedure.name), ProcedureIdentifier(table, procedure.name));
     if (IsTryFunction(procedure)) { ref.tryFunctions.insert(LowerKey(procedure.name)); }
@@ -622,6 +629,181 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
                                                           .body = {}});
   }
   return ref;
+}
+
+namespace {
+
+struct KeyFlags {
+  bool clustered;
+  bool enabled;
+  bool maintainSiftIndex;
+  bool maintainSqlIndex;
+  bool unique;
+};
+
+bool KeyBoolean(const al::TableObject &table,
+                const al::KeyDecl &key,
+                std::string_view name,
+                bool absent) {
+  const auto *property = Find(key.properties, name);
+  if (property == nullptr) { return absent; }
+  if (property->value.size() == 1 && property->value.front().kind == al::TokenKind::Identifier) {
+    const std::string value = LowerKey(property->value.front().text);
+    if (value == "true") { return true; }
+    if (value == "false") { return false; }
+  }
+  throw std::runtime_error("invalid Boolean key property: " + table.name + "." + key.name + "." +
+                           std::string(name));
+}
+
+std::vector<KeyFlags> KeyFlagsOf(const al::TableObject &table) {
+  std::vector<KeyFlags> flags;
+  flags.reserve(table.keys.size());
+  const bool selected = std::ranges::any_of(table.keys, [&](const al::KeyDecl &key) {
+    return KeyBoolean(table, key, "Clustered", false);
+  });
+  std::size_t clustered = 0;
+  for (const auto &key : table.keys) {
+    if (Find(key.properties, "SqlIndex") != nullptr) {
+      throw std::runtime_error("unrepresented key property: " + table.name + "." + key.name +
+                               ".SqlIndex");
+    }
+    flags.push_back(KeyFlags{
+        .clustered = KeyBoolean(table, key, "Clustered", flags.empty() && !selected),
+        .enabled = KeyBoolean(table, key, "Enabled", true),
+        .maintainSiftIndex = KeyBoolean(table, key, "MaintainSiftIndex", true),
+        .maintainSqlIndex = KeyBoolean(table, key, "MaintainSqlIndex", true),
+        .unique = KeyBoolean(table, key, "Unique", false),
+    });
+    clustered += flags.back().clustered ? 1 : 0;
+  }
+  if (clustered > 1) { throw std::runtime_error("multiple clustered keys: " + table.name); }
+  return flags;
+}
+
+std::string NativeFieldAssertion(const al::TableObject &table,
+                                 const al::FieldDecl &field,
+                                 const TableRef &binding,
+                                 const OptionField *option) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string body = "  const auto *field = ::agiru::Field(" + metadata + ", ::agiru::FieldNo{" +
+                     std::to_string(field.number) + "});\n";
+  body += "  if (field == nullptr || field->name != " + Literal(field.name) +
+          " || field->caption != " + Literal(Caption(field)) +
+          " || field->type != ::agiru::FieldType::" + TypeName(field.type) +
+          " || field->length != " + std::to_string(field.length) + ") { return false; }\n";
+  if (option != nullptr) {
+    body += "  if (field->values.size() != " + std::to_string(option->members.size()) +
+            ") { return false; }\n";
+    for (std::size_t i = 0; i < option->members.size(); ++i) {
+      const std::string value = "field->values[" + std::to_string(i) + "]";
+      body += std::format("  if ({0}.ordinal != {1} || {0}.name != {2} || {0}.caption != {3}) "
+                          "{{ return false; }}\n",
+                          value,
+                          i,
+                          Literal(option->members[i]),
+                          Literal(option->captions[i]));
+    }
+  }
+  body += "  return true;\n";
+  return "static_assert([] {\n" + body + "}(), " +
+         Literal("native field declaration mismatch: " + table.name + "." + field.name) + ");\n";
+}
+
+std::string NativeFieldNumbers(const al::TableObject &table,
+                               std::span<const std::string> names,
+                               const std::string &access) {
+  std::string condition = std::format("{}.size() == {}", access, names.size());
+  for (std::size_t i = 0; i < names.size(); ++i) {
+    const auto found = std::ranges::find_if(table.fields, [&](const al::FieldDecl &field) {
+      return LowerKey(field.name) == LowerKey(names[i]);
+    });
+    if (found == table.fields.end()) {
+      throw std::runtime_error("native key names an absent field: " + table.name + "." + names[i]);
+    }
+    condition += std::format(" && {}[{}] == ::agiru::FieldNo{{{}}}", access, i, found->number);
+  }
+  return condition;
+}
+
+std::string
+NativeKeyProperties(const al::KeyDecl &key, const KeyFlags &flags, const std::string &access) {
+  std::string condition = std::format("{0}.clustered == {1} && {0}.enabled == {2} && "
+                                      "{0}.maintainSiftIndex == {3} && "
+                                      "{0}.maintainSqlIndex == {4} && {0}.unique == {5}",
+                                      access,
+                                      flags.clustered,
+                                      flags.enabled,
+                                      flags.maintainSiftIndex,
+                                      flags.maintainSqlIndex,
+                                      flags.unique);
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"IncludedFields", "includedFields"},
+        std::pair<std::string_view, std::string_view>{"Description", "description"},
+        std::pair<std::string_view, std::string_view>{"ObsoleteState", "obsoleteState"}}) {
+    const auto *property = Find(key.properties, name);
+    condition += std::format(
+        " && {}.{} == {}", access, member, Literal(property == nullptr ? "" : property->text));
+  }
+  return condition;
+}
+
+std::string NativeKeyAssertions(const al::TableObject &declared, const std::string &metadata) {
+  al::TableObject table = declared;
+  al::EnsurePrimaryKey(table);
+  const auto flags = KeyFlagsOf(table);
+  std::string out = "static_assert(" + metadata +
+                    ".keys.size() == " + std::to_string(table.keys.size()) + ", " +
+                    Literal("native key count mismatch: " + table.name) + ");\n";
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    const auto &key = table.keys[i];
+    const std::string access = metadata + ".keys[" + std::to_string(i) + "]";
+    std::string condition = std::format("{}.keys.size() > {} && {}.name == {} && {}",
+                                        metadata,
+                                        i,
+                                        access,
+                                        Literal(key.name),
+                                        NativeFieldNumbers(table, key.fields, access + ".fields"));
+    const auto *sums = Find(key.properties, "SumIndexFields");
+    const auto names =
+        sums == nullptr ? std::vector<std::string>{} : CommaSeparatedNames(sums->text);
+    condition += std::format(" && {} && {}",
+                             NativeKeyProperties(key, flags[i], access),
+                             NativeFieldNumbers(table, names, access + ".sumIndexFields"));
+    out += std::format("static_assert({}, {});\n",
+                       condition,
+                       Literal("native key declaration mismatch: " + table.name + "." + key.name));
+  }
+  return out;
+}
+
+}
+
+std::string NativeTableAssertions(const al::TableObject &table, const TableRef &binding) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string out = "#include \"" + binding.header + "\"\n";
+  out += "#include \"meta/Declare.h\"\n#include \"meta/Ids.h\"\n";
+  out += "#include \"meta/TableDef.h\"\n#include <cstddef>\n\n";
+  out += "static_assert(" + metadata + ".id == ::agiru::TableId{" + std::to_string(table.id) +
+         "} && " + metadata + ".name == " + Literal(table.name) + ", " +
+         Literal("native table identity mismatch: " + table.name) + ");\n";
+  out += "static_assert([] {\n  std::size_t declared = 0;\n  for (const auto &field : " + metadata +
+         ".fields) {\n    bool system = false;\n";
+  out += "    for (const auto &implicit : ::agiru::kSystemFields) {\n";
+  out += "      system = system || field.no == implicit.no;\n    }\n";
+  out += "    if (!system) { ++declared; }\n  }\n  return declared == " +
+         std::to_string(table.fields.size()) + ";\n}(), " +
+         Literal("native field count mismatch: " + table.name) + ");\n";
+  const auto options = OptionFields(table);
+  for (const auto &field : table.fields) {
+    out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
+  }
+  out += NativeKeyAssertions(table, metadata);
+  const auto *perCompany = al::Find(table.properties, "DataPerCompany");
+  const bool company = perCompany == nullptr || LowerKey(perCompany->text) != "false";
+  out += "static_assert(" + metadata + ".dataPerCompany == " + (company ? "true" : "false") + ", " +
+         Literal("native company scope mismatch: " + table.name) + ");\n";
+  return out + "\n";
 }
 
 namespace {
@@ -846,14 +1028,26 @@ std::set<std::string> Shadowed(const al::TableObject &table) {
   return hidden;
 }
 
+std::string TableIdentifier(const al::TableObject &table, const Objects &objects) {
+  const auto found = objects.tables.find(std::to_string(table.id));
+  if (found == objects.tables.end() || found->second.outputIdentifier.empty()) {
+    return Identifier(table.name);
+  }
+  if (found->second.id != table.id || LowerKey(found->second.name) != LowerKey(table.name)) {
+    throw std::runtime_error("table output binding does not match declaration: " + table.name);
+  }
+  return found->second.outputIdentifier;
+}
+
 std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
   const std::string space = NamespaceOf(declared.nameSpace);
   const EnumIndex &enums = objects.enums;
   const al::TableObject table = WithSystemFields(declared);
-  const std::string tableIdentifier = Identifier(table.name);
+  const std::string tableIdentifier = TableIdentifier(table, objects);
   const std::vector<OptionField> options = OptionFields(table);
   const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
   const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  const auto keyFlags = KeyFlagsOf(table);
   const std::string qualified = space + "::" + tableClass;
   std::string out = "namespace " + space + " {\n\n";
   out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
@@ -861,21 +1055,17 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
-    const auto said = [&](std::string_view name, bool absent) {
-      const al::Property *found = Find(table.keys[i].properties, name);
-      return found == nullptr ? absent : LowerKey(found->text) == "true";
-    };
+    const auto &flags = keyFlags[i];
     const al::Property *sums = Find(table.keys[i].properties, "SumIndexFields");
     out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableClass +
-           "::" + KeyArrayName(i) +
-           ", .clustered = " + (said("Clustered", false) ? "true" : "false");
-    if (!said("Enabled", true)) { out += ", .enabled = false"; }
+           "::" + KeyArrayName(i) + ", .clustered = " + (flags.clustered ? "true" : "false");
+    if (!flags.enabled) { out += ", .enabled = false"; }
     if (sums != nullptr) {
       out += ", .sumIndexFields = " + tableClass + "::" + KeyArrayName(i) + "Sums";
     }
-    if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
-    if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
-    if (said("Unique", false)) { out += ", .unique = true"; }
+    if (!flags.maintainSiftIndex) { out += ", .maintainSiftIndex = false"; }
+    if (!flags.maintainSqlIndex) { out += ", .maintainSqlIndex = false"; }
+    if (flags.unique) { out += ", .unique = true"; }
     const al::Property *included = Find(table.keys[i].properties, "IncludedFields");
     if (included != nullptr) { out += ", .includedFields = " + Literal(included->text); }
     for (const auto &[name, member] :
@@ -1010,7 +1200,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
                         const EnumIndex &enums,
                         const Objects &objects) {
   const al::TableObject table = WithSystemFields(declared);
-  const std::string tableIdentifier = Identifier(table.name);
+  const std::string tableIdentifier = TableIdentifier(table, objects);
   const std::string space = NamespaceOf(table.nameSpace);
   const std::string qualified = space + "::" + ClassName(tableIdentifier, ObjectKind::Table);
   const std::vector<OptionField> options = OptionFields(table);

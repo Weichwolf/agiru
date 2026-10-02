@@ -455,11 +455,6 @@ struct TableDef {
   ///       nothing, because an unbounded series is a loop AL ends with `CurrReport.Break` and this
   ///       runtime has no such brake yet (board:0697).
   FieldNo sequenceField{};
-
-  /// \brief Explicit missing-provider diagnostic; nonempty forbids physical storage access.
-  /// Temporary record-variable storage remains independent. Never provision an empty SQL
-  /// replacement for a declaration whose runtime projection is not implemented.
-  std::string_view providerRefusal{};
 };
 
 /// \brief Finds a field by its AL number.

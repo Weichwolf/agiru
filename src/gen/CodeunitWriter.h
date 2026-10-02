@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -17,6 +18,7 @@ namespace agiru::gen {
 struct TableRef {
   std::string identifier;
   std::string header;
+  std::string outputIdentifier{};
 
   std::int32_t id = 0;
 
@@ -36,6 +38,7 @@ struct TableRef {
   std::set<std::string> tryFunctions;
 
   std::vector<al::ProcedureDecl> procedureDeclarations;
+  std::string declarationAssertions{};
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -97,9 +100,6 @@ QueryColumnOf(const Objects &objects, const al::VarDecl *declared, std::string_v
                                                  const al::VarDecl *declared,
                                                  std::string_view member);
 
-[[nodiscard]] std::string
-FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field);
-
 std::string OptionTypeName(const std::string &owner,
                            const std::string &within,
                            const al::VarDecl &declared,
@@ -107,11 +107,15 @@ std::string OptionTypeName(const std::string &owner,
 
 [[nodiscard]] TableIndex PlatformTables();
 
+[[nodiscard]] TableIndex PlatformTables(std::span<const al::TableObject> declarations);
+
 [[nodiscard]] bool NamesAbsentType(const al::VarDecl &declared);
 
 [[nodiscard]] std::string AbsentDotNetOf(const al::VarDecl &declared);
 
 [[nodiscard]] FieldEnums PlatformFieldEnums();
+
+[[nodiscard]] FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations);
 
 struct InterfaceHeader {
   std::string text;
