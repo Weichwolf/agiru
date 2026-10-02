@@ -110,6 +110,8 @@ what a file names; no master header or macros. Measure build cost before widenin
   Genuine Excel workbook layouts remain a separate format, not PDF or a dataset dump.
 - Reuse upstream Web Platform Tests (WPT) CSS reftests and wptrunner through an engine
   adapter. Pin the upstream revision; retain original match/mismatch and fuzzy metadata.
+  Render each test/reference pair with the same engine; browser-to-agiru comparisons
+  are separate differential checks, not the WPT reftest oracle. Pin fonts and viewport.
   Declare the tested profile and count failures, crashes, unsupported and unexecuted cases.
   WPT conformance does not replace BC layout/dataset/chart and paginated PDF comparisons.
 - Business Charts and interactive ledger-page analysis are required. Share exact typed
@@ -163,6 +165,16 @@ what a file names; no master header or macros. Measure build cost before widenin
   original native report source. It inventories the full package, then compiles the
   native/extension declaration fixture and records its analysis command. Run it before
   analysing that consumer; this is not native-loader activation or asset installation.
+- `make native-bindings AGIRU_SYSTEM_SYMBOLS=<verified-package>` inventories every
+  original native table independently, emits production-generator contracts and compiles
+  every bound candidate without PCH. Unbound/refused/crashed/mismatched identities remain
+  red in `build/native-bindings.<id>/result.json`; non-table objects stay counted and
+  business-unexecuted. The original Page Fields Selection List also compiles and reads
+  its bound control through the production field primitive; source-expression mutants
+  must fail. This is not the full eight-consumer replay. The raw declaration audit is not
+  product selection, provider, complete native declaration, production-loader or G1 proof.
+  Retire commercial families
+  through 0725; do not repair licensing to make the raw audit green.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source
