@@ -6,12 +6,11 @@
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Relation.h"
 #include "runtime/Session.h"
-#include "runtime/Storage.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -700,7 +699,6 @@ bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId) {
     return TempInsert(record, table);
   }
 
-  RequireTableProvider(table);
   StampInserted(record, table, withSystemId);
   AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
@@ -727,7 +725,6 @@ bool TakePlatformOwned(void *record,
 
 bool RuntimeModify(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempModify(record, table); }
-  RequireTableProvider(table);
 
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
@@ -739,7 +736,6 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
     if (!TempDelete(const_cast<void *>(before), table)) { return false; }
     return TempInsert(record, table);
   }
-  RequireTableProvider(table);
   StampModified(record, table, CurrentDateTime(), Session::Current().UserSecurityId());
   const FieldValues values = ValuesOf(record, table);
   const FieldValues oldKey = KeyOf(before, table);
@@ -753,7 +749,6 @@ bool RuntimeRename(void *record, const void *before, const TableDef &table) {
 
 bool RuntimeDelete(const void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempDelete(const_cast<void *>(record), table); }
-  RequireTableProvider(table);
 
   const FieldValues key = KeyOf(record, table);
   return DeleteRow(Session::Current().Database(), table, key);
@@ -774,7 +769,6 @@ void LoadRow(void *record, const TableDef &table, const FieldValues &row) {
 
 bool RuntimeGet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempGet(record, table); }
-  RequireTableProvider(table);
 
   const FieldValues key = KeyOf(record, table);
   const std::optional<FieldValues> row = GetRow(Session::Current().Database(), table, key);
@@ -797,7 +791,6 @@ bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &syste
   if (TempOf(record) != nullptr) {
     throw Error("GetBySystemId on a temporary record is not written yet (board:0035)");
   }
-  RequireTableProvider(table);
   const std::optional<FieldValues> row =
       GetRowWhere(Session::Current().Database(), table, *column, systemId.ToText());
   if (!row.has_value()) { return false; }

@@ -13358,8 +13358,7 @@ tests/core/codeunit/O365PurchCalcDiscByType.cpp
 tests/core/codeunit/O365PurchCodeTypeLkupTest.cpp
 tests/core/codeunit/O365PurchItemChargeTests.cpp
 tests/core/codeunit/O365RetDocTypeLookupTest.cpp
-# Product exclusion: licensing-and-microsoft-cloud, source codeunit 138073 (scope.json).
-# tests/core/codeunit/O365RoleCenterNotifications.cpp
+tests/core/codeunit/O365RoleCenterNotifications.cpp
 tests/core/codeunit/O365SalesCalcDiscByType.cpp
 tests/core/codeunit/O365SalesCodeTypeLkupTest.cpp
 tests/core/codeunit/O365SalesInvoiceStatus.cpp
@@ -14216,6 +14215,5 @@ tests/test/foundation/no_series/codeunit/NoSeriesCheckTests.cpp
 # THE SLICE: the generated sources that compile and are LINKED INTO `agiru`, so that
 # whole point of naming them rather than globbing whatever happens to work.
 tests/core/codeunit/LibraryXMLRead.cpp
-tests/core/codeunit/LibraryGraphMgt.cpp
 foundation/foundation/no_series/codeunit/NoSeriesCopilotImpl.cpp
 base/purchases/vendor/page/AgedAccPayableChart.cpp

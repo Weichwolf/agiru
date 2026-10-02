@@ -1,5 +1,5 @@
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/XmlPort.h"
 #include "type/Blob.h"
 #include "type/Stream.h"

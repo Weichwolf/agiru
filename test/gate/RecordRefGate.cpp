@@ -3,7 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
@@ -231,7 +231,7 @@ void AValueCarriesItsType() {
 
   const agiru::Variant code = ref.Field(2).Value();
   CHECK_TRUE("a Code comes out as text", code.IsText());
-  CHECK_TEXT("with its value", std::string_view(code.Get<agiru::Text<0>>()), "WELDER");
+  CHECK_TEXT("with its value", code.Get<std::string>(), "WELDER");
 
   const agiru::Variant cost = ref.Field(6).Value();
   CHECK_TRUE("a Decimal comes out as a Decimal", cost.IsDecimal());
