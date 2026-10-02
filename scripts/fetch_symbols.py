@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch source-bearing System.app by HTTP ranges; preserve NAVX bytes and provenance.
 
-Publish immutable build/symbols/<BC_VERSION>/<SHA256> inputs. Decode each ZIP path
+Publish immutable build/symbols/<version>/<SHA256> inputs. Decode each ZIP path
 segment twice, refusing traversal, links and collisions before extraction.
 """
 
@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import pathlib
+import re
 import stat
 import struct
 import subprocess
@@ -201,11 +202,20 @@ def publish(app, version, url, entry, output):
     return destination
 
 
+def artifact_version(value):
+    if re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+', value) is None:
+        raise argparse.ArgumentTypeError('version must contain four numeric components')
+    return value
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=pathlib.Path, default=OUT,
                         help='parent of version/hash package directories (default: build/symbols)')
-    parser.add_argument("--verify", type=pathlib.Path,
+    operation = parser.add_mutually_exclusive_group()
+    operation.add_argument('--version', type=artifact_version,
+                           help='explicit public OnPrem platform version; BC_VERSION stays unchanged')
+    operation.add_argument("--verify", type=pathlib.Path,
                         help="verify an existing package without downloading or writing")
     arguments = parser.parse_args()
     if arguments.verify is not None:
@@ -213,7 +223,7 @@ def main():
         print(json.dumps({key: ledger[key] for key in
                           ('package_sha256', 'package_bytes', 'identity')}, sort_keys=True))
         return
-    version = (ROOT / "BC_VERSION").read_text().strip()
+    version = arguments.version or (ROOT / "BC_VERSION").read_text().strip()
     url = f"{CDN}/onprem/{version}/platform"
     total = size_of(url)
     print(f"symbols: {url} is {total / 1e9:.2f} GB, and this reads three ranges of it")

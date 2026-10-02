@@ -133,6 +133,40 @@ class SymbolsPackageGate(unittest.TestCase):
             ledger = json.loads((originals[0].parent / 'provenance.json').read_text())
             self.assertEqual(ledger['package_sha256'], hashlib.sha256(app).hexdigest())
 
+    def test_explicit_platform_version_does_not_change_the_demo_pin(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            pin = root / 'BC_VERSION'
+            pin.write_text('28.4.1.0\n')
+            original = pin.read_bytes(), pin.stat().st_mtime_ns
+            app = self.package()
+            output = root / 'symbols'
+            with patch.object(symbols, 'ROOT', root), patch.object(symbols, 'OUT', output), \
+                    patch.object(sys, 'argv', ['fetch_symbols.py', '--version', '29.0.2.3']), \
+                    patch.object(symbols, 'size_of', return_value=1000) as size, \
+                    patch.object(symbols, 'central_directory', return_value=(1, b'directory')), \
+                    patch.object(symbols, 'entry_named', return_value=('System.app', 40, len(app))), \
+                    patch.object(symbols, 'member', return_value=app), redirect_stdout(io.StringIO()):
+                symbols.main()
+            size.assert_called_once_with(symbols.CDN + '/onprem/29.0.2.3/platform')
+            packages = list(output.rglob('provenance.json'))
+            self.assertEqual(len(packages), 1)
+            ledger = json.loads(packages[0].read_text())
+            self.assertEqual(ledger['bc_version'], '29.0.2.3')
+            self.assertEqual(ledger['identity']['Version'], '28.0.1.0')
+            self.assertEqual((pin.read_bytes(), pin.stat().st_mtime_ns), original)
+
+    def test_explicit_version_refuses_paths_and_conflicting_verification_before_network(self):
+        for arguments in (['--version', '../29.0.1.2'], ['--version', '29.0.1.2/platform'],
+                          ['--version', '29.0'], ['--version', '29.0.1.2?x'],
+                          ['--version', '29.0.1.2', '--verify', 'package']):
+            with self.subTest(arguments=arguments), \
+                    patch.object(sys, 'argv', ['fetch_symbols.py', *arguments]), \
+                    patch.object(symbols, 'size_of', side_effect=AssertionError('unexpected network')), \
+                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as refused:
+                symbols.main()
+            self.assertEqual(refused.exception.code, 2)
+
     def test_changed_package_is_refused_and_not_overwritten(self):
         for relative in ('System.app', 'src/Virtual Tables/Fixture.Table.al', 'NavxManifest.xml'):
             with self.subTest(relative=relative), tempfile.TemporaryDirectory() as folder:

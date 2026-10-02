@@ -16,7 +16,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata number-sequences
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts number-sequences
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -75,6 +75,9 @@ report-layouts: comments db tc ## retain named report layouts, actual assets and
 report-layout-metadata: ## compile all generated immutable layout declarations, not complete apps
 	@B="$(B)" bash "$(SELF)/scripts/report_layout_metadata.sh" "$(SELF)/apps"
 
+native-report-layouts: comments db tc ## prove native/extension declarations from explicit AGIRU_SYSTEM_SYMBOLS, not installation
+	@B="$(B)" bash "$(SELF)/test/native-report-layouts.sh"
+
 number-sequences: comments db ## prove atomic SQL reservations, process parity and negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_NumberSequenceGate
 	@"$(B)/gate_NumberSequenceGate"
@@ -130,8 +133,8 @@ schema:            ## how much of the CRONUS dataset the transpiled schema can h
 demo:              ## the CRONUS rows into the runner's database, so a test starts where BC does
 	@python3 $(SELF)/scripts/seed_demo.py
 
-symbols:           ## the AL source of every platform object, out of the system symbols
-	@python3 $(SELF)/scripts/fetch_symbols.py
+symbols:           ## source-bearing System.app; SYMBOL_VERSION overrides only the inspected platform
+	@python3 $(SELF)/scripts/fetch_symbols.py $(if $(SYMBOL_VERSION),--version "$(SYMBOL_VERSION)")
 
 cronus:            ## the demo database from the CDN into PostgreSQL, one to one
 	@sh $(SELF)/scripts/fetch_artifact.sh
