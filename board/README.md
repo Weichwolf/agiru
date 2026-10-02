@@ -7,11 +7,15 @@ Build cleanup (2026-10-02): handwritten sources from 79 source copies are preser
 are in `archive/build-20261002/probes`. Old `build/` receipts, binaries and downloaded
 inputs were moved to the desktop Trash and remain recoverable; references below are
 historical, not available current proof. New verification starts from an empty `build/`.
+Second requested cleanup: the 14 GB rebuild directory was also moved to Trash;
+its four completed verification-worktree registrations were pruned. External worktrees
+and archived source branches were preserved. The current receipts below are newly created.
 Preserved native prototype: branch `work/native-field-metadata`, worktree
 `/home/cosmo/Git/agiru-worktrees/native-field-metadata`; not promoted to `main`.
 
 ## Current verification — 2026-10-02
 
+- Clean main rebuild at `d87f54f` (documentation-only working changes), BCApps `6261b1c458`: `make all JOBS=6` and `make ut JOBS=6` both exit 2. Clang 19.1.7/LLVM C++23 probe succeeds; CMake refuses the missing UpgradeCompositeReportParts source before compilation. No runner starts: zero executed of 2,314 methods across 80 incomplete codeunits. `build/rebuild.log`, `build/ut-command.log`, `build/ut.log{,.manifest.json,.run.json,.results.jsonl}`. PostgreSQL is reachable; no test database was mutated. The two source migrations remain 0589, not a reason to remove tests.
 - Current four-family source declaration batch: 100 local cases/zero red, 146 toolchain tests/zero skipped. Original verified System package and pinned fixtures both pass 453 PlatformSource checks; nine source mutants/missing-package controls refuse. Compiler/runtime aliases use original IDs. Analysis remains red on inherited findings; no new diagnostics in the four touched headers/new gate. `build/platform-source-{tests,lint,generation,missing}.log`; 0034 owns complete native binding, 0013 owns populated-schema activation.
 - Fresh old/new generators against the same BCApps `6261b1c458` produce 24,375 byte-identical output files, zero gains/losses (`build/platform-source-comparison.json`). Both retain 80 UT codeunits/2,314 methods and refuse one unclassified RequiredTestIsolation declaration. Existing CodeunitDef retention is not runner-policy enforcement (0039); no baseline raised. Generated-tree changes versus the earlier image belong to the upstream refresh, not this compiler patch.
 - Latest frozen main `47f9a2b`, BCApps `6261b1c458`: `build/verify/20261002T112727Z-2478547/{result.json,verify.log}`. Terminal failed after 137 seconds; all/test/UT/census exit 2. Source/System hashes unchanged. Regeneration exposes two stale slice paths: UpgradeCompositeReportParts and AmountAutoFormatCurrency (0589). Native Page Table Field binding remains independently open (0034); this is not database connectivity.

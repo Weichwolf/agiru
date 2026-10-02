@@ -152,6 +152,9 @@ Use one editable development tree. Bundle coherent fixes and features, freeze th
 batch, compile/test it, inspect the results and repeat. Separate development worktrees
 are optional and require a concrete isolation need; keep them outside `build/`.
 Source copies under `build/` are frozen verification inputs, never development trees.
+Before a requested clean rebuild, stop or finish verification, preserve any unmerged
+source outside `build/`, then clear build artefacts and run the build and UT through
+Make. Record build refusals and every unexecuted UT; a clean directory is not a pass.
 Build/test results identify the frozen Git HEAD and content hashes; development may
 continue in the editable tree after freezing. On this six-core host, run at
 most one six-job integration build at a time; use two jobs for local gates while
