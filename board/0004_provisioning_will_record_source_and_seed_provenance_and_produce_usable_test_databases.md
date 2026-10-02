@@ -1,34 +1,22 @@
 # 0004 — Provisioning will record source and seed provenance and produce usable test databases
 
-Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-09-28
-Depends on: 0013 schema contract; 0589 reproducible inputs.
+Status: open | Priority: P1 | Reviewed: 2026-09-22
 
-## Evidence
+## Current evidence
 
-- Integrated scratch guards reject source/maintenance/template targets, unmarked databases, foreign owners, stale handles and identifier truncation. Acquisition is serialized in PostgreSQL. Clang: 80 local gate cases green; GCC: ConnectionInfo 16/16, ScratchGuard 18/18, RunnerDatabase 12/12. Legacy negative control: 4 red; all newly created fixture databases/roles were removed.
-- Changed-code analysis: 164/180 available units, 161 failed. New nullable-access and argument-identity findings were repaired; targeted RunnerDatabase/ScratchGuard checks now report only the pre-existing common Error.h finding. Full frozen integration of the scratch patch is pending; the live snapshot predates it.
-- `agiru_seeded`: template=true, connections allowed, no provenance row (2026-09-28 inspection). It supports a diagnostic rerun, not a sealed-seed A/B.
-- Read-only September 30 inspection: legacy User Personalization has nine columns, including wrongly stored User ID; complete symbols declare nineteen fields and five system fields. Correct declaration requires thirteen Normal columns plus five system fields; six lookups are not stored. Generic AddMissingColumns widens disposable clones, but does not validate old types/keys/defaults or remove the legacy FlowField column. Do not mutate or relabel the seed as complete.
-- `seed_demo.py` records building/complete identity and checks both transfer processes. `provision.sh` still ends with the obsolete transfer-not-implemented message.
+`BC_VERSION` is 28.4.53241.0. `scripts/provision.sh` claims it checks the source version but only runs three scripts and prints that transfer is not implemented. A seeded runner and import scripts already exist. Imported CRONUS schemas and the runner public schema are different layouts.
 
-## Implementation
+## Implementation for Sol
 
-1. Verify the integrated guards in the next frozen run. Preserve unique per-run names; do not adopt unmarked legacy databases. Canonical libpq keyword serialization replaces the effective database, including URI query overrides, without echoing credentials in parse errors.
-2. Build a fresh seed from immutable imported CRONUS data. Record BC_VERSION/checksum, BCApps revision, company, scope, schema hashes, unmapped columns and transfer counts; only zero-refusal completion may seal it.
-   Include System.app package identity/runtime/symbol hash separately from the demo version and BCApps commit. Validate field/enum/schema compatibility rather than assuming all version strings coincide.
-3. Support provenance inspection through maintenance metadata when template connections are disabled; clone only a complete sealed identity. Do not retrofit identity onto the legacy seed.
-4. Make provisioning resume by checked stages. Populate AllObj, Field and Page Metadata independently; an existing AllObj row must not skip the others. Record work-date policy.
-   Supply deployment tenant facts and the versioned platform feature catalogue through one provenance-bearing PostgreSQL authority. Do not guess tenant IDs from a database name, invent AAD identifiers, or seed every feature disabled. 0006 owns session selection, 0035 native setting signatures, 0034 declarations and 0044 virtual-table access; no second mutable configuration store.
+1. Record artefact version/checksum, BCApps commit and scope hash in database metadata. Compare schemas and publish unmapped columns explicitly; do not claim the artefact and current main are version-matched.
+2. Make provision orchestrate the actual download, restore, conversion, schema and seed steps with checked exit statuses. Keep imported data immutable and create disposable test clones.
+3. Remove early-return coupling between platform catalogue tables in ProvisionInstalled: an existing AllObj row must not prevent Field/Page Metadata from being repaired. Make each catalogue population idempotent.
+4. Derive the work date from documented seed policy and record it in run results. Keep test gate DSNs distinct from masters and refuse destructive operations on templates.
 
 ## Acceptance
 
-- Disposable fixtures: source=scratch, template target, unowned existing scratch and interrupted transfer refuse before mutation.
-- Two fresh clones share the sealed identity and schema/data checksums; interrupted provisioning cannot advertise completion; cleanup removes only run-owned databases.
+Provision twice, compare catalogue/data counts and identity, then clone and run a representative AL codeunit. Interrupt a transfer and prove restart does not advertise a complete seed. Check empty and partially populated catalogue tables.
 
 ## References
 
-Code: `scripts/{provision.sh,seed_demo.py,ut_milestone.py}`, `src/rt/{RunnerDatabase,Storage}.cpp`. Predecessor: WI-832 (held-open master), WI-847 (work date).
-
-Guard code: `include/runtime/ConnectionInfo.h`, `src/db/ConnectionInfo.cpp`, `test/gate/{ConnectionInfo,ScratchGuard,RunnerDatabase}Gate.cpp`. Ownership comment: `agiru.runner.v1.from.<source OID>` plus current PostgreSQL role and acquired target OID. Session lock: `hashtextextended('agiru.runner:' || name, 0)`; zero is the protocol seed, collisions only serialize unrelated names, connection closure releases the lock. This coordinates cooperating calls, not malicious privileged DDL. Physical source OID is not sealed seed/data provenance.
-
-PostgreSQL 17: [libpq connection parsing](https://www.postgresql.org/docs/17/libpq-connect.html), [database identities and owners](https://www.postgresql.org/docs/17/catalog-pg-database.html), [shared object comments](https://www.postgresql.org/docs/17/functions-info.html), [session advisory locks](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS).
+Repository: scripts/provision.sh, seed_demo.py, cronus_to_pg.py, pg_master.sh, src/rt/Storage.cpp::ProvisionInstalled, RunnerDatabase.cpp. AL: platform metadata consumers. Predecessor: WI-832 (master held open), WI-847 (demo working date).

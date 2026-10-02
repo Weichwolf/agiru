@@ -1,5 +1,5 @@
 #include "platform/RecordLink.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"

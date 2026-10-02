@@ -20,9 +20,10 @@ namespace agiru::detail {
 
 /// \brief What a record variable owns as its `xRec` -- a record of its own table, type erased.
 ///
-/// \note Record.Copy transfers filters and the image into independently owned state. Ordinary
-///       record assignment copies fields while leaving the destination state intact. Sharing an
-///       image would let changes through one variable affect another variable's xRec.
+/// \note IT OWNS AND IT CLONES. The state is copied whenever the record variable is
+///       (`Rec2 := Rec` takes the filters, and the image with them), so a shared pointer would
+///       give two variables one image and a write through one would be seen by the other. AL's
+///       `xRec` belongs to the variable.
 class HeldImage {
 public:
   /// \brief No image, which is what a record nobody has touched carries.
@@ -67,16 +68,15 @@ public:
   /// \brief Takes ownership of a record as this variable's image.
   /// \tparam Record The generated record type.
   /// \param record The record, which this now owns or copies into the existing image.
-  /// \warning Ownership transfers on entry, including when field assignment throws.
   template <typename Record> void Hold(Record *record) {
-    HeldImage incoming;
-    incoming.record_ = record;
-    incoming.ops_ = &kOps<Record>;
     if (record_ != nullptr && ops_ == &kOps<Record>) {
       ops_->assign(record_, record);
+      kOps<Record>.free(record);
       return;
     }
-    *this = std::move(incoming);
+    Reset();
+    record_ = record;
+    ops_ = &kOps<Record>;
   }
 
   /// \brief Copies another image into this one's stable address, or blanks it if absent.
@@ -90,8 +90,8 @@ public:
       ops_->assign(record_, o.record_);
       return;
     }
-    HeldImage copy(o);
-    *this = std::move(copy);
+    Reset();
+    Take(o);
   }
 
   /// \return The image, or `nullptr` when there is none.
@@ -138,10 +138,6 @@ private:
 ///        `Find Record Management` puts the "contains" search on `No.`, `Description` and the unit
 ///        of measure there at once (4 cases of Record Set UT found nothing, 2026-09-12).
 inline constexpr int kCrossColumnGroup = -1;
-
-/// \brief The highest selectable group; `record-filtergroup-method.md` says values above 255
-///        are ignored.
-inline constexpr int kMaximumFilterGroup = 255;
 
 /// \brief One field's filter, as the record variable carries it.
 struct FieldFilter {
@@ -453,21 +449,18 @@ public:
   ///       record invalidates the enumerator, and a temporary one's rows do not come across, so
   ///       those start unpositioned.
   /// \param o The other.
-  /// \warning A failed allocation or image assignment retains the destination's image owner
-  ///          and filter state. A throwing field assignment may partially change image fields.
   void CopyStateFrom(const StateHandle &o) {
     if (this == &o) { return; }
     TempHandle keep = state_ == nullptr ? TempHandle{} : state_->temporary;
     StateHandle copy(o);
-    if (keep != nullptr) { static_cast<void>(copy.Ensure()); }
-    if (state_ != nullptr && state_->image.Get() != nullptr) {
-      RecordState &prepared = copy.Ensure();
-      state_->image.SetFrom(prepared.image);
-      prepared.image = std::move(state_->image);
-    }
+    HeldImage retained = state_ == nullptr ? HeldImage{} : std::move(state_->image);
     Swap(copy);
-    if (state_ != nullptr || keep != nullptr) {
+    if (state_ != nullptr || keep != nullptr || retained.Get() != nullptr) {
       RecordState &mine = Ensure();
+      if (retained.Get() != nullptr) {
+        retained.SetFrom(mine.image);
+        mine.image = std::move(retained);
+      }
       const bool positioned = mine.positioned && mine.temporary == nullptr && keep == nullptr;
       mine.temporary = std::move(keep);
       mine.view.clear();

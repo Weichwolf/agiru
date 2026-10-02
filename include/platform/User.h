@@ -4,7 +4,6 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "platform/UserLicenseType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
@@ -32,6 +31,22 @@ enum class UserState : std::int32_t {
   Disabled = 1, ///< The user may not.
 };
 
+/// \brief The vocabulary of AL `User."License Type"` -- what a user counts as against the licence.
+///
+/// From the declaration, in the declared ORDER, which is what an ordinal comparison depends on.
+enum class UserLicenseType : std::int32_t {
+  FullUser = 0,              ///< A named user with the full application.
+  LimitedUser = 1,           ///< Restricted to three writable tables outside the free range.
+  DeviceOnlyUser = 2,        ///< Licensed per device rather than per person.
+  WindowsGroup = 3,          ///< A group, not a person: the members inherit it.
+  ExternalUser = 4,          ///< Signs in from outside the tenant.
+  ExternalAdministrator = 5, ///< A delegated administrator.
+  ExternalAccountant = 6,    ///< A delegated accountant.
+  Application = 7,           ///< A service principal rather than a person.
+  AADGroup = 8,              ///< An Entra group.
+  Agent = 9,                 ///< An agent acting on a user's behalf.
+};
+
 }
 
 /// \brief The vocabulary of AL `User.State`.
@@ -40,6 +55,23 @@ template <> struct agiru::OptionTraits<agiru::platform::UserState> {
   static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
       {.ordinal = 0, .name = "Enabled", .caption = "Enabled"},
       {.ordinal = 1, .name = "Disabled", .caption = "Disabled"},
+  }};
+};
+
+/// \brief The vocabulary of AL `User."License Type"`.
+template <> struct agiru::OptionTraits<agiru::platform::UserLicenseType> {
+  /// \brief The ten types, spelled as AL spells them.
+  static constexpr std::array<agiru::EnumValueDef, 10> kValues{{
+      {.ordinal = 0, .name = "Full User", .caption = "Full User"},
+      {.ordinal = 1, .name = "Limited User", .caption = "Limited User"},
+      {.ordinal = 2, .name = "Device Only User", .caption = "Device Only User"},
+      {.ordinal = 3, .name = "Windows Group", .caption = "Windows Group"},
+      {.ordinal = 4, .name = "External User", .caption = "External User"},
+      {.ordinal = 5, .name = "External Administrator", .caption = "External Administrator"},
+      {.ordinal = 6, .name = "External Accountant", .caption = "External Accountant"},
+      {.ordinal = 7, .name = "Application", .caption = "Application"},
+      {.ordinal = 8, .name = "AAD Group", .caption = "AAD Group"},
+      {.ordinal = 9, .name = "Agent", .caption = "Agent"},
   }};
 };
 
