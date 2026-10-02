@@ -1,7 +1,6 @@
 #pragma once
 
 #include "meta/Declare.h"
-#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/RecordState.h"
@@ -16,18 +15,14 @@
 #include <string_view>
 
 /// \file
-/// \brief The platform's `Privacy Notice Approval` table: who agreed to which notice.
-///
-/// \note IT HAS NO AL SOURCE; the columns are the demo database's
-///       (`system."Privacy Notice Approval"`: `ID`, `User SID`, `Approver User SID`, `Approved`),
-///       and the organisation-wide decision is the row whose `User SID` is the empty Guid. The
-///       field numbers are assigned here [SET].
+/// \brief System `Privacy Notice Approval`, from `PrivacyNoticeApproval.Table.al`.
+/// \note The source key retains both notice and user; an empty User SID is organization-wide.
 
 namespace agiru::platform {
 
 class PrivacyNoticeApproval_Table : public Table<PrivacyNoticeApproval_Table> {
 public:
-  static constexpr TableId kId{1561};
+  static constexpr TableId kId{2000000238};
   static constexpr std::string_view kName{"Privacy Notice Approval"};
   detail::StateHandle State_Block;
   static constexpr std::size_t kIdLength = 50;
@@ -59,17 +54,22 @@ public:
 using PrivacyNoticeApproval = PrivacyNoticeApproval_Table;
 
 inline constexpr std::array<FieldDef, 4> kPrivacyNoticeApprovalFields{{
-    Declare<&PrivacyNoticeApproval::ID>(
-        PrivacyNoticeApproval::Field_No::ID, "ID", "ID", offsetof(PrivacyNoticeApproval, ID)),
+    Declare<&PrivacyNoticeApproval::ID>(PrivacyNoticeApproval::Field_No::ID,
+                                        "ID",
+                                        "Privacy Notice ID",
+                                        offsetof(PrivacyNoticeApproval, ID),
+                                        Declared{.relation = "\"Privacy Notice\""}),
     Declare<&PrivacyNoticeApproval::UserSID>(PrivacyNoticeApproval::Field_No::UserSID,
                                              "User SID",
                                              "User SID",
-                                             offsetof(PrivacyNoticeApproval, UserSID)),
+                                             offsetof(PrivacyNoticeApproval, UserSID),
+                                             Declared{.relation = "User.\"User Security ID\""}),
     Declare<&PrivacyNoticeApproval::ApproverUserSID>(
         PrivacyNoticeApproval::Field_No::ApproverUserSID,
         "Approver User SID",
-        "Approver User SID",
-        offsetof(PrivacyNoticeApproval, ApproverUserSID)),
+        "Approver User ID",
+        offsetof(PrivacyNoticeApproval, ApproverUserSID),
+        Declared{.relation = "User.\"User Security ID\""}),
     Declare<&PrivacyNoticeApproval::Approved>(PrivacyNoticeApproval::Field_No::Approved,
                                               "Approved",
                                               "Approved",
@@ -87,6 +87,7 @@ inline constexpr TableDef kPrivacyNoticeApprovalTable{
     .fields = kPrivacyNoticeApprovalFields,
     .keys = kPrivacyNoticeApprovalKeys,
     .dataPerCompany = false,
+    .replicateData = false,
 };
 
 static_assert(FieldsAreSorted(kPrivacyNoticeApprovalTable),

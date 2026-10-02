@@ -815,17 +815,23 @@ std::string PageTypeOf(const al::PageObject &page) {
   return "Card";
 }
 
+std::string_view SourceDeclarationContract(const Objects &objects, const al::TableObject *source) {
+  if (source == nullptr) { return {}; }
+  const auto binding = objects.tables.find(std::to_string(source->id));
+  if (binding == objects.tables.end()) { return {}; }
+  return binding->second.declarationAssertions;
+}
+
 }
 
 std::string
 PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source) {
-  const std::string identifier = ClassName(Identifier(page.name), PageKind(page));
+  const std::string stem = PageIdentifier(page, objects);
+  const std::string identifier = ClassName(stem, PageKind(page));
   const std::string space = NamespaceOf(page.nameSpace);
-  const std::string prefix = "k" + Identifier(page.name) +
-                             (page.xmlport  ? "XmlPort"
-                              : page.report ? "Report"
-                                            : "");
-  std::string out = "namespace " + space + " {\n\n";
+  const std::string prefix = "k" + stem + (page.xmlport ? "XmlPort" : page.report ? "Report" : "");
+  std::string out{SourceDeclarationContract(objects, source)};
+  out += "namespace " + space + " {\n\n";
   int counter = 0;
   const std::string layout =
       ControlArrays(page.layout, prefix, prefix + "Layout", objects, source, counter, out);
@@ -1011,8 +1017,14 @@ std::vector<al::VarDecl> VariablesAside(const al::PageObject &page) {
   return aside;
 }
 
-std::string PageHeaderPath(const al::PageObject &object) {
-  return OutputDirectory(object.nameSpace, PageKind(object)) + "/" + Identifier(object.name) + ".h";
+std::string PageHeaderPath(const al::PageObject &object, std::string identifier) {
+  if (identifier.empty()) { identifier = Identifier(object.name); }
+  return OutputDirectory(object.nameSpace, PageKind(object)) + "/" + identifier + ".h";
+}
+
+std::string PageIdentifier(const al::PageObject &object, const Objects &objects) {
+  if (object.xmlport) { return OutputIdentifier(object.id, object.name, objects.xmlports); }
+  return Identifier(object.name);
 }
 
 ObjectKind PageKind(const al::PageObject &object) {
@@ -1430,7 +1442,7 @@ std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page,
 
 PageHeader
 WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
-  const std::string identifier = Identifier(object.name);
+  const std::string identifier = PageIdentifier(object, objects);
   const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object, objects);
   const std::string pageClass = ClassName(identifier, PageKind(object));
   const std::string controlsClass = identifier + (object.xmlport  ? "_XmlPort_Controls"

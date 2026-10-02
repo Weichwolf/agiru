@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cstddef>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -29,6 +30,24 @@ bool SameName(std::string_view a, std::string_view b) {
     if (Lower(a[i]) != Lower(b[i])) { return false; }
   }
   return true;
+}
+
+bool DefaultKeyField(const FieldDecl &field) {
+  const auto *fieldClass = Find(field.properties, "FieldClass");
+  if (fieldClass != nullptr) {
+    if (SameName(fieldClass->text, "FlowField") || SameName(fieldClass->text, "FlowFilter")) {
+      return false;
+    }
+    if (!SameName(fieldClass->text, "Normal")) {
+      throw std::runtime_error("unsupported default primary key field class: " + field.name + ": " +
+                               fieldClass->text);
+    }
+  }
+  const auto *timestamp = Find(field.properties, "SqlTimestamp");
+  const auto *obsolete = Find(field.properties, "ObsoleteState");
+  return !SameName(field.type, "Blob") &&
+         (timestamp == nullptr || !SameName(timestamp->text, "true")) &&
+         (obsolete == nullptr || !SameName(obsolete->text, "Removed"));
 }
 
 class Parser {
@@ -1239,6 +1258,39 @@ std::vector<std::string> ListValue(const Property &property) {
 
 TableObject ParseTable(std::string_view source) {
   return Parser(Tokenize(source)).ParseTable();
+}
+
+void EnsurePrimaryKey(TableObject &table) {
+  if (!table.keys.empty()) { return; }
+  const FieldDecl *first = nullptr;
+  for (const FieldDecl &field : table.fields) {
+    if (!DefaultKeyField(field)) { continue; }
+    if (first == nullptr || field.number < first->number) { first = &field; }
+  }
+  if (first == nullptr) {
+    throw std::runtime_error(
+        "AL0464: Could not determine a suitable default primary key for table '" + table.name +
+        "'. Specify a primary key for the table.");
+  }
+  constexpr auto types = std::to_array<std::string_view>({"Integer",
+                                                          "BigInteger",
+                                                          "Decimal",
+                                                          "Boolean",
+                                                          "Code",
+                                                          "Text",
+                                                          "Guid",
+                                                          "Date",
+                                                          "Time",
+                                                          "DateTime",
+                                                          "Duration",
+                                                          "Option",
+                                                          "Enum"});
+  if (!std::ranges::any_of(
+          types, [first](std::string_view type) { return SameName(first->type, type); })) {
+    throw std::runtime_error("unsupported default primary key field type: " + table.name + "." +
+                             first->name + ": " + first->type);
+  }
+  table.keys.push_back(KeyDecl{.name = first->name, .fields = {first->name}, .properties = {}});
 }
 
 CodeunitObject ParseCodeunit(std::string_view source) {
