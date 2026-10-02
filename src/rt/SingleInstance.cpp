@@ -1,55 +1,40 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/ErrorValue.h"
-#include "runtime/Session.h"
 
-#include "SessionState.h"
-
-#include <algorithm>
-#include <memory>
+#include <cstdint>
+#include <map>
 #include <utility>
 
 namespace agiru::detail {
 
-SessionState &SessionState::Current() {
-  Session &session = Session::Current();
-  if (session.state_ == nullptr) { session.state_ = std::make_unique<SessionState>(); }
-  return *session.state_;
+namespace {
+
+struct Single {
+  void *instance;
+  void (*free)(void *);
+};
+
+std::map<std::int32_t, Single> &Singles() {
+  thread_local std::map<std::int32_t, Single> singles;
+  return singles;
 }
 
-SessionState *SessionState::Peek() {
-  return Session::HasCurrent() ? Session::Current().state_.get() : nullptr;
-}
-
-void SessionState::ReleaseBindings(CodeunitId id, void *instance) noexcept {
-  if (!Session::HasCurrent()) { return; }
-  for (Session *session = &Session::Current(); session != nullptr; session = session->previous_) {
-    if (session->state_ == nullptr) { continue; }
-    std::erase_if(session->state_->bindings, [=](const Binding &held) noexcept {
-      return held.id == id && held.instance == instance;
-    });
-  }
 }
 
 void *SingleInstanceOf(CodeunitId id, void *(*make)(), void (*free)(void *)) {
-  auto &singles = SessionState::Current().singles;
-  auto found = singles.find(id);
+  std::map<std::int32_t, Single> &singles = Singles();
+  auto found = singles.find(id.Value());
   if (found == singles.end()) {
-    if (make == nullptr || free == nullptr) { throw Error("SingleInstance: invalid factory"); }
-    SessionState::OwnedInstance owned(make(), free);
-    if (owned == nullptr) { throw Error("SingleInstance: the factory returned no instance"); }
-    found = singles.emplace(id, std::move(owned)).first;
+    found = singles.emplace(id.Value(), Single{.instance = make(), .free = free}).first;
   }
-  return found->second.get();
-}
-
-void SessionState::ReleaseSingles() {
-  decltype(singles) released;
-  released.swap(singles);
+  return found->second.instance;
 }
 
 void ReleaseSingleInstances() {
-  if (SessionState *state = SessionState::Peek(); state != nullptr) { state->ReleaseSingles(); }
+  std::map<std::int32_t, Single> &singles = Singles();
+  std::map<std::int32_t, Single> released;
+  released.swap(singles);
+  for (auto &[id, single] : released) { single.free(single.instance); }
 }
 
 }

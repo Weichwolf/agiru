@@ -11,7 +11,7 @@
 #include <type_traits>
 
 /// \file
-/// \brief AL's Option -- ordinary dense ordinals or explicitly coded native ordinals.
+/// \brief AL's Option -- a zero-based enumerator carrying a name table.
 
 #include <string>
 
@@ -228,22 +228,13 @@ public:
   /// \brief The member table for that enumeration.
   using Traits = OptionTraits<E>;
 
-  /// \brief Ordinary options are dense; native options may declare sorted, nonnegative codes.
-  ///
-  /// `Field.Table.al` declares coded `Type` values. Only a vocabulary carrying
-  /// `kCodedOrdinals = true` accepts this exception; ordinary options retain their density check.
-  static_assert(
-      [] {
-        if constexpr (requires { Traits::kCodedOrdinals; }) {
-          if constexpr (Traits::kCodedOrdinals) {
-            return ValuesAreSorted(Traits::kValues) &&
-                   (Traits::kValues.empty() || Traits::kValues.front().ordinal >= 0);
-          }
-        }
-        return ValuesAreDense(Traits::kValues);
-      }(),
-      "ordinary options require dense ordinals; coded native options require sorted nonnegative "
-      "ordinals");
+  /// THE ZERO-BASED SEQUENTIAL PROMISE IS CHECKED, NOT TRUSTED. It is what lets this type resolve a
+  /// member by indexing where Enum has to search, so an option whose members are not the numbers
+  /// 0, 1, 2 ... is a translation error at compile time rather than a lookup that finds the wrong
+  /// member at run time.
+  static_assert(ValuesAreDense(std::span<const EnumValueDef>(Traits::kValues)),
+                "option-data-type.md: an Option is zero-based and sequential. A declaration that "
+                "is not belongs in an Enum");
 
   /// \brief The zero member.
   constexpr Option() = default;
@@ -396,19 +387,21 @@ public:
   [[nodiscard]] constexpr E Value() const { return static_cast<E>(AsInteger()); }
 
   /// \return True when the ordinal names one of the declared members.
-  [[nodiscard]] constexpr bool IsDeclared() const { return DeclaredValue_() != nullptr; }
+  [[nodiscard]] constexpr bool IsDeclared() const {
+    return AsInteger() >= 0 && static_cast<std::size_t>(AsInteger()) < Traits::kValues.size();
+  }
 
   /// \return The member name as AL spelled it, or empty when the ordinal is undeclared.
   [[nodiscard]] constexpr std::string_view Name() const {
-    const auto *value = DeclaredValue_();
-    return value != nullptr ? value->name : std::string_view{};
+    return IsDeclared() ? Traits::kValues[static_cast<std::size_t>(AsInteger())].name
+                        : std::string_view{};
   }
 
   /// \return The display caption, or empty when the ordinal is undeclared.
   /// \note `OptionCaption` may differ from `OptionMembers`, so both are carried and never one.
   [[nodiscard]] constexpr std::string_view Caption() const {
-    const auto *value = DeclaredValue_();
-    return value != nullptr ? value->caption : std::string_view{};
+    return IsDeclared() ? Traits::kValues[static_cast<std::size_t>(AsInteger())].caption
+                        : std::string_view{};
   }
 
   /// \brief Compares against a named member, the way AL writes `Type = Type::All`.
@@ -454,16 +447,6 @@ public:
   /// \return True when the ordinals are equal.
   template <std::same_as<Option> O> [[nodiscard]] constexpr bool operator==(const O &o) const {
     return AsInteger() == o.AsInteger();
-  }
-
-private:
-  [[nodiscard]] constexpr const EnumValueDef *DeclaredValue_() const {
-    if constexpr (ValuesAreDense(Traits::kValues)) {
-      return AsInteger() >= 0 && static_cast<std::size_t>(AsInteger()) < Traits::kValues.size()
-                 ? &Traits::kValues[static_cast<std::size_t>(AsInteger())]
-                 : nullptr;
-    }
-    return ValueOf(Traits::kValues, AsInteger());
   }
 };
 
