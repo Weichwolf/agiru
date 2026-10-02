@@ -2,6 +2,13 @@
 
 Review: 2026-09-28; latest shared filter-group runtime evidence: 2026-10-02. Repository text is English. Open outcomes only; no historical pass count is a current measurement.
 
+Build cleanup (2026-10-02): handwritten sources from 79 source copies are preserved in
+`archive/build-20261002/<relative-path-with-slashes-replaced-by-->`; standalone probes
+are in `archive/build-20261002/probes`. Old `build/` receipts, binaries and downloaded
+inputs are deleted, so references below are historical, not available current proof.
+Active native work: branch `work/native-field-metadata`, worktree
+`/home/cosmo/Git/agiru-worktrees/native-field-metadata`; not promoted to `main`.
+
 ## Release gates
 
 | Gate | Required outcome | Owner |
