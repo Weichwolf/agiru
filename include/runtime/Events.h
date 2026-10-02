@@ -2,7 +2,6 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
-#include "runtime/Subscriptions.h"
 
 #include <array>
 #include <cstddef>
@@ -56,9 +55,8 @@ struct Subscription {
 /// \brief A codeunit's subscriptions, registered at start-up the way `TestCatalogue` is.
 ///
 /// \note `EventSubscriberInstance = Manual` dispatches only to instances a `BindSubscription`
-///       registered for the session. `StaticAutomatic` shares a SingleInstance codeunit within
-///       its session; otherwise each subscriber invocation receives a fresh instance, disposed
-///       before dispatch proceeds or propagates an error.
+///       registered for the session; `StaticAutomatic` (the default) to one instance per session
+///       made on first dispatch.
 class SubscriptionCatalogue {
 public:
   /// \brief Registers the catalogue.
@@ -169,6 +167,18 @@ void RaiseIsolated(EventObject kind,
                    std::string_view event,
                    std::string_view element,
                    const EventArgs &args);
+
+/// \brief AL `BindSubscription(Codeunit)` for the session.
+/// \param id       The codeunit.
+/// \param instance The instance to dispatch to.
+/// \return False when that instance is already bound, or the codeunit has no subscriptions.
+bool BindSubscriptions(CodeunitId id, void *instance);
+
+/// \brief AL `UnbindSubscription(Codeunit)`.
+/// \param id       The codeunit.
+/// \param instance The instance.
+/// \return False when it was not bound.
+bool UnbindSubscriptions(CodeunitId id, void *instance);
 
 template <typename T, auto Method, typename... P>
 void CallBound(T &unit,
