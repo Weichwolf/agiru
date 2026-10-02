@@ -4,6 +4,7 @@
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
 #include "meta/TableDef.h"
+#include "runtime/Error.h"
 #include "runtime/RecordState.h"
 #include "runtime/Report.h"
 #include "type/Stream.h"

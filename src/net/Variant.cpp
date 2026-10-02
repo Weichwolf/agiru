@@ -1,6 +1,6 @@
 #include "type/Variant.h"
 
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 
 #include <cerrno>
 #include <cstdint>

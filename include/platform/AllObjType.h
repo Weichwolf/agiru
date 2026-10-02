@@ -8,13 +8,14 @@
 /// \file
 /// \brief The `Object Type` option of the platform's object tables, with BC's own ordinals.
 ///
-/// \note Names, captions and positions follow System.app's AllObj/AllObjWithCaption declarations
-///       (28.0.53152.0). Positions 2, 4, 12 and 13 have no AL option name.
-///       Legacy C++ enumerators preserve reserved ordinal identities, not invented AL names.
+/// \note THE FIRST ELEVEN ARE THE BASEAPP'S OWN WORDS: `Permission."Object Type"` declares
+///       `"Table Data","Table",,"Report",,"Codeunit","XMLport",MenuSuite,"Page","Query",System`,
+///       and the gaps at 2 and 4 are `Form` and `Dataport`, the C/SIDE kinds. The twelve that
+///       follow are the extension kinds in the order the platform numbers them [SET]; no AL in the
+///       read roots filters on one of them by ordinal.
 
 namespace agiru::platform {
 
-/// \brief Source ordinal identities shared by both object catalogues.
 enum class AllObjType : std::int32_t {
   TableData = 0,
   Table = 1,
@@ -43,15 +44,13 @@ enum class AllObjType : std::int32_t {
 
 }
 
-/// \brief Source option names and captions, including empty reserved positions.
 template <> struct agiru::OptionTraits<agiru::platform::AllObjType> {
-  /// \brief All 23 System-source positions in their declared order.
   static constexpr std::array<agiru::EnumValueDef, 23> kValues{{
       {.ordinal = 0, .name = "TableData", .caption = "TableData"},
       {.ordinal = 1, .name = "Table", .caption = "Table"},
-      {.ordinal = 2, .name = "", .caption = ""},
+      {.ordinal = 2, .name = "Form", .caption = "Form"},
       {.ordinal = 3, .name = "Report", .caption = "Report"},
-      {.ordinal = 4, .name = "", .caption = ""},
+      {.ordinal = 4, .name = "Dataport", .caption = "Dataport"},
       {.ordinal = 5, .name = "Codeunit", .caption = "Codeunit"},
       {.ordinal = 6, .name = "XMLport", .caption = "XMLport"},
       {.ordinal = 7, .name = "MenuSuite", .caption = "MenuSuite"},

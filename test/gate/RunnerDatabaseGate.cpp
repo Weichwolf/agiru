@@ -1,6 +1,6 @@
 #include "runtime/ConnectionInfo.h"
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/test/RunnerDatabase.h"
 
 #include "Check.h"
