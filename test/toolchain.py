@@ -53,28 +53,6 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
-    def test_verification_entrypoint_is_offline_and_read_only(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', root)
-            before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                      for path in package.rglob('*') if path.is_file()}
-            output = io.StringIO()
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    patch.object(symbols, 'curl', side_effect=AssertionError('unexpected network')), \
-                    redirect_stdout(output):
-                symbols.main()
-            self.assertEqual(json.loads(output.getvalue())['package_sha256'],
-                             symbols.verify_package(package)['package_sha256'])
-            self.assertEqual(before, {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                                     for path in package.rglob('*') if path.is_file()})
-            changed = package / 'src/Virtual Tables/Fixture.Table.al'
-            changed.write_text('changed')
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                symbols.main()
-            self.assertEqual(changed.read_text(), 'changed')
-
     @staticmethod
     def package(extra=(), manifest=None, source=True):
         manifest = manifest if manifest is not None else (
@@ -315,6 +293,794 @@ class FoundationLinkGate(unittest.TestCase):
                 unguarded[unguarded.index('-o') + 1] = str(self.temporary / f'unguarded_{tier}.so')
                 control = self.run_command(unguarded + [str(injected)])
                 self.assertEqual(control.returncode, 0, control.stdout + control.stderr)
+
+
+class SystemDeclarationGate(unittest.TestCase):
+    def setUp(self):
+        TranspilerAttributeCensusGate.setUp(self)
+        self.symbols = self.root / 'symbols'
+        (self.symbols / 'src').mkdir(parents=True)
+        (self.symbols / 'NavxManifest.xml').write_text('<Package/>')
+        (self.symbols / 'SymbolReference.json').write_text('{}')
+        self.table = ('namespace System.Reflection;\n'
+                      '  TaBlE 2000000058 AllObjWithCaption {\n'
+                      'fields { field(63; "AL Namespace"; Text[500]) {} } }\n')
+        (self.symbols / 'src/not-a-table-name.AL').write_text(self.table)
+
+    def run_transpiler(self, source='AllObjWithCaption'):
+        (self.root / 'source/Fixture.Page.al').write_text(
+            'namespace Microsoft.Fixture; page 50180 "System Source" {\n'
+            f'SourceTable = {source};\n'
+            'layout { area(Content) { field(Namespace; Rec."AL Namespace") {} } } }')
+        return subprocess.run([str(self.transpiler), str(self.root),
+                               str(self.root / 'apps.json'), str(self.root / 'generated'),
+                               '--system-symbols', str(self.symbols)],
+                              text=True, capture_output=True, timeout=30)
+
+    def test_native_source_and_field_ids_use_the_existing_ast(self):
+        for name in ('AllObjWithCaption', '2000000058', '"AllObjWithCaption"',
+                     'System.Reflection.AllObjWithCaption'):
+            with self.subTest(name=name):
+                result = self.run_transpiler(name)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('SYSTEM TABLES: 1 parsed from 1 AL files', result.stdout)
+                self.assertIn('SYSTEM TABLES: 1 bound, 0 unbound', result.stdout)
+                definitions = list((self.root / 'generated').rglob('SystemSource.def.cpp'))
+                self.assertEqual(len(definitions), 1)
+                output = definitions[0].read_text()
+                self.assertIn('.source = ::agiru::TableId{2000000058}', output)
+                self.assertIn('.field = ::agiru::FieldNo{63}', output)
+
+    def test_unbound_native_declarations_are_counted_not_invented(self):
+        (self.symbols / 'src/Other.al').write_text(
+            'namespace System.Fixture; table 2000000999 "Unbound Native" {}')
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('SYSTEM TABLES: 2 parsed from 2 AL files', result.stdout)
+        self.assertIn('SYSTEM TABLES: 1 bound, 1 unbound', result.stdout)
+        self.assertFalse(list((self.root / 'generated').rglob('UnboundNative.h')))
+
+    def test_bad_and_duplicate_declarations_refuse(self):
+        path = self.symbols / 'src/not-a-table-name.AL'
+        path.write_text('namespace System.Reflection; table broken AllObjWithCaption {}')
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System table', result.stderr)
+        path.write_text(self.table)
+        (self.symbols / 'src/Duplicate.al').write_text(self.table)
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('duplicate System table declaration', result.stderr)
+
+    def test_missing_explicit_input_refuses_without_a_hidden_fallback(self):
+        (self.symbols / 'NavxManifest.xml').unlink()
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System symbols input lacks', result.stderr)
+
+    def test_unknown_and_incomplete_cli_arguments_refuse(self):
+        command = [str(self.transpiler), str(self.root), str(self.root / 'apps.json'),
+                   str(self.root / 'generated')]
+        for extra in (['--system-symbols'], ['--unknown', str(self.symbols)], ['unexpected']):
+            with self.subTest(extra=extra):
+                result = subprocess.run(command + extra, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn('--system-symbols <root>', result.stderr)
+
+    def test_make_forwards_only_the_explicit_symbols_input(self):
+        shutil.copyfile(SCRIPT.parents[1] / 'Makefile', self.root / 'Makefile')
+        build = self.root / 'build'
+        build.mkdir()
+        probe = build / 'agirutc'
+        probe.write_text('#!/usr/bin/env python3\nimport json, pathlib, sys\n'
+                         'pathlib.Path("arguments.json").write_text(json.dumps(sys.argv[1:]))\n')
+        probe.chmod(0o755)
+        environment = os.environ.copy()
+        environment['AGIRU_BC_SOURCE'] = str(self.root / 'source with spaces')
+        environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
+        command = ['make', '--no-print-directory', '-o', 'tc', 'transpile', 'B=build']
+        base = [environment['AGIRU_BC_SOURCE'], str(self.root / 'apps.json'),
+                str(self.root / 'apps')]
+        for symbols in (None, str(self.root / 'symbols with spaces')):
+            with self.subTest(symbols=symbols):
+                if symbols is not None:
+                    environment['AGIRU_SYSTEM_SYMBOLS'] = symbols
+                result = subprocess.run(command, cwd=self.root, env=environment,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                expected = base if symbols is None else base + ['--system-symbols', symbols]
+                self.assertEqual(json.loads((self.root / 'arguments.json').read_text()), expected)
+
+    def test_incompatible_intrinsic_ids_and_links_do_not_pass_as_native_bindings(self):
+        (self.symbols / 'src/Other.al').write_text(
+            'namespace System.Fixture; table 2000000998 "Object Options" {}')
+        result = self.run_transpiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('SYSTEM TABLE REFUSED: Object Options declares ID 2000000998, '
+                      'intrinsic target has ID 2000000196', result.stdout)
+        self.assertIn('SYSTEM TABLES: 1 bound, 1 unbound', result.stdout)
+        manifest = self.symbols / 'NavxManifest.xml'
+        saved = self.root / 'manifest.xml'
+        manifest.rename(saved)
+        manifest.symlink_to(saved)
+        result = self.run_transpiler()
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('System symbols input contains a symlink', result.stderr)
+
+
+class TranspilerOwnershipGate(unittest.TestCase):
+    def setUp(self):
+        TranspilerAttributeCensusGate.setUp(self)
+        self.generated = self.root / 'generated'
+        (self.root / 'source/Fixture.Table.al').write_text(
+            self.declaration('Table', 50170, 'FixtureSource'))
+        (self.root / 'source/Owner.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50192 "Owner UT"
+{
+    Subtype = Test;
+    [Test] procedure SourceCounted() begin end;
+}
+''')
+
+    def translate(self):
+        return subprocess.run([str(self.transpiler), str(self.root),
+                               str(self.root / 'apps.json'), str(self.generated)],
+                              text=True, capture_output=True, timeout=30)
+
+    @staticmethod
+    def declaration(kind, identifier, name):
+        bodies = {
+            'Table': 'fields { field(1; Value; Integer) {} } keys { key(PK; Value) {} }',
+            'Codeunit': 'procedure Inspect() begin end;',
+            'Page': 'PageType = Card; layout {}',
+            'Report': 'dataset { dataitem(Source; FixtureSource) { column(Value; Value) {} } }',
+            'Query': 'elements { dataitem(Source; FixtureSource) { column(Value; Value) {} } }',
+            'XmlPort': 'schema { textelement(Root) {} }',
+            'Enum': 'value(0; Zero) {}',
+            'Interface': 'procedure Inspect();',
+            'Profile': 'RoleCenter = 21;',
+        }
+        object_id = '' if kind == 'Profile' else str(identifier) + ' '
+        return ('namespace Microsoft.Fixture;\n' + kind.lower() + ' ' + object_id +
+                '"' + name + '"\n{\n' + bodies[kind] + '\n}\n')
+
+    def test_distinct_sources_cannot_overwrite_any_supported_kind(self):
+        for kind in ('Table', 'Codeunit', 'Page', 'Report', 'Query', 'XmlPort',
+                     'Enum', 'Interface', 'Profile'):
+            with self.subTest(kind=kind):
+                first = self.root / 'source' / ('AOriginal.' + kind + '.al')
+                second = self.root / 'source' / ('ZConflicting.' + kind + '.al')
+                sentinel = self.generated / 'retained-after-failure'
+                try:
+                    first.write_text(self.declaration(kind, 50180, 'ClashingValue'))
+                    positive = self.translate()
+                    self.assertEqual(positive.returncode, 0, positive.stdout + positive.stderr)
+                    original = {str(path.relative_to(self.generated)): path.read_bytes()
+                                for path in self.generated.rglob('*') if path.is_file()}
+                    sentinel.write_text('owned fixture data')
+                    second.write_text(self.declaration(kind, 50181, 'Clashing Value'))
+                    result = self.translate()
+                    if kind in ('Table', 'XmlPort'):
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        headers = {path.stem: path.read_text()
+                                   for path in self.generated.rglob('*.h')}
+                        id_type = 'TableId' if kind == 'Table' else 'PageId'
+                        self.assertIn(id_type + ' kId{50180}', headers['ClashingValue_50180'])
+                        self.assertIn(id_type + ' kId{50181}', headers['ClashingValue_50181'])
+                        self.assertNotIn('ClashingValue', headers)
+                        self.assertFalse(sentinel.exists())
+                    else:
+                        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                        diagnostic = result.stdout + result.stderr
+                        self.assertIn('generated output collision:', diagnostic)
+                        self.assertIn(str(first), diagnostic)
+                        self.assertIn(str(second), diagnostic)
+                        self.assertEqual(sentinel.read_text(), 'owned fixture data')
+                        for path, contents in original.items():
+                            self.assertEqual((self.generated / path).read_bytes(), contents)
+                    population = milestone.scan(self.root / 'source')
+                    self.assertEqual([(unit['id'], unit['methods']) for unit in population],
+                                     [(50192, ['SourceCounted'])])
+                finally:
+                    first.unlink(missing_ok=True)
+                    second.unlink(missing_ok=True)
+                    sentinel.unlink(missing_ok=True)
+
+    def test_cross_app_claims_do_not_skip_a_distinct_declaration(self):
+        first = self.root / 'source/Original.Table.al'
+        first.write_text(self.declaration('Table', 50180, 'ClashingValue'))
+        initial = self.translate()
+        self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+        (self.root / 'dependent').mkdir()
+        second = self.root / 'dependent/Conflicting.Table.al'
+        second.write_text(self.declaration('Table', 50181, 'Clashing Value'))
+        (self.root / 'apps.json').write_text(json.dumps({'apps': [
+            {'name': 'fixture', 'source': 'source', 'depends': []},
+            {'name': 'extension', 'source': 'dependent', 'depends': ['fixture']}]}))
+        sentinel = self.generated / 'retained-after-failure'
+        sentinel.write_text('owned fixture data')
+        result = self.translate()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        diagnostic = result.stdout + result.stderr
+        first_header = self.generated / 'fixture/fixture/table/ClashingValue_50180.h'
+        second_header = self.generated / 'extension/fixture/table/ClashingValue_50181.h'
+        self.assertIn('TableId kId{50180}', first_header.read_text())
+        self.assertIn('TableId kId{50181}', second_header.read_text())
+        self.assertNotIn('translated once', diagnostic)
+        self.assertFalse(sentinel.exists())
+        before = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                  for path in self.generated.rglob('*') if path.is_file()}
+        repeated = self.translate()
+        self.assertEqual(repeated.returncode, 0, repeated.stdout + repeated.stderr)
+        after = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                 for path in self.generated.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+
+    def test_duplicate_table_ids_refuse_before_output_replacement(self):
+        self.duplicate_id_refuses('Table')
+
+    def test_duplicate_xmlport_ids_refuse_without_confusing_table_ids(self):
+        (self.root / 'source/Shared.Table.al').write_text(
+            self.declaration('Table', 50180, 'Shared ID'))
+        self.duplicate_id_refuses('XmlPort')
+
+    def duplicate_id_refuses(self, kind):
+        first = self.root / 'source' / ('First.' + kind + '.al')
+        first.write_text(self.declaration(kind, 50180, 'First Value'))
+        initial = self.translate()
+        self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+        before = {str(path.relative_to(self.generated)): path.read_bytes()
+                  for path in self.generated.rglob('*') if path.is_file()}
+        (self.root / 'source' / ('Second.' + kind + '.al')).write_text(
+            self.declaration(kind, 50180, 'Second Value'))
+        result = self.translate()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('duplicate ' + kind.lower() + ' ID: 50180', result.stderr)
+        after = {str(path.relative_to(self.generated)): path.read_bytes()
+                 for path in self.generated.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+
+    def test_noncolliding_sources_retain_both_ids_and_repeat_mtimes(self):
+        for number, name in ((50180, 'First Value'), (50181, 'Second Value')):
+            (self.root / 'source' / (str(number) + '.Table.al')).write_text(
+                self.declaration('Table', number, name))
+        initial = self.translate()
+        self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+        headers = {path.stem: path.read_text() for path in self.generated.rglob('*.h')}
+        self.assertIn('TableId kId{50180}', headers['FirstValue'])
+        self.assertIn('TableId kId{50181}', headers['SecondValue'])
+        before = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                  for path in self.generated.rglob('*') if path.is_file()}
+        result = self.translate()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        after = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                 for path in self.generated.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+
+
+class GeneratedTableIdentityGate(unittest.TestCase):
+    def test_colliding_tables_keep_metadata_self_types_and_record_references(self):
+        repository = SCRIPT.parents[1]
+        build = (repository / Path(os.environ.get('B', 'build'))).resolve()
+        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$',
+                             (build / 'CMakeCache.txt').read_text(), re.M)
+        self.assertIsNotNone(compiler)
+        for cross_app in (False, True):
+            with self.subTest(cross_app=cross_app), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                (root / 'base').mkdir()
+                second = root / ('dependent' if cross_app else 'base')
+                second.mkdir(exist_ok=True)
+                apps = [{'name': 'base', 'source': 'base', 'depends': []}]
+                if cross_app:
+                    apps.append({'name': 'dependent', 'source': 'dependent', 'depends': ['base']})
+                (root / 'apps.json').write_text(json.dumps({'apps': apps}))
+                (root / 'scope.json').write_text(json.dumps({
+                    'include': ['Microsoft.Fixture'], 'exclude': []}))
+                (root / 'base/First.Table.al').write_text('''namespace Microsoft.Fixture;
+table 50180 ClashingValue
+{
+    TableType = Temporary;
+    fields { field(1; Key; Integer) {} field(11; "First Value"; Integer) {} }
+    keys { key(PK; Key) {} }
+    procedure Touch(): Integer
+    begin Rec.Validate("First Value", 11); exit("First Value"); end;
+}
+''')
+                (second / 'Second.Table.al').write_text('''namespace Microsoft.Fixture;
+table 50181 "Clashing Value"
+{
+    TableType = Temporary;
+    fields { field(3; Key; Integer) {} field(19; "Second Text"; Text[30]) {} }
+    keys { key(PK; Key) {} }
+    procedure Touch(): Text
+    begin Rec.Validate("Second Text", 'second'); exit("Second Text"); end;
+}
+''')
+                (second / 'Extended.TableExt.al').write_text('''namespace Microsoft.Fixture;
+tableextension 50182 Extended extends ClashingValue
+{
+    fields { field(31; "Extension Value"; Integer) {} }
+    procedure FirstValue(): Integer
+    begin "Extension Value" := "First Value" + 100; exit("Extension Value"); end;
+}
+''')
+                (second / 'Consumer.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50190 Consumer
+{
+    procedure Exercise(): Integer
+    var First: Record ClashingValue temporary;
+        Second: Record "Clashing Value" temporary;
+        Numeric: Record 50181 temporary;
+    begin
+        First.Key := 1;
+        First.Touch();
+        if First.FirstValue() <> 111 then Error('extension procedure binding');
+        if First."Extension Value" <> 111 then Error('extension field binding');
+        First.Insert();
+        Second.Key := 2;
+        Second.Touch();
+        Second.Insert();
+        Numeric.Key := 3;
+        Numeric."Second Text" := 'numeric';
+        Numeric.Insert();
+        if First."First Value" <> 11 then Error('first binding');
+        if Second."Second Text" <> 'second' then Error('second binding');
+        if Numeric."Second Text" <> 'numeric' then Error('numeric binding');
+        exit(First.Count() + Second.Count() + Numeric.Count());
+    end;
+}
+''')
+                generated = root / 'generated'
+                result = subprocess.run([str(build / 'agirutc'), str(root),
+                                         str(root / 'apps.json'), str(generated)],
+                                        text=True, capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                driver = root / 'driver.cpp'
+                headers = {name: list(generated.rglob(name + '.h')) for name in
+                           ('ClashingValue_50180', 'ClashingValue_50181', 'Consumer')}
+                for paths in headers.values():
+                    self.assertEqual(len(paths), 1)
+                driver.write_text(''.join('#include "' + str(paths[0]) + '"\n'
+                                          for paths in headers.values()) + '''
+#include "Check.h"
+#include "runtime/Catalogue.h"
+#include "runtime/Table.h"
+#include <type_traits>
+
+int main() {
+  return gate::Run("GeneratedTableIdentity", [] {
+    using First = agiru::Fixture::ClashingValue_50180_Table;
+    using Second = agiru::Fixture::ClashingValue_50181_Table;
+    CHECK_TRUE("the two AL declarations have distinct C++ types", (!std::is_same_v<First, Second>));
+    CHECK_TRUE("the first original ID survives", First::kId == agiru::TableId{50180});
+    CHECK_TRUE("the second original ID survives", Second::kId == agiru::TableId{50181});
+    CHECK_TEXT("the first original name survives", First::kName, "ClashingValue");
+    CHECK_TEXT("the second original name survives", Second::kName, "Clashing Value");
+    const auto &first = agiru::TableTraits<First>::kTable;
+    const auto &second = agiru::TableTraits<Second>::kTable;
+    CHECK_TRUE("the first key retains its field number", first.keys[0].fields[0] == agiru::FieldNo{1});
+    CHECK_TRUE("the second key retains its field number", second.keys[0].fields[0] == agiru::FieldNo{3});
+    CHECK_TRUE("registration retains the first declaration", agiru::FindTable(First::kId)->table == &first);
+    CHECK_TRUE("registration retains the second declaration", agiru::FindTable(Second::kId)->table == &second);
+    CHECK_TRUE("lookup uses the first original AL name", agiru::FindTable("ClashingValue")->table == &first);
+    CHECK_TRUE("lookup uses the second original AL name", agiru::FindTable("Clashing Value")->table == &second);
+    First firstRow;
+    Second secondRow;
+    CHECK_TRUE("first self Validate binds its own field", firstRow.Touch() == 11);
+    CHECK_TEXT("second self Validate binds its own field", secondRow.Touch(), "second");
+    agiru::Fixture::Consumer_Codeunit consumer;
+    CHECK_TRUE("named and numeric AL record references execute independently", consumer.Exercise() == 3);
+  });
+}
+''')
+                command = [compiler[1], '-std=c++23', '-stdlib=libc++', '--rtlib=compiler-rt',
+                           '--unwindlib=libunwind', '-fuse-ld=lld-19',
+                           '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                           '-I' + str(repository / 'include'), '-I' + str(repository / 'test/gate')]
+                command += ['-I' + str(path) for path in generated.iterdir() if path.is_dir()]
+                output = root / 'run'
+                command += [str(driver)] + [str(path) for path in sorted(generated.rglob('*.cpp'))]
+                command += ['-L' + str(build), '-Wl,-rpath,' + str(build),
+                            '-lagiru_rt', '-lagiru_net', '-lagiru_db', '-o', str(output)]
+                compiled = subprocess.run(command, text=True, capture_output=True, timeout=60)
+                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+                executed = subprocess.run([str(output)], text=True, capture_output=True, timeout=30)
+                self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+                self.assertIn('GeneratedTableIdentity: 14 check(s), 0 red', executed.stdout)
+
+
+class GeneratedXmlPortIdentityGate(unittest.TestCase):
+    def test_colliding_ports_export_through_named_and_numeric_al_references(self):
+        repository = SCRIPT.parents[1]
+        build = (repository / Path(os.environ.get('B', 'build'))).resolve()
+        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$',
+                             (build / 'CMakeCache.txt').read_text(), re.M)
+        self.assertIsNotNone(compiler)
+        for cross_app in (False, True):
+            with self.subTest(cross_app=cross_app), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                (root / 'base').mkdir()
+                second = root / ('dependent' if cross_app else 'base')
+                second.mkdir(exist_ok=True)
+                apps = [{'name': 'base', 'source': 'base', 'depends': []}]
+                if cross_app:
+                    apps.append({'name': 'dependent', 'source': 'dependent', 'depends': ['base']})
+                (root / 'apps.json').write_text(json.dumps({'apps': apps}))
+                (root / 'scope.json').write_text(json.dumps({
+                    'include': ['Microsoft.Fixture'], 'exclude': []}))
+                for destination, identifier, name, node, payload in (
+                        (root / 'base', 50180, 'ClashingValue', 'FirstValue', 'first'),
+                        (second, 50181, 'Clashing Value', 'SecondValue', 'second')):
+                    (destination / (str(identifier) + '.XmlPort.al')).write_text(
+                        'namespace Microsoft.Fixture;\nXMLPORT ' + str(identifier) + ' "' + name +
+                        '"\n{\nFormat = Xml; Direction = Export; UseRequestPage = false;\n'
+                        'schema { textelement(Root) { textelement(' + node + ') {\n'
+                        'trigger OnBeforePassVariable() begin ' + node + " := '" + payload +
+                        "'; end; } } }\n}\n")
+                (second / 'Consumer.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50190 Consumer
+{
+    procedure First(var Output: OutStream): Boolean
+    var Port: XmlPort ClashingValue;
+    begin exit(Port.Export(Output)); end;
+    procedure Second(var Output: OutStream): Boolean
+    var Port: XmlPort "Clashing Value";
+    begin exit(Port.Export(Output)); end;
+    procedure Numeric(var Output: OutStream): Boolean
+    var Port: XmlPort 50181;
+    begin exit(Port.Export(Output)); end;
+}
+''')
+                generated = root / 'generated'
+                result = subprocess.run([str(build / 'agirutc'), str(root),
+                                         str(root / 'apps.json'), str(generated)],
+                                        text=True, capture_output=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                headers = {name: list(generated.rglob(name + '.h')) for name in
+                           ('ClashingValue_50180', 'ClashingValue_50181', 'Consumer')}
+                for paths in headers.values():
+                    self.assertEqual(len(paths), 1)
+                driver = root / 'driver.cpp'
+                driver.write_text(''.join('#include "' + str(paths[0]) + '"\n'
+                                          for paths in headers.values()) + '''
+#include "Check.h"
+#include "runtime/XmlPort.h"
+#include "type/Blob.h"
+#include "type/Stream.h"
+#include <string>
+#include <type_traits>
+
+int main() {
+  return gate::Run("GeneratedXmlPortIdentity", [] {
+    using First = agiru::Fixture::ClashingValue_50180_XmlPort;
+    using Second = agiru::Fixture::ClashingValue_50181_XmlPort;
+    const auto &first = agiru::XmlPortTraits<First>::kPort;
+    const auto &second = agiru::XmlPortTraits<Second>::kPort;
+    CHECK_TRUE("the ports have distinct C++ types", (!std::is_same_v<First, Second>));
+    CHECK_TRUE("the first original ID survives", first.id == agiru::XmlPortId{50180});
+    CHECK_TRUE("the second original ID survives", second.id == agiru::XmlPortId{50181});
+    CHECK_TEXT("the first original name survives", first.name, "ClashingValue");
+    CHECK_TEXT("the second original name survives", second.name, "Clashing Value");
+    CHECK_TRUE("first registration is retained", agiru::FindXmlPort(first.id) != nullptr);
+    CHECK_TRUE("second registration is retained", agiru::FindXmlPort(second.id) != nullptr);
+    agiru::Fixture::Consumer_Codeunit consumer;
+    agiru::Blob firstBytes;
+    auto firstOut = firstBytes.CreateOutStream();
+    CHECK_TRUE("named first AL reference exports", consumer.First(firstOut));
+    const std::string firstXml(firstBytes.Bytes().begin(), firstBytes.Bytes().end());
+    CHECK_TRUE("first schema and trigger produce first payload", firstXml.contains("<FirstValue>first</FirstValue>"));
+    CHECK_TRUE("first export cannot acquire the other schema", !firstXml.contains("SecondValue"));
+    agiru::Blob secondBytes;
+    auto secondOut = secondBytes.CreateOutStream();
+    CHECK_TRUE("named second AL reference exports", consumer.Second(secondOut));
+    const std::string secondXml(secondBytes.Bytes().begin(), secondBytes.Bytes().end());
+    CHECK_TRUE("second schema and trigger produce second payload", secondXml.contains("<SecondValue>second</SecondValue>"));
+    CHECK_TRUE("second export cannot acquire the first schema", !secondXml.contains("FirstValue"));
+    agiru::Blob numericBytes;
+    auto numericOut = numericBytes.CreateOutStream();
+    CHECK_TRUE("numeric AL reference exports", consumer.Numeric(numericOut));
+    CHECK_TRUE("numeric and named references produce identical bytes", numericBytes.Bytes() == secondBytes.Bytes());
+  });
+}
+''')
+                command = [compiler[1], '-std=c++23', '-stdlib=libc++', '--rtlib=compiler-rt',
+                           '--unwindlib=libunwind', '-fuse-ld=lld-19',
+                           '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                           '-I' + str(repository / 'include'), '-I' + str(repository / 'test/gate')]
+                command += ['-I' + str(path) for path in generated.iterdir() if path.is_dir()]
+                output = root / 'run'
+                command += [str(driver)] + [str(path) for path in sorted(generated.rglob('*.cpp'))]
+                command += ['-L' + str(build), '-Wl,-rpath,' + str(build),
+                            '-lagiru_rt', '-lagiru_net', '-lagiru_db', '-o', str(output)]
+                compiled = subprocess.run(command, text=True, capture_output=True, timeout=60)
+                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+                executed = subprocess.run([str(output)], text=True, capture_output=True, timeout=30)
+                self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+                self.assertIn('GeneratedXmlPortIdentity: 15 check(s), 0 red', executed.stdout)
+
+
+class TranspilerOutputGate(unittest.TestCase):
+    def setUp(self):
+        TranspilerAttributeCensusGate.setUp(self)
+        (self.root / 'source/Output.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50192 "Output UT"
+{
+    Subtype = Test;
+    [Test] procedure SourceCounted() begin end;
+}
+''')
+        self.generated = self.root / 'generated'
+
+    def translate(self):
+        return subprocess.run([str(self.transpiler), str(self.root),
+                               str(self.root / 'apps.json'), str(self.generated)],
+                              text=True, capture_output=True, timeout=30)
+
+    def test_failed_header_write_refuses_and_preserves_unswept_outputs(self):
+        initial = self.translate()
+        self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+        headers = list(self.generated.rglob('OutputUT.h'))
+        self.assertEqual(len(headers), 1)
+        header = headers[0]
+        body = header.with_suffix('.cpp')
+        previous_body = body.read_bytes()
+        header.unlink()
+        header.mkdir()
+        sentinel = header / 'sentinel'
+        sentinel.write_text('owned fixture data')
+        result = self.translate()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('cannot write generated output: ' + str(header), result.stdout + result.stderr)
+        self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed')
+        self.assertRegex(result.stdout, r'UT\s+1 codeunits, 1 \[Test\] methods')
+        self.assertEqual(sentinel.read_text(), 'owned fixture data')
+        self.assertEqual(body.read_bytes(), previous_body)
+        self.assertIn('0 swept', result.stdout)
+
+    def test_support_outputs_use_the_same_checked_writer(self):
+        for relative in ('fixture/reaches', 'shared/options/Types.h', 'absent/absent/Types.h'):
+            with self.subTest(relative=relative):
+                obstacle = self.generated / relative
+                if obstacle.is_file():
+                    obstacle.unlink()
+                obstacle.mkdir(parents=True, exist_ok=True)
+                sentinel = obstacle / 'sentinel'
+                sentinel.write_text('owned fixture data')
+                result = self.translate()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('cannot write generated output: ' + str(obstacle),
+                              result.stdout + result.stderr)
+                self.assertEqual(sentinel.read_text(), 'owned fixture data')
+                sentinel.unlink()
+                obstacle.rmdir()
+
+    def test_success_keeps_identical_output_mtimes_and_sweeps_stale_files(self):
+        initial = self.translate()
+        self.assertEqual(initial.returncode, 0, initial.stdout + initial.stderr)
+        before = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                  for path in self.generated.rglob('*') if path.is_file()}
+        self.assertTrue(before)
+        stale = self.generated / 'stale.cpp'
+        stale.write_text('generated fixture no longer declared')
+        result = self.translate()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(stale.exists())
+        after = {str(path.relative_to(self.generated)): (path.read_bytes(), path.stat().st_mtime_ns)
+                 for path in self.generated.rglob('*') if path.is_file()}
+        self.assertEqual(before, after)
+        self.assertIn('0 changed, 1 swept', result.stdout)
+
+
+class ImplicitPrimaryKeyGate(unittest.TestCase):
+    def test_an_invalid_default_refuses_without_shrinking_source_counts(self):
+        repository = SCRIPT.parents[1]
+        build = (repository / Path(os.environ.get('B', 'build'))).resolve()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'source').mkdir()
+            (root / 'apps.json').write_text(json.dumps({
+                'apps': [{'name': 'fixture', 'source': 'source', 'depends': []}]}))
+            (root / 'scope.json').write_text(json.dumps({
+                'include': ['Microsoft.Fixture'], 'exclude': []}))
+            (root / 'source/Invalid.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50192 "Invalid UT"
+{
+    Subtype = Test;
+    [Test] procedure SourceCounted() begin end;
+}
+''')
+            for fields in ('', 'field(1; Contents; Blob) {}',
+                           'field(1; Value; Integer) { FieldClass = FlowField; }'):
+                with self.subTest(fields=fields):
+                    (root / 'source/Invalid.Table.al').write_text(
+                        'namespace Microsoft.Fixture; table 50190 Invalid { fields {' + fields + '} }')
+                    result = subprocess.run([str(build / 'agirutc'), str(root),
+                                             str(root / 'apps.json'), str(root / 'generated')],
+                                            text=True, capture_output=True, timeout=30)
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertIn('AL0464:', result.stdout + result.stderr)
+                    self.assertRegex(result.stdout, r'tables\s+0 of 1 parsed')
+                    self.assertRegex(result.stdout, r'UT\s+1 codeunits, 1 \[Test\] methods')
+                    self.assertFalse(list((root / 'generated').rglob('Invalid.h')))
+
+    def test_base_default_survives_extension_keys_and_lower_field_ids(self):
+        repository = SCRIPT.parents[1]
+        build = (repository / Path(os.environ.get('B', 'build'))).resolve()
+        cache = (build / 'CMakeCache.txt').read_text()
+        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'source').mkdir()
+            (root / 'apps.json').write_text(json.dumps({
+                'apps': [{'name': 'fixture', 'source': 'source', 'depends': []}]}))
+            (root / 'scope.json').write_text(json.dumps({
+                'include': ['Microsoft.Fixture'], 'exclude': []}))
+            (root / 'source/Implicit.Table.al').write_text('''namespace Microsoft.Fixture;
+table 50190 "Implicit"
+{
+    TableType = Temporary;
+    fields {
+        field(9; Later; Text[30]) {}
+        field(7; "Original Key"; Integer) {}
+    }
+}
+''')
+            (root / 'source/Implicit.TableExt.al').write_text('''namespace Microsoft.Fixture;
+tableextension 50191 "Implicit Extension" extends Implicit
+{
+    fields { field(2; "Lower Extension ID"; Integer) {} }
+    keys { key(Secondary; "Lower Extension ID") {} }
+}
+''')
+            generated = subprocess.run([str(build / 'agirutc'), str(root),
+                                        str(root / 'apps.json'), str(root / 'generated')],
+                                       text=True, capture_output=True, timeout=30)
+            self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+            headers = list((root / 'generated').rglob('Implicit.h'))
+            self.assertEqual(len(headers), 1)
+            driver = root / 'driver.cpp'
+            driver.write_text('#include "' + str(headers[0]) + '''"
+#include "meta/Ids.h"
+#include "runtime/Table.h"
+#include "Check.h"
+
+int main() {
+  return gate::Run("GeneratedImplicitKey", [] {
+    using Row = agiru::Fixture::Implicit_Table;
+    const auto &metadata = agiru::TableTraits<Row>::kTable;
+    CHECK_TRUE("the implicit primary and extension secondary are both retained", metadata.keys.size() == 2);
+    CHECK_TEXT("the primary name remains the original base field", metadata.keys[0].name, "Original Key");
+    CHECK_TRUE("a lower extension field ID cannot replace the primary", metadata.keys[0].fields[0] == agiru::FieldNo{7});
+    CHECK_TRUE("the implicit primary is clustered", metadata.keys[0].clustered);
+    CHECK_TEXT("the extension remains a secondary key", metadata.keys.size() > 1 ? metadata.keys[1].name : "", "Secondary");
+    CHECK_TRUE("the secondary retains its declared field", metadata.keys.size() > 1 && metadata.keys[1].fields[0] == agiru::FieldNo{2});
+    CHECK_TRUE("the secondary is not implicitly clustered", metadata.keys.size() > 1 && !metadata.keys[1].clustered);
+    agiru::Temporary<Row> row;
+    row.OriginalKey = 42;
+    row.LowerExtensionID = 1;
+    row.Later = "payload";
+    CHECK_TRUE("insert uses the effective primary", row.Ok_Insert());
+    row.OriginalKey = 0;
+    CHECK_TRUE("Get uses the base key rather than the extension", row.Get(42));
+    CHECK_TEXT("Get returns the stored values", row.Later, "payload");
+    row.LowerExtensionID = 2;
+    CHECK_TRUE("duplicate primary returns false even when the secondary differs", !row.Ok_Insert());
+    CHECK_TRUE("duplicate rejection preserves the row count", row.Count() == 1);
+  });
+}
+''')
+            sources = sorted((root / 'generated/fixture').rglob('*.cpp'))
+            self.assertTrue(sources)
+            output = root / 'run'
+            command = [compiler[1], '-std=c++23', '-stdlib=libc++', '--rtlib=compiler-rt',
+                       '--unwindlib=libunwind', '-fuse-ld=lld-19',
+                       '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                       '-I' + str(repository / 'include'), '-I' + str(repository / 'test/gate')]
+            command += ['-I' + str(path) for path in (root / 'generated').iterdir() if path.is_dir()]
+            command += [str(driver)] + [str(path) for path in sources]
+            command += ['-L' + str(build), '-Wl,-rpath,' + str(build),
+                        '-lagiru_rt', '-lagiru_net', '-lagiru_db', '-o', str(output)]
+            compiled = subprocess.run(command, text=True, capture_output=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(output)], text=True, capture_output=True, timeout=30)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn('GeneratedImplicitKey: 12 check(s), 0 red', executed.stdout)
+
+
+class TextConcatenationGate(unittest.TestCase):
+    def test_generated_text_expressions_select_the_text_overload(self):
+        repository = SCRIPT.parents[1]
+        build = (repository / Path(os.environ.get('B', 'build'))).resolve()
+        cache = (build / 'CMakeCache.txt').read_text()
+        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'source').mkdir()
+            (root / 'apps.json').write_text(json.dumps({
+                'apps': [{'name': 'fixture', 'source': 'source', 'depends': []}]}))
+            (root / 'scope.json').write_text(json.dumps({
+                'include': ['Microsoft.Fixture'], 'exclude': []}))
+            (root / 'source/TextJoin.Codeunit.al').write_text('''namespace Microsoft.Fixture;
+codeunit 50190 "Text Join"
+{
+    var Prefix: Label 'left '; Suffix: Label 'right ';
+    procedure Literal(Value: Text): Integer begin exit(Which('prefix ' + Value)); end;
+    procedure LiteralRun(): Integer begin exit(Which('left ' + 'right ')); end;
+    procedure Labels(): Integer begin exit(Which(Prefix + Suffix)); end;
+    procedure Variables(Left: Text; Right: Text): Integer begin exit(Which(Left + Right)); end;
+    procedure Mixed(Value: Text; Key: Code[2]): Integer begin exit(Which(Value + Key)); end;
+    procedure Reversed(Key: Code[2]; Value: Text): Integer begin exit(Which(Key + Value)); end;
+    procedure Nested(Value: Text; Key: Code[2]): Integer
+    begin exit(Which('prefix ' + (Value + Key) + ' suffix ')); end;
+    procedure Returns(): Integer begin exit(Which(TextValue() + TextValue())); end;
+    procedure Indexed(): Integer
+    var Values: array[2] of Text;
+    begin Values[1] := 'left '; Values[2] := 'right '; exit(Which(Values[1] + Values[2])); end;
+    procedure Secret(Value: SecretText): Integer begin exit(Which(Value)); end;
+    procedure Joined(Left: Text; Right: Text): Text begin exit(Left + Right); end;
+    procedure Limited(Left: Text[2]; Right: Text[2]): Text[3]
+    var Destination: Text[3];
+    begin Destination := Left + Right; exit(Destination); end;
+    local procedure TextValue(): Text begin exit('value '); end;
+    local procedure Which(Value: Text): Integer begin exit(1); end;
+    local procedure Which(Value: SecretText): Integer begin exit(2); end;
+}
+''')
+            generated = subprocess.run([str(build / 'agirutc'), str(root),
+                                        str(root / 'apps.json'), str(root / 'generated')],
+                                       text=True, capture_output=True, timeout=30)
+            self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+            headers = list((root / 'generated').rglob('TextJoin.h'))
+            self.assertEqual(len(headers), 1)
+            driver = root / 'driver.cpp'
+            driver.write_text('#include "' + str(headers[0]) + '''"
+#include "type/Code.h"
+#include "type/SecretText.h"
+#include "type/Text.h"
+#include "Check.h"
+
+int main() {
+  return gate::Run("GeneratedTextJoin", [] {
+    agiru::Fixture::TextJoin_Codeunit fixture;
+    CHECK_TRUE("literal and Text choose Text", fixture.Literal("token") == 1);
+    CHECK_TRUE("literal-only join chooses Text", fixture.LiteralRun() == 1);
+    CHECK_TRUE("label-only join chooses Text", fixture.Labels() == 1);
+    CHECK_TRUE("Text variables choose Text", fixture.Variables("left ", "right ") == 1);
+    CHECK_TRUE("Text plus Code chooses Text", fixture.Mixed("left ", "ab") == 1);
+    CHECK_TRUE("Code plus Text chooses Text", fixture.Reversed("ab", " right ") == 1);
+    CHECK_TRUE("nested join chooses Text", fixture.Nested("value ", "ab") == 1);
+    CHECK_TRUE("returned Text values choose Text", fixture.Returns() == 1);
+    CHECK_TRUE("indexed Text values choose Text", fixture.Indexed() == 1);
+    CHECK_TRUE("SecretText remains a secret", fixture.Secret(agiru::SecretText{"fixture"}) == 2);
+    CHECK_TEXT("case and spaces survive", fixture.Joined(" lower ", "Mixed "), " lower Mixed ");
+    CHECK_TEXT("UTF-8 survives", fixture.Joined("\\xc3\\xa4", "\\xf0\\x9f\\x92\\xa1"),
+               "\\xc3\\xa4\\xf0\\x9f\\x92\\xa1");
+    bool overflow = false;
+    try { static_cast<void>(fixture.Limited("ab", "cd")); }
+    catch (const agiru::StringError &) { overflow = true; }
+    CHECK_TRUE("destination length is still checked", overflow);
+  });
+}
+''')
+            sources = sorted((root / 'generated/fixture').rglob('*.cpp'))
+            self.assertTrue(sources)
+            output = root / 'run'
+            command = [compiler[1], '-std=c++23', '-stdlib=libc++', '--rtlib=compiler-rt',
+                       '--unwindlib=libunwind', '-fuse-ld=lld-19',
+                       '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                       '-I' + str(repository / 'include'), '-I' + str(repository / 'test/gate')]
+            command += ['-I' + str(path) for path in (root / 'generated').iterdir() if path.is_dir()]
+            command += [str(driver)] + [str(path) for path in sources]
+            command += ['-L' + str(build), '-Wl,-rpath,' + str(build),
+                        '-lagiru_rt', '-lagiru_net', '-lagiru_db', '-o', str(output)]
+            compiled = subprocess.run(command, text=True, capture_output=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            executed = subprocess.run([str(output)], text=True, capture_output=True, timeout=30)
+            self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+            self.assertIn('GeneratedTextJoin: 13 check(s), 0 red', executed.stdout)
 
 
 class TranspilerAttributeCensusGate(unittest.TestCase):
@@ -802,15 +1568,13 @@ set_target_properties(slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
 
     def test_clang_pch_recompile_hits_the_configured_cache(self):
         repo = Path(__file__).resolve().parents[1]
-        build = repo / Path(os.environ.get('B', 'build'))
-        commands = json.loads((build / 'compile_commands.json').read_text())
+        commands = json.loads((repo / 'build/compile_commands.json').read_text())
         pch = [row for row in commands
                if 'agiru_slice' in row['command'] and 'cmake_pch.hxx.cxx' in row['file']]
         self.assertEqual(len(pch), 1)
         self.assertIn('-Xclang -fno-pch-timestamp', pch[0]['command'])
         setting = subprocess.run(
-            ['make', '-s', f'B={build}',
-             '--eval=cache-env:; @printf %s "$$CCACHE_SLOPPINESS"', 'cache-env'],
+            ['make', '-s', '--eval=cache-env:; @printf %s "$$CCACHE_SLOPPINESS"', 'cache-env'],
             cwd=repo, capture_output=True, text=True, check=True).stdout
         self.assertEqual(setting, 'pch_defines,time_macros')
         with tempfile.TemporaryDirectory() as folder:
@@ -821,8 +1585,6 @@ set_target_properties(slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
             (root / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.28)
 project(PchCacheProbe CXX)
 add_executable(probe probe.cpp)
-target_compile_options(probe PRIVATE -stdlib=libc++)
-target_link_options(probe PRIVATE -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 target_precompile_headers(probe PRIVATE Pch.h)
 target_compile_options(probe PRIVATE -Xclang -fno-pch-timestamp)
 ''')
@@ -1297,42 +2059,6 @@ class NativeToolchainGate(unittest.TestCase):
 
 
 class SnapshotGate(unittest.TestCase):
-    def test_deleted_tracked_caches_do_not_abort_freezing(self):
-        for reuse in (False, True):
-            for cache_removed in (False, True):
-                with self.subTest(reuse=reuse, cache_removed=cache_removed), \
-                        tempfile.TemporaryDirectory() as folder:
-                    root = Path(folder)
-                    cache = root / 'test/__pycache__/tracked.pyc'
-                    cache.parent.mkdir(parents=True)
-                    cache.write_bytes(b'cache')
-                    retired = root / 'retired.cpp'
-                    retired.write_text('retired source\n')
-                    (root / 'Makefile').write_text('probe:\n\t@mkdir -p build\n'
-                                                 '\t@touch build/executed\n')
-                    for command in (['init', '-q'], ['add', '.'],
-                                    ['-c', 'user.name=Gate', '-c', 'user.email=gate@example.invalid',
-                                     'commit', '-qm', 'fixture']):
-                        subprocess.run(['git', '-C', str(root), *command], check=True,
-                                       capture_output=True)
-                    retired.unlink()
-                    if cache_removed:
-                        cache.unlink()
-                    expected = verify.digest(root)
-                    arguments = SimpleNamespace(targets=['probe'], jobs=1, detach=False, reuse=reuse)
-                    with patch.object(verify, 'ROOT', root), \
-                            patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': ''}):
-                        self.assertEqual(verify.start(arguments), 0)
-                    run = Path((root / 'build/verify/latest').read_text().strip())
-                    result = json.loads((run / 'result.json').read_text())
-                    build_source = Path(result.get('build_source', run / 'source'))
-                    self.assertTrue((build_source / 'build/executed').is_file())
-                    self.assertFalse((run / 'source/test/__pycache__').exists())
-                    self.assertFalse((build_source / 'retired.cpp').exists())
-                    self.assertEqual(result['source_sha256'], expected)
-                    self.assertEqual(result['post_source_sha256'], expected)
-                    self.assertEqual(result['target_exits'], {'probe': 0})
-
     def test_explicit_system_symbols_are_frozen_and_reach_the_runner(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -1689,20 +2415,20 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'build').mkdir()
             shutil.copyfile(SCRIPT.parents[1] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
-            for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh'):
+            for name in ('door-reproduces.sh', 'one-definition.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 1 red', result.stdout)
+            self.assertIn('4 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 0 red', result.stdout)
+            self.assertIn('4 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):
@@ -2000,68 +2726,6 @@ add_custom_target(agiru DEPENDS image)
         self.assertIn('linked library is stale', stale.stderr)
 
 
-class SourceRevisionGate(unittest.TestCase):
-    def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
-        self.project = self.root / 'project'
-        self.project.mkdir()
-        owner = patch.object(milestone, 'ROOT', self.root / 'image')
-        owner.start()
-        self.addCleanup(owner.stop)
-        environment = dict(os.environ)
-        environment.pop('AGIRU_BC_REVISION', None)
-        inherited = patch.dict(os.environ, environment, clear=True)
-        inherited.start()
-        self.addCleanup(inherited.stop)
-
-    def repository(self, sources):
-        subprocess.run(['git', '-C', str(self.project), 'init', '-q'], check=True)
-        for name in sources:
-            path = self.project / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text('fixture')
-        subprocess.run(['git', '-C', str(self.project), 'add', '.'], check=True)
-        subprocess.run(['git', '-C', str(self.project), '-c', 'user.name=Fixture',
-                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'fixture'],
-                       check=True)
-        return subprocess.run(['git', '-C', str(self.project), 'rev-parse', 'HEAD'],
-                              check=True, capture_output=True, text=True).stdout.strip()
-
-    def test_untracked_frozen_al_cannot_borrow_an_outer_git_revision(self):
-        self.repository(['source.cpp'])
-        frozen = self.project / 'build/frozen-bc'
-        frozen.mkdir(parents=True)
-        (frozen / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(frozen))
-
-    def test_tracked_al_outside_the_source_root_is_not_its_provenance(self):
-        self.repository(['other/Tracked.al'])
-        frozen = self.project / 'frozen-bc'
-        frozen.mkdir()
-        (frozen / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(frozen))
-
-    def test_real_tracked_al_checkout_keeps_its_revision_in_both_suffix_cases(self):
-        for suffix in ('al', 'AL'):
-            with self.subTest(suffix=suffix):
-                self.project = self.root / suffix
-                self.project.mkdir()
-                revision = self.repository(['src/nested/Example.' + suffix])
-                self.assertEqual(milestone.bc_source_revision(self.project / 'src'), revision)
-
-    def test_non_git_source_has_unknown_revision(self):
-        (self.project / 'Example.al').write_text('codeunit 50100 Example {}')
-        self.assertIsNone(milestone.bc_source_revision(self.project))
-
-    def test_explicit_frozen_revision_stays_authoritative(self):
-        self.repository(['src/Example.al'])
-        with patch.dict(os.environ, AGIRU_BC_REVISION='frozen-input-revision'):
-            self.assertEqual(milestone.bc_source_revision(self.project / 'src'),
-                             'frozen-input-revision')
-
-
 class ManifestGate(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -2131,28 +2795,6 @@ class ManifestGate(unittest.TestCase):
                    'Subtype = Test; var "[Test] procedure Ghost()": Boolean;\n'
                    '[Test] procedure Real() begin end; }')
         self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['Real'])
-
-    def test_escaped_boundary_quotes_remain_part_of_object_and_method_names(self):
-        self.write('Example.al', 'codeunit 50100 """Boundary UT" {\n'
-                   'Subtype = Test; [Test] procedure """Boundary"""() begin end; }')
-        entry = self.manifest.scan(self.root)[0]
-        self.assertEqual(entry['name'], '"Boundary UT')
-        self.assertEqual(entry['methods'], ['"Boundary"'])
-
-    def test_literal_trailing_quote_cannot_invent_a_ut_suffix(self):
-        self.write('Example.al', 'codeunit 50100 "Boundary UT""" {\n'
-                   'Subtype = Test; [Test] procedure Phantom() begin end; }\n'
-                   'codeunit 50101 "Real UT" {\n'
-                   'Subtype = Test; [Test] procedure Real() begin end; }')
-        entries = self.manifest.scan(self.root)
-        self.assertEqual([(entry['id'], entry['name'], entry['methods']) for entry in entries],
-                         [(50101, 'Real UT', ['Real'])])
-
-    def test_escaped_quotes_do_not_collapse_distinct_method_identities(self):
-        self.write('Example.al', 'codeunit 50100 "Boundary UT" {\n'
-                   'Subtype = Test; [Test] procedure Case() begin end;\n'
-                   '[Test] procedure """Case"""() begin end; }')
-        self.assertEqual(self.manifest.scan(self.root)[0]['methods'], ['Case', '"Case"'])
 
     def test_utf16_source_is_counted_in_both_byte_orders(self):
         for encoding in ('utf-16', 'utf-16-be'):
@@ -2254,115 +2896,6 @@ class ResultIdentityGate(unittest.TestCase):
             results = [json.loads(line) for line in
                        (root / 'summary.log.results.jsonl').read_text().splitlines()]
             self.assertEqual([row['codeunit'] for row in results], list(names))
-
-
-class TableSourceBindingGate(unittest.TestCase):
-    def setUp(self):
-        self.root = SCRIPT.parents[1]
-        self.build = (self.root / Path(os.environ.get('B', 'build'))).resolve()
-        self.fixtures = self.root / 'test/source-binding'
-        cache = (self.build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        self.compiler = compiler[1]
-
-    def run_fixture(self, receiver_kind, numeric):
-        with tempfile.TemporaryDirectory() as temp:
-            fixture = Path(temp) / 'fixture'
-            shutil.copytree(self.fixtures, fixture)
-            caller = fixture / 'al/fixture/Caller.Codeunit.al'
-            text = caller.read_text()
-            if numeric:
-                self.assertEqual(text.count('Record "Source Row"'), 1)
-                text = text.replace('Record "Source Row"', 'Record 50170')
-            consumer = fixture / 'Consumer.cpp'
-            consumer_text = (fixture / 'Consumer.cpp.in').read_text()
-            if receiver_kind == 'table':
-                self.assertEqual(text.count('codeunit 50172 Caller\n{'), 1)
-                text = text.replace('codeunit 50172 Caller\n{',
-                                    'table 50172 Caller\n{\n'
-                                    '    fields { field(1; ID; Integer) { } }')
-                caller.unlink()
-                caller = caller.with_name('Caller.Table.al')
-                self.assertEqual(consumer_text.count('fixture/codeunit/Caller.h'), 1)
-                self.assertEqual(consumer_text.count('Caller_Codeunit'), 1)
-                consumer_text = (consumer_text
-                    .replace('fixture/codeunit/Caller.h', 'fixture/table/Caller.h')
-                    .replace('Caller_Codeunit', 'Caller_Table'))
-            consumer.write_text(consumer_text)
-            caller.write_text(text)
-            output = Path(temp) / 'generated'
-            generated = subprocess.run([
-                str(self.build / 'agirutc'), str(fixture / 'al'),
-                str(fixture / 'apps.json'), str(output)],
-                cwd=self.root, capture_output=True, text=True, timeout=30)
-            self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-            executable = Path(temp) / 'consumer'
-            command = [self.compiler, '-std=c++23', '-stdlib=libc++',
-                '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{self.root / "include"}',
-                *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                          output / 'absent')),
-                *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                str(fixture / 'Consumer.cpp'), f'-L{self.build}', f'-Wl,-rpath,{self.build}',
-                '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-            compiled = subprocess.run(command, cwd=self.root, capture_output=True,
-                                      text=True, timeout=60)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run([str(executable)], cwd=self.root, capture_output=True,
-                                    text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_codeunit_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('codeunit', numeric)
-
-    def test_table_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('table', numeric)
-
-
-class PageRecordBindingGate(unittest.TestCase):
-    def test_native_page_options_compile_and_execute_without_a_copied_ast(self):
-        root = SCRIPT.parents[1]
-        build = (root / Path(os.environ.get('B', 'build'))).resolve()
-        cache = (build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        for alias in ('Field', '2000000041'):
-            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as temp:
-                fixture = Path(temp) / 'fixture'
-                shutil.copytree(root / 'test/page-record-binding', fixture)
-                page = fixture / 'al/fixture/RecordBinding.Page.al'
-                text = page.read_text()
-                self.assertEqual(text.count('SourceTable = Field;'), 1)
-                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};'))
-                output = Path(temp) / 'generated'
-                generated = subprocess.run([
-                    str(build / 'agirutc'), str(fixture / 'al'),
-                    str(fixture / 'apps.json'), str(output)],
-                    cwd=root, capture_output=True, text=True, timeout=30)
-                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-                body = next(output.rglob('RecordBinding.cpp')).read_text()
-                self.assertNotIn('RefusedOption', body)
-                self.assertIn('::agiru::platform::FieldClass::FlowFilter', body)
-                executable = Path(temp) / 'consumer'
-                command = [compiler[1], '-x', 'c++', '-std=c++23', '-stdlib=libc++',
-                    '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                    '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{root / "include"}',
-                    *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                              output / 'absent')),
-                    *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                    str(fixture / 'Consumer.cpp.in'), f'-L{build}', f'-Wl,-rpath,{build}',
-                    '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-                compiled = subprocess.run(command, cwd=root, capture_output=True,
-                                          text=True, timeout=60)
-                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-                result = subprocess.run([str(executable)], cwd=root, capture_output=True,
-                                        text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':

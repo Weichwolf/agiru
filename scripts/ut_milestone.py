@@ -48,11 +48,6 @@ def bc_source_revision(path):
         return frozen
     if path.resolve().is_relative_to(ROOT):
         return None
-    tracked = subprocess.run(['git', '-C', str(path), 'ls-files', '-z', '--', '.'],
-                             capture_output=True, check=False)
-    if tracked.returncode != 0 or not any(
-            name.lower().endswith(b'.al') for name in tracked.stdout.split(b'\0')):
-        return None
     return source_revision(path)
 
 

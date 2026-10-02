@@ -34,13 +34,6 @@
 
 namespace agiru {
 
-void RequireTableProvider(const TableDef &table) {
-  if (!table.providerRefusal.empty()) {
-    throw Error("table " + std::string(table.name) + " (" + std::to_string(table.id.Value()) +
-                "): " + std::string(table.providerRefusal));
-  }
-}
-
 namespace {
 
 std::string Quoted(std::string_view identifier) {
@@ -165,7 +158,6 @@ void EnsureSequences(const Connection &connection, const TableDef &table) {
 }
 
 void CreateTable(const Connection &connection, const TableDef &table) {
-  RequireTableProvider(table);
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
   bool written = false;
   for (const FieldDef &field : table.fields) {
@@ -206,7 +198,6 @@ void CreateTable(const Connection &connection, const TableDef &table) {
 }
 
 void DropTable(const Connection &connection, const TableDef &table) {
-  RequireTableProvider(table);
   connection.Run("DROP TABLE IF EXISTS " + Quoted(table.name));
   for (const FieldDef &field : table.fields) {
     if (!detail::DrawsFromSequence(field)) { continue; }
@@ -250,7 +241,6 @@ std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
 bool InsertRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> values) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Insert: the value count does not match the declaration");
   }
@@ -270,7 +260,6 @@ bool InsertRow(const Connection &connection,
 std::optional<FieldValues> GetRow(const Connection &connection,
                                   const TableDef &table,
                                   std::span<const std::optional<std::string>> key) {
-  RequireTableProvider(table);
   const std::string columns = StoredColumns(table);
   const Result result = connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) +
                                                " WHERE " + KeyPredicate(table, 1),
@@ -283,7 +272,6 @@ std::optional<FieldValues> GetRowWhere(const Connection &connection,
                                        const TableDef &table,
                                        const FieldDef &column,
                                        std::string_view value) {
-  RequireTableProvider(table);
   const std::string columns = StoredColumns(table);
   const std::optional<std::string> bound{std::string(value)};
   const Result result =
@@ -346,7 +334,6 @@ std::optional<FieldValues> Updated(const Connection &connection,
 std::optional<FieldValues> ModifyRow(const Connection &connection,
                                      const TableDef &table,
                                      std::span<const std::optional<std::string>> values) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Modify: the value count does not match the declaration");
   }
@@ -364,7 +351,6 @@ std::optional<FieldValues> RenameRow(const Connection &connection,
                                      const TableDef &table,
                                      std::span<const std::optional<std::string>> values,
                                      std::span<const std::optional<std::string>> oldKey) {
-  RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Rename: the value count does not match the declaration");
   }
@@ -379,7 +365,6 @@ std::optional<FieldValues> RenameRow(const Connection &connection,
 bool DeleteRow(const Connection &connection,
                const TableDef &table,
                std::span<const std::optional<std::string>> key) {
-  RequireTableProvider(table);
   const Result result = connection.Execute("DELETE FROM " + Quoted(table.name) + " WHERE " +
                                                KeyPredicate(table, 1) + " RETURNING 1",
                                            key);
@@ -429,9 +414,7 @@ std::size_t AddMissingColumns(const Connection &into, const TableDef &table) {
 
 }
 
-namespace {
-
-void ProvisionSchema(const Connection &into) {
+void ProvisionInstalled(const Connection &into) {
   const Result standing =
       into.Execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
   std::set<std::string> there;
@@ -442,11 +425,6 @@ void ProvisionSchema(const Connection &into) {
   std::size_t made = 0;
   std::size_t widened = 0;
   for (const TableEntry *entry : InstalledTables()) {
-    if (!entry->table->providerRefusal.empty()) {
-      std::println(
-          "TABLE PROVIDER REFUSED: {}: {}", entry->table->name, entry->table->providerRefusal);
-      continue;
-    }
     if (there.contains(std::string(entry->table->name))) {
       widened += AddMissingColumns(into, *entry->table);
       EnsureSequences(into, *entry->table);
@@ -459,12 +437,6 @@ void ProvisionSchema(const Connection &into) {
   if (widened != 0) {
     std::println("{} column(s) added to platform tables the database already had", widened);
   }
-}
-
-}
-
-void ProvisionInstalled(const Connection &into) {
-  ProvisionSchema(into);
   if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
   const std::string_view company = Session::Current().CompanyName();
   if (!company.empty()) {
@@ -622,21 +594,15 @@ void ProvisionInstalled(const Connection &into) {
     row.Name = entry->table->name;
     row.Caption = entry->table->caption.empty() ? entry->table->name : entry->table->caption;
     row.ObsoleteState = platform::TableMetadataObsoleteState::No;
-    row.TableType = [type = entry->table->tableType] {
-      switch (type) {
-        case TableType::Normal: return platform::TableMetadataTableType::Normal;
-        case TableType::CRM: return platform::TableMetadataTableType::CRM;
-        case TableType::CDS: return platform::TableMetadataTableType::CDS;
-        case TableType::ExternalSQL: return platform::TableMetadataTableType::ExternalSQL;
-        case TableType::Exchange: return platform::TableMetadataTableType::Exchange;
-        case TableType::MicrosoftGraph: return platform::TableMetadataTableType::MicrosoftGraph;
-        case TableType::Temporary: return platform::TableMetadataTableType::Temporary;
-      }
-      return platform::TableMetadataTableType::Normal;
-    }();
+    const auto type = platform::TableMetadataTypeOf(entry->table->tableType);
+    if (!type.has_value()) {
+      throw Error("Table Metadata: no source-backed TableType mapping for " +
+                  std::string(entry->table->name));
+    }
+    row.TableType = *type;
     row.DataPerCompany = entry->table->dataPerCompany;
     row.LookupPageID = entry->table->lookupPageId.Value();
-    row.DrillDownPageID = entry->table->drillDownPageId.Value();
+    row.DrillDownPageId = entry->table->drillDownPageId.Value();
     row.Insert();
     ++tables;
   }
@@ -662,32 +628,11 @@ void ProvisionInstalled(const Connection &into) {
     row.ID = entry->page->id.Value();
     row.Name = entry->page->name;
     row.Caption = entry->page->caption.empty() ? entry->page->name : entry->page->caption;
-    row.PageType = [type = entry->page->type] {
-      switch (type) {
-        case PageType::Card: return platform::PageMetadataPageType::Card;
-        case PageType::List: return platform::PageMetadataPageType::List;
-        case PageType::RoleCenter: return platform::PageMetadataPageType::RoleCenter;
-        case PageType::CardPart: return platform::PageMetadataPageType::CardPart;
-        case PageType::ListPart: return platform::PageMetadataPageType::ListPart;
-        case PageType::Document: return platform::PageMetadataPageType::Document;
-        case PageType::Worksheet: return platform::PageMetadataPageType::Worksheet;
-        case PageType::ListPlus: return platform::PageMetadataPageType::ListPlus;
-        case PageType::ConfirmationDialog:
-          return platform::PageMetadataPageType::ConfirmationDialog;
-        case PageType::NavigatePage: return platform::PageMetadataPageType::NavigatePage;
-        case PageType::StandardDialog: return platform::PageMetadataPageType::StandardDialog;
-        case PageType::Api: return platform::PageMetadataPageType::Api;
-        case PageType::ReportPreview: return platform::PageMetadataPageType::ReportPreview;
-        case PageType::ReportProcessingOnly:
-          return platform::PageMetadataPageType::ReportProcessingOnly;
-        case PageType::HeadlinePart: return platform::PageMetadataPageType::HeadlinePart;
-        case PageType::PromptDialog: return platform::PageMetadataPageType::PromptDialog;
-        case PageType::UserControlHost: return platform::PageMetadataPageType::UserControlHost;
-        case PageType::XmlPort:
-        case PageType::ConfigurationDialog: return platform::PageMetadataPageType::Card;
-      }
-      return platform::PageMetadataPageType::Card;
-    }();
+    const auto type = platform::PageMetadataTypeOf(entry->page->type);
+    if (!type.has_value()) {
+      throw Error("Storage: Page Metadata has no declared option for this PageType");
+    }
+    row.PageType = *type;
     row.SourceTable = entry->page->source.Value();
     row.CardPageID = entry->page->cardPageId.Value();
     row.SourceTableTemporary = entry->page->sourceTableTemporary;

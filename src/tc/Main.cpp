@@ -3,6 +3,7 @@
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
+#include "Lexer.h"
 #include "Names.h"
 #include "PageWriter.h"
 #include "Parser.h"
@@ -10,6 +11,7 @@
 #include "Refused.h"
 #include "Scope.h"
 #include "TableWriter.h"
+#include "Token.h"
 
 #include <algorithm>
 #include <array>
@@ -47,6 +49,7 @@ struct Failure {
 
 std::string Read(const std::filesystem::path &path) {
   const std::ifstream file(path);
+  if (!file) { throw std::runtime_error("cannot read " + path.string()); }
   std::ostringstream text;
   text << file.rdbuf();
   return text.str();
@@ -125,11 +128,20 @@ void Cluster(const std::vector<Failure> &failures) {
   }
 }
 
+int ReportFailures(const std::vector<Failure> &failures, const std::vector<Failure> &refusals) {
+  Cluster(failures);
+  if (!refusals.empty()) {
+    std::println("");
+    std::println("refused   what parses and cannot be written yet");
+    Cluster(refusals);
+  }
+  return failures.empty() && refusals.empty() ? 0 : 1;
+}
+
 struct Run {
   const agiru::gen::TranspileScope *scope = nullptr;
   std::filesystem::path sourceRoot;
-  std::map<std::string, std::string> *symbols = nullptr;
-  std::vector<std::string> *collisions = nullptr;
+  std::map<std::string, std::string> *outputSources = nullptr;
   std::filesystem::path root;
   std::filesystem::path output;
   std::vector<Failure> failures;
@@ -214,7 +226,11 @@ std::map<std::string, std::size_t> UntranslatedKinds(const Run &run) {
 struct Output {
   std::filesystem::path directory;
   std::string relative;
+  std::string source = {};
 };
+
+constexpr auto kOptionsHeader = "shared/options/Types.h";
+constexpr auto kAbsentHeader = "absent/absent/Types.h";
 
 bool WriteFile(const Output &where, const std::string &text) {
   const std::filesystem::path path = where.directory / where.relative;
@@ -227,6 +243,8 @@ bool WriteFile(const Output &where, const std::string &text) {
   std::filesystem::create_directories(path.parent_path());
   std::ofstream file(path, std::ios::binary);
   file << text;
+  file.close();
+  if (!file) { throw std::runtime_error("cannot write generated output: " + path.string()); }
   return true;
 }
 
@@ -234,18 +252,17 @@ struct Job {
   std::filesystem::path source;
   std::filesystem::path output;
   std::filesystem::path apps;
+  std::filesystem::path systemSymbols;
 };
 
 void Keep(Run &run, const Output &where, const std::string &text) {
-  if (run.symbols != nullptr) {
-    const std::string mine = where.directory.filename().string();
-    const auto [held, isNew] = run.symbols->try_emplace(where.relative, mine);
+  if (where.source.empty()) { throw std::runtime_error("generated output has no source owner"); }
+  if (run.outputSources != nullptr) {
+    const std::string mine = (run.root / where.source).lexically_normal().string();
+    const auto [held, isNew] = run.outputSources->try_emplace(where.relative, mine);
     if (!isNew && held->second != mine) {
-      if (run.collisions != nullptr && where.relative.ends_with(".h")) {
-        run.collisions->push_back(where.relative + " is declared by " + held->second + " and by " +
-                                  mine);
-      }
-      return;
+      throw std::runtime_error("generated output collision: " + where.relative + " is owned by " +
+                               held->second + " and by " + mine);
     }
   }
   if (WriteFile(where, text)) { ++run.changed; }
@@ -940,7 +957,8 @@ void WriteInterfaces(Run &run,
          Output{.directory = run.output,
                 .relative = agiru::gen::OutputDirectory(kept.objects[i].nameSpace,
                                                         agiru::gen::ObjectKind::Interface) +
-                            "/" + identifier + ".h"},
+                            "/" + identifier + ".h",
+                .source = kept.paths[i]},
          written.text);
     ++run.written;
   }
@@ -1285,7 +1303,9 @@ const agiru::al::TableObject *SourceOf(const agiru::al::PageObject &page,
                                        const TableByName &tables) {
   const agiru::al::Property *source = agiru::al::Find(page.properties, "SourceTable");
   if (source == nullptr) { return nullptr; }
-  const auto found = tables.find(agiru::gen::LowerKey(source->text));
+  std::string name;
+  for (const agiru::al::Token &token : source->value) { name += token.text; }
+  const auto found = tables.find(agiru::gen::LowerKey(name));
   return found == tables.end() ? nullptr : found->second;
 }
 
@@ -1304,19 +1324,22 @@ void WritePages(Run &run,
     CheckNormal(pages.objects[i], "page", false, gathered.refused);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
-    const std::filesystem::path header = agiru::gen::PageHeaderPath(pages.objects[i]);
-    Keep(run, Output{.directory = run.output, .relative = header}, written.text);
+    const std::filesystem::path header = agiru::gen::PageHeaderPath(
+        pages.objects[i], agiru::gen::PageIdentifier(pages.objects[i], objects));
+    Keep(run,
+         Output{.directory = run.output, .relative = header, .source = pages.paths[i]},
+         written.text);
     ++run.written;
     std::filesystem::path body = header;
     body.replace_extension(".cpp");
     Keep(run,
-         Output{.directory = run.output, .relative = body},
+         Output{.directory = run.output, .relative = body, .source = pages.paths[i]},
          agiru::gen::WriteSource(
              pages.objects[i], pages.paths[i], objects, SourceOf(pages.objects[i], tables)));
     std::filesystem::path definitions = header;
     definitions.replace_extension(".def.cpp");
     Keep(run,
-         Output{.directory = run.output, .relative = definitions},
+         Output{.directory = run.output, .relative = definitions, .source = pages.paths[i]},
          agiru::gen::WriteDefinitions(
              pages.objects[i], pages.paths[i], objects, SourceOf(pages.objects[i], tables)));
     run.written += 2;
@@ -1413,7 +1436,8 @@ void WriteEnumExtensions(Run &run,
       if (source.empty()) { continue; }
       Keep(run,
            Output{.directory = run.output,
-                  .relative = agiru::gen::EnumExtensionSourcePath(extension)},
+                  .relative = agiru::gen::EnumExtensionSourcePath(extension),
+                  .source = owner->second.path},
            source);
       ++run.written;
       for (const std::string &key : registered) { foreign.pending.erase(key); }
@@ -1426,13 +1450,17 @@ void WriteEnums(Run &run, const Enums &held, const agiru::gen::Objects &objects)
   if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < held.objects.size(); ++i) {
     Keep(run,
-         Output{.directory = run.output, .relative = agiru::gen::EnumHeaderPath(held.objects[i])},
+         Output{.directory = run.output,
+                .relative = agiru::gen::EnumHeaderPath(held.objects[i]),
+                .source = held.paths[i]},
          agiru::gen::WriteEnum(held.objects[i], held.paths[i], objects));
     ++run.written;
     const std::string source = agiru::gen::WriteEnumSource(held.objects[i], held.paths[i], objects);
     if (source.empty()) { continue; }
     Keep(run,
-         Output{.directory = run.output, .relative = agiru::gen::EnumSourcePath(held.objects[i])},
+         Output{.directory = run.output,
+                .relative = agiru::gen::EnumSourcePath(held.objects[i]),
+                .source = held.paths[i]},
          source);
     ++run.written;
   }
@@ -1469,9 +1497,9 @@ std::set<std::string> DeclaredTryFunctions(std::string_view source) {
   return tried;
 }
 
-std::string TableHeaderPath(const agiru::al::TableObject &table) {
+std::string TableHeaderPath(const agiru::al::TableObject &table, const std::string &identifier) {
   return agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
-         agiru::gen::Identifier(table.name) + ".h";
+         identifier + ".h";
 }
 
 void WriteTable(Run &run,
@@ -1483,7 +1511,7 @@ void WriteTable(Run &run,
                 std::map<std::string, std::size_t> &unresolved) {
   const std::string stem =
       agiru::gen::OutputDirectory(table.nameSpace, agiru::gen::ObjectKind::Table) + "/" +
-      agiru::gen::Identifier(table.name);
+      agiru::gen::TableIdentifier(table, objects);
   const agiru::gen::TableHeader header = agiru::gen::WriteHeader(table, relative, index, objects);
   Absorb(gathered.refused, agiru::gen::Refused(table));
   CountAttributes(table, gathered.attributes, gathered.deprecatedScopes);
@@ -1493,12 +1521,14 @@ void WriteTable(Run &run,
   Absorb(gathered.dotnet, header.dotnet);
   Absorb(gathered.absent, header.absent);
   for (const std::string &missing : header.unresolvedEnums) { ++unresolved[missing]; }
-  Keep(run, Output{.directory = run.output, .relative = stem + ".h"}, header.text);
   Keep(run,
-       Output{.directory = run.output, .relative = stem + ".cpp"},
+       Output{.directory = run.output, .relative = stem + ".h", .source = relative},
+       header.text);
+  Keep(run,
+       Output{.directory = run.output, .relative = stem + ".cpp", .source = relative},
        agiru::gen::WriteSource(table, relative, objects));
   Keep(run,
-       Output{.directory = run.output, .relative = stem + ".def.cpp"},
+       Output{.directory = run.output, .relative = stem + ".def.cpp", .source = relative},
        agiru::gen::WriteDefinitions(table, relative, objects));
   run.written += 2;
 }
@@ -1508,17 +1538,104 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
-void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
-  for (const agiru::al::TableObject &table : tables.objects) {
-    const agiru::gen::TableRef ref =
-        agiru::gen::BindTable(table,
-                              "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
-                                  agiru::gen::ClassName(agiru::gen::Identifier(table.name),
-                                                        agiru::gen::ObjectKind::Table),
-                              TableHeaderPath(table));
-    objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
-    objects.tables.insert_or_assign(std::to_string(table.id), ref);
+std::vector<std::filesystem::path> SystemSources(const std::filesystem::path &root) {
+  for (const auto &path :
+       {root, root / "src", root / "NavxManifest.xml", root / "SymbolReference.json"}) {
+    if (std::filesystem::is_symlink(path)) {
+      throw std::runtime_error("System symbols input contains a symlink");
+    }
   }
+  if (!std::filesystem::is_regular_file(root / "NavxManifest.xml") ||
+      !std::filesystem::is_regular_file(root / "SymbolReference.json") ||
+      !std::filesystem::is_directory(root / "src")) {
+    throw std::runtime_error("System symbols input lacks its manifest, reference or AL sources");
+  }
+  std::vector<std::filesystem::path> paths;
+  for (const auto &entry : std::filesystem::recursive_directory_iterator(root / "src")) {
+    if (entry.is_symlink()) { throw std::runtime_error("System symbols input contains a symlink"); }
+    if (entry.is_regular_file() &&
+        agiru::gen::LowerKey(entry.path().extension().string()) == ".al") {
+      paths.push_back(entry.path());
+    }
+  }
+  std::ranges::sort(paths);
+  return paths;
+}
+
+bool DeclaresSystemTable(std::string_view source) {
+  const std::vector<agiru::al::Token> tokens = agiru::al::Tokenize(source);
+  std::size_t at = 0;
+  while (at < tokens.size()) {
+    if (tokens[at].kind == agiru::al::TokenKind::Directive) {
+      ++at;
+      continue;
+    }
+    if (!agiru::al::IsKeyword(tokens[at], "namespace") &&
+        !agiru::al::IsKeyword(tokens[at], "using")) {
+      break;
+    }
+    while (at < tokens.size() && !agiru::al::IsPunctuation(tokens[at], ";")) { ++at; }
+    if (at < tokens.size()) { ++at; }
+  }
+  return at < tokens.size() && agiru::al::IsKeyword(tokens[at], "table");
+}
+
+Tables ReadSystemTables(const std::filesystem::path &root) {
+  if (root.empty()) { return {}; }
+  const auto paths = SystemSources(root);
+  Tables tables;
+  std::set<int> ids;
+  std::set<std::string> names;
+  for (const auto &path : paths) {
+    const std::string source = Read(path);
+    if (!DeclaresSystemTable(source)) { continue; }
+    agiru::al::TableObject table;
+    try {
+      table = agiru::al::ParseTable(source);
+    } catch (const std::exception &error) {
+      throw std::runtime_error("System table " + path.string() + ": " + error.what());
+    }
+    if (!ids.insert(table.id).second || !names.insert(agiru::gen::LowerKey(table.name)).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    tables.paths.push_back(std::filesystem::relative(path, root).string());
+    tables.objects.push_back(std::move(table));
+  }
+  if (tables.objects.empty()) {
+    throw std::runtime_error("System symbols contain no table declarations");
+  }
+  std::println("SYSTEM TABLES: {} parsed from {} AL files", tables.objects.size(), paths.size());
+  return tables;
+}
+
+void IndexSystemTables(const Tables &tables, agiru::gen::Objects &objects, TableByName &byName) {
+  if (tables.objects.empty()) {
+    objects.tables = agiru::gen::PlatformTables();
+    objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+    return;
+  }
+  objects.tables = agiru::gen::PlatformTables(tables.objects);
+  objects.fieldEnums = agiru::gen::PlatformFieldEnums(tables.objects);
+  const auto intrinsic = agiru::gen::PlatformTables();
+  std::size_t bound = 0;
+  for (const auto &table : tables.objects) {
+    const auto name = agiru::gen::LowerKey(table.name);
+    if (!objects.tables.contains(name)) {
+      const auto target = intrinsic.find(name);
+      if (target != intrinsic.end() && target->second.id != table.id) {
+        std::println("SYSTEM TABLE REFUSED: {} declares ID {}, intrinsic target has ID {}",
+                     table.name,
+                     table.id,
+                     target->second.id);
+      }
+      continue;
+    }
+    ++bound;
+    byName.emplace(name, &table);
+    byName.emplace(std::to_string(table.id), &table);
+    byName.emplace(agiru::gen::LowerKey(table.nameSpace + "." + table.name), &table);
+  }
+  std::println("SYSTEM TABLES: {} bound, {} unbound", bound, tables.objects.size() - bound);
 }
 
 using OptionsInScope = std::map<std::string, std::vector<std::string>>;
@@ -1576,7 +1693,7 @@ void NoteFieldEnums(const agiru::al::TableObject &table,
   }
 }
 
-Tables IndexTables(Run &run, Counts &counts) {
+Tables ReadTables(Run &run, Counts &counts) {
   Tables kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Table.al")) {
     ++counts.files;
@@ -1586,6 +1703,7 @@ Tables IndexTables(Run &run, Counts &counts) {
         ++counts.moved;
         continue;
       }
+      agiru::al::EnsurePrimaryKey(table);
       ++counts.parsed;
       counts.members += table.fields.size();
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
@@ -1595,6 +1713,94 @@ Tables IndexTables(Run &run, Counts &counts) {
     }
   }
   return kept;
+}
+
+Pages ReadXmlPorts(Run &run) {
+  Pages ports;
+  for (const auto &path : SourcesEndingIn(run, ".XmlPort.al")) {
+    try {
+      auto port = agiru::al::ParseXmlPort(Read(path));
+      agiru::gen::PrepareXmlPort(port);
+      ports.paths.push_back(std::filesystem::relative(path, run.root).string());
+      ports.objects.push_back(std::move(port));
+    } catch (const std::exception &error) { static_cast<void>(Note(run, path, error)); }
+  }
+  return ports;
+}
+
+struct AppInputs {
+  Tables tables;
+  Pages xmlports;
+  Counts tableCounts;
+  std::vector<Failure> failures;
+  std::vector<Failure> refusals;
+};
+
+using ObjectIdentifiers = std::map<std::pair<agiru::gen::ObjectKind, int>, std::string>;
+
+struct ObjectInputs {
+  std::map<std::string, AppInputs> apps;
+  ObjectIdentifiers identifiers;
+};
+
+ObjectInputs PrepareObjects(const std::vector<agiru::gen::App> &apps,
+                            const std::filesystem::path &source,
+                            const agiru::gen::TranspileScope &scope) {
+  ObjectInputs inputs;
+  std::vector<agiru::gen::ObjectIdentity> identities;
+  const auto note = [&](const std::string &app, const auto &objects, agiru::gen::ObjectKind kind) {
+    for (const auto &object : objects) {
+      identities.push_back({.app = app,
+                            .nameSpace = object.nameSpace,
+                            .kind = kind,
+                            .id = object.id,
+                            .name = object.name});
+    }
+  };
+  for (const auto &app : apps) {
+    const auto root = source / app.source;
+    if (!std::filesystem::is_directory(root)) { continue; }
+    Run reader{.scope = &scope,
+               .sourceRoot = source,
+               .root = root,
+               .output = {},
+               .failures = {},
+               .refusals = {},
+               .kept = {}};
+    AppInputs &held = inputs.apps[app.name];
+    held.tables = ReadTables(reader, held.tableCounts);
+    held.xmlports = ReadXmlPorts(reader);
+    held.failures = std::move(reader.failures);
+    held.refusals = std::move(reader.refusals);
+    note(app.name, held.tables.objects, agiru::gen::ObjectKind::Table);
+    note(app.name, held.xmlports.objects, agiru::gen::ObjectKind::XmlPort);
+  }
+  const auto assigned = agiru::gen::ObjectIdentifiers(identities);
+  for (std::size_t at = 0; at < identities.size(); ++at) {
+    const auto &identity = identities[at];
+    if (!inputs.identifiers.emplace(std::pair{identity.kind, identity.id}, assigned[at]).second) {
+      throw std::runtime_error("duplicate " + std::string(agiru::gen::DirectoryOf(identity.kind)) +
+                               " ID: " + std::to_string(identity.id));
+    }
+  }
+  return inputs;
+}
+
+void IndexTables(const Tables &tables,
+                 const ObjectIdentifiers &identifiers,
+                 agiru::gen::Objects &objects) {
+  for (const auto &table : tables.objects) {
+    const auto &identifier = identifiers.at({agiru::gen::ObjectKind::Table, table.id});
+    const auto ref =
+        agiru::gen::BindTable(table,
+                              "::agiru::" + agiru::gen::NamespaceSuffix(table.nameSpace) +
+                                  agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Table),
+                              TableHeaderPath(table, identifier),
+                              identifier);
+    objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
+    objects.tables.insert_or_assign(std::to_string(table.id), ref);
+    NoteFieldEnums(table, objects.enums, objects.fieldEnums);
+  }
 }
 
 std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
@@ -1785,7 +1991,9 @@ void WriteModule(Run &run,
   header += "    .publisher = " + literal(JsonValue(text, "publisher")) + ",\n";
   header += "    .version = " + literal(JsonValue(text, "version")) + ",\n};\n\n}\n";
   if (!run.output.empty()) {
-    Keep(run, Output{.directory = run.output, .relative = identifier + "Module.h"}, header);
+    Keep(run,
+         Output{.directory = run.output, .relative = identifier + "Module.h", .source = "app.json"},
+         header);
   }
   objects.module = "::agiru::app::" + identifier + "::kModule";
   objects.moduleHeader = identifier + "Module.h";
@@ -1889,45 +2097,31 @@ void RefreshReportControls(const Pages &reports, agiru::gen::Objects &objects) {
   }
 }
 
-Pages IndexXmlPorts(Run &run, agiru::gen::Objects &objects) {
-  Pages ports;
-  for (const std::filesystem::path &path : SourcesEndingIn(run, ".XmlPort.al")) {
-    const std::string text = Read(path);
-    const agiru::gen::ObjectDeclaration declared =
-        agiru::gen::DeclarationOf(text, agiru::gen::ObjectKind::XmlPort);
-    if (!declared.found || declared.id == 0) { continue; }
-    std::optional<agiru::al::PageObject> parsed;
-    try {
-      parsed = agiru::al::ParseXmlPort(text);
-      agiru::gen::PrepareXmlPort(*parsed);
-    } catch (const std::exception &e) { static_cast<void>(Note(run, path, e)); }
-    const std::string identifier = agiru::gen::Identifier(declared.name);
-    objects.xmlports.insert_or_assign(
-        agiru::gen::LowerKey(declared.name),
-        agiru::gen::TableRef{
-            .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(declared.nameSpace) +
-                          agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::XmlPort),
-            .header =
-                agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::XmlPort) +
-                "/" + identifier + ".h",
-            .id = declared.id,
-            .fields = parsed.has_value() ? agiru::gen::ControlIdentifiers(*parsed, objects)
-                                         : std::map<std::string, std::string>{},
-            .procedures = {},
-            .parts = {},
-            .name = {},
-            .dataItems = {},
-            .requestFields = {},
-            .columnSources = {},
-            .interfaceReturns = {},
-            .tryFunctions = {},
-            .procedureDeclarations = {}});
-    if (parsed.has_value()) {
-      ports.paths.push_back(std::filesystem::relative(path, run.root).string());
-      ports.objects.push_back(std::move(*parsed));
-    }
+void IndexXmlPorts(const Pages &ports,
+                   const ObjectIdentifiers &identifiers,
+                   agiru::gen::Objects &objects) {
+  for (const auto &declared : ports.objects) {
+    const auto &identifier = identifiers.at({agiru::gen::ObjectKind::XmlPort, declared.id});
+    const agiru::gen::TableRef ref{
+        .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(declared.nameSpace) +
+                      agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::XmlPort),
+        .header = agiru::gen::OutputDirectory(declared.nameSpace, agiru::gen::ObjectKind::XmlPort) +
+                  "/" + identifier + ".h",
+        .outputIdentifier = identifier,
+        .id = declared.id,
+        .fields = agiru::gen::ControlIdentifiers(declared, objects),
+        .procedures = {},
+        .parts = {},
+        .name = declared.name,
+        .dataItems = {},
+        .requestFields = {},
+        .columnSources = {},
+        .interfaceReturns = {},
+        .tryFunctions = {},
+        .procedureDeclarations = {}};
+    objects.xmlports.insert_or_assign(agiru::gen::LowerKey(declared.name), ref);
+    objects.xmlports.insert_or_assign(std::to_string(declared.id), ref);
   }
-  return ports;
 }
 
 struct Queries {
@@ -2008,10 +2202,15 @@ void WriteQueries(Run &run,
       objects.queries.erase(ref);
       continue;
     }
-    Keep(run, Output{.directory = run.output, .relative = ref->second.header}, made.header);
+    Keep(
+        run,
+        Output{.directory = run.output, .relative = ref->second.header, .source = queries.paths[i]},
+        made.header);
     std::filesystem::path body = ref->second.header;
     body.replace_extension(".cpp");
-    Keep(run, Output{.directory = run.output, .relative = body}, made.source);
+    Keep(run,
+         Output{.directory = run.output, .relative = body, .source = queries.paths[i]},
+         made.source);
     run.written += 2;
     ++counts.written;
     written.insert(ref->first);
@@ -2083,7 +2282,9 @@ void WriteProfiles(Run &run, const agiru::gen::Objects &objects, ProfileCounts &
         agiru::gen::OutputDirectory(parsed->nameSpace, agiru::gen::ObjectKind::Profile) + "/" +
         agiru::gen::Identifier(parsed->name) + ".cpp";
     Keep(run,
-         Output{.directory = run.output, .relative = relative},
+         Output{.directory = run.output,
+                .relative = relative,
+                .source = std::filesystem::relative(path, run.root).string()},
          ProfileSource(*parsed,
                        std::filesystem::relative(path, run.root).string(),
                        objects,
@@ -2138,9 +2339,11 @@ void ScanCodeunits(Run &run,
       Absorb(gathered.absent, header.absent);
       const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
       const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
-      Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
+      Keep(run, Output{.directory = run.output, .relative = stem, .source = relative}, header.text);
       Keep(run,
-           Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
+           Output{.directory = run.output,
+                  .relative = stem.substr(0, stem.size() - 1) + "cpp",
+                  .source = relative},
            body);
       ++counts.emitted;
       ++run.written;
@@ -2337,10 +2540,7 @@ void WriteOptions(const std::filesystem::path &out, const OptionsInScope &option
     }
     text += "  }};\n};\n\n";
   }
-  const std::filesystem::path path = out / "shared" / "options" / "Types.h";
-  std::filesystem::create_directories(path.parent_path());
-  std::ofstream file(path, std::ios::binary);
-  file << text;
+  static_cast<void>(WriteFile(Output{.directory = out, .relative = kOptionsHeader}, text));
   std::println("options   {} enumeration(s) named by their members", options.size());
 }
 
@@ -2356,10 +2556,7 @@ void WriteAbsent(const std::filesystem::path &out,
   const Counted objects = Stubs(text, absent, false, true);
   text += "\n} // namespace agiru::absent\n";
 
-  const std::filesystem::path path = out / "absent" / "absent" / "Types.h";
-  std::filesystem::create_directories(path.parent_path());
-  std::ofstream file(path, std::ios::binary);
-  file << text;
+  static_cast<void>(WriteFile(Output{.directory = out, .relative = kAbsentHeader}, text));
   std::println("absent    {} .NET type(s) with {} member(s), {} AL object(s) with {}",
                net.types,
                net.members,
@@ -2403,10 +2600,26 @@ std::size_t Sweep(const std::filesystem::path &out, const std::set<std::filesyst
   return stale.size();
 }
 
+void ReportOutput(const Job &job,
+                  std::set<std::filesystem::path> &kept,
+                  std::size_t written,
+                  std::size_t changed,
+                  int status) {
+  if (job.output.empty()) { return; }
+  kept.insert(job.output / kOptionsHeader);
+  kept.insert(job.output / kAbsentHeader);
+  const std::size_t swept = status == 0 ? Sweep(job.output, kept) : 0;
+  std::println("written   {} objects into {}; {} changed, {} swept",
+               written,
+               job.output.string(),
+               changed,
+               swept);
+}
+
 void ClaimApp(const std::filesystem::path &out) {
   if (out.empty()) { return; }
   std::filesystem::create_directories(out);
-  std::ofstream reaches(out / "reaches", std::ios::binary);
+  std::ostringstream reaches;
   reaches << "# GENERATED. Never by hand.\n#\n"
           << "# An app sees ONLY the door under include/agiru/ and the apps it declares a "
              "dependency on in\n"
@@ -2414,6 +2627,7 @@ void ClaimApp(const std::filesystem::path &out) {
              "to an\n"
           << "# internal runtime header would throw away every generated translation unit in "
              "every app.\n";
+  static_cast<void>(WriteFile(Output{.directory = out, .relative = "reaches"}, reaches.str()));
 }
 
 void Add(Counts &into, const Counts &one) {
@@ -2478,7 +2692,7 @@ int Scan(const Job &job) {
   std::size_t written = 0;
   std::size_t changed = 0;
   std::set<std::filesystem::path> kept;
-  std::vector<Tables> held;
+  ObjectInputs objectInputs = PrepareObjects(apps, job.source, scope);
   TableByName everyTable;
   std::map<std::string, std::size_t> untranslated;
   std::map<std::string, std::size_t> declaredOnly;
@@ -2489,11 +2703,10 @@ int Scan(const Job &job) {
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
-  objects.tables = agiru::gen::PlatformTables();
-  objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+  const Tables systemTables = ReadSystemTables(job.systemSymbols);
+  IndexSystemTables(systemTables, objects, everyTable);
 
-  std::map<std::string, std::string> symbols;
-  std::vector<std::string> collisions;
+  std::map<std::string, std::string> outputSources;
   for (const agiru::gen::App &app : apps) {
     const std::filesystem::path source = job.source / app.source;
     if (!std::filesystem::is_directory(source)) {
@@ -2502,8 +2715,7 @@ int Scan(const Job &job) {
     }
     Run run{.scope = &scope,
             .sourceRoot = job.source,
-            .symbols = &symbols,
-            .collisions = &collisions,
+            .outputSources = &outputSources,
             .root = source,
             .output = job.output.empty() ? std::filesystem::path{} : job.output / app.name,
             .failures = {},
@@ -2514,7 +2726,10 @@ int Scan(const Job &job) {
     WriteModule(run, app, source, objects);
     Counts enums;
     Counts interfaces;
-    Counts tables;
+    AppInputs &appInput = objectInputs.apps.at(app.name);
+    const Counts &tables = appInput.tableCounts;
+    run.failures = std::move(appInput.failures);
+    run.refusals = std::move(appInput.refusals);
     Counts codeunits;
     Counts pages;
     Counts extensions;
@@ -2529,20 +2744,19 @@ int Scan(const Job &job) {
     for (agiru::al::PageObject &report : parsedReports.objects) {
       agiru::gen::PrepareReport(report);
     }
-    Pages parsedXmlPorts = IndexXmlPorts(run, objects);
+    const Pages &parsedXmlPorts = appInput.xmlports;
+    IndexXmlPorts(parsedXmlPorts, objectInputs.identifiers, objects);
     const Queries parsedQueries = IndexQueries(run, objects);
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
-    Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
+    Tables &parsedTables = appInput.tables;
     extensions.emitted += MergeExtensions(store, parsedTables);
-    RefreshTableIndex(parsedTables, objects);
-    for (const agiru::al::TableObject &table : parsedTables.objects) {
-      NoteFieldEnums(table, objects.enums, objects.fieldEnums);
-    }
+    IndexTables(parsedTables, objectInputs.identifiers, objects);
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       everyTable.insert_or_assign(agiru::gen::LowerKey(table.name), &table);
+      everyTable.insert_or_assign(std::to_string(table.id), &table);
     }
     Pages parsed = IndexPages(run, pages, objects);
     RefreshReportControls(parsedReports, objects);
@@ -2613,14 +2827,6 @@ int Scan(const Job &job) {
     refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
-  if (!job.output.empty()) {
-    const std::size_t swept = Sweep(job.output, kept);
-    std::println("written   {} objects into {}; {} changed, {} swept",
-                 written,
-                 job.output.string(),
-                 changed,
-                 swept);
-  }
   Report("enums", allEnums);
   Report("tables", allTables);
   Report("codeunits", allCodeunits);
@@ -2799,12 +3005,7 @@ int Scan(const Job &job) {
   WriteAbsent(job.output, gathered.dotnet, gathered.absent);
   WriteOptions(job.output, gathered.options);
   ReportUnresolved("table(s)", "declaration(s)", unresolvedTables);
-  Cluster(failures);
-  if (!refusals.empty()) {
-    std::println("");
-    std::println("refused   what parses and cannot be written yet");
-    Cluster(refusals);
-  }
+  const int failureStatus = ReportFailures(failures, refusals);
   if (silentAttributes != 0) {
     std::println("");
     std::println("ABORT     {} attribute declaration(s) are read and dropped, and the count is 0 "
@@ -2814,12 +3015,6 @@ int Scan(const Job &job) {
                  "or in");
     std::println("          `kAcknowledgedAttributes` with the reason it is a no-op here.");
     return 1;
-  }
-  if (!collisions.empty()) {
-    std::println("declared  {} object name(s) are declared by two apps and translated once, since "
-                 "every app is linked into one image here (board:0686)",
-                 collisions.size());
-    for (const std::string &one : collisions) { std::println("          {}", one); }
   }
   if (silentProperties != 0) {
     std::println("");
@@ -2834,22 +3029,29 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return 0;
+  ReportOutput(job, kept, written, changed, failureStatus);
+  return failureStatus;
 }
 
 }
 
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
-  if (arguments.size() < 3) {
-    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>]\n", stderr);
+  const bool explicitSymbols =
+      arguments.size() == 6 && std::string_view(arguments[4]) == "--system-symbols";
+  if (arguments.size() != 3 && arguments.size() != 4 && !explicitSymbols) {
+    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>] "
+               "[--system-symbols <root>]\n",
+               stderr);
     return 2;
   }
   try {
     return Scan(Job{.source = std::filesystem::path(arguments[1]),
                     .output = arguments.size() > 3 ? std::filesystem::path(arguments[3])
                                                    : std::filesystem::path{},
-                    .apps = std::filesystem::path(arguments[2])});
+                    .apps = std::filesystem::path(arguments[2]),
+                    .systemSymbols = explicitSymbols ? std::filesystem::path(arguments.back())
+                                                     : std::filesystem::path{}});
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);
