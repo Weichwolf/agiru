@@ -19,7 +19,9 @@ struct PageHeader {
 PageHeader
 WritePage(const al::PageObject &object, const std::string &source, const Objects &objects);
 
-std::string PageHeaderPath(const al::PageObject &object);
+std::string PageHeaderPath(const al::PageObject &object, std::string identifier = {});
+
+[[nodiscard]] std::string PageIdentifier(const al::PageObject &object, const Objects &objects);
 
 [[nodiscard]] ObjectKind PageKind(const al::PageObject &object);
 

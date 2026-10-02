@@ -4,6 +4,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/PersonalizationScope.h"
 #include "platform/UserLicenseType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
@@ -25,14 +26,6 @@
 
 namespace agiru::platform {
 
-/// \brief The vocabulary of AL `User Personalization.Scope` -- whose personalisation a row is.
-///
-/// From the declaration: `OptionMembers = System,Tenant`.
-enum class PersonalizationScope : std::int32_t {
-  System = 0, ///< Shipped with the object.
-  Tenant = 1, ///< The tenant's own.
-};
-
 /// \brief System `User Personalization."Customization Status"` members.
 enum class CustomizationStatus : std::int32_t {
   Updated = 0,             ///< Current customizations.
@@ -41,15 +34,6 @@ enum class CustomizationStatus : std::int32_t {
 };
 
 }
-
-/// \brief The vocabulary of AL `User Personalization.Scope`.
-template <> struct agiru::OptionTraits<agiru::platform::PersonalizationScope> {
-  /// \brief The two scopes.
-  static constexpr std::array<agiru::EnumValueDef, 2> kValues{{
-      {.ordinal = 0, .name = "System", .caption = "System"},
-      {.ordinal = 1, .name = "Tenant", .caption = "Tenant"},
-  }};
-};
 
 /// \brief Declared customization-state vocabulary.
 template <> struct agiru::OptionTraits<agiru::platform::CustomizationStatus> {
