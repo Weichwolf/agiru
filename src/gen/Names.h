@@ -3,6 +3,7 @@
 #include "Scope.h"
 
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,6 +12,16 @@
 namespace agiru::gen {
 
 std::string Identifier(std::string_view alName);
+
+struct ObjectIdentity {
+  std::string app;
+  std::string nameSpace;
+  ObjectKind kind = ObjectKind::Table;
+  int id = 0;
+  std::string name;
+};
+
+[[nodiscard]] std::vector<std::string> ObjectIdentifiers(std::span<const ObjectIdentity> objects);
 
 std::string Unprefixed(std::string_view identifier);
 

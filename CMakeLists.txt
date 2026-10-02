@@ -6,14 +6,7 @@
 # else. A tier break therefore fails at the `#include` with a file and a line rather than later in
 # the linker.
 cmake_minimum_required(VERSION 3.28)
-if(NOT DEFINED CMAKE_CXX_COMPILER)
-  find_program(CMAKE_CXX_COMPILER NAMES clang++-19 REQUIRED)
-endif()
 project(agiru CXX)
-
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  message(FATAL_ERROR "agiru requires Clang; configure a new build directory with clang++-19.")
-endif()
 
 set(CMAKE_CXX_STANDARD 23)
 # NO MODULE SCANNING: nothing here is a C++20 module, the scan is a second preprocessor pass over
@@ -29,7 +22,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # `src/app/` falls out of the static analysis because a finding there has no address; it does NOT
 # fall out of the compiler, and that is the hold which replaces it.
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
-add_compile_options(-stdlib=libc++)
 
 # A TEMPLATE'S INLINE FUNCTIONS ARE NOT AN EXPORTED SYMBOL. The door is templates all the way down --
 # `Table<Derived>`, `Text<N>`, `Declare<&Member>` -- and every instantiation lands in the dynamic
@@ -75,29 +67,9 @@ endif()
 set(AGIRU_RUNTIME_FLAGS ${AGIRU_GENERATED_FLAGS})
 list(APPEND AGIRU_GENERATED_FLAGS -Wno-infinite-recursion)
 
-find_program(LLD NAMES ld.lld-19 REQUIRED)
-add_link_options(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind "-fuse-ld=${LLD}")
-
-include(CheckCXXSourceCompiles)
-set(CMAKE_REQUIRED_FLAGS "-stdlib=libc++")
-set(CMAKE_REQUIRED_LINK_OPTIONS --rtlib=compiler-rt --unwindlib=libunwind "-fuse-ld=${LLD}")
-unset(AGIRU_LLVM_CXX23_WORKS CACHE)
-check_cxx_source_compiles("#include <expected>
-#include <format>
-#include <stdexcept>
-#include <string>
-#ifndef _LIBCPP_VERSION
-#error LLVM libc++ is required
-#endif
-int main() {
-  std::expected<int, std::string> value = 42;
-  try { throw std::runtime_error(std::format(\"{}\", *value)); }
-  catch (const std::runtime_error& error) { return std::string(error.what()) != \"42\"; }
-}" AGIRU_LLVM_CXX23_WORKS)
-unset(CMAKE_REQUIRED_FLAGS)
-unset(CMAKE_REQUIRED_LINK_OPTIONS)
-if(NOT AGIRU_LLVM_CXX23_WORKS)
-  message(FATAL_ERROR "LLVM C++23 libraries are unavailable. Run scripts/install.sh, then reconfigure in a fresh B directory; do not mix C++ ABIs.")
+find_program(LLD ld.lld-19 ld.lld)
+if(LLD)
+  add_link_options(-fuse-ld=lld)
 endif()
 
 # The tiers in dependency order. The order here is a BUILD order; who may see whom is still said by
@@ -271,12 +243,14 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
     endforeach()
     target_link_libraries(agiru_slice PRIVATE agiru_rt agiru_net agiru_db)
     # THE DOOR IS PARSED ONCE AND NOT ONCE PER FILE. `cmake/Precompiled.h` is the union of it, and
-    # generated source takes (measured 2026-09-03 on the previous toolchain), and 5 835 of them
+    # generated source takes (measured 2026-09-03, clang++-19 over libstdc++-14), and 5 835 of them
     # read it. A precompiled header is 1.1 s built once. It is not a substitute for a generated file
     # including what it uses -- that stands as its own rule -- it is what makes the loop bearable
     # while the tree is still repaired file by file.
     target_precompile_headers(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
-    target_compile_options(agiru_slice PRIVATE -Xclang -fno-pch-timestamp)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+      target_compile_options(agiru_slice PRIVATE -Xclang -fno-pch-timestamp)
+    endif()
     # THE DOOR IS PARSED ONCE PER BATCH, NOT ONCE PER FILE. Measured 2026-09-06 on a 1 022-line
     # table source: 8.2 s, of which 6.6 s parse the door and 0.5 s are the back end. A unity batch
     # of 16 pays that parse once for 16 sources; every generated file keeps its file-scope names in
@@ -334,7 +308,9 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
-    target_compile_options(agiru_app_${app} PRIVATE -Xclang -fno-pch-timestamp)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+      target_compile_options(agiru_app_${app} PRIVATE -Xclang -fno-pch-timestamp)
+    endif()
     target_compile_options(agiru_app_${app} PRIVATE ${AGIRU_GENERATED_FLAGS})
 
     string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)

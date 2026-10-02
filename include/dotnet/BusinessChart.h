@@ -16,114 +16,46 @@ namespace agiru::dotnet {
 
 /// \brief The platform's `Microsoft.Dynamics.Nav.Client.BusinessChart.DataMeasureType`: how a
 ///        measure is drawn. AL assigns it from `"Business Chart Type".AsInteger()`, so it is the
-///        declared value, never a dense position. Values follow enum 484 in
-///        `System Application/App/Business Chart/src/BusinessChartType.Enum.al` and
-///        `Generic Chart Mgt.ChartType2GraphType`/`GraphType2ChartType`.
+///        ordinal of that enum -- Point 0, Bubble 1, Line 2, StepLine 3, Column 4,
+///        StackedColumn 5, StackedColumn100 6, Area 7, StackedArea 8, StackedArea100 9, Pie 10,
+///        Doughnut 11, Range 12, Radar 13, Funnel 14 -- and `Line` and `StackedColumn` are the
+///        two members AL names by name (`System.Visualization."Business Chart Type"`).
 class DataMeasureType {
 public:
   /// \brief The binder AL never calls; it marks the class as rebuilt.
   struct Binder {};
 
   /// \brief `DataMeasureType.Line`. \return The line type.
-  [[nodiscard]] static constexpr DataMeasureType Line() { return DataMeasureType{Kind::Line}; }
+  [[nodiscard]] static DataMeasureType Line() { return DataMeasureType{kLine}; }
 
   /// \brief `DataMeasureType.StackedColumn`. \return The stacked-column type.
-  [[nodiscard]] static constexpr DataMeasureType StackedColumn() {
-    return DataMeasureType{Kind::StackedColumn};
-  }
-
-  /// \brief The declared Point value. \return Point.
-  [[nodiscard]] static constexpr DataMeasureType Point() { return DataMeasureType{Kind::Point}; }
-
-  /// \brief The declared Bubble value. \return Bubble.
-  [[nodiscard]] static constexpr DataMeasureType Bubble() { return DataMeasureType{Kind::Bubble}; }
-
-  /// \brief The declared StepLine value. \return StepLine.
-  [[nodiscard]] static constexpr DataMeasureType StepLine() {
-    return DataMeasureType{Kind::StepLine};
-  }
-
-  /// \brief The declared Column value. \return Column.
-  [[nodiscard]] static constexpr DataMeasureType Column() { return DataMeasureType{Kind::Column}; }
-
-  /// \brief The declared StackedColumn100 value. \return StackedColumn100.
-  [[nodiscard]] static constexpr DataMeasureType StackedColumn100() {
-    return DataMeasureType{Kind::StackedColumn100};
-  }
-
-  /// \brief The declared Area value. \return Area.
-  [[nodiscard]] static constexpr DataMeasureType Area() { return DataMeasureType{Kind::Area}; }
-
-  /// \brief The declared StackedArea value. \return StackedArea.
-  [[nodiscard]] static constexpr DataMeasureType StackedArea() {
-    return DataMeasureType{Kind::StackedArea};
-  }
-
-  /// \brief The declared StackedArea100 value. \return StackedArea100.
-  [[nodiscard]] static constexpr DataMeasureType StackedArea100() {
-    return DataMeasureType{Kind::StackedArea100};
-  }
-
-  /// \brief The declared Pie value. \return Pie.
-  [[nodiscard]] static constexpr DataMeasureType Pie() { return DataMeasureType{Kind::Pie}; }
-
-  /// \brief The declared Doughnut value. \return Doughnut.
-  [[nodiscard]] static constexpr DataMeasureType Doughnut() {
-    return DataMeasureType{Kind::Doughnut};
-  }
-
-  /// \brief The declared Range value. \return Range.
-  [[nodiscard]] static constexpr DataMeasureType Range() { return DataMeasureType{Kind::Range}; }
-
-  /// \brief The declared Radar value. \return Radar.
-  [[nodiscard]] static constexpr DataMeasureType Radar() { return DataMeasureType{Kind::Radar}; }
-
-  /// \brief The declared Funnel value. \return Funnel.
-  [[nodiscard]] static constexpr DataMeasureType Funnel() { return DataMeasureType{Kind::Funnel}; }
+  [[nodiscard]] static DataMeasureType StackedColumn() { return DataMeasureType{kStackedColumn}; }
 
   /// \brief `Type := Integer`, the ordinal of `Business Chart Type`. \param ordinal The ordinal.
   /// \return This.
-  constexpr DataMeasureType &operator=(Integer ordinal) {
+  DataMeasureType &operator=(Integer ordinal) {
     ordinal_ = ordinal;
     return *this;
   }
 
   /// \brief The ordinal. \return It.
-  [[nodiscard]] constexpr Integer AsInteger() const { return ordinal_; }
-
-  /// \brief AL's numeric read boundary for the .NET enum. \return The declared value.
-  [[nodiscard]] constexpr operator Integer() const { return ordinal_; }
+  [[nodiscard]] Integer AsInteger() const { return ordinal_; }
 
   /// \brief What `Format(DataMeasureType)` renders: the ordinal. \return It.
   [[nodiscard]] std::string ToText() const { return std::to_string(ordinal_); }
 
 private:
-  enum class Kind : Integer {
-    Point = 0,
-    Bubble = 2,
-    Line = 3,
-    StepLine = 5,
-    Column = 10,
-    StackedColumn = 11,
-    StackedColumn100 = 12,
-    Area = 13,
-    StackedArea = 15,
-    StackedArea100 = 16,
-    Pie = 17,
-    Doughnut = 18,
-    Range = 21,
-    Radar = 25,
-    Funnel = 33
-  };
+  static constexpr std::int32_t kLine = 2;
+  static constexpr std::int32_t kStackedColumn = 5;
 
-  explicit constexpr DataMeasureType(Kind ordinal) : ordinal_(static_cast<Integer>(ordinal)) {}
+  explicit DataMeasureType(std::int32_t ordinal) : ordinal_(ordinal) {}
 
 public:
   /// \brief The default, `Point`, which is the enum's first member.
-  constexpr DataMeasureType() = default;
+  DataMeasureType() = default;
 
 private:
-  Integer ordinal_ = static_cast<Integer>(Kind::Point);
+  std::int32_t ordinal_ = 0;
 };
 
 /// \brief The platform's `BusinessChartData`: the table a chart draws, its X (and Z) dimension

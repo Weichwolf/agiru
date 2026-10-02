@@ -205,14 +205,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=pathlib.Path, default=OUT,
                         help='parent of version/hash package directories (default: build/symbols)')
-    parser.add_argument("--verify", type=pathlib.Path,
-                        help="verify an existing package without downloading or writing")
     arguments = parser.parse_args()
-    if arguments.verify is not None:
-        ledger = verify_package(arguments.verify)
-        print(json.dumps({key: ledger[key] for key in
-                          ('package_sha256', 'package_bytes', 'identity')}, sort_keys=True))
-        return
     version = (ROOT / "BC_VERSION").read_text().strip()
     url = f"{CDN}/onprem/{version}/platform"
     total = size_of(url)
