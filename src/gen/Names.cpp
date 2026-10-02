@@ -12,9 +12,12 @@
 #include <map>
 #include <regex>
 #include <set>
+#include <span>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -113,6 +116,46 @@ std::string TraitsOf(std::string_view traits, std::string_view space, std::strin
 
 std::string Identifier(std::string_view alName) {
   return Join(Words(alName));
+}
+
+std::vector<std::string> ObjectIdentifiers(std::span<const ObjectIdentity> objects) {
+  const auto identity = [](const ObjectIdentity &object) {
+    return std::tuple{LowerKey(object.app),
+                      LowerKey(object.nameSpace),
+                      object.kind,
+                      object.id,
+                      LowerKey(object.name)};
+  };
+  std::set<decltype(identity(ObjectIdentity{}))> identities;
+  std::map<std::string, std::vector<std::size_t>> groups;
+  std::set<std::string> reserved;
+  std::vector<std::string> names(objects.size());
+  for (std::size_t at = 0; at < objects.size(); ++at) {
+    const ObjectIdentity &object = objects[at];
+    if (!identities.insert(identity(object)).second) {
+      throw std::runtime_error("duplicate object identity: " + object.app + "/" + object.name);
+    }
+    names[at] = Identifier(object.name);
+    if (names[at].empty()) { names[at] = "Object"; }
+    const std::string path = OutputDirectory(object.nameSpace, object.kind) + "/" + names[at];
+    groups[path].push_back(at);
+    reserved.insert(path);
+  }
+  for (auto &[path, group] : groups) {
+    if (group.size() == 1) { continue; }
+    std::ranges::sort(group, [&](std::size_t left, std::size_t right) {
+      return identity(objects[left]) < identity(objects[right]);
+    });
+    for (const std::size_t at : group) {
+      const std::string suffix = "_" + std::to_string(objects[at].id);
+      std::string candidate = path + suffix;
+      for (std::size_t serial = 2; !reserved.insert(candidate).second; ++serial) {
+        candidate = path + suffix + "_" + std::to_string(serial);
+      }
+      names[at] += candidate.substr(path.size());
+    }
+  }
+  return names;
 }
 
 std::string Unprefixed(std::string_view identifier) {

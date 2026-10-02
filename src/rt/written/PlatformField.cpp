@@ -34,13 +34,23 @@ std::string detail::FieldOptionMembers(const FieldDef &def) {
 
 namespace {
 
-std::string TypeNameOf(const FieldDef &def) {
+Option<platform::FieldDataType> NativeFieldTypeOf(const FieldDef &def) {
   const FieldType type = def.type == FieldType::Enum ? FieldType::Option : def.type;
   const std::string_view name = type == FieldType::TableFilter ? std::string_view{"TableFilter"}
                                                                : Option<FieldType>{type}.Name();
-  if (name.empty()) { throw Error("Field metadata: unsupported type name"); }
-  std::string out{name};
-  if (type == FieldType::Code || type == FieldType::Text) { out += std::to_string(def.length); }
+  const auto &values = OptionTraits<platform::FieldDataType>::kValues;
+  const auto *const found = std::ranges::find(values, name, &EnumValueDef::name);
+  if (name.empty() || found == values.end()) {
+    throw Error("Field metadata: unsupported type name");
+  }
+  return Option<platform::FieldDataType>{found->ordinal};
+}
+
+std::string TypeNameOf(const FieldDef &def, Option<platform::FieldDataType> type) {
+  std::string out{type.Name()};
+  if (type == platform::FieldDataType::Code || type == platform::FieldDataType::Text) {
+    out += std::to_string(def.length);
+  }
   return out;
 }
 
@@ -73,12 +83,13 @@ Option<platform::ObsoleteState> ObsoleteStateOf(const FieldDef &def) {
 
 void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, const FieldDef &def) {
   const auto obsoleteState = ObsoleteStateOf(def);
-  const std::string typeName = TypeNameOf(def);
+  const auto type = NativeFieldTypeOf(def);
+  const std::string typeName = TypeNameOf(def, type);
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
   row.FieldName = FittedFieldText(def.name, platform::Field::kNameLength);
-  row.Type = def.type == FieldType::Enum ? FieldType::Option : def.type;
+  row.Type = type;
   row.Len = static_cast<::agiru::Integer>(def.length);
   row.Class = def.fieldClass;
   row.TypeName = typeName;
