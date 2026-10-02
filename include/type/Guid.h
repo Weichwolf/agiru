@@ -180,6 +180,7 @@ private:
 /// \brief AL compares a Text against a Guid, and compares them AS GUIDS.
 ///
 /// \tparam T The text side -- a `Text[N]`, a `Code[N]`, a literal or a `std::string`.
+/// \tparam G The Guid type; implicit text-to-Guid conversions are excluded.
 /// \param left  The text.
 /// \param right The Guid.
 /// \return True when the text spells that GUID.
@@ -206,9 +207,11 @@ template <typename T, typename G>
 
 /// \brief AL `+` on text and a Guid.
 ///
+/// \tparam T The declared Text type, bounded or unbounded.
+/// \tparam G The Guid type; implicit text-to-Guid conversions are excluded.
 /// \param left  The text.
 /// \param right The Guid.
-/// \return The two joined, the Guid in its braced canonical form.
+/// \return Owning unbounded Text, the Guid in its braced canonical form.
 ///
 /// \note AL CONVERTS A GUID TO TEXT WHERE TEXT IS WANTED, which BC's own tests rely on --
 ///       `CopyStr(CreateGuid(), 1, 20)` compiles there. C++ has no such conversion and must not
@@ -220,17 +223,41 @@ template <typename T, typename G>
 ///       let `Text + std::string` reach this operator by converting the string to a Guid -- against
 ///       the text operator it belongs to and at the same rank, which is 50 ambiguous call sites
 ///       (measured 2026-09-07). `std::same_as` keeps the operator to the type it is written for.
-template <typename G>
-  requires std::same_as<G, Guid>
-[[nodiscard]] inline std::string operator+(const ::agiru::Text<0> &left, const G &right) {
+template <typename T, typename G>
+  requires std::derived_from<T, Text<0>> && std::same_as<G, Guid>
+[[nodiscard]] Text<0> operator+(const T &left, const G &right) {
   return left + right.ToText();
 }
 
 /// \brief AL `+` on a Guid and text.
+/// \tparam G The Guid type; implicit text-to-Guid conversions are excluded.
+/// \tparam T The declared Text type, bounded or unbounded.
 /// \param left  The Guid.
 /// \param right The text.
-/// \return The two joined.
+/// \return Owning unbounded Text, the Guid in its braced canonical form.
 /// \note Constrained for the reason above, from the other side.
+template <typename G, typename T>
+  requires std::same_as<G, Guid> && std::derived_from<T, Text<0>>
+[[nodiscard]] Text<0> operator+(const G &left, const T &right) {
+  return left.ToText() + right;
+}
+
+/// \brief Join native character storage and a Guid without changing its storage type.
+/// \tparam G The Guid type; implicit text-to-Guid conversions are excluded.
+/// \param left The native character storage.
+/// \param right The Guid.
+/// \return Joined native storage, the Guid in its braced canonical form.
+template <typename G>
+  requires std::same_as<G, Guid>
+[[nodiscard]] inline std::string operator+(std::string_view left, const G &right) {
+  return std::string(left) + right.ToText();
+}
+
+/// \brief Join a Guid and native character storage without changing its storage type.
+/// \tparam G The Guid type; implicit text-to-Guid conversions are excluded.
+/// \param left The Guid.
+/// \param right The native character storage.
+/// \return Joined native storage, the Guid in its braced canonical form.
 template <typename G>
   requires std::same_as<G, Guid>
 [[nodiscard]] inline std::string operator+(const G &left, std::string_view right) {
