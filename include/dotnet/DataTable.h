@@ -3,7 +3,7 @@
 #include "dotnet/CultureInfo.h"
 #include "dotnet/Refused.h"
 #include "dotnet/Type.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Text.h"

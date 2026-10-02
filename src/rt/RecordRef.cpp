@@ -5,7 +5,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
@@ -28,7 +28,6 @@
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
-#include "FieldMetadata.h"
 
 #include <algorithm>
 #include <cctype>
@@ -203,23 +202,8 @@ RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering
   return was;
 }
 
-::agiru::Integer RecordRef::FilterGroup() const {
-  if (State().record == nullptr) {
-    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
-  }
-  return detail::RuntimeFilterGroup(State().record);
-}
-
 ::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
-  if (State().record == nullptr) {
-    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
-  }
   return detail::RuntimeFilterGroup(State().record, NewGroup);
-}
-
-::agiru::Boolean RecordRef::HasFilter() const {
-  if (State().record == nullptr) { throw Error("RecordRef.HasFilter: the RecordRef is not open"); }
-  return detail::RuntimeHasFilter(State().record);
 }
 
 void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
@@ -290,7 +274,7 @@ detail::Found RecordRef::Find(std::string_view Which) {
 }
 
 ::agiru::Integer RecordRef::Next(::agiru::Integer Steps) {
-  return detail::RuntimeNext(State().record, Table(), Steps);
+  return detail::RuntimeNext(State().record, Table(), Steps == 0 ? 1 : Steps);
 }
 
 detail::Found RecordRef::FindSet() {
@@ -511,7 +495,12 @@ std::string_view FieldRef::GetEnumValueCaptionFromOrdinalValue(Integer ordinal) 
 }
 
 std::string FieldRef::OptionMembers() const {
-  return detail::FieldOptionMembers(Def_());
+  std::string members;
+  for (const EnumValueDef &value : Def_().values) {
+    if (!members.empty()) { members += ','; }
+    members += value.name;
+  }
+  return members;
 }
 
 Variant FieldRef::Value() const {

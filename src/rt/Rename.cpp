@@ -1,5 +1,6 @@
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"

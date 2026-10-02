@@ -386,13 +386,11 @@ private:
 
 public:
   /// \brief AL `FieldRef.GetRangeMax()`. The upper bound of the range standing on the field.
-  /// \return The bound as the field's value; blank for an open upper end of an applied range.
-  /// \throws Error when the field has no filter or the filter is not a single range.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it above.
   [[nodiscard]] ::agiru::Variant GetRangeMax() const { return RangeBound_(true); }
 
   /// \brief AL `FieldRef.GetRangeMin()`. The lower bound of the range standing on the field.
-  /// \return The bound as the field's value; blank for an open lower end of an applied range.
-  /// \throws Error when the field has no filter or the filter is not a single range.
+  /// \return The bound as the field's value; the field's blank when nothing bounds it below.
   [[nodiscard]] ::agiru::Variant GetRangeMin() const { return RangeBound_(false); }
 
   /// \brief AL `FieldRef.IsOptimizedForTextSearch()`. Gets if the field is optimized for textual
@@ -975,16 +973,13 @@ public:
   ///       the other alone.
   ::agiru::RecordRef Duplicate();
 
-  /// \brief AL `RecordRef.FilterGroup()`: reads the selected group without changing it.
-  /// \return The current filter group.
-  /// \throws Error when the RecordRef is not open.
-  [[nodiscard]] ::agiru::Integer FilterGroup() const;
-
-  /// \brief AL `RecordRef.FilterGroup(Integer)`: selects the group for subsequent filters.
-  /// \param NewGroup The group; values above 255 are ignored (`record-filtergroup-method.md`).
-  /// \return The group that was current.
-  /// \throws Error when the RecordRef is not open.
-  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup);
+  /// \brief AL `RecordRef.FilterGroup(Integer)`. Changes the filter group that is being applied to
+  /// the table. You can also use this method to return the number of the current filtergroup. You
+  /// cannot return the number of the filtergroup and set a new filtergroup at the same time.
+  /// \param NewGroup The AL `Integer`.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer FilterGroup(::agiru::Integer NewGroup = {});
 
   /// \brief AL `RecordRef.Find(Text)`. Finds a record in a table based on the values stored in the
   /// key fields.
@@ -1082,10 +1077,13 @@ public:
   /// \throws Error when the RecordRef is not open.
   [[nodiscard]] std::string GetView(::agiru::Boolean UseNames = true) const;
 
-  /// \brief AL `RecordRef.HasFilter()`: whether the current filter group contains a field filter.
-  /// \return True only when this group is filtered, just like `Record.HasFilter()`.
-  /// \throws Error when the RecordRef is not open.
-  [[nodiscard]] ::agiru::Boolean HasFilter() const;
+  /// \brief AL `RecordRef.HasFilter()`. Determines whether a filter has been applied to the table
+  /// that the RecordRef refers to.
+  /// \return The AL `Boolean`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean HasFilter() {
+    throw Error("RecordRef.HasFilter() is declared and not implemented yet (board:0035)");
+  }
 
   /// \brief AL `RecordRef.HasLinks()`. Determines whether a record contains any links.
   /// \return The AL `Boolean`.
@@ -1201,10 +1199,10 @@ public:
 
   /// \brief AL `RecordRef.Next(Integer)`. Steps through a specified number of records and retrieves
   /// a record.
-  /// \param Steps The signed number of steps; one when omitted, zero preserves the current row.
-  /// \return The signed number of steps actually taken.
-  /// \throws Error when the reference is closed or the database operation fails.
-  ::agiru::Integer Next(::agiru::Integer Steps = 1);
+  /// \param Steps The AL `Integer`.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Integer Next(::agiru::Integer Steps = {});
 
   /// \brief AL `RecordRef.ReadConsistency()`. Gets a value indicating whether read consistency is
   /// enabled.

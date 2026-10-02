@@ -42,8 +42,9 @@ public:
   ///
   /// \param master The connection string of the template.
   /// \param name   The name the runner's database carries.
-  /// \param fresh Replace an existing non-template clone only when its role and origin ownership
-  ///              marker match. Unmarked legacy databases require a new scratch name.
+  /// \param fresh  Drop what is there and clone again. The cost of a run that inherits a database
+  ///               a crash left mid-write is a diagnosis aimed at the wrong tree, so the way back
+  ///               is a flag and not a doubt.
   ///
   /// \throws DatabaseError When the maintenance database refuses. Cloning needs a template no
   ///         session holds open, which is why `scripts/pg_seal.sh` keeps the master unconnectable.
@@ -68,8 +69,7 @@ public:
   /// \return `false` when it was already there, which is the ordinary case after the first run.
   [[nodiscard]] bool Cloned() const { return cloned_; }
 
-  /// \brief Drops the acquired database only while its OID, role and origin marker still match.
-  /// \throws DatabaseError when the database is protected, unowned or has been replaced.
+  /// \brief Drops it.
   ///
   /// \note NOT WHAT A RUN DOES. A run keeps its database; this is for a caller that made one to
   ///       prove something about it.
@@ -79,8 +79,6 @@ private:
   std::string maintenance_;
   std::string name_;
   std::string dsn_;
-  std::string identity_;
-  std::string marker_;
   bool cloned_ = false;
 };
 
@@ -97,7 +95,7 @@ struct DatabaseName {
 ///
 /// \param dsn      A libpq connection string, in URI or keyword form.
 /// \param database The database to name instead.
-/// \return Canonical libpq keyword syntax preserving other options and replacing the database.
+/// \return The same string with its database replaced.
 ///
 /// \throws DatabaseError When the string names no database at all, since then there is nothing to
 ///         replace and guessing which server was meant is worse than refusing.
