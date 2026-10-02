@@ -1,7 +1,7 @@
 #include "meta/EnumDef.h"
 #include "meta/TableDef.h"
 #include "platform/Integer.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Code.h"

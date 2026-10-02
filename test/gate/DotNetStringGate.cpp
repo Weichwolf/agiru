@@ -1,6 +1,6 @@
 #include "dotnet/Regex.h"
 #include "dotnet/String.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Char.h"
 #include "type/Integer.h"
 #include "type/Text.h"
