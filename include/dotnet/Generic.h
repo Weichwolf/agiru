@@ -1,10 +1,7 @@
 #pragma once
 
 #include "runtime/ErrorValue.h"
-#include "type/BigInteger.h"
 #include "type/Boolean.h"
-#include "type/Decimal.h"
-#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Variant.h"
 

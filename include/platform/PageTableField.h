@@ -161,61 +161,53 @@ public:
   static constexpr TableId kId{2000000171};
   /// \brief Original AL name.
   static constexpr std::string_view kName{"Page Table Field"};
-  /// \brief Number of fields explicitly declared by PageTableField.Table.al.
-  static constexpr std::size_t kFieldCount = 15;
-  /// \brief Source-declared Caption length.
-  static constexpr int kCaptionLength = 80;
-  /// \brief Source-declared Name length.
-  static constexpr int kNameLength = 256;
-  /// \brief Source-declared Tooltip and Description length.
-  static constexpr int kLongTextLength = 2048;
   /// \brief Original extension availability, not a cloud-service dependency.
   static constexpr std::string_view kScope{"OnPrem"};
   /// \brief Source Brick fieldgroup, not yet represented by TableDef.
   static constexpr std::array<::agiru::FieldNo, 4> kBrick{
       {::agiru::FieldNo{3}, ::agiru::FieldNo{5}, ::agiru::FieldNo{6}, ::agiru::FieldNo{8}}};
   /// \brief Record state at the required first offset.
-  detail::StateHandle State_Block{};
+  detail::StateHandle State_Block;
   /// \brief Original AL Page ID field.
-  ::agiru::Integer PageID{};
+  ::agiru::Integer PageID;
   /// \brief Original AL Index field.
-  ::agiru::Integer Index{};
+  ::agiru::Integer Index;
   /// \brief Original AL Type field.
-  Option<PageTableFieldType> Type{};
+  Option<PageTableFieldType> Type;
   /// \brief Original AL Length field.
-  ::agiru::Integer Length{};
+  ::agiru::Integer Length;
   /// \brief Original AL Caption field.
-  Text<kCaptionLength> Caption{};
+  Text<80> Caption;
   /// \brief Original AL Status field.
-  Option<PageTableFieldStatus> Status{};
+  Option<PageTableFieldStatus> Status;
   /// \brief Original AL IsTableField field.
-  Boolean IsTableField{};
+  Boolean IsTableField;
   /// \brief Original AL Scope field.
-  Option<PageTableFieldScope> Scope{};
+  Option<PageTableFieldScope> Scope;
   /// \brief Original AL Tooltip field.
-  Text<kLongTextLength> Tooltip{};
+  Text<2048> Tooltip;
   /// \brief Original AL FieldKind field.
-  Option<PageTableFieldKind> FieldKind{};
+  Option<PageTableFieldKind> FieldKind;
   /// \brief Original AL Name field.
-  Text<kNameLength> Name{};
+  Text<256> Name;
   /// \brief Original AL Field ID field.
-  ::agiru::Integer FieldID{};
+  ::agiru::Integer FieldID;
   /// \brief Original AL Table No field.
-  ::agiru::Integer TableNo{};
+  ::agiru::Integer TableNo;
   /// \brief Original AL Description field.
-  Text<kLongTextLength> Description{};
+  Text<2048> Description;
   /// \brief Original AL Table Field Id field.
-  ::agiru::Integer TableFieldId{};
+  ::agiru::Integer TableFieldId;
   /// \brief Common AL SystemId field.
-  Guid SystemId{};
+  Guid SystemId;
   /// \brief Common AL SystemCreatedAt field.
-  DateTime SystemCreatedAt{};
+  DateTime SystemCreatedAt;
   /// \brief Common AL SystemCreatedBy field.
-  Guid SystemCreatedBy{};
+  Guid SystemCreatedBy;
   /// \brief Common AL SystemModifiedAt field.
-  DateTime SystemModifiedAt{};
+  DateTime SystemModifiedAt;
   /// \brief Common AL SystemModifiedBy field.
-  Guid SystemModifiedBy{};
+  Guid SystemModifiedBy;
 
   /// \brief Original field numbers.
   struct Field_No : SystemFieldNumbers {
@@ -260,7 +252,7 @@ using PageTableField = PageTableField_Table;
 
 /// \brief All fifteen source fields, original obsolete properties and common system fields.
 inline constexpr auto kPageTableFieldFields = WithSystemFields<PageTableField>([] {
-  std::array<FieldDef, PageTableField::kFieldCount> fields{{
+  std::array<FieldDef, 15> fields{{
       Declare<&PageTableField::PageID>(
           PageTableField::Field_No::PageID, "Page ID", "Page ID", offsetof(PageTableField, PageID)),
       Declare<&PageTableField::Index>(
@@ -311,13 +303,12 @@ inline constexpr auto kPageTableFieldFields = WithSystemFields<PageTableField>([
   fields[2].optionOrdinalValues =
       "4912, 4988, 11519, 11775, 11776, 11797, 12799, 26207, 26208, 31488, 31489, 33791, 33793, "
       "34047, 34559, 35071, 35583, 36095, 36863, 37119, 37375";
-  fields[PageTableField::Field_No::Status.Value() - 1].obsoleteState = "Pending";
-  fields[PageTableField::Field_No::Status.Value() - 1].obsoleteReason =
+  fields[5].obsoleteState = "Pending";
+  fields[5].obsoleteReason =
       "This is being removed in favor of the Scope field which provides more granular information.";
-  fields[PageTableField::Field_No::IsTableField.Value() - 1].obsoleteState = "Pending";
-  fields[PageTableField::Field_No::IsTableField.Value() - 1].obsoleteReason =
-      "This is being removed in favor of the FieldKind field which provides "
-      "more granular information.";
+  fields[6].obsoleteState = "Pending";
+  fields[6].obsoleteReason = "This is being removed in favor of the FieldKind field which provides "
+                             "more granular information.";
   return fields;
 }());
 /// \brief Original primary key, clustered by the shared AL default.

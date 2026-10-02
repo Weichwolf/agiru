@@ -20,13 +20,8 @@ namespace agiru {
 /// This list grows as the generator learns types. A type it cannot emit is a translation error
 /// rather than a silent fallback to Text.
 ///
-/// \warning THE NUMBERS ARE THE PLATFORM'S OWN AND NOT A COUNTER. `FieldRef.Type()` and
-///          `Field.Type` return this, and AL compares the result against `Field.Type::Code`
-///          directly -- so a dense 0, 1, 2 ... of this tree's own invention would make every such
-///          comparison quietly false. The sparse values are BC's: measured from
-///          `~/Git/openerp/openerp/runtime/al_system_enums.py`, which mirrors AL's `FieldType`
-///          system type, and cross-checked against `fieldtype-option.md`, whose eighteen documented
-///          members are exactly a subset of them.
+/// \warning These stable internal tags are not native `Field.Type` or `FieldRef.Type()` codes.
+///          Public reflection boundaries require separate, source-backed conversions.
 enum class FieldType : std::uint8_t {
   Boolean = 3,      ///< AL `Boolean`.
   Option = 5,       ///< AL `Option`, and what an Enum field reports too.
@@ -49,8 +44,8 @@ enum class FieldType : std::uint8_t {
 
   /// \brief An enum field, which the PLATFORM does not distinguish and this metadata does.
   ///
-  /// It is deliberately outside the platform's own range: `FieldRef::Type()` reports `Option` for
-  /// a field declared this way, because `fieldtype-option.md` has no `Enum` member at all, and
+  /// It is deliberately outside the ordinary metadata range: `FieldRef::Type()` reports `Option`
+  /// for a field declared this way, because `fieldtype-option.md` has no `Enum` member at all, and
   /// `IsEnum()` is the one place BC puts the difference. So this value never leaves the metadata,
   /// and giving it a platform number would let it escape looking like one.
   Enum = 200,

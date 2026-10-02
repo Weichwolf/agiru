@@ -1122,6 +1122,39 @@ private:
     bool callee = false;
   };
 
+  std::string CallableSpelling(const Reach &reach, const How &how) const {
+    if (reach.spelling != "." || reach.link.kind != al::ExprKind::Name ||
+        reach.base.kind != al::ExprKind::Name) {
+      return {};
+    }
+    if (!how.callee && !how.parens) { return {}; }
+    const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
+    const std::string spelled = AsTheDoorSpellsIt(Identifier(reach.link.text));
+    const bool calledBesideAField =
+        scope_.HasField(member) ||
+        (scope_.IsRecord(reach.base.text) && scope_.MemberSpelling(member) != spelled);
+    std::string besideAField;
+    if (calledBesideAField) {
+      besideAField = scope_.ProcedureOf(member);
+      if (besideAField.empty() && HiddenByABaseMember(spelled)) {
+        const std::string table = scope_.TableOf(reach.base.text);
+        if (!table.empty()) { besideAField = "::agiru::Table<" + table + ">::" + spelled; }
+      }
+    }
+    const bool calledOnAQuery = how.callee &&
+                                SameName(scope_.DeclaredType(reach.base.text), "Query") &&
+                                DoorCalls(reach.link.text);
+    if (calledOnAQuery && besideAField.empty()) { besideAField = spelled; }
+    const std::string baseType = scope_.DeclaredType(reach.base.text);
+    const bool calledOnATestPage =
+        how.callee && (SameName(baseType, "TestPage") || SameName(baseType, "TestRequestPage")) &&
+        DoorCalls(reach.link.text);
+    if (calledOnATestPage && besideAField.empty()) {
+      if (scope_.MemberSpelling(member) != spelled) { besideAField = spelled; }
+    }
+    return besideAField;
+  }
+
   void Link(std::string &out, const Reach &reach, const How &how) {
     if (reach.spelling == ".") {
       out += how.arrow ? "->" : ".";
@@ -1143,37 +1176,7 @@ private:
         return;
       }
     }
-    const bool calledBesideAField =
-        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
-        reach.base.kind == al::ExprKind::Name && scope_.HasField(member);
-    std::string besideAField;
-    if (calledBesideAField) {
-      besideAField = scope_.ProcedureOf(member);
-      if (besideAField.empty() && HiddenByABaseMember(reach.link.text)) {
-        const std::string table = scope_.TableOf(reach.base.text);
-        if (!table.empty()) {
-          besideAField =
-              "::agiru::Table<" + table + ">::" + AsTheDoorSpellsIt(Identifier(reach.link.text));
-        }
-      }
-    }
-    const bool calledOnAQuery =
-        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
-        reach.base.kind == al::ExprKind::Name &&
-        SameName(scope_.DeclaredType(reach.base.text), "Query") && DoorCalls(reach.link.text);
-    if (calledOnAQuery && besideAField.empty()) {
-      besideAField = AsTheDoorSpellsIt(Identifier(reach.link.text));
-    }
-    const std::string baseType =
-        reach.base.kind == al::ExprKind::Name ? scope_.DeclaredType(reach.base.text) : "";
-    const bool calledOnATestPage =
-        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
-        (SameName(baseType, "TestPage") || SameName(baseType, "TestRequestPage")) &&
-        DoorCalls(reach.link.text);
-    if (calledOnATestPage && besideAField.empty()) {
-      const std::string spelled = AsTheDoorSpellsIt(Identifier(reach.link.text));
-      if (scope_.MemberSpelling(member) != spelled) { besideAField = spelled; }
-    }
+    const std::string besideAField = CallableSpelling(reach, how);
     out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(member)
@@ -1198,7 +1201,7 @@ private:
     const std::string rendered = Expression(expression, precedence);
     const bool wrap = expression.kind == al::ExprKind::StringLiteral ||
                       (expression.kind == al::ExprKind::Name && scope_.IsLabel(expression.text));
-    return wrap ? "std::string(" + rendered + ")" : rendered;
+    return wrap ? "::agiru::Text<0>(" + rendered + ")" : rendered;
   }
 
   [[nodiscard]] bool IsText(const al::Expr &expression) const {
@@ -1304,7 +1307,7 @@ private:
     const auto flush = [&out, &run] {
       if (run.empty()) { return; }
       if (!out.empty()) { out += " + "; }
-      out += "std::string(" + run + ")";
+      out += "::agiru::Text<0>(" + run + ")";
       run.clear();
     };
     for (const al::Expr *part : parts) {
@@ -1536,8 +1539,9 @@ public:
 
   TableNames(const al::TableObject &table,
              const Objects &objects,
-             const al::ProcedureDecl *running = nullptr)
-      : table_(table), objects_(objects), running_(running) {}
+             const al::ProcedureDecl *running = nullptr,
+             std::string self = {})
+      : table_(table), objects_(objects), running_(running), self_(std::move(self)) {}
 
   [[nodiscard]] bool ShadowedByALocal(const std::string &identifier) const {
     if (running_ == nullptr) { return false; }
@@ -1604,8 +1608,9 @@ public:
   }
 
   [[nodiscard]] std::string ThisTable() const override {
+    if (!self_.empty()) { return self_; }
     return "::agiru::" + NamespaceSuffix(table_.nameSpace) +
-           ClassName(Identifier(table_.name), ObjectKind::Table);
+           ClassName(TableIdentifier(table_, objects_), ObjectKind::Table);
   }
 
   [[nodiscard]] std::string ProcedureOf(const OfVariable &member) const override {
@@ -1628,10 +1633,7 @@ public:
   }
 
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {
-    if (IsRecord(variable)) {
-      return "::agiru::" + NamespaceSuffix(table_.nameSpace) +
-             ClassName(Identifier(table_.name), ObjectKind::Table);
-    }
+    if (IsRecord(variable)) { return ThisTable(); }
     for (const al::VarDecl *where : {Local(variable), Global(variable)}) {
       if (where == nullptr || TypeName(where->type) != "Record") { continue; }
       const auto table = objects_.tables.find(LowerKey(where->subtype));
@@ -1841,23 +1843,7 @@ public:
   MemberLentParameters(const OfVariable &member) const override {
     const al::VarDecl *declared = Local(member.variable);
     if (declared == nullptr) { declared = Global(member.variable); }
-    if (declared == nullptr && IsRecord(member.variable)) {
-      return LentParametersOf(table_.procedures, member.field, objects_, table_.name);
-    }
     return MemberLentParametersOf(objects_, declared, member.field);
-  }
-
-  [[nodiscard]] std::vector<std::string> LentParameters(std::string_view name) const override {
-    return LentParametersOf(table_.procedures, name, objects_, table_.name);
-  }
-
-  [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
-    const al::VarDecl *declared = Local(variable);
-    if (declared == nullptr) { declared = Global(variable); }
-    if (declared != nullptr) { return TypeName(declared->type); }
-    const al::FieldDecl *field = FieldNamed(table_, variable);
-    if (field != nullptr) { return TypeName(field->type); }
-    return IsRecord(variable) ? "Record" : std::string{};
   }
 
   [[nodiscard]] std::string Enumeration(std::string_view name) const override {
@@ -1876,6 +1862,10 @@ public:
         }
       }
       return {};
+    }
+    if (const std::string bound = FieldEnumerationOf(objects_, table_.name, field->name);
+        !bound.empty()) {
+      return bound;
     }
     if (const al::Property *members = Find(field->properties, "OptionMembers");
         members != nullptr) {
@@ -1981,33 +1971,22 @@ public:
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (IsRecord(field.variable)) { return Enumeration(field.field); }
-    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
-      if (const std::string column = QueryColumnEnumeration(objects_, where, field.field);
-          !column.empty()) {
-        return column;
-      }
+    const al::VarDecl *where = Local(field.variable);
+    if (where == nullptr) { where = Global(field.variable); }
+    if (const std::string column = QueryColumnEnumeration(objects_, where, field.field);
+        !column.empty()) {
+      return column;
     }
-    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
-      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
-      const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
-      if (table == objects_.fieldEnums.end()) { break; }
-      const auto found = table->second.find(LowerKey(std::string(field.field)));
-      if (found != table->second.end()) { return found->second; }
-    }
-    for (const al::VarDecl *where : {Local(field.variable), Global(field.variable)}) {
-      if (where == nullptr || TypeName(where->type) != "Record") { continue; }
-      const auto table = objects_.fieldEnums.find(LowerKey(where->subtype));
-      if (table == objects_.fieldEnums.end()) { return {}; }
-      const auto found = table->second.find(LowerKey(std::string(field.field)));
-      return found == table->second.end() ? std::string{} : found->second;
-    }
-    return {};
+    return where == nullptr || TypeName(where->type) != "Record"
+               ? std::string{}
+               : FieldEnumerationOf(objects_, where->subtype, field.field);
   }
 
 private:
   const al::TableObject &table_;
   const Objects &objects_;
   const al::ProcedureDecl *running_;
+  std::string self_;
 };
 
 class PageNames : public Names {
@@ -2035,55 +2014,6 @@ public:
     return &table->second;
   }
 
-  [[nodiscard]] std::string SourceSubtype() const {
-    if (source_ != nullptr) {
-      const std::string id = std::to_string(source_->id);
-      return objects_.tables.contains(LowerKey(id)) ? id : source_->name;
-    }
-    const al::Property *source = Find(page_.properties, "SourceTable");
-    if (source == nullptr) { return {}; }
-    std::string subtype;
-    for (const al::Token &token : source->value) { subtype += token.text; }
-    return subtype.empty() ? source->text : subtype;
-  }
-
-  [[nodiscard]] std::string RecordSubtype(std::string_view variable) const {
-    if (DataItemTable() != nullptr && SameName("Rec", variable)) { return dataItem_->subtype; }
-    if (const al::VarDecl *declared = DeclarationOf(variable); declared != nullptr) {
-      return TypeName(declared->type) == "Record" ? declared->subtype : std::string{};
-    }
-    return SameName("Rec", variable) || SameName("xRec", variable) ? SourceSubtype()
-                                                                   : std::string{};
-  }
-
-  [[nodiscard]] const TableRef *RecordOf(std::string_view variable) const {
-    const auto table = objects_.tables.find(LowerKey(RecordSubtype(variable)));
-    return table == objects_.tables.end() || table->second.header.empty() ? nullptr
-                                                                          : &table->second;
-  }
-
-  [[nodiscard]] std::string PlatformFieldOf(const OfVariable &member) const {
-    const TableRef *table = RecordOf(member.variable);
-    if (table == nullptr || !table->identifier.starts_with("::agiru::platform::")) { return {}; }
-    const std::string name = table->identifier.substr(table->identifier.rfind("::") + 2);
-    return PlatformFieldSpelling({.table = name, .field = member.field});
-  }
-
-  [[nodiscard]] std::string RecordFieldOf(const OfVariable &member) const {
-    if (const TableRef *table = RecordOf(member.variable); table != nullptr) {
-      const auto field = table->fields.find(LowerKey(std::string(member.field)));
-      if (field != table->fields.end()) { return field->second; }
-      if (table->fields.empty()) { return PlatformFieldOf(member); }
-    }
-    if (IsRecord(member.variable) && source_ != nullptr &&
-        (DataItemTable() == nullptr || !SameName("Rec", member.variable))) {
-      if (const al::FieldDecl *field = FieldNamed(*source_, member.field); field != nullptr) {
-        return FieldIdentifier(*source_, field->name);
-      }
-    }
-    return {};
-  }
-
   [[nodiscard]] std::string DataItemField(std::string_view name) const {
     const TableRef *table = DataItemTable();
     if (table == nullptr) { return {}; }
@@ -2100,7 +2030,8 @@ public:
       return "Rec." + procedure->second;
     }
     if (dataItem_ != nullptr && table->identifier.starts_with("::agiru::platform::")) {
-      const std::string spelled = PlatformFieldOf({.variable = "Rec", .field = name});
+      const std::string spelled =
+          PlatformFieldSpelling(PlatformField{.table = dataItem_->subtype, .field = name});
       if (!spelled.empty()) { return "Rec." + spelled; }
     }
     return {};
@@ -2108,13 +2039,14 @@ public:
 
   [[nodiscard]] std::string BareRecordCall(std::string_view name) const override {
     if (!LocalSpelling(name).empty() || !GlobalSpelling(name).empty()) { return {}; }
-    if (!IsRecord("Rec") || HasField({.variable = "Rec", .field = name}) ||
-        !ControlOf(name).empty()) {
-      return {};
-    }
-    if (const std::string procedure = ProcedureOf({.variable = "Rec", .field = name});
-        !procedure.empty()) {
-      return "Rec." + procedure;
+    if (DataItemTable() == nullptr && source_ == nullptr) { return {}; }
+    if (source_ != nullptr && DataItemTable() == nullptr) {
+      if (FieldNamed(*source_, name) != nullptr || !ControlOf(name).empty()) { return {}; }
+      for (const al::ProcedureDecl &procedure : source_->procedures) {
+        if (SameName(procedure.name, name)) {
+          return "Rec." + ProcedureIdentifier(*source_, procedure.name);
+        }
+      }
     }
     const std::string spelled = AsTheDoorSpellsIt(Identifier(name));
     return TableMembers().contains(spelled) ? "Rec." + spelled : std::string{};
@@ -2231,12 +2163,11 @@ public:
       if (const std::string field = DataItemField(name); !field.empty()) { return field; }
       if (const std::string global = GlobalSpelling(name); !global.empty()) { return global; }
     }
-    if (const TableRef *table = RecordOf("Rec"); table != nullptr) {
-      const auto field = table->fields.find(LowerKey(std::string(name)));
-      if (field != table->fields.end()) { return "Rec." + field->second; }
-    }
-    if (source_ != nullptr && FieldNamed(*source_, name) != nullptr) {
-      return "Rec." + MemberSpelling({.variable = "Rec", .field = name});
+    if (source_ != nullptr) {
+      const al::FieldDecl *field = FieldNamed(*source_, name);
+      if (field != nullptr) {
+        return "Rec." + MemberSpelling(OfVariable{.variable = "Rec", .field = field->name});
+      }
     }
     if (SameName("Rec", name)) { return "Rec"; }
     if (SameName("CurrPage", name)) { return "(*this)"; }
@@ -2245,9 +2176,7 @@ public:
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
     if (DataItemTable() != nullptr && SameName("Rec", variable)) { return true; }
-    return DeclarationOf(variable) == nullptr &&
-           (SameName("Rec", variable) || SameName("xRec", variable)) &&
-           (source_ != nullptr || RecordOf(variable) != nullptr);
+    return source_ != nullptr && (SameName("Rec", variable) || SameName("xRec", variable));
   }
 
   [[nodiscard]] bool IsVariable(std::string_view name) const override {
@@ -2269,8 +2198,13 @@ public:
         query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
       return !QueryColumnOf(objects_, query, member.field).isColumn && DoorCalls(member.field);
     }
-    if (IsRecord(member.variable) || RecordOf(member.variable) != nullptr) {
-      return DoorCalls(member.field) && RecordFieldOf(member).empty();
+    if (const TableRef *table = DataItemTable();
+        table != nullptr && SameName("Rec", member.variable)) {
+      return DoorCalls(member.field) &&
+             !table->fields.contains(LowerKey(std::string(member.field)));
+    }
+    if (IsRecord(member.variable)) {
+      return DoorCalls(member.field) && FieldNamed(*source_, member.field) == nullptr;
     }
     if (SameName("CurrPage", member.variable)) {
       return DoorCalls(member.field) && ControlOf(member.field).empty();
@@ -2302,12 +2236,12 @@ public:
   }
 
   [[nodiscard]] std::string ProcedureOf(const OfVariable &member) const override {
-    if (const TableRef *table = RecordOf(member.variable); table != nullptr) {
+    if (const TableRef *table = DataItemTable();
+        table != nullptr && SameName("Rec", member.variable)) {
       const auto found = table->procedures.find(LowerKey(std::string(member.field)));
-      if (found != table->procedures.end()) { return found->second; }
+      return found == table->procedures.end() ? std::string{} : found->second;
     }
-    if (IsRecord(member.variable) && source_ != nullptr &&
-        (DataItemTable() == nullptr || !SameName("Rec", member.variable))) {
+    if (IsRecord(member.variable)) {
       for (const al::ProcedureDecl &procedure : source_->procedures) {
         if (SameName(procedure.name, member.field)) {
           return ProcedureIdentifier(*source_, procedure.name);
@@ -2323,7 +2257,11 @@ public:
       const auto found = unit->second.procedures.find(LowerKey(std::string(member.field)));
       return found == unit->second.procedures.end() ? std::string{} : found->second;
     }
-    return {};
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return {}; }
+    const auto table = objects_.tables.find(LowerKey(declared->subtype));
+    if (table == objects_.tables.end()) { return {}; }
+    const auto found = table->second.procedures.find(LowerKey(std::string(member.field)));
+    return found == table->second.procedures.end() ? std::string{} : found->second;
   }
 
   [[nodiscard]] bool HasField(const OfVariable &member) const override {
@@ -2331,28 +2269,46 @@ public:
       return true;
     }
     const std::string spelled = LowerKey(Identifier(member.field));
-    if (const TableRef *table = RecordOf(member.variable); table != nullptr) {
+    if (const TableRef *table = DataItemTable();
+        table != nullptr && SameName("Rec", member.variable)) {
       if (table->fields.contains(LowerKey(std::string(member.field)))) { return true; }
       if (std::ranges::any_of(table->fields, [&](const auto &field) {
             return LowerKey(Identifier(field.second)) == spelled;
           })) {
         return true;
       }
-      if (!PlatformFieldOf(member).empty()) { return true; }
+      return dataItem_ != nullptr && table->identifier.starts_with("::agiru::platform::") &&
+             PlatformFieldNamed(PlatformField{.table = dataItem_->subtype, .field = member.field});
     }
-    if (IsRecord(member.variable) && source_ != nullptr &&
-        (DataItemTable() == nullptr || !SameName("Rec", member.variable))) {
+    if (IsRecord(member.variable)) {
       if (FieldNamed(*source_, member.field) != nullptr) { return true; }
       return std::ranges::any_of(source_->fields, [&](const al::FieldDecl &field) {
         return LowerKey(Identifier(field.name)) == spelled;
       });
     }
-    return false;
+    const al::VarDecl *declared = DeclarationOf(member.variable);
+    if (declared == nullptr || TypeName(declared->type) != "Record") { return false; }
+    const auto table = objects_.tables.find(LowerKey(declared->subtype));
+    if (table == objects_.tables.end()) { return false; }
+    if (table->second.fields.contains(LowerKey(std::string(member.field)))) { return true; }
+    return std::ranges::any_of(table->second.fields, [&](const auto &field) {
+      return LowerKey(Identifier(field.second)) == spelled;
+    });
   }
 
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {
-    const TableRef *table = RecordOf(variable);
-    return table == nullptr ? std::string{} : table->identifier;
+    std::string subtype;
+    if (DataItemTable() != nullptr && SameName("Rec", variable)) {
+      subtype = dataItem_->subtype;
+    } else if (IsRecord(variable)) {
+      subtype = source_->name;
+    } else if (const al::VarDecl *declared = DeclarationOf(variable);
+               declared != nullptr && TypeName(declared->type) == "Record") {
+      subtype = declared->subtype;
+    }
+    if (subtype.empty()) { return {}; }
+    const auto table = objects_.tables.find(LowerKey(subtype));
+    return table == objects_.tables.end() ? std::string{} : table->second.identifier;
   }
 
   [[nodiscard]] std::vector<std::string> LentParameters(std::string_view name) const override {
@@ -2366,8 +2322,7 @@ public:
 
   [[nodiscard]] std::string DeclaredType(std::string_view variable) const override {
     const al::VarDecl *where = DeclarationOf(variable);
-    return where == nullptr ? (IsRecord(variable) ? "Record" : std::string{})
-                            : TypeName(where->type);
+    return where == nullptr ? std::string{} : TypeName(where->type);
   }
 
   [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
@@ -2494,8 +2449,20 @@ public:
       const auto field = fields->find(LowerKey(std::string(member.field)));
       return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
     }
-    if (const std::string platform = PlatformFieldOf(member); !platform.empty()) {
-      return platform;
+    if (const al::VarDecl *where = DeclarationOf(member.variable); where != nullptr) {
+      const std::string platform =
+          PlatformFieldSpelling(PlatformField{.table = where->subtype, .field = member.field});
+      if (!platform.empty()) { return platform; }
+    }
+    if (dataItem_ != nullptr && SameName("Rec", member.variable)) {
+      const std::string platform =
+          PlatformFieldSpelling(PlatformField{.table = dataItem_->subtype, .field = member.field});
+      if (!platform.empty()) { return platform; }
+    }
+    if (const TableRef *table = DataItemTable();
+        table != nullptr && SameName("Rec", member.variable)) {
+      const auto field = table->fields.find(LowerKey(std::string(member.field)));
+      return field != table->fields.end() ? field->second : AsTheDoorSpellsIt(member.field);
     }
     if (const al::FieldDecl *own = IsRecord(member.variable) && source_ != nullptr
                                        ? FieldNamed(*source_, member.field)
@@ -2515,43 +2482,40 @@ public:
   }
 
   [[nodiscard]] const std::map<std::string, std::string> *
-  FieldsOfRecord(std::string_view variable) const {
-    const TableRef *table = RecordOf(variable);
-    return table == nullptr || table->fields.empty() ? nullptr : &table->fields;
+  FieldsForTable(std::string_view subtype) const {
+    const auto table = objects_.tables.find(LowerKey(std::string(subtype)));
+    return table == objects_.tables.end() || table->second.fields.empty() ? nullptr
+                                                                          : &table->second.fields;
   }
 
-  [[nodiscard]] std::string SourceEnumeration(std::string_view name) const {
-    if (source_ != nullptr) {
-      if (const std::string bound = FieldEnumerationOf(objects_, std::to_string(source_->id), name);
-          !bound.empty()) {
-        return bound;
-      }
-      if (const std::string bound = FieldEnumerationOf(objects_, source_->name, name);
-          !bound.empty()) {
-        return bound;
-      }
-      const al::FieldDecl *field = FieldNamed(*source_, name);
-      if (field == nullptr) { return {}; }
-      if (const al::Property *members = Find(field->properties, "OptionMembers");
-          members != nullptr) {
-        return OptionEnumName(source_->name, field->name, al::ListValue(*members));
-      }
-      return TypeName(field->type) == "Enum" && !field->subtype.empty()
-                 ? NamedEnum(objects_, field->subtype)
-                 : std::string{};
+  [[nodiscard]] const std::map<std::string, std::string> *
+  FieldsOfRecord(std::string_view variable) const {
+    if (const TableRef *table = DataItemTable();
+        table != nullptr && SameName("Rec", variable) && !table->fields.empty()) {
+      return &table->fields;
     }
-    return FieldEnumerationOf(objects_, SourceSubtype(), name);
+    if (running_ != nullptr) {
+      for (const auto *where : {&running_->variables, &running_->parameters}) {
+        for (const al::VarDecl &declared : *where) {
+          if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") {
+            continue;
+          }
+          return FieldsForTable(declared.subtype);
+        }
+      }
+    }
+    for (const al::VarDecl &declared : page_.variables) {
+      if (!SameName(declared.name, variable) || TypeName(declared.type) != "Record") { continue; }
+      return FieldsForTable(declared.subtype);
+    }
+    if (source_ != nullptr && (SameName("Rec", variable) || SameName("xRec", variable))) {
+      return FieldsForTable(std::to_string(source_->id));
+    }
+    return nullptr;
   }
 
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
-    if (dataItem_ != nullptr && SameName("Rec", field.variable)) {
-      return FieldEnumerationOf(objects_, dataItem_->subtype, field.field);
-    }
-    if (SameName("Rec", field.variable) || SameName("xRec", field.variable)) {
-      if (const std::string source = SourceEnumeration(field.field); !source.empty()) {
-        return source;
-      }
-    }
+    if (IsRecord(field.variable)) { return Enumeration(field.field); }
     const al::VarDecl *where = DeclarationOf(field.variable);
     if (const std::string column = QueryColumnEnumeration(objects_, where, field.field);
         !column.empty()) {
@@ -2577,12 +2541,25 @@ public:
       if (TypeName(where->type) == "Enum" && !where->subtype.empty()) {
         return NamedEnum(objects_, where->subtype);
       }
-      return {};
     }
     if (dataItem_ != nullptr && LocalSpelling(name).empty() && !DataItemField(name).empty()) {
       return FieldEnumeration(OfVariable{.variable = dataItem_->name, .field = std::string(name)});
     }
-    return SourceEnumeration(name);
+    if (source_ == nullptr) { return {}; }
+    const al::FieldDecl *field = FieldNamed(*source_, name);
+    if (field == nullptr) { return {}; }
+    if (const std::string bound = FieldEnumerationOf(objects_, source_->name, field->name);
+        !bound.empty()) {
+      return bound;
+    }
+    if (const al::Property *members = Find(field->properties, "OptionMembers");
+        members != nullptr) {
+      return OptionEnumName(source_->name, field->name, al::ListValue(*members));
+    }
+    if (TypeName(field->type) == "Enum" && !field->subtype.empty()) {
+      return NamedEnum(objects_, field->subtype);
+    }
+    return {};
   }
 
 private:
@@ -2624,7 +2601,7 @@ std::string SourceOfPage(const al::TableObject *source, const Objects &objects) 
 
 std::string
 WriteSource(const al::TableObject &table, const std::string &sourcePath, const Objects &objects) {
-  const std::string identifier = Identifier(table.name);
+  const std::string identifier = TableIdentifier(table, objects);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
@@ -2700,12 +2677,12 @@ std::string WriteDefinitions(const al::TableObject &table,
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
-  out += "#include \"" + Identifier(table.name) + ".h\"\n\n";
+  out += "#include \"" + TableIdentifier(table, objects) + ".h\"\n\n";
   out += kDoorMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + TableDefinitions(table, objects);
   const std::string space = NamespaceOf(table.nameSpace);
-  const std::string identifier = Identifier(table.name);
+  const std::string identifier = TableIdentifier(table, objects);
   out += "namespace " + space + " {\n\nnamespace {\nnamespace " + identifier +
          "_unit {\nconst RegisterTable<" + ClassName(identifier, ObjectKind::Table) +
          "> kInCatalogue;\n} // namespace " + identifier +
@@ -2722,8 +2699,11 @@ std::string QueryProcedureBodies(const al::TableObject &facade,
   const std::string space = NamespaceOf(facade.nameSpace);
   for (const al::ProcedureDecl &procedure : facade.procedures) {
     const std::string body =
-        WriteStatements(TableNames(facade, objects, &procedure), procedure.body, 2) +
-        FallsOffEnd(procedure, TableNames(facade, objects, &procedure));
+        WriteStatements(TableNames(facade, objects, &procedure, InNamespace(space, className)),
+                        procedure.body,
+                        2) +
+        FallsOffEnd(procedure,
+                    TableNames(facade, objects, &procedure, InNamespace(space, className)));
     const std::string locals =
         ProcedureLocals(
             procedure, objects, facade.name, facade.procedures, shadowedByColumns, body) +
@@ -3598,7 +3578,7 @@ std::string WriteSource(const al::PageObject &page,
                         const std::string &sourcePath,
                         const Objects &objects,
                         const al::TableObject *source) {
-  const std::string identifier = Identifier(page.name);
+  const std::string identifier = PageIdentifier(page, objects);
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
@@ -3681,12 +3661,12 @@ std::string WriteDefinitions(const al::PageObject &page,
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
-  out += "#include \"" + Identifier(page.name) + ".h\"\n\n";
+  out += "#include \"" + PageIdentifier(page, objects) + ".h\"\n\n";
   out += kDoorMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + PageDefinition(page, objects, source);
   const std::string space = NamespaceOf(page.nameSpace);
-  const std::string identifier = Identifier(page.name);
+  const std::string identifier = PageIdentifier(page, objects);
   if (page.xmlport) {
     const auto text = [&page](std::string_view name, std::string_view fallback) {
       const al::Property *found = al::Find(page.properties, name);
