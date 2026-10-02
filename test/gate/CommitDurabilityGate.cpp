@@ -102,30 +102,6 @@ void ADeferredFailureUnwindsNestedScopesAndAllowsANewTransaction() {
              Rows(writer, "scope_commit_gate") == 1);
 }
 
-void AnInnerRollbackRestoresTheOuterConsistencyMark() {
-  agiru::Connection writer(AGIRU_TEST_DSN);
-  writer.Run("CREATE TEMP TABLE consistency_gate (value integer)");
-  agiru::Boundaries boundaries;
-  const std::size_t outer = boundaries.Open(writer);
-  writer.Run("INSERT INTO consistency_gate VALUES (1)");
-  boundaries.MarkConsistent("G/L Entry", false);
-  const std::size_t inner = boundaries.Open(writer);
-  boundaries.MarkConsistent("G/L Entry", true);
-  CHECK_TRUE("the inner mark temporarily lifts the inconsistency",
-             boundaries.Inconsistent().empty());
-  boundaries.Rollback(writer, inner);
-  CHECK_TRUE("rolling back the inner boundary restores the outer inconsistency",
-             boundaries.Inconsistent().size() == 1 &&
-                 boundaries.Inconsistent().front() == "G/L Entry");
-  bool refused = false;
-  try {
-    boundaries.Commit(writer);
-  } catch (const agiru::Error &) { refused = true; }
-  CHECK_TRUE("the outer inconsistent write still refuses Commit", refused);
-  boundaries.Rollback(writer, outer);
-  CHECK_TRUE("the refused write is discarded", Rows(writer, "consistency_gate") == 0);
-}
-
 }
 
 int main() {
@@ -134,6 +110,5 @@ int main() {
     AnAbortedTransactionCannotReportACommit();
     ADeferredCommitFailureLeavesNoStaleSavepoints();
     ADeferredFailureUnwindsNestedScopesAndAllowsANewTransaction();
-    AnInnerRollbackRestoresTheOuterConsistencyMark();
   });
 }

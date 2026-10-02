@@ -1,27 +1,26 @@
 # 0718 — Record images and temporary handles will survive copies without dangling references
 
-Status: open | Priority: P0 | Stage: UT ownership | Reviewed: 2026-09-28
-Depends on: none; activation uses 0058.
+Status: open | Priority: P0 | Reviewed: 2026-09-22
 
-## Evidence
+## Current evidence
 
-- HeldImage preserves addresses across Copy/Get/Insert/Modify; allocation, SharedRecord and boxed RecordRef/FieldRef/KeyRef lifetime regressions have ASan/UBSan gates.
-- Remaining raw Instance bridges are not fully audited. Historical SCM tracking mismatches are downstream symptoms, not proof of a remaining lifetime defect.
+`include/runtime/Table.h::CaptureImage` previously replaced the owned image; `RecordState.h::CopyStateFrom` swapped out the state that owned it, while `xRec` had been handed out as a reference. The new `RecordImageGate` failed on the old implementation because `Copy` changed the image address. `HeldImage` now stores a pointer to immutable type operations and updates a live image in place; `CopyStateFrom` preserves the destination's owner while copying source state. The expanded gate proves Insert updates the same image and Copy retains the destination address while copying a nonblank source image: 71 local gates passed. AddressSanitizer passed with the held reference dereferenced (6 checks). Get/Modify/nested triggers and complete AL A/B remain pending. The full analysis additionally flags uninitialized-state paths in `SharedRecord::Reset` and several RecordRef methods; reproduce them under sanitizers before classifying them. Its historical -7 regression was traced to committed serial rows leaking between tests, not evidence that freed memory was correct.
 
-## Implementation
+The complete frozen run reached all 2,310 methods without a crash, but `SCM Available to Pick UT` still failed 21 methods. Seven share a tracking mismatch where `Qty. to Handle (Base)` stays 4 while 10 or 125 is expected. Select one of those methods on a fresh seed clone, trace the tracking row and xRec through validation, event subscribers, temporary Copy and Commit boundaries, and compare with the predecessor's named xRec findings. Keep test isolation and record-image lifetime as separate hypotheses until the trace identifies the first wrong value.
 
-1. Audit `Instance`, HeldImage, SharedRecord and Variant bridges: explicit owner, aliases, Close/move/destruction behavior, exception guarantee. Preserve temporary storage sharing separately from record/filter/cursor copying.
-2. Keep existing image owners stable while assigning fields; prepare allocations before publishing state. Do not promise strong field-value rollback for a throwing assignment unless implemented.
-3. Trace the first wrong tracking quantity through validation/events/temp Copy under the corrected runner. Compare SCM Available to Pick, Payment Export Validation and Price Worksheet Line as complete codeunits, then all UT.
-4. Preserve shared RecordRefState semantics: FieldRef/KeyRef survive the creating handle, Record() mutations affect the same state and Close invalidates aliases safely.
+## Implementation for Sol
+
+1. Extend the failing-before/green-after `RecordImageGate` through Get, Modify and nested triggers, then repeat under ASan/UBSan. The first version covers Copy; the expanded version adds Insert and source-to-destination image content.
+2. Keep the destination image owner when copying filter/cursor state and update existing images in place. The type-erased image operations now live in immutable static data, with an image pointer and one operations pointer per populated state. Verify allocation failure leaves the old owner intact. Specify separately when temporary table storage is shared and when record fields are copied.
+3. Coordinate with 0039: test-isolation rollback must include explicit commits while preserving a commit across an inner Codeunit.Run rollback. Do not install CommitScope(Ignore) around every test; the historical full run lost 15 cases with that shortcut.
+4. Recheck Variant, RecordRef and Instance lifetime bridges against the same fixture. Variant already owns record snapshots; the old claim that it always stores a bare address is obsolete.
 
 ## Acceptance
 
-- Meaningful failing-before controls cover lifetime, aliases and allocation failure under ASan/UBSan; no new suppression.
-- Full source population has zero crashes and no unexplained losses. Do not replace commits with Ignore to mask leaked test state.
+ASan fixture fails before the ownership repair and passes after it. Compare the same complete SCM Available to Pick UT codeunit, Payment Export Validation UT and Price Worksheet Line UT before/after, then the whole milestone. Report crashes and method identities, not only aggregate wins.
 
 ## References
 
-Code: `include/runtime/{RecordState,RecordRef,Codeunit}.h`, `include/type/KeyRef.h`, `src/rt/RecordRef.cpp`; gates: `RecordImageGate`, `RecordRefGate`, `SharedRecordGate`, `EventGate`, `RenameGate`. Platform: system-defined variables, Record.Copy, RecordRef.GetTable and Variant contracts. AL: TrackingSpecification, SCMAvailabletoPickUT, ApprovalEntryOverview. Predecessor: WI-781/1078/1137/1156/1095/1241.
+Platform: devenv-system-defined-variables.md, methods-auto/record/record-copy-method.md. AL: TrackingSpecification.Table.al and SCMAvailabletoPickUT.Codeunit.al. Predecessor: WI-781, WI-1078, WI-1137, WI-1156; Variant findings WI-1095 and WI-1241.
 
-Property scope: `testisolation`.
+Consolidated property scope (look up each under `developer/properties/`; carriage alone does not close behaviour): `testisolation`.

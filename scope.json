@@ -1,5 +1,5 @@
 {
-  "_doc": "Canonical selection policy, shared by transpilation, gates, source inventory and seed provenance. Namespace matching uses the longest case-insensitive prefix on a dot boundary; ties exclude, no match excludes. Local ERP/API helpers in Microsoft.Integration.Graph are not the Microsoft cloud Graph client and remain required. Other legacy re-inclusions preserve current core dependency reachability, not permission to implement excluded Microsoft services. Licensing and Microsoft cloud integration retirement needs explicit source/dependency classification (board 0725); namespace omissions remain coverage gaps unless approved. Never equate a Microsoft name or Scope=Cloud with an external-service dependency.",
+  "_doc": "What of BC this tree translates, and it is a WHITELIST. A namespace is in scope when the LONGEST matching prefix -- case-insensitive, on a dot boundary -- comes from `include`; an `exclude` entry wins over a shorter `include` prefix, which is what makes a carve-out possible. No match at all is out of scope. `Microsoft` is whitelisted WHOLE, because the goal is the complete BC business functionality and not a subset; what is carved out of it is the CLOUD GLUE -- Dataverse, D365 sync, Graph, PowerBI, Booking -- which has nothing to talk to in a standalone ERP. `System.*` is whitelisted per sub, because that is where the platform glue lives. WIDENED 2026-09-09 (board:0631): what an in-scope object NAMES is in scope -- Dataverse, D365Sales and SyncEngine because `Item.OnInsert` asks `CRM Integration Management` whether the integration is enabled and the on-premises answer is false; `System.Azure.Identity` because every session's role centre is read out of `Role Center from Plans`; `System.Privacy` and `System.Telemetry` because the BaseApp logs feature uptake and privacy approval on document paths. A codeunit that is installed and disabled is BC's own on-premises picture. `Microsoft.CRM.Outlook` followed on 2026-09-09 for the same reason: `Office Management` is asked by the document pages whether the add-in is running, and the answer on premises is no (24 UT cases named it). THIS IS THE PREDECESSOR'S OWN SCOPE, entry for entry: `~/Git/openerp/scripts/transpiler/scope.json`, where the border cases were decided by the user and are recorded in its WI-990 -- CRM stays whole except Outlook, because Microsoft.CRM.Team is Salesperson (table 13) and Microsoft.CRM.Contact is 5050 and both are document foundation; e-invoicing stays whole INCLUDING its transport, because 'exclude the interfaces' meant cloud sync and not sending an e-document.",
   "include": [
     "Microsoft",
     "Microsoft.Integration.Entity",
@@ -76,7 +76,7 @@
     "System.Test.Integration.PowerBI",
     "System.Test.Integration.Graph"
   ],
-  "_area_doc": "Namespace-less files use their top-level folder within the configured app. Local Graph/API data helpers and their UT stay required. Existing area omissions remain visible coverage gaps, not automatic product exclusions.",
+  "_area_doc": "A file that declares NO namespace is decided by the top-level folder it sits in instead. W1's test suite is 91 % namespace-less, so the folder is the only signal it has. `CRM integration` is Dataverse sync and goes; the real CRM tests live under ERM and Marketing and stay. A `-Internal` suffix marks a test of the test framework. `Graph` STAYS (2026-09-12): its two UT codeunits -- Graph Collect Mgt Item UT and O365 Integration Record UT -- test `Microsoft.Integration.Graph` objects that are in scope and are counted in the milestone's 78, and a codeunit that is counted has to run.",
   "area_exclude": [
     "Azure AI",
     "CRM integration",
@@ -85,9 +85,5 @@
   ],
   "area_exclude_suffix": [
     "-Internal"
-  ],
-  "_product_doc": "Explicit approved source exclusions, reason:path relative to BCApps/src. A trailing slash selects a module directory, otherwise a single exact file. No filename/namespace heuristic. Raw object and method identities always remain inventoried. Current exclusion is a test of BC license/trial warnings and BC SaaS sandbox notifications, not general notifications or ERP workflows.",
-  "product_exclude": [
-    "licensing-and-microsoft-cloud:Layers/W1/Tests/SMB/O365RoleCenterNotifications.Codeunit.al"
   ]
 }

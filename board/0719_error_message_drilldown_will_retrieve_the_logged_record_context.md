@@ -1,22 +1,22 @@
 # 0719 — Error-message drilldown will retrieve the logged record context
 
-Status: open | Priority: P1 | Stage: UT | Reviewed: 2026-09-28
-Depends on: 0061 original error; 0055 typed context; 0030 traps; 0718 ownership.
+Status: open | Priority: P1 | Reviewed: 2026-09-22
 
-## Evidence
+## Current evidence
 
-- Incoming Doc. To Data Exch.UT has conversion, missing-error and unopened-page failures. Their common root is not established.
+The previous trace plan identifies Incoming Doc. To Data Exch.UT: the conversion failure should be caught, logged under a RecordId context, then exposed by a trapped Error Messages page. It remains a hypothesis until reproduced on the repaired image/runner; no current result was measured in this review.
 
-## Implementation
+## Implementation for Sol
 
-1. Run the complete codeunit on a fresh clone with `AGIRU_TRACE_ERRORS=1`; preserve the first caught error and initialization order.
-2. Trace ErrorMessage insert → RecordId serialization → SetContextFilter → DrillDown/trap. Distinguish no log row, wrong context filter and unopened page.
-3. Fix only the demonstrated generic primitive; add one reduced context round trip and one trapped DrillDown case. Feed the scenario into 0720 parity.
+1. After 0718 and 0061, run the complete codeunit on a fresh seed and isolate TestProcessWithDataExchSucceeds while preserving its initialization.
+2. Trace the error insert and the drilldown select, including RecordId serialization and context filters. Determine whether logging never occurred, the filter differs, or page trapping failed.
+3. Fix the generic primitive identified by that trace. Do not special-case the table, test, page name or expected message.
+4. Add a reduced error-context round trip and trapped DrillDown fixture, then include it in the HTTP parity suite.
 
 ## Acceptance
 
-- Correct context retrieves the logged row/message and opens its page; different context returns none. Full UT comparison reports no unexplained losses.
+Logged RecordId context survives write/read/filter and the intended trapped page opens with the same message. An intentionally different context returns no rows; SQL tracing is removed or remains a generic opt-in facility.
 
 ## References
 
-AL: `IncomingDocToDataExchUT.Codeunit.al`, `ErrorMessage.Table.al::{SetContext,SetContextFilter,ShowErrorMessages}`. Code: `src/rt/{RecordRef,TestPage,Transaction}.cpp`. Platform: RecordId and TestPage DrillDown overloads. Predecessor: WI-1141/1235.
+AL: IncomingDocToDataExchUT.Codeunit.al, ErrorMessage.Table.al SetContext/SetContextFilter/ShowErrorMessages. Platform: RecordId and TestPage DrillDown methods. Predecessor: search logged-error/context/filter findings after the trace identifies the primitive.

@@ -28,7 +28,6 @@ std::string Utf8(std::string_view text);
 std::string Dump(const XmlHandle &handle);
 std::string DumpChildren(const XmlHandle &handle);
 bool Parse(std::string_view text, bool preserveWhitespace, XmlHandle &into);
-bool ParseLocation(std::string_view location, bool preserveWhitespace, XmlHandle &into);
 std::vector<XmlHandle> XPath(const XmlHandle &from,
                              std::string_view expression,
                              const std::vector<std::pair<std::string, std::string>> &namespaces);

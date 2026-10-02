@@ -42,20 +42,6 @@ def source_revision(path):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def bc_source_revision(path):
-    frozen = os.environ.get('AGIRU_BC_REVISION')
-    if frozen:
-        return frozen
-    if path.resolve().is_relative_to(ROOT):
-        return None
-    tracked = subprocess.run(['git', '-C', str(path), 'ls-files', '-z', '--', '.'],
-                             capture_output=True, check=False)
-    if tracked.returncode != 0 or not any(
-            name.lower().endswith(b'.al') for name in tracked.stdout.split(b'\0')):
-        return None
-    return source_revision(path)
-
-
 def file_sha256(path):
     digest = hashlib.sha256()
     with path.open('rb') as stream:
@@ -91,51 +77,10 @@ def seed_snapshot(dsn):
     return {'database_oid': int(parts[0]), 'size_bytes': int(parts[1])}
 
 
-def seed_identity(dsn):
-    command = ['psql', '-XAt', '-v', 'ON_ERROR_STOP=1', '-d', dsn, '-c']
-    try:
-        exists = subprocess.run(command + ["SELECT to_regclass('public.agiru_seed_provenance')"],
-                                capture_output=True, text=True, check=False, timeout=10)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise ValueError(f'cannot inspect seed provenance: {error}') from error
-    if exists.returncode != 0:
-        raise ValueError(f'cannot inspect seed provenance: {exists.stderr.strip()}')
-    if not exists.stdout.strip():
-        return None
-    try:
-        result = subprocess.run(command + [
-            "SELECT status || E'\\t' || details::text FROM public.agiru_seed_provenance "
-            "WHERE singleton"], capture_output=True, text=True, check=False, timeout=10)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise ValueError(f'cannot read seed provenance: {error}') from error
-    if result.returncode != 0:
-        raise ValueError(f'cannot read seed provenance: {result.stderr.strip()}')
-    status, separator, encoded = result.stdout.strip().partition('\t')
-    if not separator or status != 'complete':
-        raise ValueError(f'seed provenance is not complete: {status or "missing"}')
-    try:
-        details = json.loads(encoded)
-    except json.JSONDecodeError as error:
-        raise ValueError(f'seed provenance is not valid JSON: {error}') from error
-    if not isinstance(details, dict) or not details.get('id'):
-        raise ValueError('seed provenance has no identity')
-    return details
-
-
 def require_current_image():
-    build = ROOT / 'build'
     try:
-        configured = subprocess.run(['ninja', '-C', str(build), 'build.ninja'],
-                                    capture_output=True, text=True, check=False, timeout=30)
-        if configured.returncode != 0:
-            raise ValueError(f'cannot refresh the build graph: {configured.stderr}')
-        # CMake's always-dirty glob edge makes a dry run of build.ninja stop at
-        # regeneration. An alternate manifest checks actual image dependencies.
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.ninja', dir=build) as manifest:
-            manifest.write((build / 'build.ninja').read_text())
-            manifest.flush()
-            result = subprocess.run(['ninja', '-C', str(build), '-f', manifest.name, '-n', 'agiru'],
-                                    capture_output=True, text=True, check=False, timeout=30)
+        result = subprocess.run(['ninja', '-C', str(ROOT / 'build'), '-n', 'agiru'],
+                                capture_output=True, text=True, check=False, timeout=30)
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ValueError(f'cannot inspect the linked image: {error}') from error
     if result.returncode != 0 or not result.stdout.rstrip().endswith('ninja: no work to do.'):
@@ -146,14 +91,6 @@ def write_json(path, value):
     replacement = path.with_suffix(path.suffix + '.pending')
     replacement.write_text(json.dumps(value, indent=2, sort_keys=True) + '\n')
     replacement.replace(path)
-
-
-def finish_run(path, metadata, status, errors):
-    metadata['finished_utc'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    metadata['status'] = status
-    metadata['infrastructure_errors'] = errors
-    write_json(path, metadata)
-    return status
 
 
 def run_one(entry, parts, dsn, maintenance, work_date, timeout, stop, active, lock):
@@ -232,28 +169,51 @@ def terminate(process):
         process.wait()
 
 
-def run_build(workers, stop):
-    if stop.is_set():
-        return 130
-    process = subprocess.Popen(['make', 'all', f'JOBS={workers}'], cwd=ROOT,
-                               start_new_session=True)
-    while process.poll() is None:
-        if stop.is_set():
-            terminate(process)
-            break
-        try:
-            process.wait(timeout=0.25)
-        except subprocess.TimeoutExpired:
-            continue
-    return process.returncode
-
-
 def main(arguments):
-    build = arguments[-1] == '--build'
-    if build:
-        arguments = arguments[:-1]
     if len(arguments) not in (2, 3, 4):
-        raise ValueError('usage: ut-milestone.sh output.log [workers] [master-dsn] [--build]')
+        raise ValueError('usage: ut-milestone.sh output.log [workers] [master-dsn]')
+    output = Path(arguments[1]).resolve()
+    workers = int(arguments[2]) if len(arguments) >= 3 else 6
+    if workers < 1:
+        raise ValueError('workers must be positive')
+    dsn = arguments[3] if len(arguments) == 4 else DEFAULT_DSN
+    maintenance = maintenance_dsn(dsn)
+    work_date = os.environ.get('AGIRU_WORK_DATE', '2028-01-25')
+    timeout = int(os.environ.get('AGIRU_UT_TIMEOUT_SECONDS', str(TIMEOUT_SECONDS)))
+    if timeout < 1:
+        raise ValueError('UT timeout must be positive')
+    require_current_image()
+    source = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
+    tests_root = source / 'Layers/W1/Tests'
+    manifest = scan(tests_root)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path = Path(str(output) + '.manifest.json')
+    write_json(manifest_path, manifest)
+    parts = Path(tempfile.mkdtemp(prefix=output.name + '.parts.', dir=output.parent))
+    binary = ROOT / 'build/agiru'
+    canonical_manifest = [{**entry, 'source': str(Path(entry['source']).relative_to(tests_root))}
+                          for entry in manifest]
+    manifest_digest = hashlib.sha256(json.dumps(canonical_manifest, sort_keys=True).encode()).hexdigest()
+    images = [binary, *sorted(ROOT.joinpath('build').glob('libagiru_*.so'))]
+    metadata = {
+        'agiru_revision': source_revision(ROOT),
+        'image_sha256': {path.name: file_sha256(path) for path in images},
+        'source_revision': source_revision(source),
+        'source_manifest_sha256': manifest_digest,
+        'source_files_sha256': source_sha256(manifest, tests_root),
+        'seed_database': urlsplit(dsn).path.lstrip('/') if '://' in dsn else None,
+        'seed_identity': None,
+        'seed_snapshot_hint': seed_snapshot(dsn),
+        'work_date': work_date,
+        'workers': workers,
+        'timeout_seconds': timeout,
+        'parts': str(parts),
+        'command': ['agiru', 'run-tests', '--fresh', '--codeunit', '<source manifest>',
+                    '--results-jsonl', '<per-codeunit artifact>'],
+        'started_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+    }
+    metadata_path = Path(str(output) + '.run.json')
+    write_json(metadata_path, metadata)
     stop = threading.Event()
     active = {}
     lock = threading.Lock()
@@ -263,85 +223,6 @@ def main(arguments):
 
     signal.signal(signal.SIGINT, request_stop)
     signal.signal(signal.SIGTERM, request_stop)
-    output = Path(arguments[1]).resolve()
-    work_date = os.environ.get('AGIRU_WORK_DATE', '2028-01-25')
-    source = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
-    tests_root = source / 'Layers/W1/Tests'
-    manifest = scan(tests_root)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path = Path(str(output) + '.manifest.json')
-    write_json(manifest_path, manifest)
-    parts = Path(tempfile.mkdtemp(prefix=output.name + '.parts.', dir=output.parent))
-    for entry in manifest:
-        (parts / f"{entry['id']}.status").write_text('-1\n')
-    binary = ROOT / 'build/agiru'
-    canonical_manifest = [{**entry, 'source': str(Path(entry['source']).relative_to(tests_root))}
-                          for entry in manifest]
-    manifest_digest = hashlib.sha256(json.dumps(canonical_manifest, sort_keys=True).encode()).hexdigest()
-    metadata = {
-        'agiru_revision': None,
-        'image_sha256': {},
-        'source_revision': None,
-        'source_manifest_sha256': manifest_digest,
-        'source_files_sha256': None,
-        'seed_database': None,
-        'seed_identity': None,
-        'seed_snapshot_hint': None,
-        'work_date': work_date,
-        'workers': None,
-        'timeout_seconds': None,
-        'parts': str(parts),
-        'command': ['agiru', 'run-tests', '--fresh', '--codeunit', '<source manifest>',
-                    '--results-jsonl', '<per-codeunit artifact>'],
-        'started_utc': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
-    }
-    metadata_path = Path(str(output) + '.run.json')
-    write_json(metadata_path, metadata)
-    preflight = time.monotonic()
-    try:
-        if stop.is_set():
-            raise InterruptedError('UT preflight interrupted')
-        workers = int(arguments[2]) if len(arguments) >= 3 else 6
-        if workers < 1:
-            raise ValueError('workers must be positive')
-        metadata['workers'] = workers
-        timeout = int(os.environ.get('AGIRU_UT_TIMEOUT_SECONDS', str(TIMEOUT_SECONDS)))
-        if timeout < 1:
-            raise ValueError('UT timeout must be positive')
-        metadata['timeout_seconds'] = timeout
-        dsn = arguments[3] if len(arguments) == 4 else DEFAULT_DSN
-        maintenance = maintenance_dsn(dsn)
-        metadata['agiru_revision'] = source_revision(ROOT)
-        metadata['source_revision'] = bc_source_revision(source)
-        metadata['source_files_sha256'] = source_sha256(manifest, tests_root)
-        metadata['seed_database'] = urlsplit(dsn).path.lstrip('/') if '://' in dsn else None
-        if build:
-            built = run_build(workers, stop)
-            metadata['build_exit'] = built
-            if stop.is_set():
-                raise InterruptedError('build interrupted')
-            if built != 0:
-                raise ValueError(f'build exited {built}; the UT runner was not started')
-        require_current_image()
-        images = [binary, *sorted(ROOT.joinpath('build').glob('libagiru_*.so'))]
-        metadata['image_sha256'] = {path.name: file_sha256(path) for path in images}
-        metadata['seed_identity'] = seed_identity(dsn)
-        metadata['seed_snapshot_hint'] = seed_snapshot(dsn)
-        if stop.is_set():
-            raise InterruptedError('UT preflight interrupted')
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
-        message = str(error)
-        print(f'UT milestone: {message}', file=sys.stderr)
-        status = 130 if stop.is_set() else 2
-        for entry in manifest:
-            stem = parts / str(entry['id'])
-            stem.with_suffix('.log').write_text(f'INCOMPLETE: preflight refused: {message}\n')
-            stem.with_suffix('.status').write_text(str(status) + '\n')
-        elapsed = int(time.monotonic() - preflight)
-        aggregate(manifest, parts, output, metadata['workers'] or 0, elapsed)
-        return finish_run(metadata_path, metadata, status, [message])
-    metadata['preflight_seconds'] = int(time.monotonic() - preflight)
-    write_json(metadata_path, metadata)
     start = time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         futures = [pool.submit(run_one, entry, parts, dsn, maintenance, work_date,
@@ -363,7 +244,11 @@ def main(arguments):
     status = aggregate(manifest, parts, output, workers, elapsed)
     if failures or stop.is_set():
         status = 1
-    return finish_run(metadata_path, metadata, status, [str(error) for error in failures])
+    metadata['finished_utc'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    metadata['status'] = status
+    metadata['infrastructure_errors'] = [str(error) for error in failures]
+    write_json(metadata_path, metadata)
+    return status
 
 
 if __name__ == '__main__':
