@@ -7,6 +7,7 @@
 #include "Expr.h"
 #include "Names.h"
 #include "Scope.h"
+#include "TableWriter.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -840,10 +841,15 @@ void IndexedHeader(const Index &index, const std::string &subtype, std::set<std:
 
 std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
+  std::map<std::string, const TableRef *> declarations;
+  const auto include = [&](const TableRef *ref) {
+    if (ref == nullptr) { return; }
+    if (!ref->header.empty()) { headers.insert(ref->header); }
+    if (!ref->declarationAssertions.empty()) { declarations.emplace(ref->identifier, ref); }
+  };
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
-    const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+    include(Reach(declared, objects));
   };
   const auto reachInterface = [&](const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Interface") { return; }
@@ -865,8 +871,14 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
   }
+  const auto source = objects.tables.find(LowerKey(TableNoOf(unit)));
+  if (source != objects.tables.end()) { include(&source->second); }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  for (const auto &[identifier, ref] : declarations) {
+    static_cast<void>(identifier);
+    out += ref->declarationAssertions;
+  }
   return out;
 }
 
@@ -1417,11 +1429,7 @@ public:
         SubtypeOfRecord(field.variable).empty() && LowerKey(std::string(field.variable)) == "rec"
             ? TableNoOf(unit_)
             : SubtypeOfRecord(field.variable);
-    if (subtype.empty()) { return {}; }
-    const auto table = objects_.fieldEnums.find(LowerKey(subtype));
-    if (table == objects_.fieldEnums.end()) { return {}; }
-    const auto found = table->second.find(LowerKey(std::string(field.field)));
-    return found == table->second.end() ? std::string{} : found->second;
+    return FieldEnumerationOf(objects_, subtype, field.field);
   }
 
   [[nodiscard]] std::string ControlNamed(const al::VarDecl &declared,
@@ -2070,6 +2078,7 @@ TableIndex PlatformTables() {
   const auto add = [&tables](std::string_view name, std::string_view number) {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = "platform/" + Identifier(name) + ".h",
+                       .id = std::stoi(std::string(number)),
                        .fields = {},
                        .procedures = {},
                        .parts = {},
@@ -2090,12 +2099,12 @@ TableIndex PlatformTables() {
   add("Feature Key", "2000000211");
   add("Field", "2000000041");
   add("Integer", "2000000026");
-  add("Privacy Notice", "1560");
-  add("Privacy Notice Approval", "1561");
+  add("Privacy Notice", "2000000237");
+  add("Privacy Notice Approval", "2000000238");
   add("Record Link", "2000000068");
   add("Table Metadata", "2000000136");
-  add("Object Options", "2000000225");
-  add("OData Edm Type", "2000000203");
+  add("Object Options", "2000000196");
+  add("OData Edm Type", "2000000179");
   add("Page Metadata", "2000000138");
   add("Tenant License State", "2000000189");
   add("Date", "2000000007");
@@ -2106,11 +2115,13 @@ TableIndex PlatformTables() {
 
 FieldEnums PlatformFieldEnums() {
   FieldEnums enums;
-  enums["field"]["type"] = "::agiru::FieldType";
+  enums["field"]["type"] = "::agiru::platform::FieldDataType";
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
   enums["field"]["obsoletestate"] = "::agiru::platform::ObsoleteState";
-  enums["field"]["dataclassification"] = "::agiru::DataClassification";
+  enums["field"]["dataclassification"] = "::agiru::platform::FieldDataClassification";
+  enums["field"]["sqldatatype"] = "::agiru::platform::FieldSQLDataType";
+  enums["field"]["access"] = "::agiru::platform::FieldAccess";
   enums["2000000041"] = enums["field"];
   enums["user"]["state"] = "::agiru::platform::UserState";
   enums["user"]["license type"] = "::agiru::platform::UserLicenseType";
@@ -2127,9 +2138,13 @@ FieldEnums PlatformFieldEnums() {
   enums["table metadata"]["tabletype"] = "::agiru::platform::TableMetadataTableType";
   enums["object options"]["object type"] = "::agiru::platform::ObjectOptionsObjectType";
   enums["object options"]["objecttype"] = "::agiru::platform::ObjectOptionsObjectType";
-  enums["2000000225"] = enums["object options"];
+  enums["2000000196"] = enums["object options"];
   enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
+  enums["table metadata"]["dataclassification"] = "::agiru::platform::FieldDataClassification";
+  enums["table metadata"]["compressiontype"] = "::agiru::platform::TableMetadataCompressionType";
+  enums["table metadata"]["scope"] = "::agiru::platform::TableMetadataScope";
+  enums["table metadata"]["access"] = "::agiru::platform::TableMetadataAccess";
   enums["2000000136"] = enums["table metadata"];
   enums["2000000068"] = enums["record link"];
   enums["tenant license state"]["state"] = "::agiru::platform::TenantLicenseStateState";
@@ -2138,6 +2153,57 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000058"] = enums["allobjwithcaption"];
+  return enums;
+}
+
+TableIndex PlatformTables(std::span<const al::TableObject> declarations) {
+  const TableIndex bindings = PlatformTables();
+  TableIndex tables;
+  for (const al::TableObject &table : declarations) {
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end() || binding->second.id != table.id) { continue; }
+    TableRef ref = BindTable(table, binding->second.identifier, binding->second.header);
+    for (const auto &field : table.fields) {
+      const auto spelling =
+          PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});
+      if (!spelling.empty()) { ref.fields.insert_or_assign(LowerKey(field.name), spelling); }
+    }
+    ref.declarationAssertions = NativeTableAssertions(table, ref);
+    const std::string name = LowerKey(table.name);
+    if (!tables.emplace(name, ref).second ||
+        !tables.emplace(std::to_string(table.id), ref).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    if (!table.nameSpace.empty()) {
+      tables.emplace(LowerKey(table.nameSpace + "." + table.name), ref);
+    }
+  }
+  return tables;
+}
+
+FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations) {
+  const FieldEnums bindings = PlatformFieldEnums();
+  const TableIndex tables = PlatformTables(declarations);
+  FieldEnums enums;
+  for (const al::TableObject &table : declarations) {
+    if (!tables.contains(LowerKey(table.name))) { continue; }
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end()) { continue; }
+    auto &fields = enums[LowerKey(table.name)];
+    for (const al::FieldDecl &field : table.fields) {
+      const auto known = binding->second.find(LowerKey(field.name));
+      if (known == binding->second.end()) { continue; }
+      if (TypeName(field.type) != "Option" && TypeName(field.type) != "Enum") {
+        throw std::runtime_error("incompatible native option binding: " + table.name + "." +
+                                 field.name);
+      }
+      fields.emplace(known->first, known->second);
+    }
+    enums.emplace(std::to_string(table.id), fields);
+    if (!table.nameSpace.empty()) {
+      enums.emplace(LowerKey(table.nameSpace + "." + table.name), fields);
+    }
+  }
   return enums;
 }
 
@@ -2439,6 +2505,15 @@ void NoteObjectNames(const Objects &objects) {
   }
 }
 
+std::string OutputIdentifier(int id, std::string_view name, const TableIndex &index) {
+  const auto found = index.find(std::to_string(id));
+  if (found == index.end() || found->second.outputIdentifier.empty()) { return Identifier(name); }
+  if (found->second.id != id || LowerKey(found->second.name) != LowerKey(std::string(name))) {
+    throw std::runtime_error("output binding does not match declaration: " + std::string(name));
+  }
+  return found->second.outputIdentifier;
+}
+
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type) {
   return type == "TestRequestPage" ? objects.reports : objects.pages;
 }
@@ -2465,17 +2540,12 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
 
 std::vector<std::string>
 MemberLentParametersOf(const Objects &objects, const al::VarDecl *receiver, std::string_view name) {
-  if (receiver == nullptr || receiver->subtype.empty()) { return {}; }
-  const std::string type = TypeName(receiver->type);
-  const TableIndex *index = nullptr;
-  if (type == "Codeunit") { index = &objects.codeunits; }
-  if (type == "Record") { index = &objects.tables; }
-  if (index == nullptr) { return {}; }
-  const auto found = index->find(LowerKey(receiver->subtype));
-  if (found == index->end()) { return {}; }
-  const TableRef &ref = found->second;
-  return LentParametersOf(
-      ref.procedureDeclarations, name, objects, ref.name.empty() ? receiver->subtype : ref.name);
+  if (receiver == nullptr || TypeName(receiver->type) != "Codeunit" || receiver->subtype.empty()) {
+    return {};
+  }
+  const auto unit = objects.codeunits.find(LowerKey(receiver->subtype));
+  if (unit == objects.codeunits.end()) { return {}; }
+  return LentParametersOf(unit->second.procedureDeclarations, name, objects, receiver->subtype);
 }
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects) {
