@@ -20,6 +20,9 @@ struct TableHeader {
 [[nodiscard]] TableRef
 BindTable(const al::TableObject &table, std::string identifier, std::string header);
 
+[[nodiscard]] std::string NativeTableAssertions(const al::TableObject &table,
+                                                const TableRef &binding);
+
 std::string VariableIdentifier(const al::TableObject &table, const std::string &name);
 
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name);

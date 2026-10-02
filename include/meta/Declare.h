@@ -310,6 +310,8 @@ struct Declared {
   std::string_view externalName{};          ///< `ExternalName`, on a field of an external table.
   std::string_view optionOrdinalValues{};   ///< `OptionOrdinalValues`, a member's foreign number.
   bool sqlTimestamp = false;                ///< `SqlTimestamp`.
+  std::string_view dataClassification{};    ///< Effective source `DataClassification`.
+  std::string_view sqlDataType{};           ///< `SqlDataType`, empty means `Varchar`.
 };
 
 template <auto Member>
@@ -352,6 +354,8 @@ constexpr FieldDef Declare(FieldNo no,
       .obsoleteTag = declared.obsoleteTag,
       .externalName = declared.externalName,
       .optionOrdinalValues = declared.optionOrdinalValues,
+      .dataClassification = declared.dataClassification,
+      .sqlDataType = declared.sqlDataType,
       .initValue = declared.initValue,
       .no = no,
       .fieldClass = declared.fieldClass,

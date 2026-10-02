@@ -1,0 +1,123 @@
+#include "meta/Ids.h"
+#include "platform/Field.h"
+#include "runtime/Page.h"
+#include "runtime/RecordRef.h"
+#include "runtime/Relation.h"
+#include "type/Option.h"
+#include "type/Variant.h"
+
+#include "fixture/system/reflection/page/NativeFieldBindingFixture.h"
+#include "fixture/system/reflection/table/FieldPropertiesFixture.h"
+#include "fixture/system/tooling/page/PageFieldsSelectionList.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <string_view>
+
+namespace {
+
+void Require(bool value, std::string_view message) {
+  if (!value) {
+    std::fprintf(stderr, "native-source: %.*s\n", static_cast<int>(message.size()), message.data());
+    std::exit(1);
+  }
+}
+
+void EffectiveFieldProperties() {
+  using namespace agiru::platform;
+  Field row;
+  Require(row.Get(50172, 1), "base field exists");
+  Require(row.DataClassification == FieldDataClassification::CustomerContent,
+          "base field inherits its declaring table's classification");
+  Require(row.IsAllowedInCustomizations, "base field inherits AsReadWrite");
+  Require(row.Access == FieldAccess::Public, "table Internal does not make its field Internal");
+  Require(row.SQLDataType == FieldSQLDataType::Varchar, "default SQL property is Varchar");
+  Require(!row.OptimizeForTextSearch, "text search defaults false");
+  Require(row.Get(50172, 2), "numeric Code exists");
+  Require(row.DataClassification == FieldDataClassification::AccountData,
+          "field classification overrides table classification");
+  Require(row.SQLDataType == FieldSQLDataType::Integer, "Code retains SqlDataType Integer");
+  Require(row.Access == FieldAccess::Protected, "field retains Protected access");
+  Require(!row.IsAllowedInCustomizations, "field Never overrides table AsReadWrite");
+  agiru::RecordRef ref;
+  ref.GetTable(row);
+  Require(static_cast<agiru::Integer>(
+              ref.Field(Field::Field_No::DataClassification.Value()).Value()) == 3,
+          "RecordRef exports native AccountData ordinal, not telemetry ordinal");
+  Require(row.Get(50172, 3), "search field exists");
+  Require(row.OptimizeForTextSearch, "normal field retains text search property");
+  Require(row.Access == FieldAccess::Public && row.SQLDataType == FieldSQLDataType::Varchar &&
+              row.IsAllowedInCustomizations,
+          "previous access, SQL and customization properties do not leak");
+  Require(row.Get(50172, 4), "FlowFilter exists");
+  Require(row.DataClassification == FieldDataClassification::SystemMetadata,
+          "FlowFilter classification is SystemMetadata regardless of table default");
+  Require(!row.OptimizeForTextSearch, "FlowFilter is not text-search indexed");
+  Require(row.Get(50172, 5), "modified field exists");
+  Require(row.FieldCaption.Value() == "Changed caption", "modify replaces the original caption");
+  Require(row.DataClassification == FieldDataClassification::ToBeClassified,
+          "explicit ToBeClassified overrides the table classification");
+  Require(row.Get(50172, 50173), "extension field exists");
+  Require(row.DataClassification == FieldDataClassification::ToBeClassified,
+          "extension field does not inherit base table classification");
+  Require(!row.IsAllowedInCustomizations, "extension field inherits its own Never");
+  Require(row.Get(50172, 50174), "extension override exists");
+  Require(row.IsAllowedInCustomizations, "extension field AsReadOnly overrides extension Never");
+  Require(row.DataClassification == FieldDataClassification::EndUserIdentifiableInformation,
+          "extension field retains its explicit classification");
+  Require(row.Get(50172, 50176), "default extension field exists");
+  Require(row.IsAllowedInCustomizations &&
+              row.DataClassification == FieldDataClassification::ToBeClassified,
+          "one extension's defaults never leak into another");
+  Require(row.Get(50175, 1), "default table exists");
+  Require(row.IsAllowedInCustomizations &&
+              row.DataClassification == FieldDataClassification::ToBeClassified,
+          "absent source properties have documented defaults");
+}
+
+void ModifiedRelationsKeepTheirDeclaredOrder() {
+  using Table = agiru::System::Reflection::FieldPropertiesFixture_Table;
+  Table record;
+  const auto check =
+      [&record](agiru::Integer no, std::string_view target, std::string_view message) {
+        const auto &table = agiru::TableTraits<Table>::kTable;
+        const auto *field = agiru::Field(table, agiru::FieldNo{no});
+        Require(field != nullptr, "relation field is declared");
+        const auto relation = agiru::detail::ResolveRelation(&record, table, *field);
+        Require(relation.has_value() && relation->table == target, message);
+      };
+  record.ID = 1;
+  check(6, "Field Defaults Fixture", "the original conditional relation runs first");
+  record.ID = 2;
+  check(6, "Field Properties Fixture", "the added conditional relation remains reachable");
+  check(7, "Field Properties Fixture", "an unconditional base relation cannot be replaced");
+  check(
+      8, "Field Properties Fixture", "an unconditional fallback prevents later extension branches");
+}
+
+}
+
+int main() {
+  EffectiveFieldProperties();
+  ModifiedRelationsKeepTheirDeclaredOrder();
+  using P = agiru::System::Tooling::PageFieldsSelectionList_Page;
+  using F = agiru::System::Reflection::NativeFieldBindingFixture_Page;
+  F fields;
+  fields.Rec.Type = agiru::platform::FieldDataType::Code;
+  if (fields.Rec.Type.AsInteger() != 31489) { return 5; }
+  if (agiru::PageTraits<F>::kPage.source != agiru::TableId{2000000041}) { return 6; }
+  P page;
+  page.Rec.Caption = "caption from the source record";
+  page.Rec.Type = agiru::platform::PageTableFieldType::Text;
+  if (page.Rec.Type.AsInteger() != 31488) { return 1; }
+  const auto &definition = agiru::PageTraits<P>::kPage;
+  if (definition.source != agiru::TableId{2000000171}) { return 2; }
+  if (definition.layout[0].children[0].children[0].field != agiru::FieldNo{5}) { return 3; }
+  for (const auto &trigger : agiru::PageTraits<P>::kControlTriggers) {
+    if (trigger.sourceText != nullptr &&
+        (page.*trigger.sourceText)().Value() != "caption from the source record") {
+      return 4;
+    }
+  }
+  return page.Rec.Caption.Value() != "caption from the source record";
+}

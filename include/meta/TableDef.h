@@ -164,8 +164,9 @@ struct FieldDef {
   std::string_view autoFormatType{};
   std::string_view autoFormatExpression{}; ///< \see autoFormatType
 
-  /// \brief The `AllowInCustomizations` property, as AL wrote it: `Never`, `Always` or a value in
-  ///        between (board:0480).
+  /// \brief Effective `AllowInCustomizations` from the field or its declaring table/extension.
+  /// Empty means `ToBeClassified`; `Never` forbids customization. `Always`/`AsReadOnly`
+  /// allow read-only use; `AsReadWrite` also allows editing (runtime 16 property contract).
   std::string_view allowInCustomizations{};
 
   /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.
@@ -204,6 +205,14 @@ struct FieldDef {
   ///       is the number some other system gives the same member, and the two are different
   ///       questions about one value.
   std::string_view optionOrdinalValues{};
+
+  /// \brief Effective source `DataClassification`, including the declaring table's default.
+  /// Empty means `ToBeClassified`; FlowFields and FlowFilters report `SystemMetadata`.
+  std::string_view dataClassification{};
+
+  /// \brief Source `SqlDataType` on Code fields; empty means `Varchar`.
+  /// Reflection of this property does not implement its storage or ordering contract.
+  std::string_view sqlDataType{};
   /// \brief The `InitValue` property, as the COLUMN spells it, or nothing when AL declared none.
   ///
   /// `devenv-initvalue-property.md`: "Sets the initial value of this field when a user creates a

@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
+#include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
@@ -25,6 +26,7 @@ using agiru::RecordRef;
 using agiru::Temporary;
 using agiru::platform::Field;
 using agiru::platform::FieldClass;
+using agiru::platform::FieldDataType;
 
 namespace {
 
@@ -39,6 +41,7 @@ constexpr agiru::TableId kMetadataFixtureId{50151};
 constexpr agiru::TableId kMetadataTargetId{50152};
 constexpr agiru::TableId kLongMetadataId{50153};
 constexpr agiru::TableId kTypeMetadataId{50154};
+constexpr agiru::TableId kPropertyMetadataId{50155};
 constexpr agiru::Integer kTypeNameField = 9;
 constexpr FieldType kUnsupportedType = static_cast<FieldType>(250);
 
@@ -72,6 +75,9 @@ constexpr std::array<TypeNameCase, 21> kTypeNames{{
     {.type = FieldType::Media, .length = 0, .name = "Media"},
 }};
 constexpr agiru::Integer kUnknownTypeField = static_cast<agiru::Integer>(kTypeNames.size() + 1);
+constexpr std::array<agiru::Integer, kTypeNames.size()> kNativeTypeCodes{
+    34047, 34559, 36095, 12799, 35583, 35583, 36863, 31489, 31488, 31489, 31488,
+    11775, 11776, 37375, 37119, 4988,  11797, 33793, 4912,  26208, 26207};
 
 constexpr auto kTypeMetadataFields = [] {
   std::array<agiru::FieldDef, kTypeNames.size() + 1> fields{};
@@ -183,6 +189,50 @@ constexpr agiru::TableEntry kTargetEntry = MetadataEntry(kMetadataTarget);
 constexpr agiru::TableEntry kLongMetadataEntry = MetadataEntry(kLongMetadataTable);
 constexpr agiru::TableEntry kTypeMetadataEntry = MetadataEntry(kTypeMetadataTable);
 
+constexpr std::array<std::string_view, 7> kClassifications{"CustomerContent",
+                                                           "ToBeClassified",
+                                                           "EndUserIdentifiableInformation",
+                                                           "AccountData",
+                                                           "EndUserPseudonymousIdentifiers",
+                                                           "OrganizationIdentifiableInformation",
+                                                           "SystemMetadata"};
+constexpr std::array<std::string_view, 4> kSqlTypes{"Varchar", "Integer", "Variant", "BigInteger"};
+constexpr std::array<std::string_view, 4> kAccessModes{"Public", "Internal", "Protected", "Local"};
+constexpr std::array<std::string_view, 6> kCustomizations{
+    "", "ToBeClassified", "Always", "AsReadOnly", "AsReadWrite", "Never"};
+constexpr auto kPropertyFields = [] {
+  std::array<agiru::FieldDef, 28> fields{};
+  for (std::size_t i = 0; i < fields.size(); ++i) {
+    fields[i] = {.name = "Property fixture",
+                 .no = agiru::FieldNo{static_cast<agiru::Integer>(i + 1)},
+                 .length = 20,
+                 .type = FieldType::Code};
+  }
+  for (std::size_t i = 0; i < kClassifications.size(); ++i) {
+    fields[1 + i].dataClassification = kClassifications[i];
+  }
+  for (std::size_t i = 0; i < kSqlTypes.size(); ++i) { fields[8 + i].sqlDataType = kSqlTypes[i]; }
+  for (std::size_t i = 0; i < kAccessModes.size(); ++i) { fields[12 + i].access = kAccessModes[i]; }
+  for (std::size_t i = 0; i < kCustomizations.size(); ++i) {
+    fields[16 + i].allowInCustomizations = kCustomizations[i];
+  }
+  fields[8].optimizeForTextSearch = true;
+  fields[22].fieldClass = agiru::FieldClass::FlowField;
+  fields[22].dataClassification = "AccountData";
+  fields[22].optimizeForTextSearch = true;
+  fields[23].fieldClass = agiru::FieldClass::FlowFilter;
+  fields[23].dataClassification = "CustomerContent";
+  fields[23].optimizeForTextSearch = true;
+  fields[24].dataClassification = "Undocumented";
+  fields[25].sqlDataType = "Undocumented";
+  fields[26].access = "Undocumented";
+  fields[27].allowInCustomizations = "Undocumented";
+  return fields;
+}();
+constexpr agiru::TableDef kPropertyTable{
+    .id = kPropertyMetadataId, .name = "Fixture Field Properties", .fields = kPropertyFields};
+constexpr agiru::TableEntry kPropertyEntry = MetadataEntry(kPropertyTable);
+
 std::string ReadTypeName(Field &row) {
   RecordRef ref;
   ref.GetTable(row);
@@ -205,6 +255,9 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
     CHECK_TEXT("Type Name uses the native primitive spelling and length",
                ReadTypeName(row),
                kTypeNames[i].name);
+    CHECK_TRUE("primitive metadata uses the source-declared native code",
+               row.Type.AsInteger() == kNativeTypeCodes[i]);
+    CHECK_TRUE("every reported primitive has a declared native member", row.Type.IsDeclared());
   }
   CHECK_TEXT("an unknown primitive type refuses rather than returning blank",
              ReadMetadata(row, kUnknownTypeField, kTypeMetadataId),
@@ -256,7 +309,7 @@ void MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary() {
              ",,Alpha,,Omega,");
   CHECK_TRUE("an ordinary field is Normal", row.Class == FieldClass::Normal);
   CHECK_SILENT("an enum declaration is readable", ReadMetadata(row, 4));
-  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldType::Option);
+  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldDataType::Option);
   CHECK_TRUE("the reported type has a declared member", row.Type.IsDeclared());
   CHECK_TEXT("enum members retain declaration order", row.OptionString.Value(), "Zero,Ten");
   CHECK_SILENT("a scalar declaration is readable", ReadMetadata(row, 2));
@@ -298,14 +351,14 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   rows.TableNo = kItem;
   rows.No = kItemNo;
   rows.FieldName = "No.";
-  rows.Type = FieldType::Code;
+  rows.Type = FieldDataType::Code;
   rows.Len = kNoLength;
   rows.Insert();
 
   rows.TableNo = kItem;
   rows.No = kItemDescription;
   rows.FieldName = "Description";
-  rows.Type = FieldType::Text;
+  rows.Type = FieldDataType::Text;
   rows.Len = kDescriptionLength;
   rows.Insert();
 
@@ -315,7 +368,7 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   read.Copy(rows, true);
   CHECK_TRUE("a row is found by its primary key", read.Get(kItem, kItemNo));
   CHECK_TEXT("carrying its name", std::string(read.FieldName.Value()), "No.");
-  CHECK_TRUE("and its type", read.Type == FieldType::Code);
+  CHECK_TRUE("and its type", read.Type == FieldDataType::Code);
   CHECK_TRUE("a key that matches nothing answers false", !read.Get(kItem, agiru::Integer{2}));
 }
 
@@ -332,8 +385,8 @@ void ItIsTheTableTheBaseAppReadsFrom() {
   // `SystemId` in `FieldCount()`, `ApplicationAreaMgmt` read a Guid into a Boolean (214 cases,
   // commit 1b27053). The system fields exist all the same and AL reaches them BY NUMBER --
   // `Config. Package Management` writes `Field.FieldNo(SystemId)` -- which `FieldExist` answers.
-  CHECK_TRUE("eighteen declared fields, and not the five the platform adds",
-             ref.FieldCount() == 18);
+  CHECK_TRUE("twenty-four declared fields, and not the five the platform adds",
+             ref.FieldCount() == 24);
   CHECK_TRUE("while a system field is reachable by number",
              ref.FieldExist(agiru::kSystemFields.front().no.Value()));
   CHECK_TEXT("the field AL calls \"No.\" keeps its dot", std::string(ref.Field(2).Name()), "No.");
@@ -363,10 +416,148 @@ void TheCompatibilityTypeKeepsItsExistingOptionVocabulary() {
   Field row;
   RecordRef ref;
   ref.GetTable(row);
-  CHECK_TRUE("FieldRef retains the same leading blank option members",
+  CHECK_TRUE("Field.Type reflection exposes native members instead of metadata-tag gaps",
              ref.Field(Field::Field_No::Type.Value())
                  .OptionMembers()
-                 .starts_with(",,,Boolean,,Option,,Integer"));
+                 .starts_with("TableFilter,RecordID,OemText,Date,Time,DateFormula,Decimal"));
+}
+
+struct NativeFieldCase {
+  agiru::Integer number;
+  std::string_view name;
+  FieldType type;
+  std::uint16_t length;
+};
+
+constexpr std::array<NativeFieldCase, 24> kNativeFields{{
+    {1, "TableNo", FieldType::Integer, 0},
+    {2, "No.", FieldType::Integer, 0},
+    {3, "TableName", FieldType::Text, 30},
+    {4, "FieldName", FieldType::Text, 30},
+    {5, "Type", FieldType::Option, 0},
+    {6, "Len", FieldType::Integer, 0},
+    {7, "Class", FieldType::Option, 0},
+    {8, "Enabled", FieldType::Boolean, 0},
+    {9, "Type Name", FieldType::Text, 30},
+    {10, "ExternalName", FieldType::Text, 100},
+    {20, "Field Caption", FieldType::Text, 80},
+    {21, "RelationTableNo", FieldType::Integer, 0},
+    {22, "RelationFieldNo", FieldType::Integer, 0},
+    {23, "SQLDataType", FieldType::Option, 0},
+    {24, "OptionString", FieldType::Text, 2047},
+    {25, "ObsoleteState", FieldType::Option, 0},
+    {26, "ObsoleteReason", FieldType::Text, 248},
+    {27, "DataClassification", FieldType::Option, 0},
+    {28, "IsPartOfPrimaryKey", FieldType::Boolean, 0},
+    {60, "App Package ID", FieldType::Guid, 0},
+    {61, "App Runtime Package ID", FieldType::Guid, 0},
+    {62, "OptimizeForTextSearch", FieldType::Boolean, 0},
+    {63, "Access", FieldType::Option, 0},
+    {64, "IsAllowedInCustomizations", FieldType::Boolean, 0},
+}};
+
+void EveryNativeFieldRetainsItsSourceDeclaration() {
+  const auto &table = agiru::TableTraits<Field>::kTable;
+  CHECK_TRUE("complete source population plus implicit system fields",
+             table.fields.size() == kNativeFields.size() + agiru::kSystemFieldCount);
+  for (const auto &expected : kNativeFields) {
+    const auto *field = agiru::Field(table, agiru::FieldNo{expected.number});
+    CHECK_TRUE("every declared field number exists", field != nullptr);
+    if (field == nullptr) { continue; }
+    CHECK_TEXT(
+        "source field names are not captions or guessed spellings", field->name, expected.name);
+    CHECK_TEXT("absent captions default to the declared name", field->caption, expected.name);
+    CHECK_TRUE("source primitive type is retained", field->type == expected.type);
+    CHECK_TRUE("source text length is retained", field->length == expected.length);
+  }
+  CHECK_TRUE("ExternalName does not invent the old field number",
+             agiru::Field(table, agiru::FieldNo{29}) == nullptr);
+  CHECK_TEXT("source primary key name", table.keys.front().name, "pk");
+  CHECK_TRUE("source primary key order",
+             table.keys.front().fields[0].Value() == 1 &&
+                 table.keys.front().fields[1].Value() == 2);
+}
+
+void NativeTypeCodesRemainDistinctFromMetadataTags() {
+  const agiru::Option<FieldDataType> code{FieldDataType::Code};
+  CHECK_TRUE("Field.Type Code uses its declared native code", code.AsInteger() == 31489);
+  CHECK_TEXT("the native code retains its source name", code.Name(), "Code");
+  CHECK_TRUE(
+      "the internal Code tag is not a declared native value",
+      !agiru::Option<FieldDataType>{static_cast<agiru::Integer>(FieldType::Code)}.IsDeclared());
+  Field row;
+  row.Type = code;
+  RecordRef ref;
+  ref.GetTable(row);
+  CHECK_TRUE("reflection exports the native code, not an option index",
+             static_cast<agiru::Integer>(ref.Field(Field::Field_No::Type.Value()).Value()) ==
+                 31489);
+  CHECK_TEXT("the SQL property vocabulary has source order",
+             ref.Field(Field::Field_No::SQLDataType.Value()).OptionMembers(),
+             "Varchar,Integer,Variant,BigInteger");
+  CHECK_TEXT("the obsolete state does not invent relocation options",
+             ref.Field(Field::Field_No::ObsoleteState.Value()).OptionMembers(),
+             "No,Pending,Removed");
+  CHECK_TEXT("the native classifier is not the telemetry classifier",
+             ref.Field(Field::Field_No::DataClassification.Value()).OptionMembers(),
+             "CustomerContent,ToBeClassified,EndUserIdentifiableInformation,AccountData,"
+             "EndUserPseudonymousIdentifiers,OrganizationIdentifiableInformation,SystemMetadata");
+  CHECK_TEXT("compile-time access retains the source vocabulary",
+             ref.Field(Field::Field_No::Access.Value()).OptionMembers(),
+             "Public,Internal,Protected,Local");
+}
+
+void FieldPropertiesUseNativeNamesDefaultsAndRefusals() {
+  Field row;
+  const auto get = [&row](std::size_t index) {
+    CHECK_SILENT("property fixture is readable",
+                 ReadMetadata(row, static_cast<agiru::Integer>(index + 1), kPropertyMetadataId));
+  };
+  get(0);
+  CHECK_TRUE("an unclassified normal field defaults to ToBeClassified",
+             row.DataClassification == agiru::platform::FieldDataClassification::ToBeClassified);
+  CHECK_TRUE("source defaults are restored together",
+             row.SQLDataType == agiru::platform::FieldSQLDataType::Varchar &&
+                 row.Access == agiru::platform::FieldAccess::Public &&
+                 row.IsAllowedInCustomizations && !row.OptimizeForTextSearch);
+  for (std::size_t i = 0; i < kClassifications.size(); ++i) {
+    get(1 + i);
+    CHECK_TEXT("classification retains its source name",
+               row.DataClassification.Name(),
+               kClassifications[i]);
+    CHECK_TRUE("classification uses native source order",
+               row.DataClassification.AsInteger() == static_cast<agiru::Integer>(i));
+  }
+  for (std::size_t i = 0; i < kSqlTypes.size(); ++i) {
+    get(8 + i);
+    CHECK_TEXT("SQL type retains its source name", row.SQLDataType.Name(), kSqlTypes[i]);
+    CHECK_TRUE("search property follows the current normal field",
+               row.OptimizeForTextSearch == (i == 0));
+  }
+  for (std::size_t i = 0; i < kAccessModes.size(); ++i) {
+    get(12 + i);
+    CHECK_TEXT("access retains its source name", row.Access.Name(), kAccessModes[i]);
+  }
+  for (std::size_t i = 0; i < kCustomizations.size(); ++i) {
+    get(16 + i);
+    CHECK_TRUE("only Never forbids field customization", row.IsAllowedInCustomizations == (i != 5));
+  }
+  for (const std::size_t index : {22U, 23U}) {
+    get(index);
+    CHECK_TRUE("computed/filter fields force SystemMetadata",
+               row.DataClassification == agiru::platform::FieldDataClassification::SystemMetadata);
+    CHECK_TRUE("computed/filter fields are not text-search indexed", !row.OptimizeForTextSearch);
+  }
+  constexpr std::array<std::string_view, 4> invalid{
+      "DataClassification", "SqlDataType", "Access", "AllowInCustomizations"};
+  for (std::size_t i = 0; i < invalid.size(); ++i) {
+    CHECK_TEXT("unknown properties refuse instead of manufacturing defaults",
+               ReadMetadata(row, static_cast<agiru::Integer>(25 + i), kPropertyMetadataId),
+               "Field metadata: unsupported " + std::string(invalid[i]) + " Undocumented");
+    CHECK_TRUE("refused property does not replace the previous metadata row", row.No == 24);
+    CHECK_TRUE("refused property does not replace the previous classification",
+               row.DataClassification == agiru::platform::FieldDataClassification::SystemMetadata);
+  }
 }
 
 } // namespace
@@ -377,6 +568,7 @@ int main() {
     agiru::RegisterTableEntry(&kTargetEntry);
     agiru::RegisterTableEntry(&kLongMetadataEntry);
     agiru::RegisterTableEntry(&kTypeMetadataEntry);
+    agiru::RegisterTableEntry(&kPropertyEntry);
     ATemporaryFieldIsAContainerAndNeedsNoPlatform();
     ItIsTheTableTheBaseAppReadsFrom();
     TheCompatibilityTypeKeepsItsExistingOptionVocabulary();
@@ -384,5 +576,8 @@ int main() {
     MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary();
     MetadataLoadsRelationsAndRefusesUnknownStates();
     MetadataTypeNamesMatchTheNativePrimitiveContract();
+    EveryNativeFieldRetainsItsSourceDeclaration();
+    NativeTypeCodesRemainDistinctFromMetadataTags();
+    FieldPropertiesUseNativeNamesDefaultsAndRefusals();
   });
 }

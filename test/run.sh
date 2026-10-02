@@ -24,6 +24,8 @@ done
 n=$((n + 1))
 if ! B="$B" bash test/function-size.sh; then red=$((red + 1)); fi
 n=$((n + 1))
+if ! B="$B" bash test/native-source.sh; then red=$((red + 1)); fi
+n=$((n + 1))
 if ! B="$B" python3 test/toolchain.py; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]

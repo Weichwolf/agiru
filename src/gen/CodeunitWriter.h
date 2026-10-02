@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -36,6 +37,7 @@ struct TableRef {
   std::set<std::string> tryFunctions;
 
   std::vector<al::ProcedureDecl> procedureDeclarations;
+  std::string declarationAssertions{};
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -105,7 +107,12 @@ std::string OptionTypeName(const std::string &owner,
                            const al::VarDecl &declared,
                            const std::vector<al::ProcedureDecl> &procedures);
 
+[[nodiscard]] bool NeedsNativeDefinition(const TableRef &binding);
+
 [[nodiscard]] TableIndex PlatformTables();
+[[nodiscard]] TableIndex PlatformTables(std::span<const al::TableObject> declarations);
+[[nodiscard]] FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations,
+                                            const TableIndex &tables);
 
 [[nodiscard]] bool NamesAbsentType(const al::VarDecl &declared);
 

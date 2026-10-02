@@ -7,6 +7,7 @@
 #include "Expr.h"
 #include "Names.h"
 #include "Scope.h"
+#include "TableWriter.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -840,10 +841,16 @@ void IndexedHeader(const Index &index, const std::string &subtype, std::set<std:
 
 std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
   std::set<std::string> headers;
+  std::map<std::string, const TableRef *> contracts;
+  const auto note = [&](const TableRef *ref) {
+    if (ref == nullptr) { return; }
+    if (!ref->header.empty()) { headers.insert(ref->header); }
+    if (!ref->declarationAssertions.empty()) { contracts.emplace(ref->identifier, ref); }
+  };
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
     const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { headers.insert(ref->header); }
+    note(ref);
   };
   const auto reachInterface = [&](const al::VarDecl &declared) {
     if (TypeName(declared.type) != "Interface") { return; }
@@ -865,8 +872,14 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
   }
+  const auto implicit = objects.tables.find(LowerKey(TableNoOf(unit)));
+  if (implicit != objects.tables.end()) { note(&implicit->second); }
   std::string out;
   for (const std::string &header : headers) { out += "#include \"" + header + "\"\n"; }
+  for (const auto &[name, ref] : contracts) {
+    static_cast<void>(name);
+    out += ref->declarationAssertions;
+  }
   return out;
 }
 
@@ -882,7 +895,13 @@ void Declared(const al::VarDecl &declared,
   }
   if (NamesAnObject(declared)) {
     const TableRef *ref = Reach(declared, objects);
-    if (ref != nullptr && !ref->header.empty()) { ahead(ref->identifier); }
+    if (ref != nullptr && !ref->header.empty()) {
+      if (NeedsNativeDefinition(*ref)) {
+        reachElement(ref->header);
+      } else {
+        ahead(ref->identifier);
+      }
+    }
   }
   if (TypeName(declared.type) == "Interface") {
     const auto found = objects.interfaces.find(LowerKey(declared.subtype));
@@ -2065,11 +2084,16 @@ bool NamesAbsentType(const al::VarDecl &declared) {
          declared.members.empty() && declared.arguments.empty();
 }
 
+bool NeedsNativeDefinition(const TableRef &binding) {
+  return Unprefixed(binding.identifier).starts_with("platform::");
+}
+
 TableIndex PlatformTables() {
   TableIndex tables;
   const auto add = [&tables](std::string_view name, std::string_view number) {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = "platform/" + Identifier(name) + ".h",
+                       .id = std::stoi(std::string(number)),
                        .fields = {},
                        .procedures = {},
                        .parts = {},
@@ -2097,6 +2121,7 @@ TableIndex PlatformTables() {
   add("Object Options", "2000000225");
   add("OData Edm Type", "2000000203");
   add("Page Metadata", "2000000138");
+  add("Page Table Field", "2000000171");
   add("Tenant License State", "2000000189");
   add("Date", "2000000007");
   add("User", "2000000120");
@@ -2106,11 +2131,13 @@ TableIndex PlatformTables() {
 
 FieldEnums PlatformFieldEnums() {
   FieldEnums enums;
-  enums["field"]["type"] = "::agiru::FieldType";
+  enums["field"]["type"] = "::agiru::platform::FieldDataType";
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
   enums["field"]["obsoletestate"] = "::agiru::platform::ObsoleteState";
-  enums["field"]["dataclassification"] = "::agiru::DataClassification";
+  enums["field"]["dataclassification"] = "::agiru::platform::FieldDataClassification";
+  enums["field"]["sqldatatype"] = "::agiru::platform::FieldSQLDataType";
+  enums["field"]["access"] = "::agiru::platform::FieldAccess";
   enums["2000000041"] = enums["field"];
   enums["user"]["state"] = "::agiru::platform::UserState";
   enums["user"]["license type"] = "::agiru::platform::UserLicenseType";
@@ -2128,6 +2155,11 @@ FieldEnums PlatformFieldEnums() {
   enums["object options"]["object type"] = "::agiru::platform::ObjectOptionsObjectType";
   enums["object options"]["objecttype"] = "::agiru::platform::ObjectOptionsObjectType";
   enums["2000000225"] = enums["object options"];
+  enums["page table field"]["type"] = "::agiru::platform::PageTableFieldType";
+  enums["page table field"]["status"] = "::agiru::platform::PageTableFieldStatus";
+  enums["page table field"]["scope"] = "::agiru::platform::PageTableFieldScope";
+  enums["page table field"]["fieldkind"] = "::agiru::platform::PageTableFieldKind";
+  enums["2000000171"] = enums["page table field"];
   enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
   enums["2000000136"] = enums["table metadata"];
@@ -2138,6 +2170,62 @@ FieldEnums PlatformFieldEnums() {
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000058"] = enums["allobjwithcaption"];
+  return enums;
+}
+
+TableIndex PlatformTables(std::span<const al::TableObject> declarations) {
+  const TableIndex bindings = PlatformTables();
+  TableIndex tables;
+  std::set<int> ids;
+  std::set<std::string> names;
+  for (const al::TableObject &table : declarations) {
+    if (!ids.insert(table.id).second || !names.insert(LowerKey(table.name)).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end() || binding->second.id != table.id) { continue; }
+    TableRef ref = BindTable(table, binding->second.identifier, binding->second.header);
+    for (const auto &field : table.fields) {
+      const auto spelling =
+          PlatformFieldSpelling(PlatformField{.table = table.name, .field = field.name});
+      if (!spelling.empty()) { ref.fields.insert_or_assign(LowerKey(field.name), spelling); }
+    }
+    ref.declarationAssertions = NativeTableAssertions(table, ref);
+    const std::string name = LowerKey(table.name);
+    if (!tables.emplace(name, ref).second ||
+        !tables.emplace(std::to_string(table.id), ref).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    if (!table.nameSpace.empty()) {
+      tables.emplace(LowerKey(table.nameSpace + "." + table.name), ref);
+    }
+  }
+  return tables;
+}
+
+FieldEnums PlatformFieldEnums(std::span<const al::TableObject> declarations,
+                              const TableIndex &tables) {
+  const FieldEnums bindings = PlatformFieldEnums();
+  FieldEnums enums;
+  for (const al::TableObject &table : declarations) {
+    if (!tables.contains(LowerKey(table.name))) { continue; }
+    const auto binding = bindings.find(LowerKey(table.name));
+    if (binding == bindings.end()) { continue; }
+    auto &fields = enums[LowerKey(table.name)];
+    for (const al::FieldDecl &field : table.fields) {
+      const auto known = binding->second.find(LowerKey(field.name));
+      if (known == binding->second.end()) { continue; }
+      if (TypeName(field.type) != "Option" && TypeName(field.type) != "Enum") {
+        throw std::runtime_error("incompatible native option binding: " + table.name + "." +
+                                 field.name);
+      }
+      fields.emplace(known->first, known->second);
+    }
+    enums.emplace(std::to_string(table.id), fields);
+    if (!table.nameSpace.empty()) {
+      enums.emplace(LowerKey(table.nameSpace + "." + table.name), fields);
+    }
+  }
   return enums;
 }
 

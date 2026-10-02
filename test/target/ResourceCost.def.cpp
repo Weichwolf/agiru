@@ -12,11 +12,12 @@
 namespace agiru::Projects::Resources::Pricing {
 
 constexpr auto kResourceCostFields = WithSystemFields<ResourceCost_Table>(std::array<FieldDef, 6>{{
-    Declare<&ResourceCost_Table::Type>(ResourceCost_Table::Field_No::Type,
-                                       "Type",
-                                       "Type",
-                                       offsetof(ResourceCost_Table, Type),
-                                       Declared{.toolTip = "Specifies the type."}),
+    Declare<&ResourceCost_Table::Type>(
+        ResourceCost_Table::Field_No::Type,
+        "Type",
+        "Type",
+        offsetof(ResourceCost_Table, Type),
+        Declared{.toolTip = "Specifies the type.", .dataClassification = "CustomerContent"}),
     Declare<&ResourceCost_Table::Code>(
         ResourceCost_Table::Field_No::Code,
         "Code",
@@ -24,7 +25,8 @@ constexpr auto kResourceCostFields = WithSystemFields<ResourceCost_Table>(std::a
         offsetof(ResourceCost_Table, Code),
         Declared{.relation = "if ( Type = const ( Resource ) ) Resource else if ( Type = const ( "
                              "Group(Resource) ) ) Resource Group",
-                 .toolTip = "Specifies the code."}),
+                 .toolTip = "Specifies the code.",
+                 .dataClassification = "CustomerContent"}),
     Declare<&ResourceCost_Table::WorkTypeCode>(
         ResourceCost_Table::Field_No::WorkTypeCode,
         "Work Type Code",
@@ -33,26 +35,30 @@ constexpr auto kResourceCostFields = WithSystemFields<ResourceCost_Table>(std::a
         Declared{.relationTable = "Work Type",
                  .relation = "Work Type",
                  .toolTip = "Specifies the code for the type of work. You can also assign a unit "
-                            "price to a work type."}),
+                            "price to a work type.",
+                 .dataClassification = "CustomerContent"}),
     Declare<&ResourceCost_Table::CostType>(ResourceCost_Table::Field_No::CostType,
                                            "Cost Type",
                                            "Cost Type",
                                            offsetof(ResourceCost_Table, CostType),
-                                           Declared{.toolTip = "Specifies the type of cost."}),
+                                           Declared{.toolTip = "Specifies the type of cost.",
+                                                    .dataClassification = "CustomerContent"}),
     Declare<&ResourceCost_Table::DirectUnitCost>(
         ResourceCost_Table::Field_No::DirectUnitCost,
         "Direct Unit Cost",
         "Direct Unit Cost",
         offsetof(ResourceCost_Table, DirectUnitCost),
         Declared{.toolTip = "Specifies the cost of one unit of the selected item or resource.",
-                 .autoFormatType = "2"}),
+                 .autoFormatType = "2",
+                 .dataClassification = "CustomerContent"}),
     Declare<&ResourceCost_Table::UnitCost>(
         ResourceCost_Table::Field_No::UnitCost,
         "Unit Cost",
         "Unit Cost",
         offsetof(ResourceCost_Table, UnitCost),
         Declared{.toolTip = "Specifies the cost of one unit of the item or resource on the line.",
-                 .autoFormatType = "2"}),
+                 .autoFormatType = "2",
+                 .dataClassification = "CustomerContent"}),
 }});
 
 constexpr std::array<KeyDef, 2> kResourceCostKeys{{

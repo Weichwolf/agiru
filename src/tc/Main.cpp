@@ -3,6 +3,7 @@
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
+#include "Lexer.h"
 #include "Names.h"
 #include "PageWriter.h"
 #include "Parser.h"
@@ -10,6 +11,7 @@
 #include "Refused.h"
 #include "Scope.h"
 #include "TableWriter.h"
+#include "Token.h"
 
 #include <algorithm>
 #include <array>
@@ -234,6 +236,7 @@ struct Job {
   std::filesystem::path source;
   std::filesystem::path output;
   std::filesystem::path apps;
+  std::filesystem::path systemSymbols;
 };
 
 void Keep(Run &run, const Output &where, const std::string &text) {
@@ -1508,6 +1511,115 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
+std::vector<std::filesystem::path> SystemSources(const std::filesystem::path &root) {
+  for (const auto &path :
+       {root, root / "src", root / "NavxManifest.xml", root / "SymbolReference.json"}) {
+    if (std::filesystem::is_symlink(path)) {
+      throw std::runtime_error("System symbols input contains a symlink");
+    }
+  }
+  if (!std::filesystem::is_regular_file(root / "NavxManifest.xml") ||
+      !std::filesystem::is_regular_file(root / "SymbolReference.json") ||
+      !std::filesystem::is_directory(root / "src")) {
+    throw std::runtime_error("System symbols input lacks its manifest, reference or AL sources");
+  }
+  std::vector<std::filesystem::path> paths;
+  for (const auto &entry : std::filesystem::recursive_directory_iterator(root / "src")) {
+    if (entry.is_symlink()) { throw std::runtime_error("System symbols input contains a symlink"); }
+    if (entry.is_regular_file() &&
+        agiru::gen::LowerKey(entry.path().extension().string()) == ".al") {
+      paths.push_back(entry.path());
+    }
+  }
+  std::ranges::sort(paths);
+  return paths;
+}
+
+bool DeclaresSystemTable(std::string_view source) {
+  const std::vector<agiru::al::Token> tokens = agiru::al::Tokenize(source);
+  std::size_t at = 0;
+  while (at < tokens.size()) {
+    if (tokens[at].kind == agiru::al::TokenKind::Directive) {
+      ++at;
+      continue;
+    }
+    if (!agiru::al::IsKeyword(tokens[at], "namespace") &&
+        !agiru::al::IsKeyword(tokens[at], "using")) {
+      break;
+    }
+    while (at < tokens.size() && !agiru::al::IsPunctuation(tokens[at], ";")) { ++at; }
+    if (at < tokens.size()) { ++at; }
+  }
+  return at < tokens.size() && agiru::al::IsKeyword(tokens[at], "table");
+}
+
+Tables ReadSystemTables(const std::filesystem::path &root) {
+  if (root.empty()) { return {}; }
+  const auto paths = SystemSources(root);
+  Tables tables;
+  std::set<int> ids;
+  std::set<std::string> names;
+  for (const auto &path : paths) {
+    const std::string source = Read(path);
+    if (!DeclaresSystemTable(source)) {
+      std::println("SYSTEM SOURCE UNBOUND: {} (non-table declaration or namespace-only)",
+                   std::filesystem::relative(path, root).string());
+      continue;
+    }
+    agiru::al::TableObject table;
+    try {
+      table = agiru::al::ParseTable(source);
+    } catch (const std::exception &error) {
+      throw std::runtime_error("System table " + path.string() + ": " + error.what());
+    }
+    if (!ids.insert(table.id).second || !names.insert(agiru::gen::LowerKey(table.name)).second) {
+      throw std::runtime_error("duplicate System table declaration: " + table.name);
+    }
+    tables.paths.push_back(std::filesystem::relative(path, root).string());
+    tables.objects.push_back(std::move(table));
+  }
+  if (tables.objects.empty()) {
+    throw std::runtime_error("System symbols contain no table declarations");
+  }
+  std::println("SYSTEM TABLES: {} parsed from {} AL files", tables.objects.size(), paths.size());
+  return tables;
+}
+
+void IndexSystemTables(const Tables &tables, agiru::gen::Objects &objects, TableByName &byName) {
+  if (tables.objects.empty()) {
+    objects.tables = agiru::gen::PlatformTables();
+    objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+    return;
+  }
+  objects.tables = agiru::gen::PlatformTables(tables.objects);
+  objects.fieldEnums = agiru::gen::PlatformFieldEnums(tables.objects, objects.tables);
+  const auto intrinsic = agiru::gen::PlatformTables();
+  std::size_t bound = 0;
+  for (const auto &table : tables.objects) {
+    const auto name = agiru::gen::LowerKey(table.name);
+    if (!objects.tables.contains(name)) {
+      const auto target = intrinsic.find(name);
+      if (target != intrinsic.end() && target->second.id != table.id) {
+        std::println("SYSTEM TABLE REFUSED: {} declares ID {}, intrinsic target has ID {}",
+                     table.name,
+                     table.id,
+                     target->second.id);
+      } else {
+        std::println("SYSTEM TABLE UNBOUND: {} ID {} source {}",
+                     table.name,
+                     table.id,
+                     tables.paths.at(&table - tables.objects.data()));
+      }
+      continue;
+    }
+    ++bound;
+    byName.emplace(name, &table);
+    byName.emplace(std::to_string(table.id), &table);
+    byName.emplace(agiru::gen::LowerKey(table.nameSpace + "." + table.name), &table);
+  }
+  std::println("SYSTEM TABLES: {} bound, {} unbound", bound, tables.objects.size() - bound);
+}
+
 void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
   for (const agiru::al::TableObject &table : tables.objects) {
     const agiru::gen::TableRef ref =
@@ -1597,6 +1709,39 @@ Tables IndexTables(Run &run, Counts &counts) {
   return kept;
 }
 
+bool HasUnconditionalRelation(const agiru::al::Property &property) {
+  const auto tokens = agiru::al::Tokenize(property.text);
+  if (tokens.empty() || !agiru::al::IsKeyword(tokens.front(), "if")) { return true; }
+  int depth = 0;
+  for (std::size_t i = 0; i < tokens.size(); ++i) {
+    if (agiru::al::IsPunctuation(tokens[i], "(")) { ++depth; }
+    if (agiru::al::IsPunctuation(tokens[i], ")")) { --depth; }
+    if (depth == 0 && agiru::al::IsKeyword(tokens[i], "else") &&
+        (i + 1 == tokens.size() || !agiru::al::IsKeyword(tokens[i + 1], "if"))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void MergeFieldProperties(std::vector<agiru::al::Property> &into,
+                          const std::vector<agiru::al::Property> &from) {
+  for (const agiru::al::Property &property : from) {
+    const std::string name = agiru::gen::LowerKey(property.name);
+    const auto found = std::ranges::find_if(
+        into, [&name](const auto &held) { return agiru::gen::LowerKey(held.name) == name; });
+    if (found == into.end()) {
+      into.push_back(property);
+    } else if (name == "tablerelation") {
+      if (HasUnconditionalRelation(*found)) { continue; }
+      found->text += " else " + property.text;
+      found->value = agiru::al::Tokenize(found->text);
+    } else {
+      *found = property;
+    }
+  }
+}
+
 std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
   std::size_t merged = 0;
   const auto take = [](auto &into, const auto &from) {
@@ -1609,7 +1754,7 @@ std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
       for (const agiru::al::FieldDecl &change : extension.modified) {
         for (agiru::al::FieldDecl &field : table.fields) {
           if (agiru::gen::LowerKey(field.name) != agiru::gen::LowerKey(change.name)) { continue; }
-          take(field.properties, change.properties);
+          MergeFieldProperties(field.properties, change.properties);
           take(field.triggers, change.triggers);
           break;
         }
@@ -2446,6 +2591,7 @@ int Scan(const Job &job) {
   const agiru::gen::TranspileScope scope =
       agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
   NoteProductExclusions(job, scope);
+  const Tables systemTables = ReadSystemTables(job.systemSymbols);
   ClaimOutput(job.output);
 
   Counts allExtensionsRead;
@@ -2489,8 +2635,7 @@ int Scan(const Job &job) {
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
-  objects.tables = agiru::gen::PlatformTables();
-  objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+  IndexSystemTables(systemTables, objects, everyTable);
 
   std::map<std::string, std::string> symbols;
   std::vector<std::string> collisions;
@@ -2841,15 +2986,23 @@ int Scan(const Job &job) {
 
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
-  if (arguments.size() < 3) {
-    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>]\n", stderr);
+  const bool plain = arguments.size() == 3 || arguments.size() == 4;
+  const bool symbols = arguments.size() == 6 &&
+                       std::string_view(arguments[4]) == "--system-symbols" &&
+                       !std::string_view(arguments.back()).empty();
+  if (!plain && !symbols) {
+    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>] "
+               "[--system-symbols <root>]\n",
+               stderr);
     return 2;
   }
   try {
     return Scan(Job{.source = std::filesystem::path(arguments[1]),
                     .output = arguments.size() > 3 ? std::filesystem::path(arguments[3])
                                                    : std::filesystem::path{},
-                    .apps = std::filesystem::path(arguments[2])});
+                    .apps = std::filesystem::path(arguments[2]),
+                    .systemSymbols = symbols ? std::filesystem::path(arguments.back())
+                                             : std::filesystem::path{}});
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);

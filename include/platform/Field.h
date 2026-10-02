@@ -4,6 +4,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/ReflectionOptions.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
@@ -17,7 +18,9 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <span>
 #include <string_view>
+#include <type_traits>
 
 /// \file
 /// \brief The AL virtual table `Field` (2000000041) -- one row per field of every table.
@@ -26,29 +29,52 @@ namespace agiru::platform {
 
 /// \brief AL `FieldClass` -- what a field IS, as against what it holds.
 ///
-/// `FindRecordManagement` and its neighbours branch on it: `if FldRef.Class = FieldClass::FlowField
-/// then ...`. Measured from `~/Git/openerp/openerp/runtime/al_system_enums.py`.
+/// `Virtual Tables/Field.Table.al` declares `Normal,FlowField,FlowFilter`.
 enum class FieldClass : std::int32_t {
   Normal = 0,     ///< Stored in the row.
   FlowField = 1,  ///< Calculated, and therefore not a column (board:0019).
   FlowFilter = 2, ///< A filter carried on the record rather than a value.
 };
 
-/// \brief AL `ObsoleteState` -- how far along a field is on its way out.
-///
-/// \note THE ORDER IS THE DOCUMENTED ONE AS FAR AS IT GOES. `devenv-obsoletestate-property.md`
-///       lists `No` first as "the normal/default setting" and `Pending` second, and names the full
-///       set as `Moved`, `No`, `Pending`, `PendingMove`, `Removed` -- alphabetically, which is not
-///       an ordinal order. The last three are ordered here by the version that introduced them,
-///       which is [SET] rather than measured, and it costs nothing until AL compares one: the
-///       BaseApp writes `ObsoleteState = Pending` 3 445 times and `Removed` 1 321 times, both of
-///       which are pinned.
-enum class ObsoleteState : std::int32_t {
-  No = 0,          ///< Not obsolete.
-  Pending = 1,     ///< Will become obsolete.
-  Removed = 2,     ///< Gone, and the declaration is a headstone.
-  Moved = 3,       ///< Moved to another extension.
-  PendingMove = 4, ///< On its way to another extension.
+/// \brief `Field.Type` codes from `Field.Table.al`, not internal metadata or FieldRef codes.
+enum class FieldDataType : std::int32_t {
+  TableFilter = 4912,  ///< AL TableFilter.
+  RecordId = 4988,     ///< AL RecordID.
+  OemText = 11519,     ///< Legacy OemText.
+  Date = 11775,        ///< AL Date.
+  Time = 11776,        ///< AL Time.
+  DateFormula = 11797, ///< AL DateFormula.
+  Decimal = 12799,     ///< AL Decimal.
+  Media = 26207,       ///< AL Media.
+  MediaSet = 26208,    ///< AL MediaSet.
+  Text = 31488,        ///< AL Text.
+  Code = 31489,        ///< AL Code; distinct from FieldRef.Type().
+  Binary = 33791,      ///< Legacy Binary.
+  Blob = 33793,        ///< AL BLOB.
+  Boolean = 34047,     ///< AL Boolean.
+  Integer = 34559,     ///< AL Integer.
+  OemCode = 35071,     ///< Legacy OemCode.
+  Option = 35583,      ///< AL Option and enum fields.
+  BigInteger = 36095,  ///< AL BigInteger.
+  Duration = 36863,    ///< AL Duration.
+  Guid = 37119,        ///< AL GUID.
+  DateTime = 37375,    ///< AL DateTime.
+};
+
+/// \brief The `SQLDataType` vocabulary declared by System `Field.Table.al`.
+enum class FieldSQLDataType : std::int32_t {
+  Varchar = 0,    ///< Default Code storage property.
+  Integer = 1,    ///< Numeric Code storage property.
+  Variant = 2,    ///< Mixed Code storage property.
+  BigInteger = 3, ///< Large numeric Code storage property.
+};
+
+/// \brief The compile-time `Field.Access` vocabulary, not a runtime permission grant.
+enum class FieldAccess : std::int32_t {
+  Public = 0,    ///< Available to other apps.
+  Internal = 1,  ///< Available within the declaring app.
+  Protected = 2, ///< Available through derived declarations.
+  Local = 3,     ///< Available within the declaring object.
 };
 
 }
@@ -68,7 +94,7 @@ struct Named {
 /// \return Every ordinal from 0 to N-1, named or blank.
 ///
 /// This preserves the current metadata-tag compatibility vocabulary. It is not the native
-/// Field.Type mapping; its distinct coded ordinals remain open in board:0034.
+/// Field.Type mapping, which has its own compact coded vocabulary below.
 template <std::size_t N>
 constexpr std::array<EnumValueDef, N> Sparse(std::span<const Named> named) {
   std::array<EnumValueDef, N> values{};
@@ -111,9 +137,7 @@ template <> struct agiru::OptionTraits<agiru::FieldType> {
   static constexpr auto kValues = agiru::detail::Sparse<41>(agiru::detail::kFieldTypeNames);
 };
 
-/// \brief The vocabulary of AL `FieldClass`.
-/// \brief The members of `Field.DataClassification`, in the order `type/DataClassification.h`
-///        declares them.
+/// \brief The telemetry classifier vocabulary; not the native Field option order.
 template <> struct agiru::OptionTraits<agiru::DataClassification> {
   /// \brief The seven classifications, dense.
   static constexpr std::array<agiru::EnumValueDef, 7> kValues{{
@@ -142,15 +166,55 @@ template <> struct agiru::OptionTraits<agiru::platform::FieldClass> {
   }};
 };
 
-/// \brief The vocabulary of AL `ObsoleteState`.
-template <> struct agiru::OptionTraits<agiru::platform::ObsoleteState> {
-  /// \brief The five states.
-  static constexpr std::array<agiru::EnumValueDef, 5> kValues{{
-      {.ordinal = 0, .name = "No", .caption = "No"},
-      {.ordinal = 1, .name = "Pending", .caption = "Pending"},
-      {.ordinal = 2, .name = "Removed", .caption = "Removed"},
-      {.ordinal = 3, .name = "Moved", .caption = "Moved"},
-      {.ordinal = 4, .name = "PendingMove", .caption = "PendingMove"},
+/// \brief The compact, sorted native `Field.Type` vocabulary from System symbols.
+template <> struct agiru::OptionTraits<agiru::platform::FieldDataType> {
+  /// \brief Native codes are explicit rather than ordinary zero-based option positions.
+  static constexpr bool kCodedOrdinals = true;
+  /// \brief All twenty-one source members; no padding for the ordinal gaps.
+  static constexpr std::array<agiru::EnumValueDef, 21> kValues{{
+      {.ordinal = 4912, .name = "TableFilter", .caption = "TableFilter"},
+      {.ordinal = 4988, .name = "RecordID", .caption = "RecordID"},
+      {.ordinal = 11519, .name = "OemText", .caption = "OemText"},
+      {.ordinal = 11775, .name = "Date", .caption = "Date"},
+      {.ordinal = 11776, .name = "Time", .caption = "Time"},
+      {.ordinal = 11797, .name = "DateFormula", .caption = "DateFormula"},
+      {.ordinal = 12799, .name = "Decimal", .caption = "Decimal"},
+      {.ordinal = 26207, .name = "Media", .caption = "Media"},
+      {.ordinal = 26208, .name = "MediaSet", .caption = "MediaSet"},
+      {.ordinal = 31488, .name = "Text", .caption = "Text"},
+      {.ordinal = 31489, .name = "Code", .caption = "Code"},
+      {.ordinal = 33791, .name = "Binary", .caption = "Binary"},
+      {.ordinal = 33793, .name = "BLOB", .caption = "BLOB"},
+      {.ordinal = 34047, .name = "Boolean", .caption = "Boolean"},
+      {.ordinal = 34559, .name = "Integer", .caption = "Integer"},
+      {.ordinal = 35071, .name = "OemCode", .caption = "OemCode"},
+      {.ordinal = 35583, .name = "Option", .caption = "Option"},
+      {.ordinal = 36095, .name = "BigInteger", .caption = "BigInteger"},
+      {.ordinal = 36863, .name = "Duration", .caption = "Duration"},
+      {.ordinal = 37119, .name = "GUID", .caption = "GUID"},
+      {.ordinal = 37375, .name = "DateTime", .caption = "DateTime"},
+  }};
+};
+
+/// \brief Native `Field.SQLDataType` members in source order.
+template <> struct agiru::OptionTraits<agiru::platform::FieldSQLDataType> {
+  /// \brief The four declared storage properties.
+  static constexpr std::array<agiru::EnumValueDef, 4> kValues{{
+      {.ordinal = 0, .name = "Varchar", .caption = "Varchar"},
+      {.ordinal = 1, .name = "Integer", .caption = "Integer"},
+      {.ordinal = 2, .name = "Variant", .caption = "Variant"},
+      {.ordinal = 3, .name = "BigInteger", .caption = "BigInteger"},
+  }};
+};
+
+/// \brief Native `Field.Access` members in source order.
+template <> struct agiru::OptionTraits<agiru::platform::FieldAccess> {
+  /// \brief The four declared compile-time access levels.
+  static constexpr std::array<agiru::EnumValueDef, 4> kValues{{
+      {.ordinal = 0, .name = "Public", .caption = "Public"},
+      {.ordinal = 1, .name = "Internal", .caption = "Internal"},
+      {.ordinal = 2, .name = "Protected", .caption = "Protected"},
+      {.ordinal = 3, .name = "Local", .caption = "Local"},
   }};
 };
 
@@ -161,23 +225,10 @@ namespace agiru::platform {
 /// \note System symbols declare the table; the platform supplies its rows. Its partial runtime
 ///       binding lives here rather than in generated application sources (board:0034).
 ///
-/// \note MOST USES ARE TEMPORARY. Measured over BCApps on 2026-09-02: 1 069 `Record Field`
-///       declarations, of which 282 carry `temporary`. A temporary one needs nothing but this
-///       declaration, because `Temporary<T>` keeps its own store and touches no database.
-///
-/// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
-///       `work/symbols/src/Virtual Tables/Field.Table.al` (`make symbols`) carries it. The
-///       predecessor's measured layout, which this file carried until 2026-09-07, had `Enabled`
-///       sitting on `RelationTableNo`'s number and four more one place too low -- a `FieldRef` by
-///       number would have read the wrong column and thrown nothing (board:0607).
-///
-/// \note The partial declaration has eighteen fields. `ExternalName` still has the wrong
-///       number and length; `SQLDataType` and fields 60-64 are absent (board:0034).
-///
-/// \warning `Field.Type` IS NOT `FieldType`. The declaration gives the virtual table's own option
-///          coded ordinals running 4912 to 37375. BC 28.4 reports Code as 31489 in Field.Type
-///          and 31490 in FieldRef.Type(); the current internal metadata tag is 33. This file
-///          incorrectly shares one option for both public boundaries (board:0034).
+/// \note The declaration follows all twenty-four fields in System `Field.Table.al`.
+///       Temporary storage is distinct from the incomplete production metadata provider.
+/// \warning `Field.Type`, `FieldRef.Type()` and internal `FieldType` are separate boundaries.
+///          Package provenance and several metadata properties remain open (board:0034).
 class Field : public Table<Field> {
 public:
   /// \brief The AL table number of the virtual `Field` table.
@@ -195,6 +246,8 @@ public:
   static constexpr std::size_t kReasonLength = 248;
   /// \brief The declared length of `OptionString`.
   static constexpr std::size_t kOptionStringLength = 2047;
+  /// \brief The System-symbol length of `ExternalName`.
+  static constexpr std::size_t kExternalNameLength = 100;
 
   /// \brief AL `Field."TableNo"`.
   ::agiru::Integer TableNo{};
@@ -205,7 +258,7 @@ public:
   /// \brief AL `Field."FieldName"`.
   Text<kNameLength> FieldName;
   /// \brief AL `Field."Type"`.
-  Option<agiru::FieldType> Type;
+  Option<FieldDataType> Type;
   /// \brief AL `Field."Len"`.
   ::agiru::Integer Len{};
   /// \brief AL `Field."Class"`.
@@ -220,6 +273,8 @@ public:
   ::agiru::Integer RelationTableNo{};
   /// \brief AL `Field."RelationFieldNo"`.
   ::agiru::Integer RelationFieldNo{};
+  /// \brief AL `Field.SQLDataType`; not the PostgreSQL column type.
+  Option<FieldSQLDataType> SQLDataType;
   /// \brief AL `Field."OptionString"`.
   Text<kOptionStringLength> OptionString;
   /// \brief AL `Field."ObsoleteState"`.
@@ -232,12 +287,21 @@ public:
   Boolean Enabled{};
   /// \brief AL `Field.IsPartOfPrimaryKey`, which the declaration spells without spaces.
   Boolean IsPartOfPrimaryKey{};
-  /// \brief AL `Field.DataClassification` (`Field-Virtual-Table.md`: "The classification of data
-  ///        in the field"). Blank until the transpiler carries the property (board:0358's kind).
-  Option<::agiru::DataClassification> DataClassification;
+  /// \brief AL `Field.DataClassification`, with its own source-declared option order.
+  Option<FieldDataClassification> DataClassification;
   /// \brief AL `Field.ExternalName` -- the name the field carries outward, which the API pages
   ///        read. Blank until the transpiler carries the property.
-  Text<kOptionStringLength> ExternalName;
+  Text<kExternalNameLength> ExternalName;
+  /// \brief AL `Field."App Package ID"`; production package provenance is not yet supplied.
+  Guid AppPackageID;
+  /// \brief AL `Field."App Runtime Package ID"`; not an inferred C++ app identifier.
+  Guid AppRuntimePackageID;
+  /// \brief AL `Field.OptimizeForTextSearch`.
+  Boolean OptimizeForTextSearch{};
+  /// \brief AL `Field.Access`; not a runtime security boundary.
+  Option<FieldAccess> Access;
+  /// \brief AL `Field.IsAllowedInCustomizations`; separate from page editability.
+  Boolean IsAllowedInCustomizations{};
 
   /// \brief AL `Field.SystemId` -- blank, because a virtual table has no row to carry one.
   Guid SystemId;
@@ -289,11 +353,22 @@ public:
     static constexpr ::agiru::FieldNo Enabled{8};
     /// \brief The AL field number of `IsPartOfPrimaryKey`.
     static constexpr ::agiru::FieldNo IsPartOfPrimaryKey{28};
-    /// \brief The AL field number of `DataClassification`, which follows `ObsoleteReason` (26)
-    ///        in the order the platform page lists the columns and the predecessor numbers them.
+    /// \brief The System-symbol field number of `DataClassification`.
     static constexpr ::agiru::FieldNo DataClassification{27};
-    /// \brief The AL field number of `ExternalName`, the next number the table had free.
-    static constexpr ::agiru::FieldNo ExternalName{29};
+    /// \brief The System-symbol field number of `ExternalName`.
+    static constexpr ::agiru::FieldNo ExternalName{10};
+    /// \brief The System-symbol field number of `SQLDataType`.
+    static constexpr ::agiru::FieldNo SQLDataType{23};
+    /// \brief The System-symbol field number of `App Package ID`.
+    static constexpr ::agiru::FieldNo AppPackageID{60};
+    /// \brief The System-symbol field number of `App Runtime Package ID`.
+    static constexpr ::agiru::FieldNo AppRuntimePackageID{61};
+    /// \brief The System-symbol field number of `OptimizeForTextSearch`.
+    static constexpr ::agiru::FieldNo OptimizeForTextSearch{62};
+    /// \brief The System-symbol field number of `Access`.
+    static constexpr ::agiru::FieldNo Access{63};
+    /// \brief The System-symbol field number of `IsAllowedInCustomizations`.
+    static constexpr ::agiru::FieldNo IsAllowedInCustomizations{64};
   };
 
   /// \brief The primary key: the table and the field within it.
@@ -318,7 +393,7 @@ public:
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.
-inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 18>{{
+inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 24>{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
     Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),
@@ -333,6 +408,10 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
         Field::Field_No::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
     Declare<&Field::TypeName>(
         Field::Field_No::TypeName, "Type Name", "Type Name", offsetof(Field, TypeName)),
+    Declare<&Field::ExternalName>(Field::Field_No::ExternalName,
+                                  "ExternalName",
+                                  "ExternalName",
+                                  offsetof(Field, ExternalName)),
     Declare<&Field::FieldCaption>(Field::Field_No::FieldCaption,
                                   "Field Caption",
                                   "Field Caption",
@@ -345,6 +424,8 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
                                      "RelationFieldNo",
                                      "RelationFieldNo",
                                      offsetof(Field, RelationFieldNo)),
+    Declare<&Field::SQLDataType>(
+        Field::Field_No::SQLDataType, "SQLDataType", "SQLDataType", offsetof(Field, SQLDataType)),
     Declare<&Field::OptionString>(Field::Field_No::OptionString,
                                   "OptionString",
                                   "OptionString",
@@ -365,10 +446,23 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
                                         "IsPartOfPrimaryKey",
                                         "IsPartOfPrimaryKey",
                                         offsetof(Field, IsPartOfPrimaryKey)),
-    Declare<&Field::ExternalName>(Field::Field_No::ExternalName,
-                                  "ExternalName",
-                                  "ExternalName",
-                                  offsetof(Field, ExternalName)),
+    Declare<&Field::AppPackageID>(Field::Field_No::AppPackageID,
+                                  "App Package ID",
+                                  "App Package ID",
+                                  offsetof(Field, AppPackageID)),
+    Declare<&Field::AppRuntimePackageID>(Field::Field_No::AppRuntimePackageID,
+                                         "App Runtime Package ID",
+                                         "App Runtime Package ID",
+                                         offsetof(Field, AppRuntimePackageID)),
+    Declare<&Field::OptimizeForTextSearch>(Field::Field_No::OptimizeForTextSearch,
+                                           "OptimizeForTextSearch",
+                                           "OptimizeForTextSearch",
+                                           offsetof(Field, OptimizeForTextSearch)),
+    Declare<&Field::Access>(Field::Field_No::Access, "Access", "Access", offsetof(Field, Access)),
+    Declare<&Field::IsAllowedInCustomizations>(Field::Field_No::IsAllowedInCustomizations,
+                                               "IsAllowedInCustomizations",
+                                               "IsAllowedInCustomizations",
+                                               offsetof(Field, IsAllowedInCustomizations)),
 }});
 
 /// \brief The keys of the virtual `Field` table.

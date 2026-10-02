@@ -42,6 +42,7 @@ public:
     table.id = ExpectInteger();
     table.name = ExpectName();
     ParseTableBody(table);
+    InheritFieldProperties(table);
     return table;
   }
 
@@ -55,6 +56,8 @@ public:
     extension.extends = ExpectName();
     TableObject body;
     ParseTableBody(body);
+    InheritFieldProperties(body);
+    extension.properties = std::move(body.properties);
     extension.fields = std::move(body.fields);
     extension.modified = std::move(body.modified);
     extension.keys = std::move(body.keys);
@@ -62,6 +65,16 @@ public:
     extension.variables = std::move(body.variables);
     extension.procedures = std::move(body.procedures);
     return extension;
+  }
+
+  static void InheritFieldProperties(TableObject &table) {
+    for (FieldDecl &field : table.fields) {
+      for (const std::string_view name : {"DataClassification", "AllowInCustomizations"}) {
+        if (const Property *property = Find(table.properties, name); property != nullptr) {
+          field.inheritedProperties.push_back(*property);
+        }
+      }
+    }
   }
 
   void ParseTableBody(TableObject &table) {

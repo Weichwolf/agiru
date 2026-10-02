@@ -2,6 +2,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
+#include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
@@ -15,6 +16,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -34,13 +36,23 @@ std::string detail::FieldOptionMembers(const FieldDef &def) {
 
 namespace {
 
-std::string TypeNameOf(const FieldDef &def) {
+Option<platform::FieldDataType> NativeFieldTypeOf(const FieldDef &def) {
   const FieldType type = def.type == FieldType::Enum ? FieldType::Option : def.type;
   const std::string_view name = type == FieldType::TableFilter ? std::string_view{"TableFilter"}
                                                                : Option<FieldType>{type}.Name();
-  if (name.empty()) { throw Error("Field metadata: unsupported type name"); }
-  std::string out{name};
-  if (type == FieldType::Code || type == FieldType::Text) { out += std::to_string(def.length); }
+  const auto &values = OptionTraits<platform::FieldDataType>::kValues;
+  const auto *const found = std::ranges::find(values, name, &EnumValueDef::name);
+  if (name.empty() || found == values.end()) {
+    throw Error("Field metadata: unsupported type name");
+  }
+  return Option<platform::FieldDataType>{found->ordinal};
+}
+
+std::string TypeNameOf(const FieldDef &def, Option<platform::FieldDataType> type) {
+  std::string out{type.Name()};
+  if (type == platform::FieldDataType::Code || type == platform::FieldDataType::Text) {
+    out += std::to_string(def.length);
+  }
   return out;
 }
 
@@ -69,16 +81,55 @@ Option<platform::ObsoleteState> ObsoleteStateOf(const FieldDef &def) {
   return *value;
 }
 
+bool SamePropertyName(std::string_view left, std::string_view right) {
+  return std::ranges::equal(left, right, [](unsigned char a, unsigned char b) {
+    return std::tolower(a) == std::tolower(b);
+  });
+}
+
+template <typename Kind>
+Option<Kind>
+FieldPropertyOption(std::string_view name, std::string_view fallback, std::string_view property) {
+  if (name.empty()) { name = fallback; }
+  const auto &values = OptionTraits<Kind>::kValues;
+  const auto *const value = std::ranges::find_if(
+      values, [name](const EnumValueDef &held) { return SamePropertyName(held.name, name); });
+  if (value == values.end()) {
+    throw Error("Field metadata: unsupported " + std::string(property) + " " + std::string(name));
+  }
+  return Option<Kind>{value->ordinal};
+}
+
+bool AllowsCustomization(const FieldDef &def) {
+  const std::string_view name = def.allowInCustomizations;
+  if (SamePropertyName(name, "Never")) { return false; }
+  constexpr std::array<std::string_view, 5> allowed{
+      "", "ToBeClassified", "Always", "AsReadOnly", "AsReadWrite"};
+  if (std::ranges::none_of(allowed, [name](auto held) { return SamePropertyName(name, held); })) {
+    throw Error("Field metadata: unsupported AllowInCustomizations " + std::string(name));
+  }
+  return true;
+}
+
 }
 
 void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, const FieldDef &def) {
   const auto obsoleteState = ObsoleteStateOf(def);
-  const std::string typeName = TypeNameOf(def);
+  const auto type = NativeFieldTypeOf(def);
+  const std::string typeName = TypeNameOf(def, type);
+  const auto classification = FieldPropertyOption<platform::FieldDataClassification>(
+      def.fieldClass == ::agiru::FieldClass::Normal ? def.dataClassification : "SystemMetadata",
+      "ToBeClassified",
+      "DataClassification");
+  const auto sqlDataType =
+      FieldPropertyOption<platform::FieldSQLDataType>(def.sqlDataType, "Varchar", "SqlDataType");
+  const auto access = FieldPropertyOption<platform::FieldAccess>(def.access, "Public", "Access");
+  const bool allowsCustomization = AllowsCustomization(def);
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
   row.FieldName = FittedFieldText(def.name, platform::Field::kNameLength);
-  row.Type = def.type == FieldType::Enum ? FieldType::Option : def.type;
+  row.Type = type;
   row.Len = static_cast<::agiru::Integer>(def.length);
   row.Class = def.fieldClass;
   row.TypeName = typeName;
@@ -92,6 +143,12 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
                                      platform::Field::kCaptionLength);
   row.Enabled = def.enabled;
   row.IsPartOfPrimaryKey = InPrimaryKey(table, def.no);
+  row.DataClassification = classification;
+  row.SQLDataType = sqlDataType;
+  row.Access = access;
+  row.OptimizeForTextSearch =
+      def.fieldClass == ::agiru::FieldClass::Normal && def.optimizeForTextSearch;
+  row.IsAllowedInCustomizations = allowsCustomization;
 }
 
 Boolean platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {

@@ -68,6 +68,7 @@ struct FieldDecl {
   int length = 0;
   std::vector<Property> properties;
   std::vector<ProcedureDecl> triggers;
+  std::vector<Property> inheritedProperties{};
 };
 
 struct CodeunitObject {
@@ -172,6 +173,7 @@ struct TableExtensionObject {
   std::string name;
   std::string extends;
   std::string nameSpace;
+  std::vector<Property> properties;
   std::vector<FieldDecl> fields;
   std::vector<FieldDecl> modified;
   std::vector<KeyDecl> keys;

@@ -672,6 +672,7 @@ void AnExtensionCarriesWhatItAdds() {
   const agiru::al::TableExtensionObject table = agiru::al::ParseTableExtension(
       R"(tableextension 50000 "More Item" extends Item
 {
+    AllowInCustomizations = Never;
     fields
     {
         field(50000; "Shelf Depth"; Decimal) { Caption = 'Shelf Depth'; }
@@ -685,6 +686,13 @@ void AnExtensionCarriesWhatItAdds() {
 })");
   CHECK_TEXT("it names the table it extends", table.extends, "Item");
   CHECK_TRUE("one field is added", table.fields.size() == 1);
+  CHECK_TRUE("table extension properties survive parsing", table.properties.size() == 1);
+  CHECK_TEXT("the extension property retains its value", table.properties[0].text, "Never");
+  CHECK_TRUE("an added field retains its declaring extension's default",
+             table.fields[0].inheritedProperties.size() == 1);
+  CHECK_TEXT("the default belongs to this extension's field",
+             table.fields[0].inheritedProperties[0].text,
+             "Never");
   CHECK_TEXT("with its own number", std::to_string(table.fields[0].number), "50000");
   // A MODIFIED FIELD IS NOT AN ADDED ONE. It carries no type, only what it changes, and merging it
   // as a field would give the table a second `No.` with number 0.
