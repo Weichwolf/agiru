@@ -2,6 +2,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
+#include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
@@ -34,12 +35,35 @@ std::string detail::FieldOptionMembers(const FieldDef &def) {
 
 namespace {
 
-std::string TypeNameOf(const FieldDef &def) {
+Option<platform::FieldDataType> NativeFieldTypeOf(const FieldDef &def) {
+  using Native = platform::FieldDataType;
+  switch (def.type) {
+    case FieldType::TableFilter: return Native::TableFilter;
+    case FieldType::RecordId: return Native::RecordId;
+    case FieldType::Date: return Native::Date;
+    case FieldType::Time: return Native::Time;
+    case FieldType::DateFormula: return Native::DateFormula;
+    case FieldType::Decimal: return Native::Decimal;
+    case FieldType::Media: return Native::Media;
+    case FieldType::MediaSet: return Native::MediaSet;
+    case FieldType::Text: return Native::Text;
+    case FieldType::Code: return Native::Code;
+    case FieldType::Blob: return Native::Blob;
+    case FieldType::Boolean: return Native::Boolean;
+    case FieldType::Integer: return Native::Integer;
+    case FieldType::Option:
+    case FieldType::Enum: return Native::Option;
+    case FieldType::BigInteger: return Native::BigInteger;
+    case FieldType::Duration: return Native::Duration;
+    case FieldType::Guid: return Native::Guid;
+    case FieldType::DateTime: return Native::DateTime;
+    default: throw Error("Field metadata: unsupported type name");
+  }
+}
+
+std::string TypeNameOf(const FieldDef &def, Option<platform::FieldDataType> native) {
   const FieldType type = def.type == FieldType::Enum ? FieldType::Option : def.type;
-  const std::string_view name = type == FieldType::TableFilter ? std::string_view{"TableFilter"}
-                                                               : Option<FieldType>{type}.Name();
-  if (name.empty()) { throw Error("Field metadata: unsupported type name"); }
-  std::string out{name};
+  std::string out{native.Name()};
   if (type == FieldType::Code || type == FieldType::Text) { out += std::to_string(def.length); }
   return out;
 }
@@ -73,12 +97,13 @@ Option<platform::ObsoleteState> ObsoleteStateOf(const FieldDef &def) {
 
 void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, const FieldDef &def) {
   const auto obsoleteState = ObsoleteStateOf(def);
-  const std::string typeName = TypeNameOf(def);
+  const auto nativeType = NativeFieldTypeOf(def);
+  const std::string typeName = TypeNameOf(def, nativeType);
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
   row.FieldName = FittedFieldText(def.name, platform::Field::kNameLength);
-  row.Type = def.type == FieldType::Enum ? FieldType::Option : def.type;
+  row.Type = nativeType;
   row.Len = static_cast<::agiru::Integer>(def.length);
   row.Class = def.fieldClass;
   row.TypeName = typeName;

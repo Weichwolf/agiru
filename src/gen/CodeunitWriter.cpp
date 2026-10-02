@@ -2187,11 +2187,13 @@ TableIndex PlatformTables() {
 
 FieldEnums PlatformFieldEnums() {
   FieldEnums enums;
-  enums["field"]["type"] = "::agiru::FieldType";
+  enums["field"]["type"] = "::agiru::platform::FieldDataType";
   enums["field"]["class"] = "::agiru::platform::FieldClass";
   enums["field"]["obsolete state"] = "::agiru::platform::ObsoleteState";
   enums["field"]["obsoletestate"] = "::agiru::platform::ObsoleteState";
-  enums["field"]["dataclassification"] = "::agiru::DataClassification";
+  enums["field"]["dataclassification"] = "::agiru::platform::FieldDataClassification";
+  enums["field"]["sqldatatype"] = "::agiru::platform::FieldSQLDataType";
+  enums["field"]["access"] = "::agiru::platform::FieldAccess";
   enums["2000000041"] = enums["field"];
   enums["user"]["state"] = "::agiru::platform::UserState";
   enums["user"]["license type"] = "::agiru::platform::UserLicenseType";

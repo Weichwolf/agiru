@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
+#include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
@@ -25,6 +26,7 @@ using agiru::RecordRef;
 using agiru::Temporary;
 using agiru::platform::Field;
 using agiru::platform::FieldClass;
+using agiru::platform::FieldDataType;
 
 namespace {
 
@@ -41,6 +43,8 @@ constexpr agiru::TableId kLongMetadataId{50153};
 constexpr agiru::TableId kTypeMetadataId{50154};
 constexpr agiru::Integer kTypeNameField = 9;
 constexpr FieldType kUnsupportedType = static_cast<FieldType>(250);
+constexpr agiru::Integer kNativeCodeOrdinal = 31489;
+constexpr agiru::Integer kNativeFieldRefCodeOrdinal = 31490;
 
 struct TypeNameCase {
   FieldType type;
@@ -205,6 +209,13 @@ void MetadataTypeNamesMatchTheNativePrimitiveContract() {
     CHECK_TEXT("Type Name uses the native primitive spelling and length",
                ReadTypeName(row),
                kTypeNames[i].name);
+    CHECK_TRUE("every primitive maps to a declared native code", row.Type.IsDeclared());
+    CHECK_TRUE("an internal metadata tag cannot escape the Type boundary",
+               row.Type.AsInteger() != static_cast<int>(kTypeNames[i].type));
+    if (kTypeNames[i].type == FieldType::Code) {
+      CHECK_TRUE("Code uses the Field.Table.al ordinal",
+                 row.Type.AsInteger() == kNativeCodeOrdinal);
+    }
   }
   CHECK_TEXT("an unknown primitive type refuses rather than returning blank",
              ReadMetadata(row, kUnknownTypeField, kTypeMetadataId),
@@ -256,7 +267,7 @@ void MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary() {
              ",,Alpha,,Omega,");
   CHECK_TRUE("an ordinary field is Normal", row.Class == FieldClass::Normal);
   CHECK_SILENT("an enum declaration is readable", ReadMetadata(row, 4));
-  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldType::Option);
+  CHECK_TRUE("the private Enum type code does not escape", row.Type == FieldDataType::Option);
   CHECK_TRUE("the reported type has a declared member", row.Type.IsDeclared());
   CHECK_TEXT("enum members retain declaration order", row.OptionString.Value(), "Zero,Ten");
   CHECK_SILENT("a scalar declaration is readable", ReadMetadata(row, 2));
@@ -298,14 +309,14 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   rows.TableNo = kItem;
   rows.No = kItemNo;
   rows.FieldName = "No.";
-  rows.Type = FieldType::Code;
+  rows.Type = FieldDataType::Code;
   rows.Len = kNoLength;
   rows.Insert();
 
   rows.TableNo = kItem;
   rows.No = kItemDescription;
   rows.FieldName = "Description";
-  rows.Type = FieldType::Text;
+  rows.Type = FieldDataType::Text;
   rows.Len = kDescriptionLength;
   rows.Insert();
 
@@ -315,7 +326,7 @@ void ATemporaryFieldIsAContainerAndNeedsNoPlatform() {
   read.Copy(rows, true);
   CHECK_TRUE("a row is found by its primary key", read.Get(kItem, kItemNo));
   CHECK_TEXT("carrying its name", std::string(read.FieldName.Value()), "No.");
-  CHECK_TRUE("and its type", read.Type == FieldType::Code);
+  CHECK_TRUE("and its type", read.Type == FieldDataType::Code);
   CHECK_TRUE("a key that matches nothing answers false", !read.Get(kItem, agiru::Integer{2}));
 }
 
@@ -332,8 +343,8 @@ void ItIsTheTableTheBaseAppReadsFrom() {
   // `SystemId` in `FieldCount()`, `ApplicationAreaMgmt` read a Guid into a Boolean (214 cases,
   // commit 1b27053). The system fields exist all the same and AL reaches them BY NUMBER --
   // `Config. Package Management` writes `Field.FieldNo(SystemId)` -- which `FieldExist` answers.
-  CHECK_TRUE("eighteen declared fields, and not the five the platform adds",
-             ref.FieldCount() == 18);
+  CHECK_TRUE("twenty-four declared fields, and not the five the platform adds",
+             ref.FieldCount() == 24);
   CHECK_TRUE("while a system field is reachable by number",
              ref.FieldExist(agiru::kSystemFields.front().no.Value()));
   CHECK_TEXT("the field AL calls \"No.\" keeps its dot", std::string(ref.Field(2).Name()), "No.");
@@ -363,10 +374,41 @@ void TheCompatibilityTypeKeepsItsExistingOptionVocabulary() {
   Field row;
   RecordRef ref;
   ref.GetTable(row);
-  CHECK_TRUE("FieldRef retains the same leading blank option members",
+  CHECK_TRUE("Field.Type reflection exposes native members without padded gaps",
              ref.Field(Field::Field_No::Type.Value())
                  .OptionMembers()
-                 .starts_with(",,,Boolean,,Option,,Integer"));
+                 .starts_with("TableFilter,RecordID,OemText,Date,Time"));
+}
+
+void NativeTypeCodesRoundtripThroughTemporaryStorageAndReflection() {
+  Temporary<Field> row;
+  RecordRef ref;
+  ref.GetTable(row);
+  CHECK_TRUE("a fresh coded option preserves the zero default", row.Type.AsInteger() == 0);
+  CHECK_TRUE("zero is not a fabricated native member", !row.Type.IsDeclared());
+  const auto &values = agiru::OptionTraits<FieldDataType>::kValues;
+  CHECK_TRUE("native vocabulary is compact", values.size() == 21);
+  for (const auto &value : values) {
+    ref.Field(Field::Field_No::Type.Value()).Value(agiru::Variant(value.ordinal));
+    ref.SetTable(row);
+    CHECK_TRUE("reflection preserves the coded ordinal", row.Type.AsInteger() == value.ordinal);
+    CHECK_TEXT("reflection preserves the native name", row.Type.Name(), value.name);
+    CHECK_TRUE("a native code is declared", row.Type.IsDeclared());
+    row.TableNo = kItem;
+    row.No = value.ordinal;
+    row.Insert();
+  }
+  CHECK_TRUE("no native option vanished from temporary storage", row.Count() == 21);
+  Temporary<Field> read;
+  read.Copy(row, true);
+  for (const auto &value : values) {
+    CHECK_TRUE("each native ordinal can be read by its key", read.Get(kItem, value.ordinal));
+    CHECK_TRUE("temporary storage keeps the native code", read.Type.AsInteger() == value.ordinal);
+  }
+  CHECK_TRUE("the internal Code tag is not a native member",
+             !agiru::Option<FieldDataType>{static_cast<int>(FieldType::Code)}.IsDeclared());
+  CHECK_TRUE("the FieldRef Code code is not the Field.Type Code code",
+             !agiru::Option<FieldDataType>{kNativeFieldRefCodeOrdinal}.IsDeclared());
 }
 
 } // namespace
@@ -380,6 +422,7 @@ int main() {
     ATemporaryFieldIsAContainerAndNeedsNoPlatform();
     ItIsTheTableTheBaseAppReadsFrom();
     TheCompatibilityTypeKeepsItsExistingOptionVocabulary();
+    NativeTypeCodesRoundtripThroughTemporaryStorageAndReflection();
     MetadataKeepsDeclaredValuesAndRecordState();
     MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary();
     MetadataLoadsRelationsAndRefusesUnknownStates();

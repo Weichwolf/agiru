@@ -1,6 +1,7 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/Field.h"
 #include "platform/ODataEdmType.h"
 #include "platform/ObjectOptions.h"
 #include "platform/PrivacyNotice.h"
@@ -40,6 +41,7 @@ constexpr int kWrongObjectOptionsId = 2000000225;
 constexpr int kShorterTextLength = 20;
 constexpr int kOriginalToolingPageId = 9630;
 constexpr int kSavedTemporaryField = 8;
+constexpr int kRetiredExternalNameField = 29;
 
 struct Family {
   std::string_view path;
@@ -47,7 +49,7 @@ struct Family {
   std::string_view scope;
 };
 
-constexpr std::array<Family, 4> kFamilies{{
+constexpr std::array<Family, 5> kFamilies{{
     {.path = "Tenant Database Tables/ObjectOptions.Table.al",
      .table = &agiru::platform::kObjectOptionsTable,
      .scope = agiru::platform::ObjectOptions::kScope},
@@ -60,6 +62,9 @@ constexpr std::array<Family, 4> kFamilies{{
     {.path = "Tenant Database Tables/PrivacyNoticeApproval.Table.al",
      .table = &agiru::platform::kPrivacyNoticeApprovalTable,
      .scope = agiru::platform::PrivacyNoticeApproval::kScope},
+    {.path = "Virtual Tables/Field.Table.al",
+     .table = &agiru::platform::kFieldTable,
+     .scope = agiru::platform::Field::kScope},
 }};
 
 std::string Text(const std::vector<agiru::al::Property> &properties,
@@ -108,6 +113,11 @@ void Options(const agiru::al::FieldDecl &source, const agiru::FieldDef &field, C
     return;
   }
   const auto members = agiru::al::ListValue(*property);
+  const auto *codes = agiru::al::Find(source.properties, "OptionOrdinalValues");
+  const auto ordinals =
+      codes == nullptr ? std::vector<std::string>{} : agiru::al::ListValue(*codes);
+  checks.emplace_back(source.name + " coded ordinal population",
+                      codes == nullptr || ordinals.size() == members.size());
   std::vector<std::string> captions;
   const std::string text = Text(source.properties, "OptionCaption");
   std::size_t start = 0;
@@ -117,12 +127,16 @@ void Options(const agiru::al::FieldDecl &source, const agiru::FieldDef &field, C
     if (end == std::string::npos) { break; }
     start = end + 1;
   }
+  if (agiru::al::Find(source.properties, "OptionCaption") == nullptr) { captions = members; }
   checks.emplace_back(source.name + " option population", field.values.size() == members.size());
   checks.emplace_back(source.name + " caption population", captions.size() == members.size());
   for (std::size_t i = 0; i < members.size(); ++i) {
     const auto *value = i < field.values.size() ? &field.values[i] : nullptr;
+    const int ordinal = codes == nullptr      ? static_cast<int>(i)
+                        : i < ordinals.size() ? std::stoi(ordinals[i])
+                                              : -1;
     checks.emplace_back(source.name + " option " + std::to_string(i),
-                        value != nullptr && value->ordinal == static_cast<int>(i) &&
+                        value != nullptr && value->ordinal == ordinal &&
                             value->name == members[i] && i < captions.size() &&
                             value->caption == captions[i]);
   }
@@ -198,6 +212,8 @@ Checks Compare(const agiru::al::TableObject &source, const Family &family) {
                       table.replicateData ==
                           (Text(source.properties, "ReplicateData", "true") == "true"));
   checks.emplace_back("extension availability", family.scope == Text(source.properties, "Scope"));
+  checks.emplace_back("inherent permissions declaration",
+                      table.inherentPermissions == Text(source.properties, "InherentPermissions"));
   Fields(source, table, checks);
   Keys(source, table, checks);
   return checks;
@@ -295,6 +311,52 @@ void MutantsMustFail(const std::filesystem::path &root) {
   CHECK_TRUE("a guessed field caption is detected", rejects(changed));
 }
 
+void FieldMutantsMustFail(const std::filesystem::path &root) {
+  const auto &family = kFamilies.back();
+  const auto original = agiru::al::ParseTable(Read(family, root));
+  const auto rejects = [](const agiru::al::TableObject &changed) {
+    const auto checks = Compare(changed, kFamilies.back());
+    return std::ranges::any_of(checks, [](const auto &check) { return !check.second; });
+  };
+  auto changed = original;
+  for (auto &field : changed.fields) {
+    if (field.number != agiru::platform::Field::Field_No::Type.Value()) { continue; }
+    for (auto &property : field.properties) {
+      if (property.name == "OptionOrdinalValues") { property.value.front().text = "3"; }
+    }
+  }
+  CHECK_TRUE("an internal tag cannot replace a native Type code", rejects(changed));
+  changed = original;
+  for (auto &field : changed.fields) {
+    if (field.number == agiru::platform::Field::Field_No::ExternalName.Value()) {
+      field.number = kRetiredExternalNameField;
+    }
+  }
+  CHECK_TRUE("the retired external-name number is rejected", rejects(changed));
+  changed = original;
+  for (auto &field : changed.fields) {
+    if (field.number == agiru::platform::Field::Field_No::ExternalName.Value()) {
+      field.length = agiru::platform::Field::kOptionStringLength;
+    }
+  }
+  CHECK_TRUE("the retired external-name length is rejected", rejects(changed));
+  changed = original;
+  std::erase_if(changed.fields, [](const auto &field) {
+    return field.number == agiru::platform::Field::Field_No::AppPackageID.Value();
+  });
+  CHECK_TRUE("missing package provenance is a declaration loss", rejects(changed));
+  changed = original;
+  for (auto &field : changed.fields) {
+    if (field.number != agiru::platform::Field::Field_No::DataClassification.Value()) { continue; }
+    for (auto &property : field.properties) {
+      if (property.name == "OptionMembers") {
+        std::swap(property.value.front(), property.value.back());
+      }
+    }
+  }
+  CHECK_TRUE("telemetry classification order is not native Field order", rejects(changed));
+}
+
 template <typename Row> void Reflection() {
   Row row;
   agiru::RecordRef reference;
@@ -366,10 +428,12 @@ int main(int argc, char *argv[]) {
     const auto root = argc == 2 ? std::filesystem::path(argv[1]) : std::filesystem::path{};
     SourceAndRegistry(root);
     MutantsMustFail(root);
+    FieldMutantsMustFail(root);
     Reflection<agiru::platform::ObjectOptions>();
     Reflection<agiru::platform::ODataEdmType>();
     Reflection<agiru::platform::PrivacyNotice>();
     Reflection<agiru::platform::PrivacyNoticeApproval>();
+    Reflection<agiru::platform::Field>();
     OptionOrdinals();
     TypedMembers();
   });
