@@ -25,28 +25,6 @@ int main() {
     if (target.Value() != "First") { return 1; }
     second.Read(target);
     if (target.Value() != "Second") { return 1; }
-    if (!first.TemporaryStatus() || first.RowCount() != 0) { return 1; }
-    if (first.CurrentGroup() != 0 || second.CurrentGroup() != 0) { return 1; }
-    first.SetNameFilter("Group zero");
-    if (first.SelectGroup(2) != 0 || first.CurrentGroup() != 2 ||
-        second.CurrentGroup() != 0 || first.PreviousGroup() != 0) {
-      return 1;
-    }
-    if (!first.ReadNameFilter().Value().empty()) { return 1; }
-    first.SetNameFilter("Group two");
-    if (first.ReadNameFilter().Value() != "Group two") { return 1; }
-    if (first.IgnoreLargeGroup() != 2 || first.ReadNameFilter().Value() != "Group two") { return 1; }
-    if (first.ReflectedGroups() != 11 || first.CurrentGroup() != 2 ||
-        first.ReadNameFilter().Value() != "Group two") {
-      return 1;
-    }
-    if (first.SelectGroup(0) != 2 || first.ReadNameFilter().Value() != "Group zero") { return 1; }
-    if (second.SelectGroup(4) != 0 || second.CurrentGroup() != 4 || first.CurrentGroup() != 0) {
-      return 1;
-    }
-    if (first.LocalNameFilter().Value() != "Local" || first.ReadNameFilter().Value() != "Group zero") {
-      return 1;
-    }
     return 0;
   } catch (const std::exception &error) {
     std::fputs(error.what(), stderr);

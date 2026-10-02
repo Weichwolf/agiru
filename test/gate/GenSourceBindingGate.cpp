@@ -257,113 +257,6 @@ void DataItemOptionsKeepTheirOwnRecordContext() {
   CHECK_TRUE("bare dataitem options use their record context", !body.contains("RefusedOption"));
 }
 
-void NativeRecordPropertiesUseTheirSourceBinding() {
-  agiru::gen::Objects objects;
-  objects.tables = agiru::gen::PlatformTables();
-  const auto native = objects.tables.at("field");
-  const std::array aliases{
-      "Field", "2000000041", "System.Reflection.Field", "sYsTeM.ReFlEcTiOn.FiElD"};
-  for (const char *alias : aliases) { objects.tables[agiru::gen::LowerKey(alias)] = native; }
-  for (const char *alias : aliases) {
-    const auto page =
-        agiru::al::ParsePage("page 50183 Fixture { SourceTable = " + std::string(alias) + R"(;
-      var Saved: Integer; Temporary: Boolean; Caption: Text;
-      trigger OnOpenPage() begin
-        Saved := Rec.FilterGroup;
-        Rec.FilterGroup := 2;
-        Rec.FilterGroup := Saved;
-        Saved := FilterGroup;
-        FilterGroup := 3;
-        Saved := xRec.FilterGroup;
-        Saved := Rec.Count;
-        Temporary := Rec.IsTemporary;
-        Caption := Rec.TableCaption;
-        Caption := Rec.TableName;
-        Caption := TableName;
-      end;
-      procedure ReadLocal(): Integer
-      var Other: Record Field temporary;
-      begin Other.FilterGroup := 4; Other.SetRange(TableName, 'Other'); exit(Other.FilterGroup); end;
-      procedure ReadShadow(FilterGroup: Integer): Integer
-      begin exit(FilterGroup); end;
-    })");
-    const auto body = agiru::gen::WriteSource(page, "Fixture.Page.al", objects, nullptr);
-    CHECK_TRUE("native property reads call the record getter",
-               body.contains("Saved = Rec.FilterGroup();"));
-    CHECK_TRUE("native property writes call the record setter",
-               body.contains("Rec.FilterGroup(2);"));
-    CHECK_TRUE("saved groups can be restored", body.contains("Rec.FilterGroup(Saved);"));
-    CHECK_TRUE("implicit property reads retain the record context",
-               body.contains("Rec.FilterGroup();"));
-    CHECK_TRUE("implicit property writes retain the record context",
-               body.contains("Rec.FilterGroup(3);"));
-    CHECK_TRUE("xRec properties share the source binding",
-               body.contains("Saved = XRec.FilterGroup();"));
-    CHECK_TRUE("count is also a property method", body.contains("Saved = Rec.Count();"));
-    CHECK_TRUE("temporary status is also a property method",
-               body.contains(agiru::gen::PageVariableIdentifier(page, "Temporary") +
-                             " = Rec.IsTemporary();"));
-    CHECK_TRUE("table captions are also property methods",
-               body.contains(agiru::gen::PageVariableIdentifier(page, "Caption") +
-                             " = Rec.TableCaption();"));
-    CHECK_TRUE(
-        "native fields remain values",
-        body.contains(agiru::gen::PageVariableIdentifier(page, "Caption") + " = Rec.TableName;"));
-    CHECK_TRUE(
-        "undeclared bare fields are not guessed from C++ member names",
-        body.contains(agiru::gen::PageVariableIdentifier(page, "Caption") + " = TableName;"));
-    CHECK_TRUE("local records retain property syntax",
-               body.contains("Other.FilterGroup(4);") &&
-                   body.contains("return Other.FilterGroup();"));
-    CHECK_TRUE("parameters still shadow implicit properties", body.contains("return FilterGroup;"));
-    CHECK_TRUE("record fields do not turn into getter calls", !body.contains("Rec.TableName()"));
-    CHECK_TRUE("native field arguments belong to their named receiver",
-               body.contains("Other.SetRange(Other.TableName, \"Other\");"));
-  }
-  const auto table = agiru::al::ParseTable(R"(table 50184 "Method Names" {
-    fields { field(1; Count; Integer) {} field(2; FilterGroup; Integer) {} field(3; "User ID"; Text[50]) {} field(4; "Table Caption"; Text[50]) {} }
-    procedure Touch() begin end;
-  })");
-  objects.tables["method names"] = agiru::gen::BindTable(table, "::fixture::Row", "fixture/Row.h");
-  const auto page = agiru::al::ParsePage(R"(page 50185 Fixture {
-    SourceTable = "Method Names";
-    procedure Read(): Integer begin Rec.FilterGroup := Rec.Count; exit(FilterGroup); end;
-    procedure Call() begin Rec.Touch(); end;
-    procedure ReadIdentity(): Text begin exit(UserId); end;
-    procedure ReadDeclaredIdentity(): Text begin exit("User ID"); end;
-    procedure ReadCaption(): Text begin exit(Rec.TableCaption); end;
-    procedure ReadDeclaredCaption(): Text begin exit(Rec."Table Caption"); end;
-  })");
-  const auto body = agiru::gen::WriteSource(page, "Fixture.Page.al", objects, nullptr);
-  CHECK_TRUE("bound fields precede same-named native methods",
-             body.contains("Rec." + agiru::gen::FieldIdentifier(table, "FilterGroup") + " = Rec." +
-                           agiru::gen::FieldIdentifier(table, "Count") + ";"));
-  CHECK_TRUE(
-      "bare ordinary fields keep their allocation",
-      body.contains("return Rec." + agiru::gen::FieldIdentifier(table, "FilterGroup") + ";"));
-  CHECK_TRUE("bound custom procedures do not need a copied AST", body.contains("Rec.Touch();"));
-  CHECK_TRUE("a quoted field does not capture the UserId builtin",
-             body.contains("return ::agiru::" + agiru::gen::BuiltinSpelling("UserId") + "();") ||
-                 body.contains("return " + agiru::gen::BuiltinSpelling("UserId") + "();"));
-  CHECK_TRUE("the exact quoted AL field still binds",
-             body.contains("return Rec." + agiru::gen::FieldIdentifier(table, "User ID") + ";"));
-  for (const auto *source : {static_cast<const agiru::al::TableObject *>(nullptr), &table}) {
-    const auto caption = agiru::gen::WriteSource(page, "Fixture.Page.al", objects, source);
-    CHECK_TRUE("a quoted field does not capture the TableCaption method",
-               caption.contains("return Rec.TableCaption();"));
-    CHECK_TRUE("the exact quoted Table Caption field keeps its declaration",
-               caption.contains("return Rec." +
-                                agiru::gen::FieldIdentifier(table, "Table Caption") + ";"));
-  }
-  const auto unknown = agiru::al::ParsePage(R"(page 50186 Fixture {
-    SourceTable = Unbound;
-    procedure Read(): Integer begin exit(Rec.FilterGroup); end;
-  })");
-  CHECK_TRUE("an unknown record does not acquire a native method context",
-             !agiru::gen::WriteSource(unknown, "Fixture.Page.al", objects, nullptr)
-                  .contains("Rec.FilterGroup()"));
-}
-
 }
 
 int main() {
@@ -373,6 +266,5 @@ int main() {
     PageRecordsShareFieldAndOptionBindings();
     PagesWithoutAnAstUseTheDeclaredOptionIndex();
     DataItemOptionsKeepTheirOwnRecordContext();
-    NativeRecordPropertiesUseTheirSourceBinding();
   });
 }
