@@ -87,10 +87,39 @@ bounded blocks, index declared keys according to their properties, and borrow co
 for transactions. Measure per-session memory and operation overhead against equivalent SQL.
 These are requirements, not claims that the current runtime meets them.
 
+Linux/container multi-user performance and bounded resources drive architecture decisions.
+The single-user WASM demo must retain functional behaviour, but does not impose production
+throughput or scale guarantees. Share business/layout semantics; platform adapters may differ
+for threading, storage, files and rendering integration. Do not route the native production
+runtime through a WASM VM or impose browser deployment constraints on Linux scalability.
+
 Emit immutable declarations as `constexpr` metadata; use `static_assert` for compile-time
 facts. Generated headers contain declarations and sources contain bodies. Include only
 what a file names; no master header or macros. Measure build cost before widening headers.
 `cmake/Precompiled.h` is a build optimization, not an implicit source dependency.
+
+## Layouts, charts and analysis
+
+- Translate each versioned DOCX/RDLC asset once into an agiru-owned typed layout and
+  documented HTML/CSS print profile. Bind the XML report dataset at execution time.
+  Preserve expressions, grouping, nested data, fonts and pagination; unsupported features
+  refuse explicitly and remain counted ERP gaps, never silently simplified layouts.
+- Implement layout/pagination in C++; use Cairo as the PDF backend, not as the layout
+  engine. Share positioned vector/glyph output with SVG previews and static business
+  charts. Use proper text shaping and packaged fonts, not Cairo's toy text API.
+  Genuine Excel workbook layouts remain a separate format, not PDF or a dataset dump.
+- Reuse upstream Web Platform Tests (WPT) CSS reftests and wptrunner through an engine
+  adapter. Pin the upstream revision; retain original match/mismatch and fuzzy metadata.
+  Declare the tested profile and count failures, crashes, unsupported and unexecuted cases.
+  WPT conformance does not replace BC layout/dataset/chart and paginated PDF comparisons.
+- Business Charts and interactive ledger-page analysis are required. Share exact typed
+  measures, filters, grouping/pivots and drilldown semantics across CLI, web and exports;
+  interactive UI is not a PDF renderer. Reuse query/filter/aggregate primitives, keep
+  permissions/company context on the server and persist private analysis definitions in
+  PostgreSQL. Bound scans, pivot cardinality, output blocks and per-session memory.
+- Native Linux execution is primary. Prove the same layout/chart code and Cairo PDF
+  backend in Emscripten with packaged resources; WASM support is not yet verified.
+  Preserve dependency licenses/notices. Client/analysis UI starts only after G1.
 
 ## Implementation rules
 
@@ -104,7 +133,9 @@ what a file names; no master header or macros. Measure build cost before widenin
 - Diagnostics are part of AL behaviour. Do not swallow errors or add uncounted suppressions.
   Constants need a documented origin where their meaning is not self-evident.
 - Dependencies are allowed when the standard library is insufficient; justify their purpose
-  and portability. XML uses libxml2. The reporting target is XSL-FO/Apache FOP to PDF.
+  and portability. XML uses libxml2. Reporting must preserve BC layout semantics and produce
+  genuine PDF/workbook output through the layout/Cairo architecture above. Verify native
+  Linux performance/resources and browser-only WASM compatibility; no Java/desktop-Office engine.
 - Artefacts go to `build/` or a temporary directory. Golden files in `test/target/` are
   specifications: edit them deliberately, never regenerate them from observed output.
 

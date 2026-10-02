@@ -1,12 +1,13 @@
 # 0720 — CLI and web will execute the same ERP operations
 
-Status: open | Priority: P2 | Stage: Clients; start only after G1 | Reviewed: 2026-09-28
-Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 authorization; 0722 exact JSON.
+Status: open | Priority: P2 | Stage: Clients; start only after G1 | Reviewed: 2026-10-02
+Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 authorization; 0722 exact JSON; 0018/0019/0064 analysis filters/aggregates; 0035 chart contracts; 0063 chart/export rendering.
 
 ## Evidence
 
 - `src/cli/Main.cpp` exposes run-tests/version only. No HTTP server or test/ui directory exists. TestPage success is not client parity.
 - Predecessor page smoke reached 2,517/2,653 open/render cases, not business parity. Its thin-client experiment exposed two transferable requirements: modal AL execution needs an answer/resume protocol, and lookup targets must come from runtime metadata rather than hard-coded field-name maps. Do not copy its thread/ContextVar machinery or start clients before G1.
+- Business Charts and interactive ledger-page analysis are explicit product requirements, not PDF-only presentation. `AnalysisModeEnabled` defaults true; analysis retains page filters and private saved views, grouping/pivots, totals, date hierarchies and authorized drilldown/related fields. No implementation/parity proof exists. BC large-dataset/browser limitations are reference behaviour, not permission to silently drop fields or totals in agiru.
 
 ## Implementation
 
@@ -21,6 +22,8 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 7. Browser sampling only: list/card/document+part, modal lookup, failed validation, posting, upload/download, report, keyboard/focus and reconnect. Retest affected samples on renderer changes; all business regression runs use the CLI.
    Reject stale/out-of-order DOM patches by page revision; preserve focus and unsaved control text across partial refreshes. Use stable control/row IDs in HTML, not caption selectors.
 8. Classify page-open failures into expected AL refusals, runtime defects and transport/render defects; opening a page is not an operation-parity pass. Test modal answer/resume while its caller remains suspended and reject client-local table/field lookup maps.
+9. Add typed chart read/series-selection/drilldown and analysis enter/leave/filter/sort/group/pivot/aggregate/view/export commands to the same registry. CLI consumes exact chart data and drives every business interaction; web renders SVG and dispatches the same commands. Reuse the chart scene for static PDF exports (0063), not an independent calculation or PDF-based interactive UI.
+10. Derive ledger analysis from authorized page/query metadata and filter state. Reuse typed SQL/filter/aggregate plans (0018/0019/0064), including FlowFields and supported page expressions without bypassing AL semantics. PostgreSQL performs eligible grouping/HAVING; bound pivot cardinality, row blocks, cancellation and per-session memory. Never load the complete ledger into the browser or report a page-sized subset as the full total. Persist versioned private view definitions in PostgreSQL with user/company/page identity; shared links recheck recipient permissions.
 
 ## Acceptance
 
@@ -30,6 +33,8 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 - Independent AL/SQL expectations catch a shared wrong implementation. Negative controls disconnect one adapter, omit a value, change order/scale, bypass permissions and duplicate a posting; each is detected.
 - CLI completes sales/purchase posting, journals, stock/warehouse and error recovery as capability coverage grows. Browser samples verify the actual htmx/DOM path; a shared dispatcher alone does not prove UI wiring.
 - G2 is required before expanding execution to the complete AL suite; keep the UT regression gate green throughout.
+- Chart fixtures compare series/types, labels, exact measures, selection and drilldown results through CLI/web/export; browser samples verify real SVG wiring. Negative controls swap series, truncate data and bypass permissions.
+- G/L, customer, vendor and item ledger analysis fixtures cover page+analysis filters, group subtotals, sum/count/min/max/average, calendar date hierarchies, pivots, saved/reopened views, related-field authorization and exact exports. Compare against independent SQL including more rows than one fetch block; analysis never mutates ledger entries. Two users/companies cannot leak views/data. Disabled analysis and unsupported expressions refuse explicitly; all missing operations remain parity gaps.
 
 ## References
 
@@ -38,3 +43,5 @@ Code: `src/cli/Main.cpp`, `include/meta/PageDef.h`, `include/runtime/test/PageCo
 Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/Linux x86_64/aarch64 builds, bounded executor and cancellation before adoption.
 
 Browser-only demo delivery is owned by 0724; both targets share the production dispatcher and typed operation contract above.
+
+Analysis/chart references: developer `properties/devenv-analysismodeenabled-property.md` at `ff5939a46`; BCApps `System Application/App/Business Chart/src/{BusinessChart.Codeunit,BusinessChartType.Enum}.al` at `6261b1c458`; user `business-central/analysis-mode.md` at `634710c42` (page filters, private views, pivots, statistics, related fields, permissions and large-dataset limits). Predecessor 1016 rejects empty chart measures/phantom dimensions; property audit classifies analysis as client-phase work. Generic AL chart data/bridge contracts remain 0035, not a UI-only replacement.
