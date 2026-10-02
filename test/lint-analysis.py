@@ -10,18 +10,29 @@ import subprocess
 import sys
 
 
-def select_units(root, full):
+def compile_entries(root):
     entries = json.loads((root / 'compile_commands.json').read_text())
+    database_root = (root / 'compile_commands.json').resolve().parent
+    build = database_root if database_root != root else root / 'build'
+    for receipt in sorted((build / 'fixture-commands').glob('*.json')):
+        entries.extend(json.loads(receipt.read_text()))
+    return entries
+
+
+def select_units(root, full):
+    entries = compile_entries(root)
     units = {}
     for entry in entries:
         path = Path(entry['file']).resolve()
         relative = path.relative_to(root) if path.is_relative_to(root) else None
-        if relative is not None and (relative.parts[0] == 'src' or relative.parts[:2] == ('test', 'gate')):
+        if relative is not None and (relative.parts[0] == 'src' or (
+                relative.parts[0] == 'test' and relative.parts[1] != 'target')):
             units[path] = entry
     if not units:
         raise RuntimeError('compile_commands.json contains no hand-written translation units')
     expected = {p.resolve() for p in (root / 'src').rglob('*.cpp')}
-    expected.update(p.resolve() for p in (root / 'test/gate').glob('*.cpp'))
+    expected.update(p.resolve() for p in (root / 'test').rglob('*.cpp')
+                    if not p.is_relative_to(root / 'test/target'))
     missing_commands = expected - units.keys()
     if missing_commands:
         raise RuntimeError('hand-written source has no compile command: ' + ', '.join(map(str, sorted(missing_commands))))
@@ -104,9 +115,10 @@ def main():
         extra = ['--extra-arg=-Xclang', '--extra-arg=-analyzer-config', '--extra-arg=-Xclang']
         budget = extra + [f'--extra-arg=max-nodes={args.nodes}']
         budget += extra + [f'--extra-arg=optin.performance.Padding:AllowedPad={args.padding}']
+        (report / 'compile_commands.json').write_text(json.dumps(compile_entries(root)) + '\n')
 
         def check(path):
-            result = subprocess.run([args.tidy, '-p', str(root), '--quiet', *budget, str(path)],
+            result = subprocess.run([args.tidy, '-p', str(report), '--quiet', *budget, str(path)],
                                     cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             return path, result.returncode, result.stdout
 

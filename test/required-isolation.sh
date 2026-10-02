@@ -15,8 +15,16 @@ links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
 
 "$B/gate_RequiredTestIsolationGate" "$proof/generated"
 "$CXX" "${flags[@]}" -I"$proof/generated" test/required-isolation/Runner.cpp \
+  -c -o "$proof/runner.o"
+"$CXX" "${flags[@]}" -I"$proof/generated" "$proof/runner.o" \
   "$proof/generated/GeneratedIsolationUT.cpp" "${links[@]}" -o "$proof/generated-runner"
 "$proof/generated-runner" "$dsn"
+mkdir -p "$B/fixture-commands"
+jq -n --arg directory "$PWD" --arg file "$PWD/test/required-isolation/Runner.cpp" \
+  --args '[{directory: $directory, file: $file, arguments: $ARGS.positional}]' -- \
+  "$CXX" "${flags[@]}" "-I$proof/generated" test/required-isolation/Runner.cpp \
+  -c -o "$proof/runner.o" > "$proof/compile_commands.json"
+cp "$proof/compile_commands.json" "$B/fixture-commands/required-isolation.json"
 
 source="$proof/generated/GeneratedIsolationUT.cpp"
 if [ "$(rg -c '\.requiredTestIsolation = "Disabled"' "$source")" != 1 ]; then

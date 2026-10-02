@@ -123,7 +123,11 @@ what a file names; no master header or macros. Measure build cost before widenin
   `make tc JOBS=2` for generator edits, then `make gap` for one generated root.
   `make lint-one UNIT=src/rt/Transaction.cpp` analyses one configured unit without compiling objects and writes
   `build/lint/targeted.log`; `make lint` checks all changed handwritten code before
-  integration. These targets do not rebuild the slice.
+  integration. These targets do not rebuild the slice. Generated execution fixtures
+  record their actual successful compiler commands under the configured build's
+  `fixture-commands/`; run `make test` before analysing those consumers. Analysis
+  includes every handwritten test `.cpp` outside `test/target/`; a missing command
+  remains a refusal. Intentionally invalid compile fixtures use `.cpp.in` templates.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source

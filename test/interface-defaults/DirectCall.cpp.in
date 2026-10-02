@@ -1,0 +1,9 @@
+#include "type/Integer.h"
+
+#include "core/codeunit/DefaultConsumer.h"
+
+int main() {
+  agiru::DefaultConsumer_Codeunit unit;
+  agiru::Integer value = 0;
+  unit.Empty(value);
+}

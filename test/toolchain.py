@@ -1737,6 +1737,31 @@ class AnalysisGate(unittest.TestCase):
         self.assertEqual(selected, [self.root / 'src/a.cpp'])
         self.assertEqual(total, 1)
 
+    def test_compiled_fixture_receipt_adds_its_real_consumer(self):
+        fixture = self.root / 'test/fixture/Runner.cpp'
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('int main() { return 0; }\n')
+        receipts = self.root / 'build/fixture-commands'
+        receipts.mkdir(parents=True)
+        entry = {'directory': str(self.root), 'file': str(fixture),
+                 'arguments': ['clang++', '-c', str(fixture), '-o', 'runner.o']}
+        (receipts / 'fixture.json').write_text(json.dumps([entry]))
+        selected, total = analysis.select_units(self.root, True)
+        self.assertEqual(selected, sorted([self.root / 'src/a.cpp', fixture]))
+        self.assertEqual(total, 2)
+        fixture.unlink()
+        with self.assertRaisesRegex(RuntimeError, 'missing source'):
+            analysis.select_units(self.root, True)
+
+    def test_untracked_fixture_without_a_receipt_refuses(self):
+        fixture = self.root / 'test/fixture/Runner.cpp'
+        fixture.parent.mkdir(parents=True)
+        fixture.write_text('int main() { return 0; }\n')
+        with self.assertRaisesRegex(RuntimeError, 'no compile command'):
+            analysis.select_units(self.root, False)
+        with self.assertRaisesRegex(RuntimeError, 'no compile command'):
+            analysis.select_units(self.root, True)
+
     def test_untracked_source_without_compile_command_fails(self):
         (self.root / 'src/new.cpp').write_text('int b;\n')
         with self.assertRaisesRegex(RuntimeError, 'no compile command'):
@@ -1828,20 +1853,20 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'test/gate/Fixture.cpp').touch()
             for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh',
                          'platform-source.sh', 'required-isolation.sh', 'header-dependencies.sh',
-                         'slice-check.sh'):
+                         'slice-check.sh', 'interface-defaults.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('9 case(s), 1 red', result.stdout)
+            self.assertIn('10 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('9 case(s), 0 red', result.stdout)
+            self.assertIn('10 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):
