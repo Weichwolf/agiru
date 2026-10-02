@@ -1,0 +1,34 @@
+[
+  {
+    "id": 9630,
+    "name": "Page Fields Selection List",
+    "source": "Layers/W1/BaseApp/Modules/System/PageDesigner/PageFieldsSelectionList.Page.al",
+    "app": "base",
+    "unit": "system/tooling/page/PageFieldsSelectionList",
+    "tables": [2000000171]
+  },
+  {
+    "id": 9621,
+    "name": "Add Page Fields",
+    "source": "Layers/W1/BaseApp/Modules/System/PageDesigner/AddPageFields.Page.al",
+    "app": "base",
+    "unit": "system/tooling/page/AddPageFields",
+    "tables": [2000000171, 2000000041, 2000000136]
+  },
+  {
+    "id": 358,
+    "name": "Objects",
+    "source": "System Application/App/Object Selection/src/Objects.Page.al",
+    "app": "system",
+    "unit": "system/reflection/page/Objects",
+    "tables": [2000000058]
+  },
+  {
+    "id": 594,
+    "name": "Change Log Setup (Field) List",
+    "source": "Layers/W1/BaseApp/System/ChangeLog/ChangeLogSetupFieldList.Page.al",
+    "app": "base",
+    "unit": "system/diagnostics/page/ChangeLogSetupFieldList",
+    "tables": [2000000041]
+  }
+]

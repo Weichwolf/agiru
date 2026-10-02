@@ -53,6 +53,48 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
+    def test_native_consumers_build_the_compiler_before_qualification(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = os.environ.copy()
+        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+            environment.pop(name, None)
+        with tempfile.TemporaryDirectory() as folder:
+            result = subprocess.run(['make', '--no-print-directory', '-n', 'native-consumers',
+                                     f'B={folder}', 'JOBS=2'], cwd=root, env=environment,
+                                    text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertLess(result.stdout.index('--target agirutc'),
+                        result.stdout.index('test/native-consumers.sh'))
+
+    def test_native_consumers_require_explicit_package_and_audit(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = os.environ.copy()
+        for name in ('AGIRU_SYSTEM_SYMBOLS', 'AGIRU_NATIVE_AUDIT'):
+            environment.pop(name, None)
+        with tempfile.TemporaryDirectory() as folder:
+            environment['B'] = folder
+            result = subprocess.run(['bash', 'test/native-consumers.sh'], cwd=root,
+                                    env=environment, text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('explicit AGIRU_SYSTEM_SYMBOLS and matching AGIRU_NATIVE_AUDIT', result.stderr)
+
+    def test_native_consumer_denominator_rejects_missing_duplicate_and_changed_identity(self):
+        root = Path(__file__).resolve().parents[1]
+        entries = json.loads((root / 'test/native-binding/consumers.json').read_text())
+        command = ['bash', 'test/native-consumers.sh', '--validate']
+        result = subprocess.run(command, cwd=root, text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        changed = [dict(entry) for entry in entries]
+        changed[0]['id'] = 1
+        with tempfile.TemporaryDirectory() as folder:
+            fixture = Path(folder) / 'consumers.json'
+            for mutant in (entries[1:], entries + [entries[0]], changed):
+                with self.subTest(mutant=mutant):
+                    fixture.write_text(json.dumps(mutant))
+                    result = subprocess.run(command + [str(fixture)], cwd=root,
+                                            text=True, capture_output=True, check=False)
+                    self.assertNotEqual(result.returncode, 0, result.stderr)
+
     def test_native_binding_audit_builds_runtime_and_compiler_before_the_fixture(self):
         root = Path(__file__).resolve().parents[1]
         environment = os.environ.copy()
@@ -1421,7 +1463,8 @@ class NativeToolchainGate(unittest.TestCase):
                                 capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotRegex(result.stdout, r'(?im)^gcc\s')
-        for target in ('slice-check', 'include-cost', 'lint-one', 'verify-start', 'verify-status'):
+        for target in ('slice-check', 'include-cost', 'lint-one', 'verify-start', 'verify-status',
+                       'native-consumers'):
             self.assertRegex(result.stdout, rf'(?m)^{target}\s', f'{target} is absent from make help')
         refused = subprocess.run(['make', '--no-print-directory', '-n', 'gcc'], cwd=self.root,
                                  capture_output=True, text=True, timeout=10)

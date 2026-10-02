@@ -175,6 +175,15 @@ what a file names; no master header or macros. Measure build cost before widenin
   product selection, provider, complete native declaration, production-loader or G1 proof.
   Retire commercial families
   through 0725; do not repair licensing to make the raw audit green.
+- `make native-consumers AGIRU_SYSTEM_SYMBOLS=<verified-package>
+  AGIRU_NATIVE_AUDIT=<matching-native-bindings-receipt>` freezes the entire BCApps source
+  and retranslates all configured apps without editing root `apps/`. It retains all eight
+  original page body/definition results, both ordinary production compilation and compilation
+  with additional source-derived native assertions, without PCH and with declared app includes.
+  The fixed consumer manifest rejects missing/duplicate identities; a wrong native field number
+  must fail an original consumer. Reusing an audit requires matching package/source/library hashes.
+  Additional assertions are not source-AST binding, production-loader activation, provider,
+  business execution, full-app or G1 proof. Keep the raw native matrix and unexecuted UT manifest.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source
