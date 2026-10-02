@@ -37,7 +37,6 @@
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
-#include "runtime/TestRunner.h"
 #include "runtime/test/TestAction.h"
 #include "runtime/test/TestField.h"
 #include "runtime/test/TestHttpRequestMessage.h"

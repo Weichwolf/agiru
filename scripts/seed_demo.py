@@ -25,9 +25,14 @@ seeds NOTHING is an abort and not a pass.
 """
 
 import argparse
-import shlex
+import hashlib
+import json
+import os
+from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import uuid
 
 CTR = "agiru-pg"
 RUNNER = "agiru_test_0"
@@ -40,7 +45,7 @@ def fail(message):
 
 
 def psql(database, sql, quiet=True):
-    argv = ["podman", "exec", CTR, "psql", "-U", "agiru", "-d", database,
+    argv = ["podman", "exec", CTR, "psql", "-U", "agiru", "-v", "ON_ERROR_STOP=1", "-d", database,
             "-tAc" if quiet else "-c", sql]
     done = subprocess.run(argv, capture_output=True, check=False)
     if done.returncode != 0:
@@ -72,7 +77,7 @@ def columns(database, schema):
 # -- AL has no null, a blank Text is '' and an empty Blob is empty -- while SQL Server's demo rows
 # hold NULL in a blob or text nobody wrote (`Sales Header."Work Description"`). Eighteen tables
 # refused for it, `Sales Header` among them (measured 2026-09-08).
-# Dollar-quoted, because the SELECT travels inside a single-quoted `psql -c` inside `sh -c`.
+# Dollar-quoted empty values keep the generated SELECT independent of text-field quoting.
 BLANKS = {"bytea": "$$$$::bytea", "text": "$$$$", "character varying": "$$$$", "character": "$$$$"}
 
 
@@ -84,6 +89,95 @@ def blanked(database, table, column, into_kind, alias=""):
 
 def quoted(names):
     return ", ".join('"' + name.replace('"', '""') + '"' for name in names)
+
+
+def digest(path):
+    hashed = hashlib.sha256()
+    with path.open('rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            hashed.update(block)
+    return hashed.hexdigest()
+
+
+def sql_literal(value):
+    return "'" + value.replace("'", "''") + "'"
+
+
+def provenance(company, source, target, target_database):
+    root = Path(__file__).resolve().parents[1]
+    version = (root / 'BC_VERSION').read_text().strip()
+    country = os.environ.get('BC_COUNTRY', 'w1')
+    archive = root / 'work' / f'bc-{version}-{country}.zip'
+    if not archive.is_file():
+        fail(f"the BC artefact {archive} is missing; the seed cannot identify its source")
+    bc_source = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
+    revision = subprocess.run(['git', '-C', str(bc_source), 'rev-parse', '--show-toplevel', 'HEAD'],
+                              capture_output=True, text=True, check=False)
+    identity = revision.stdout.splitlines()
+    if (revision.returncode != 0 or len(identity) != 2 or not identity[1].strip()
+            or Path(identity[0]).resolve() == root):
+        fail(f"cannot identify BCApps revision under {bc_source}")
+    def shape(tables, database):
+        return sorted((table, [(column, TYPES.get((database, table, column)))
+                               for column in columns]) for table, columns in tables.items())
+    return {
+        'schema': 1,
+        'id': str(uuid.uuid4()),
+        'artefact_version': version,
+        'artefact_sha256': digest(archive),
+        'bc_source_revision': identity[1],
+        'scope_sha256': digest(root / 'scope.json'),
+        'source_schema_sha256': hashlib.sha256(
+            json.dumps(shape(source, SOURCE), sort_keys=True).encode()).hexdigest(),
+        'target_schema_sha256': hashlib.sha256(
+            json.dumps(shape(target, target_database), sort_keys=True).encode()).hexdigest(),
+        'company': company,
+    }
+
+
+def begin_seed(database, details):
+    stored = sql_literal(json.dumps(details, sort_keys=True))
+    sql = ("BEGIN; CREATE TABLE IF NOT EXISTS public.agiru_seed_provenance "
+           "(singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton), "
+           "status text NOT NULL, details jsonb NOT NULL); "
+           f"INSERT INTO public.agiru_seed_provenance VALUES (true, 'building', {stored}::jsonb); "
+           "COMMIT")
+    result, why = psql(database, sql)
+    if result is None:
+        fail(f"{database} already has seed provenance or cannot record it: {why}")
+
+
+def finish_seed(database, details):
+    stored = sql_literal(json.dumps(details, sort_keys=True))
+    sql = ("UPDATE public.agiru_seed_provenance SET status = 'complete', "
+           f"details = {stored}::jsonb WHERE singleton AND status = 'building' "
+           f"AND details->>'id' = {sql_literal(details['id'])} "
+           "RETURNING details->>'id'")
+    result, why = psql(database, sql)
+    if result is None or details['id'] not in result.splitlines():
+        fail(f"{database} could not mark its seed complete: {why or result}")
+
+
+def transfer(reading, writing, into):
+    with tempfile.TemporaryFile() as source_errors:
+        source = subprocess.Popen(
+            ["podman", "exec", CTR, "psql", "-U", "agiru", "-d", SOURCE, "-c", reading],
+            stdout=subprocess.PIPE, stderr=source_errors)
+        try:
+            target = subprocess.Popen(
+                ["podman", "exec", "-i", CTR, "psql", "-U", "agiru", "-d", into,
+                 "-c", writing],
+                stdin=source.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except OSError:
+            source.terminate()
+            source.wait()
+            raise
+        source.stdout.close()
+        target_output, target_errors = target.communicate()
+        source_status = source.wait()
+        source_errors.seek(0)
+        note = (target_output + target_errors + source_errors.read()).decode("utf-8", "replace")
+        return source_status, target.returncode, note
 
 
 # SQL SERVER'S BC SCHEMA SPELLS A DOT AS AN UNDERSCORE, and the system fields with a `$`.
@@ -112,7 +206,7 @@ def folded(name):
 
 def matched(theirs, ours):
     """Their names against ours, as pairs; a fold that is not one-to-one is REFUSED rather than
-    guessed at (CLAUDE.md: a mechanical pass cannot tell a naming defect from a gap)."""
+    guessed at (board:0004: a mechanical pass cannot tell a naming defect from a gap)."""
     by_fold = {}
     ambiguous = set()
     for name in ours:
@@ -149,6 +243,9 @@ def main():
     shared = sorted((theirs, by_fold[theirs]) for theirs in source if theirs in by_fold)
     if not shared:
         fail("no table exists in both. ABORT, not a pass.")
+
+    details = provenance(arguments.company, source, target, arguments.into)
+    begin_seed(arguments.into, details)
 
     seeded = 0
     rows = 0
@@ -187,16 +284,15 @@ def main():
         reading = ('\\copy (SELECT ' + selected +
                    f' FROM "{arguments.company}"."{theirs}" b{joined}) TO STDOUT')
         writing = '\\copy public."' + ours + '" (' + quoted(p[1] for p in pairs) + ') FROM STDIN'
-        # A COLUMN MAY CARRY AN APOSTROPHE (`Relative's Employee No.`), and the command runs
-        # through `sh -c`: the statements are quoted the way the shell wants them.
-        piped = (f"psql -U agiru -d {SOURCE} -c {shlex.quote(reading)} | "
-                 f"psql -U agiru -d {arguments.into} -c {shlex.quote(writing)}")
-        done = subprocess.run(["podman", "exec", CTR, "sh", "-c", piped],
-                              capture_output=True, check=False)
-        note = done.stdout.decode("utf-8", "replace") + done.stderr.decode("utf-8", "replace")
-        if done.returncode != 0:
+        try:
+            source_status, target_status, note = transfer(reading, writing, arguments.into)
+        except OSError as error:
+            refused.append((table, f"the transfer could not start: {error}"))
+            continue
+        if source_status != 0 or target_status != 0:
             first = [l for l in note.splitlines() if l.startswith("ERROR:")]
-            refused.append((table, first[0] if first else note.strip()[:120]))
+            reason = first[0] if first else note.strip()[:120]
+            refused.append((table, f"reader {source_status}, writer {target_status}: {reason}"))
             continue
         copied = 0
         for line in note.splitlines():
@@ -219,6 +315,13 @@ def main():
             print(f"        {table}: {why}")
     if rows == 0:
         fail("not one row went in. ABORT, not a pass.")
+    if refused:
+        fail(f"{len(refused)} table(s) refused; the seed is incomplete")
+    details.update({'tables_seeded': seeded, 'rows_seeded': rows, 'empty_tables': empty,
+                    'source_only_tables': len(source) - len(shared),
+                    'target_only_tables': len(target) - len(shared),
+                    'dropped_columns': dropped, 'defaulted_columns': defaulted})
+    finish_seed(arguments.into, details)
 
 
 if __name__ == "__main__":

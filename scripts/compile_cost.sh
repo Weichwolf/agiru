@@ -7,6 +7,7 @@
 # This measures the three costs a build actually pays, so the projection is arithmetic rather than a
 # guess.
 set -eu
+CXX=${CXX:-clang++-19}
 cd "$(dirname "$0")/.."
 
 FILE=${1:-}
@@ -16,7 +17,7 @@ fi
 [ -f "$FILE" ] || { printf 'compile: no generated source to measure (%s)\n' "$FILE" >&2; exit 2; }
 
 APP=$(printf '%s' "$FILE" | cut -d/ -f1-2)
-FLAGS="-std=c++23 -Iinclude -I$APP -Wall -Wextra -Wpedantic"
+FLAGS="-std=c++23 -stdlib=libc++ -Iinclude -I$APP -Wall -Wextra -Wpedantic -Werror"
 ROUNDS=${ROUNDS:-5}
 OUT=build/compile-cost
 mkdir -p "$OUT"
@@ -37,19 +38,19 @@ time_it() {
 }
 
 # shellcheck disable=SC2086
-time_it "syntax only" clang++ $FLAGS -fsyntax-only "$FILE"
+time_it "syntax only" "$CXX" $FLAGS -fsyntax-only "$FILE"
 # shellcheck disable=SC2086
-time_it "compile, -O2" clang++ $FLAGS -O2 -c -o "$OUT/one.o" "$FILE"
+time_it "compile, -O2" "$CXX" $FLAGS -O2 -c -o "$OUT/one.o" "$FILE"
 # shellcheck disable=SC2086
-time_it "compile, -O0" clang++ $FLAGS -O0 -c -o "$OUT/one.o" "$FILE"
+time_it "compile, -O0" "$CXX" $FLAGS -O0 -c -o "$OUT/one.o" "$FILE"
 
 printf '\ncompile: the door, precompiled\n'
 # shellcheck disable=SC2086
-clang++ $FLAGS -x c++-header -O2 -o "$OUT/agiru.pch" cmake/Precompiled.h 2>/dev/null || {
+"$CXX" $FLAGS -x c++-header -O2 -o "$OUT/agiru.pch" cmake/Precompiled.h 2>/dev/null || {
   printf '  the door does not precompile on its own\n'
   exit 0
 }
 printf '  %-28s %s\n' "size" "$(du -h "$OUT/agiru.pch" | cut -f1)"
 # shellcheck disable=SC2086
 time_it "compile, -O2, with the pch" \
-  clang++ $FLAGS -O2 -include-pch "$OUT/agiru.pch" -c -o "$OUT/one.o" "$FILE"
+  "$CXX" $FLAGS -O2 -include-pch "$OUT/agiru.pch" -c -o "$OUT/one.o" "$FILE"

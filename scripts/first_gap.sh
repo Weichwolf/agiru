@@ -1,27 +1,20 @@
 #!/bin/sh
-# `make gap` -- the generated header that blocks the MOST others, and the diagnostic that stops it.
-#
-# EVERY ERROR IN `apps/` IS A GENERIC GAP IN `src/`. That is the invariant, not an aspiration: the
-# transpiler and the runtime know no AL object, so a generated file cannot be wrong about itself --
-# it is wrong about what the generator emitted or what the runtime offers.
-#
-# IT ASKS THE CENSUS FIRST, AND THAT IS THE WHOLE SPEED ARGUMENT. `make tree` already compiled every
-# header and recorded, per failure, the file the FIRST diagnostic came from -- the root. Sweeping
-# the tree again to rediscover one of those costs one compile per header that already passed, and
-# that cost GROWS with every repair: the further the tree gets, the longer the loop that carries it
-# gets. Reading the census instead costs one compile, and it names the root that blocks 80 headers
-# rather than the one that happens to sort first.
-#
-# A ROOT LEAVES THE CENSUS BY COMPILING, never by being crossed off. So a repair is confirmed the
-# same way it was found, and a census that has gone stale ends the run by saying so rather than by
-# reporting success.
+# Rank recorded header roots; SOURCE=1 or SWEEP=1 checks a complete file inventory directly.
+# A sweep stops at its first failure. A spent census requires a fresh tree measurement.
 set -eu
+CXX=${CXX:-clang++-19}
 cd "$(dirname "$0")/.."
 
 APPS=${1:-apps}
 OUT=build/first-gap
 PCH=$OUT/agiru.pch
 CENSUS=build/tree-syntax/roots
+WARNINGS='-stdlib=libc++ -Wall -Wextra -Wpedantic -Werror'
+
+[ -d "$APPS" ] || {
+  printf 'gap: %s does not exist -- run `make transpile` first\n' "$APPS" >&2
+  exit 2
+}
 
 includes="-Iinclude"
 for d in "$APPS"/*/; do
@@ -29,7 +22,7 @@ for d in "$APPS"/*/; do
 done
 
 mkdir -p "$OUT"
-clang++ -std=c++23 -O2 $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
+"$CXX" -std=c++23 -O2 $WARNINGS $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
   printf 'gap: the door does not precompile -- see %s\n' "$OUT/pch.log" >&2
   exit 1
 }
@@ -39,14 +32,11 @@ unit=$(mktemp --suffix=.cpp)
 err=$(mktemp)
 trap 'rm -f "$unit" "$err"' EXIT
 
-# A HEADER IS INCLUDED, NOT COMPILED. `#pragma once` has NO EFFECT IN THE MAIN FILE, so a header
-# compiled directly that is reached again through one of its own includes is read twice and every
-# class in it is a redefinition -- the measurement lying about a tree a real build is fine with.
 compiles() {
   # A SOURCE IS COMPILED AND A HEADER IS INCLUDED. `#pragma once` has no effect in the main file, so
   # a header compiled directly that is reached through one of its own includes is read twice.
   if [ -n "${SOURCE:-}" ]; then
-    clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic \
+    "$CXX" -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
       $includes "$1" 2>"$err"
     return
   fi
@@ -54,51 +44,63 @@ compiles() {
     /*) printf '#include "%s"\n' "$1" > "$unit" ;;
     *) printf '#include "%s/%s"\n' "$PWD" "$1" > "$unit" ;;
   esac
-  clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 -Wall -Wextra -Wpedantic \
+  "$CXX" -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
     $includes "$unit" 2>"$err"
 }
 
-# `SOURCE=1` WALKS THE BODIES INSTEAD OF THE DECLARATIONS. A header is what a signature says and a
-# source is what the AL statements became, so the two fail for different reasons and the second set
-# has never been measured (board:0038). `make apps` finds the same defects and pays a full ninja
-# rebuild for every header the repair touches; this pays one translation unit.
-KIND=${SOURCE:+*.cpp}
-KIND=${KIND:-*.h}
+KIND='*.h'
+LABEL=headers
+if [ -n "${SOURCE:-}" ]; then
+  KIND='*.cpp'
+  LABEL=bodies
+fi
 
 sweep() {
-  : > "$OUT/files"
-  for app in $(python3 -c "
+  python3 -c "
 import json
-print(' '.join(a['name'] for a in json.load(open('apps.json'))['apps']))"); do
-    [ -d "$APPS/$app" ] && find "$APPS/$app" -name "$KIND" | sort >> "$OUT/files"
-  done
+apps = json.load(open('apps.json'))['apps']
+if not apps:
+    raise SystemExit('gap: no declared apps -- ABORT')
+print('\n'.join(a['name'] for a in apps))" > "$OUT/apps"
+  while IFS= read -r app; do
+    [ -d "$APPS/$app" ] || {
+      printf 'gap: declared app %s does not exist under %s -- ABORT\n' "$app" "$APPS" >&2
+      exit 2
+    }
+  done < "$OUT/apps"
+  find "$APPS" -type f -name "$KIND" > "$OUT/files"
+  sort -o "$OUT/files" "$OUT/files"
   total=$(wc -l < "$OUT/files")
+  [ "$total" -gt 0 ] || {
+    printf 'gap: no generated %s under %s -- ABORT\n' "$LABEL" "$APPS" >&2
+    exit 1
+  }
   seen=0
   while IFS= read -r file; do
     seen=$((seen + 1))
     compiles "$file" && continue
-    printf 'gap: %s of %s headers compile, then\n\n' "$((seen - 1))" "$total"
+    printf 'gap: %s of %s generated %s compile, then %s\n\n' "$((seen - 1))" "$total" "$LABEL" "$file"
     cat "$err" >&2
     printf '\ngap: repair it in src/gen or src/rt. A fix inside apps/ does not survive the next run.\n'
     exit 1
   done < "$OUT/files"
-  printf 'gap: all %s generated headers compile.\n' "$total"
+  printf 'gap: all %s generated %s compile.\n' "$total" "$LABEL"
 }
 
 [ "${SWEEP:-0}" = 1 ] || [ -n "${SOURCE:-}" ] && { sweep; exit 0; }
 [ -s "$CENSUS" ] || {
-  printf 'gap: no census under %s -- sweeping. `make tree` writes one.\n\n' "$CENSUS"
-  sweep
-  exit 0
+  printf 'gap: no census under %s -- `make gap` must create it before selecting a root.\n' "$CENSUS" >&2
+  exit 2
 }
 
 # THE RANKING IS BY DEPENDENTS AND THEN BY NAME, so the same census always names the same root.
 ranked=$(cut -f2 "$CENSUS" | sort | uniq -c | sort -k1,1nr -k2,2)
 roots=$(printf '%s\n' "$ranked" | wc -l)
-tried=0
 printf '%s\n' "$ranked" | while read -r blocked root; do
-  tried=$((tried + 1))
-  [ -f "$root" ] || continue
+  [ -f "$root" ] || {
+    printf 'gap: census root %s does not exist -- `make tree`.\n' "$root" >&2
+    exit 2
+  }
   compiles "$root" && continue
   printf 'gap: %s blocks %s of %s failing headers, %s root(s) in the census, then\n\n' \
     "$root" "$blocked" "$(wc -l < "$CENSUS")" "$roots"
@@ -109,3 +111,4 @@ done
 status=$?
 [ "$status" -ne 0 ] && exit "$status"
 printf 'gap: every one of the %s root(s) in the census compiles -- the census is spent. `make tree`.\n' "$roots"
+exit 2

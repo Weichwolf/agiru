@@ -6,7 +6,14 @@
 # else. A tier break therefore fails at the `#include` with a file and a line rather than later in
 # the linker.
 cmake_minimum_required(VERSION 3.28)
+if(NOT DEFINED CMAKE_CXX_COMPILER)
+  find_program(CMAKE_CXX_COMPILER NAMES clang++-19 REQUIRED)
+endif()
 project(agiru CXX)
+
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  message(FATAL_ERROR "agiru requires Clang; configure a new build directory with clang++-19.")
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 # NO MODULE SCANNING: nothing here is a C++20 module, the scan is a second preprocessor pass over
@@ -22,6 +29,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # `src/app/` falls out of the static analysis because a finding there has no address; it does NOT
 # fall out of the compiler, and that is the hold which replaces it.
 add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+add_compile_options(-stdlib=libc++)
 
 # A TEMPLATE'S INLINE FUNCTIONS ARE NOT AN EXPORTED SYMBOL. The door is templates all the way down --
 # `Table<Derived>`, `Text<N>`, `Declare<&Member>` -- and every instantiation lands in the dynamic
@@ -64,16 +72,38 @@ endif()
 # (BCApps, 2026-09-09) declares `ServLineLineDiscExists` as `exit(ServLineLineDiscExists(...))`
 # under a CLEAN directive: dead by design, and clang's `-Winfinite-recursion` is the compiler
 # arguing with AL rather than with us. Generated code only; `src/` keeps the warning.
+set(AGIRU_RUNTIME_FLAGS ${AGIRU_GENERATED_FLAGS})
 list(APPEND AGIRU_GENERATED_FLAGS -Wno-infinite-recursion)
 
-find_program(LLD ld.lld-19 ld.lld)
-if(LLD)
-  add_link_options(-fuse-ld=lld)
+find_program(LLD NAMES ld.lld-19 REQUIRED)
+add_link_options(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind "-fuse-ld=${LLD}")
+
+include(CheckCXXSourceCompiles)
+set(CMAKE_REQUIRED_FLAGS "-stdlib=libc++")
+set(CMAKE_REQUIRED_LINK_OPTIONS --rtlib=compiler-rt --unwindlib=libunwind "-fuse-ld=${LLD}")
+unset(AGIRU_LLVM_CXX23_WORKS CACHE)
+check_cxx_source_compiles("#include <expected>
+#include <format>
+#include <stdexcept>
+#include <string>
+#ifndef _LIBCPP_VERSION
+#error LLVM libc++ is required
+#endif
+int main() {
+  std::expected<int, std::string> value = 42;
+  try { throw std::runtime_error(std::format(\"{}\", *value)); }
+  catch (const std::runtime_error& error) { return std::string(error.what()) != \"42\"; }
+}" AGIRU_LLVM_CXX23_WORKS)
+unset(CMAKE_REQUIRED_FLAGS)
+unset(CMAKE_REQUIRED_LINK_OPTIONS)
+if(NOT AGIRU_LLVM_CXX23_WORKS)
+  message(FATAL_ERROR "LLVM C++23 libraries are unavailable. Run scripts/install.sh, then reconfigure in a fresh B directory; do not mix C++ ABIs.")
 endif()
 
 # The tiers in dependency order. The order here is a BUILD order; who may see whom is still said by
 # the `reaches` file alone.
 set(TIERS al net db gen rt cli tc)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/apps.json")
 
 # THE LAYERING IS CHECKED BEFORE ANY SOURCE IS LOOKED AT. A tier without a .cpp is skipped below;
 # its `reaches` would then never have been read, and a typo in it would have slept until its first
@@ -94,6 +124,8 @@ foreach(tier IN LISTS TIERS)
   if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches")
     message(FATAL_ERROR "src/${tier}/ carries no reaches file.")
   endif()
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/${tier}/reaches")
   file(STRINGS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches" reached REGEX "^[a-z]+$")
   foreach(dep IN LISTS reached)
     if(NOT IS_DIRECTORY "${CMAKE_SOURCE_DIR}/src/${dep}")
@@ -132,7 +164,7 @@ foreach(tier IN LISTS TIERS)
         target_compile_options(${target} PRIVATE -g0)
       endif()
     else()
-      target_compile_options(${target} PRIVATE ${AGIRU_GENERATED_FLAGS})
+      target_compile_options(${target} PRIVATE ${AGIRU_RUNTIME_FLAGS})
     endif()
   endif()
 
@@ -144,6 +176,9 @@ foreach(tier IN LISTS TIERS)
   # there is no caller who can forget to fill the list.
   target_compile_definitions(${target} PRIVATE AGIRU_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
   file(STRINGS "${CMAKE_SOURCE_DIR}/src/${tier}/reaches" reached REGEX "^[a-z]+$")
+  if(NOT reached AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(${target} PRIVATE "LINKER:--no-undefined")
+  endif()
   foreach(dep IN LISTS reached)
     target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/src/${dep}")
     if(TARGET agiru_${dep})
@@ -184,41 +219,43 @@ set(AGIRU_BC_SOURCE "$ENV{HOME}/Git/BCApps/src"
 # surface baseline says how much of AL is reachable, and that is the number that has to rise. The
 # day it is enough, this defaults to ON and the option goes.
 option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
+option(AGIRU_BUILD_SLICE "Build the generated slice in the CLI" ON)
 
 # THE SLICE, while AGIRU_BUILD_APPS is off: the generated sources named in `test/slice` are built
 # and linked into `agiru`, so the CLI has real AL objects to run. Comments and blank lines are
 # skipped; every other line is a path under `apps/`. A named file that does not compile makes `make`
 # red, which is the difference between a slice and a glob.
-if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
+if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
   # THE SLICE IS READ AT CONFIGURE TIME, SO IT HAS TO RE-TRIGGER CONFIGURE. Without this a source
   # added to the file never enters the build graph: `make` is green, the object is never compiled,
   # and the runner dies at load on the very data symbol the addition was for -- which is how one
   # round was spent adding `ICPartner` twice (2026-09-07).
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    "${CMAKE_SOURCE_DIR}/test/slice")
-  file(STRINGS "${CMAKE_SOURCE_DIR}/test/slice" slice_lines)
+    "${CMAKE_SOURCE_DIR}/test/slice" "${CMAKE_SOURCE_DIR}/scripts/unity_groups.py")
+  execute_process(
+    COMMAND python3 "${CMAKE_SOURCE_DIR}/scripts/unity_groups.py"
+            "${CMAKE_SOURCE_DIR}/test/slice"
+    RESULT_VARIABLE slice_group_status
+    OUTPUT_VARIABLE slice_group_output
+    ERROR_VARIABLE slice_group_error
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT slice_group_status EQUAL 0)
+    message(FATAL_ERROR "${slice_group_error}")
+  endif()
+  string(REPLACE "\n" ";" slice_lines "${slice_group_output}")
   set(slice_sources "")
   foreach(line IN LISTS slice_lines)
-    string(STRIP "${line}" line)
-    if(line STREQUAL "" OR line MATCHES "^#")
-      continue()
+    if(NOT line MATCHES "^([^|]+)[|](.+)$")
+      message(FATAL_ERROR "invalid unity-group row: ${line}")
     endif()
-    list(APPEND slice_sources "${CMAKE_SOURCE_DIR}/apps/${line}")
-    # A UNITY GROUP IS A DIRECTORY, IN BUCKETS OF 16 IN SLICE ORDER. Batches numbered over the
-    # whole list shift whenever a source enters the middle, and every batch after it recompiles;
-    # a group keyed by directory and rank keeps a new source's cost to its own bucket
-    # (board:0589).
-    # The group key is the source's app and module (`base/sales`), not its leaf directory: a leaf
-    # holds two or three slice sources on average and amortises the door parse over as few.
-    string(REGEX REPLACE "^([^/]+/[^/]+).*$" "\\1" slice_dir "${line}")
-    string(MAKE_C_IDENTIFIER "${slice_dir}" slice_dir_id)
-    if(NOT DEFINED slice_rank_${slice_dir_id})
-      set(slice_rank_${slice_dir_id} 0)
-    endif()
-    math(EXPR slice_bucket "${slice_rank_${slice_dir_id}} / 16")
-    math(EXPR slice_rank_${slice_dir_id} "${slice_rank_${slice_dir_id}} + 1")
-    set_source_files_properties("${CMAKE_SOURCE_DIR}/apps/${line}" PROPERTIES
-      UNITY_GROUP "${slice_dir}/${slice_bucket}")
+    set(slice_source "${CMAKE_MATCH_1}")
+    set(slice_group "${CMAKE_MATCH_2}")
+    list(APPEND slice_sources "${CMAKE_SOURCE_DIR}/apps/${slice_source}")
+    # 896 content-addressed roots preserve roughly the former number of unity units for the
+    # measured 14,209-source population. A root holds at most 32 sources; only an overfull root
+    # splits, so adding one source never renumbers an unrelated object (board:0589).
+    set_source_files_properties("${CMAKE_SOURCE_DIR}/apps/${slice_source}" PROPERTIES
+      UNITY_GROUP "${slice_group}")
   endforeach()
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})
@@ -234,11 +271,12 @@ if(NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/test/slice")
     endforeach()
     target_link_libraries(agiru_slice PRIVATE agiru_rt agiru_net agiru_db)
     # THE DOOR IS PARSED ONCE AND NOT ONCE PER FILE. `cmake/Precompiled.h` is the union of it, and
-    # generated source takes (measured 2026-09-03, clang++-19 over libstdc++-14), and 5 835 of them
+    # generated source takes (measured 2026-09-03 on the previous toolchain), and 5 835 of them
     # read it. A precompiled header is 1.1 s built once. It is not a substitute for a generated file
     # including what it uses -- that stands as its own rule -- it is what makes the loop bearable
     # while the tree is still repaired file by file.
     target_precompile_headers(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    target_compile_options(agiru_slice PRIVATE -Xclang -fno-pch-timestamp)
     # THE DOOR IS PARSED ONCE PER BATCH, NOT ONCE PER FILE. Measured 2026-09-06 on a 1 022-line
     # table source: 8.2 s, of which 6.6 s parse the door and 0.5 s are the back end. A unity batch
     # of 16 pays that parse once for 16 sources; every generated file keeps its file-scope names in
@@ -296,6 +334,7 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
+    target_compile_options(agiru_app_${app} PRIVATE -Xclang -fno-pch-timestamp)
     target_compile_options(agiru_app_${app} PRIVATE ${AGIRU_GENERATED_FLAGS})
 
     string(JSON depends ERROR_VARIABLE ignored GET "${apps_json}" apps ${i} depends)
@@ -338,9 +377,11 @@ target_include_directories(gate_image PUBLIC
   "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/target")
 
 file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
+add_custom_target(gates)
 foreach(case IN LISTS gate_cases)
   get_filename_component(name "${case}" NAME_WE)
   add_executable(gate_${name} "${case}")
+  add_dependencies(gates gate_${name})
   target_link_libraries(gate_${name} PRIVATE gate_image)
   # A CASE MAY SEE EVERY TIER. It is not a client: it exists to test the tiers themselves, and a
   # parser or a generator has no public door to be tested through.

@@ -5,15 +5,18 @@ A BUILTIN IS A CALL WITH NO RECEIVER. `Format(X)` and `StrSubstNo(A, B)` are the
 other call in an AL body goes through a variable, and that variable's type decides what it is. So
 the ranking is: bare `Name(` in a body, minus the object's own procedures, minus AL's keywords.
 
-The population is the milestone's -- the 86 codeunits whose name ends in UT under W1/Tests -- and
-the unit is the [Test] METHOD, because that is what the milestone counts.
+The population comes from the independent UT source manifest. Call extraction is a lexical
+ranking aid, not proof that a builtin is bound or implemented.
 """
 import collections
 import pathlib
+import os
 import re
 import sys
 
-ROOT = pathlib.Path.home() / "Git/BCApps/src/Layers/W1/Tests"
+from ut_manifest import IGNORED, scan
+
+ROOT = pathlib.Path(os.environ.get("AGIRU_BC_SOURCE", pathlib.Path.home() / "Git/BCApps/src")) / "Layers/W1/Tests"
 
 # AL's own words, which are not calls even when a parenthesis follows.
 KEYWORDS = {
@@ -34,8 +37,7 @@ def stripped(body):
     A word inside a message reads like a call to a regular expression and is not one: `Format` in
     'You must Format(X) first' would be counted, and so would every English word before a bracket.
     """
-    body = re.sub(r"//[^\n]*", " ", body)
-    return re.sub(r"'(?:[^']|'')*'", " ", body)
+    return IGNORED.sub(" ", body)
 
 
 def bodies(text):
@@ -55,17 +57,19 @@ def bodies(text):
 
 
 def main():
-    files = sorted(p for p in ROOT.rglob("*.Codeunit.al")
-                   if re.search(r'^\s*codeunit\s+\d+\s+"?[^"\n]*UT"?\s*$',
-                                p.read_text(errors="replace"), re.M | re.I))
+    entries = scan(ROOT)
     methods = 0
     calls = collections.Counter()
-    for path in files:
-        text = path.read_text(errors="replace")
+    for entry in entries:
+        path = pathlib.Path(entry["source"])
+        text = IGNORED.sub(lambda m: "\n" * m.group().count("\n") + " ", path.read_text(encoding="utf-8-sig"))
         # The object's OWN procedures are not builtins, however bare the call looks.
         own = {m.lower() for m in re.findall(r"(?im)^\s*(?:local\s+|internal\s+)?procedure\s+(\w+)",
                                              text)}
-        for body in bodies(text):
+        extracted = bodies(text)
+        if len(extracted) != len(entry["methods"]):
+            raise ValueError(f"{path}: body ranking does not match the UT source manifest")
+        for body in extracted:
             methods += 1
             seen = set()
             for m in re.finditer(r"(?<![\w.\"])([A-Za-z]\w*)\s*\(", body):
@@ -75,7 +79,7 @@ def main():
                 seen.add(name)
             for name in seen:
                 calls[name] += 1
-    print(f"population {len(files)} UT codeunits, {methods} [Test] methods")
+    print(f"population {len(entries)} UT codeunits, {methods} [Test] methods")
     print()
     print("the builtins they call, by how many [Test] methods stand on each")
     for name, count in calls.most_common(40):

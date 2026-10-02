@@ -8,6 +8,11 @@ sys.path.insert(0, str(HERE))
 import door, free
 
 ROOT = HERE.parent
+import argparse
+parser = argparse.ArgumentParser(description="Generate the builtin declarations and refusing bodies")
+parser.add_argument("--output-root", type=pathlib.Path, default=ROOT)
+args = parser.parse_args()
+OUTPUT = args.output_root.resolve()
 
 
 def settle(path, text):
@@ -25,11 +30,12 @@ def settle(path, text):
     with anything, including itself.
     """
     formatted = subprocess.run(["clang-format", f"--assume-filename={path.name}"],
-                               input=text, capture_output=True, text=True, check=False)
+                               input=text, capture_output=True, text=True, check=True)
     if formatted.returncode == 0:
         text = formatted.stdout
     if path.exists() and path.read_text() == text:
         return
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
 
 door.GENERATED = set()
@@ -194,7 +200,7 @@ namespace agiru {
 # reference -- and a template's body has to be visible where it is instantiated, so the refusal has
 # to be reachable from the header rather than hidden in an anonymous namespace in the source.
 refusal = ("[[noreturn]] void RefuseDoor(std::string_view what);\n\n")
-settle(ROOT / "include/Builtins.h", head + refusal + "\n\n".join(alldecls) + "\n}\n")
+settle(OUTPUT / "include/Builtins.h", head + refusal + "\n\n".join(alldecls) + "\n}\n")
 
 # THE SOURCE INCLUDES WHAT ITS BODIES NAME, which is only what the signatures spell -- the header
 # is what needs the whole set.
@@ -215,12 +221,12 @@ inbody = {t for t in existing if re.search(r"::agiru::" + t + r"\b", code)}
 # The same suppression the header carries, for the same reason: these are AL's parameter orders.
 guard = ("// NOLINTBEGIN(bugprone-easily-swappable-parameters,"
          "performance-unnecessary-value-param)")
-src = ['#include "Builtins.h"', "", '#include "runtime/Error.h"'] + \
+src = ['#include "Builtins.h"', "", '#include "runtime/ErrorValue.h"'] + \
       [f'#include "{h}"' for h in sorted({existing[t] for t in inbody})] + \
       ["", "#include <string>", "#include <string_view>", "", "namespace agiru {", "",
        "[[noreturn]] void RefuseDoor(std::string_view what) {",
        '  throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");',
        "}", "", guard, ""] + allbodies + \
       ["", guard.replace("NOLINTBEGIN", "NOLINTEND"), "", "}", ""]
-settle(ROOT / "src/rt/Builtins.cpp", "\n".join(src))
+settle(OUTPUT / "src/rt/Builtins.cpp", "\n".join(src))
 print(len(allbodies), "free functions")
