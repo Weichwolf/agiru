@@ -1,11 +1,17 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/AllProfile.h"
+#include "platform/Company.h"
+#include "platform/Date.h"
 #include "platform/Field.h"
+#include "platform/Integer.h"
 #include "platform/ODataEdmType.h"
 #include "platform/ObjectOptions.h"
 #include "platform/PrivacyNotice.h"
 #include "platform/PrivacyNoticeApproval.h"
+#include "platform/RecordLink.h"
+#include "platform/User.h"
 #include "runtime/Catalogue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
@@ -49,7 +55,7 @@ struct Family {
   std::string_view scope;
 };
 
-constexpr std::array<Family, 5> kFamilies{{
+constexpr std::array<Family, 11> kFamilies{{
     {.path = "Tenant Database Tables/ObjectOptions.Table.al",
      .table = &agiru::platform::kObjectOptionsTable,
      .scope = agiru::platform::ObjectOptions::kScope},
@@ -62,6 +68,24 @@ constexpr std::array<Family, 5> kFamilies{{
     {.path = "Tenant Database Tables/PrivacyNoticeApproval.Table.al",
      .table = &agiru::platform::kPrivacyNoticeApprovalTable,
      .scope = agiru::platform::PrivacyNoticeApproval::kScope},
+    {.path = "Tenant Database Tables/Company.Table.al",
+     .table = &agiru::platform::kCompanyTable,
+     .scope = agiru::platform::Company::kScope},
+    {.path = "Tenant Database Tables/User.Table.al",
+     .table = &agiru::platform::kUserTable,
+     .scope = agiru::platform::User::kScope},
+    {.path = "Tenant Database Tables/RecordLink.Table.al",
+     .table = &agiru::platform::kRecordLinkTable,
+     .scope = agiru::platform::RecordLink::kScope},
+    {.path = "Virtual Tables/Date.Table.al",
+     .table = &agiru::platform::kDateTable,
+     .scope = agiru::platform::Date::kScope},
+    {.path = "Virtual Tables/Integer.Table.al",
+     .table = &agiru::platform::kIntegerTable,
+     .scope = agiru::platform::Integer::kScope},
+    {.path = "Virtual Tables/AllProfile.Table.al",
+     .table = &agiru::platform::kAllProfileTable,
+     .scope = agiru::platform::AllProfile::kScope},
     {.path = "Virtual Tables/Field.Table.al",
      .table = &agiru::platform::kFieldTable,
      .scope = agiru::platform::Field::kScope},
@@ -96,13 +120,17 @@ std::string Canonical(const std::vector<agiru::al::Property> &properties, std::s
 }
 
 agiru::FieldType Type(std::string_view name) {
-  static const std::map<std::string, agiru::FieldType> types{{"text", agiru::FieldType::Text},
-                                                             {"code", agiru::FieldType::Code},
-                                                             {"integer", agiru::FieldType::Integer},
-                                                             {"option", agiru::FieldType::Option},
-                                                             {"blob", agiru::FieldType::Blob},
-                                                             {"boolean", agiru::FieldType::Boolean},
-                                                             {"guid", agiru::FieldType::Guid}};
+  static const std::map<std::string, agiru::FieldType> types{
+      {"text", agiru::FieldType::Text},
+      {"code", agiru::FieldType::Code},
+      {"integer", agiru::FieldType::Integer},
+      {"option", agiru::FieldType::Option},
+      {"blob", agiru::FieldType::Blob},
+      {"boolean", agiru::FieldType::Boolean},
+      {"date", agiru::FieldType::Date},
+      {"datetime", agiru::FieldType::DateTime},
+      {"recordid", agiru::FieldType::RecordId},
+      {"guid", agiru::FieldType::Guid}};
   return types.at(agiru::gen::LowerKey(std::string(name)));
 }
 
@@ -156,6 +184,13 @@ void Fields(const agiru::al::TableObject &source, const agiru::TableDef &table, 
                         field->caption == Text(declared.properties, "Caption", declared.name));
     checks.emplace_back(declared.name + " subtype",
                         field->subtype == Text(declared.properties, "SubType"));
+    for (const auto &[property, value] :
+         {std::pair<std::string_view, std::string_view>{"ObsoleteState", field->obsoleteState},
+          std::pair<std::string_view, std::string_view>{"ObsoleteReason", field->obsoleteReason},
+          std::pair<std::string_view, std::string_view>{"ObsoleteTag", field->obsoleteTag}}) {
+      checks.emplace_back(declared.name + " " + std::string(property),
+                          value == Text(declared.properties, property));
+    }
     checks.emplace_back(declared.name + " relation",
                         Canonical(agiru::al::Tokenize(field->relation)) ==
                             Canonical(declared.properties, "TableRelation"));
@@ -357,6 +392,36 @@ void FieldMutantsMustFail(const std::filesystem::path &root) {
   CHECK_TRUE("telemetry classification order is not native Field order", rejects(changed));
 }
 
+void PopulationMutantsMustFail(const std::filesystem::path &root) {
+  for (const auto &family : kFamilies) {
+    auto source = agiru::al::ParseTable(Read(family, root));
+    source.fields.pop_back();
+    const auto checks = Compare(source, family);
+    CHECK_TRUE(source.name + ": removing a source field cannot pass",
+               std::ranges::any_of(checks, [](const auto &check) { return !check.second; }));
+  }
+}
+
+void NativeTextIdentity() {
+  agiru::platform::User user;
+  user.AuthenticationEmail = "Mixed.User@example.invalid";
+  agiru::RecordRef reference;
+  reference.GetTable(user);
+  CHECK_TEXT("authentication email preserves source Text case",
+             reference.Field(agiru::platform::User::Field_No::AuthenticationEmail.Value()).ToText(),
+             "Mixed.User@example.invalid");
+  agiru::platform::RecordLink link;
+  link.UserID = "Mixed.Owner";
+  link.ToUserID = "Other.Owner";
+  reference.GetTable(link);
+  CHECK_TEXT("record-link owner is Text, not uppercase Code",
+             reference.Field(agiru::platform::RecordLink::Field_No::UserID.Value()).ToText(),
+             "Mixed.Owner");
+  CHECK_TEXT("record-link addressee is Text, not uppercase Code",
+             reference.Field(agiru::platform::RecordLink::Field_No::ToUserID.Value()).ToText(),
+             "Other.Owner");
+}
+
 template <typename Row> void Reflection() {
   Row row;
   agiru::RecordRef reference;
@@ -429,11 +494,19 @@ int main(int argc, char *argv[]) {
     SourceAndRegistry(root);
     MutantsMustFail(root);
     FieldMutantsMustFail(root);
+    PopulationMutantsMustFail(root);
     Reflection<agiru::platform::ObjectOptions>();
     Reflection<agiru::platform::ODataEdmType>();
     Reflection<agiru::platform::PrivacyNotice>();
     Reflection<agiru::platform::PrivacyNoticeApproval>();
     Reflection<agiru::platform::Field>();
+    Reflection<agiru::platform::Company>();
+    Reflection<agiru::platform::User>();
+    Reflection<agiru::platform::RecordLink>();
+    Reflection<agiru::platform::Date>();
+    Reflection<agiru::platform::Integer>();
+    Reflection<agiru::platform::AllProfile>();
+    NativeTextIdentity();
     OptionOrdinals();
     TypedMembers();
   });
