@@ -16,7 +16,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost
+.PHONY: lint-config include-cost slice-check
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -58,6 +58,9 @@ lint-config:       ## prove the clang-tidy function line limit at its boundary
 
 include-cost:      ## measure standalone header frontend cost without PCH
 	@B="$(B)" bash "$(SELF)/scripts/include_cost.sh" $(HEADERS)
+
+slice-check:       ## count every slice source and refuse missing inputs without compiling
+	@B="$(B)" bash "$(SELF)/scripts/slice_check.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)
@@ -131,7 +134,7 @@ spotless: clean    ## and the downloaded artefact with it
 	@rm -rf $(SELF)/work
 
 help:              ## this list
-	@grep -hE '^[a-z]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t14
+	@grep -hE '^[a-z][a-z0-9-]*:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/' | expand -t14
 
 gates: comments db  ## build only the handwritten C++ gates for the repair loop
 	@cmake --build $(B) -j $(JOBS) --target gates
