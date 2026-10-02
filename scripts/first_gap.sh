@@ -2,14 +2,13 @@
 # Rank recorded header roots; SOURCE=1 or SWEEP=1 checks a complete file inventory directly.
 # A sweep stops at its first failure. A spent census requires a fresh tree measurement.
 set -eu
-CXX=${CXX:-clang++-19}
 cd "$(dirname "$0")/.."
 
 APPS=${1:-apps}
 OUT=build/first-gap
 PCH=$OUT/agiru.pch
 CENSUS=build/tree-syntax/roots
-WARNINGS='-stdlib=libc++ -Wall -Wextra -Wpedantic -Werror'
+WARNINGS='-Wall -Wextra -Wpedantic -Werror'
 
 [ -d "$APPS" ] || {
   printf 'gap: %s does not exist -- run `make transpile` first\n' "$APPS" >&2
@@ -22,7 +21,7 @@ for d in "$APPS"/*/; do
 done
 
 mkdir -p "$OUT"
-"$CXX" -std=c++23 -O2 $WARNINGS $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
+clang++ -std=c++23 -O2 $WARNINGS $includes -x c++-header -o "$PCH" cmake/Precompiled.h 2>"$OUT/pch.log" || {
   printf 'gap: the door does not precompile -- see %s\n' "$OUT/pch.log" >&2
   exit 1
 }
@@ -36,7 +35,7 @@ compiles() {
   # A SOURCE IS COMPILED AND A HEADER IS INCLUDED. `#pragma once` has no effect in the main file, so
   # a header compiled directly that is reached through one of its own includes is read twice.
   if [ -n "${SOURCE:-}" ]; then
-    "$CXX" -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
+    clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
       $includes "$1" 2>"$err"
     return
   fi
@@ -44,7 +43,7 @@ compiles() {
     /*) printf '#include "%s"\n' "$1" > "$unit" ;;
     *) printf '#include "%s/%s"\n' "$PWD" "$1" > "$unit" ;;
   esac
-  "$CXX" -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
+  clang++ -std=c++23 -O2 -fsyntax-only -ferror-limit=1 $WARNINGS \
     $includes "$unit" 2>"$err"
 }
 

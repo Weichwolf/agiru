@@ -193,6 +193,8 @@ struct TableObject {
   std::vector<ProcedureDecl> procedures;
 };
 
+void EnsurePrimaryKey(TableObject &table);
+
 const Property *Find(const std::vector<Property> &properties, std::string_view name);
 
 const Trigger *Find(const std::vector<Trigger> &triggers, std::string_view name);

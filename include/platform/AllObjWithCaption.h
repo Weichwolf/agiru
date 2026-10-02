@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/Declare.h"
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "platform/AllObjType.h"
@@ -26,32 +27,20 @@
 
 namespace agiru::platform {
 
-/// \brief Source-declared object catalogue with caption and application identity.
 class AllObjWithCaption_Table : public Table<AllObjWithCaption_Table> {
 public:
-  /// \brief The System table number.
   static constexpr TableId kId{2000000058};
-  /// \brief The original AL table name.
   static constexpr std::string_view kName{"AllObjWithCaption"};
-  /// \brief Per-record state owned by the common table runtime.
   detail::StateHandle State_Block;
-  /// \brief Declared Object Name and Object Subtype length, Text[30].
   static constexpr std::size_t kObjectNameLength = 30;
-  /// \brief Declared Object Caption length, Text[249].
   static constexpr std::size_t kObjectCaptionLength = 249;
   /// \brief Length of the declared AL namespace, Text[500].
   static constexpr std::size_t kALNamespaceLength = 500;
-  /// \brief AL Object Type, including reserved option positions.
   Option<AllObjType> ObjectType;
-  /// \brief AL Object ID.
   ::agiru::Integer ObjectID{};
-  /// \brief Original AL name; independent of its caption.
   Text<kObjectNameLength> ObjectName;
-  /// \brief Source object caption, not an alternative object identity.
   Text<kObjectCaptionLength> ObjectCaption;
-  /// \brief Source object subtype.
   Text<kObjectNameLength> ObjectSubtype;
-  /// \brief AL App Package ID, field 60.
   Guid AppPackageID;
   /// \brief AL `AllObjWithCaption.SystemId`.
   Guid SystemId;
@@ -64,28 +53,19 @@ public:
   /// \brief AL `AllObjWithCaption.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
-  /// \brief AL App Runtime Package ID, field 61.
   Guid AppRuntimePackageID;
   /// \brief AL application identity; distinct from either package identity.
   Guid AppID;
   /// \brief Original AL namespace; never reconstructed from the C++ identifier.
   Text<kALNamespaceLength> ALNamespace;
 
-  /// \brief System-source field numbers, not display order.
   struct Field_No {
-    /// \brief Object Type field number.
     static constexpr ::agiru::FieldNo ObjectType{1};
-    /// \brief Object ID field number.
     static constexpr ::agiru::FieldNo ObjectID{3};
-    /// \brief Object Name field number.
     static constexpr ::agiru::FieldNo ObjectName{4};
-    /// \brief Object Caption field number.
     static constexpr ::agiru::FieldNo ObjectCaption{20};
-    /// \brief Object Subtype field number.
     static constexpr ::agiru::FieldNo ObjectSubtype{30};
-    /// \brief App Package ID field number.
     static constexpr ::agiru::FieldNo AppPackageID{60};
-    /// \brief App Runtime Package ID field number.
     static constexpr ::agiru::FieldNo AppRuntimePackageID{61};
     /// \brief AL field 62, App ID.
     static constexpr ::agiru::FieldNo AppID{62};
@@ -93,15 +73,12 @@ public:
     static constexpr ::agiru::FieldNo ALNamespace{63};
   };
 
-  /// \brief The sole declared key, Object Type followed by Object ID.
   static constexpr std::array<::agiru::FieldNo, 2> kKey1{
       {Field_No::ObjectType, Field_No::ObjectID}};
 };
 
-/// \brief The native ABI name for AL AllObjWithCaption.
 using AllObjWithCaption = AllObjWithCaption_Table;
 
-/// \brief All nine source fields in field-number order.
 inline constexpr std::array<FieldDef, 9> kAllObjWithCaptionFields{{
     Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
                                             "Object Type",
@@ -140,12 +117,10 @@ inline constexpr std::array<FieldDef, 9> kAllObjWithCaptionFields{{
                                              offsetof(AllObjWithCaption, ALNamespace)),
 }};
 
-/// \brief Only the System-source primary key; no invented name index.
 inline constexpr std::array<KeyDef, 1> kAllObjWithCaptionKeys{{
     KeyDef{.name = "pk", .fields = AllObjWithCaption::kKey1, .clustered = true},
 }};
 
-/// \brief Tenant-wide catalogue metadata with the declared inherent permissions.
 inline constexpr TableDef kAllObjWithCaptionTable{
     .id = AllObjWithCaption::kId,
     .name = AllObjWithCaption::kName,
@@ -160,8 +135,6 @@ static_assert(FieldsAreSorted(kAllObjWithCaptionTable), "the field table is sear
 
 }
 
-/// \brief The native catalogue declaration used by generic table operations.
 template <> struct agiru::TableTraits<agiru::platform::AllObjWithCaption> {
-  /// \brief The immutable source-compatible table declaration.
   static constexpr const agiru::TableDef &kTable = agiru::platform::kAllObjWithCaptionTable;
 };

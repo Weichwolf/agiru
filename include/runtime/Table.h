@@ -16,7 +16,6 @@
 #include "type/RecordId.h"
 #include "type/SecurityFilter.h"
 
-#include <algorithm>
 #include <array>
 #include <compare>
 #include <cstddef>
@@ -1421,16 +1420,23 @@ public:
 
   /// \brief AL `Record.FilterGroup()` -- which group `SetRange` and `SetFilter` write into.
   /// \return The group in force.
-  [[nodiscard]] Integer FilterGroup() const { return detail::RuntimeFilterGroup(Self()); }
+  [[nodiscard]] Integer FilterGroup() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr ? 0 : state->group;
+  }
 
   /// \brief AL `Record.FilterGroup(Integer)` -- moves the record into a filter group.
-  /// \param group The group; values above 255 are ignored (`record-filtergroup-method.md`).
+  /// \param group The group.
   /// \return The group that was in force before.
   ///
   /// \note EVERY GROUP IS ACTIVE AT ONCE AND THIS ONLY SAYS WHERE THE NEXT FILTER GOES, which is
   ///       what the state already holds: the filters carry their group and are ANDed across them,
   ///       with -1 the one whose own fields OR together.
-  Integer FilterGroup(Integer group) { return detail::RuntimeFilterGroup(Self(), group); }
+  Integer FilterGroup(Integer group) {
+    const Integer was = State().group;
+    State().group = group;
+    return was;
+  }
 
   /// \brief AL `Record.Find([Which])` -- reads the one row `Which` names.
   ///
@@ -1643,9 +1649,16 @@ public:
     return detail::ViewOf(Filtered(), TableTraits<Derived>::kTable, static_cast<bool>(UseNames));
   }
 
-  /// \brief AL `Record.HasFilter()`: whether the current filter group contains a field filter.
-  /// \return True only when this group is filtered; other groups remain active but are not read.
-  [[nodiscard]] Boolean HasFilter() const { return detail::RuntimeHasFilter(Self()); }
+  /// \brief AL `Record.HasFilter(...)`. Determines whether a filter is attached to a record within
+  /// the current filter group.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  [[nodiscard]] Boolean HasFilter() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && !state->filters.empty();
+  }
 
   /// \brief AL `Record.HasLinks()`.
   /// \return Whether a `Record Link` row names this record.
