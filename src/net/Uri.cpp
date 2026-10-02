@@ -1,6 +1,6 @@
 #include "dotnet/Uri.h"
 
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 
 #include <cctype>
 #include <cstddef>

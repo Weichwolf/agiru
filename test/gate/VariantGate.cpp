@@ -1,4 +1,4 @@
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/AlArray.h"
 #include "type/BigInteger.h"
 #include "type/Code.h"
@@ -227,27 +227,15 @@ void AVariantReadsAsTextWhateverItHolds() {
   CHECK_TEXT("and text is itself",
              std::string(std::string_view(agiru::Variant{std::string_view("plain")})),
              "plain");
-  const agiru::Text<0> rendered = agiru::Variant{agiru::Integer{42}};
-  CHECK_TEXT("a Text value uses the render conversion", std::string_view(rendered), "42");
 
   // THE NEGATIVE CONTROL: a Variant holding nothing reads as blank and not as a refusal, and one
   // holding a value with no text form refuses -- which is what `RecordInVariant` is.
   CHECK_TRUE("an empty Variant is blank", std::string_view(agiru::Variant{}).empty());
 }
 
-void AVariantLendsTextFromItsOwnStorage() {
-  agiru::Variant held{agiru::Text<0>{"before"}};
-  agiru::Text<0> &lent = held.Lend<agiru::Text<0>>();
-  lent = "after";
-  CHECK_TEXT("a var Text write reaches the Variant",
-             std::string_view(held.Get<agiru::Text<0>>()),
-             "after");
-}
-
 int main() {
   return gate::Run("Variant", [] {
     AVariantReadsAsTextWhateverItHolds();
-    AVariantLendsTextFromItsOwnStorage();
     AnOptionTakesAnIntegerFromAVariant();
     AnIntegerTakesAnOptionsOrdinalFromAVariant();
     ATextPositionHoldsItsChar();

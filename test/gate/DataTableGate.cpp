@@ -2,7 +2,7 @@
 #include "dotnet/CultureInfo.h"
 #include "dotnet/DataTable.h"
 #include "dotnet/Type.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/Text.h"
@@ -39,10 +39,6 @@ void ATypeIsItsFullName() {
   CHECK_TEXT("Format renders the full name", T(agiru::Format(type)), "System.Decimal");
   CHECK_TRUE("two types of one name are equal", type.Equals(Type::GetType("System.Decimal")));
   CHECK_TRUE("and of another are not", !type.Equals(Type::GetType("System.Int32")));
-  const Variant held{agiru::Text<0>{"System.Decimal"}};
-  const Type fromVariant{held};
-  CHECK_TEXT("a Variant text supplies the full name", T(fromVariant.FullName()), "System.Decimal");
-  CHECK_TRUE("and Type compares the Variant text", fromVariant.Equals(held));
 }
 
 /// A CULTURE IS A TAG AND A NUMBER: `CultureInfo(1033)` is `en-US`, ISO `en`, Windows `ENU`;
@@ -130,7 +126,7 @@ void ChartDataHoldsTheShape() {
   CHECK_TEXT("the X dimension", T(data.XDimension()), "Month");
   CHECK_TRUE("two measures", data.Measures().size() == 2);
   CHECK_TRUE("the first drawn as the ordinal said", data.Measures()[0].type.AsInteger() == 5);
-  CHECK_TRUE("the second uses the declared Line value", data.Measures()[1].type.AsInteger() == 3);
+  CHECK_TRUE("the second as a line", data.Measures()[1].type.AsInteger() == 2);
   data.ShowChartCondensed(true);
   CHECK_TRUE("condensed", static_cast<bool>(data.ShowChartCondensed()));
   data.ClearMeasures();

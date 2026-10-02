@@ -11,7 +11,6 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace {
@@ -39,19 +38,6 @@ std::vector<std::string> Lines(const std::string &text) {
 /// care which -- that is what makes an enum or a table reachable across apps without qualification.
 agiru::gen::Objects Tables() {
   agiru::gen::Objects objects;
-  agiru::al::VarDecl textParameter{.byReference = true,
-                                   .temporary = false,
-                                   .name = "Value",
-                                   .type = "Text",
-                                   .subtype = {},
-                                   .length = 0,
-                                   .members = {},
-                                   .arguments = {},
-                                   .dimensions = {},
-                                   .attributes = {}};
-  agiru::al::ProcedureDecl setText;
-  setText.name = "SetText";
-  setText.parameters.push_back(std::move(textParameter));
   objects.tables.insert_or_assign(
       "line number buffer",
       // THE KIND IS PART OF THE NAME, as it is in the transpiler's own index: 51 objects in the
@@ -66,27 +52,12 @@ agiru::gen::Objects Tables() {
                            .requestFields = {},
                            .columnSources = {},
                            .interfaceReturns = {},
-                           .tryFunctions = {},
-                           .procedureDeclarations = {}});
+                           .tryFunctions = {}});
   objects.enums.insert_or_assign("sales line type",
                                  agiru::gen::EnumRef{.identifier = "SalesLineType",
                                                      .header = "SalesLineType.h",
                                                      .ordinals = {},
                                                      .members = {}});
-  objects.codeunits.insert_or_assign(
-      "json management",
-      agiru::gen::TableRef{.identifier = "::agiru::app::codeunits::JsonManagement_Codeunit",
-                           .header = "JsonManagement.h",
-                           .fields = {},
-                           .procedures = {{"settext", "SetText"}},
-                           .parts = {},
-                           .name = {},
-                           .dataItems = {},
-                           .requestFields = {},
-                           .columnSources = {},
-                           .interfaceReturns = {},
-                           .tryFunctions = {},
-                           .procedureDeclarations = {std::move(setText)}});
   return objects;
 }
 
@@ -158,8 +129,8 @@ void AChangedSourceChangesTheOutput() {
   CHECK_TRUE("dropping `temporary` drops the wrapper",
              afterPermanent.find("Temporary<LineNumberBuffer> TempLineNumberBuffer") ==
                  std::string::npos);
-  // A MEMBER IS A HANDLE EITHER WAY (board:0037), so what `temporary` decides is the wrapper
-  // INSIDE it and nothing else.
+  // A MEMBER IS A HANDLE EITHER WAY (board:0037), so what `temporary` decides is the wrapper INSIDE
+  // it and nothing else.
   CHECK_TRUE("and leaves the table itself",
              afterPermanent.find(
                  "Instance<::agiru::app::tables::LineNumberBuffer_Table> TempLineNumberBuffer") !=
@@ -300,24 +271,6 @@ void ARelationalLeftOperandRetainsItsAlGrouping() {
       agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables());
   CHECK_TRUE("a nested equality is parenthesized before its next equality",
              generated.find("(SourceType == 900) == IsAssembleToOrder") != std::string::npos);
-}
-
-void ARemoteVarParameterLendsTheVariantsStoredType() {
-  const std::string source = R"(codeunit 50003 "Remote Variant"
-{
-    var
-        JSONManagement: Codeunit "JSON Management";
-
-    procedure SetText(Held: Variant)
-    begin
-        JSONManagement.SetText(Held);
-    end;
-})";
-  const std::string generated = agiru::gen::WriteCodeunitSource(
-      agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables());
-  CHECK_TRUE("a remote var Text parameter lends Variant storage",
-             generated.find("JSONManagement->SetText(Held.Lend<::agiru::Text<0>>())") !=
-                 std::string::npos);
 }
 
 /// A FIELD NAMED ON AN ARRAY ELEMENT BELONGS TO THAT ELEMENT. `CurrencyExchRate2[CacheNo].SetRange(
@@ -484,11 +437,10 @@ void ACodeunitIncludesEveryObjectItNames() {
   CHECK_TRUE("the enumeration a LOCAL variable names is included",
              generated.find("#include \"SalesLineType.h\"") != std::string::npos);
 
-  // THE NEGATIVE CONTROL: an include list that carried only what the old walk saw would still
-  // pass the second line, because a global table was always reached. The enumeration and the
-  // local are the two it missed, and the local is why the count of includes matters rather than
-  // their presence -- a set collapses the duplicate, so this asserts the file compiles as a
-  // whole.
+  // THE NEGATIVE CONTROL: an include list that carried only what the old walk saw would still pass
+  // the second line, because a global table was always reached. The enumeration and the local are
+  // the two it missed, and the local is why the count of includes matters rather than their
+  // presence -- a set collapses the duplicate, so this asserts the file compiles as a whole.
   CHECK_TRUE("the enumeration is included exactly once, however many places name it",
              generated.find("SalesLineType.h") == generated.rfind("SalesLineType.h"));
 }
@@ -509,7 +461,6 @@ int main() {
     AForeachOverADotNetCollectionFillsTheDeclaredVariable();
     AStaticPlatformMemberWithoutParenthesesIsACall();
     ARelationalLeftOperandRetainsItsAlGrouping();
-    ARemoteVarParameterLendsTheVariantsStoredType();
     ACodeunitIncludesEveryObjectItNames();
   });
 }

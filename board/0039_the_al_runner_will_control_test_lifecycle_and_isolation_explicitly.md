@@ -1,28 +1,26 @@
 # 0039 — The AL runner will control test lifecycle and isolation explicitly
 
-Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-09-28
-Depends on: 0012 boundaries; 0058 comparison; 0718 images; 0006 session state.
+Status: open | Priority: P0 | Reviewed: 2026-09-22
 
-## Evidence
+## Current evidence
 
-- `TestRunner.cpp` invokes test methods directly; generated TestRunner before/after hooks and PermissionTestHelper reset chain are not driving execution.
-- Codeunit/Function/Disabled policies and handler/trap cleanup have focused gates. CLI defaults to Codeunit; platform default is Disabled.
-- `TransactionModel::None` currently avoids success Commit but does not itself refuse direct writes or give page interactions separate transactions.
+`src/rt/TestRunner.cpp::RunOne` invokes methods directly. A new ordered gate first proved that a method with an unused declared handler failed yet retained its row for the next method (`default,missed` instead of `default`). RunOne now discards its method scope before reporting that failure. All 74 local gates pass. Allocation controls exposed three failures in handler installation/deinstallation: installation now prepares replacement state before publishing it; deinstallation detaches state before allocating diagnostics. HandlerLifetimeGate passes 7 normal/ASan/UBSan checks. Three further failing-before controls exposed leaked page traps after a successful final method and handlers/traps after a foreign C++ exception. RunOne now owns an automatic cleanup guard with allocation-free HandlerTable.Reset, and setup is inside its error boundary; the earlier TestIsolationGate passed 10 normal/ASan/UBSan checks. Foreign exceptions remain visible and the test instance is released. A Codeunit isolation floor now takes back explicit Commits, and AutoRollback refuses them. Frozen snapshot `20260922T125708Z-196091` includes these repairs and shows exactly the same 2,197/2,310 AL outcomes and error texts as the previous full run. No generated TestRunner drives before/after hooks or chooses a policy yet. The CLI runner exists, so the old claim that there is no runner is obsolete.
 
-## Implementation
+The runtime now accepts an explicit `TestIsolation` policy with the three documented values. Codeunit remains the current CLI default until a generated runner supplies its property. Function wraps each method in its own floor and discards its writes, including an explicit Commit; Disabled installs no isolation floor and implicitly commits successful non-AutoRollback methods. TestIsolationGate passes 17 checks under normal and ASan/UBSan builds and discriminates the three policies with database rows. An independent PostgreSQL connection saw only the explicit-Commit row when the implicit completion was deliberately disabled (17 checks, 1 red); restoring it made the same gate green. The current local `make test JOBS=2` passes 74 cases, and `make gcc JOBS=2` builds. Method execution and result reporting were extracted so the new policy does not add a cognitive-complexity finding. Targeted lint remains red on pre-existing findings; no suppression was added. The current frozen full run predates this addition. It does not yet prove OnRun or hook transaction semantics under Function/Disabled, and no generated TestRunner selects the policy yet. `TransactionModel::None` remains a separate open gap: direct writes must be refused while page interactions own their own transactions.
 
-1. Generate runner metadata and callback registration; select a translated TestRunner explicitly. Dispatch empty-function codeunit callbacks, skips, OnRun, OnBeforeTestRun and OnAfterTestRun.
-2. Run each before/after hook in its documented own transaction outside test isolation floors. Implement hook-error outcomes and durable reports separately from failed test data.
-3. Implement the complete TestIsolation × TransactionModel matrix. Codeunit may retain successful cross-method state; Function discards each method; AutoRollback rejects explicit Commit; None rejects direct writes but permits documented page transactions.
-4. Implement PermissionTestHelper and the translated reset chain, then retire native duplicates. Restore handlers/traps/current instance on setup, execution, callback and reporting failures.
+## Implementation for Sol
+
+1. Carry the selected TestRunner, TestIsolation and TransactionModel as explicit runtime metadata. Register OnBeforeTestRun/OnAfterTestRun hooks and drive the translated runner through the CLI, including the empty-function codeunit callbacks and skip result. The platform says both hooks run in their own transactions regardless of isolation, transaction model or test outcome; execute and commit/roll them at separate boundaries outside the test method's isolation floor.
+2. Implement an isolation floor below nested error scopes, coordinated with 0012. `TestIsolation` has three values: `Disabled` (the documented default), `Codeunit` and `Function`. Successful methods may share state under Codeunit isolation; do not unconditionally roll back each successful method. The documented `[TransactionModel(AutoRollback)]` refuses an explicit `Commit()`; `AutoCommit` allows it, while the runner's Codeunit/Function isolation still rolls it back at its own floor. `Disabled` does not install an isolation rollback floor. Keep `TransactionModel::None` separate from `TestIsolation::Disabled`; they name different platform controls.
+3. Keep the new unused-handler rollback gate. Ensure exceptions during installation, invocation, result collection and hook execution always uninstall handlers and release traps; the handler allocation and foreign-exception paths are now covered, but generated runner hooks and their exceptions still need coverage.
+4. Implement the PermissionTestHelper bookkeeping needed by the translated reset chain before activating it. Replace native reset duplicates only once the corresponding AL hooks are exercised.
 
 ## Acceptance
 
-- Two-connection gates prove hook transactions, explicit Commit, nested rollback, successful cross-method state, False before-hook, failing after-hook and None page/direct-write distinction.
-- Same complete codeunits and sealed seed before/after; unchanged population and no unexplained losses. Full UT goes through the translated runner.
+Gates cover explicit Commit followed by method failure, Commit surviving an inner rollback, successful cross-method state under Codeunit isolation, Function isolation, AutoRollback, unused handlers, false before-hook and throwing after-hook. Run the same full codeunits for A/B; per-method sampling is not an isolation proof.
 
 ## References
 
-Code: `src/rt/TestRunner.cpp`, `include/runtime/TestRunner.h`, `src/gen/CodeunitWriter.cpp`, `src/cli/Main.cpp`; gates: `TestIsolationGate`, `HandlerLifetimeGate`. Platform: TestIsolation property, TransactionModel/HandlerFunctions attributes, TestRunner triggers. AL: `Tools/Test Framework/Test Runner/src`. Predecessor: WI-963/1088/1316; method sampling changes isolation evidence.
+Platform: properties/devenv-testisolation-property.md, attributes/devenv-transactionmodel-attribute.md, attributes/devenv-handlerfunctions-attribute.md, devenv-testrunner-codeunits.md and both TestRunner triggers. AL: Tools/Test Framework/Test Runner/src. Predecessor: WI-963, WI-1088 (164/190 versus 179/190 under different isolation), WI-1316.
 
-Property scope: `requiredtestisolation`, `subtype`, `subtype-blob`, `subtype-codeunit`, `testisolation`, `testtype`.
+Consolidated property scope (look up each under `developer/properties/`; carriage alone does not close behaviour): `requiredtestisolation`, `subtype`, `subtype-blob`, `subtype-codeunit`, `testisolation`, `testtype`.
