@@ -1555,7 +1555,11 @@ class SnapshotGate(unittest.TestCase):
                                capture_output=True)
             arguments = SimpleNamespace(targets=['probe'], jobs=1, detach=False, reuse=False)
             with patch.object(verify, 'ROOT', root), \
-                    patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': str(package)}):
+                    patch.dict(os.environ, {
+                        'AGIRU_SYSTEM_SYMBOLS': str(package),
+                        'MAKEFLAGS': '-e -- AGIRU_SYSTEM_SYMBOLS=/unfrozen/make-override',
+                        'MFLAGS': '-e',
+                        'MAKEOVERRIDES': 'AGIRU_SYSTEM_SYMBOLS=/unfrozen/make-override'}):
                 self.assertEqual(verify.start(arguments), 0)
             run = Path((root / 'build/verify/latest').read_text().strip())
             result = json.loads((run / 'result.json').read_text())
@@ -1657,7 +1661,11 @@ class SnapshotGate(unittest.TestCase):
             (run / 'result.json').write_text(json.dumps({
                 'status': 'queued', 'targets': ['probe'], 'jobs': 1,
                 'source_sha256': verify.digest(source)}))
-            with patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': '/unfrozen/live/input'}):
+            with patch.dict(os.environ, {
+                    'AGIRU_SYSTEM_SYMBOLS': '/unfrozen/live/input',
+                    'MAKEFLAGS': '-e -- AGIRU_SYSTEM_SYMBOLS=/unfrozen/make-override',
+                    'MFLAGS': '-e',
+                    'MAKEOVERRIDES': 'AGIRU_SYSTEM_SYMBOLS=/unfrozen/make-override'}):
                 self.assertEqual(verify.run_snapshot(run), 0)
 
     def test_raw_census_receipts_survive_reusing_the_same_build_lane(self):

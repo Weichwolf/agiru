@@ -250,6 +250,8 @@ def run_snapshot(run):
     metadata['artifacts'] = str(run / 'artifacts')
     write_json(metadata_path, metadata)
     environment = dict(os.environ)
+    for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+        environment.pop(name, None)
     environment.pop('AGIRU_BC_REVISION', None)
     environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
     build_source = Path(metadata.get('build_source', run / 'source'))
