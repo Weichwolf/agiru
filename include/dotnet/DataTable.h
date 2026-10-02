@@ -3,7 +3,7 @@
 #include "dotnet/CultureInfo.h"
 #include "dotnet/Refused.h"
 #include "dotnet/Type.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Text.h"
@@ -96,6 +96,7 @@ private:
   friend class DataTable;
   friend class DataColumnCollection;
   friend class DataRow;
+
   struct Held {
     std::string name;
     std::string caption;
@@ -198,6 +199,7 @@ public:
 private:
   friend class DataTable;
   friend class DataRow;
+
   explicit DataColumnCollection(std::shared_ptr<std::vector<class DataColumn>> columns)
       : columns_(std::move(columns)) {}
   std::shared_ptr<std::vector<class DataColumn>> columns_;
@@ -259,10 +261,12 @@ public:
 private:
   friend class DataTable;
   friend class DataRowCollection;
+
   struct Columns {
     std::shared_ptr<std::vector<class DataColumn>> columns;
     [[nodiscard]] std::size_t IndexOfOrRefuse(std::string_view name) const;
   };
+
   struct Held {
     Columns columns;
     std::vector<Variant> values;
@@ -320,6 +324,7 @@ public:
 
 private:
   friend class DataTable;
+
   explicit DataRowCollection(std::shared_ptr<std::vector<class DataRow>> rows)
       : rows_(std::move(rows)) {}
   std::shared_ptr<std::vector<class DataRow>> rows_;

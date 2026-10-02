@@ -1,8 +1,8 @@
 #pragma once
 
 #include "dotnet/Refused.h"
+#include "runtime/ErrorValue.h"
 #include "type/Stream.h"
-#include "runtime/Error.h"
 #include "type/Text.h"
 
 #include <concepts>
@@ -15,9 +15,9 @@ namespace agiru::dotnet {
 ///        to write a note: `BinWriter := BinWriter.BinaryWriter(OutStream); BinWriter.Write(Note)`.
 ///
 /// \note A .NET STRING IS LENGTH-PREFIXED. `Write(string)` puts the UTF-8 byte count first, seven
-///       bits per byte with the high bit carrying on, then the bytes -- and `BinaryReader.ReadString`
-///       reads that back. A note written by BC is read by this reader and the other way round, so the
-///       layout is .NET's and not this runtime's.
+///       bits per byte with the high bit carrying on, then the bytes -- and
+///       `BinaryReader.ReadString` reads that back. A note written by BC is read by this reader and
+///       the other way round, so the layout is .NET's and not this runtime's.
 class BinaryWriter {
 public:
   /// \param output The stream written to; it must outlive the writer.
@@ -38,7 +38,8 @@ public:
     /// \tparam Arguments Whatever the wrapper codeunit hands over.
     /// \return An unbound writer.
     template <typename... Arguments>
-      requires(sizeof...(Arguments) != 1 || !(std::same_as<std::remove_cvref_t<Arguments>, OutStream> && ...))
+      requires(sizeof...(Arguments) != 1 ||
+               !(std::same_as<std::remove_cvref_t<Arguments>, OutStream> && ...))
     [[nodiscard]] class BinaryWriter operator()(Arguments &&...) const {
       return ::agiru::dotnet::BinaryWriter{};
     }
@@ -70,19 +71,24 @@ public:
   /// \brief `BinaryWriter.Close()`: nothing is buffered here, so nothing is left to flush.
   void Close() const {}
 
-  /// \brief .NET `BinaryWriter.Codeunit`, named by the BaseApp's wrapper codeunit and not rebuilt: a refusal
+  /// \brief .NET `BinaryWriter.Codeunit`, named by the BaseApp's wrapper codeunit and not rebuilt:
+  /// a refusal
   ///        that says so when it is called (board:0035).
   ::agiru::dotnet::Refused Codeunit{{.type = "BinaryWriter", .member = "Codeunit"}};
-  /// \brief .NET `BinaryWriter.Dispose`, named by the BaseApp's wrapper codeunit and not rebuilt: a refusal
+  /// \brief .NET `BinaryWriter.Dispose`, named by the BaseApp's wrapper codeunit and not rebuilt: a
+  /// refusal
   ///        that says so when it is called (board:0035).
   ::agiru::dotnet::Refused Dispose{{.type = "BinaryWriter", .member = "Dispose"}};
-  /// \brief .NET `BinaryWriter.Flush`, named by the BaseApp's wrapper codeunit and not rebuilt: a refusal
+  /// \brief .NET `BinaryWriter.Flush`, named by the BaseApp's wrapper codeunit and not rebuilt: a
+  /// refusal
   ///        that says so when it is called (board:0035).
   ::agiru::dotnet::Refused Flush{{.type = "BinaryWriter", .member = "Flush"}};
-  /// \brief .NET `BinaryWriter.Seek`, named by the BaseApp's wrapper codeunit and not rebuilt: a refusal
+  /// \brief .NET `BinaryWriter.Seek`, named by the BaseApp's wrapper codeunit and not rebuilt: a
+  /// refusal
   ///        that says so when it is called (board:0035).
   ::agiru::dotnet::Refused Seek{{.type = "BinaryWriter", .member = "Seek"}};
-  /// \brief .NET `BinaryWriter.BaseStream`, named by the BaseApp's wrapper codeunit and not rebuilt: a refusal
+  /// \brief .NET `BinaryWriter.BaseStream`, named by the BaseApp's wrapper codeunit and not
+  /// rebuilt: a refusal
   ///        that says so when it is called (board:0035).
   ::agiru::dotnet::Refused BaseStream{{.type = "BinaryWriter", .member = "BaseStream"}};
 

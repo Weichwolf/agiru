@@ -10,6 +10,11 @@
 
 namespace agiru {
 
+/// \brief Reject an unavailable runtime table provider before any physical storage operation.
+/// \param table The declaration whose provider is needed.
+/// \throws Error with the original table identity and providerRefusal; never returns false.
+void RequireTableProvider(const TableDef &table);
+
 /// \brief Creates the table the declaration describes.
 ///
 /// \param connection The database.

@@ -1,13 +1,13 @@
 #include "runtime/Session.h"
 
-#include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/Events.h"
 #include "runtime/Transaction.h"
 #include "type/Date.h"
+#include "type/Language.h"
 
 #include "BuiltinsWritten.h"
-#include "Subscribers.h"
+#include "SessionState.h"
 
 #include <string>
 #include <string_view>
@@ -27,8 +27,7 @@ Session::Session(const std::string &connectionInfo)
 }
 
 Session::~Session() {
-  detail::ReleaseAutomaticInstances();
-  detail::ReleaseSingleInstances();
+  if (state_ != nullptr) { state_->ReleaseSingles(); }
   g_current = previous_;
   ::agiru::Language::MakeCurrent(previous_ != nullptr ? previous_->language_
                                                       : ::agiru::Language::kEnglishUnitedStates);

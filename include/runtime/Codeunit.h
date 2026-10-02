@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/Subtype.h"
 #include "runtime/Error.h"
+#include "runtime/Subscriptions.h"
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
 
@@ -26,7 +27,6 @@ namespace detail {
 /// \brief Points a record at another's temporary rows, leaving its filters alone.
 /// \param record The record that borrows. \param from The one whose rows it borrows.
 void RuntimeBorrowTemporary(void *record, const void *from);
-bool UnbindSubscriptions(CodeunitId id, void *instance);
 }
 
 /// \brief WHY AN EVENT PUBLISHER'S BODY IS EMPTY, AND WHY ITS PARAMETERS HAVE NO NAMES.
@@ -82,11 +82,11 @@ namespace detail {
 /// \param make Makes the instance, when this call is the first.
 /// \param free Frees it, when the session closes.
 /// \return The instance.
-/// \note IT IS PER SESSION AND NEVER PER PROCESS: a session is a thread here, and a shared
-///       instance across 10 000 sessions is a data race with the answer as the prize
-///       (board:0471). `Environment Information Impl.` holds the SaaS testability flag this way,
-///       and a runtime that made one instance per variable answered `IsSaaS` from a fresh one
-///       (RapidStart Warning Page UT, Test OAuth 2.0 UT, 2026-09-12).
+/// \throws SessionError when no session is active; Error when the factory is invalid or returns
+///         no instance. Construction failure does not install an instance.
+/// \note Storage belongs to the active Session, not its worker thread. Nested sessions have
+///       separate instances and child close preserves the parent's state. Company-close
+///       invalidation remains part of the company lifecycle contract (WI 0006).
 [[nodiscard]] void *SingleInstanceOf(CodeunitId id, void *(*make)(), void (*free)(void *));
 
 /// \brief Frees every single instance this session made; the session's close calls it.
@@ -416,9 +416,7 @@ public:
   /// \note `devenv-eventsubscriberinstance-property.md`: a manually bound instance subscribes
   ///       until `UnbindSubscription` or until the instance is gone. A binding that outlived its
   ///       object was a dangling pointer the next event dispatched into.
-  ~Codeunit() {
-    static_cast<void>(detail::UnbindSubscriptions(Id(), static_cast<Derived *>(this)));
-  }
+  ~Codeunit() { detail::ReleaseSubscriptions(Id(), static_cast<Derived *>(this)); }
 
   /// \brief The codeunit's AL name.
   /// \return The name AL declared, spaces and punctuation included.
@@ -623,28 +621,30 @@ bool RunCodeunitByNumber(bool value, ::agiru::Integer Number, Arguments &&...arg
   }
   void *record = nullptr;
   TableId table{};
-  const auto take = [&](auto &argument) {
-    using A = std::remove_cvref_t<decltype(argument)>;
-    if constexpr (requires { argument.operator->(); }) {
-      using Held = std::remove_cvref_t<decltype(*argument.operator->())>;
-      if constexpr (requires {
-                      { Held::kId } -> std::convertible_to<TableId>;
-                    }) {
-        record = argument.operator->();
-        table = Held::kId;
+  if constexpr (sizeof...(Arguments) > 0) {
+    const auto take = [&](auto &argument) {
+      using A = std::remove_cvref_t<decltype(argument)>;
+      if constexpr (requires { argument.operator->(); }) {
+        using Held = std::remove_cvref_t<decltype(*argument.operator->())>;
+        if constexpr (requires {
+                        { Held::kId } -> std::convertible_to<TableId>;
+                      }) {
+          record = argument.operator->();
+          table = Held::kId;
+        }
+      } else if constexpr (requires {
+                             { A::kId } -> std::convertible_to<TableId>;
+                           }) {
+        if constexpr (std::is_const_v<std::remove_reference_t<decltype(argument)>>) {
+          throw Error("Codeunit.Run(" + std::to_string(Number) + "): the record must be a var");
+        } else {
+          record = &argument;
+          table = A::kId;
+        }
       }
-    } else if constexpr (requires {
-                           { A::kId } -> std::convertible_to<TableId>;
-                         }) {
-      if constexpr (std::is_const_v<std::remove_reference_t<decltype(argument)>>) {
-        throw Error("Codeunit.Run(" + std::to_string(Number) + "): the record must be a var");
-      } else {
-        record = &argument;
-        table = A::kId;
-      }
-    }
-  };
-  (take(arguments), ...);
+    };
+    (take(arguments), ...);
+  }
   return entry->run(record, table, value);
 }
 

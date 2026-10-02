@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/List.h"

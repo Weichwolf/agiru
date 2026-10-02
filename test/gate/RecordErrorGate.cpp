@@ -1,7 +1,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Record.h"
 #include "type/Option.h"
 
@@ -13,9 +13,9 @@
 
 using agiru::Error;
 using agiru::StrSubstNo;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 

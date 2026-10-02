@@ -1,6 +1,6 @@
 #include "dotnet/Path.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <cstddef>
 #include <filesystem>

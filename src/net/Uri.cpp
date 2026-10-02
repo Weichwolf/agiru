@@ -1,6 +1,6 @@
 #include "dotnet/Uri.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <cctype>
 #include <cstddef>
@@ -12,7 +12,8 @@ namespace agiru::dotnet {
 
 namespace {
 
-constexpr std::string_view kInvalidUri = "Invalid URI: The format of the URI could not be determined.";
+constexpr std::string_view kInvalidUri =
+    "Invalid URI: The format of the URI could not be determined.";
 constexpr std::int32_t kHttpPort = 80;
 constexpr std::int32_t kHttpsPort = 443;
 constexpr std::int32_t kFtpPort = 21;
@@ -183,7 +184,8 @@ class Uri Uri::Binder::operator()(const class Uri &baseUri, std::string_view rel
   }
   const std::size_t lastSlash = base.rfind('/');
   const std::size_t authorityEnd = base.find("://");
-  if (lastSlash != std::string::npos && (authorityEnd == std::string::npos || lastSlash > authorityEnd + 2)) {
+  if (lastSlash != std::string::npos &&
+      (authorityEnd == std::string::npos || lastSlash > authorityEnd + 2)) {
     base.resize(lastSlash + 1);
   } else {
     base += '/';
@@ -306,7 +308,8 @@ Boolean Uri::IsBaseOf(const class Uri &uri) const {
   const std::string mine = std::string(std::string_view(AbsolutePath()));
   const std::string other = std::string(std::string_view(uri.AbsolutePath()));
   const std::size_t lastSlash = mine.rfind('/');
-  const std::string directory = lastSlash == std::string::npos ? std::string("/") : mine.substr(0, lastSlash + 1);
+  const std::string directory =
+      lastSlash == std::string::npos ? std::string("/") : mine.substr(0, lastSlash + 1);
   return other.starts_with(directory);
 }
 

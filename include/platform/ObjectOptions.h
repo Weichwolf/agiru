@@ -1,7 +1,7 @@
 #pragma once
 
-#include "meta/EnumDef.h"
 #include "meta/Declare.h"
+#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Table.h"

@@ -1,6 +1,6 @@
 #include "dotnet/File.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <filesystem>
 #include <fstream>

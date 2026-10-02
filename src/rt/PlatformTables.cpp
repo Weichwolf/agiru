@@ -9,6 +9,7 @@
 #include "platform/ODataEdmType.h"
 #include "platform/ObjectOptions.h"
 #include "platform/PageMetadata.h"
+#include "platform/PageTableField.h"
 #include "platform/PrivacyNotice.h"
 #include "platform/PrivacyNoticeApproval.h"
 #include "platform/RecordLink.h"
@@ -32,6 +33,7 @@ const RegisterTable<platform::Integer> kInteger;
 const RegisterTable<platform::ODataEdmType> kODataEdmType;
 const RegisterTable<platform::ObjectOptions> kObjectOptions;
 const RegisterTable<platform::PageMetadata> kPageMetadata;
+const RegisterTable<platform::PageTableField> kPageTableField;
 const RegisterTable<platform::PrivacyNotice> kPrivacyNotice;
 const RegisterTable<platform::PrivacyNoticeApproval> kPrivacyNoticeApproval;
 const RegisterTable<platform::RecordLink> kRecordLink;

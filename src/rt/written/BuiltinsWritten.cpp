@@ -4,7 +4,7 @@
 #include "dotnet/JObject.h"
 #include "meta/EnumDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
@@ -129,7 +129,7 @@ std::string Rendered(const ::agiru::Variant &Value, ::agiru::Integer format) {
     const std::string text = Value.Get<Decimal>().Trimmed().ToInvariantString();
     return TrailingSign(format) ? WithTrailingSign(text) : text;
   }
-  if (Value.Is<std::string>()) { return Value.Get<std::string>(); }
+  if (Value.IsText()) { return std::string(std::string_view(Value.Get<Text<0>>())); }
   if (Value.Is<Date>()) { return DateText(Value.Get<Date>(), format); }
   if (Value.Is<Time>()) { return TimeText(Value.Get<Time>(), format); }
   if (Value.Is<DateTime>()) { return Value.Get<DateTime>().ToInvariantString(); }

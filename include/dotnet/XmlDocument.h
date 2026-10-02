@@ -48,6 +48,13 @@ public:
 
   /// \brief The node seen as a declaration. \param node The node.
   explicit(false) XmlDeclaration(const XmlNode &node) : XmlNode(node.Handle()) {}
+
+  /// \brief XML declaration version. \return The declared version.
+  [[nodiscard]] ::agiru::Text<0> Version() const;
+  /// \brief XML declaration encoding. \return The declared encoding, or empty text.
+  [[nodiscard]] ::agiru::Text<0> Encoding() const;
+  /// \brief XML standalone flag. \return `yes`, `no`, or empty text when absent.
+  [[nodiscard]] ::agiru::Text<0> Standalone() const;
 };
 
 /// \brief .NET `XmlDocumentType`.
@@ -253,6 +260,10 @@ public:
   /// \param stream The stream.
   /// \throws Error when the text is not XML, the way .NET throws.
   void Load(const ::agiru::InStream &stream);
+
+  /// \brief `XmlDocument.Load(filename)`: reads an XML document from a file or URL.
+  /// \param filename The file path or URL. \throws Error when it cannot be loaded or parsed.
+  void Load(std::string_view filename);
 
   /// \brief `XmlDocument.Load(reader)`: the document the reader reads, taken whole.
   /// \param reader The reader. \throws Error on bad XML.

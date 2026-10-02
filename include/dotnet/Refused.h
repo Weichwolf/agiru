@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <compare>
 #include <concepts>
@@ -69,6 +69,8 @@ public:
   /// \brief The chained member `Groups`, which a body reaches on the RESULT of a refused call.
   /// \brief The chained member `GetBytes`, which a body reaches on the RESULT of a refused call.
   static Refused GetBytes;
+  /// \brief The chained member `Get`, which a body reaches on the RESULT of a refused call.
+  static Refused Get;
   /// \brief The chained member `GetString`, which a body reaches on the RESULT of a refused call.
   static Refused GetString;
   /// \brief The chained member `CreateOutStream`, which a body reaches on the RESULT of a refused
@@ -758,6 +760,7 @@ struct AbsentObject : AbsentType {
 using RefusedResult = Refused;
 
 inline Refused Refused::GetBytes{{.type = "<result>", .member = "GetBytes"}};
+inline Refused Refused::Get{{.type = "<result>", .member = "Get"}};
 inline Refused Refused::GetString{{.type = "<result>", .member = "GetString"}};
 inline Refused Refused::CreateOutStream{{.type = "<result>", .member = "CreateOutStream"}};
 inline Refused Refused::GetResponseStream{{.type = "<result>", .member = "GetResponseStream"}};

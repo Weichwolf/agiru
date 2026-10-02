@@ -5,7 +5,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"

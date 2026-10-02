@@ -1,18 +1,18 @@
 #include "dotnet/XmlReader.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/Text.h"
-
-#include <libxml/xmlreader.h>
 
 #include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
+
+#include <libxml/xmlreader.h>
 
 namespace agiru::dotnet {
 
@@ -62,9 +62,8 @@ XmlReader XmlReader::Over(std::string text) {
                                                XML_PARSE_NOENT | XML_PARSE_NONET);
   if (reader == nullptr) { throw Error("XmlReader.Create: the data is not XML"); }
   xmlTextReaderSetStructuredErrorHandler(reader, &Quiet, nullptr);
-  out.reader_ = std::shared_ptr<void>(reader, [](void *held) {
-    xmlFreeTextReader(static_cast<xmlTextReaderPtr>(held));
-  });
+  out.reader_ = std::shared_ptr<void>(
+      reader, [](void *held) { xmlFreeTextReader(static_cast<xmlTextReaderPtr>(held)); });
   return out;
 }
 
@@ -124,14 +123,16 @@ Integer XmlReader::Depth() const {
   if (atDeclaration_) { return ::agiru::Text<0>{"xml"}; }
   if (reader_ == nullptr) { return {}; }
   const xmlChar *name = xmlTextReaderConstName(Held(reader_));
-  return ::agiru::Text<0>{name == nullptr ? std::string{} : std::string(reinterpret_cast<const char *>(name))};
+  return ::agiru::Text<0>{name == nullptr ? std::string{}
+                                          : std::string(reinterpret_cast<const char *>(name))};
 }
 
 ::agiru::Text<0> XmlReader::Value() const {
   if (atDeclaration_) { return ::agiru::Text<0>{declaration_}; }
   if (reader_ == nullptr) { return {}; }
   const xmlChar *value = xmlTextReaderConstValue(Held(reader_));
-  return ::agiru::Text<0>{value == nullptr ? std::string{} : std::string(reinterpret_cast<const char *>(value))};
+  return ::agiru::Text<0>{value == nullptr ? std::string{}
+                                           : std::string(reinterpret_cast<const char *>(value))};
 }
 
 XmlNodeType XmlReader::NodeType() const {

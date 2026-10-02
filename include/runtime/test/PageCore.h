@@ -39,10 +39,10 @@ public:
   /// \throws Error whatever the validation raises, and when the control has no field.
   virtual void SetControlText(std::string_view control, std::string_view text) = 0;
 
-  /// \brief AL `TestField.Value`: the control's field, formatted.
+  /// \brief AL `TestField.Value`: the current control source, formatted.
   /// \param control The control's AL name.
   /// \return The text a user would read.
-  /// \throws Error when the control has no field.
+  /// \throws Error from the source expression or when no readable source is bound.
   [[nodiscard]] virtual std::string ControlText(std::string_view control) const = 0;
 
   /// \brief The ordinal behind an Option or Enum control, which `AssertEquals(1)` names where

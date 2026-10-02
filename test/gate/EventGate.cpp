@@ -1,7 +1,8 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Events.h"
+#include "runtime/Session.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
@@ -160,12 +161,21 @@ public:
     after = Rec.NewLineNumber;
     sawRunTrigger = RunTrigger;
     ++modified;
+    if (nest && modified == 1) {
+      const auto &outer = xRec;
+      const auto original = outer.NewLineNumber;
+      Rec.NewLineNumber += 1;
+      Rec.Modify();
+      CHECK_TRUE("outer xRec survives a nested Modify", outer.NewLineNumber == original);
+      CHECK_TRUE("nested Modify keeps its updated Rec", Rec.NewLineNumber == after);
+    }
   }
 
   int modified = 0;
   Integer before = -1;
   Integer after = -1;
   Boolean sawRunTrigger = true;
+  bool nest = false;
 };
 
 // `CurrFieldNo` IN A VALIDATE EVENT IS THE SYSTEM VARIABLE: the field the user is editing, and 0
@@ -176,14 +186,21 @@ public:
   void Validated(agiru::app::tables::LineNumberBuffer &Rec,
                  agiru::app::tables::LineNumberBuffer &xRec,
                  Integer CurrFieldNo) {
-    static_cast<void>(Rec);
-    static_cast<void>(xRec);
     sawFieldNo = CurrFieldNo;
     ++validated;
+    if (nest && validated == 1) {
+      const auto &outer = xRec;
+      const auto original = outer.NewLineNumber;
+      const auto nestedValue = Rec.NewLineNumber + 1;
+      Rec.Validate(Rec.NewLineNumber, nestedValue);
+      CHECK_TRUE("outer xRec survives nested validation", outer.NewLineNumber == original);
+      CHECK_TRUE("nested validation updates the same Rec", Rec.NewLineNumber == nestedValue);
+    }
   }
 
   int validated = 0;
   Integer sawFieldNo = -1;
+  bool nest = false;
 };
 
 // A SUBSCRIBER MAY NAME ITS FIRST PARAMETER `Sender` AND RECEIVE THE RAISING OBJECT, which the
@@ -424,6 +441,35 @@ void AModifyWithoutATriggerRaisesItsEvents() {
   static_cast<void>(agiru::UnbindSubscription(modified));
 }
 
+void ANestedModifyKeepsTheOuterXRecAlive() {
+  Modified_Codeunit modified;
+  modified.nest = true;
+  static_cast<void>(agiru::BindSubscription(modified));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  constexpr agiru::Integer kOriginal = 10; // [SET] distinct image fixture value.
+  buffer.OldLineNumber = 1;
+  buffer.NewLineNumber = kOriginal;
+  buffer.Insert();
+  buffer.NewLineNumber += 1;
+  buffer.Modify();
+  CHECK_TRUE("both modification events ran", modified.modified == 2);
+  CHECK_TRUE("the nested write reached temporary storage",
+             buffer.Get(1) && buffer.NewLineNumber == kOriginal + 2);
+  static_cast<void>(agiru::UnbindSubscription(modified));
+}
+
+void ANestedValidationKeepsTheOuterXRecAlive() {
+  Edited_Codeunit edited;
+  edited.nest = true;
+  static_cast<void>(agiru::BindSubscription(edited));
+  agiru::Temporary<agiru::app::tables::LineNumberBuffer> buffer;
+  buffer.NewLineNumber = 1;
+  buffer.Validate(buffer.NewLineNumber, 2);
+  CHECK_TRUE("both validation events ran", edited.validated == 2);
+  CHECK_TRUE("the nested value survives the outer validation", buffer.NewLineNumber == 3);
+  static_cast<void>(agiru::UnbindSubscription(edited));
+}
+
 void ARenameEventsXRecCarriesTheOldKey() {
   Renamer_Codeunit renamer;
   static_cast<void>(agiru::BindSubscription(renamer));
@@ -515,12 +561,15 @@ void ASubscriberNamingAnUnpublishedParameterIsRefused() {
 
 int main() {
   return gate::Run("Event", [] {
+    const agiru::Session session(AGIRU_TEST_DSN);
     AManualSubscriberHearsOnlyWhileBound();
     CurrFieldNoIsTheUsersFieldAndZeroFromCode();
     ASubscriberNamingAnUnpublishedParameterIsRefused();
     ATableTriggerEventReachesASubscriber();
     ARenameEventsXRecCarriesTheOldKey();
     AModifyWithoutATriggerRaisesItsEvents();
+    ANestedModifyKeepsTheOuterXRecAlive();
+    ANestedValidationKeepsTheOuterXRecAlive();
     ASubscriberNamedSenderReceivesTheRaisingRecord();
   });
 }

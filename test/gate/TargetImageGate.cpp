@@ -13,9 +13,9 @@
 using agiru::Field;
 using agiru::FieldNo;
 using agiru::ValueOf;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 

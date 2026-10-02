@@ -10,12 +10,18 @@
 #include "type/Integer.h"
 #include "type/Language.h"
 
+#include <memory>
 #include <string>
 
 /// \file
 /// \brief The ambient session an AL record belongs to.
 
 namespace agiru {
+
+namespace detail {
+/// \brief Session-owned runtime storage, defined privately by the runtime.
+struct SessionState;
+}
 
 /// \brief An error raised when there is no session to work in.
 class SessionError : public Error {
@@ -177,6 +183,8 @@ public:
   [[nodiscard]] Boundaries &Transaction() { return boundaries_; }
 
 private:
+  friend struct detail::SessionState;
+  mutable std::unique_ptr<detail::SessionState> state_;
   Connection connection_;
   Boundaries boundaries_;
   Session *previous_;

@@ -1,6 +1,6 @@
 #include "runtime/Implementation.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <cctype>
 #include <cstdint>
@@ -57,9 +57,8 @@ const ForeignImplementation *FindImplementation(std::string_view enumName,
   return found == registry.end() ? nullptr : &found->second;
 }
 
-void *CloneForeign(const std::type_info &held,
-                   std::string_view interfaceName,
-                   const void *instance) {
+void *
+CloneForeign(const std::type_info &held, std::string_view interfaceName, const void *instance) {
   const auto &registry = ByType();
   const auto found = registry.find({std::type_index(held), Folded(interfaceName)});
   if (found == registry.end()) {

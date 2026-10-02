@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dotnet/Refused.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Text.h"
@@ -22,9 +22,13 @@ public:
   /// \brief A kind by number. \param number The number.
   explicit UriKind(std::int32_t number) : number_(number) {}
 
-  [[nodiscard]] static UriKind RelativeOrAbsolute() { return UriKind{0}; } ///< `RelativeOrAbsolute`.
-  [[nodiscard]] static UriKind Absolute() { return UriKind{1}; }           ///< `Absolute`.
-  [[nodiscard]] static UriKind Relative() { return UriKind{2}; }           ///< `Relative`.
+  [[nodiscard]] static UriKind RelativeOrAbsolute() {
+    return UriKind{0};
+  } ///< `RelativeOrAbsolute`.
+
+  [[nodiscard]] static UriKind Absolute() { return UriKind{1}; } ///< `Absolute`.
+
+  [[nodiscard]] static UriKind Relative() { return UriKind{2}; } ///< `Relative`.
 
   /// \brief The number. \return It.
   [[nodiscard]] std::int32_t Number() const { return number_; }
@@ -46,10 +50,13 @@ public:
   /// \brief A part by number. \param number The number.
   explicit UriPartial(std::int32_t number) : number_(number) {}
 
-  [[nodiscard]] static UriPartial Scheme() { return UriPartial{0}; }    ///< `Scheme`.
+  [[nodiscard]] static UriPartial Scheme() { return UriPartial{0}; } ///< `Scheme`.
+
   [[nodiscard]] static UriPartial Authority() { return UriPartial{1}; } ///< `Authority`.
-  [[nodiscard]] static UriPartial Path() { return UriPartial{2}; }      ///< `Path`.
-  [[nodiscard]] static UriPartial Query() { return UriPartial{3}; }     ///< `Query`.
+
+  [[nodiscard]] static UriPartial Path() { return UriPartial{2}; } ///< `Path`.
+
+  [[nodiscard]] static UriPartial Query() { return UriPartial{3}; } ///< `Query`.
 
   /// \brief The number. \return It.
   [[nodiscard]] std::int32_t Number() const { return number_; }
@@ -88,7 +95,8 @@ public:
     /// \brief `new Uri(baseUri, relativeUri)`: the relative text resolved against the base.
     /// \param baseUri The base. \param relativeUri The relative text.
     /// \return The combined URI.
-    [[nodiscard]] class Uri operator()(const class Uri &baseUri, std::string_view relativeUri) const;
+    [[nodiscard]] class Uri operator()(const class Uri &baseUri,
+                                       std::string_view relativeUri) const;
 
     /// \brief `new Uri(x)` over a value this runtime does not carry -- a field of an absent
     ///        table, say. \param refused The value. \return Never.
@@ -148,7 +156,9 @@ public:
   [[nodiscard]] ::agiru::Text<0> AbsolutePath() const;
 
   /// \brief `Uri.Query`: the query with its leading `?`, or empty. \return The query.
-  [[nodiscard]] ::agiru::Text<0> Query() const { return query_.empty() ? std::string{} : "?" + query_; }
+  [[nodiscard]] ::agiru::Text<0> Query() const {
+    return query_.empty() ? std::string{} : "?" + query_;
+  }
 
   /// \brief `Uri.Fragment`: the fragment with its leading `#`, or empty. \return The fragment.
   [[nodiscard]] ::agiru::Text<0> Fragment() const {
@@ -234,11 +244,13 @@ public:
 
   /// \brief `UriBuilder.Scheme` read. \return The scheme.
   [[nodiscard]] ::agiru::Text<0> Scheme() const { return scheme_; }
+
   /// \brief `UriBuilder.Scheme` write. \param value The scheme. \return It.
   ::agiru::Text<0> Scheme(std::string_view value);
 
   /// \brief `UriBuilder.Host` read. \return The host.
   [[nodiscard]] ::agiru::Text<0> Host() const { return host_; }
+
   /// \brief `UriBuilder.Host` write. \param value The host. \return It.
   ::agiru::Text<0> Host(std::string_view value) {
     host_ = std::string(value);
@@ -247,6 +259,7 @@ public:
 
   /// \brief `UriBuilder.Port` read. \return The port, -1 for the scheme's own.
   [[nodiscard]] Integer Port() const { return port_; }
+
   /// \brief `UriBuilder.Port` write. \param value The port. \return It.
   Integer Port(Integer value) {
     port_ = value;
@@ -255,11 +268,15 @@ public:
 
   /// \brief `UriBuilder.Path` read. \return The path, `/` at least.
   [[nodiscard]] ::agiru::Text<0> Path() const { return path_.empty() ? std::string("/") : path_; }
+
   /// \brief `UriBuilder.Path` write. \param value The path. \return It.
   ::agiru::Text<0> Path(std::string_view value);
 
   /// \brief `UriBuilder.Query` read: with its leading `?`, or empty. \return The query.
-  [[nodiscard]] ::agiru::Text<0> Query() const { return query_.empty() ? std::string{} : "?" + query_; }
+  [[nodiscard]] ::agiru::Text<0> Query() const {
+    return query_.empty() ? std::string{} : "?" + query_;
+  }
+
   /// \brief `UriBuilder.Query` write; a leading `?` is taken off, as .NET does since 4.5.
   /// \param value The query. \return It, with its `?`.
   ::agiru::Text<0> Query(std::string_view value);
@@ -268,6 +285,7 @@ public:
   [[nodiscard]] ::agiru::Text<0> Fragment() const {
     return fragment_.empty() ? std::string{} : "#" + fragment_;
   }
+
   /// \brief `UriBuilder.Fragment` write; a leading `#` is taken off. \param value The fragment.
   /// \return It, with its `#`.
   ::agiru::Text<0> Fragment(std::string_view value);

@@ -1,7 +1,7 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Storage.h"
 #include "type/Guid.h"
 #include "type/Media.h"

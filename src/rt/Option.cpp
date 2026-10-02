@@ -1,6 +1,6 @@
 #include "type/Option.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <string_view>
 

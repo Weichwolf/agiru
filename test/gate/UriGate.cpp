@@ -1,5 +1,5 @@
 #include "dotnet/Uri.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 
@@ -31,7 +31,8 @@ void AUriIsTakenApartAndPutBackTheWayDotNetDoesIt() {
   CHECK_TEXT("the query with its question mark", T(uri.Query()), "?x=1&y=2");
   CHECK_TEXT("the fragment with its hash", T(uri.Fragment()), "#top");
   CHECK_TEXT("the authority carries a non-default port", T(uri.Authority()), "example.com:8443");
-  CHECK_TEXT("the canonical text", T(uri.AbsoluteUri()),
+  CHECK_TEXT("the canonical text",
+             T(uri.AbsoluteUri()),
              "https://User@example.com:8443/a/b%20c?x=1&y=2#top");
 
   Uri bare;
@@ -45,7 +46,8 @@ void AUriIsTakenApartAndPutBackTheWayDotNetDoesIt() {
              Uri::IsWellFormedUriString("https://example.com/path?q=1", UriKind::Absolute()));
   CHECK_TRUE("not well formed: no scheme where an absolute one is wanted",
              !Uri::IsWellFormedUriString("example.com/path", UriKind::Absolute()));
-  CHECK_TRUE("not well formed: a space", !Uri::IsWellFormedUriString("http://a b", UriKind::Absolute()));
+  CHECK_TRUE("not well formed: a space",
+             !Uri::IsWellFormedUriString("http://a b", UriKind::Absolute()));
   CHECK_TRUE("not well formed: http with no host",
              !Uri::IsWellFormedUriString("http://", UriKind::Absolute()));
   CHECK_TRUE("well formed: a relative path when relative is allowed",
@@ -54,29 +56,36 @@ void AUriIsTakenApartAndPutBackTheWayDotNetDoesIt() {
              !Uri::IsWellFormedUriString("http://x/", UriKind::Relative()));
 
   Uri made;
-  CHECK_TRUE("TryCreate takes a good one", Uri::TryCreate("ftp://files.example.org/x", UriKind::Absolute(), made));
+  CHECK_TRUE("TryCreate takes a good one",
+             Uri::TryCreate("ftp://files.example.org/x", UriKind::Absolute(), made));
   CHECK_TEXT("and fills it", T(made.Host()), "files.example.org");
-  CHECK_TRUE("TryCreate refuses a bad one", !Uri::TryCreate("not a uri", UriKind::Absolute(), made));
+  CHECK_TRUE("TryCreate refuses a bad one",
+             !Uri::TryCreate("not a uri", UriKind::Absolute(), made));
 
   std::string said;
   try {
     Uri bad;
     bad = bad.Uri("no scheme here");
   } catch (const agiru::Error &e) { said = e.what(); }
-  CHECK_TEXT("the constructor refuses with .NET's wording", said,
+  CHECK_TEXT("the constructor refuses with .NET's wording",
+             said,
              "Invalid URI: The format of the URI could not be determined.");
 
   CHECK_TEXT("EscapeDataString keeps the unreserved set and encodes the rest as UTF-8",
-             T(Uri::EscapeDataString("a b&c=d/é~")), "a%20b%26c%3Dd%2F%C3%A9~");
-  CHECK_TEXT("UnescapeDataString is the way back", T(Uri::UnescapeDataString("a%20b%26c%3Dd%2F%C3%A9~")),
+             T(Uri::EscapeDataString("a b&c=d/é~")),
+             "a%20b%26c%3Dd%2F%C3%A9~");
+  CHECK_TEXT("UnescapeDataString is the way back",
+             T(Uri::UnescapeDataString("a%20b%26c%3Dd%2F%C3%A9~")),
              "a b&c=d/é~");
 
   Uri base;
   base = base.Uri("http://example.com/dir/page.html?old=1");
   CHECK_TEXT("a relative reference resolves against the base's directory",
-             T(base.Uri(base, "other.html?new=2").AbsoluteUri()), "http://example.com/dir/other.html?new=2");
+             T(base.Uri(base, "other.html?new=2").AbsoluteUri()),
+             "http://example.com/dir/other.html?new=2");
   CHECK_TEXT("a rooted reference resolves against the authority",
-             T(base.Uri(base, "/top").AbsoluteUri()), "http://example.com/top");
+             T(base.Uri(base, "/top").AbsoluteUri()),
+             "http://example.com/top");
   Uri deeper;
   deeper = deeper.Uri("http://example.com/dir/sub/x");
   CHECK_TRUE("IsBaseOf sees the directory", base.IsBaseOf(deeper));
@@ -95,8 +104,10 @@ void AUriBuilderAssemblesItsParts() {
   static_cast<void>(builder.Query("?y=2&z=3"));
   static_cast<void>(builder.Fragment("frag"));
   static_cast<void>(builder.Port(8080));
-  CHECK_TEXT("the assembled text", T(builder.ToString()), "https://example.com:8080/api?y=2&z=3#frag");
-  CHECK_TEXT("and as a Uri", T(builder.Uri().AbsoluteUri()), "https://example.com:8080/api?y=2&z=3#frag");
+  CHECK_TEXT(
+      "the assembled text", T(builder.ToString()), "https://example.com:8080/api?y=2&z=3#frag");
+  CHECK_TEXT(
+      "and as a Uri", T(builder.Uri().AbsoluteUri()), "https://example.com:8080/api?y=2&z=3#frag");
   UriBuilder empty;
   empty = empty.UriBuilder();
   CHECK_TEXT("the empty builder is localhost over http", T(empty.ToString()), "http://localhost/");

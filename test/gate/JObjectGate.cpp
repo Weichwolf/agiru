@@ -1,6 +1,6 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 #include "type/Variant.h"
@@ -31,7 +31,7 @@ std::string T(const agiru::Text<0> &text) {
 /// reads text, `Add` refuses a second member of one name the way Newtonsoft does, and
 /// `ToString()` is the INDENTED form Newtonsoft renders with `\r\n` line breaks.
 void AnObjectIsARefereceIntoATreeAndRendersIndented() {
-  JObject object;
+  JObject object{};
   object = object.JObject();
   CHECK_TRUE("a new object is not null", !agiru::IsNull(object));
   object.Add("unitCode", Variant(std::string("PCS")));
@@ -73,7 +73,7 @@ void AnObjectIsARefereceIntoATreeAndRendersIndented() {
 /// value to `Format`: `Value := JProperty.Value; Text := Format(Value)` reads the bare text of a
 /// string leaf and the indented JSON of an object.
 void AVariantCarriesATokenAndFormatRendersIt() {
-  JObject object;
+  JObject object{};
   object = object.Parse("{\"name\": \"Bicycle\", \"price\": 2800.5}");
   const Variant held = object.Property("name").Value();
   CHECK_TEXT("Format of a held string leaf", T(agiru::Format(held)), "Bicycle");
@@ -84,9 +84,8 @@ void AVariantCarriesATokenAndFormatRendersIt() {
              T(agiru::Format(Variant(object.Property("price").Value()))),
              "2800.5");
   const Variant property(object.Property("name"));
-  CHECK_TEXT("a property renders as name and value",
-             T(agiru::Format(property)),
-             "\"name\": \"Bicycle\"");
+  CHECK_TEXT(
+      "a property renders as name and value", T(agiru::Format(property)), "\"name\": \"Bicycle\"");
 }
 
 /// AN ARRAY ENUMERATES AND SELECTS WITH A FILTER: `JSON Management` walks
@@ -109,9 +108,7 @@ void AnArrayEnumeratesAndFiltersItsObjects() {
   CHECK_TRUE("and no other", !walker.MoveNext());
 
   int walked = 0;
-  for (const JObject &item : array) {
-    walked += static_cast<int>(item.Count());
-  }
+  for (const JObject &item : array) { walked += static_cast<int>(item.Count()); }
   CHECK_TRUE("foreach walks the items as objects", walked == 4);
 
   JArray more;
@@ -127,7 +124,7 @@ void AnArrayEnumeratesAndFiltersItsObjects() {
 /// THE PROPERTIES OF AN OBJECT ARE ENUMERATED IN ORDER, and `Replace` on one swaps its name and
 /// value inside the object (`JSON Management.ReplaceOrAddJPropertyInJObject`).
 void PropertiesEnumerateAndReplace() {
-  JObject object;
+  JObject object{};
   object = object.Parse("{\"first\": 1, \"second\": 2}");
   GenericIEnumerator1 walker = object.Properties().GetEnumerator();
   std::string names;

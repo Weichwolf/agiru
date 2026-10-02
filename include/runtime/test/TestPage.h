@@ -671,9 +671,11 @@ public:
     AttachedForReading_();
     const ControlDef *def = ControlNamed_(control);
     if (def != nullptr && def->field.Value() == 0 && page_ != nullptr) {
-      if (const ControlTrigger<P> *row = TriggerRow_(control);
-          row != nullptr && row->text != nullptr) {
-        return row->text(*page_);
+      if (const ControlTrigger<P> *row = TriggerRow_(control); row != nullptr) {
+        if (row->sourceText != nullptr) {
+          return std::string(((*page_).*row->sourceText)().Value());
+        }
+        if (row->text != nullptr) { return row->text(*page_); }
       }
     }
     if (def == nullptr || def->field.Value() == 0) {

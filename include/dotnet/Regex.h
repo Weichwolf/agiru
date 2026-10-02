@@ -346,7 +346,7 @@ public:
 
   /// \brief `Regex.Match(input)`. \param input The text. \return The first match, or an
   ///        unsuccessful one.
-  [[nodiscard]] Match Match(std::string_view input) const;
+  [[nodiscard]] ::agiru::dotnet::Match Match(std::string_view input) const;
 
   /// \brief `Regex.Matches(input)`. \param input The text. \return Every match, left to right.
   [[nodiscard]] MatchCollection Matches(std::string_view input) const;

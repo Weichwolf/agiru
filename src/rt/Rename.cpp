@@ -1,13 +1,12 @@
-#include "RenameCascade.h"
-
-#include "Filter.h"
-#include "RelationBranches.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+
+#include "Filter.h"
+#include "RelationBranches.h"
+#include "RenameCascade.h"
 
 #include <cctype>
 #include <cstddef>
@@ -59,9 +58,12 @@ const ReferenceIndex &References() {
 struct Made {
   const TableEntry *entry;
   void *record;
+
   Made(const TableEntry *e) : entry(e), record(e->make()) {}
+
   Made(const Made &) = delete;
   Made &operator=(const Made &) = delete;
+
   ~Made() { entry->free(record); }
 };
 
@@ -75,8 +77,7 @@ const FieldDef *FieldNamed(const TableDef &table, std::string_view name) {
 bool ConstantHolds(const RelationTerm &term, const void *before, const TableDef &table) {
   const FieldDef *target = FieldNamed(table, term.field);
   if (target == nullptr) { return false; }
-  const std::string text =
-      SameName(term.kind, "filter") ? term.inner : Literally(term.inner);
+  const std::string text = SameName(term.kind, "filter") ? term.inner : Literally(term.inner);
   return Matches(ParseFilter(text), FieldText(before, *target), *target);
 }
 
@@ -121,9 +122,9 @@ void Rewrite(const Reference &reference,
   Narrow(state, field.no, Literally(oldText));
   if (!Narrowed(state, referring, reference, before, table)) { return; }
   if (!RuntimeFindSet(row.record, referring)) { return; }
-  const bool inKey = !referring.keys.empty() &&
-                     std::ranges::find(referring.keys[0].fields, field.no) !=
-                         referring.keys[0].fields.end();
+  const bool inKey =
+      !referring.keys.empty() &&
+      std::ranges::find(referring.keys[0].fields, field.no) != referring.keys[0].fields.end();
   do {
     if (inKey) {
       const Made was(reference.entry);

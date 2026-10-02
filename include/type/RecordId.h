@@ -1,7 +1,7 @@
 #pragma once
 
 #include "meta/Ids.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Refusal.h"
 

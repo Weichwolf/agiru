@@ -4,8 +4,10 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/UserLicenseType.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
+#include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/DateTime.h"
 #include "type/Guid.h"
@@ -31,6 +33,13 @@ enum class PersonalizationScope : std::int32_t {
   Tenant = 1, ///< The tenant's own.
 };
 
+/// \brief System `User Personalization."Customization Status"` members.
+enum class CustomizationStatus : std::int32_t {
+  Updated = 0,             ///< Current customizations.
+  RecompilationNeeded = 1, ///< Customizations need compilation.
+  RecompilationFailed = 2, ///< Compilation failed.
+};
+
 }
 
 /// \brief The vocabulary of AL `User Personalization.Scope`.
@@ -42,20 +51,21 @@ template <> struct agiru::OptionTraits<agiru::platform::PersonalizationScope> {
   }};
 };
 
+/// \brief Declared customization-state vocabulary.
+template <> struct agiru::OptionTraits<agiru::platform::CustomizationStatus> {
+  /// \brief The three System-symbol members.
+  static constexpr std::array<agiru::EnumValueDef, 3> kValues{{
+      {.ordinal = 0, .name = "Updated", .caption = "Updated"},
+      {.ordinal = 1, .name = "Recompilation Needed", .caption = "Recompilation Needed"},
+      {.ordinal = 2, .name = "Recompilation Failed", .caption = "Recompilation Failed"},
+  }};
+};
+
 namespace agiru::platform {
 
-/// \brief AL `User Personalization` -- the platform's own table, which no `.al` file declares.
-///
-/// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
-///       `work/symbols/src/Tenant Database Tables/UserPersonalization.Table.al` (`make symbols`)
-///       carries it. The predecessor's measured layout, which this file carried until 2026-09-07,
-///       had every number wrong but one: this table starts at 3 and runs to 34 with eleven gaps,
-///       and a column order sees none of them (board:0607).
-///
-/// \note NINE OF THE TWENTY DECLARED FIELDS ARE HERE. The debugger flags, `Full Name`,
-///       `Language Name`, `Region`, `License Type`, `Customization Status`, `Role` and
-///       `Emit Version` are not, and their absence is a hole with a number rather than a decision
-///       -- board:0607 replaces this file with the transpiled declaration.
+/// \brief System `User Personalization`, declared by the pinned System symbols.
+/// \note All nineteen declared fields are retained, including obsolete fields and six lookup
+///       FlowFields. Runtime calculation uses their CalcFormula metadata, not table-specific code.
 class UserPersonalization_Table : public Table<UserPersonalization_Table> {
 public:
   /// \brief The AL table number.
@@ -74,6 +84,10 @@ public:
   static constexpr std::size_t kTimeZoneLength = 180;
   /// \brief The declared length of `User ID`.
   static constexpr std::size_t kUserIdLength = 50;
+  /// \brief Full name, language name and region use Text[80] in System symbols.
+  static constexpr std::size_t kDisplayNameLength = 80;
+  /// \brief Declared Role caption length.
+  static constexpr std::size_t kRoleLength = 100;
 
   /// \brief AL `User Personalization."User SID"`.
   Guid UserSID;
@@ -93,6 +107,26 @@ public:
   Text<kTimeZoneLength> TimeZone;
   /// \brief AL `User Personalization."User ID"`.
   Code<kUserIdLength> UserID;
+  /// \brief AL `Full Name`, a User lookup FlowField.
+  Text<kDisplayNameLength> FullName;
+  /// \brief AL `Language Name`, a Windows Language lookup FlowField.
+  Text<kDisplayNameLength> LanguageName;
+  /// \brief Obsolete debugger flag; InitValue is true in System symbols.
+  Boolean DebuggerBreakOnError = true;
+  /// \brief Obsolete debugger record-change flag.
+  Boolean DebuggerBreakOnRecChanges{};
+  /// \brief Obsolete debugger flag; InitValue is true in System symbols.
+  Boolean DebuggerSkipSystemTriggers = true;
+  /// \brief AL `Region`, a Windows Language lookup FlowField.
+  Text<kDisplayNameLength> Region;
+  /// \brief AL `License Type`, a User lookup FlowField with the shared license vocabulary.
+  Option<UserLicenseType> LicenseType;
+  /// \brief Internal customization-compilation state.
+  Option<platform::CustomizationStatus> CustomizationStatus;
+  /// \brief AL `Role`, an All Profile lookup FlowField.
+  Text<kRoleLength> Role;
+  /// \brief AL `Emit Version`.
+  ::agiru::Integer EmitVersion{};
 
   /// \brief AL `UserPersonalization.SystemId`.
   Guid SystemId;
@@ -125,6 +159,26 @@ public:
     static constexpr ::agiru::FieldNo TimeZone{30};
     /// \brief The AL field number of `User ID`.
     static constexpr ::agiru::FieldNo UserID{6};
+    /// \brief AL field number of `Full Name`.
+    static constexpr ::agiru::FieldNo FullName{7};
+    /// \brief AL field number of `Language Name`.
+    static constexpr ::agiru::FieldNo LanguageName{13};
+    /// \brief AL field number of `Debugger Break On Error`.
+    static constexpr ::agiru::FieldNo DebuggerBreakOnError{18};
+    /// \brief AL field number of `Debugger Break On Rec Changes`.
+    static constexpr ::agiru::FieldNo DebuggerBreakOnRecChanges{21};
+    /// \brief AL field number of `Debugger Skip System Triggers`.
+    static constexpr ::agiru::FieldNo DebuggerSkipSystemTriggers{24};
+    /// \brief AL field number of `Region`.
+    static constexpr ::agiru::FieldNo Region{28};
+    /// \brief AL field number of `License Type`.
+    static constexpr ::agiru::FieldNo LicenseType{31};
+    /// \brief AL field number of `Customization Status`.
+    static constexpr ::agiru::FieldNo CustomizationStatus{32};
+    /// \brief AL field number of `Role`.
+    static constexpr ::agiru::FieldNo Role{33};
+    /// \brief AL field number of `Emit Version`.
+    static constexpr ::agiru::FieldNo EmitVersion{34};
   };
 
   /// \brief The primary key.
@@ -139,44 +193,127 @@ public:
 using UserPersonalization = UserPersonalization_Table;
 
 /// \brief The field table of the system `User Personalization` table.
-inline constexpr std::array<FieldDef, 9> kUserPersonalizationFields{{
-    Declare<&UserPersonalization::UserSID>(UserPersonalization::Field_No::UserSID,
-                                           "User SID",
-                                           "User SID",
-                                           offsetof(UserPersonalization, UserSID)),
-    Declare<&UserPersonalization::UserID>(UserPersonalization::Field_No::UserID,
-                                          "User ID",
-                                          "User ID",
-                                          offsetof(UserPersonalization, UserID)),
-    Declare<&UserPersonalization::ProfileID>(UserPersonalization::Field_No::ProfileID,
-                                             "Profile ID",
-                                             "Profile ID",
-                                             offsetof(UserPersonalization, ProfileID)),
-    Declare<&UserPersonalization::AppID>(UserPersonalization::Field_No::AppID,
-                                         "App ID",
-                                         "App ID",
-                                         offsetof(UserPersonalization, AppID)),
-    Declare<&UserPersonalization::Scope>(UserPersonalization::Field_No::Scope,
-                                         "Scope",
-                                         "Scope",
-                                         offsetof(UserPersonalization, Scope)),
-    Declare<&UserPersonalization::LanguageID>(UserPersonalization::Field_No::LanguageID,
-                                              "Language ID",
-                                              "Language ID",
-                                              offsetof(UserPersonalization, LanguageID)),
-    Declare<&UserPersonalization::Company>(UserPersonalization::Field_No::Company,
-                                           "Company",
-                                           "Company",
-                                           offsetof(UserPersonalization, Company)),
-    Declare<&UserPersonalization::LocaleID>(UserPersonalization::Field_No::LocaleID,
-                                            "Locale ID",
-                                            "Locale ID",
-                                            offsetof(UserPersonalization, LocaleID)),
-    Declare<&UserPersonalization::TimeZone>(UserPersonalization::Field_No::TimeZone,
-                                            "Time Zone",
-                                            "Time Zone",
-                                            offsetof(UserPersonalization, TimeZone)),
-}};
+inline constexpr auto kUserPersonalizationFields =
+    WithSystemFields<UserPersonalization>(std::array<FieldDef, 19>{{
+        Declare<&UserPersonalization::UserSID>(
+            UserPersonalization::Field_No::UserSID,
+            "User SID",
+            "User SID",
+            offsetof(UserPersonalization, UserSID),
+            {.relationTable = "User", .relationField = "User Security ID"}),
+        Declare<&UserPersonalization::UserID>(
+            UserPersonalization::Field_No::UserID,
+            "User ID",
+            "User ID",
+            offsetof(UserPersonalization, UserID),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula =
+                 R"(Lookup(User."User Name" WHERE("User Security ID" = FIELD("User SID"))))"}),
+        Declare<&UserPersonalization::FullName>(
+            UserPersonalization::Field_No::FullName,
+            "Full Name",
+            "Full Name",
+            offsetof(UserPersonalization, FullName),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula = R"(Lookup(User."Full Name" WHERE("User Name" = FIELD("User ID"))))"}),
+        Declare<&UserPersonalization::ProfileID>(
+            UserPersonalization::Field_No::ProfileID,
+            "Profile ID",
+            "Profile ID",
+            offsetof(UserPersonalization, ProfileID),
+            {.relationTable = "All Profile", .relationField = "Profile ID"}),
+        Declare<&UserPersonalization::AppID>(UserPersonalization::Field_No::AppID,
+                                             "App ID",
+                                             "App ID",
+                                             offsetof(UserPersonalization, AppID)),
+        Declare<&UserPersonalization::Scope>(UserPersonalization::Field_No::Scope,
+                                             "Scope",
+                                             "Scope",
+                                             offsetof(UserPersonalization, Scope)),
+        Declare<&UserPersonalization::LanguageID>(UserPersonalization::Field_No::LanguageID,
+                                                  "Language ID",
+                                                  "Language ID",
+                                                  offsetof(UserPersonalization, LanguageID)),
+        Declare<&UserPersonalization::LanguageName>(
+            UserPersonalization::Field_No::LanguageName,
+            "Language Name",
+            "Language",
+            offsetof(UserPersonalization, LanguageName),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula =
+                 R"(Lookup("Windows Language".Name WHERE("Language ID" = FIELD("Language ID"))))"}),
+        Declare<&UserPersonalization::Company>(
+            UserPersonalization::Field_No::Company,
+            "Company",
+            "Company",
+            offsetof(UserPersonalization, Company),
+            {.relationTable = "Company", .relationField = "Name"}),
+        Declare<&UserPersonalization::DebuggerBreakOnError>(
+            UserPersonalization::Field_No::DebuggerBreakOnError,
+            "Debugger Break On Error",
+            "Debugger Break On Error",
+            offsetof(UserPersonalization, DebuggerBreakOnError),
+            {.initValue = "true",
+             .obsoleteState = "Removed",
+             .obsoleteReason = "Support for the classic debugger engine has been removed."}),
+        Declare<&UserPersonalization::DebuggerBreakOnRecChanges>(
+            UserPersonalization::Field_No::DebuggerBreakOnRecChanges,
+            "Debugger Break On Rec Changes",
+            "Debugger Break On Rec Changes",
+            offsetof(UserPersonalization, DebuggerBreakOnRecChanges),
+            {.obsoleteState = "Removed",
+             .obsoleteReason = "Support for the classic debugger engine has been removed."}),
+        Declare<&UserPersonalization::DebuggerSkipSystemTriggers>(
+            UserPersonalization::Field_No::DebuggerSkipSystemTriggers,
+            "Debugger Skip System Triggers",
+            "Debugger Skip System Triggers",
+            offsetof(UserPersonalization, DebuggerSkipSystemTriggers),
+            {.initValue = "true",
+             .obsoleteState = "Removed",
+             .obsoleteReason = "Support for the classic debugger engine has been removed."}),
+        Declare<&UserPersonalization::LocaleID>(UserPersonalization::Field_No::LocaleID,
+                                                "Locale ID",
+                                                "Locale ID",
+                                                offsetof(UserPersonalization, LocaleID)),
+        Declare<&UserPersonalization::Region>(
+            UserPersonalization::Field_No::Region,
+            "Region",
+            "Region",
+            offsetof(UserPersonalization, Region),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula =
+                 R"(Lookup("Windows Language".Name WHERE("Language ID" = FIELD("Locale ID"))))"}),
+        Declare<&UserPersonalization::TimeZone>(UserPersonalization::Field_No::TimeZone,
+                                                "Time Zone",
+                                                "Time Zone",
+                                                offsetof(UserPersonalization, TimeZone)),
+        Declare<&UserPersonalization::LicenseType>(
+            UserPersonalization::Field_No::LicenseType,
+            "License Type",
+            "License Type",
+            offsetof(UserPersonalization, LicenseType),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula =
+                 R"(Lookup(User."License Type" WHERE("User Security ID" = FIELD("User SID"))))"}),
+        Declare<&UserPersonalization::CustomizationStatus>(
+            UserPersonalization::Field_No::CustomizationStatus,
+            "Customization Status",
+            "Customization Status",
+            offsetof(UserPersonalization, CustomizationStatus),
+            {.access = "Internal"}),
+        Declare<&UserPersonalization::Role>(
+            UserPersonalization::Field_No::Role,
+            "Role",
+            "Role",
+            offsetof(UserPersonalization, Role),
+            {.fieldClass = ::agiru::FieldClass::FlowField,
+             .calcFormula = "Lookup(\"All Profile\".Caption WHERE(\"Profile ID\" = FIELD(\"Profile "
+                            "ID\"), Scope = FIELD(Scope), \"App ID\" = FIELD(\"App ID\")))"}),
+        Declare<&UserPersonalization::EmitVersion>(UserPersonalization::Field_No::EmitVersion,
+                                                   "Emit Version",
+                                                   "Emit Version",
+                                                   offsetof(UserPersonalization, EmitVersion)),
+    }});
 
 /// \brief The keys of the system `User Personalization` table.
 inline constexpr std::array<KeyDef, 3> kUserPersonalizationKeys{{
@@ -192,6 +329,8 @@ inline constexpr TableDef kUserPersonalizationTable{
     .caption = UserPersonalization::kName,
     .fields = kUserPersonalizationFields,
     .keys = kUserPersonalizationKeys,
+    .dataPerCompany = false,
+    .replicateData = false,
 };
 
 static_assert(FieldsAreSorted(kUserPersonalizationTable), "the field table is searched by number");

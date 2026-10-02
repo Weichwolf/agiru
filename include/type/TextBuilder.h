@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
@@ -100,10 +100,14 @@ public:
   /// \return The AL `Boolean`.
   ::agiru::Boolean Insert(::agiru::Integer Position, std::string_view Text);
 
-  /// \brief AL `TextBuilder.Length(Integer)`. Gets or sets the length of this TextBuilder instance.
+  /// \brief AL `TextBuilder.Length()`. Reads the length without modifying the text.
+  /// \return The current length.
+  [[nodiscard]] ::agiru::Integer Length() const;
+
+  /// \brief AL `TextBuilder.Length(Integer)`. Sets the length of this TextBuilder instance.
   /// \param NewLength The AL `Integer`.
   /// \return The AL `Integer`.
-  ::agiru::Integer Length(::agiru::Integer NewLength = {});
+  ::agiru::Integer Length(::agiru::Integer NewLength);
 
   /// \brief AL `TextBuilder.MaxCapacity()`. Gets the maximum capacity of this TextBuilder instance.
   /// \return The AL `Integer`.

@@ -1,8 +1,7 @@
-#include "type/File.h"
-
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Blob.h"
 #include "type/Date.h"
+#include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/Text.h"

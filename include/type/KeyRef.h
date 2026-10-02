@@ -1,7 +1,7 @@
 #pragma once
 
 #include "meta/TableDef.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Byte.h"
@@ -28,6 +28,10 @@ namespace agiru {
 class FieldRef;
 class RecordRef;
 
+namespace detail {
+struct RecordRefState;
+}
+
 /// \brief AL `KeyRef`.
 ///
 /// \note IT IS A KEY'S DECLARATION AND A RECORD, the same pair `FieldRef` is. `RecordRef.KeyIndex`
@@ -39,12 +43,22 @@ public:
   /// \brief A KeyRef pointing at nothing, which is what `var K: KeyRef` declares.
   KeyRef() = default;
 
-  /// \brief A KeyRef over one key of one record.
-  /// \param record The record.
-  /// \param table  Its declaration.
-  /// \param def    The key's declaration.
-  KeyRef(void *record, const TableDef &table, const KeyDef &def)
-      : record_(record), table_(&table), def_(&def) {}
+  /// \brief Shares another key reference's record.
+  /// \param other The source reference.
+  KeyRef(const KeyRef &other);
+  /// \brief Takes another key reference's record handle.
+  /// \param other The source reference.
+  KeyRef(KeyRef &&other) noexcept;
+  /// \brief Shares another key reference's record.
+  /// \param other The source reference.
+  /// \return This reference.
+  KeyRef &operator=(const KeyRef &other);
+  /// \brief Takes another key reference's record handle.
+  /// \param other The source reference.
+  /// \return This reference.
+  KeyRef &operator=(KeyRef &&other) noexcept;
+  /// \brief Releases this key reference's record handle.
+  ~KeyRef();
 
   /// \brief AL `KeyRef.Active()`. Indicates whether the key is enabled.
   /// \return The AL `Boolean`.
@@ -76,7 +90,10 @@ public:
   ::agiru::RecordRef Record() const;
 
 private:
-  void *record_ = nullptr;
+  friend class RecordRef;
+  KeyRef(detail::RecordRefState &state, const TableDef &table, const KeyDef &def);
+  void Release_() noexcept;
+  detail::RecordRefState *state_ = nullptr;
   const TableDef *table_ = nullptr;
   const KeyDef *def_ = nullptr;
 };

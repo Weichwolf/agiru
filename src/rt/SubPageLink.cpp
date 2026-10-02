@@ -1,6 +1,6 @@
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
@@ -74,7 +74,8 @@ std::string TableNumberNamed(std::string_view name) {
 std::string ConstText(std::string_view value) {
   const std::string_view trimmed = Trim(value);
   const std::size_t database = trimmed.find("::");
-  if (database != std::string_view::npos && SameName(Trim(trimmed.substr(0, database)), "Database")) {
+  if (database != std::string_view::npos &&
+      SameName(Trim(trimmed.substr(0, database)), "Database")) {
     return TableNumberNamed(trimmed.substr(database + 2));
   }
   return std::string(Unquoted(trimmed));
@@ -93,8 +94,8 @@ void ApplySubPageLink(void *sub,
     if (equals == std::string_view::npos) { continue; }
     const FieldDef *target = FieldNamed(subTable, clause.substr(0, equals));
     if (target == nullptr) {
-      throw Error("SubPageLink: `" + std::string(Trim(clause.substr(0, equals))) + "` is no field of " +
-                  std::string(subTable.name));
+      throw Error("SubPageLink: `" + std::string(Trim(clause.substr(0, equals))) +
+                  "` is no field of " + std::string(subTable.name));
     }
     const std::string_view rhs = Trim(clause.substr(equals + 1));
     const std::size_t open = rhs.find('(');

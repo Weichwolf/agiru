@@ -1,6 +1,6 @@
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 #include "platform/Company.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/TestRunner.h"

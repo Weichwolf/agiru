@@ -2,6 +2,7 @@
 
 #include "type/Boolean.h"
 #include "type/Integer.h"
+#include "type/Text.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -31,7 +32,7 @@ std::size_t Span(Integer count, std::size_t from, std::size_t length) {
 }
 
 ::agiru::Boolean TextBuilder::AppendLine() {
-  text_ += '\n';
+  text_ += "\r\n";
   return true;
 }
 
@@ -62,6 +63,10 @@ void TextBuilder::Clear() {
 ::agiru::Boolean TextBuilder::Insert(::agiru::Integer Position, std::string_view Text) {
   text_.insert(At(Position, text_.size()), Text);
   return true;
+}
+
+::agiru::Integer TextBuilder::Length() const {
+  return static_cast<Integer>(text_.size());
 }
 
 ::agiru::Integer TextBuilder::Length(::agiru::Integer NewLength) {

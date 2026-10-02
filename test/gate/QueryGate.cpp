@@ -1,6 +1,6 @@
 #include "meta/Ids.h"
 #include "meta/QueryDef.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Query.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
@@ -28,9 +28,9 @@ using agiru::QueryLink;
 using agiru::QueryMethod;
 using agiru::QueryOrder;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 using CodeValue = decltype(ResourceCost::Code);
 
@@ -99,48 +99,161 @@ public:
 };
 
 constexpr std::array<QueryLink, 1> kPairLinks{{
-    QueryLink{.field = ResourceCost::Field_No::Code, .dataItem = 0, .reference = ResourceCost::Field_No::Code},
+    QueryLink{.field = ResourceCost::Field_No::Code,
+              .dataItem = 0,
+              .reference = ResourceCost::Field_No::Code},
 }};
 
 constexpr std::array<QueryDataItem, 2> kPairItems{{
-    QueryDataItem{.name = "Upper", .table = &agiru::TableTraits<ResourceCost>::kTable, .join = QueryJoin::LeftOuter, .links = {}, .tableFilter = ""},
-    QueryDataItem{.name = "Lower", .table = &agiru::TableTraits<ResourceCost>::kTable, .join = QueryJoin::LeftOuter, .links = kPairLinks, .tableFilter = "Code = const(R01)"},
+    QueryDataItem{.name = "Upper",
+                  .table = &agiru::TableTraits<ResourceCost>::kTable,
+                  .join = QueryJoin::LeftOuter,
+                  .links = {},
+                  .tableFilter = ""},
+    QueryDataItem{.name = "Lower",
+                  .table = &agiru::TableTraits<ResourceCost>::kTable,
+                  .join = QueryJoin::LeftOuter,
+                  .links = kPairLinks,
+                  .tableFilter = "Code = const(R01)"},
 }};
 
 constexpr std::array<QueryColumn, 4> kPairColumns{{
-    QueryColumn{.name = "Type", .caption = "Type", .offset = offsetof(Pairs_Query, Type), .dataItem = 0, .field = ResourceCost::Field_No::Type, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Code", .caption = "Code", .offset = offsetof(Pairs_Query, Code), .dataItem = 0, .field = ResourceCost::Field_No::Code, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Matched_Code", .caption = "Matched Code", .offset = offsetof(Pairs_Query, Matched_Code), .dataItem = 1, .field = ResourceCost::Field_No::Code, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Matched_Cost", .caption = "Matched Cost", .offset = offsetof(Pairs_Query, Matched_Cost), .dataItem = 1, .field = ResourceCost::Field_No::DirectUnitCost, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
+    QueryColumn{.name = "Type",
+                .caption = "Type",
+                .offset = offsetof(Pairs_Query, Type),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::Type,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Code",
+                .caption = "Code",
+                .offset = offsetof(Pairs_Query, Code),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::Code,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Matched_Code",
+                .caption = "Matched Code",
+                .offset = offsetof(Pairs_Query, Matched_Code),
+                .dataItem = 1,
+                .field = ResourceCost::Field_No::Code,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Matched_Cost",
+                .caption = "Matched Cost",
+                .offset = offsetof(Pairs_Query, Matched_Cost),
+                .dataItem = 1,
+                .field = ResourceCost::Field_No::DirectUnitCost,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
 }};
 
 constexpr std::array<QueryOrder, 1> kPairOrder{{QueryOrder{.column = "Code", .descending = false}}};
 
 constexpr std::array<QueryDataItem, 2> kInnerItems{{
-    QueryDataItem{.name = "Upper", .table = &agiru::TableTraits<ResourceCost>::kTable, .join = QueryJoin::LeftOuter, .links = {}, .tableFilter = ""},
-    QueryDataItem{.name = "Lower", .table = &agiru::TableTraits<ResourceCost>::kTable, .join = QueryJoin::Inner, .links = kPairLinks, .tableFilter = "Code = const(R01)"},
+    QueryDataItem{.name = "Upper",
+                  .table = &agiru::TableTraits<ResourceCost>::kTable,
+                  .join = QueryJoin::LeftOuter,
+                  .links = {},
+                  .tableFilter = ""},
+    QueryDataItem{.name = "Lower",
+                  .table = &agiru::TableTraits<ResourceCost>::kTable,
+                  .join = QueryJoin::Inner,
+                  .links = kPairLinks,
+                  .tableFilter = "Code = const(R01)"},
 }};
 
 constexpr std::array<QueryColumn, 2> kInnerColumns{{
-    QueryColumn{.name = "Code", .caption = "Code", .offset = offsetof(InnerPairs_Query, Code), .dataItem = 0, .field = ResourceCost::Field_No::Code, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Matched_Code", .caption = "Matched Code", .offset = offsetof(InnerPairs_Query, Matched_Code), .dataItem = 1, .field = ResourceCost::Field_No::Code, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
+    QueryColumn{.name = "Code",
+                .caption = "Code",
+                .offset = offsetof(InnerPairs_Query, Code),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::Code,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Matched_Code",
+                .caption = "Matched Code",
+                .offset = offsetof(InnerPairs_Query, Matched_Code),
+                .dataItem = 1,
+                .field = ResourceCost::Field_No::Code,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
 }};
 
 constexpr std::array<QueryDataItem, 1> kTotalItems{{
-    QueryDataItem{.name = "Cost", .table = &agiru::TableTraits<ResourceCost>::kTable, .join = QueryJoin::LeftOuter, .links = {}, .tableFilter = ""},
+    QueryDataItem{.name = "Cost",
+                  .table = &agiru::TableTraits<ResourceCost>::kTable,
+                  .join = QueryJoin::LeftOuter,
+                  .links = {},
+                  .tableFilter = ""},
 }};
 
 constexpr std::array<QueryColumn, 3> kTotalColumns{{
-    QueryColumn{.name = "Type", .caption = "Type", .offset = offsetof(Totals_Query, Type), .dataItem = 0, .field = ResourceCost::Field_No::Type, .method = QueryMethod::None, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Sum_Cost", .caption = "Sum Cost", .offset = offsetof(Totals_Query, Sum_Cost), .dataItem = 0, .field = ResourceCost::Field_No::DirectUnitCost, .method = QueryMethod::Sum, .returned = true, .reverseSign = false, .columnFilter = ""},
-    QueryColumn{.name = "Rows", .caption = "Rows", .offset = offsetof(Totals_Query, Rows), .dataItem = 0, .field = ResourceCost::Field_No::Code, .method = QueryMethod::Count, .returned = true, .reverseSign = false, .columnFilter = ""},
+    QueryColumn{.name = "Type",
+                .caption = "Type",
+                .offset = offsetof(Totals_Query, Type),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::Type,
+                .method = QueryMethod::None,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Sum_Cost",
+                .caption = "Sum Cost",
+                .offset = offsetof(Totals_Query, Sum_Cost),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::DirectUnitCost,
+                .method = QueryMethod::Sum,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
+    QueryColumn{.name = "Rows",
+                .caption = "Rows",
+                .offset = offsetof(Totals_Query, Rows),
+                .dataItem = 0,
+                .field = ResourceCost::Field_No::Code,
+                .method = QueryMethod::Count,
+                .returned = true,
+                .reverseSign = false,
+                .columnFilter = ""},
 }};
 
-constexpr std::array<QueryOrder, 1> kTotalOrder{{QueryOrder{.column = "Type", .descending = false}}};
+constexpr std::array<QueryOrder, 1> kTotalOrder{
+    {QueryOrder{.column = "Type", .descending = false}}};
 
-constexpr QueryDef kPairsQuery{.id = Pairs_Query::kId, .name = Pairs_Query::kName, .caption = "Pairs", .dataItems = kPairItems, .columns = kPairColumns, .orderBy = kPairOrder, .topNumberOfRows = 0};
-constexpr QueryDef kInnerPairsQuery{.id = InnerPairs_Query::kId, .name = InnerPairs_Query::kName, .caption = "Inner Pairs", .dataItems = kInnerItems, .columns = kInnerColumns, .orderBy = {}, .topNumberOfRows = 0};
-constexpr QueryDef kTotalsQuery{.id = Totals_Query::kId, .name = Totals_Query::kName, .caption = "Totals", .dataItems = kTotalItems, .columns = kTotalColumns, .orderBy = kTotalOrder, .topNumberOfRows = 0};
+constexpr QueryDef kPairsQuery{.id = Pairs_Query::kId,
+                               .name = Pairs_Query::kName,
+                               .caption = "Pairs",
+                               .dataItems = kPairItems,
+                               .columns = kPairColumns,
+                               .orderBy = kPairOrder,
+                               .topNumberOfRows = 0};
+constexpr QueryDef kInnerPairsQuery{.id = InnerPairs_Query::kId,
+                                    .name = InnerPairs_Query::kName,
+                                    .caption = "Inner Pairs",
+                                    .dataItems = kInnerItems,
+                                    .columns = kInnerColumns,
+                                    .orderBy = {},
+                                    .topNumberOfRows = 0};
+constexpr QueryDef kTotalsQuery{.id = Totals_Query::kId,
+                                .name = Totals_Query::kName,
+                                .caption = "Totals",
+                                .dataItems = kTotalItems,
+                                .columns = kTotalColumns,
+                                .orderBy = kTotalOrder,
+                                .topNumberOfRows = 0};
 
 } // namespace
 

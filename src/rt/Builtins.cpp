@@ -1,6 +1,6 @@
 #include "Builtins.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "type/AuditCategory.h"
 #include "type/BigInteger.h"

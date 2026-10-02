@@ -1,8 +1,7 @@
-#include "runtime/Page.h"
-
 #include "meta/PageDef.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
+#include "runtime/Page.h"
 #include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/RecordState.h"
@@ -90,9 +89,12 @@ std::string CaptionOfRecord(const void *record, const TableDef &table) {
   return caption;
 }
 
-std::string CaptionOfRelated(const TableDef &target, const FieldDef *column, std::string_view value) {
-  const std::span<const FieldNo> key = target.keys.empty() ? std::span<const FieldNo>{} : target.keys[0].fields;
-  const FieldDef *keyField = column != nullptr ? column : (key.size() == 1 ? Field(target, key[0]) : nullptr);
+std::string
+CaptionOfRelated(const TableDef &target, const FieldDef *column, std::string_view value) {
+  const std::span<const FieldNo> key =
+      target.keys.empty() ? std::span<const FieldNo>{} : target.keys[0].fields;
+  const FieldDef *keyField =
+      column != nullptr ? column : (key.size() == 1 ? Field(target, key[0]) : nullptr);
   if (keyField == nullptr) { return std::string(value); }
   RecordRef related;
   related.Open(static_cast<Integer>(target.id.Value()));
@@ -120,7 +122,8 @@ std::string CaptionOfFilters(const void *record, const TableDef &table, std::str
       Append(caption, *single);
       continue;
     }
-    const FieldDef *column = resolved->field.empty() ? nullptr : FieldNamed(*entry->table, resolved->field);
+    const FieldDef *column =
+        resolved->field.empty() ? nullptr : FieldNamed(*entry->table, resolved->field);
     Append(caption, CaptionOfRelated(*entry->table, column, *single));
   }
   return caption;
@@ -128,7 +131,9 @@ std::string CaptionOfFilters(const void *record, const TableDef &table, std::str
 
 }
 
-void CalcShownFlowFields(void *record, const TableDef &table, std::span<const ControlDef> controls) {
+void CalcShownFlowFields(void *record,
+                         const TableDef &table,
+                         std::span<const ControlDef> controls) {
   const RecordState *state = reinterpret_cast<const StateHandle *>(record)->Peek();
   for (const ControlDef &control : controls) {
     if (control.kind == ControlKind::Field && control.field.Value() != 0) {
@@ -138,10 +143,8 @@ void CalcShownFlowFields(void *record, const TableDef &table, std::span<const Co
   }
 }
 
-std::string PageDataCaption(const void *record,
-                            const TableDef &table,
-                            PageType type,
-                            std::string_view fields) {
+std::string
+PageDataCaption(const void *record, const TableDef &table, PageType type, std::string_view fields) {
   if (EntityOriented(type)) { return CaptionOfRecord(record, table); }
   return CaptionOfFilters(record, table, fields);
 }

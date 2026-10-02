@@ -14,14 +14,16 @@ constexpr auto kWorkTypeFields = WithSystemFields<WorkType>(std::array<FieldDef,
                              "Code",
                              offsetof(WorkType, Code),
                              Declared{.notBlank = true}),
-    Declare<&WorkType::Description>(
-        WorkType::Field_No::Description, "Description", "Description", offsetof(WorkType, Description)),
-    Declare<&WorkType::UnitOfMeasureCode>(WorkType::Field_No::UnitOfMeasureCode,
-                                          "Unit of Measure Code",
-                                          "Unit of Measure Code",
-                                          offsetof(WorkType, UnitOfMeasureCode),
-                                          Declared{.relationTable = "Unit of Measure",
-                                                   .relation = "Unit of Measure"}),
+    Declare<&WorkType::Description>(WorkType::Field_No::Description,
+                                    "Description",
+                                    "Description",
+                                    offsetof(WorkType, Description)),
+    Declare<&WorkType::UnitOfMeasureCode>(
+        WorkType::Field_No::UnitOfMeasureCode,
+        "Unit of Measure Code",
+        "Unit of Measure Code",
+        offsetof(WorkType, UnitOfMeasureCode),
+        Declared{.relationTable = "Unit of Measure", .relation = "Unit of Measure"}),
 }});
 
 constexpr std::array<KeyDef, 1> kWorkTypeKeys{{

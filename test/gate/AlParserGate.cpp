@@ -15,11 +15,11 @@
 
 using agiru::al::Find;
 using agiru::al::ListValue;
+using agiru::al::PageControl;
 using agiru::al::PageObject;
 using agiru::al::ParseReport;
-using agiru::al::ParseXmlPort;
-using agiru::al::PageControl;
 using agiru::al::ParseTable;
+using agiru::al::ParseXmlPort;
 using agiru::al::ProcedureDecl;
 using agiru::al::TableObject;
 using agiru::al::Token;
@@ -433,13 +433,15 @@ xmlport 50001 "Export Some Lines"
   CHECK_TRUE("the object is an xmlport", port.xmlport && !port.report);
   CHECK_TRUE("xmlport 50001", port.id == 50001);
   CHECK_TEXT("with its name", port.name, "Export Some Lines");
-  CHECK_TRUE("one root element", port.dataset.size() == 1 && port.dataset.front().kind == "textelement");
+  CHECK_TRUE("one root element",
+             port.dataset.size() == 1 && port.dataset.front().kind == "textelement");
   const PageControl &table = port.dataset.front().children.front();
   CHECK_TEXT("the table element by its AL name", table.name, "Some Line");
   CHECK_TRUE("with three children in order",
              table.children.size() == 3 && table.children[0].kind == "fieldelement" &&
                  table.children[2].kind == "textelement");
-  CHECK_TRUE("a field element's trigger", Find(table.children[1].triggers, "OnBeforePassField") != nullptr);
+  CHECK_TRUE("a field element's trigger",
+             Find(table.children[1].triggers, "OnBeforePassField") != nullptr);
   const ProcedureDecl *pass = Find(table.children[2].triggers, "OnBeforePassVariable");
   bool currPage = false;
   if (pass != nullptr) {
@@ -448,11 +450,13 @@ xmlport 50001 "Export Some Lines"
     }
   }
   CHECK_TRUE("currXMLport is spelled CurrPage", pass != nullptr && currPage);
-  CHECK_TRUE("the table element's OnAfterGetRecord", Find(table.triggers, "OnAfterGetRecord") != nullptr);
+  CHECK_TRUE("the table element's OnAfterGetRecord",
+             Find(table.triggers, "OnAfterGetRecord") != nullptr);
   CHECK_TRUE("the port's OnPreXmlPort", Find(port.procedures, "OnPreXmlPort") != nullptr);
   CHECK_TRUE("one global", port.variables.size() == 1);
   CHECK_TRUE("the properties are kept",
-             Find(port.properties, "Format") != nullptr && Find(port.properties, "FieldSeparator") != nullptr);
+             Find(port.properties, "Format") != nullptr &&
+                 Find(port.properties, "FieldSeparator") != nullptr);
 }
 
 void TheLexerReadsWhatBaseAppActuallyContains() {

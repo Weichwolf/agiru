@@ -20,7 +20,8 @@ namespace agiru {
 ///       the caller (board:0193).
 class CommitScope {
 public:
-  /// \brief Pushes the behaviour for as long as this object lives.
+  /// \brief Pushes the behaviour for as long as this object lives, without weakening an outer
+  /// Error.
   /// \param behaviour What a `Commit` inside the scope does.
   explicit CommitScope(::agiru::CommitBehavior behaviour);
 
@@ -32,7 +33,7 @@ public:
   /// \brief Pops it again, on the way out of the method either way.
   ~CommitScope();
 
-  /// \brief What the innermost scope says a `Commit` does.
+  /// \brief The effective restriction on explicit Commit; Error dominates nested Ignore.
   /// \return The behaviour, or nothing when no scope is standing and a `Commit` commits.
   [[nodiscard]] static std::optional<::agiru::CommitBehavior> Standing();
 };

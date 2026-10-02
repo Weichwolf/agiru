@@ -1,7 +1,7 @@
 #include "dotnet/Regex.h"
 
 #include "dotnet/TimeSpan.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
@@ -61,9 +61,7 @@ Translated WithoutNamedGroups(std::string_view pattern) {
       out.pattern += c;
       continue;
     }
-    if (c == '(') {
-      out.names.emplace_back(std::to_string(out.names.size()));
-    }
+    if (c == '(') { out.names.emplace_back(std::to_string(out.names.size())); }
     out.pattern += c;
   }
   return out;
@@ -71,7 +69,8 @@ Translated WithoutNamedGroups(std::string_view pattern) {
 
 std::regex::flag_type FlagsOf(const RegexOptions &options) {
   if ((options.Flags() & RegexOptions::kIgnorePatternWhitespace) != 0) {
-    throw Error("Regex: the IgnorePatternWhitespace option is not one this runtime reads a pattern with");
+    throw Error(
+        "Regex: the IgnorePatternWhitespace option is not one this runtime reads a pattern with");
   }
   std::regex::flag_type flags = std::regex::ECMAScript;
   if ((options.Flags() & RegexOptions::kIgnoreCase) != 0) { flags |= std::regex::icase; }
@@ -83,10 +82,11 @@ Match MatchOf(const std::smatch &found, std::size_t offset, const std::vector<st
   std::vector<Group> groups;
   for (std::size_t g = 0; g < found.size(); ++g) {
     const std::string name = g < names.size() ? names[g] : std::to_string(g);
-    groups.emplace_back(static_cast<Integer>(found.position(g) + static_cast<std::ptrdiff_t>(offset)),
-                        found[g].str(),
-                        found[g].matched,
-                        name);
+    groups.emplace_back(
+        static_cast<Integer>(found.position(g) + static_cast<std::ptrdiff_t>(offset)),
+        found[g].str(),
+        found[g].matched,
+        name);
   }
   return Match(static_cast<Integer>(found.position(0) + static_cast<std::ptrdiff_t>(offset)),
                found[0].str(),
@@ -202,7 +202,9 @@ GroupCollection Match::Groups() const {
     }
     if (next >= '0' && next <= '9') {
       std::size_t end = i + 1;
-      while (end < replacement.size() && replacement[end] >= '0' && replacement[end] <= '9') { ++end; }
+      while (end < replacement.size() && replacement[end] >= '0' && replacement[end] <= '9') {
+        ++end;
+      }
       const std::size_t number = std::stoul(std::string(replacement.substr(i + 1, end - i - 1)));
       if (number < groups_.size()) { out += std::string(groups_[number].Value().Value()); }
       i = end - 1;
@@ -260,8 +262,8 @@ class Regex Regex::Binder::operator()(std::string_view pattern,
   try {
     out.compiled_ = std::make_shared<const std::regex>(translated.pattern, FlagsOf(options));
   } catch (const std::regex_error &e) {
-    throw Error("Regex: the pattern '" + std::string(pattern) + "' is not one this runtime reads: " +
-                e.what());
+    throw Error("Regex: the pattern '" + std::string(pattern) +
+                "' is not one this runtime reads: " + e.what());
   }
   out.pattern_ = std::string(pattern);
   out.groupNames_ = std::move(translated.names);
@@ -276,7 +278,8 @@ Boolean Regex::IsMatch(std::string_view input) const {
 
 Boolean Regex::IsMatch(std::string_view input, Integer startAt) const {
   if (compiled_ == nullptr) { throw Error("Regex: no pattern was given yet"); }
-  const std::size_t from = startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
+  const std::size_t from =
+      startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
   const std::string rest(input.substr(from));
   return std::regex_search(rest, *compiled_);
 }
@@ -292,7 +295,8 @@ MatchCollection Regex::Matches(std::string_view input) const {
 
 MatchCollection Regex::Matches(std::string_view input, Integer startAt) const {
   if (compiled_ == nullptr) { throw Error("Regex: no pattern was given yet"); }
-  const std::size_t from = startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
+  const std::size_t from =
+      startAt < 0 ? 0 : std::min(static_cast<std::size_t>(startAt), input.size());
   const std::string rest(input.substr(from));
   std::vector<dotnet::Match> found;
   for (auto it = std::sregex_iterator(rest.begin(), rest.end(), *compiled_);
@@ -395,12 +399,16 @@ Array Regex::GetGroupNames() const {
 
 Array Regex::GetGroupNumbers() const {
   Array out;
-  for (std::size_t i = 0; i < groupNames_.size(); ++i) { out.Add(Variant(static_cast<Integer>(i))); }
+  for (std::size_t i = 0; i < groupNames_.size(); ++i) {
+    out.Add(Variant(static_cast<Integer>(i)));
+  }
   return out;
 }
 
 ::agiru::Text<0> Regex::GroupNameFromNumber(Integer number) const {
-  if (number < 0 || static_cast<std::size_t>(number) >= groupNames_.size()) { return ::agiru::Text<0>{}; }
+  if (number < 0 || static_cast<std::size_t>(number) >= groupNames_.size()) {
+    return ::agiru::Text<0>{};
+  }
   return ::agiru::Text<0>{groupNames_[static_cast<std::size_t>(number)]};
 }
 
@@ -427,9 +435,7 @@ Integer Regex::GetHashCode() const {
 ::agiru::Text<0> Regex::Unescape(std::string_view text) {
   std::string out;
   for (std::size_t i = 0; i < text.size(); ++i) {
-    if (text[i] == '\\' && i + 1 < text.size()) {
-      ++i;
-    }
+    if (text[i] == '\\' && i + 1 < text.size()) { ++i; }
     out += text[i];
   }
   return ::agiru::Text<0>{out};

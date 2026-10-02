@@ -1,7 +1,7 @@
 #include "dotnet/StreamReader.h"
 
 #include "dotnet/Encoding.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/Text.h"

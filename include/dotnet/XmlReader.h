@@ -9,8 +9,8 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <utility>
 #include <string_view>
+#include <utility>
 
 namespace agiru::dotnet {
 
@@ -31,18 +31,35 @@ public:
   /// \brief The number. \return It.
   [[nodiscard]] std::int32_t Number() const { return number_; }
 
-  [[nodiscard]] static XmlNodeType None() { return XmlNodeType{0}; }                    ///< `None`.
-  [[nodiscard]] static XmlNodeType Element() { return XmlNodeType{1}; }                 ///< `Element`.
-  [[nodiscard]] static XmlNodeType Attribute() { return XmlNodeType{2}; }               ///< `Attribute`.
-  [[nodiscard]] static XmlNodeType Text() { return XmlNodeType{3}; }                    ///< `Text`.
-  [[nodiscard]] static XmlNodeType CDATA() { return XmlNodeType{4}; }                   ///< `CDATA`.
-  [[nodiscard]] static XmlNodeType ProcessingInstruction() { return XmlNodeType{7}; }   ///< `ProcessingInstruction`.
-  [[nodiscard]] static XmlNodeType Comment() { return XmlNodeType{8}; }                 ///< `Comment`.
-  [[nodiscard]] static XmlNodeType Document() { return XmlNodeType{9}; }                ///< `Document`.
-  [[nodiscard]] static XmlNodeType Whitespace() { return XmlNodeType{13}; }             ///< `Whitespace`.
-  [[nodiscard]] static XmlNodeType SignificantWhitespace() { return XmlNodeType{14}; }  ///< `SignificantWhitespace`.
-  [[nodiscard]] static XmlNodeType EndElement() { return XmlNodeType{15}; }             ///< `EndElement`.
-  [[nodiscard]] static XmlNodeType XmlDeclaration() { return XmlNodeType{17}; }         ///< `XmlDeclaration`.
+  [[nodiscard]] static XmlNodeType None() { return XmlNodeType{0}; } ///< `None`.
+
+  [[nodiscard]] static XmlNodeType Element() { return XmlNodeType{1}; } ///< `Element`.
+
+  [[nodiscard]] static XmlNodeType Attribute() { return XmlNodeType{2}; } ///< `Attribute`.
+
+  [[nodiscard]] static XmlNodeType Text() { return XmlNodeType{3}; } ///< `Text`.
+
+  [[nodiscard]] static XmlNodeType CDATA() { return XmlNodeType{4}; } ///< `CDATA`.
+
+  [[nodiscard]] static XmlNodeType ProcessingInstruction() {
+    return XmlNodeType{7};
+  } ///< `ProcessingInstruction`.
+
+  [[nodiscard]] static XmlNodeType Comment() { return XmlNodeType{8}; } ///< `Comment`.
+
+  [[nodiscard]] static XmlNodeType Document() { return XmlNodeType{9}; } ///< `Document`.
+
+  [[nodiscard]] static XmlNodeType Whitespace() { return XmlNodeType{13}; } ///< `Whitespace`.
+
+  [[nodiscard]] static XmlNodeType SignificantWhitespace() {
+    return XmlNodeType{14};
+  } ///< `SignificantWhitespace`.
+
+  [[nodiscard]] static XmlNodeType EndElement() { return XmlNodeType{15}; } ///< `EndElement`.
+
+  [[nodiscard]] static XmlNodeType XmlDeclaration() {
+    return XmlNodeType{17};
+  } ///< `XmlDeclaration`.
 
 private:
   std::int32_t number_ = 0;
@@ -56,27 +73,35 @@ public:
   DtdProcessing() = default;
 
   [[nodiscard]] static DtdProcessing Prohibit() { return DtdProcessing{0}; } ///< `Prohibit`.
-  [[nodiscard]] static DtdProcessing Ignore() { return DtdProcessing{1}; }   ///< `Ignore`.
-  [[nodiscard]] static DtdProcessing Parse() { return DtdProcessing{2}; }    ///< `Parse`.
+
+  [[nodiscard]] static DtdProcessing Ignore() { return DtdProcessing{1}; } ///< `Ignore`.
+
+  [[nodiscard]] static DtdProcessing Parse() { return DtdProcessing{2}; } ///< `Parse`.
 
   /// \brief The number. \return It.
   [[nodiscard]] std::int32_t Number() const { return number_; }
 
   /// \brief The value by its number, as AL spells `DtdProcessing := 2`. \param number The value.
   /// \return The value.
-  [[nodiscard]] static DtdProcessing FromNumber(std::int32_t number) { return DtdProcessing{number}; }
+  [[nodiscard]] static DtdProcessing FromNumber(std::int32_t number) {
+    return DtdProcessing{number};
+  }
 
 private:
   explicit DtdProcessing(std::int32_t number) : number_(number) {}
+
   std::int32_t number_ = 0;
 };
 
 /// \brief .NET `NetworkCredential` / `CredentialCache`: the BaseApp hands the default network
-///        credentials to a URL resolver, and this reader resolves no URL, so they are carried empty.
+///        credentials to a URL resolver, and this reader resolves no URL, so they are carried
+///        empty.
 class NetCredentialCache {
 public:
   /// \brief `CredentialCache.DefaultNetworkCredentials`. \return An empty credential.
-  [[nodiscard]] static NetCredentialCache DefaultNetworkCredentials() { return NetCredentialCache{}; }
+  [[nodiscard]] static NetCredentialCache DefaultNetworkCredentials() {
+    return NetCredentialCache{};
+  }
 };
 
 /// \brief .NET `XmlUrlResolver`, carried and never asked: no external entity is fetched here.
@@ -176,7 +201,9 @@ public:
 
   /// \brief `XmlReader.Create(reader)` with the default settings. \param reader The text.
   /// \return The reader.
-  static XmlReader Create(const StringReader &reader) { return Create(reader, XmlReaderSettings{}); }
+  static XmlReader Create(const StringReader &reader) {
+    return Create(reader, XmlReaderSettings{});
+  }
 
   /// \brief `XmlReader.Create(stream, settings)`. \param stream The stream, read whole.
   ///        \param settings The settings. \return A reader over the stream's bytes.

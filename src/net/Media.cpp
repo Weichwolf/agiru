@@ -1,6 +1,6 @@
 #include "type/Media.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Guid.h"
 #include "type/Integer.h"

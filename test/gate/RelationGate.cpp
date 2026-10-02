@@ -10,8 +10,8 @@
 #include <string>
 #include <vector>
 
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 
@@ -21,22 +21,24 @@ namespace {
 /// (`devenv-set-relationships-between-tables.md`), and which table the code relates to is a
 /// question about THIS record's `Type` (board:0658; 736 conditional declarations in the BaseApp).
 void AConditionalRelationFollowsTheRecordsType() {
-  const agiru::FieldDef *code =
-      agiru::Field(agiru::app::tables::kResourceCostTable, ResourceCost::Field_No::Code);
+  const agiru::FieldDef *code = agiru::Field(
+      agiru::Projects::Resources::Pricing::kResourceCostTable, ResourceCost::Field_No::Code);
   CHECK_TRUE("the target image carries the whole declaration",
              code != nullptr && !code->relation.empty());
   ResourceCost rec;
   rec.Type = ResourceCostType::Resource;
-  std::optional<agiru::detail::ResolvedRelation> found =
-      agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, *code);
+  std::optional<agiru::detail::ResolvedRelation> found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, *code);
   CHECK_TRUE("a resource relates to Resource", found.has_value() && found->table == "Resource");
   CHECK_TEXT("by its primary key", found.has_value() ? found->field : std::string("?"), "");
   rec.Type = ResourceCostType::GroupResource;
-  found = agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, *code);
+  found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, *code);
   CHECK_TRUE("a group relates to Resource Group",
              found.has_value() && found->table == "Resource Group");
   rec.Type = ResourceCostType::All;
-  found = agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, *code);
+  found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, *code);
   CHECK_TRUE("and All matches no branch, so no relation", !found.has_value());
 }
 
@@ -50,8 +52,8 @@ void AWhereClauseReadsTheRecordsFields() {
       .name = "Unit of Measure Code",
       .relation = "\"Item Unit of Measure\".Code where(\"Item No.\" = field(Code), "
                   "Type = const(Inventory), \"Qty. per Unit of Measure\" = filter(<>0))"};
-  const std::optional<agiru::detail::ResolvedRelation> found =
-      agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, declared);
+  const std::optional<agiru::detail::ResolvedRelation> found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, declared);
   CHECK_TRUE("the table and its field are read",
              found.has_value() && found->table == "Item Unit of Measure" && found->field == "Code");
   CHECK_TRUE("three terms", found.has_value() && found->filters.size() == 3);
@@ -66,8 +68,8 @@ void AWhereClauseReadsTheRecordsFields() {
     CHECK_TEXT("filter(<>0) is the filter text as written", found->filters[2].text, "<>0");
   }
   const agiru::FieldDef simple{.name = "Work Type Code", .relationTable = "Work Type"};
-  const std::optional<agiru::detail::ResolvedRelation> bare =
-      agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, simple);
+  const std::optional<agiru::detail::ResolvedRelation> bare = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, simple);
   CHECK_TRUE("the simple form still answers through its two fields",
              bare.has_value() && bare->table == "Work Type" && bare->filters.empty());
 }
@@ -83,15 +85,16 @@ void TheSpacedDotSeparatesTableAndField() {
   ResourceCost rec;
   rec.Type = ResourceCostType::Resource;
   const agiru::FieldDef posted{.name = "Document No.", .relation = "Purch. Cr. Memo Hdr."};
-  std::optional<agiru::detail::ResolvedRelation> found =
-      agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, posted);
+  std::optional<agiru::detail::ResolvedRelation> found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, posted);
   CHECK_TRUE("a table name with dots is one name",
              found.has_value() && found->table == "Purch. Cr. Memo Hdr." && found->field.empty());
 
   const agiru::FieldDef linked{.name = "Document No.",
                                .relation =
                                    "Sales Header . No. where ( Document Type = const ( Order ) )"};
-  found = agiru::detail::ResolveRelation(&rec, agiru::app::tables::kResourceCostTable, linked);
+  found = agiru::detail::ResolveRelation(
+      &rec, agiru::Projects::Resources::Pricing::kResourceCostTable, linked);
   CHECK_TRUE("the spaced dot splits table and field",
              found.has_value() && found->table == "Sales Header" && found->field == "No.");
   CHECK_TRUE("and the where term is read",

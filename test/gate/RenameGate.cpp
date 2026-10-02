@@ -1,4 +1,4 @@
-#include "runtime/Error.h"
+#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
@@ -15,9 +15,9 @@ using agiru::CreateTable;
 using agiru::Decimal;
 using agiru::DropTable;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 using agiru::app::tables::WorkType;
 
 namespace {
@@ -55,8 +55,8 @@ std::string WorkTypeOf(const char *code) {
   return std::string(cost.WorkTypeCode.Value());
 }
 
-/// A RENAME FOLLOWS EVERY RELATION TO THE KEY. `record-rename-method.md`: "renaming a record changes
-/// the primary key and updates the primary key value in all related tables";
+/// A RENAME FOLLOWS EVERY RELATION TO THE KEY. `record-rename-method.md`: "renaming a record
+/// changes the primary key and updates the primary key value in all related tables";
 /// `devenv-set-relationships-between-tables.md`: "if you change one of the currency codes in the
 /// Currency Code table, then the change is automatically propagated to all tables that refer to
 /// this code." `Resource Cost."Work Type Code"` relates to `Work Type`, so renaming the work type
@@ -101,6 +101,23 @@ void AFilteredRecordRenamesTheSame() {
   CHECK_TEXT("the referring row follows", WorkTypeOf("R1"), "B");
 }
 
+void ARecordRefRenamesTheSameRowAndRelatedRows() {
+  Fresh();
+  WorkTypeNamed("HOURS");
+  CostFor("R1", "HOURS");
+
+  WorkType type;
+  CHECK_TRUE("RecordRef source row exists", type.Get(agiru::Code<10>("HOURS")));
+  agiru::RecordRef reference;
+  reference.GetTable(type);
+  CHECK_TRUE("RecordRef.Rename reports success",
+             reference.Rename(agiru::Variant(agiru::Code<10>("H"))));
+  CHECK_TEXT("RecordRef.Rename changes the selected key", reference.Field(1).ToText(), "H");
+  CHECK_TEXT("RecordRef.Rename cascades to related rows", WorkTypeOf("R1"), "H");
+  WorkType old;
+  CHECK_TRUE("RecordRef.Rename removes the old key", !old.Get(agiru::Code<10>("HOURS")));
+}
+
 } // namespace
 
 int main() {
@@ -108,5 +125,6 @@ int main() {
     const Session session(AGIRU_TEST_DSN);
     ARenameCarriesTheRowsThatReferToTheKey();
     AFilteredRecordRenamesTheSame();
+    ARecordRefRenamesTheSameRowAndRelatedRows();
   });
 }

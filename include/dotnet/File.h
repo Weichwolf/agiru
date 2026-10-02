@@ -1,8 +1,8 @@
 #pragma once
 
 #include "dotnet/Refused.h"
-#include "type/Boolean.h"
 #include "dotnet/Regex.h"
+#include "type/Boolean.h"
 #include "type/Stream.h"
 #include "type/Text.h"
 

@@ -1,8 +1,9 @@
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "type/Decimal.h"
 
+#include "BodyWriter.h"
 #include "Check.h"
 #include "EnumWriter.h"
 #include "Parser.h"
@@ -16,16 +17,18 @@ using agiru::Decimal;
 using agiru::DropTable;
 using agiru::Error;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 
 using CodeValue = decltype(ResourceCost::Code);
 
 std::string Emitted(const std::string &al, const agiru::gen::EnumIndex &enums) {
-  return agiru::gen::WriteHeader(agiru::al::ParseTable(al), "Gate.Table.al", enums, {}).text;
+  agiru::gen::Objects objects;
+  objects.enums = enums;
+  return agiru::gen::WriteDefinitions(agiru::al::ParseTable(al), "Gate.Table.al", objects);
 }
 
 // `devenv-initvalue-property.md`. The property is on the FIELD, and the value AL writes is read in
@@ -50,15 +53,16 @@ void AnInitValueIsTranslatedIntoTheColumnsOwnSpelling() {
 })",
                                    {});
   CHECK_TRUE("a Boolean carries its literal",
-             text.find("offsetof(Gate, DirectPosting), Declared{.initValue = \"true\"})") !=
+             text.find("offsetof(Gate_Table, DirectPosting), Declared{.initValue = \"true\"})") !=
                  std::string::npos);
   CHECK_TRUE("a Code carries the quoted text, spaces and all",
-             text.find("offsetof(Gate, Filler), Declared{.initValue = \" \"})") !=
+             text.find("offsetof(Gate_Table, Filler), Declared{.initValue = \" \"})") !=
                  std::string::npos);
   CHECK_TRUE("AN OPTION CARRIES ITS ORDINAL AND NOT ITS MEMBER NAME",
-             text.find("offsetof(Gate, Kind), Declared{.initValue = \"2\"})") != std::string::npos);
+             text.find("offsetof(Gate_Table, Kind), Declared{.initValue = \"2\"})") !=
+                 std::string::npos);
   CHECK_TRUE("a field that declares none carries nothing",
-             text.find("offsetof(Gate, Code)),") != std::string::npos);
+             text.find("offsetof(Gate_Table, Code)),") != std::string::npos);
 }
 
 // An ENUM field's value lives in another object, so the ordinal is DECLARED rather than counted --
@@ -81,7 +85,7 @@ void AnEnumInitValueResolvesThroughTheEnumIndex() {
 })",
                                    enums);
   CHECK_TRUE("the DECLARED ordinal is emitted, not the position",
-             text.find("offsetof(Gate, Answer), Declared{.initValue = \"10\"})") !=
+             text.find("offsetof(Gate_Table, Answer), Declared{.initValue = \"10\"})") !=
                  std::string::npos);
 }
 
@@ -100,9 +104,9 @@ void AnUnknownEnumYieldsNoInitValueAtAll() {
 })",
                                    {});
   CHECK_TRUE("no init value is emitted",
-             text.find("offsetof(Gate, Answer), \"") == std::string::npos);
+             text.find("offsetof(Gate_Table, Answer), \"") == std::string::npos);
   CHECK_TRUE("and the field is still declared",
-             text.find("offsetof(Gate, Answer))") != std::string::npos);
+             text.find("offsetof(Gate_Table, Answer))") != std::string::npos);
 }
 
 // `record-init-method.md`: "This method assigns default values to each field in the record" and

@@ -1,4 +1,4 @@
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "type/Code.h"
@@ -14,9 +14,9 @@ using agiru::Decimal;
 using agiru::DropTable;
 using agiru::Error;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 /// The type of `Resource Cost."Code"`, TAKEN FROM THE FIELD rather than written out. Its declared
 /// length is a property of the AL table and repeating it here is a second place for it to be wrong.

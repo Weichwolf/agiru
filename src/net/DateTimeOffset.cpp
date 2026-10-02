@@ -1,7 +1,7 @@
 #include "dotnet/DateTimeOffset.h"
 
 #include "dotnet/DateTime.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/BigInteger.h"
 #include "type/Date.h"
 #include "type/DateTime.h"

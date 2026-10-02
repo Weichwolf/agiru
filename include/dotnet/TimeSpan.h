@@ -51,7 +51,8 @@ public:
   /// \brief `TimeSpan.FromSeconds(seconds)`. \param seconds The seconds. \return The span.
   [[nodiscard]] static class TimeSpan FromSeconds(const Decimal &seconds);
 
-  /// \brief `TimeSpan.FromMilliseconds(milliseconds)`. \param milliseconds The count. \return The span.
+  /// \brief `TimeSpan.FromMilliseconds(milliseconds)`. \param milliseconds The count. \return The
+  /// span.
   [[nodiscard]] static class TimeSpan FromMilliseconds(const Decimal &milliseconds);
 
   /// \brief `TimeSpan.Ticks`. \return The ticks.

@@ -80,7 +80,9 @@ public:
 
   /// \brief What AL reads wherever it puts the string into a `Text`: the text.
   /// \return The characters.
-  operator std::string_view() const { return std::string_view(value_); } // NOLINT(*-explicit-constructor)
+  operator std::string_view() const {
+    return std::string_view(value_);
+  } // NOLINT(*-explicit-constructor)
 
   /// \brief AL `Proc(var Param: Text)` given a `DotNet String`, which AL allows because a .NET
   ///        string IS a text there: the callee writes into this string's own text.
@@ -157,15 +159,18 @@ public:
 
   /// \brief `String.PadLeft(totalWidth [, paddingChar])`. \param totalWidth The width.
   /// \param paddingChar The filler, a space by default. \return The new string.
-  [[nodiscard]] class String PadLeft(::agiru::Integer totalWidth, ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
+  [[nodiscard]] class String PadLeft(::agiru::Integer totalWidth,
+                                     ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
 
   /// \brief `String.PadRight(totalWidth [, paddingChar])`. \param totalWidth The width.
   /// \param paddingChar The filler, a space by default. \return The new string.
-  [[nodiscard]] class String PadRight(::agiru::Integer totalWidth, ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
+  [[nodiscard]] class String PadRight(::agiru::Integer totalWidth,
+                                      ::agiru::Char paddingChar = ::agiru::Char{' '}) const;
 
   /// \brief `String.IndexOf(value [, startIndex])`. \param value The text to find.
   /// \param startIndex Where to start, zero-based. \return The position, or -1.
-  [[nodiscard]] ::agiru::Integer IndexOf(std::string_view value, ::agiru::Integer startIndex = 0) const;
+  [[nodiscard]] ::agiru::Integer IndexOf(std::string_view value,
+                                         ::agiru::Integer startIndex = 0) const;
 
   /// \brief `String.IndexOf(char [, startIndex])`. \param value The character.
   /// \param startIndex Where to start, zero-based. \return The position, or -1.

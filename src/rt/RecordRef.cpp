@@ -5,7 +5,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
@@ -19,15 +19,19 @@
 #include "type/Duration.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
+#include "type/IsolationLevel.h"
 #include "type/KeyRef.h"
 #include "type/RecordId.h"
+#include "type/SecurityFilter.h"
 #include "type/StringValue.h"
 #include "type/Time.h"
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
+#include "FieldMetadata.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstddef>
 #include <memory>
 #include <span>
@@ -37,6 +41,107 @@
 #include <vector>
 
 namespace agiru {
+
+FieldRef::FieldRef(detail::RecordRefState &state, const TableDef &table, const FieldDef &def)
+    : state_(&state), table_(&table), def_(&def) {
+  ++state.uses;
+}
+
+FieldRef::FieldRef(const FieldRef &other)
+    : state_(other.state_), table_(other.table_), def_(other.def_) {
+  if (state_ != nullptr) { ++state_->uses; }
+}
+
+FieldRef::FieldRef(FieldRef &&other) noexcept
+    : state_(std::exchange(other.state_, nullptr)), table_(other.table_), def_(other.def_) {}
+
+FieldRef &FieldRef::operator=(const FieldRef &other) {
+  if (this != &other) {
+    if (other.state_ != nullptr) { ++other.state_->uses; }
+    Release_();
+    state_ = other.state_;
+    table_ = other.table_;
+    def_ = other.def_;
+  }
+  return *this;
+}
+
+FieldRef &FieldRef::operator=(FieldRef &&other) noexcept {
+  if (this != &other) {
+    Release_();
+    state_ = std::exchange(other.state_, nullptr);
+    table_ = other.table_;
+    def_ = other.def_;
+  }
+  return *this;
+}
+
+FieldRef::~FieldRef() {
+  Release_();
+}
+
+void FieldRef::Release_() noexcept {
+  if (state_ != nullptr && --state_->uses == 0) { delete state_; }
+  state_ = nullptr;
+}
+
+void *FieldRef::Record_() const {
+  if (state_ == nullptr || state_->record == nullptr) {
+    throw Error("this FieldRef names no open record");
+  }
+  return state_->record;
+}
+
+KeyRef::KeyRef(detail::RecordRefState &state, const TableDef &table, const KeyDef &def)
+    : state_(&state), table_(&table), def_(&def) {
+  ++state.uses;
+}
+
+KeyRef::KeyRef(const KeyRef &other) : state_(other.state_), table_(other.table_), def_(other.def_) {
+  if (state_ != nullptr) { ++state_->uses; }
+}
+
+KeyRef::KeyRef(KeyRef &&other) noexcept
+    : state_(std::exchange(other.state_, nullptr)), table_(other.table_), def_(other.def_) {}
+
+KeyRef &KeyRef::operator=(const KeyRef &other) {
+  if (this != &other) {
+    if (other.state_ != nullptr) { ++other.state_->uses; }
+    Release_();
+    state_ = other.state_;
+    table_ = other.table_;
+    def_ = other.def_;
+  }
+  return *this;
+}
+
+KeyRef &KeyRef::operator=(KeyRef &&other) noexcept {
+  if (this != &other) {
+    Release_();
+    state_ = std::exchange(other.state_, nullptr);
+    table_ = other.table_;
+    def_ = other.def_;
+  }
+  return *this;
+}
+
+KeyRef::~KeyRef() {
+  Release_();
+}
+
+void KeyRef::Release_() noexcept {
+  if (state_ != nullptr && --state_->uses == 0) { delete state_; }
+  state_ = nullptr;
+}
+
+RecordRefInVariant::RecordRefInVariant(const RecordRef &ref) : ref_(new RecordRef(ref)) {
+  static constexpr Ops kOps{
+      .clone = [](const RecordRef *source) { return new RecordRef(*source); },
+      .free = [](RecordRef *owned) { delete owned; },
+      .equal = [](const RecordRef *left,
+                  const RecordRef *right) { return left->state_ == right->state_; }};
+  ops_ = &kOps;
+}
 
 namespace {
 
@@ -98,8 +203,23 @@ RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering
   return was;
 }
 
+::agiru::Integer RecordRef::FilterGroup() const {
+  if (State().record == nullptr) {
+    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
+  }
+  return detail::RuntimeFilterGroup(State().record);
+}
+
 ::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
+  if (State().record == nullptr) {
+    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
+  }
   return detail::RuntimeFilterGroup(State().record, NewGroup);
+}
+
+::agiru::Boolean RecordRef::HasFilter() const {
+  if (State().record == nullptr) { throw Error("RecordRef.HasFilter: the RecordRef is not open"); }
+  return detail::RuntimeHasFilter(State().record);
 }
 
 void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
@@ -108,9 +228,9 @@ void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
     throw Error("FieldRef.Validate: this build carries no table " + std::string(Table_().name));
   }
   const std::string text = NewValue.IsEmpty()
-                               ? FieldText(record_, Def_())
+                               ? FieldText(Record_(), Def_())
                                : std::string(std::string_view(::agiru::AsText(NewValue)));
-  entry->validate(record_, Def_().no, text);
+  entry->validate(Record_(), Def_().no, text);
 }
 
 ::agiru::Boolean RecordRef::IsTemporary() {
@@ -170,7 +290,7 @@ detail::Found RecordRef::Find(std::string_view Which) {
 }
 
 ::agiru::Integer RecordRef::Next(::agiru::Integer Steps) {
-  return detail::RuntimeNext(State().record, Table(), Steps == 0 ? 1 : Steps);
+  return detail::RuntimeNext(State().record, Table(), Steps);
 }
 
 detail::Found RecordRef::FindSet() {
@@ -192,7 +312,7 @@ detail::Found RecordRef::FindFirst() {
 
 std::string FieldRef::ToText() const {
   if (def_ == nullptr) { throw Error("this FieldRef names no field"); }
-  return ::agiru::FieldText(record_, Def_());
+  return ::agiru::FieldText(Record_(), Def_());
 }
 
 detail::Found RecordRef::FindLast() {
@@ -292,7 +412,11 @@ std::string RecordRef::GetFilters() const {
   try {
     entry->copy(before, State().record);
     std::size_t position = 0;
-    for (const FieldNo no : table.keys[0].fields) { Field(no.Value()).Value(keys[position++]); }
+    for (const FieldNo no : table.keys[0].fields) {
+      const FieldDef *field = agiru::Field(table, no);
+      if (field == nullptr) { throw Error("RecordRef.Rename: the primary key names no field"); }
+      detail::SetFieldText(State().record, *field, AsText(keys[position++]));
+    }
     const bool renamed = entry->rename(State().record, before);
     entry->free(before);
     return renamed;
@@ -305,8 +429,9 @@ std::string RecordRef::GetFilters() const {
 constexpr ::agiru::Integer kInvariantFormat = 9;
 
 std::string FieldRef::GetFilter() const {
-  if (record_ == nullptr || def_ == nullptr) { return {}; }
-  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if ((state_ == nullptr || state_->record == nullptr) || def_ == nullptr) { return {}; }
+  const detail::RecordState *state =
+      reinterpret_cast<const detail::StateHandle *>(Record_())->Peek();
   if (state == nullptr) { return {}; }
   for (const detail::FieldFilter &one : state->filters) {
     if (one.field == Def_().no && one.group == state->group) {
@@ -317,21 +442,22 @@ std::string FieldRef::GetFilter() const {
 }
 
 ::agiru::Variant FieldRef::RangeBound_(bool upper) const {
-  if (record_ == nullptr || def_ == nullptr) { return {}; }
-  const detail::RecordState *state = reinterpret_cast<const detail::StateHandle *>(record_)->Peek();
+  if ((state_ == nullptr || state_->record == nullptr) || def_ == nullptr) { return {}; }
+  const detail::RecordState *state =
+      reinterpret_cast<const detail::StateHandle *>(Record_())->Peek();
   const std::string text = detail::RangeBoundText(state, Def_().no, upper);
   const TableEntry *entry = FindTable(Table_().id);
   if (entry == nullptr) { return {}; }
   const std::unique_ptr<void, void (*)(void *)> bound(entry->make(), entry->free);
   if (!text.empty()) { detail::EvaluateInto(bound.get(), Table_(), Def_().no, text); }
-  return FieldRef(bound.get(), Table_(), Def_()).Value();
+  return RecordRef(bound.get(), Table_()).Field(Def_().no.Value()).Value();
 }
 
 void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Variant &ToValue) const {
-  if (record_ == nullptr || def_ == nullptr) {
+  if ((state_ == nullptr || state_->record == nullptr) || def_ == nullptr) {
     throw Error("FieldRef.SetRange: the FieldRef names no field yet");
   }
-  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(record_)->Ensure();
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(Record_())->Ensure();
   if (FromValue.IsEmpty()) {
     detail::Narrow(state, Def_().no, {});
     return;
@@ -349,10 +475,10 @@ void FieldRef::SetRange(const ::agiru::Variant &FromValue, const ::agiru::Varian
 }
 
 void FieldRef::SetFilterText(const std::string &text) const {
-  if (record_ == nullptr || def_ == nullptr) {
+  if ((state_ == nullptr || state_->record == nullptr) || def_ == nullptr) {
     throw Error("FieldRef.SetFilter: the FieldRef names no field yet");
   }
-  detail::Narrow(reinterpret_cast<detail::StateHandle *>(record_)->Ensure(), Def_().no, text);
+  detail::Narrow(reinterpret_cast<detail::StateHandle *>(Record_())->Ensure(), Def_().no, text);
 }
 
 FieldType FieldRef::Type() const {
@@ -385,34 +511,29 @@ std::string_view FieldRef::GetEnumValueCaptionFromOrdinalValue(Integer ordinal) 
 }
 
 std::string FieldRef::OptionMembers() const {
-  std::string members;
-  for (const EnumValueDef &value : Def_().values) {
-    if (!members.empty()) { members += ','; }
-    members += value.name;
-  }
-  return members;
+  return detail::FieldOptionMembers(Def_());
 }
 
 Variant FieldRef::Value() const {
   switch (Def_().type) {
-    case FieldType::Boolean: return Variant{As<Boolean>(record_, Def_())};
-    case FieldType::Integer: return Variant{As<Integer>(record_, Def_())};
-    case FieldType::BigInteger: return Variant{As<BigInteger>(record_, Def_())};
-    case FieldType::Decimal: return Variant{As<Decimal>(record_, Def_())};
+    case FieldType::Boolean: return Variant{As<Boolean>(Record_(), Def_())};
+    case FieldType::Integer: return Variant{As<Integer>(Record_(), Def_())};
+    case FieldType::BigInteger: return Variant{As<BigInteger>(Record_(), Def_())};
+    case FieldType::Decimal: return Variant{As<Decimal>(Record_(), Def_())};
     case FieldType::Code:
-    case FieldType::Text: return Variant{std::string(As<StringValue>(record_, Def_()).Value())};
-    case FieldType::Date: return Variant{As<Date>(record_, Def_())};
-    case FieldType::Time: return Variant{As<Time>(record_, Def_())};
-    case FieldType::DateTime: return Variant{As<DateTime>(record_, Def_())};
-    case FieldType::Duration: return Variant{As<Duration>(record_, Def_())};
-    case FieldType::Guid: return Variant{As<Guid>(record_, Def_())};
-    case FieldType::RecordId: return Variant{As<RecordId>(record_, Def_())};
-    case FieldType::DateFormula: return Variant{As<DateFormula>(record_, Def_())};
+    case FieldType::Text: return Variant{std::string(As<StringValue>(Record_(), Def_()).Value())};
+    case FieldType::Date: return Variant{As<Date>(Record_(), Def_())};
+    case FieldType::Time: return Variant{As<Time>(Record_(), Def_())};
+    case FieldType::DateTime: return Variant{As<DateTime>(Record_(), Def_())};
+    case FieldType::Duration: return Variant{As<Duration>(Record_(), Def_())};
+    case FieldType::Guid: return Variant{As<Guid>(Record_(), Def_())};
+    case FieldType::RecordId: return Variant{As<RecordId>(Record_(), Def_())};
+    case FieldType::DateFormula: return Variant{As<DateFormula>(Record_(), Def_())};
     case FieldType::Option:
     case FieldType::Enum:
-      return Variant{OrdinalInVariant{.ordinal = As<OrdinalValue>(record_, Def_()).AsInteger(),
+      return Variant{OrdinalInVariant{.ordinal = As<OrdinalValue>(Record_(), Def_()).AsInteger(),
                                       .values = Def_().values}};
-    case FieldType::Blob: return Variant{As<Blob>(record_, Def_())};
+    case FieldType::Blob: return Variant{As<Blob>(Record_(), Def_())};
     case FieldType::Media:
     case FieldType::MediaSet:
       throw Error("a Media is an object rather than a value, and a Variant holds no objects yet");
@@ -423,23 +544,25 @@ Variant FieldRef::Value() const {
 }
 
 void FieldRef::SetValue(std::string_view text) {
-  detail::SetFieldText(record_, Def_(), text);
+  detail::SetFieldText(Record_(), Def_(), text);
 }
 
 void FieldRef::Value(const ::agiru::Blob &blob) {
   if (Def_().type != FieldType::Blob) {
     throw Error("FieldRef.Value: " + std::string(Def_().name) + " is not a BLOB field");
   }
-  *reinterpret_cast<Blob *>(static_cast<std::byte *>(record_) + Def_().offset) = blob;
+  *reinterpret_cast<Blob *>(static_cast<std::byte *>(Record_()) + Def_().offset) = blob;
 }
 
 void FieldRef::TestField() const {
-  agiru::detail::TestField(record_, Table_(), Def_().no);
+  agiru::detail::TestField(Record_(), Table_(), Def_().no);
 }
 
 RecordRef FieldRef::Record() const {
-  if (record_ == nullptr || table_ == nullptr) { throw Error("this FieldRef names no field"); }
-  return RecordRef{record_, Table_()};
+  if ((state_ == nullptr || state_->record == nullptr) || table_ == nullptr) {
+    throw Error("this FieldRef names no field");
+  }
+  return RecordRef{*state_};
 }
 
 ::agiru::Integer RecordRef::SystemIdNo() {
@@ -485,8 +608,10 @@ RecordRef RecordRef::Duplicate() {
 }
 
 Boolean FieldRef::CalcField() const {
-  detail::CalcField(
-      record_, Table_(), reinterpret_cast<const detail::StateHandle *>(record_)->Peek(), Def_().no);
+  detail::CalcField(Record_(),
+                    Table_(),
+                    reinterpret_cast<const detail::StateHandle *>(Record_())->Peek(),
+                    Def_().no);
   return true;
 }
 
@@ -546,7 +671,7 @@ Integer RecordRef::KeyCount() const {
 FieldRef RecordRef::Field(Integer fieldNo) const {
   const FieldDef *def = agiru::Field(Table(), FieldNo{fieldNo});
   if (def == nullptr) { throw Error("the table declares no field " + std::to_string(fieldNo)); }
-  return FieldRef{State().record, Table(), *def};
+  return FieldRef{State(), Table(), *def};
 }
 
 FieldRef RecordRef::FieldIndex(Integer index) const {
@@ -556,7 +681,7 @@ FieldRef RecordRef::FieldIndex(Integer index) const {
     throw Error("the field index " + std::to_string(index) + " is outside 1.." +
                 std::to_string(indexed.size()));
   }
-  return FieldRef{State().record, table, *indexed[static_cast<std::size_t>(index) - 1]};
+  return FieldRef{State(), table, *indexed[static_cast<std::size_t>(index) - 1]};
 }
 
 Integer RecordRef::CurrentKeyIndex(Integer NewKeyIndex) {
@@ -611,7 +736,7 @@ KeyRef RecordRef::KeyIndex(Integer Index) const {
     throw Error("the key index " + std::to_string(Index) + " is outside 1.." +
                 std::to_string(table.keys.size()));
   }
-  return KeyRef{State().record, table, table.keys[static_cast<std::size_t>(Index) - 1]};
+  return KeyRef{State(), table, table.keys[static_cast<std::size_t>(Index) - 1]};
 }
 
 Boolean KeyRef::Active() const {
@@ -636,12 +761,18 @@ FieldRef KeyRef::FieldIndex(Integer Index) const {
     throw Error("key " + std::string(def_->name) + " names field " + std::to_string(no.Value()) +
                 ", which the table does not declare");
   }
-  return FieldRef{record_, *table_, *field};
+  if (state_ == nullptr || state_->record == nullptr) {
+    throw Error("this KeyRef names no open record");
+  }
+  return FieldRef{*state_, *table_, *field};
 }
 
 RecordRef KeyRef::Record() const {
   if (table_ == nullptr) { throw Error("this KeyRef selects no key"); }
-  return RecordRef{record_, *table_};
+  if (state_ == nullptr || state_->record == nullptr) {
+    throw Error("this KeyRef names no open record");
+  }
+  return RecordRef{*state_};
 }
 
 bool RecordRef::FieldExist(Integer fieldNo) const {

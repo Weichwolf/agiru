@@ -1,6 +1,6 @@
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "type/Code.h"
@@ -21,9 +21,9 @@ using agiru::Decimal;
 using agiru::DropTable;
 using agiru::Error;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostCostType;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostCostType = agiru::options::OptionFixedPercentExtraLCYExtra;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 

@@ -73,17 +73,16 @@ public:
 using ODataEdmType = ODataEdmType_Table;
 
 /// \brief The field table.
-inline constexpr auto kODataEdmTypeFields =
-    WithSystemFields<ODataEdmType>(std::array<FieldDef, 3>{{
-        Declare<&ODataEdmType::Key>(
-            ODataEdmType::Field_No::Key, "Key", "Key", offsetof(ODataEdmType, Key)),
-        Declare<&ODataEdmType::Description>(ODataEdmType::Field_No::Description,
-                                            "Description",
-                                            "Description",
-                                            offsetof(ODataEdmType, Description)),
-        Declare<&ODataEdmType::EdmXml>(
-            ODataEdmType::Field_No::EdmXml, "Edm Xml", "Edm Xml", offsetof(ODataEdmType, EdmXml)),
-    }});
+inline constexpr auto kODataEdmTypeFields = WithSystemFields<ODataEdmType>(std::array<FieldDef, 3>{{
+    Declare<&ODataEdmType::Key>(
+        ODataEdmType::Field_No::Key, "Key", "Key", offsetof(ODataEdmType, Key)),
+    Declare<&ODataEdmType::Description>(ODataEdmType::Field_No::Description,
+                                        "Description",
+                                        "Description",
+                                        offsetof(ODataEdmType, Description)),
+    Declare<&ODataEdmType::EdmXml>(
+        ODataEdmType::Field_No::EdmXml, "Edm Xml", "Edm Xml", offsetof(ODataEdmType, EdmXml)),
+}});
 
 /// \brief The keys.
 inline constexpr std::array<KeyDef, 1> kODataEdmTypeKeys{{

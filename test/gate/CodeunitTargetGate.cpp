@@ -1,5 +1,5 @@
 #include "meta/Ids.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
 
@@ -12,7 +12,7 @@
 
 using agiru::CodeunitId;
 using agiru::Error;
-using agiru::app::codeunits::TransferOldExtTextLines;
+using TransferOldExtTextLines = agiru::Foundation::ExtendedText::TransferOldExtTextLines_Codeunit;
 using agiru::app::tables::LineNumberBuffer;
 
 namespace {

@@ -1,6 +1,6 @@
 #include "type/Version.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 
 #include <array>

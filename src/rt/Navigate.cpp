@@ -1,19 +1,19 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
+#include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
+#include "runtime/Storage.h"
 #include "runtime/Table.h"
 
 #include "Cursor.h"
-#include "Rows.h"
 #include "Selection.h"
 #include "Temporary.h"
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -125,6 +125,7 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
 
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
   if (TempOf(record) != nullptr) { return TempFind(record, table, which); }
+  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   if (which.empty()) { which = "="; }
@@ -157,6 +158,7 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempFindSet(record, table); }
+  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   state->open.Forget();
@@ -177,29 +179,35 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
 }
 
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
+  if (steps == 0) { return 0; }
   if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
+  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();
   if (!state->positioned) { return 0; }
-  const std::int32_t wanted = steps == 0 ? 1 : steps;
+  const std::int32_t wanted = steps;
   if (wanted < 0 || open == nullptr) {
     const std::string_view direction = wanted < 0 ? "<" : ">";
-    std::int32_t moved = 0;
-    for (std::int32_t taken = 0; taken < std::abs(wanted); ++taken) {
-      if (!RuntimeFind(record, table, direction)) { break; }
+    const std::int64_t count = wanted < 0 ? -std::int64_t{wanted} : wanted;
+    std::int64_t moved = 0;
+    for (std::int64_t taken = 0; taken < count; ++taken) {
+      if (!RuntimeFind(record, table, direction)) {
+        state->positioned = true;
+        break;
+      }
       ++moved;
     }
-    return wanted < 0 ? -moved : moved;
+    return static_cast<std::int32_t>(wanted < 0 ? -moved : moved);
   }
   for (std::int32_t taken = 0; taken < wanted; ++taken) {
     if (!open->cursor.Step()) {
-      state->positioned = false;
+      if (taken != 0) { ReadInto(record, table, open->cursor); }
       return taken;
     }
+    ++state->stepped;
   }
   ReadInto(record, table, open->cursor);
-  ++state->stepped;
   return wanted;
 }
 

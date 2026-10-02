@@ -1,5 +1,7 @@
 #include "dotnet/DataTable.h"
 
+#include "runtime/ErrorValue.h"
+
 #include <cctype>
 #include <string>
 #include <string_view>

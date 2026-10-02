@@ -282,12 +282,21 @@ struct TestResult {
   std::string error;         ///< What was raised, when something was.
 };
 
+/// \brief Serializes a completed test as a schema-versioned JSON object on one line.
+/// \param id The declaring codeunit's AL ID.
+/// \param result Method identity, outcome and diagnostic to serialize.
+/// \return UTF-8 JSON without a trailing newline; embedded control characters are escaped.
+[[nodiscard]] std::string TestResultJson(CodeunitId id, const TestResult &result);
+
 /// \brief What a run did.
 struct TestRun {
   std::vector<TestResult> results; ///< Every procedure that ran, in the order it ran.
   std::size_t passed = 0;          ///< How many did not raise.
   std::size_t failed = 0;          ///< How many did.
 };
+
+/// \brief The AL TestRunner codeunit's `TestIsolation` property.
+enum class TestIsolation { Disabled, Codeunit, Function };
 
 /// \brief Runs the registered `[Test]` procedures.
 ///
@@ -310,6 +319,12 @@ struct TestRun {
 ///       `PermissionTestHelper` is a platform type this tree does not carry yet (board:0715).
 [[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit);
 
+/// \brief Runs one test codeunit under an explicit runner isolation policy.
+/// \param codeunit The test codeunit's AL name, or empty for all.
+/// \param isolation The runner's documented TestIsolation value.
+/// \return Results in declaration order.
+[[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit, TestIsolation isolation);
+
 /// \brief What a run reports about one procedure the moment it finishes.
 using TestReport = void (*)(const TestResult &);
 
@@ -325,6 +340,23 @@ using TestReport = void (*)(const TestResult &);
 ///       report with it: 0 lines of output for a run that had done most of its work. Reporting as
 ///       it goes is what makes such a run say where it stopped.
 [[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit, TestReport report);
+
+/// \brief Reports one completed test using state owned by the caller.
+using ContextTestReport = void (*)(void *context, const TestResult &result);
+
+/// \brief Runs registered tests and reports each completion through a caller-owned context.
+/// \param codeunit The AL codeunit name, or empty for all registered codeunits.
+/// \param context State borrowed until this synchronous call returns; never retained.
+/// \param report Callback invoked after each completed test; may be null.
+/// \param isolation The selected runner's TestIsolation policy; Codeunit is the CLI's current
+///                  policy until generated TestRunner metadata drives this call.
+/// \return Results and counts for the selected procedures.
+/// \throws Error When the runner cannot establish a test boundary.
+/// \warning Exceptions from the callback propagate; output failure is not a successful run.
+[[nodiscard]] TestRun RunRegisteredTests(std::string_view codeunit,
+                                         void *context,
+                                         ContextTestReport report,
+                                         TestIsolation isolation = TestIsolation::Codeunit);
 
 /// \brief Every registered test codeunit.
 /// \return Them, by codeunit number.

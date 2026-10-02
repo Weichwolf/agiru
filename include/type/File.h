@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
@@ -220,7 +220,7 @@ public:
   Read(T &Read) {
     ::agiru::Variant held;
     const ::agiru::Integer read = this->Read(held);
-    Read = std::string_view(held.Get<std::string>());
+    Read = std::string_view(held.Get<Text<0>>());
     return read;
   }
 

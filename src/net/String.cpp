@@ -1,6 +1,6 @@
 #include "dotnet/String.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Variant.h"
 
 #include <cctype>
@@ -19,7 +19,9 @@ std::vector<std::string> TextsOf(const Array &chars) {
   return out;
 }
 
-bool StartsWithAnyOf(std::string_view text, const std::vector<std::string> &pieces, std::size_t &length) {
+bool StartsWithAnyOf(std::string_view text,
+                     const std::vector<std::string> &pieces,
+                     std::size_t &length) {
   for (const std::string &piece : pieces) {
     if (!piece.empty() && text.starts_with(piece)) {
       length = piece.size();
@@ -129,7 +131,8 @@ std::string_view Sv(const ::agiru::Text<0> &text) {
 void CheckRange(std::string_view text, ::agiru::Integer startIndex, ::agiru::Integer length) {
   if (startIndex < 0 || length < 0 ||
       static_cast<std::size_t>(startIndex) + static_cast<std::size_t>(length) > text.size()) {
-    throw Error("String: the index and length are outside the string (ArgumentOutOfRangeException)");
+    throw Error(
+        "String: the index and length are outside the string (ArgumentOutOfRangeException)");
   }
 }
 
@@ -172,15 +175,17 @@ Array String::ToCharArray() const {
 Array String::ToCharArray(::agiru::Integer startIndex, ::agiru::Integer length) const {
   CheckRange(Sv(value_), startIndex, length);
   Array out;
-  for (const std::string &one : EachCharacter(
-           Sv(value_).substr(static_cast<std::size_t>(startIndex), static_cast<std::size_t>(length)))) {
+  for (const std::string &one : EachCharacter(Sv(value_).substr(
+           static_cast<std::size_t>(startIndex), static_cast<std::size_t>(length)))) {
     out.Add(::agiru::Variant(one));
   }
   return out;
 }
 
 String String::Replace(std::string_view oldValue, std::string_view newValue) const {
-  if (oldValue.empty()) { throw Error("String.Replace: the value to replace is empty (ArgumentException)"); }
+  if (oldValue.empty()) {
+    throw Error("String.Replace: the value to replace is empty (ArgumentException)");
+  }
   std::string out;
   const std::string_view text = Sv(value_);
   std::size_t at = 0;
@@ -242,7 +247,8 @@ String String::PadRight(::agiru::Integer totalWidth, ::agiru::Char paddingChar) 
 
 ::agiru::Integer String::IndexOf(std::string_view value, ::agiru::Integer startIndex) const {
   if (startIndex < 0 || static_cast<std::size_t>(startIndex) > Sv(value_).size()) {
-    throw Error("String.IndexOf: the start index is outside the string (ArgumentOutOfRangeException)");
+    throw Error(
+        "String.IndexOf: the start index is outside the string (ArgumentOutOfRangeException)");
   }
   const std::size_t at = Sv(value_).find(value, static_cast<std::size_t>(startIndex));
   return at == std::string_view::npos ? ::agiru::Integer{-1} : static_cast<::agiru::Integer>(at);
@@ -268,8 +274,8 @@ String String::Substring(::agiru::Integer startIndex) const {
 
 String String::Substring(::agiru::Integer startIndex, ::agiru::Integer length) const {
   CheckRange(Sv(value_), startIndex, length);
-  return Of(Sv(value_).substr(static_cast<std::size_t>(startIndex),
-                                            static_cast<std::size_t>(length)));
+  return Of(
+      Sv(value_).substr(static_cast<std::size_t>(startIndex), static_cast<std::size_t>(length)));
 }
 
 }

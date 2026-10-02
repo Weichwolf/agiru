@@ -7,6 +7,7 @@
 #include <set>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru {
@@ -34,11 +35,11 @@ bool Declared(const Standing &held, std::string_view name) {
 
 void HandlerTable::Install(std::span<const TestHandler> handlers,
                            std::span<const std::string_view> declared) {
-  Standing &held = Held();
-  held.handlers = handlers;
-  held.declared.assign(declared.begin(), declared.end());
-  held.ran.clear();
-  held.installed = true;
+  Standing next{.handlers = handlers,
+                .declared = {declared.begin(), declared.end()},
+                .ran = {},
+                .installed = true};
+  Held() = std::move(next);
   Notification::OnSend(+[](Notification &sent) {
     const TestHandler *handler = For(HandlerKind::SendNotification);
     if (handler == nullptr) { return; }
@@ -48,7 +49,8 @@ void HandlerTable::Install(std::span<const TestHandler> handlers,
 }
 
 std::vector<std::string_view> HandlerTable::Uninstall() {
-  Standing &held = Held();
+  const Standing held = std::move(Held());
+  Reset();
   std::vector<std::string_view> missed;
   for (const std::string_view name : held.declared) {
     const auto found = std::ranges::find_if(
@@ -59,8 +61,11 @@ std::vector<std::string_view> HandlerTable::Uninstall() {
     }
     if (!found->optional && !held.ran.contains(&*found)) { missed.push_back(name); }
   }
-  held = Standing{};
   return missed;
+}
+
+void HandlerTable::Reset() noexcept {
+  Held() = Standing{};
 }
 
 const TestHandler *HandlerTable::For(HandlerKind kind, std::int32_t object) {

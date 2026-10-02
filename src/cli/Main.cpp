@@ -1,4 +1,4 @@
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/TestRunner.h"
@@ -14,11 +14,15 @@
 #include <execinfo.h>
 #endif
 #include <exception>
+#include <fstream>
+#include <ios>
 #include <print>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <sys/wait.h>
 
 namespace {
 
@@ -33,6 +37,8 @@ struct Options {
   bool isolate = false;
   std::string workDate;
   std::string self;
+  std::string resultsJsonl;
+  bool appendResults = false;
 };
 
 constexpr int kUsage = 2;
@@ -57,6 +63,7 @@ void Usage() {
   std::println("      only itself: a segmentation fault is not an exception and nothing in the");
   std::println("      process can catch it (board:0612).");
   std::println("      --database <url> connects somewhere other than the built-in default.");
+  std::println("      --results-jsonl <file> writes each completed test as a flushed JSON record.");
   std::println("");
   std::println("  agiru version");
   std::println("      What this binary is.");
@@ -104,6 +111,10 @@ Options Read(std::span<const std::string_view> arguments) {
       options.list = true;
     } else if (argument == "--isolate") {
       options.isolate = true;
+    } else if (argument == "--results-jsonl") {
+      options.resultsJsonl = ValueOf(arguments, at);
+    } else if (argument == "--append-results") {
+      options.appendResults = true;
     } else if (argument == "--work-date") {
       options.workDate = ValueOf(arguments, at);
     } else {
@@ -127,6 +138,12 @@ std::string Quoted(std::string_view text) {
 }
 
 int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *const> codeunits) {
+  if (!options.resultsJsonl.empty() && !options.appendResults) {
+    std::ofstream output;
+    output.exceptions(std::ios::badbit | std::ios::failbit);
+    output.open(options.resultsJsonl, std::ios::out | std::ios::trunc);
+    output.close();
+  }
   std::size_t passed = 0;
   std::size_t failed = 0;
   std::size_t died = 0;
@@ -135,6 +152,10 @@ int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *co
                           Quoted(codeunit->Name()) + " --scratch " + Quoted(options.scratch);
     if (!options.database.empty()) { command += " --database " + Quoted(options.database); }
     if (!options.workDate.empty()) { command += " --work-date " + Quoted(options.workDate); }
+    if (options.fresh) { command += " --fresh"; }
+    if (!options.resultsJsonl.empty()) {
+      command += " --results-jsonl " + Quoted(options.resultsJsonl) + " --append-results";
+    }
     command += " 2>&1";
     std::FILE *child = popen(command.c_str(), "r");
     if (child == nullptr) {
@@ -153,7 +174,10 @@ int RunIsolated(const Options &options, std::span<const agiru::TestCatalogue *co
     std::fflush(stdout);
     std::size_t ran = 0;
     std::size_t of = 0;
-    if (!tail.empty() && std::sscanf(tail.c_str(), "%zu of %zu", &ran, &of) == 2) {
+    if (status != -1 && WIFEXITED(status) && !tail.empty() &&
+        std::sscanf(tail.c_str(), "%zu of %zu", &ran, &of) == 2 &&
+        of == codeunit->Methods().size() && ran <= of &&
+        WEXITSTATUS(status) == (ran == of ? 0 : 1)) {
       passed += ran;
       failed += of - ran;
       continue;
@@ -197,6 +221,12 @@ int RunTests(const Options &options) {
     }
   }
   if (options.isolate && options.codeunit.empty()) { return RunIsolated(options, codeunits); }
+  std::ofstream results;
+  if (!options.resultsJsonl.empty()) {
+    results.exceptions(std::ios::badbit | std::ios::failbit);
+    results.open(options.resultsJsonl,
+                 std::ios::out | (options.appendResults ? std::ios::app : std::ios::trunc));
+  }
   const std::string master = options.database.empty() ? std::string(kDatabase) : options.database;
   const agiru::RunnerDatabase runner(master, options.scratch, options.fresh);
   agiru::Session session(runner.Dsn());
@@ -204,8 +234,26 @@ int RunTests(const Options &options) {
   if (!options.workDate.empty()) { session.WorkDate(WorkDateOf(options.workDate)); }
   agiru::ProvisionInstalled(session.Database());
   session.OpenCompany();
-  const agiru::TestRun run =
-      agiru::RunRegisteredTests(options.codeunit, [](const agiru::TestResult &result) {
+
+  struct ReportContext {
+    std::ofstream &output;
+    const std::vector<const agiru::TestCatalogue *> &codeunits;
+  } reportContext{.output = results, .codeunits = codeunits};
+
+  const agiru::TestRun run = agiru::RunRegisteredTests(
+      options.codeunit, &reportContext, [](void *context, const agiru::TestResult &result) {
+        auto &report = *static_cast<ReportContext *>(context);
+        auto &results = report.output;
+        const auto &codeunits = report.codeunits;
+        if (results.is_open()) {
+          const auto catalogue = std::ranges::find_if(
+              codeunits, [&](const auto *entry) { return entry->Name() == result.codeunit; });
+          if (catalogue == codeunits.end()) {
+            throw agiru::Error("a test result names an unregistered codeunit");
+          }
+          results << agiru::TestResultJson((*catalogue)->Id(), result) << '\n';
+          results.flush();
+        }
         if (result.passed) { return; }
         std::println("FAIL  {}  {}\n      {}", result.codeunit, result.method, result.error);
         std::fflush(stdout);

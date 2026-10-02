@@ -1,4 +1,4 @@
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -130,7 +130,7 @@ const std::vector<std::pair<std::string, std::string>> &NoNamespaces() {
 }
 
 XmlHandle NodeFrom(const Variant &content) {
-  if (content.IsText()) { return detail::Detached(xmlNewText(Bytes(content.Get<std::string>()))); }
+  if (content.IsText()) { return detail::Detached(xmlNewText(Bytes(content.Get<Text<0>>()))); }
   if (const XmlHandle *held = content.XmlHeld(); held != nullptr) { return *held; }
   throw Error("XML content must be a node or a text, and this Variant holds neither");
 }

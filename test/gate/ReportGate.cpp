@@ -1,6 +1,6 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
 #include "runtime/Report.h"
 #include "runtime/Table.h"

@@ -1,6 +1,6 @@
 #include "type/Variant.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include <cerrno>
 #include <cstdint>
@@ -25,7 +25,7 @@ std::string_view Variant::HeldName() const {
           return "BigInteger";
         } else if constexpr (std::same_as<Held, Decimal>) {
           return "Decimal";
-        } else if constexpr (std::same_as<Held, std::string>) {
+        } else if constexpr (std::same_as<Held, Text<0>>) {
           return "Text";
         } else if constexpr (std::same_as<Held, Date>) {
           return "Date";
@@ -68,8 +68,8 @@ std::string_view Variant::Rendered() const {
           return {};
         } else if constexpr (std::same_as<Held, Boolean>) {
           return held ? "Yes" : "No";
-        } else if constexpr (std::same_as<Held, std::string>) {
-          return held;
+        } else if constexpr (std::same_as<Held, Text<0>>) {
+          return std::string(std::string_view(held));
         } else if constexpr (std::same_as<Held, Integer> || std::same_as<Held, BigInteger>) {
           return std::to_string(held);
         } else if constexpr (requires { held.ToInvariantString(); }) {
@@ -90,7 +90,7 @@ bool Variant::HoldsSomethingTextual() const {
       [](const auto &held) {
         using Held = std::remove_cvref_t<decltype(held)>;
         return std::same_as<Held, std::monostate> || std::same_as<Held, Boolean> ||
-               std::same_as<Held, std::string> || std::same_as<Held, Integer> ||
+               std::same_as<Held, Text<0>> || std::same_as<Held, Integer> ||
                std::same_as<Held, BigInteger> || requires { held.ToInvariantString(); } ||
                requires { held.ToText(); };
       },

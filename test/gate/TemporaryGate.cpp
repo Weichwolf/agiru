@@ -1,5 +1,5 @@
 #include "runtime/Codeunit.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
@@ -19,8 +19,8 @@ using agiru::Decimal;
 using agiru::Error;
 using agiru::Temporary;
 using agiru::app::tables::LineNumberBuffer;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 

@@ -67,10 +67,8 @@ struct Named {
 /// \param named The values that have a name.
 /// \return Every ordinal from 0 to N-1, named or blank.
 ///
-/// NAV WRITES A SPARSE OPTION AS A DENSE ONE WITH BLANKS. `option-data-type.md` promises an option
-/// is "zero-based ... assigned to sequential numbers, starting with 0", and `FieldType` runs 3, 5,
-/// 7, ... 40 -- both are true at once because the OptionString carries an empty member at every
-/// gap. This builds that string's table, so `Option` can keep asserting density.
+/// This preserves the current metadata-tag compatibility vocabulary. It is not the native
+/// Field.Type mapping; its distinct coded ordinals remain open in board:0034.
 template <std::size_t N>
 constexpr std::array<EnumValueDef, N> Sparse(std::span<const Named> named) {
   std::array<EnumValueDef, N> values{};
@@ -84,7 +82,7 @@ constexpr std::array<EnumValueDef, N> Sparse(std::span<const Named> named) {
   return values;
 }
 
-/// \brief The named values of AL's `FieldType`, which `Field.Type` and `FieldRef.Type()` return.
+/// \brief Names for the current metadata-tag compatibility vocabulary, not native ordinals.
 inline constexpr std::array<Named, 17> kFieldTypeNames{{
     {.ordinal = 3, .name = "Boolean"},
     {.ordinal = 5, .name = "Option"},
@@ -107,7 +105,7 @@ inline constexpr std::array<Named, 17> kFieldTypeNames{{
 
 }
 
-/// \brief The vocabulary of AL `FieldType`, which the virtual table reports as an option.
+/// \brief Compatibility vocabulary for the current internal `FieldType` metadata tags.
 template <> struct agiru::OptionTraits<agiru::FieldType> {
   /// \brief Every ordinal from 0 to 40, named where AL names one.
   static constexpr auto kValues = agiru::detail::Sparse<41>(agiru::detail::kFieldTypeNames);
@@ -160,10 +158,8 @@ namespace agiru::platform {
 
 /// \brief The AL virtual table `Field` -- one row per field of every table in the catalogue.
 ///
-/// \note IT IS NOT AN AL OBJECT. No `.al` file declares it: the platform computes its rows, which
-///       is why it lives here and not in `apps/` (board:0032). To AL code it is an ordinary table,
-///       and the BaseApp uses it as one -- `Field.SetRange(Type, Field.Type::Code)`,
-///       `Field.SetFilter("Field Name", '*Global Dimension*')`.
+/// \note System symbols declare the table; the platform supplies its rows. Its partial runtime
+///       binding lives here rather than in generated application sources (board:0034).
 ///
 /// \note MOST USES ARE TEMPORARY. Measured over BCApps on 2026-09-02: 1 069 `Record Field`
 ///       declarations, of which 282 carry `temporary`. A temporary one needs nothing but this
@@ -175,16 +171,13 @@ namespace agiru::platform {
 ///       sitting on `RelationTableNo`'s number and four more one place too low -- a `FieldRef` by
 ///       number would have read the wrong column and thrown nothing (board:0607).
 ///
-/// \note FIFTEEN OF THE TWENTY-FOUR DECLARED FIELDS ARE HERE. `Type Name`, `ExternalName`,
-///       `SQLDataType`, `DataClassification`, `App Package ID`, `App Runtime Package ID`,
-///       `OptimizeForTextSearch`, `Access` and `IsAllowedInCustomizations` are not, and their
-///       absence is a hole with a number rather than a decision (board:0607).
+/// \note The partial declaration has eighteen fields. `ExternalName` still has the wrong
+///       number and length; `SQLDataType` and fields 60-64 are absent (board:0034).
 ///
 /// \warning `Field.Type` IS NOT `FieldType`. The declaration gives the virtual table's own option
-///          `OptionOrdinalValues` running 4912 to 37375, so `Field.Type::Code` is 31489 where
-///          `FieldRef.Type()` answers 33. This file stores one option for both; the BaseApp
-///          compares by MEMBER and never by number, so nothing has failed yet, and board:0607
-///          carries the separation.
+///          coded ordinals running 4912 to 37375. BC 28.4 reports Code as 31489 in Field.Type
+///          and 31490 in FieldRef.Type(); the current internal metadata tag is 33. This file
+///          incorrectly shares one option for both public boundaries (board:0034).
 class Field : public Table<Field> {
 public:
   /// \brief The AL table number of the virtual `Field` table.
@@ -217,6 +210,12 @@ public:
   ::agiru::Integer Len{};
   /// \brief AL `Field."Class"`.
   Option<FieldClass> Class;
+  /// \brief AL `Field."Type Name"`, declared as Text[30] in System symbols.
+  ///
+  /// Native metadata renders the primitive type, appending Code/Text length without a separator
+  /// (BC 28.4 FieldDataProvider.GetFieldTypeName). Typed Get and provisioning share the mapper;
+  /// native virtual-table navigation remains incomplete (board:0044).
+  Text<kNameLength> TypeName;
   /// \brief AL `Field."RelationTableNo"`.
   ::agiru::Integer RelationTableNo{};
   /// \brief AL `Field."RelationFieldNo"`.
@@ -272,6 +271,8 @@ public:
     static constexpr ::agiru::FieldNo Len{6};
     /// \brief The AL field number of `Class`.
     static constexpr ::agiru::FieldNo Class{7};
+    /// \brief The System-symbol field number of `Type Name`.
+    static constexpr ::agiru::FieldNo TypeName{9};
     /// \brief The AL field number of `RelationTableNo`.
     static constexpr ::agiru::FieldNo RelationTableNo{21};
     /// \brief The AL field number of `RelationFieldNo`.
@@ -317,7 +318,7 @@ public:
 };
 
 /// \brief The field table of the virtual `Field` table, as static const data.
-inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 17>{{
+inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef, 18>{{
     Declare<&Field::TableNo>(
         Field::Field_No::TableNo, "TableNo", "TableNo", offsetof(Field, TableNo)),
     Declare<&Field::No>(Field::Field_No::No, "No.", "No.", offsetof(Field, No)),
@@ -330,6 +331,8 @@ inline constexpr auto kFieldFields = WithSystemFields<Field>(std::array<FieldDef
     Declare<&Field::Class>(Field::Field_No::Class, "Class", "Class", offsetof(Field, Class)),
     Declare<&Field::Enabled>(
         Field::Field_No::Enabled, "Enabled", "Enabled", offsetof(Field, Enabled)),
+    Declare<&Field::TypeName>(
+        Field::Field_No::TypeName, "Type Name", "Type Name", offsetof(Field, TypeName)),
     Declare<&Field::FieldCaption>(Field::Field_No::FieldCaption,
                                   "Field Caption",
                                   "Field Caption",

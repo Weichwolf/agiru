@@ -1,6 +1,6 @@
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
 
@@ -55,12 +55,34 @@ void ItWalksMoreRowsThanItHolds(const Connection &connection) {
   CHECK_TRUE("it walks the whole set", seen == kRows);
   CHECK_TRUE("and never holds more than one block", widest <= kFetchBlock);
   CHECK_TRUE("which is smaller than the set", kFetchBlock < kRows);
+  const std::optional<std::string_view> last = cursor.Value(0);
+  CHECK_TRUE("exhaustion preserves the last successful row",
+             last.has_value() && std::stoul(std::string(*last)) == kRows);
+  CHECK_TRUE("a spent cursor takes no more steps", !cursor.Step());
+  const std::optional<std::string_view> stillLast = cursor.Value(0);
+  CHECK_TRUE("repeated exhaustion preserves the last successful row",
+             stillLast.has_value() && std::stoul(std::string(*stillLast)) == kRows);
 }
 
 void AnEmptySetStepsNowhere(const Connection &connection) {
   Cursor cursor(connection, "SELECT n FROM cursor_gate WHERE n > 100000 ORDER BY n", {});
   CHECK_TRUE("a cursor over nothing steps nowhere", !cursor.Step());
   CHECK_TRUE("and stays there", !cursor.Step());
+}
+
+void AFullBlockPreservesItsLastRow(const Connection &connection) {
+  Cursor cursor(connection,
+                "SELECT n FROM cursor_gate WHERE n <= " + std::to_string(kFetchBlock) +
+                    " ORDER BY n",
+                {});
+  std::size_t seen = 0;
+  while (cursor.Step()) { ++seen; }
+  CHECK_TRUE("an exact block is read completely", seen == kFetchBlock);
+  CHECK_TRUE("an exact block remains bounded after exhaustion", cursor.Held() == kFetchBlock);
+  const std::optional<std::string_view> last = cursor.Value(0);
+  CHECK_TRUE("the empty fetch after a full block preserves its last row",
+             last.has_value() && std::stoul(std::string(*last)) == kFetchBlock);
+  CHECK_TRUE("the empty fetch after a full block is terminal", !cursor.Step());
 }
 
 // THE FILTER IS BOUND AND NEVER CONCATENATED. The value below carries a quote and a percent sign,
@@ -136,6 +158,7 @@ int main() {
       agiru::detail::Scope boundary;
       ItWalksMoreRowsThanItHolds(connection);
       AnEmptySetStepsNowhere(connection);
+      AFullBlockPreservesItsLastRow(connection);
       TheFilterBindsItsValues(connection);
       AWildcardBecomesALikeAndAnEmptyValueIsAValue(connection);
       boundary.Discard("");

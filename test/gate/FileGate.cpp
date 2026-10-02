@@ -1,4 +1,3 @@
-#include "runtime/Error.h"
 #include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
@@ -44,8 +43,7 @@ void ATempFileIsMadeOpenedAndWritten() {
   // THE NEGATIVE CONTROL: opening what is not there answers false rather than raising, and
   // erasing it twice answers false the second time.
   agiru::File missing;
-  CHECK_TRUE("a file that is not there does not open",
-             !static_cast<bool>(missing.Open(name)));
+  CHECK_TRUE("a file that is not there does not open", !static_cast<bool>(missing.Open(name)));
   CHECK_TRUE("nor erase", !static_cast<bool>(agiru::File::Erase(name)));
 }
 
@@ -65,7 +63,8 @@ void AStreamOverAFileReadsIt() {
   agiru::Text<0> held;
   reading.ReadText(held);
   CHECK_TEXT("the stream reads what was written",
-             std::string(std::string_view(held)).substr(0, 7), "payload");
+             std::string(std::string_view(held)).substr(0, 7),
+             "payload");
   opened.Close();
   static_cast<void>(agiru::File::Erase(name));
 }

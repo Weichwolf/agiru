@@ -1,6 +1,5 @@
 #include "type/RecordId.h"
 
-#include "runtime/Error.h"
 #include "type/Integer.h"
 
 #include <cstddef>

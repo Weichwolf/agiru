@@ -37,10 +37,10 @@ void AppendingGrowsTheText() {
   builder.Append("one");
   builder.AppendLine(" two");
   builder.Append("three");
-  CHECK_TEXT("AppendLine ends the line it appends", builder.ToText(), "one two\nthree");
+  CHECK_TEXT("AppendLine ends the line it appends", builder.ToText(), "one two\r\nthree");
   builder.Append(agiru::Char{'!'});
-  CHECK_TEXT("a Char is appended as its text", builder.ToText(), "one two\nthree!");
-  CHECK_TRUE("and the length counts what is there", builder.Length() == 14);
+  CHECK_TEXT("a Char is appended as its text", builder.ToText(), "one two\r\nthree!");
+  CHECK_TRUE("and the length counts what is there", builder.Length() == 15);
   builder.Clear();
   CHECK_TEXT("Clear empties it", builder.ToText(), "");
 }
@@ -63,8 +63,12 @@ void ReplaceWorksWholeAndInRange() {
 void LengthReadsAndTruncates() {
   TextBuilder builder;
   builder.Append("abcdef");
+  CHECK_TRUE("reading the length is repeatable", builder.Length() == 6 && builder.Length() == 6);
+  CHECK_TEXT("reading the length preserves the text", builder.ToText(), "abcdef");
   CHECK_TRUE("the setter returns the old length", builder.Length(3) == 6);
   CHECK_TEXT("and cuts the text to the new one", builder.ToText(), "abc");
+  CHECK_TRUE("an explicit zero returns the old length", builder.Length(0) == 3);
+  CHECK_TEXT("an explicit zero clears the text", builder.ToText(), "");
 }
 
 } // namespace

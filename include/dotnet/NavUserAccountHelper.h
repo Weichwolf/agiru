@@ -69,9 +69,7 @@ public:
 
   /// \brief `UserName(Sid)`. \param Sid A Windows security id or Entra object id.
   /// \return Empty: no directory answers here.
-  template <typename Sid> [[nodiscard]] static ::agiru::Text<0> UserName(const Sid &) {
-    return {};
-  }
+  template <typename Sid> [[nodiscard]] static ::agiru::Text<0> UserName(const Sid &) { return {}; }
 
   /// \brief `GetAllowedCompanies([UserSecurityId])`. \return None listed: the caller then
   ///        falls back to the companies it can read itself.
@@ -166,13 +164,20 @@ public:
     return false;
   }
 
-  Refused CreateUserFromAzureADObjectId{{.type = "NavUserAccountHelper", .member = "CreateUserFromAzureADObjectId"}};
-  Refused CreateUserFromAAdGroupObjectId{{.type = "NavUserAccountHelper", .member = "CreateUserFromAAdGroupObjectId"}};
-  Refused GetWindowsGroupMembersByName{{.type = "NavUserAccountHelper", .member = "GetWindowsGroupMembersByName"}};
-  Refused GetTokenAuthorityEndpointServerSetting{{.type = "NavUserAccountHelper", .member = "GetTokenAuthorityEndpointServerSetting"}};
-  Refused GetLocalWindowsGroups{{.type = "NavUserAccountHelper", .member = "GetLocalWindowsGroups"}};
-  Refused GetPermissionSetRelations{{.type = "NavUserAccountHelper", .member = "GetPermissionSetRelations"}};
-  Refused CreateApplicationRegistration{{.type = "NavUserAccountHelper", .member = "CreateApplicationRegistration"}};
+  Refused CreateUserFromAzureADObjectId{
+      {.type = "NavUserAccountHelper", .member = "CreateUserFromAzureADObjectId"}};
+  Refused CreateUserFromAAdGroupObjectId{
+      {.type = "NavUserAccountHelper", .member = "CreateUserFromAAdGroupObjectId"}};
+  Refused GetWindowsGroupMembersByName{
+      {.type = "NavUserAccountHelper", .member = "GetWindowsGroupMembersByName"}};
+  Refused GetTokenAuthorityEndpointServerSetting{
+      {.type = "NavUserAccountHelper", .member = "GetTokenAuthorityEndpointServerSetting"}};
+  Refused GetLocalWindowsGroups{
+      {.type = "NavUserAccountHelper", .member = "GetLocalWindowsGroups"}};
+  Refused GetPermissionSetRelations{
+      {.type = "NavUserAccountHelper", .member = "GetPermissionSetRelations"}};
+  Refused CreateApplicationRegistration{
+      {.type = "NavUserAccountHelper", .member = "CreateApplicationRegistration"}};
 
 private:
   static constexpr std::string_view kAllGranted = "1,1,1,1,1";

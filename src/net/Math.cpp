@@ -1,6 +1,6 @@
 #include "dotnet/Math.h"
 
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/BigInteger.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"

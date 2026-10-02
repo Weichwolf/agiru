@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dotnet/Encoding.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"
 #include "type/Stream.h"

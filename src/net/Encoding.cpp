@@ -1,7 +1,7 @@
 #include "dotnet/Encoding.h"
 
 #include "dotnet/Regex.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 #include "type/Variant.h"

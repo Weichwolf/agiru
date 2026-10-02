@@ -20,10 +20,9 @@ namespace agiru::detail {
 
 /// \brief What a record variable owns as its `xRec` -- a record of its own table, type erased.
 ///
-/// \note IT OWNS AND IT CLONES. The state is copied whenever the record variable is
-///       (`Rec2 := Rec` takes the filters, and the image with them), so a shared pointer would
-///       give two variables one image and a write through one would be seen by the other. AL's
-///       `xRec` belongs to the variable.
+/// \note Record.Copy transfers filters and the image into independently owned state. Ordinary
+///       record assignment copies fields while leaving the destination state intact. Sharing an
+///       image would let changes through one variable affect another variable's xRec.
 class HeldImage {
 public:
   /// \brief No image, which is what a record nobody has touched carries.
@@ -35,18 +34,16 @@ public:
 
   /// \brief Takes the other's image.
   /// \param o The other.
-  HeldImage(HeldImage &&o) noexcept : record_(o.record_), free_(o.free_), clone_(o.clone_) {
+  HeldImage(HeldImage &&o) noexcept : record_(o.record_), ops_(o.ops_) {
     o.record_ = nullptr;
+    o.ops_ = nullptr;
   }
 
   /// \brief Clones the other's image, letting go of this one's.
   /// \param o The other.
   /// \return This.
   HeldImage &operator=(const HeldImage &o) {
-    if (this != &o) {
-      Reset();
-      Take(o);
-    }
+    if (this != &o) { SetFrom(o); }
     return *this;
   }
 
@@ -57,9 +54,9 @@ public:
     if (this != &o) {
       Reset();
       record_ = o.record_;
-      free_ = o.free_;
-      clone_ = o.clone_;
+      ops_ = o.ops_;
       o.record_ = nullptr;
+      o.ops_ = nullptr;
     }
     return *this;
   }
@@ -68,14 +65,33 @@ public:
   ~HeldImage() { Reset(); }
 
   /// \brief Takes ownership of a record as this variable's image.
-  /// \param record The record, which this now owns.
-  /// \param free   How to unmake one.
-  /// \param clone  How to copy one.
-  void Hold(void *record, void (*free)(void *), void *(*clone)(const void *)) {
-    Reset();
-    record_ = record;
-    free_ = free;
-    clone_ = clone;
+  /// \tparam Record The generated record type.
+  /// \param record The record, which this now owns or copies into the existing image.
+  /// \warning Ownership transfers on entry, including when field assignment throws.
+  template <typename Record> void Hold(Record *record) {
+    HeldImage incoming;
+    incoming.record_ = record;
+    incoming.ops_ = &kOps<Record>;
+    if (record_ != nullptr && ops_ == &kOps<Record>) {
+      ops_->assign(record_, record);
+      return;
+    }
+    *this = std::move(incoming);
+  }
+
+  /// \brief Copies another image into this one's stable address, or blanks it if absent.
+  /// \param o The source image.
+  void SetFrom(const HeldImage &o) {
+    if (o.record_ == nullptr) {
+      if (record_ != nullptr) { ops_->blank(record_); }
+      return;
+    }
+    if (record_ != nullptr && ops_ == o.ops_) {
+      ops_->assign(record_, o.record_);
+      return;
+    }
+    HeldImage copy(o);
+    *this = std::move(copy);
   }
 
   /// \return The image, or `nullptr` when there is none.
@@ -83,20 +99,38 @@ public:
 
 private:
   void Take(const HeldImage &o) {
-    if (o.record_ == nullptr || o.clone_ == nullptr) { return; }
-    record_ = o.clone_(o.record_);
-    free_ = o.free_;
-    clone_ = o.clone_;
+    if (o.record_ == nullptr) { return; }
+    record_ = o.ops_->clone(o.record_);
+    ops_ = o.ops_;
   }
 
   void Reset() {
-    if (record_ != nullptr && free_ != nullptr) { free_(record_); }
+    if (record_ != nullptr) { ops_->free(record_); }
     record_ = nullptr;
+    ops_ = nullptr;
   }
 
+  struct Ops {
+    void (*free)(void *);
+    void *(*clone)(const void *);
+    void (*assign)(void *, const void *);
+    void (*blank)(void *);
+  };
+
+  template <typename Record>
+  static constexpr Ops kOps{.free = [](void *held) { delete static_cast<Record *>(held); },
+                            .clone = [](const void *held) -> void * {
+                              return new Record(*static_cast<const Record *>(held));
+                            },
+                            .assign =
+                                [](void *held, const void *source) {
+                                  *static_cast<Record *>(held) =
+                                      *static_cast<const Record *>(source);
+                                },
+                            .blank = [](void *held) { *static_cast<Record *>(held) = Record{}; }};
+
   void *record_ = nullptr;
-  void (*free_)(void *) = nullptr;
-  void *(*clone_)(const void *) = nullptr;
+  const Ops *ops_ = nullptr;
 };
 
 /// \brief The filter group whose fields OR together: `record-filtergroup-method.md` names -1 the
@@ -104,6 +138,10 @@ private:
 ///        `Find Record Management` puts the "contains" search on `No.`, `Description` and the unit
 ///        of measure there at once (4 cases of Record Set UT found nothing, 2026-09-12).
 inline constexpr int kCrossColumnGroup = -1;
+
+/// \brief The highest selectable group; `record-filtergroup-method.md` says values above 255
+///        are ignored.
+inline constexpr int kMaximumFilterGroup = 255;
 
 /// \brief One field's filter, as the record variable carries it.
 struct FieldFilter {
@@ -340,7 +378,8 @@ struct RecordState {
   ///       a preference: this header is in the door, and `<memory>` took the door's parse from
   ///       1.19 s to 1.71 s (min of 3, measured 2026-09-08) -- half a second on every one of the
   ///       6 939 generated translation units. CLAUDE.md names the same trap with the same header.
-  ///       Three pointers and a hand-written copy do the same job for nothing.
+  ///       An image pointer and a pointer to immutable type operations preserve its owner while
+  ///       references are live; records without state still cost only the StateHandle pointer.
   HeldImage image;
 
   /// \brief The cursor `FindSet` opened, if one is open.
@@ -414,10 +453,18 @@ public:
   ///       record invalidates the enumerator, and a temporary one's rows do not come across, so
   ///       those start unpositioned.
   /// \param o The other.
+  /// \warning A failed allocation or image assignment retains the destination's image owner
+  ///          and filter state. A throwing field assignment may partially change image fields.
   void CopyStateFrom(const StateHandle &o) {
     if (this == &o) { return; }
     TempHandle keep = state_ == nullptr ? TempHandle{} : state_->temporary;
     StateHandle copy(o);
+    if (keep != nullptr) { static_cast<void>(copy.Ensure()); }
+    if (state_ != nullptr && state_->image.Get() != nullptr) {
+      RecordState &prepared = copy.Ensure();
+      state_->image.SetFrom(prepared.image);
+      prepared.image = std::move(state_->image);
+    }
     Swap(copy);
     if (state_ != nullptr || keep != nullptr) {
       RecordState &mine = Ensure();

@@ -49,28 +49,46 @@ public:
   ///
   /// \param connection The session's connection.
   ///
-  /// \warning A COMMIT DOES NOT RELEASE THE ENCLOSING BOUNDARY, IT MOVES IT. Releasing it would
-  ///          leave the block with nothing to roll back to, so everything written AFTER an inner
-  ///          `Commit` would survive an error that should have discarded it -- the predecessor
-  ///          records exactly that defect and the reverse of it. Every open savepoint is therefore
-  ///          released and retaken HERE, at the commit point, so a later error rolls back to the
-  ///          commit and no further.
+  /// \warning Production Commit ends the PostgreSQL transaction. Open logical boundaries are
+  ///          recreated in the next transaction so later errors only discard later writes. Under
+  ///          a test isolation floor, the floor remains open and takes explicit Commits back at
+  ///          the end of the test codeunit, as the platform TestIsolation property requires.
   void Commit(const Connection &connection);
 
   /// \return How many boundaries are open.
   [[nodiscard]] std::size_t Depth() const { return names_.size(); }
 
-  /// \brief How many boundaries have been rolled back in this session, which is what a cursor
-  ///        remembers beside the depth it was opened at.
+  /// \brief The transaction generation a cursor belongs to.
   ///
   /// \warning `ROLLBACK TO SAVEPOINT` DESTROYS EVERY CURSOR DECLARED AFTER THE SAVEPOINT, and the
   ///          depth alone cannot tell: the next boundary opens at the SAME depth, so a cursor
   ///          from the rolled-back one looked alive, its `CLOSE` failed with "cursor does not
   ///          exist", and PostgreSQL aborted the transaction the next test was running in
-  ///          (`Incoming Doc. To Data Exch.UT`, 11 cases, 2026-09-10). A cursor opened under a
-  ///          different count is gone and is not closed.
-  /// \return The count.
-  [[nodiscard]] std::size_t Rollbacks() const { return rollbacks_; }
+  ///          (`Incoming Doc. To Data Exch.UT`, 11 cases, 2026-09-10). Production Commit also
+  ///          closes non-holdable cursors. A cursor opened under a different generation is gone.
+  /// \return The generation, advanced by rollback or production Commit.
+  [[nodiscard]] std::size_t CursorEpoch() const { return cursorEpoch_; }
+
+  /// \brief Sets the outer rollback boundary of a test runner.
+  /// \param depth The runner's boundary depth; zero restores production behaviour.
+  /// \return The previous floor for nested runner invocations.
+  std::size_t IsolationFloor(std::size_t depth) {
+    const std::size_t previous = isolationFloor_;
+    isolationFloor_ = depth;
+    return previous;
+  }
+
+  /// \brief Sets whether the current AutoRollback test method refuses AL Commit.
+  /// \param active Whether the refusal applies inside this method.
+  /// \return The previous setting for nested test execution.
+  bool AutoRollbackTest(bool active) {
+    const bool previous = autoRollbackTest_;
+    autoRollbackTest_ = active;
+    return previous;
+  }
+
+  /// \return Whether AL Commit is refused by the current AutoRollback test method.
+  [[nodiscard]] bool IsAutoRollbackTest() const { return autoRollbackTest_; }
 
   /// \brief The message of the last error a boundary rolled back, for AL `GetLastErrorText()`.
   /// \return The text, or empty when nothing has failed in this session.
@@ -124,10 +142,17 @@ public:
   }
 
 private:
-  std::vector<std::string> names_;
+  struct Boundary {
+    std::string name;
+    std::vector<std::string> inconsistentBefore;
+  };
+
+  std::vector<Boundary> names_;
   std::vector<std::string> inconsistent_;
   std::string lastError_;
-  std::size_t rollbacks_ = 0;
+  std::size_t cursorEpoch_ = 0;
+  std::size_t isolationFloor_ = 0;
+  bool autoRollbackTest_ = false;
   std::string lastErrorCode_;
   std::size_t issued_ = 0;
   TransactionType type_ = TransactionType::UpdateNoLocks;
@@ -165,9 +190,40 @@ public:
   /// \param error The error.
   void Discard(const Error &error);
 
+  /// \return The boundary depth, for an enclosing test isolation policy.
+  [[nodiscard]] std::size_t Depth() const { return depth_; }
+
 private:
   std::size_t depth_;
   bool open_ = true;
+};
+
+/// \brief Restores the previous test isolation floor when a runner returns or raises.
+class IsolationFloor {
+public:
+  /// \param depth The runner's outer rollback boundary.
+  explicit IsolationFloor(std::size_t depth);
+  ~IsolationFloor();
+
+  IsolationFloor(const IsolationFloor &) = delete;
+  IsolationFloor &operator=(const IsolationFloor &) = delete;
+
+private:
+  std::size_t previous_;
+};
+
+/// \brief Restores the enclosing test method's Commit policy on return or error.
+class AutoRollbackTest {
+public:
+  /// \param active Whether this test method refuses AL Commit.
+  explicit AutoRollbackTest(bool active);
+  ~AutoRollbackTest();
+
+  AutoRollbackTest(const AutoRollbackTest &) = delete;
+  AutoRollbackTest &operator=(const AutoRollbackTest &) = delete;
+
+private:
+  bool previous_;
 };
 
 }

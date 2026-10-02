@@ -1,6 +1,7 @@
 #include "runtime/Scopes.h"
 
 #include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/CommitBehavior.h"
 #include "type/ErrorBehavior.h"
 
@@ -33,7 +34,11 @@ std::vector<std::string> &CollectedErrors() {
 }
 
 CommitScope::CommitScope(::agiru::CommitBehavior behaviour) {
-  Commits().push_back(behaviour);
+  auto &standing = Commits();
+  if (!standing.empty() && standing.back() == CommitBehavior::Error) {
+    behaviour = CommitBehavior::Error;
+  }
+  standing.push_back(behaviour);
 }
 
 CommitScope::~CommitScope() {

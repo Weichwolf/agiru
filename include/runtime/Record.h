@@ -251,18 +251,29 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
 /// \return Whether a row was there to rename.
 bool RuntimeRename(void *record, const void *before, const TableDef &table);
 
+/// \brief AL `Record.FilterGroup()` on any record, without allocating or changing its state.
+/// \param record The record.
+/// \return The current group, or zero when the record has no state.
+Integer RuntimeFilterGroup(const void *record);
+
 /// \brief AL `Record.FilterGroup(NewGroup)` on any record: sets the group later filters land in.
 /// \param record The record.
-/// \param group  The group.
+/// \param group The group; values above 255 are ignored (`record-filtergroup-method.md`).
 /// \return The group that was current.
 Integer RuntimeFilterGroup(void *record, Integer group);
+
+/// \brief AL `Record.HasFilter()` on any record, limited to its current filter group.
+/// \param record The record.
+/// \return Whether that group contains a field filter, without allocating state.
+bool RuntimeHasFilter(const void *record);
 
 /// \brief AL `Record.GetRangeMax` / `GetRangeMin`: the bound of the filter standing on a field.
 /// \param state The record's filters, or `nullptr`.
 /// \param no    The field.
 /// \param upper True for the maximum, false for the minimum.
-/// \return The bound as filter text; empty when no filter bounds the field on that side.
-/// \throws Error when the filter is not a single range -- `A|B`, `<>A`, a wildcard -- which is
+/// \return The bound as filter text; empty for an open end of an applied range.
+/// \throws Error when the field has no filter or the filter is not a single range --
+///         `A|B`, `<>A`, a wildcard -- which is
 ///         what `devenv-setcurrentkey-setrange-setfilter-getrangemin-and-getrangemax-methods.md`
 ///         documents as a runtime error (board:0508).
 /// \note THE RANGE IS READ ACROSS FILTER GROUPS when the current group holds none: the BaseApp

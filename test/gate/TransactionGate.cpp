@@ -1,6 +1,7 @@
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Transaction.h"
@@ -13,8 +14,8 @@
 
 using agiru::Error;
 using agiru::Session;
-using agiru::app::tables::ResourceCost;
-using agiru::app::tables::ResourceCostType;
+using ResourceCost = agiru::Projects::Resources::Pricing::ResourceCost_Table;
+using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 
 namespace {
 

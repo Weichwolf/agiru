@@ -1,5 +1,6 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
+#include "runtime/Session.h"
 
 #include "BuiltinsWritten.h"
 #include "Check.h"
@@ -127,6 +128,7 @@ namespace {
 /// close frees it once. `Environment Information Impl.` holds the SaaS testability flag this way
 /// (board:0471).
 void ASingleInstanceCodeunitIsOneObjectPerSession() {
+  const agiru::Session session(AGIRU_TEST_DSN);
   {
     agiru::Instance<SingleCounted> one;
     agiru::Instance<SingleCounted> other;

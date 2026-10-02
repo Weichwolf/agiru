@@ -2,23 +2,22 @@
 
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 
-#include "Subscribers.h"
+#include "SessionState.h"
 
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
-#include <map>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace agiru {
@@ -36,39 +35,20 @@ bool SameName(std::string_view a, std::string_view b) {
          });
 }
 
-struct Bound {
-  const SubscriptionCatalogue *catalogue;
+struct Invocation {
   void *instance;
+  std::uint64_t generation;
 };
 
-std::vector<Bound> &ManualBindings() {
-  thread_local std::vector<Bound> bound;
-  return bound;
-}
+using OwnedSubscriber = std::unique_ptr<void, void (*)(void *)>;
 
-struct Automatic {
-  const SubscriptionCatalogue *catalogue;
-  void *instance;
-
-  ~Automatic() { catalogue->Free(instance); }
-};
-
-std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &Made() {
-  thread_local std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> made;
-  return made;
-}
-
-void *AutomaticInstance(const SubscriptionCatalogue &catalogue) {
-  if (catalogue.SingleInstance()) {
-    return ::agiru::detail::SingleInstanceOf(catalogue.Id(), catalogue.Maker(), catalogue.Freer());
+OwnedSubscriber MakeSubscriber(const SubscriptionCatalogue &catalogue) {
+  if (catalogue.Maker() == nullptr || catalogue.Freer() == nullptr) {
+    throw Error("event subscriber: invalid factory");
   }
-  std::map<const SubscriptionCatalogue *, std::unique_ptr<Automatic>> &made = Made();
-  auto found = made.find(&catalogue);
-  if (found == made.end()) {
-    found =
-        made.emplace(&catalogue, std::make_unique<Automatic>(&catalogue, catalogue.Make())).first;
-  }
-  return found->second->instance;
+  OwnedSubscriber owned(catalogue.Make(), catalogue.Freer());
+  if (owned == nullptr) { throw Error("event subscriber: the factory returned no instance"); }
+  return owned;
 }
 
 bool Listens(const Subscription &subscription,
@@ -141,6 +121,46 @@ namespace detail {
 
 namespace {
 
+std::vector<Invocation> BoundInstances(const SubscriptionCatalogue &catalogue) {
+  std::vector<Invocation> instances;
+  const detail::SessionState *state = detail::SessionState::Peek();
+  if (state == nullptr) { return instances; }
+  for (const detail::SessionState::Binding &held : state->bindings) {
+    if (held.catalogue == &catalogue) { instances.push_back({held.instance, held.generation}); }
+  }
+  return instances;
+}
+
+bool StillBound(const detail::SessionState *owner, std::uint64_t generation) {
+  if (generation == 0) { return true; }
+  const detail::SessionState *state = detail::SessionState::Peek();
+  return state != nullptr && state == owner &&
+         std::ranges::any_of(state->bindings,
+                             [=](const auto &held) { return held.generation == generation; });
+}
+
+void Invoke(const Subscription &subscription,
+            void *instance,
+            const EventArgs &args,
+            std::span<const std::size_t> bound,
+            bool isolated) {
+  if (!isolated) {
+    subscription.invoke(instance, args, bound);
+    return;
+  }
+  Scope boundary;
+  try {
+    subscription.invoke(instance, args, bound);
+  } catch (const Error &e) {
+    boundary.Discard(e);
+    return;
+  } catch (const std::exception &e) {
+    boundary.Discard(e.what());
+    return;
+  }
+  boundary.Keep();
+}
+
 void Dispatch(EventObject kind,
               std::int32_t objectId,
               std::string_view objectName,
@@ -151,32 +171,23 @@ void Dispatch(EventObject kind,
   for (const SubscriptionCatalogue *catalogue : Catalogues()) {
     for (const Subscription &subscription : catalogue->Subscriptions()) {
       if (!Listens(subscription, kind, objectId, objectName, event, element)) { continue; }
-      std::vector<void *> instances;
+      const SessionState *owner = SessionState::Peek();
+      std::vector<Invocation> instances;
+      OwnedSubscriber automatic(nullptr, catalogue->Freer());
       if (catalogue->Manual()) {
-        for (const Bound &held : ManualBindings()) {
-          if (held.catalogue == catalogue) { instances.push_back(held.instance); }
-        }
+        instances = BoundInstances(*catalogue);
+      } else if (catalogue->SingleInstance()) {
+        instances.push_back(
+            {SingleInstanceOf(catalogue->Id(), catalogue->Maker(), catalogue->Freer()), 0});
       } else {
-        instances.push_back(AutomaticInstance(*catalogue));
+        automatic = MakeSubscriber(*catalogue);
+        instances.push_back({automatic.get(), 0});
       }
       if (instances.empty()) { continue; }
       const std::vector<std::size_t> bound = Bind(subscription, *catalogue, args);
-      for (void *instance : instances) {
-        if (!isolated) {
-          subscription.invoke(instance, args, bound);
-          continue;
-        }
-        Scope boundary;
-        try {
-          subscription.invoke(instance, args, bound);
-        } catch (const Error &e) {
-          boundary.Discard(e);
-          continue;
-        } catch (const std::exception &e) {
-          boundary.Discard(e.what());
-          continue;
-        }
-        boundary.Keep();
+      for (const Invocation &held : instances) {
+        if (!StillBound(owner, held.generation)) { continue; }
+        Invoke(subscription, held.instance, args, bound, isolated);
       }
     }
   }
@@ -202,29 +213,42 @@ void RaiseIsolated(EventObject kind,
   Dispatch(kind, objectId, objectName, event, element, args, true);
 }
 
-void ReleaseAutomaticInstances() {
-  Made().clear();
-}
-
 bool BindSubscriptions(CodeunitId id, void *instance) {
+  SessionState &state = SessionState::Current();
   const auto found = std::ranges::find_if(
       Catalogues(), [&](const SubscriptionCatalogue *c) { return c->Id().Value() == id.Value(); });
   if (found == Catalogues().end()) { return false; }
-  for (const Bound &held : ManualBindings()) {
+  if (!(*found)->Manual()) {
+    throw Error("BindSubscription requires EventSubscriberInstance Manual");
+  }
+  if (instance == nullptr) { throw Error("BindSubscription requires a live instance"); }
+  for (const SessionState::Binding &held : state.bindings) {
     if (held.instance == instance) { return false; }
   }
-  ManualBindings().push_back(Bound{.catalogue = *found, .instance = instance});
+  if (state.lastBinding == std::numeric_limits<std::uint64_t>::max()) {
+    throw Error("BindSubscription exhausted this session's binding identities");
+  }
+  state.bindings.push_back({id, *found, instance, ++state.lastBinding});
   return true;
 }
 
 bool UnbindSubscriptions(CodeunitId id, void *instance) {
-  std::vector<Bound> &held = ManualBindings();
-  const auto at = std::ranges::find_if(held, [&](const Bound &b) {
-    return b.instance == instance && b.catalogue->Id().Value() == id.Value();
-  });
+  SessionState &state = SessionState::Current();
+  const auto catalogue =
+      std::ranges::find_if(Catalogues(), [=](const auto *entry) { return entry->Id() == id; });
+  if (catalogue != Catalogues().end() && !(*catalogue)->Manual()) {
+    throw Error("UnbindSubscription requires EventSubscriberInstance Manual");
+  }
+  auto &held = state.bindings;
+  const auto at = std::ranges::find_if(
+      held, [&](const SessionState::Binding &b) { return b.instance == instance && b.id == id; });
   if (at == held.end()) { return false; }
   held.erase(at);
   return true;
+}
+
+void ReleaseSubscriptions(CodeunitId id, void *instance) noexcept {
+  SessionState::ReleaseBindings(id, instance);
 }
 
 }

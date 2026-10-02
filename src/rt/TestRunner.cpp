@@ -2,9 +2,13 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageCore.h"
+#include "type/Integer.h"
+#include "type/JsonObject.h"
+#include "type/Text.h"
 #include "type/TransactionModel.h"
 
 #include "BuiltinsWritten.h"
@@ -16,10 +20,12 @@
 #include <exception>
 #include <mutex>
 #include <new>
+#include <optional>
 #include <print>
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <execinfo.h>
@@ -97,14 +103,31 @@ struct Driven {
   void *instance;
 };
 
-TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void *instance) {
+struct MethodResources {
+  MethodResources() { detail::ClearTraps(); }
+
+  MethodResources(const MethodResources &) = delete;
+  MethodResources &operator=(const MethodResources &) = delete;
+
+  ~MethodResources() {
+    HandlerTable::Reset();
+    detail::ClearTraps();
+  }
+};
+
+TestResult RunOne(const TestCatalogue &codeunit,
+                  const TestMethod &method,
+                  void *instance,
+                  bool commitOnSuccess) {
   TraceAllocationFailures_();
-  detail::ClearTraps();
+  const MethodResources resources;
   ClearLastError();
   Randomize(kSeedBeforeEachTest);
   detail::Scope scope;
-  HandlerTable::Install(codeunit.Handlers(), method.handlers);
+  const detail::AutoRollbackTest commitPolicy(method.model.has_value() &&
+                                              *method.model == TransactionModel::AutoRollback);
   try {
+    HandlerTable::Install(codeunit.Handlers(), method.handlers);
     method.invoke(instance);
   } catch (const Error &e) {
     static_cast<void>(HandlerTable::Uninstall());
@@ -123,20 +146,56 @@ TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void 
                                e.what()};
   }
   const std::vector<std::string_view> missed = HandlerTable::Uninstall();
+  if (!missed.empty()) {
+    const std::string error =
+        "The handler(s) " + Missed(missed) + " were named and never ran (board:0054)";
+    scope.Discard(error);
+    return TestResult{
+        .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = error};
+  }
   if (method.model.has_value() && *method.model == TransactionModel::AutoRollback) {
     scope.Discard("");
   } else {
+    if (commitOnSuccess) {
+      try {
+        Commit();
+      } catch (const Error &e) {
+        scope.Discard(e);
+        return TestResult{
+            .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
+      }
+    }
     scope.Keep();
-  }
-  if (!missed.empty()) {
-    return TestResult{.codeunit = codeunit.Name(),
-                      .method = method.name,
-                      .passed = false,
-                      .error = "The handler(s) " + Missed(missed) +
-                               " were named and never ran (board:0054)"};
   }
   return TestResult{
       .codeunit = codeunit.Name(), .method = method.name, .passed = true, .error = {}};
+}
+
+TestResult RunSelectedMethod(const TestCatalogue &codeunit,
+                             const TestMethod &method,
+                             void *instance,
+                             TestIsolation isolation) {
+  if (isolation == TestIsolation::Function) {
+    detail::Scope methodIsolation;
+    const detail::IsolationFloor methodFloor(methodIsolation.Depth());
+    TestResult result = RunOne(codeunit, method, instance, false);
+    methodIsolation.Discard("");
+    return result;
+  }
+  return RunOne(codeunit,
+                method,
+                instance,
+                isolation == TestIsolation::Disabled && method.model != TransactionModel::None);
+}
+
+void AppendResult(TestRun &run, TestResult result, void *context, ContextTestReport report) {
+  run.results.push_back(std::move(result));
+  if (run.results.back().passed) {
+    ++run.passed;
+  } else {
+    ++run.failed;
+  }
+  if (report != nullptr) { report(context, run.results.back()); }
 }
 
 }
@@ -176,40 +235,73 @@ std::vector<const TestCatalogue *> RegisteredTestCodeunits() {
   return Registered();
 }
 
+std::string TestResultJson(CodeunitId id, const TestResult &result) {
+  constexpr Integer kResultSchema = 1;
+  JsonObject row;
+  row.Add("schema", kResultSchema);
+  row.Add("codeunit_id", id.Value());
+  row.Add("codeunit", result.codeunit);
+  row.Add("method", result.method);
+  row.Add("passed", result.passed);
+  row.Add("error", std::string_view(result.error));
+  Text<0> encoded;
+  row.WriteTo(encoded);
+  return std::string(std::string_view(encoded));
+}
+
 TestRun RunRegisteredTests(std::string_view codeunit) {
   return RunRegisteredTests(codeunit, nullptr);
 }
 
+TestRun RunRegisteredTests(std::string_view codeunit, TestIsolation isolation) {
+  return RunRegisteredTests(codeunit, nullptr, nullptr, isolation);
+}
+
 TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
+  return RunRegisteredTests(codeunit, &report, [](void *context, const TestResult &result) {
+    const auto callback = *static_cast<TestReport *>(context);
+    if (callback != nullptr) { callback(result); }
+  });
+}
+
+TestRun RunRegisteredTests(std::string_view codeunit,
+                           void *context,
+                           ContextTestReport report,
+                           TestIsolation isolationPolicy) {
   TestRun run;
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
-    detail::Scope isolation;
+    std::optional<detail::Scope> isolation;
+    std::optional<detail::IsolationFloor> floor;
+    if (isolationPolicy == TestIsolation::Codeunit) {
+      isolation.emplace();
+      floor.emplace(isolation->Depth());
+    }
     const Driven driven(*catalogue);
     if (catalogue->OnRun() != nullptr) {
       try {
         catalogue->OnRun()(driven.instance);
       } catch (const std::exception &e) {
-        isolation.Discard(e.what());
-        run.results.push_back(TestResult{
-            .codeunit = catalogue->Name(), .method = "OnRun", .passed = false, .error = e.what()});
-        ++run.failed;
-        if (report != nullptr) { report(run.results.back()); }
+        if (isolation.has_value()) { isolation->Discard(e.what()); }
+        AppendResult(run,
+                     TestResult{.codeunit = catalogue->Name(),
+                                .method = "OnRun",
+                                .passed = false,
+                                .error = e.what()},
+                     context,
+                     report);
         continue;
       }
     }
     static const char *const only = std::getenv("AGIRU_TEST_PROCEDURE");
     for (const TestMethod &method : catalogue->Methods()) {
       if (only != nullptr && !Named(only, method.name)) { continue; }
-      run.results.push_back(RunOne(*catalogue, method, driven.instance));
-      if (run.results.back().passed) {
-        ++run.passed;
-      } else {
-        ++run.failed;
-      }
-      if (report != nullptr) { report(run.results.back()); }
+      AppendResult(run,
+                   RunSelectedMethod(*catalogue, method, driven.instance, isolationPolicy),
+                   context,
+                   report);
     }
-    isolation.Discard("");
+    if (isolation.has_value()) { isolation->Discard(""); }
   }
   return run;
 }

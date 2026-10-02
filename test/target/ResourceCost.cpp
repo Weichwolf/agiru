@@ -3,31 +3,33 @@
 #include "ResourceCost.h"
 
 #include "Builtins.h"
+#include "meta/Declare.h"
 #include "meta/Ids.h"
-#include "runtime/Catalogue.h"
+#include "meta/TableDef.h"
 #include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/Table.h"
-#include "type/Code.h"
+#include "runtime/test/TestField.h"
+#include "type/Option.h"
 
 #include "BuiltinsWritten.h"
+#include "options/Types.h"
 
-namespace agiru::app::tables {
+namespace agiru::Projects::Resources::Pricing {
 
-void ResourceCost::OnValidateCode() {
-  if (Code != "" && Type == ResourceCostType::All) {
+void ResourceCost_Table::OnValidateCode() {
+  if (Code != "" && Type == ::agiru::Option<::agiru::options::OptionResourceGroupResourceAll>{
+                                ::agiru::options::OptionResourceGroupResourceAll::All}) {
     FieldError(Code, StrSubstNo(Text000, FieldCaption(Type), Format(Type)));
   }
 }
 
-void ResourceCost::OnValidateCostType() {
-  if (WorkTypeCode == "") { TestField(CostType, ResourceCostCostType::Fixed); }
+void ResourceCost_Table::OnValidateCostType() {
+  if (WorkTypeCode == "") {
+    TestField(CostType,
+              ::agiru::Option<::agiru::options::OptionFixedPercentExtraLCYExtra>{
+                  ::agiru::options::OptionFixedPercentExtraLCYExtra::Fixed});
+  }
 }
 
-namespace {
-namespace ResourceCost_unit {
-const RegisterTable<ResourceCost> kInCatalogue;
-} // namespace ResourceCost_unit
-} // namespace
-
-} // namespace agiru::app::tables
+} // namespace agiru::Projects::Resources::Pricing

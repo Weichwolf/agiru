@@ -14,60 +14,31 @@
 #include "type/Guid.h"
 #include "type/Option.h"
 
+#include "options/Types.h"
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
 
-namespace agiru::app::tables {
-
-enum class ResourceCostType : std::int32_t {
-  Resource = 0,
-  GroupResource = 1,
-  All = 2,
-};
-
-enum class ResourceCostCostType : std::int32_t {
-  Fixed = 0,
-  PercentExtra = 1,
-  LCYExtra = 2,
-};
-
-} // namespace agiru::app::tables
-
-template <> struct agiru::OptionTraits<agiru::app::tables::ResourceCostType> {
-  static constexpr std::array<EnumValueDef, 3> kValues{{
-      EnumValueDef{.ordinal = 0, .name = "Resource", .caption = "Resource"},
-      EnumValueDef{.ordinal = 1, .name = "Group(Resource)", .caption = "Group(Resource)"},
-      EnumValueDef{.ordinal = 2, .name = "All", .caption = "All"},
-  }};
-};
-
-template <> struct agiru::OptionTraits<agiru::app::tables::ResourceCostCostType> {
-  static constexpr std::array<EnumValueDef, 3> kValues{{
-      EnumValueDef{.ordinal = 0, .name = "Fixed", .caption = "Fixed"},
-      EnumValueDef{.ordinal = 1, .name = "% Extra", .caption = "% Extra"},
-      EnumValueDef{.ordinal = 2, .name = "LCY Extra", .caption = "LCY Extra"},
-  }};
-};
-
-namespace agiru::app::tables {
+namespace agiru::Projects::Resources::Pricing {
 
 class ResourceCost_Table;
-using ResourceCost = ResourceCost_Table;
 
 class ResourceCost_Table : public Table<ResourceCost_Table> {
 public:
+  using Table<ResourceCost_Table>::operator=;
+
   static constexpr TableId kId{202};
   static constexpr std::string_view kName{"Resource Cost"};
 
   detail::StateHandle State_Block;
 
-  Option<ResourceCostType> Type{};
+  Option<::agiru::options::OptionResourceGroupResourceAll> Type{};
   ::agiru::Code<20> Code{};
   ::agiru::Code<10> WorkTypeCode{};
-  Option<ResourceCostCostType> CostType{};
+  Option<::agiru::options::OptionFixedPercentExtraLCYExtra> CostType{};
   Decimal DirectUnitCost{};
   Decimal UnitCost{};
   Guid SystemId{};
@@ -98,15 +69,22 @@ public:
 
 extern const TableDef kResourceCostTable;
 
-} // namespace agiru::app::tables
+} // namespace agiru::Projects::Resources::Pricing
 
-template <> struct agiru::TableTraits<agiru::app::tables::ResourceCost> {
-  static constexpr const TableDef &kTable = agiru::app::tables::kResourceCostTable;
-  static constexpr std::array<agiru::OnValidateOf<agiru::app::tables::ResourceCost>, 2> kOnValidate{
-      {
-          {.field = agiru::app::tables::ResourceCost::Field_No::Code,
-           .run = [](agiru::app::tables::ResourceCost &record) { record.OnValidateCode(); }},
-          {.field = agiru::app::tables::ResourceCost::Field_No::CostType,
-           .run = [](agiru::app::tables::ResourceCost &record) { record.OnValidateCostType(); }},
-      }};
+template <> struct agiru::TableTraits<agiru::Projects::Resources::Pricing::ResourceCost_Table> {
+  static constexpr const TableDef &kTable = agiru::Projects::Resources::Pricing::kResourceCostTable;
+  static constexpr std::
+      array<agiru::OnValidateOf<agiru::Projects::Resources::Pricing::ResourceCost_Table>, 2>
+          kOnValidate{{
+              {.field = agiru::Projects::Resources::Pricing::ResourceCost_Table::Field_No::Code,
+               .run =
+                   [](agiru::Projects::Resources::Pricing::ResourceCost_Table &record) {
+                     record.OnValidateCode();
+                   }},
+              {.field = agiru::Projects::Resources::Pricing::ResourceCost_Table::Field_No::CostType,
+               .run =
+                   [](agiru::Projects::Resources::Pricing::ResourceCost_Table &record) {
+                     record.OnValidateCostType();
+                   }},
+          }};
 };

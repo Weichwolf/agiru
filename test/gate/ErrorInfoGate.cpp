@@ -1,4 +1,4 @@
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "type/ErrorInfo.h"
 
 #include "Check.h"

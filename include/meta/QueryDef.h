@@ -62,9 +62,9 @@ enum class QueryMethod : std::uint8_t {
 /// \brief One equality of a `DataItemLink`: a field of the lower dataitem's table against a
 ///        field of an ANCESTOR dataitem's table (`devenv-dataitemlink-query-property.md`).
 struct QueryLink {
-  FieldNo field{};          ///< The lower dataitem's field.
-  std::size_t dataItem{};   ///< Which ancestor, by position in `QueryDef::dataItems`.
-  FieldNo reference{};      ///< The ancestor's field.
+  FieldNo field{};        ///< The lower dataitem's field.
+  std::size_t dataItem{}; ///< Which ancestor, by position in `QueryDef::dataItems`.
+  FieldNo reference{};    ///< The ancestor's field.
 };
 
 /// \brief One `dataitem`: a table, how it joins what is above it, and its permanent filter.
@@ -73,12 +73,13 @@ struct QueryLink {
 ///       "lower data items are linked to the resulting dataset of the linked data items above it"
 ///       -- so the flat list here is the nesting flattened in order, and the first has no join.
 struct QueryDataItem {
-  std::string_view name{};              ///< The dataitem's AL name.
-  const TableDef *table = nullptr;      ///< Its table.
+  std::string_view name{};               ///< The dataitem's AL name.
+  const TableDef *table = nullptr;       ///< Its table.
   QueryJoin join = QueryJoin::LeftOuter; ///< How it joins the dataset above it.
-  std::span<const QueryLink> links{};   ///< The `DataItemLink` equalities.
+  std::span<const QueryLink> links{};    ///< The `DataItemLink` equalities.
 
-  /// \brief The `DataItemTableFilter` property, as AL wrote it: `Field = const(V), Field = filter(E)`.
+  /// \brief The `DataItemTableFilter` property, as AL wrote it: `Field = const(V), Field =
+  /// filter(E)`.
   ///
   /// \warning IT CANNOT BE OVERWRITTEN FROM AL CODE (`devenv-dataitemtablefilter-property.md`):
   ///          a `SetRange` on the same field is ANDed with it, never put in its place. So it is
@@ -89,14 +90,14 @@ struct QueryDataItem {
 /// \brief One `column` or `filter` element: a field of a dataitem, read into a member of the
 ///        generated class -- or, for a `filter`, only filtered on and never read.
 struct QueryColumn {
-  std::string_view name{};    ///< The column's AL name, which `ColumnName` answers.
-  std::string_view caption{}; ///< The `Caption` property, or the name.
-  std::size_t offset{};       ///< `offsetof` within the generated query.
-  std::size_t dataItem{};     ///< Which dataitem, by position.
-  FieldNo field{};            ///< Which field of that dataitem's table.
+  std::string_view name{};                ///< The column's AL name, which `ColumnName` answers.
+  std::string_view caption{};             ///< The `Caption` property, or the name.
+  std::size_t offset{};                   ///< `offsetof` within the generated query.
+  std::size_t dataItem{};                 ///< Which dataitem, by position.
+  FieldNo field{};                        ///< Which field of that dataitem's table.
   QueryMethod method = QueryMethod::None; ///< The `Method` property.
-  bool returned = true;       ///< A `column` is read; a `filter` element is not.
-  bool reverseSign = false;   ///< The `ReverseSign` property.
+  bool returned = true;                   ///< A `column` is read; a `filter` element is not.
+  bool reverseSign = false;               ///< The `ReverseSign` property.
 
   /// \brief The `ColumnFilter` property, as AL wrote it. A `SetFilter` or `SetRange` from AL code
   ///        REPLACES it, which is the difference from a dataitem's table filter.
@@ -111,13 +112,13 @@ struct QueryOrder {
 
 /// \brief A query's whole declaration.
 struct QueryDef {
-  QueryId id{};                             ///< The AL query number.
-  std::string_view name{};                  ///< The AL name.
-  std::string_view caption{};               ///< The `Caption` property.
+  QueryId id{};                               ///< The AL query number.
+  std::string_view name{};                    ///< The AL name.
+  std::string_view caption{};                 ///< The `Caption` property.
   std::span<const QueryDataItem> dataItems{}; ///< In nesting order; the first is the root.
-  std::span<const QueryColumn> columns{};   ///< In declaration order.
-  std::span<const QueryOrder> orderBy{};    ///< The `OrderBy` property.
-  std::int32_t topNumberOfRows = 0;         ///< The `TopNumberOfRows` property; 0 is no limit.
+  std::span<const QueryColumn> columns{};     ///< In declaration order.
+  std::span<const QueryOrder> orderBy{};      ///< The `OrderBy` property.
+  std::int32_t topNumberOfRows = 0;           ///< The `TopNumberOfRows` property; 0 is no limit.
 };
 
 /// \brief Whether any column aggregates, so the rows group.

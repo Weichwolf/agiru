@@ -1,5 +1,5 @@
 #include "dotnet/XmlReader.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 
 #include "Check.h"
 
@@ -14,8 +14,8 @@ using agiru::dotnet::XmlReaderSettings;
 namespace {
 
 /// A READER WALKS THE NODES FORWARD, AS .NET'S DOES, with the node types numbered the same:
-/// `XML Buffer Writer` fills the XML Buffer from `Read`, `NodeType`, `Depth`, `Name`, `Value` and the
-/// attribute moves, and the whitespace between elements is a node like in .NET (board:0676).
+/// `XML Buffer Writer` fills the XML Buffer from `Read`, `NodeType`, `Depth`, `Name`, `Value` and
+/// the attribute moves, and the whitespace between elements is a node like in .NET (board:0676).
 void AReaderWalksElementsAttributesAndText() {
   StringReader source;
   source = source.StringReader("<?xml version=\"1.0\"?><a x=\"1\"><b>hi</b><c/></a>");
@@ -25,11 +25,12 @@ void AReaderWalksElementsAttributesAndText() {
   XmlReader reader = XmlReader::Create(source, settings);
   std::vector<std::string> walk;
   while (reader.Read()) {
-    walk.push_back(std::to_string(reader.NodeType().Number()) + ":" + std::string(reader.Name().Value()) +
-                   "@" + std::to_string(reader.Depth()));
+    walk.push_back(std::to_string(reader.NodeType().Number()) + ":" +
+                   std::string(reader.Name().Value()) + "@" + std::to_string(reader.Depth()));
     if (reader.NodeType().Equals(XmlNodeType::Element()) && reader.MoveToFirstAttribute()) {
       do {
-        walk.push_back("attr " + std::string(reader.Name().Value()) + "=" + std::string(reader.Value().Value()));
+        walk.push_back("attr " + std::string(reader.Name().Value()) + "=" +
+                       std::string(reader.Value().Value()));
       } while (reader.MoveToNextAttribute());
     }
   }
@@ -48,7 +49,8 @@ void AReaderWalksElementsAttributesAndText() {
     XmlReader broken = XmlReader::Create(bad, settings);
     while (broken.Read()) {}
   } catch (const agiru::Error &e) { said = e.what(); }
-  CHECK_TRUE("malformed XML refuses when it is reached", said.find("well-formed") != std::string::npos);
+  CHECK_TRUE("malformed XML refuses when it is reached",
+             said.find("well-formed") != std::string::npos);
 }
 
 } // namespace

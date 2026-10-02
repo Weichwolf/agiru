@@ -1,10 +1,13 @@
+#include "runtime/ConnectionInfo.h"
 #include "runtime/Database.h"
-#include "runtime/Error.h"
+#include "runtime/ErrorValue.h"
 #include "runtime/test/RunnerDatabase.h"
 
 #include "Check.h"
 
 #include <string>
+
+#include <unistd.h>
 
 using agiru::Connection;
 using agiru::DatabaseError;
@@ -20,15 +23,19 @@ namespace {
 // database would look like a test defect for as long as anyone cared to look.
 void TheDsnIsPointedElsewhere() {
   CHECK_TEXT("the URI's database is replaced",
-             PointedAt("postgresql://u:p@h:5433/agiru_master", DatabaseName{"agiru_test_0"}),
-             "postgresql://u:p@h:5433/agiru_test_0");
-  CHECK_TEXT("and its parameters survive",
+             agiru::ConnectionInfo(
+                 PointedAt("postgresql://u:p@h:5433/agiru_master", DatabaseName{"agiru_test_0"}))
+                 .Database(),
+             "agiru_test_0");
+  CHECK_TRUE("and its parameters survive",
              PointedAt("postgresql://u:p@h:5433/agiru_master?sslmode=require",
-                       DatabaseName{"agiru_test_0"}),
-             "postgresql://u:p@h:5433/agiru_test_0?sslmode=require");
+                       DatabaseName{"agiru_test_0"})
+                 .contains("sslmode='require'"));
   CHECK_TEXT("the keyword form's database is replaced",
-             PointedAt("host=h port=5433 dbname=agiru_master user=u", DatabaseName{"agiru_test_0"}),
-             "host=h port=5433 dbname=agiru_test_0 user=u");
+             agiru::ConnectionInfo(PointedAt("host=h port=5433 dbname=agiru_master user=u",
+                                             DatabaseName{"agiru_test_0"}))
+                 .Database(),
+             "agiru_test_0");
 
   // AND A STRING THAT NAMES NO DATABASE IS REFUSED. Defaulting to the server's own idea of one
   // would put the runner's writes wherever libpq happened to land.
@@ -43,6 +50,8 @@ void TheDsnIsPointedElsewhere() {
 // whole claim: physical write isolation. The predecessor ran the AL suite and its gate against one
 // database and spent a session chasing eleven failures that belonged to the seed (openerp WI-832).
 void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
+  const std::string templateName = "agiru_runner_template_" + std::to_string(getpid());
+  const std::string scratchName = "agiru_runner_gate_" + std::to_string(getpid());
   // THE GATE MAKES ITS OWN TEMPLATE AND DOES NOT CLONE THE MASTER. Two reasons, and the second is
   // the one that decides: a case that reads the master's state fails for what an earlier case left
   // there, and PostgreSQL refuses to copy a database ANY session is connected to -- so a template
@@ -50,18 +59,17 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
   {
     const Connection maintenance(PointedAt(AGIRU_TEST_DSN, DatabaseName{"postgres"}));
     maintenance.Run("SET client_min_messages = warning");
-    maintenance.Run("DROP DATABASE IF EXISTS agiru_runner_template");
-    maintenance.Run("CREATE DATABASE agiru_runner_template");
+    maintenance.Run("CREATE DATABASE " + templateName);
   }
   {
-    const Connection seed(PointedAt(AGIRU_TEST_DSN, DatabaseName{"agiru_runner_template"}));
+    const Connection seed(PointedAt(AGIRU_TEST_DSN, DatabaseName{templateName}));
     seed.Run("CREATE TABLE runner_gate (who text NOT NULL)");
     seed.Run("INSERT INTO runner_gate (who) VALUES ('template')");
   }
 
-  const std::string tpl = PointedAt(AGIRU_TEST_DSN, DatabaseName{"agiru_runner_template"});
+  const std::string tpl = PointedAt(AGIRU_TEST_DSN, DatabaseName{templateName});
   {
-    const RunnerDatabase runner(tpl, "agiru_runner_gate", true);
+    const RunnerDatabase runner(tpl, scratchName, true);
     CHECK_TRUE("the runner's dsn is not the template's", runner.Dsn() != tpl);
     CHECK_TRUE("the first call clones it", runner.Cloned());
     const Connection clone(runner.Dsn());
@@ -79,7 +87,7 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
   // back the way it was found, so there is nothing for a re-clone to restore -- and a clone costs
   // the master's BYTES, which is the CRONUS dataset once that is loaded.
   {
-    const RunnerDatabase again(tpl, "agiru_runner_gate");
+    const RunnerDatabase again(tpl, scratchName);
     CHECK_TRUE("a second call does not clone again", !again.Cloned());
     const Connection kept(again.Dsn());
     CHECK_TRUE("and it is the database that was there, not a new one",
@@ -88,7 +96,7 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
 
   // WHICH IS WHY `--fresh` EXISTS. A run that inherits what a crash left mid-write points the
   // diagnosis at the wrong tree, and the way back has to be a flag rather than a doubt.
-  const RunnerDatabase forced(tpl, "agiru_runner_gate", true);
+  const RunnerDatabase forced(tpl, scratchName, true);
   CHECK_TRUE("--fresh clones it again", forced.Cloned());
   {
     const Connection reborn(forced.Dsn());
@@ -99,7 +107,7 @@ void TheCloneCarriesTheTemplateAndTheTemplateStaysClean() {
 
   const Connection maintenance(PointedAt(AGIRU_TEST_DSN, DatabaseName{"postgres"}));
   maintenance.Run("SET client_min_messages = warning");
-  maintenance.Run("DROP DATABASE IF EXISTS agiru_runner_template");
+  maintenance.Run("DROP DATABASE " + templateName);
 }
 
 } // namespace
