@@ -1,6 +1,6 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Decimal.h"

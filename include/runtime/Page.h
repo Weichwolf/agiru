@@ -120,11 +120,6 @@ template <typename P> struct ControlTrigger {
   void (*set)(P &page, std::string_view text) = nullptr;
   /// \brief Reads the control's page variable as text, the same way.
   std::string (*text)(const P &page) = nullptr;
-  /// \brief Evaluates a computed source on its owning page; AL errors propagate to the caller.
-  /// \note This is a read accessor, not an AL trigger. Complex expressions do not implicitly
-  ///       calculate their FlowFields
-  ///       (`devenv-calcfields-calcsums-fielderror-fieldname-init-testfield-and-validate-methods.md`).
-  ::agiru::Text<0> (P::*sourceText)() = nullptr;
 };
 
 /// \brief What every AL page can do, without the generated class saying any of it.

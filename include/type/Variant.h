@@ -2,7 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -1263,7 +1263,7 @@ public:
   ///          so the types that need widening do not come through one.
   template <typename T>
     requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Decimal>) &&
-             (!std::is_same_v<T, BigInteger>) && (!std::is_same_v<T, Text<0>>)
+             (!std::is_same_v<T, BigInteger>)
   operator T &() {
     T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
@@ -1343,7 +1343,7 @@ public:
   ///       `"Qty. per Unit of Measure".Value` back as a Decimal that way (4 cases, 2026-09-11).
   ///       A text that does not spell the type still refuses.
   template <typename T>
-    requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Text<0>>)
+    requires detail::InVariant<T, Held>::value
   operator T() const {
     const T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -11,6 +11,73 @@
 /// \brief The base of every error the agiru runtime raises.
 
 namespace agiru {
+
+/// \brief An AL runtime error.
+///
+/// AL errors are catchable -- `[TryFunction]` and `asserterror` both see them -- and their TEXT is
+/// part of intended behaviour: BC test code compares it, and `Assert.ExpectedError` matches
+/// substrings of it. One base lets the runtime catch "an AL error" without also catching a
+/// `std::bad_alloc`.
+///
+/// \note Message wording is therefore never paraphrased. Where a message comes from the platform,
+///       the source of that wording is cited at the function that raises it.
+class Error : public std::runtime_error {
+public:
+  using std::runtime_error::runtime_error;
+
+  /// \brief An error with a message that is not a `std::string`.
+  ///
+  /// \param text The message.
+  ///
+  /// \note AL PASSES A TEXT AND THE TEXT TYPES READ AS `std::string_view`, which
+  ///       `std::runtime_error` does not take. Without this, `Error(GetLastErrorText())` -- the
+  ///       shape a test writes to re-raise -- does not compile.
+  explicit Error(std::string_view text) : std::runtime_error(std::string(text)) {}
+
+  /// \brief An error with the CODE `GetLastErrorCode()` reports beside its text.
+  /// \param text The text.
+  /// \param code The code: `TestField`, `NCLCSRTS:TableErrorStr`, `TestValidation`,
+  ///             `DB:RecordNotFound`, `DB:NothingInsideFilter`, `DB:RecordExists`; empty reads
+  ///             `Dialog`.
+  /// \note THE CODE IS THE RAISING STATEMENT, which is how `Assert.ExpectedErrorCode` reads it: an
+  ///       `Error(...)` in AL is `Dialog` WHEREVER IT STANDS -- `Workflow Step Argument` raises
+  ///       "The URI is not valid." from an `OnValidate` and the test expects `Dialog` (3 cases,
+  ///       2026-09-12) -- `TestField` is `TestField`, `FieldError` is `NCLCSRTS:TableErrorStr`
+  ///       (the Assert library compares that spelling EXACTLY in `ExpectedTestFieldError`), a value
+  ///       the client refuses -- `NotBlank`, `MinValue`, `MaxValue` under a `TestPage.SetValue` --
+  ///       is `TestValidation`, and the platform's own refusals carry `DB:` codes: a `Get` that
+  ///       finds nothing `DB:RecordNotFound`, a `FindFirst` as a statement
+  ///       `DB:NothingInsideFilter`, a duplicate `Insert` `DB:RecordExists`
+  ///       (`Assert.AssertNothingInsideFilter` and `ExpectedErrorCannotFind` read them).
+  Error(std::string_view text, std::string_view code)
+      : std::runtime_error(std::string(text)), code_(code) {}
+
+  /// \brief AL `Error(ErrorInfo)` -- the error an `ErrorInfo` describes.
+  ///
+  /// \tparam Info Anything that carries a `Message()`, which is what `ErrorInfo` is here.
+  /// \param  info The described error.
+  ///
+  /// \note IT IS A TEMPLATE SO THAT THE DOOR STAYS CHEAP. `runtime/Error.h` is included by every
+  ///       generated translation unit and `type/ErrorInfo.h` is not; naming the type here would
+  ///       put the second behind the first for all 7 885 of them.
+  template <typename Info>
+    requires requires(Info &info) { std::string_view{info.Message()}; }
+  explicit Error(Info info) : std::runtime_error(std::string(info.Message())) {}
+
+  /// \brief The code, empty for an AL `Error(...)`.
+  /// \return The code.
+  [[nodiscard]] std::string_view Code() const { return code_; }
+
+  /// \brief The same error with a code, when it has none yet -- what a wrapping site gives it.
+  /// \param code The code the site stands for.
+  /// \return This error, coded.
+  [[nodiscard]] Error Coded(std::string_view code) const {
+    return Error(what(), code_.empty() ? code : std::string_view(code_));
+  }
+
+private:
+  std::string code_;
+};
 
 /// \brief AL `asserterror <statement>` -- the statement is expected to raise.
 ///
