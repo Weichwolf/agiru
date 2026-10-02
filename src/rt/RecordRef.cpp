@@ -5,7 +5,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
@@ -203,23 +203,8 @@ RecordRef::SecurityFiltering(const ::agiru::SecurityFilter &NewSecurityFiltering
   return was;
 }
 
-::agiru::Integer RecordRef::FilterGroup() const {
-  if (State().record == nullptr) {
-    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
-  }
-  return detail::RuntimeFilterGroup(State().record);
-}
-
 ::agiru::Integer RecordRef::FilterGroup(::agiru::Integer NewGroup) {
-  if (State().record == nullptr) {
-    throw Error("RecordRef.FilterGroup: the RecordRef is not open");
-  }
   return detail::RuntimeFilterGroup(State().record, NewGroup);
-}
-
-::agiru::Boolean RecordRef::HasFilter() const {
-  if (State().record == nullptr) { throw Error("RecordRef.HasFilter: the RecordRef is not open"); }
-  return detail::RuntimeHasFilter(State().record);
 }
 
 void FieldRef::Validate(const ::agiru::Variant &NewValue) const {
