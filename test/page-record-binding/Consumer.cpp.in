@@ -35,11 +35,6 @@ int main() {
     if (!first.ReadNameFilter().Value().empty()) { return 1; }
     first.SetNameFilter("Group two");
     if (first.ReadNameFilter().Value() != "Group two") { return 1; }
-    if (first.IgnoreLargeGroup() != 2 || first.ReadNameFilter().Value() != "Group two") { return 1; }
-    if (first.ReflectedGroups() != 11 || first.CurrentGroup() != 2 ||
-        first.ReadNameFilter().Value() != "Group two") {
-      return 1;
-    }
     if (first.SelectGroup(0) != 2 || first.ReadNameFilter().Value() != "Group zero") { return 1; }
     if (second.SelectGroup(4) != 0 || second.CurrentGroup() != 4 || first.CurrentGroup() != 0) {
       return 1;

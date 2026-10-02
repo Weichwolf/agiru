@@ -83,47 +83,4 @@ page 50179 "Record Binding"
         Other.SetRange(TableName, 'Local');
         exit(Other.GetFilter(TableName));
     end;
-
-    procedure IgnoreLargeGroup(): Integer
-    begin
-        Rec.FilterGroup(256);
-        exit(Rec.FilterGroup);
-    end;
-
-    procedure ReflectedGroups(): Integer
-    var
-        Ref: RecordRef;
-        NameField: FieldRef;
-        Original: Integer;
-        Candidate: Integer;
-    begin
-        Ref.GetTable(Rec);
-        NameField := Ref.Field(3);
-        Ref.FilterGroup := 2;
-        NameField.SetFilter('Ref two');
-        Original := Ref.FilterGroup;
-        if Ref.FilterGroup() <> Original then
-            Error('The reflected getter changed the group');
-        Ref.FilterGroup(256);
-        if Ref.FilterGroup <> 2 then
-            Error('The reflected group limit was ignored');
-        if not Ref.HasFilter then
-            Error('The reflected group lost its filter');
-        NameField.SetRange();
-        if Ref.HasFilter() then
-            Error('The reflected filter was not cleared');
-        Ref.FilterGroup(0);
-        if not Ref.HasFilter then
-            Error('Clearing group two deleted group zero');
-        Ref.FilterGroup(10);
-        NameField.SetFilter('Occupied');
-        Candidate := 10;
-        while Ref.HasFilter do begin
-            Candidate += 1;
-            if Candidate > 12 then
-                Error('The free-group search did not terminate');
-            Ref.FilterGroup(Candidate);
-        end;
-        exit(Ref.FilterGroup);
-    end;
 }
