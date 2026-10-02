@@ -76,6 +76,56 @@ page 50179 "Record Binding"
              Rec.DataClassification + Rec.ObsoleteState);
     end;
 
+    procedure MetadataProperties(): Integer
+    var
+        PageMetadata: Record "Page Metadata" temporary;
+        TableMetadata: Record "Table Metadata" temporary;
+    begin
+        PageMetadata.ID := 50175;
+        PageMetadata.Name := 'Page source name';
+        PageMetadata.Caption := 'Independent page caption';
+        PageMetadata.PageType := PageMetadata.PageType::HeadlinePart;
+        PageMetadata."DataCaptionExpr." := 'Source expression';
+        PageMetadata.APIPublisher := 'Publisher';
+        PageMetadata."AL Namespace" := 'Fixture.Pages';
+        PageMetadata.Insert();
+        PageMetadata.Name := 'Discarded page name';
+        if not PageMetadata.Get(50175) then
+            Error('The source page key was lost');
+        if (PageMetadata.Name <> 'Page source name') or
+           (PageMetadata.Caption <> 'Independent page caption') or
+           (PageMetadata."DataCaptionExpr." <> 'Source expression') or
+           (PageMetadata.APIPublisher <> 'Publisher') or
+           (PageMetadata."AL Namespace" <> 'Fixture.Pages') then
+            Error('Page Metadata source fields were lost');
+
+        TableMetadata.ID := 50176;
+        TableMetadata.Name := 'Table source name';
+        TableMetadata.Caption := 'Independent table caption';
+        TableMetadata.TableType := TableMetadata.TableType::Query;
+        TableMetadata.ObsoleteState := TableMetadata.ObsoleteState::Removed;
+        TableMetadata.DataClassification := TableMetadata.DataClassification::SystemMetadata;
+        TableMetadata.CompressionType := TableMetadata.CompressionType::Page;
+        TableMetadata.Scope := TableMetadata.Scope::OnPrem;
+        TableMetadata.Access := TableMetadata.Access::Internal;
+        TableMetadata.InherentPermissions := 'rX';
+        TableMetadata."AL Namespace" := 'Fixture.Tables';
+        TableMetadata.Insert();
+        TableMetadata.Caption := 'Discarded table caption';
+        if not TableMetadata.Get(50176) then
+            Error('The implicit table key was lost');
+        if (TableMetadata.Name <> 'Table source name') or
+           (TableMetadata.Caption <> 'Independent table caption') or
+           (TableMetadata.InherentPermissions <> 'rX') or
+           (TableMetadata."AL Namespace" <> 'Fixture.Tables') then
+            Error('Table Metadata source fields were lost');
+        if (PageMetadata.Count <> 1) or (TableMetadata.Count <> 1) then
+            Error('Temporary metadata rows leaked');
+        exit(PageMetadata.PageType + TableMetadata.TableType + TableMetadata.ObsoleteState +
+             TableMetadata.DataClassification + TableMetadata.CompressionType +
+             TableMetadata.Scope + TableMetadata.Access);
+    end;
+
     procedure Read(var Target: Text)
     begin
         Target := Rec.TableName;

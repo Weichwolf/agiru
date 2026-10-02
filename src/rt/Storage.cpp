@@ -2,23 +2,26 @@
 
 #include "meta/Declare.h"
 #include "meta/Ids.h"
+#include "meta/ProfileDef.h"
 #include "meta/TableDef.h"
 #include "platform/AllObj.h"
+#include "platform/AllObjType.h"
 #include "platform/AllObjWithCaption.h"
 #include "platform/AllProfile.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
 #include "platform/Field.h"
-#include "platform/PageMetadata.h"
-#include "platform/TableMetadata.h"
+#include "platform/UserPersonalization.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/NumberSequenceStorage.h"
-#include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
+#include "type/Date.h"
+#include "type/FieldClass.h"
+#include "type/Integer.h"
 
 #include "FieldMetadata.h"
 #include "Rows.h"
@@ -26,6 +29,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <print>
 #include <set>
@@ -462,6 +466,90 @@ void ProvisionSchema(const Connection &into) {
   }
 }
 
+void ProvisionDates() {
+  platform::Date anyPeriod;
+  if (anyPeriod.FindFirst()) { return; }
+  static constexpr int kFirstYear = 1980;
+  static constexpr int kLastYear = 2079;
+  static constexpr std::array<std::string_view, 7> kDays{
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
+  static constexpr std::array<std::string_view, 12> kMonths{"January",
+                                                            "February",
+                                                            "March",
+                                                            "April",
+                                                            "May",
+                                                            "June",
+                                                            "July",
+                                                            "August",
+                                                            "September",
+                                                            "October",
+                                                            "November",
+                                                            "December"};
+  std::size_t periods = 0;
+  const auto period = [&periods](platform::PeriodType type,
+                                 ::agiru::Date start,
+                                 ::agiru::Date end,
+                                 ::agiru::Integer no,
+                                 std::string_view name) {
+    platform::Date row;
+    row.PeriodType_ = type;
+    row.PeriodStart = start;
+    row.PeriodEnd = end.Closing();
+    row.PeriodNo = no;
+    row.PeriodName = name;
+    row.PeriodInvariantName = name;
+    row.Insert();
+    ++periods;
+  };
+  const std::int32_t first = calendar::DaysFromCivil(kFirstYear, 1, 1);
+  const std::int32_t last = calendar::DaysFromCivil(kLastYear, 12, 31);
+  for (std::int32_t days = first; days <= last; ++days) {
+    const calendar::Civil civil = calendar::CivilFromDays(days);
+    const ::agiru::Date day = ::agiru::Date::FromYmd(civil.year, civil.month, civil.day);
+    period(platform::PeriodType::Date, day, day, day.DayOfWeek(), kDays[day.DayOfWeek() - 1]);
+    if (day.DayOfWeek() == 1) {
+      const calendar::Civil sunday = calendar::CivilFromDays(days + 6);
+      period(platform::PeriodType::Week,
+             day,
+             ::agiru::Date::FromYmd(sunday.year, sunday.month, sunday.day),
+             day.WeekNo(),
+             "Week " + std::to_string(day.WeekNo()));
+    }
+    if (civil.day == 1) {
+      const std::int32_t next =
+          calendar::DaysFromCivil(civil.month == 12 ? civil.year + 1 : civil.year,
+                                  civil.month == 12 ? 1 : civil.month + 1,
+                                  1);
+      const calendar::Civil monthEnd = calendar::CivilFromDays(next - 1);
+      period(platform::PeriodType::Month,
+             day,
+             ::agiru::Date::FromYmd(monthEnd.year, monthEnd.month, monthEnd.day),
+             static_cast<::agiru::Integer>(civil.month),
+             kMonths[civil.month - 1]);
+      if (civil.month % 3 == 1) {
+        const unsigned quarter = (civil.month - 1) / 3 + 1;
+        const std::int32_t after = quarter == 4
+                                       ? calendar::DaysFromCivil(civil.year + 1, 1, 1)
+                                       : calendar::DaysFromCivil(civil.year, quarter * 3 + 1, 1);
+        const calendar::Civil quarterEnd = calendar::CivilFromDays(after - 1);
+        period(platform::PeriodType::Quarter,
+               day,
+               ::agiru::Date::FromYmd(quarterEnd.year, quarterEnd.month, quarterEnd.day),
+               static_cast<::agiru::Integer>(quarter),
+               "Quarter " + std::to_string(quarter));
+      }
+      if (civil.month == 1) {
+        period(platform::PeriodType::Year,
+               day,
+               ::agiru::Date::FromYmd(civil.year, 12, 31),
+               civil.year,
+               std::to_string(civil.year));
+      }
+    }
+  }
+  std::println("{} period(s) written into Date", periods);
+}
+
 }
 
 void ProvisionInstalled(const Connection &into) {
@@ -497,88 +585,7 @@ void ProvisionInstalled(const Connection &into) {
     ++profiles;
   }
   if (profiles != 0) { std::println("{} profile(s) written into All Profile", profiles); }
-  platform::Date anyPeriod;
-  if (!anyPeriod.FindFirst()) {
-    static constexpr int kFirstYear = 1980;
-    static constexpr int kLastYear = 2079;
-    static constexpr std::array<std::string_view, 7> kDays{
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
-    static constexpr std::array<std::string_view, 12> kMonths{"January",
-                                                              "February",
-                                                              "March",
-                                                              "April",
-                                                              "May",
-                                                              "June",
-                                                              "July",
-                                                              "August",
-                                                              "September",
-                                                              "October",
-                                                              "November",
-                                                              "December"};
-    std::size_t periods = 0;
-    const auto period = [&periods](platform::PeriodType type,
-                                   ::agiru::Date start,
-                                   ::agiru::Date end,
-                                   ::agiru::Integer no,
-                                   std::string_view name) {
-      platform::Date row;
-      row.PeriodType_ = type;
-      row.PeriodStart = start;
-      row.PeriodEnd = end.Closing();
-      row.PeriodNo = no;
-      row.PeriodName = name;
-      row.PeriodInvariantName = name;
-      row.Insert();
-      ++periods;
-    };
-    const std::int32_t first = calendar::DaysFromCivil(kFirstYear, 1, 1);
-    const std::int32_t last = calendar::DaysFromCivil(kLastYear, 12, 31);
-    for (std::int32_t days = first; days <= last; ++days) {
-      const calendar::Civil civil = calendar::CivilFromDays(days);
-      const ::agiru::Date day = ::agiru::Date::FromYmd(civil.year, civil.month, civil.day);
-      period(platform::PeriodType::Date, day, day, day.DayOfWeek(), kDays[day.DayOfWeek() - 1]);
-      if (day.DayOfWeek() == 1) {
-        const calendar::Civil sunday = calendar::CivilFromDays(days + 6);
-        period(platform::PeriodType::Week,
-               day,
-               ::agiru::Date::FromYmd(sunday.year, sunday.month, sunday.day),
-               day.WeekNo(),
-               "Week " + std::to_string(day.WeekNo()));
-      }
-      if (civil.day == 1) {
-        const std::int32_t next =
-            calendar::DaysFromCivil(civil.month == 12 ? civil.year + 1 : civil.year,
-                                    civil.month == 12 ? 1 : civil.month + 1,
-                                    1);
-        const calendar::Civil monthEnd = calendar::CivilFromDays(next - 1);
-        period(platform::PeriodType::Month,
-               day,
-               ::agiru::Date::FromYmd(monthEnd.year, monthEnd.month, monthEnd.day),
-               static_cast<::agiru::Integer>(civil.month),
-               kMonths[civil.month - 1]);
-        if (civil.month % 3 == 1) {
-          const unsigned quarter = (civil.month - 1) / 3 + 1;
-          const std::int32_t after = quarter == 4
-                                         ? calendar::DaysFromCivil(civil.year + 1, 1, 1)
-                                         : calendar::DaysFromCivil(civil.year, quarter * 3 + 1, 1);
-          const calendar::Civil quarterEnd = calendar::CivilFromDays(after - 1);
-          period(platform::PeriodType::Quarter,
-                 day,
-                 ::agiru::Date::FromYmd(quarterEnd.year, quarterEnd.month, quarterEnd.day),
-                 static_cast<::agiru::Integer>(quarter),
-                 "Quarter " + std::to_string(quarter));
-        }
-        if (civil.month == 1) {
-          period(platform::PeriodType::Year,
-                 day,
-                 ::agiru::Date::FromYmd(civil.year, 12, 31),
-                 civil.year,
-                 std::to_string(civil.year));
-        }
-      }
-    }
-    std::println("{} period(s) written into Date", periods);
-  }
+  ProvisionDates();
   platform::AllObj anyObject;
   if (anyObject.FindFirst()) { return; }
   std::size_t objects = 0;
@@ -615,34 +622,6 @@ void ProvisionInstalled(const Connection &into) {
            entry->page->caption);
   }
   if (objects != 0) { std::println("{} object(s) written into AllObj", objects); }
-  platform::TableMetadata anyTable;
-  if (anyTable.FindFirst()) { return; }
-  std::size_t tables = 0;
-  for (const TableEntry *entry : InstalledTables()) {
-    platform::TableMetadata row;
-    row.ID = entry->table->id.Value();
-    row.Name = entry->table->name;
-    row.Caption = entry->table->caption.empty() ? entry->table->name : entry->table->caption;
-    row.ObsoleteState = platform::TableMetadataObsoleteState::No;
-    row.TableType = [type = entry->table->tableType] {
-      switch (type) {
-        case TableType::Normal: return platform::TableMetadataTableType::Normal;
-        case TableType::CRM: return platform::TableMetadataTableType::CRM;
-        case TableType::CDS: return platform::TableMetadataTableType::CDS;
-        case TableType::ExternalSQL: return platform::TableMetadataTableType::ExternalSQL;
-        case TableType::Exchange: return platform::TableMetadataTableType::Exchange;
-        case TableType::MicrosoftGraph: return platform::TableMetadataTableType::MicrosoftGraph;
-        case TableType::Temporary: return platform::TableMetadataTableType::Temporary;
-      }
-      return platform::TableMetadataTableType::Normal;
-    }();
-    row.DataPerCompany = entry->table->dataPerCompany;
-    row.LookupPageID = entry->table->lookupPageId.Value();
-    row.DrillDownPageID = entry->table->drillDownPageId.Value();
-    row.Insert();
-    ++tables;
-  }
-  if (tables != 0) { std::println("{} table(s) written into Table Metadata", tables); }
   platform::Field anyField;
   if (!anyField.FindFirst()) {
     std::size_t fields = 0;
@@ -656,51 +635,6 @@ void ProvisionInstalled(const Connection &into) {
     }
     if (fields != 0) { std::println("{} field(s) written into Field", fields); }
   }
-  platform::PageMetadata anyPage;
-  if (anyPage.FindFirst()) { return; }
-  std::size_t pages = 0;
-  for (const PageEntry *entry : InstalledPages()) {
-    platform::PageMetadata row;
-    row.ID = entry->page->id.Value();
-    row.Name = entry->page->name;
-    row.Caption = entry->page->caption.empty() ? entry->page->name : entry->page->caption;
-    row.PageType = [type = entry->page->type] {
-      switch (type) {
-        case PageType::Card: return platform::PageMetadataPageType::Card;
-        case PageType::List: return platform::PageMetadataPageType::List;
-        case PageType::RoleCenter: return platform::PageMetadataPageType::RoleCenter;
-        case PageType::CardPart: return platform::PageMetadataPageType::CardPart;
-        case PageType::ListPart: return platform::PageMetadataPageType::ListPart;
-        case PageType::Document: return platform::PageMetadataPageType::Document;
-        case PageType::Worksheet: return platform::PageMetadataPageType::Worksheet;
-        case PageType::ListPlus: return platform::PageMetadataPageType::ListPlus;
-        case PageType::ConfirmationDialog:
-          return platform::PageMetadataPageType::ConfirmationDialog;
-        case PageType::NavigatePage: return platform::PageMetadataPageType::NavigatePage;
-        case PageType::StandardDialog: return platform::PageMetadataPageType::StandardDialog;
-        case PageType::Api: return platform::PageMetadataPageType::Api;
-        case PageType::ReportPreview: return platform::PageMetadataPageType::ReportPreview;
-        case PageType::ReportProcessingOnly:
-          return platform::PageMetadataPageType::ReportProcessingOnly;
-        case PageType::HeadlinePart: return platform::PageMetadataPageType::HeadlinePart;
-        case PageType::PromptDialog: return platform::PageMetadataPageType::PromptDialog;
-        case PageType::UserControlHost: return platform::PageMetadataPageType::UserControlHost;
-        case PageType::XmlPort:
-        case PageType::ConfigurationDialog: return platform::PageMetadataPageType::Card;
-      }
-      return platform::PageMetadataPageType::Card;
-    }();
-    row.SourceTable = entry->page->source.Value();
-    row.CardPageID = entry->page->cardPageId.Value();
-    row.SourceTableTemporary = entry->page->sourceTableTemporary;
-    row.Editable = entry->page->editable.empty() || entry->page->editable != "false";
-    row.InsertAllowed = entry->page->insertAllowed != "false";
-    row.ModifyAllowed = entry->page->modifyAllowed != "false";
-    row.DeleteAllowed = entry->page->deleteAllowed != "false";
-    row.Insert();
-    ++pages;
-  }
-  if (pages != 0) { std::println("{} page(s) written into Page Metadata", pages); }
 }
 
 }

@@ -8,9 +8,11 @@
 #include "platform/Integer.h"
 #include "platform/ODataEdmType.h"
 #include "platform/ObjectOptions.h"
+#include "platform/PageMetadata.h"
 #include "platform/PrivacyNotice.h"
 #include "platform/PrivacyNoticeApproval.h"
 #include "platform/RecordLink.h"
+#include "platform/TableMetadata.h"
 #include "platform/User.h"
 #include "runtime/Catalogue.h"
 #include "runtime/RecordRef.h"
@@ -24,6 +26,7 @@
 #include "EnumWriter.h"
 #include "Lexer.h"
 #include "Parser.h"
+#include "TableKeys.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -55,7 +58,7 @@ struct Family {
   std::string_view scope;
 };
 
-constexpr std::array<Family, 11> kFamilies{{
+constexpr std::array<Family, 13> kFamilies{{
     {.path = "Tenant Database Tables/ObjectOptions.Table.al",
      .table = &agiru::platform::kObjectOptionsTable,
      .scope = agiru::platform::ObjectOptions::kScope},
@@ -86,6 +89,12 @@ constexpr std::array<Family, 11> kFamilies{{
     {.path = "Virtual Tables/AllProfile.Table.al",
      .table = &agiru::platform::kAllProfileTable,
      .scope = agiru::platform::AllProfile::kScope},
+    {.path = "Virtual Tables/PageMetadata.Table.al",
+     .table = &agiru::platform::kPageMetadataTable,
+     .scope = agiru::platform::PageMetadata::kScope},
+    {.path = "Virtual Tables/TableMetadata.Table.al",
+     .table = &agiru::platform::kTableMetadataTable,
+     .scope = agiru::platform::TableMetadata::kScope},
     {.path = "Virtual Tables/Field.Table.al",
      .table = &agiru::platform::kFieldTable,
      .scope = agiru::platform::Field::kScope},
@@ -211,7 +220,9 @@ void Fields(const agiru::al::TableObject &source, const agiru::TableDef &table, 
   }
 }
 
-void Keys(const agiru::al::TableObject &source, const agiru::TableDef &table, Checks &checks) {
+void Keys(const agiru::al::TableObject &declared, const agiru::TableDef &table, Checks &checks) {
+  auto source = declared;
+  agiru::gen::CompletePrimaryKey(source);
   checks.emplace_back("key population", table.keys.size() == source.keys.size());
   for (std::size_t i = 0; i < source.keys.size(); ++i) {
     const auto &declared = source.keys[i];
@@ -402,6 +413,39 @@ void PopulationMutantsMustFail(const std::filesystem::path &root) {
   }
 }
 
+void MetadataMutantsMustFail(const std::filesystem::path &root) {
+  constexpr std::size_t kRejectedPredecessorCaptionLength = 249;
+  for (const auto &family : kFamilies) {
+    if (family.table->id != agiru::platform::PageMetadata::kId &&
+        family.table->id != agiru::platform::TableMetadata::kId) {
+      continue;
+    }
+    const auto original = agiru::al::ParseTable(Read(family, root));
+    const auto rejects = [&](const auto &source) {
+      const auto checks = Compare(source, family);
+      return std::ranges::any_of(checks, [](const auto &check) { return !check.second; });
+    };
+    auto changed = original;
+    changed.fields[2].length = kRejectedPredecessorCaptionLength;
+    CHECK_TRUE("predecessor Caption length cannot override original System Text[80]",
+               rejects(changed));
+    changed = original;
+    changed.keys = {agiru::al::KeyDecl{.name = "Key1", .fields = {"ID"}, .properties = {}}};
+    CHECK_TRUE("invented explicit key names fail original metadata contracts", rejects(changed));
+    changed = original;
+    for (auto &field : changed.fields) {
+      if (field.type != "Option") { continue; }
+      for (auto &property : field.properties) {
+        if (property.name != "OptionMembers") { continue; }
+        property.value.back().text = "InventedPropertyKind";
+        break;
+      }
+      break;
+    }
+    CHECK_TRUE("property enums cannot widen reflection option vocabularies", rejects(changed));
+  }
+}
+
 void NativeTextIdentity() {
   agiru::platform::User user;
   user.AuthenticationEmail = "Mixed.User@example.invalid";
@@ -495,6 +539,7 @@ int main(int argc, char *argv[]) {
     MutantsMustFail(root);
     FieldMutantsMustFail(root);
     PopulationMutantsMustFail(root);
+    MetadataMutantsMustFail(root);
     Reflection<agiru::platform::ObjectOptions>();
     Reflection<agiru::platform::ODataEdmType>();
     Reflection<agiru::platform::PrivacyNotice>();
@@ -506,6 +551,8 @@ int main(int argc, char *argv[]) {
     Reflection<agiru::platform::Date>();
     Reflection<agiru::platform::Integer>();
     Reflection<agiru::platform::AllProfile>();
+    Reflection<agiru::platform::PageMetadata>();
+    Reflection<agiru::platform::TableMetadata>();
     NativeTextIdentity();
     OptionOrdinals();
     TypedMembers();

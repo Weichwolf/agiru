@@ -16,7 +16,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts native-bindings number-sequences table-keys
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts native-bindings number-sequences table-keys reflection-metadata
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -93,6 +93,11 @@ table-keys: comments db tc ## prove implicit primary keys before extension mergi
 	@"$(B)/gate_GenTableKeysGate"
 	@"$(B)/gate_GenNativeBindingGate"
 	@B="$(B)" bash "$(SELF)/test/table-keys.sh"
+
+reflection-metadata: comments db ## prove original metadata vocabulary, refusal and temporary records
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReflectionMetadataGate gate_PlatformSourceGate
+	@"$(B)/gate_PlatformSourceGate"
+	@B="$(B)" bash "$(SELF)/test/reflection-metadata.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)

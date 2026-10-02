@@ -1,9 +1,10 @@
 #pragma once
 
 #include "meta/Declare.h"
-#include "meta/EnumDef.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "platform/ReflectionOptions.h"
+#include "platform/ReflectionTypes.h"
 #include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
@@ -15,130 +16,159 @@
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <string_view>
 
 namespace agiru::platform {
 
-/// \brief The `TableType` of `Table Metadata`: BC's system enum `Table Type`, in its order.
-enum class TableMetadataTableType : std::int32_t {
-  Normal = 0,
-  CRM = 1,
-  ExternalSQL = 2,
-  Exchange = 3,
-  MicrosoftGraph = 4,
-  CDS = 5,
-  Temporary = 6,
-};
-
-/// \brief The `ObsoleteState` of `Table Metadata`: `No`, `Pending`, `Removed`.
-enum class TableMetadataObsoleteState : std::int32_t {
-  No = 0,
-  Pending = 1,
-  Removed = 2,
-};
-
-}
-
-template <> struct agiru::OptionTraits<agiru::platform::TableMetadataTableType> {
-  static constexpr std::array<agiru::EnumValueDef, 7> kValues{{
-      {.ordinal = 0, .name = "Normal", .caption = "Normal"},
-      {.ordinal = 1, .name = "CRM", .caption = "CRM"},
-      {.ordinal = 2, .name = "ExternalSQL", .caption = "ExternalSQL"},
-      {.ordinal = 3, .name = "Exchange", .caption = "Exchange"},
-      {.ordinal = 4, .name = "MicrosoftGraph", .caption = "MicrosoftGraph"},
-      {.ordinal = 5, .name = "CDS", .caption = "CDS"},
-      {.ordinal = 6, .name = "Temporary", .caption = "Temporary"},
-  }};
-};
-
-template <> struct agiru::OptionTraits<agiru::platform::TableMetadataObsoleteState> {
-  static constexpr std::array<agiru::EnumValueDef, 3> kValues{{
-      {.ordinal = 0, .name = "No", .caption = "No"},
-      {.ordinal = 1, .name = "Pending", .caption = "Pending"},
-      {.ordinal = 2, .name = "Removed", .caption = "Removed"},
-  }};
-};
-
-namespace agiru::platform {
-
-/// \brief The virtual table `Table Metadata` (2000000136): one row per table this build carries,
-///        written from the catalogue when the runner's database is provisioned, the way `AllObj`
-///        is. `Workflow Event`, `Table Relations Metadata` and the record-link and data-migration
-///        codeunits read it (39 `Get`, 22 `TableType`, 16 `ObsoleteState` in the BaseApp; 27 UT
-///        cases stopped at its absence, 2026-09-10). The field numbers follow the predecessor's
-///        `virtual_metadata.py`; no BaseApp site names one by number.
+/// \brief System 28/29 `Table Metadata` declaration; live-provider/provenance acceptance is
+/// separate.
 class TableMetadata_Table : public Table<TableMetadata_Table> {
 public:
+  /// \brief Original System table identity.
   static constexpr TableId kId{2000000136};
+  /// \brief Original AL object name.
   static constexpr std::string_view kName{"Table Metadata"};
+  /// \brief Original extension availability, not a product integration requirement.
+  static constexpr std::string_view kScope{"Cloud"};
 
   detail::StateHandle State_Block;
 
+  /// \brief Original System Name field length.
   static constexpr std::size_t kNameLength = 30;
-  static constexpr std::size_t kCaptionLength = 249;
-  static constexpr std::size_t kReasonLength = 250;
+  /// \brief Original System Caption field length.
+  static constexpr std::size_t kCaptionLength = 80;
+  /// \brief Original System ExternalName field length.
+  static constexpr std::size_t kExternalNameLength = 248;
+  /// \brief Original System Reason field length.
+  static constexpr std::size_t kReasonLength = 248;
+  /// \brief Original System Permissions field length.
+  static constexpr std::size_t kPermissionsLength = 5;
+  /// \brief Original System Namespace field length.
+  static constexpr std::size_t kNamespaceLength = 500;
 
+  /// \brief AL `Table Metadata.ID`.
   ::agiru::Integer ID{};
-  Text<kNameLength> Name;
-  Text<kCaptionLength> Caption;
-  Option<TableMetadataObsoleteState> ObsoleteState;
-  Text<kReasonLength> ObsoleteReason;
-  Option<TableMetadataTableType> TableType;
-  Boolean DataPerCompany;
+  /// \brief AL `Table Metadata.Name`.
+  Text<kNameLength> Name{};
+  /// \brief AL `Table Metadata.Caption`.
+  Text<kCaptionLength> Caption{};
+  /// \brief AL `Table Metadata.DataPerCompany`.
+  Boolean DataPerCompany{};
+  /// \brief AL `Table Metadata.LookupPageID`.
   ::agiru::Integer LookupPageID{};
+  /// \brief AL `Table Metadata.DrillDownPageId`.
   ::agiru::Integer DrillDownPageID{};
-  Boolean DataIsExternal;
-  Text<kCaptionLength> ExternalName;
-  /// \brief AL `TableMetadata.SystemId`.
-  Guid SystemId;
-  /// \brief AL `TableMetadata.SystemCreatedAt`.
-  DateTime SystemCreatedAt;
-  /// \brief AL `TableMetadata.SystemCreatedBy`.
-  Guid SystemCreatedBy;
-  /// \brief AL `TableMetadata.SystemModifiedAt`.
-  DateTime SystemModifiedAt;
-  /// \brief AL `TableMetadata.SystemModifiedBy`.
-  Guid SystemModifiedBy;
+  /// \brief AL `Table Metadata.DataCaptionFields`.
+  Text<kCaptionLength> DataCaptionFields{};
+  /// \brief AL `Table Metadata.PasteIsValid`.
+  Boolean PasteIsValid{};
+  /// \brief AL `Table Metadata.LinkedObject`.
+  Boolean LinkedObject{};
+  /// \brief AL `Table Metadata.DataIsExternal`.
+  Boolean DataIsExternal{};
+  /// \brief AL `Table Metadata.TableType`.
+  Option<TableMetadataTableType> TableType{};
+  /// \brief AL `Table Metadata.ExternalName`.
+  Text<kExternalNameLength> ExternalName{};
+  /// \brief AL `Table Metadata.ObsoleteState`.
+  Option<TableMetadataObsoleteState> ObsoleteState{};
+  /// \brief AL `Table Metadata.ObsoleteReason`.
+  Text<kReasonLength> ObsoleteReason{};
+  /// \brief AL `Table Metadata.DataClassification`.
+  Option<FieldDataClassification> DataClassification{};
+  /// \brief AL `Table Metadata.ReplicateData`.
+  Boolean ReplicateData{};
+  /// \brief AL `Table Metadata.CompressionType`.
+  Option<TableMetadataCompressionType> CompressionType{};
+  /// \brief AL `Table Metadata.App ID`.
+  Guid AppID{};
+  /// \brief AL `Table Metadata.InherentPermissions`.
+  Text<kPermissionsLength> InherentPermissions{};
+  /// \brief AL `Table Metadata.InherentEntitlements`.
+  Text<kPermissionsLength> InherentEntitlements{};
+  /// \brief AL `Table Metadata.Scope`.
+  Option<TableMetadataScope> Scope{};
+  /// \brief AL `Table Metadata.Access`.
+  Option<TableMetadataAccess> Access{};
+  /// \brief AL `Table Metadata.AL Namespace`.
+  Text<kNamespaceLength> ALNamespace{};
+  /// \brief Implicit AL `SystemId`.
+  Guid SystemId{};
+  /// \brief Implicit AL `SystemCreatedAt`.
+  DateTime SystemCreatedAt{};
+  /// \brief Implicit AL `SystemCreatedBy`.
+  Guid SystemCreatedBy{};
+  /// \brief Implicit AL `SystemModifiedAt`.
+  DateTime SystemModifiedAt{};
+  /// \brief Implicit AL `SystemModifiedBy`.
+  Guid SystemModifiedBy{};
 
-  struct Field_No {
+  /// \brief Original source field numbers; implicit fields use the canonical platform numbers.
+  struct Field_No : SystemFieldNumbers {
+    /// \brief Original `ID` number.
     static constexpr ::agiru::FieldNo ID{1};
+    /// \brief Original `Name` number.
     static constexpr ::agiru::FieldNo Name{2};
+    /// \brief Original `Caption` number.
     static constexpr ::agiru::FieldNo Caption{3};
-    static constexpr ::agiru::FieldNo ObsoleteState{4};
-    static constexpr ::agiru::FieldNo ObsoleteReason{5};
-    static constexpr ::agiru::FieldNo TableType{6};
-    static constexpr ::agiru::FieldNo DataPerCompany{7};
-    static constexpr ::agiru::FieldNo LookupPageID{8};
-    static constexpr ::agiru::FieldNo DrillDownPageID{9};
+    /// \brief Original `DataPerCompany` number.
+    static constexpr ::agiru::FieldNo DataPerCompany{4};
+    /// \brief Original `LookupPageID` number.
+    static constexpr ::agiru::FieldNo LookupPageID{5};
+    /// \brief Original `DrillDownPageId` number.
+    static constexpr ::agiru::FieldNo DrillDownPageID{6};
+    /// \brief Original `DataCaptionFields` number.
+    static constexpr ::agiru::FieldNo DataCaptionFields{7};
+    /// \brief Original `PasteIsValid` number.
+    static constexpr ::agiru::FieldNo PasteIsValid{8};
+    /// \brief Original `LinkedObject` number.
+    static constexpr ::agiru::FieldNo LinkedObject{9};
+    /// \brief Original `DataIsExternal` number.
     static constexpr ::agiru::FieldNo DataIsExternal{10};
-    static constexpr ::agiru::FieldNo ExternalName{11};
+    /// \brief Original `TableType` number.
+    static constexpr ::agiru::FieldNo TableType{11};
+    /// \brief Original `ExternalName` number.
+    static constexpr ::agiru::FieldNo ExternalName{12};
+    /// \brief Original `ObsoleteState` number.
+    static constexpr ::agiru::FieldNo ObsoleteState{13};
+    /// \brief Original `ObsoleteReason` number.
+    static constexpr ::agiru::FieldNo ObsoleteReason{14};
+    /// \brief Original `DataClassification` number.
+    static constexpr ::agiru::FieldNo DataClassification{15};
+    /// \brief Original `ReplicateData` number.
+    static constexpr ::agiru::FieldNo ReplicateData{16};
+    /// \brief Original `CompressionType` number.
+    static constexpr ::agiru::FieldNo CompressionType{17};
+    /// \brief Original `App ID` number.
+    static constexpr ::agiru::FieldNo AppID{18};
+    /// \brief Original `InherentPermissions` number.
+    static constexpr ::agiru::FieldNo InherentPermissions{19};
+    /// \brief Original `InherentEntitlements` number.
+    static constexpr ::agiru::FieldNo InherentEntitlements{20};
+    /// \brief Original `Scope` number.
+    static constexpr ::agiru::FieldNo Scope{21};
+    /// \brief Original `Access` number.
+    static constexpr ::agiru::FieldNo Access{22};
+    /// \brief Original `AL Namespace` number.
+    static constexpr ::agiru::FieldNo ALNamespace{23};
   };
 
+  /// \brief Documented implicit primary key from the lowest declared field ID.
   static constexpr std::array<::agiru::FieldNo, 1> kKey1{{Field_No::ID}};
 };
 
+/// \brief Native record binding for AL `Table Metadata`.
 using TableMetadata = TableMetadata_Table;
 
-inline constexpr std::array<FieldDef, 11> kTableMetadataFields{{
+/// \brief All source fields plus the canonical implicit system fields.
+inline constexpr auto kTableMetadataFields = WithSystemFields<TableMetadata>(std::array<FieldDef,
+                                                                                        23>{{
     Declare<&TableMetadata::ID>(
         TableMetadata::Field_No::ID, "ID", "ID", offsetof(TableMetadata, ID)),
     Declare<&TableMetadata::Name>(
         TableMetadata::Field_No::Name, "Name", "Name", offsetof(TableMetadata, Name)),
     Declare<&TableMetadata::Caption>(
         TableMetadata::Field_No::Caption, "Caption", "Caption", offsetof(TableMetadata, Caption)),
-    Declare<&TableMetadata::ObsoleteState>(TableMetadata::Field_No::ObsoleteState,
-                                           "ObsoleteState",
-                                           "ObsoleteState",
-                                           offsetof(TableMetadata, ObsoleteState)),
-    Declare<&TableMetadata::ObsoleteReason>(TableMetadata::Field_No::ObsoleteReason,
-                                            "ObsoleteReason",
-                                            "ObsoleteReason",
-                                            offsetof(TableMetadata, ObsoleteReason)),
-    Declare<&TableMetadata::TableType>(TableMetadata::Field_No::TableType,
-                                       "TableType",
-                                       "TableType",
-                                       offsetof(TableMetadata, TableType)),
     Declare<&TableMetadata::DataPerCompany>(TableMetadata::Field_No::DataPerCompany,
                                             "DataPerCompany",
                                             "DataPerCompany",
@@ -148,23 +178,79 @@ inline constexpr std::array<FieldDef, 11> kTableMetadataFields{{
                                           "LookupPageID",
                                           offsetof(TableMetadata, LookupPageID)),
     Declare<&TableMetadata::DrillDownPageID>(TableMetadata::Field_No::DrillDownPageID,
-                                             "DrillDownPageID",
-                                             "DrillDownPageID",
+                                             "DrillDownPageId",
+                                             "DrillDownPageId",
                                              offsetof(TableMetadata, DrillDownPageID)),
+    Declare<&TableMetadata::DataCaptionFields>(TableMetadata::Field_No::DataCaptionFields,
+                                               "DataCaptionFields",
+                                               "DataCaptionFields",
+                                               offsetof(TableMetadata, DataCaptionFields)),
+    Declare<&TableMetadata::PasteIsValid>(TableMetadata::Field_No::PasteIsValid,
+                                          "PasteIsValid",
+                                          "PasteIsValid",
+                                          offsetof(TableMetadata, PasteIsValid)),
+    Declare<&TableMetadata::LinkedObject>(TableMetadata::Field_No::LinkedObject,
+                                          "LinkedObject",
+                                          "LinkedObject",
+                                          offsetof(TableMetadata, LinkedObject)),
     Declare<&TableMetadata::DataIsExternal>(TableMetadata::Field_No::DataIsExternal,
                                             "DataIsExternal",
                                             "DataIsExternal",
                                             offsetof(TableMetadata, DataIsExternal)),
+    Declare<&TableMetadata::TableType>(TableMetadata::Field_No::TableType,
+                                       "TableType",
+                                       "TableType",
+                                       offsetof(TableMetadata, TableType)),
     Declare<&TableMetadata::ExternalName>(TableMetadata::Field_No::ExternalName,
                                           "ExternalName",
                                           "ExternalName",
                                           offsetof(TableMetadata, ExternalName)),
-}};
+    Declare<&TableMetadata::ObsoleteState>(TableMetadata::Field_No::ObsoleteState,
+                                           "ObsoleteState",
+                                           "ObsoleteState",
+                                           offsetof(TableMetadata, ObsoleteState)),
+    Declare<&TableMetadata::ObsoleteReason>(TableMetadata::Field_No::ObsoleteReason,
+                                            "ObsoleteReason",
+                                            "ObsoleteReason",
+                                            offsetof(TableMetadata, ObsoleteReason)),
+    Declare<&TableMetadata::DataClassification>(TableMetadata::Field_No::DataClassification,
+                                                "DataClassification",
+                                                "DataClassification",
+                                                offsetof(TableMetadata, DataClassification)),
+    Declare<&TableMetadata::ReplicateData>(TableMetadata::Field_No::ReplicateData,
+                                           "ReplicateData",
+                                           "ReplicateData",
+                                           offsetof(TableMetadata, ReplicateData)),
+    Declare<&TableMetadata::CompressionType>(TableMetadata::Field_No::CompressionType,
+                                             "CompressionType",
+                                             "CompressionType",
+                                             offsetof(TableMetadata, CompressionType)),
+    Declare<&TableMetadata::AppID>(
+        TableMetadata::Field_No::AppID, "App ID", "App ID", offsetof(TableMetadata, AppID)),
+    Declare<&TableMetadata::InherentPermissions>(TableMetadata::Field_No::InherentPermissions,
+                                                 "InherentPermissions",
+                                                 "InherentPermissions",
+                                                 offsetof(TableMetadata, InherentPermissions)),
+    Declare<&TableMetadata::InherentEntitlements>(TableMetadata::Field_No::InherentEntitlements,
+                                                  "InherentEntitlements",
+                                                  "InherentEntitlements",
+                                                  offsetof(TableMetadata, InherentEntitlements)),
+    Declare<&TableMetadata::Scope>(
+        TableMetadata::Field_No::Scope, "Scope", "Scope", offsetof(TableMetadata, Scope)),
+    Declare<&TableMetadata::Access>(
+        TableMetadata::Field_No::Access, "Access", "Access", offsetof(TableMetadata, Access)),
+    Declare<&TableMetadata::ALNamespace>(TableMetadata::Field_No::ALNamespace,
+                                         "AL Namespace",
+                                         "AL Namespace",
+                                         offsetof(TableMetadata, ALNamespace)),
+}});
 
+/// \brief Effective primary key; its case-sensitive AL name is part of the contract.
 inline constexpr std::array<KeyDef, 1> kTableMetadataKeys{{
-    KeyDef{.name = "Key1", .fields = TableMetadata::kKey1, .clustered = true},
+    KeyDef{.name = "ID", .fields = TableMetadata::kKey1, .clustered = true},
 }};
 
+/// \brief Original source declaration, not a physical virtual-table provider guarantee.
 inline constexpr TableDef kTableMetadataTable{
     .id = TableMetadata::kId,
     .name = TableMetadata::kName,
@@ -172,12 +258,18 @@ inline constexpr TableDef kTableMetadataTable{
     .fields = kTableMetadataFields,
     .keys = kTableMetadataKeys,
     .dataPerCompany = false,
+    .inherentPermissions = "rX",
+    .providerRefusal =
+        "live table metadata projection and schema identity are unavailable (board:0034/0044/0013)",
 };
 
-static_assert(FieldsAreSorted(kTableMetadataTable), "the field table is searched by number");
+static_assert(FieldsAreSorted(kTableMetadataTable),
+              "reflection fields are searched by original number");
 
 }
 
+/// \brief Native declaration ownership for AL reflection and temporary records.
 template <> struct agiru::TableTraits<agiru::platform::TableMetadata> {
+  /// \brief Immutable original-source table declaration.
   static constexpr const agiru::TableDef &kTable = agiru::platform::kTableMetadataTable;
 };

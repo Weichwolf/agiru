@@ -2295,12 +2295,17 @@ FieldEnums PlatformFieldEnums() {
   enums["object options"]["objecttype"] = "::agiru::platform::ObjectOptionsObjectType";
   enums["2000000196"] = enums["object options"];
   enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
+  enums["2000000138"] = enums["page metadata"];
   enums["page table field"]["type"] = "::agiru::platform::PageTableFieldType";
   enums["page table field"]["status"] = "::agiru::platform::PageTableFieldStatus";
   enums["page table field"]["scope"] = "::agiru::platform::PageTableFieldScope";
   enums["page table field"]["fieldkind"] = "::agiru::platform::PageTableFieldKind";
   enums["2000000171"] = enums["page table field"];
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
+  enums["table metadata"]["dataclassification"] = "::agiru::platform::FieldDataClassification";
+  enums["table metadata"]["compressiontype"] = "::agiru::platform::TableMetadataCompressionType";
+  enums["table metadata"]["scope"] = "::agiru::platform::TableMetadataScope";
+  enums["table metadata"]["access"] = "::agiru::platform::TableMetadataAccess";
   enums["2000000136"] = enums["table metadata"];
   enums["2000000068"] = enums["record link"];
   enums["tenant license state"]["state"] = "::agiru::platform::TenantLicenseStateState";
