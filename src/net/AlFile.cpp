@@ -1,4 +1,4 @@
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Date.h"
 #include "type/File.h"

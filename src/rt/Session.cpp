@@ -8,6 +8,7 @@
 
 #include "BuiltinsWritten.h"
 #include "SessionState.h"
+#include "Subscribers.h"
 
 #include <string>
 #include <string_view>
@@ -27,6 +28,7 @@ Session::Session(const std::string &connectionInfo)
 }
 
 Session::~Session() {
+  detail::ReleaseAutomaticInstances();
   if (state_ != nullptr) { state_->ReleaseSingles(); }
   g_current = previous_;
   ::agiru::Language::MakeCurrent(previous_ != nullptr ? previous_->language_

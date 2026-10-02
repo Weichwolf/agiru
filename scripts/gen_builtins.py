@@ -221,7 +221,7 @@ inbody = {t for t in existing if re.search(r"::agiru::" + t + r"\b", code)}
 # The same suppression the header carries, for the same reason: these are AL's parameter orders.
 guard = ("// NOLINTBEGIN(bugprone-easily-swappable-parameters,"
          "performance-unnecessary-value-param)")
-src = ['#include "Builtins.h"', "", '#include "runtime/ErrorValue.h"'] + \
+src = ['#include "Builtins.h"', "", '#include "runtime/Error.h"'] + \
       [f'#include "{h}"' for h in sorted({existing[t] for t in inbody})] + \
       ["", "#include <string>", "#include <string_view>", "", "namespace agiru {", "",
        "[[noreturn]] void RefuseDoor(std::string_view what) {",

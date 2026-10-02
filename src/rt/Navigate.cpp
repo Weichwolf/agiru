@@ -1,11 +1,10 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "runtime/Session.h"
-#include "runtime/Storage.h"
 #include "runtime/Table.h"
 
 #include "Cursor.h"
@@ -125,7 +124,6 @@ bool ReadOne(void *record, const TableDef &table, const Selection &made, const s
 
 bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
   if (TempOf(record) != nullptr) { return TempFind(record, table, which); }
-  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   if (which.empty()) { which = "="; }
@@ -158,7 +156,6 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
 
 bool RuntimeFindSet(void *record, const TableDef &table) {
   if (TempOf(record) != nullptr) { return TempFindSet(record, table); }
-  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   state->open.Forget();
@@ -181,7 +178,6 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
 std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps) {
   if (steps == 0) { return 0; }
   if (TempOf(record) != nullptr) { return TempNext(record, table, steps); }
-  RequireTableProvider(table);
 
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();

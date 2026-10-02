@@ -3,7 +3,6 @@
 #include "meta/Ids.h"
 #include "meta/Subtype.h"
 #include "runtime/Error.h"
-#include "runtime/Subscriptions.h"
 #include "runtime/Transaction.h"
 #include "type/Integer.h"
 
@@ -27,6 +26,7 @@ namespace detail {
 /// \brief Points a record at another's temporary rows, leaving its filters alone.
 /// \param record The record that borrows. \param from The one whose rows it borrows.
 void RuntimeBorrowTemporary(void *record, const void *from);
+bool UnbindSubscriptions(CodeunitId id, void *instance);
 }
 
 /// \brief WHY AN EVENT PUBLISHER'S BODY IS EMPTY, AND WHY ITS PARAMETERS HAVE NO NAMES.
@@ -416,7 +416,9 @@ public:
   /// \note `devenv-eventsubscriberinstance-property.md`: a manually bound instance subscribes
   ///       until `UnbindSubscription` or until the instance is gone. A binding that outlived its
   ///       object was a dangling pointer the next event dispatched into.
-  ~Codeunit() { detail::ReleaseSubscriptions(Id(), static_cast<Derived *>(this)); }
+  ~Codeunit() {
+    static_cast<void>(detail::UnbindSubscriptions(Id(), static_cast<Derived *>(this)));
+  }
 
   /// \brief The codeunit's AL name.
   /// \return The name AL declared, spaces and punctuation included.

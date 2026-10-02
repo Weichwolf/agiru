@@ -1,11 +1,10 @@
 #include "meta/Ids.h"
 #include "runtime/Codeunit.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 
 #include "SessionState.h"
 
-#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -19,16 +18,6 @@ SessionState &SessionState::Current() {
 
 SessionState *SessionState::Peek() {
   return Session::HasCurrent() ? Session::Current().state_.get() : nullptr;
-}
-
-void SessionState::ReleaseBindings(CodeunitId id, void *instance) noexcept {
-  if (!Session::HasCurrent()) { return; }
-  for (Session *session = &Session::Current(); session != nullptr; session = session->previous_) {
-    if (session->state_ == nullptr) { continue; }
-    std::erase_if(session->state_->bindings, [=](const Binding &held) noexcept {
-      return held.id == id && held.instance == instance;
-    });
-  }
 }
 
 void *SingleInstanceOf(CodeunitId id, void *(*make)(), void (*free)(void *)) {
