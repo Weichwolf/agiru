@@ -1,6 +1,6 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 #include "type/Variant.h"

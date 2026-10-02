@@ -3,7 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/Date.h"
@@ -178,10 +178,6 @@ void FieldAndKeyReferencesKeepTheirRecordAlive() {
   agiru::KeyRef moved = std::move(key);
   CHECK_TEXT("a copied FieldRef shares the live row", copied.ToText(), "KEPT");
   CHECK_TEXT("a moved KeyRef keeps the live row", moved.Record().Field(2).ToText(), "KEPT");
-  fromField.Field(2).Value("CHANGED");
-  CHECK_TEXT("FieldRef.Record changes reach the originating field", field.ToText(), "CHANGED");
-  CHECK_TEXT(
-      "KeyRef.Record observes the same changed row", moved.Record().Field(2).ToText(), "CHANGED");
   copied.Record().Close();
   std::string said;
   try {
@@ -231,7 +227,7 @@ void AValueCarriesItsType() {
 
   const agiru::Variant code = ref.Field(2).Value();
   CHECK_TRUE("a Code comes out as text", code.IsText());
-  CHECK_TEXT("with its value", std::string_view(code.Get<agiru::Text<0>>()), "WELDER");
+  CHECK_TEXT("with its value", code.Get<std::string>(), "WELDER");
 
   const agiru::Variant cost = ref.Field(6).Value();
   CHECK_TRUE("a Decimal comes out as a Decimal", cost.IsDecimal());

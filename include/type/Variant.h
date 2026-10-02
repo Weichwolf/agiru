@@ -2,7 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
@@ -18,7 +18,6 @@
 #include "type/JsonHandle.h"
 #include "type/Option.h"
 #include "type/RecordId.h"
-#include "type/Text.h"
 #include "type/Time.h"
 #include "type/XmlHandle.h"
 
@@ -384,7 +383,7 @@ public:
                             Integer,
                             BigInteger,
                             Decimal,
-                            Text<0>,
+                            std::string,
                             Date,
                             Time,
                             DateTime,
@@ -655,7 +654,7 @@ public:
   template <typename T>
     requires std::convertible_to<const T &, std::string_view> &&
              (!detail::InVariant<T, Held>::value)
-  Variant(const T &value) : held_(Text<0>(std::string_view(value))) {}
+  Variant(const T &value) : held_(std::string(std::string_view(value))) {}
 
   /// \brief Holds a number AL's `Any` takes and this Variant has no alternative for.
   /// \tparam T The number's type -- `Byte` and `Char` are the two.
@@ -756,12 +755,12 @@ public:
   [[nodiscard]] bool IsDecimal() const { return Is<Decimal>(); }
 
   /// \brief AL `Variant.IsText()`. \return True when it holds one.
-  [[nodiscard]] bool IsText() const { return Is<Text<0>>(); }
+  [[nodiscard]] bool IsText() const { return Is<std::string>(); }
 
   /// \brief AL `Variant.IsCode()`. \return True when it holds one.
   /// \note A Code and a Text are one alternative here, because AL's Code IS a Text with a
   ///       normalisation rule, and a Variant carries the VALUE rather than the rule.
-  [[nodiscard]] bool IsCode() const { return Is<Text<0>>(); }
+  [[nodiscard]] bool IsCode() const { return Is<std::string>(); }
 
   /// \brief AL `Variant.IsDate()`. \return True when it holds one.
   [[nodiscard]] bool IsDate() const { return Is<Date>(); }
@@ -1234,7 +1233,9 @@ public:
   ///       mismatch because AL's does: what it must not do is hand back an empty string for an
   ///       Integer, which is the wrong answer wearing the right type.
   operator std::string_view() const {
-    if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) { return *text; }
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return *text;
+    }
     return Rendered();
   }
 
@@ -1263,7 +1264,7 @@ public:
   ///          so the types that need widening do not come through one.
   template <typename T>
     requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Decimal>) &&
-             (!std::is_same_v<T, BigInteger>) && (!std::is_same_v<T, Text<0>>)
+             (!std::is_same_v<T, BigInteger>)
   operator T &() {
     T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
@@ -1291,7 +1292,7 @@ public:
   /// \param into Where the converted value lands.
   /// \return Whether the held value converts.
   template <typename T> [[nodiscard]] bool ConvertsTo_(T &into) const {
-    if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) {
+    if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
       return detail::TextSpells(*text, into);
     }
     if constexpr (std::is_same_v<T, Integer>) {
@@ -1343,7 +1344,7 @@ public:
   ///       `"Qty. per Unit of Measure".Value` back as a Decimal that way (4 cases, 2026-09-11).
   ///       A text that does not spell the type still refuses.
   template <typename T>
-    requires detail::InVariant<T, Held>::value && (!std::is_same_v<T, Text<0>>)
+    requires detail::InVariant<T, Held>::value
   operator T() const {
     const T *value = std::get_if<T>(&held_);
     if (value != nullptr) { return *value; }
@@ -1367,7 +1368,7 @@ public:
     }
     if constexpr (std::is_same_v<T, Decimal> || std::is_same_v<T, Integer> ||
                   std::is_same_v<T, BigInteger> || std::is_same_v<T, Boolean>) {
-      if (const Text<0> *text = std::get_if<Text<0>>(&held_); text != nullptr) {
+      if (const std::string *text = std::get_if<std::string>(&held_); text != nullptr) {
         T evaluated{};
         if (detail::TextSpells(*text, evaluated)) { return evaluated; }
       }
@@ -1392,9 +1393,8 @@ public:
   /// \brief The `Char` a variant holds: a text's first code point, or an integer's value.
   /// \throws Error when it holds neither.
   operator ::agiru::Char() const {
-    if (const auto *text = std::get_if<Text<0>>(&held_); text != nullptr) {
-      const std::string_view value(*text);
-      return ::agiru::Char{value.empty() ? 0 : static_cast<unsigned char>(value.front())};
+    if (const auto *text = std::get_if<std::string>(&held_); text != nullptr) {
+      return ::agiru::Char{text->empty() ? 0 : static_cast<unsigned char>(text->front())};
     }
     if (const auto *number = std::get_if<Integer>(&held_); number != nullptr) {
       return ::agiru::Char{static_cast<std::int32_t>(*number)};

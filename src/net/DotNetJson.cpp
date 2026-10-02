@@ -1,6 +1,6 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
 #include "type/Decimal.h"
@@ -62,7 +62,7 @@ Json FromVariant(const ::agiru::Variant &value) {
   if (value.Is<Decimal>()) {
     return Json::parse(value.Get<Decimal>().Trimmed().ToInvariantString());
   }
-  if (value.IsText()) { return Json(std::string(std::string_view(value.Get<Text<0>>()))); }
+  if (value.Is<std::string>()) { return Json(value.Get<std::string>()); }
   throw Error(std::string("a JSON value cannot be made of a Variant holding ") +
               std::string(value.HeldName()));
 }
@@ -246,8 +246,8 @@ JToken JToken::Item(const ::agiru::Variant &key) const {
     if (at >= node.size()) { throw Error("JArray.Item: the index is outside the array"); }
     return TokenAt(handle_, node[at]);
   }
-  if (node.is_object() && key.IsText()) {
-    const std::string name(key.Get<Text<0>>());
+  if (node.is_object() && key.Is<std::string>()) {
+    const std::string &name = key.Get<std::string>();
     if (!node.contains(name)) { return {}; }
     return TokenAt(handle_, node[name]);
   }
