@@ -13,6 +13,7 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -2066,14 +2067,40 @@ bool NamesAbsentType(const al::VarDecl &declared) {
 }
 
 TableIndex PlatformTables() {
+  struct Identity {
+    std::string_view name;
+    std::int32_t number;
+  };
+
+  constexpr std::array<Identity, 18> identities{{
+      {.name = "AllObj", .number = 2000000038},
+      {.name = "AllObjWithCaption", .number = 2000000058},
+      {.name = "All Profile", .number = 2000000178},
+      {.name = "Company", .number = 2000000006},
+      {.name = "Feature Key", .number = 2000000211},
+      {.name = "Field", .number = 2000000041},
+      {.name = "Integer", .number = 2000000026},
+      {.name = "Privacy Notice", .number = 2000000237},
+      {.name = "Privacy Notice Approval", .number = 2000000238},
+      {.name = "Record Link", .number = 2000000068},
+      {.name = "Table Metadata", .number = 2000000136},
+      {.name = "Object Options", .number = 2000000196},
+      {.name = "OData Edm Type", .number = 2000000179},
+      {.name = "Page Metadata", .number = 2000000138},
+      {.name = "Tenant License State", .number = 2000000189},
+      {.name = "Date", .number = 2000000007},
+      {.name = "User", .number = 2000000120},
+      {.name = "User Personalization", .number = 2000000073},
+  }};
   TableIndex tables;
-  const auto add = [&tables](std::string_view name, std::string_view number) {
+  const auto add = [&tables](std::string_view name, std::int32_t number) {
     const TableRef ref{.identifier = "::agiru::platform::" + Identifier(name),
                        .header = "platform/" + Identifier(name) + ".h",
+                       .id = number,
                        .fields = {},
                        .procedures = {},
                        .parts = {},
-                       .name = {},
+                       .name = std::string(name),
                        .dataItems = {},
                        .requestFields = {},
                        .columnSources = {},
@@ -2081,26 +2108,9 @@ TableIndex PlatformTables() {
                        .tryFunctions = {},
                        .procedureDeclarations = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
-    tables.insert_or_assign(std::string(number), ref);
+    tables.insert_or_assign(std::to_string(number), ref);
   };
-  add("AllObj", "2000000038");
-  add("AllObjWithCaption", "2000000058");
-  add("All Profile", "2000000178");
-  add("Company", "2000000006");
-  add("Feature Key", "2000000211");
-  add("Field", "2000000041");
-  add("Integer", "2000000026");
-  add("Privacy Notice", "1560");
-  add("Privacy Notice Approval", "1561");
-  add("Record Link", "2000000068");
-  add("Table Metadata", "2000000136");
-  add("Object Options", "2000000225");
-  add("OData Edm Type", "2000000203");
-  add("Page Metadata", "2000000138");
-  add("Tenant License State", "2000000189");
-  add("Date", "2000000007");
-  add("User", "2000000120");
-  add("User Personalization", "2000000073");
+  for (const auto &[name, number] : identities) { add(name, number); }
   return tables;
 }
 
@@ -2127,7 +2137,7 @@ FieldEnums PlatformFieldEnums() {
   enums["table metadata"]["tabletype"] = "::agiru::platform::TableMetadataTableType";
   enums["object options"]["object type"] = "::agiru::platform::ObjectOptionsObjectType";
   enums["object options"]["objecttype"] = "::agiru::platform::ObjectOptionsObjectType";
-  enums["2000000225"] = enums["object options"];
+  enums["2000000196"] = enums["object options"];
   enums["page metadata"]["pagetype"] = "::agiru::platform::PageMetadataPageType";
   enums["table metadata"]["obsoletestate"] = "::agiru::platform::TableMetadataObsoleteState";
   enums["2000000136"] = enums["table metadata"];
