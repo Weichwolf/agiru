@@ -1053,6 +1053,80 @@ class SourceInventoryGate(unittest.TestCase):
         self.assertEqual(scope_inventory.declarations('namespace System.Security;'),
                          ('System.Security', []))
 
+    def test_correlated_conditional_braces_retain_every_source_method_once(self):
+        text = ('report 1 R { dataset {\n#if not CLEAN\n'
+                'dataitem(Outer; Integer) {\n#endif\ndataitem(Inner; Integer) {}\n'
+                '#if not CLEAN\n}\n#endif\n} }\n'
+                'codeunit 2 "Variant UT" { Subtype = Test;\n'
+                '#if A and (not B or CLEAN)\n[Test] procedure Branch() begin end;\n'
+                '#elif A or B\n[Test] procedure Branch() begin end;\n'
+                '#else\n[Test] procedure Last() begin end;\n#endif\n'
+                '[Test] procedure Common() begin end; }')
+        with self.assertRaisesRegex(ValueError, 'variant-specific'):
+            scope_inventory.raw_declarations(text)
+        namespace, objects = scope_inventory.declarations(text)
+        self.assertEqual(namespace, '')
+        self.assertEqual([(item['kind'], item['id']) for item in objects],
+                         [('report', 1), ('codeunit', 2)])
+        self.assertEqual(objects[1]['methods'], ['Branch', 'Branch', 'Last', 'Common'])
+        self.assertEqual(objects[1]['test_attributes'], 4)
+        self.assertEqual(len(objects[0]['conditional_variants']), 8)
+        self.assertEqual(len(objects[1]['conditional_variants']), 8)
+        self.assertEqual({tuple(sorted(item.items()))
+                          for item in objects[0]['conditional_variants']},
+                         {tuple(zip(('A', 'B', 'CLEAN'), flags))
+                          for flags in scope_inventory.product((False, True), repeat=3)})
+
+    def test_conditional_fallback_honours_define_undef_and_nested_branches(self):
+        text = ('#define LOCAL\nreport 1 R { dataset {\n#if LOCAL\n'
+                'dataitem(Outer; Integer) {\n#endif\n'
+                '#if FIRST\n#if SECOND\ndataitem(A; Integer) {}\n'
+                '#elif not SECOND\ndataitem(B; Integer) {}\n#endif\n'
+                '#else\ndataitem(C; Integer) {}\n#endif\n'
+                '#if LOCAL\n}\n#endif\n} }\n#undef LOCAL\n'
+                '#if not LOCAL\ncodeunit 2 "Kept UT" { Subtype = Test; '
+                '[Test] procedure Keep() begin end; }\n#endif\n')
+        _, objects = scope_inventory.declarations(text)
+        self.assertEqual([item['name'] for item in objects], ['R', 'Kept UT'])
+        self.assertEqual(objects[1]['methods'], ['Keep'])
+        self.assertEqual(len(objects[1]['conditional_variants']), 8)
+
+    def test_conditional_fallback_refuses_invalid_or_unmeasurable_populations(self):
+        split = ('report 1 R { dataset {\n#if A\ndataitem(Outer; Integer) {\n'
+                 '#endif\ndataitem(Inner; Integer) {}\n#if A\n}\n#endif\n} }\n')
+        for extra in ('#if A and\n#endif\n', '#if A + B\n#endif\n',
+                      '#else\n#endif\n', '#if A\n#else\n#elif B\n#endif\n',
+                      '#if A\n', '#define LOCAL\n#if not LOCAL\n'
+                      'codeunit 2 X { Subtype = Test; [Test] procedure Lost() begin end; }\n'
+                      '#endif\n'):
+            with self.subTest(extra=extra), self.assertRaises(ValueError):
+                scope_inventory.declarations(split + extra)
+        budget = '\n'.join(f'#if S{at}\n#endif' for at in range(8))
+        with self.assertRaisesRegex(ValueError, 'work budget'):
+            scope_inventory.declarations(split + budget)
+
+    def test_refused_conditional_variants_never_erase_measured_source_identities(self):
+        text = ('report 1 R { dataset {\n#if A\ndataitem(Outer; Integer) {\n'
+                '#endif\ndataitem(Inner; Integer) {}\n#if A\n}\n#endif\n} }\n'
+                '#if FUTURE\n}\n#endif\n'
+                'codeunit 2 X { Subtype = Test; [Test] procedure Keep() begin end; }')
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'Fixture').mkdir()
+            (root / 'Fixture/Source.al').write_text(text)
+            report = scope_inventory.inventory(
+                root, {'apps': [{'name': 'fixture', 'source': 'Fixture'}]}, self.policy)
+            self.assertEqual(report['summary']['objects'], 2)
+            self.assertEqual(report['summary']['test_methods'], 1)
+            self.assertEqual(report['summary']['raw_test_attributes'], 1)
+            self.assertEqual(report['summary']['unmeasured_files'], 0)
+            self.assertEqual(report['objects'][1]['methods'], ['Keep'])
+            self.assertEqual(len(report['errors']), 1)
+            refusals = report['files'][0]['conditional_variant_refusals']
+            self.assertEqual(len(refusals), 2)
+            self.assertTrue(all(item['symbols']['FUTURE'] for item in refusals))
+            self.assertEqual(report['errors'][0]['variants'], refusals)
+
     def test_conditional_duplicates_are_not_collapsed_into_a_runnable_population(self):
         text = ('#if OLD\ncodeunit 1 "Same UT" { Subtype = Test; '
                 '[Test] procedure A() begin end; }\n#else\n'
@@ -1767,7 +1841,8 @@ class MilestoneGate(unittest.TestCase):
             [Test] procedure Second() begin end;
         }''')
         repo = SCRIPT.parents[1]
-        for name in ('ut-milestone.sh', 'ut_milestone.py', 'ut_manifest.py', 'ut_results.py'):
+        for name in ('ut-milestone.sh', 'ut_milestone.py', 'ut_manifest.py', 'ut_results.py',
+                     'source_revision.py'):
             shutil.copyfile(repo / 'scripts' / name, self.root / 'scripts' / name)
         self.runner = self.root / 'build/agiru'
         self.psql = self.root / 'build/psql'
@@ -2061,6 +2136,22 @@ class SourceRevisionGate(unittest.TestCase):
         with patch.dict(os.environ, AGIRU_BC_REVISION='frozen-input-revision'):
             self.assertEqual(milestone.bc_source_revision(self.project / 'src'),
                              'frozen-input-revision')
+
+    def test_raw_inventory_and_runner_share_the_revision_contract(self):
+        self.assertIs(scope_inventory.bc_revision, milestone.bc_revision)
+        for tracked in (False, True):
+            with self.subTest(tracked=tracked):
+                if tracked:
+                    expected = self.repository(['src/Example.al'])
+                else:
+                    expected = None
+                    (self.project / 'src').mkdir()
+                    (self.project / 'src/Example.al').write_text('table 1 Example {}')
+                self.assertEqual(scope_inventory.bc_revision(self.project / 'src', milestone.ROOT),
+                                 expected)
+                with patch.dict(os.environ, AGIRU_BC_REVISION='frozen-source'):
+                    self.assertEqual(scope_inventory.bc_revision(self.project / 'src', milestone.ROOT),
+                                     'frozen-source')
 
 
 class ManifestGate(unittest.TestCase):

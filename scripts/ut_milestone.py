@@ -16,6 +16,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from ut_manifest import scan
 from ut_results import aggregate
+from source_revision import bc_revision, git_revision as source_revision
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,24 +37,8 @@ def maintenance_dsn(dsn):
     return dsn[:match.start()] + 'dbname=postgres' + dsn[match.end():]
 
 
-def source_revision(path):
-    result = subprocess.run(['git', '-C', str(path), 'rev-parse', 'HEAD'],
-                            capture_output=True, text=True, check=False)
-    return result.stdout.strip() if result.returncode == 0 else None
-
-
 def bc_source_revision(path):
-    frozen = os.environ.get('AGIRU_BC_REVISION')
-    if frozen:
-        return frozen
-    if path.resolve().is_relative_to(ROOT):
-        return None
-    tracked = subprocess.run(['git', '-C', str(path), 'ls-files', '-z', '--', '.'],
-                             capture_output=True, check=False)
-    if tracked.returncode != 0 or not any(
-            name.lower().endswith(b'.al') for name in tracked.stdout.split(b'\0')):
-        return None
-    return source_revision(path)
+    return bc_revision(path, ROOT)
 
 
 def file_sha256(path):
