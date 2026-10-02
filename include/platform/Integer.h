@@ -42,6 +42,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"Integer"};
+  /// \brief Original System declaration's extension availability; not a deployment restriction.
+  static constexpr std::string_view kScope{"Cloud"};
 
   detail::StateHandle State_Block;
 
@@ -73,14 +75,14 @@ public:
 using Integer = Integer_Table;
 
 /// \brief The field table of the virtual `Integer` table.
-inline constexpr std::array<FieldDef, 1> kIntegerFields{{
+inline constexpr auto kIntegerFields = WithSystemFields<Integer>(std::array<FieldDef, 1>{{
     Declare<&Integer::Number>(
         Integer::Field_No::Number, "Number", "Number", offsetof(Integer, Number)),
-}};
+}});
 
 /// \brief The keys of the virtual `Integer` table.
 inline constexpr std::array<KeyDef, 1> kIntegerKeys{{
-    KeyDef{.name = "PK", .fields = Integer::kKey1, .clustered = true},
+    KeyDef{.name = "pk", .fields = Integer::kKey1, .clustered = true},
 }};
 
 /// \brief The declaration of the virtual `Integer` table.
@@ -90,6 +92,7 @@ inline constexpr TableDef kIntegerTable{
     .caption = Integer::kName,
     .fields = kIntegerFields,
     .keys = kIntegerKeys,
+    .dataPerCompany = false,
     .sequenceField = Integer::Field_No::Number,
 };
 

@@ -45,7 +45,7 @@ template <> struct agiru::OptionTraits<agiru::platform::UserState> {
 
 namespace agiru::platform {
 
-/// \brief AL `User` -- the platform's own user table, which no `.al` file declares.
+/// \brief AL `User`, declared by the original System symbols.
 ///
 /// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
 ///       `work/symbols/src/Tenant Database Tables/User.Table.al` (`make symbols`) carries every
@@ -60,6 +60,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"User"};
+  /// \brief Original System declaration's extension availability; not a deployment restriction.
+  static constexpr std::string_view kScope{"Cloud"};
 
   detail::StateHandle State_Block;
 
@@ -89,7 +91,7 @@ public:
   /// \brief AL `User."License Type"`.
   Option<UserLicenseType> LicenseType;
   /// \brief AL `User."Authentication Email"`.
-  Code<kEmailLength> AuthenticationEmail;
+  Text<kEmailLength> AuthenticationEmail;
   /// \brief AL `User."Contact Email"`.
   Text<kEmailLength> ContactEmail;
   /// \brief AL `User."Exchange Identifier"`.
@@ -148,7 +150,7 @@ public:
 using User = User_Table;
 
 /// \brief The field table of the system `User` table.
-inline constexpr std::array<FieldDef, 12> kUserFields{{
+inline constexpr auto kUserFields = WithSystemFields<User>(std::array<FieldDef, 12>{{
     Declare<&User::UserSecurityID>(User::Field_No::UserSecurityID,
                                    "User Security ID",
                                    "User Security ID",
@@ -186,7 +188,7 @@ inline constexpr std::array<FieldDef, 12> kUserFields{{
                                   "Application ID",
                                   "Application ID",
                                   offsetof(User, ApplicationID)),
-}};
+}});
 
 /// \brief The keys of the system `User` table.
 inline constexpr std::array<KeyDef, 3> kUserKeys{{
@@ -202,6 +204,8 @@ inline constexpr TableDef kUserTable{
     .caption = User::kName,
     .fields = kUserFields,
     .keys = kUserKeys,
+    .dataPerCompany = false,
+    .replicateData = false,
 };
 
 static_assert(FieldsAreSorted(kUserTable), "the field table is searched by number");

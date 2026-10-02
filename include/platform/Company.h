@@ -37,6 +37,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"Company"};
+  /// \brief Original System declaration's extension availability; not a deployment restriction.
+  static constexpr std::string_view kScope{"Cloud"};
 
   detail::StateHandle State_Block;
 
@@ -118,6 +120,8 @@ inline constexpr TableDef kCompanyTable{
     .caption = Company::kName,
     .fields = kCompanyFields,
     .keys = kCompanyKeys,
+    .dataPerCompany = false,
+    .replicateData = false,
 };
 
 static_assert(FieldsAreSorted(kCompanyTable), "the field table is searched by number");

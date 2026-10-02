@@ -66,6 +66,8 @@ public:
 
   /// \brief The AL name.
   static constexpr std::string_view kName{"Date"};
+  /// \brief Original System declaration's extension availability; not a deployment restriction.
+  static constexpr std::string_view kScope{"Cloud"};
 
   detail::StateHandle State_Block;
 
@@ -122,7 +124,7 @@ public:
 using Date = Date_Table;
 
 /// \brief The field table of the virtual `Date` table.
-inline constexpr std::array<FieldDef, 6> kDateFields{{
+inline constexpr auto kDateFields = WithSystemFields<Date>(std::array<FieldDef, 6>{{
     Declare<&Date::PeriodType_>(
         Date::Field_No::PeriodType, "Period Type", "Period Type", offsetof(Date, PeriodType_)),
     Declare<&Date::PeriodStart>(
@@ -137,7 +139,7 @@ inline constexpr std::array<FieldDef, 6> kDateFields{{
                                         "Period Invariant Name",
                                         "Period Invariant Name",
                                         offsetof(Date, PeriodInvariantName)),
-}};
+}});
 
 /// \brief The keys of the virtual `Date` table.
 inline constexpr std::array<KeyDef, 1> kDateKeys{{
@@ -151,6 +153,8 @@ inline constexpr TableDef kDateTable{
     .caption = Date::kName,
     .fields = kDateFields,
     .keys = kDateKeys,
+    .dataPerCompany = false,
+    .inherentPermissions = "RX",
 };
 
 static_assert(FieldsAreSorted(kDateTable), "the field table is searched by number");

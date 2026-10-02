@@ -20,19 +20,9 @@
 #include <string_view>
 
 /// \file
-/// \brief The platform's `All Profile` table (2000000178): every installed profile, and the one the
-///        tenant made its default role centre.
-///
-/// \note IT HAS NO AL SOURCE AND THE FIELD LIST IS TAKEN FROM WHAT THE BASEAPP READS. 246 UT cases
-///       reach it through `Conf./Personalization Mgt.GetDefaultProfileID` (2026-09-09), and the
-///       fields below are the ones that code names: `Scope`, `App ID`, `Profile ID`, `Description`,
-///       `Role Center ID`, `Default Role Center`, `Caption`, `Enabled`, `Promoted` and
-///       `Disable Personalization`. The FIELD NUMBERS ARE ASSIGNED HERE in that order [SET]; BC's
-///       own are not in the documentation this tree reads, and nothing in AL names a field of this
-///       table by number.
-/// \warning ITS ROWS COME FROM THE PROFILE CATALOGUE. `ProvisionInstalled` writes one row per
-///          translated `profile` object into a clone that lacks it (board:0004), which is what BC
-///          does at app install; `Default Role Center` is then the tenant's to set.
+/// \brief Source-declared System `All Profile` (2000000178).
+/// \note Fields, lengths and the sole PK follow System 28 `Virtual Tables/AllProfile.Table.al`.
+///       This declaration does not implement the read-only live profile provider (0044).
 
 namespace agiru::platform {
 
@@ -40,9 +30,13 @@ class AllProfile_Table : public Table<AllProfile_Table> {
 public:
   static constexpr TableId kId{2000000178};
   static constexpr std::string_view kName{"All Profile"};
+  /// \brief Original System declaration's extension availability; not a deployment restriction.
+  static constexpr std::string_view kScope{"Cloud"};
   detail::StateHandle State_Block;
   static constexpr std::size_t kProfileIdLength = 30;
-  static constexpr std::size_t kDescriptionLength = 250;
+  static constexpr std::size_t kDescriptionLength = 2048;
+  /// \brief Declared length of app names and obsolete notebook fields.
+  static constexpr std::size_t kAppNameLength = 250;
   static constexpr std::size_t kCaptionLength = 100;
   Option<PersonalizationScope> Scope;
   Guid AppID;
@@ -50,11 +44,23 @@ public:
   Text<kDescriptionLength> Description;
   ::agiru::Integer RoleCenterID{};
   Boolean DefaultRoleCenter{};
+  /// \brief Source field 7; pending removal.
+  Boolean UseComments{};
+  /// \brief Source field 8; pending removal.
+  Boolean UseNotes{};
+  /// \brief Source field 9; pending removal.
+  Boolean UseRecordNotes{};
+  /// \brief Source field 10; pending removal.
+  Text<kAppNameLength> RecordNotebook;
+  /// \brief Source field 11; pending removal.
+  Boolean UsePageNotes{};
+  /// \brief Source field 12; pending removal.
+  Text<kAppNameLength> PageNotebook;
   Boolean DisablePersonalization{};
   Text<kCaptionLength> Caption;
   Boolean Enabled{};
   /// \brief AL `AllProfile."App Name"` -- the name of the app the profile came with.
-  Text<kDescriptionLength> AppName;
+  Text<kAppNameLength> AppName;
   /// \brief AL `AllProfile.SystemId`.
   Guid SystemId;
   /// \brief AL `AllProfile.SystemCreatedAt`.
@@ -75,22 +81,39 @@ public:
     static constexpr ::agiru::FieldNo Description{4};
     static constexpr ::agiru::FieldNo RoleCenterID{5};
     static constexpr ::agiru::FieldNo DefaultRoleCenter{6};
-    static constexpr ::agiru::FieldNo DisablePersonalization{7};
-    static constexpr ::agiru::FieldNo Caption{8};
-    static constexpr ::agiru::FieldNo Enabled{9};
-    static constexpr ::agiru::FieldNo Promoted{10};
-    /// \brief The AL field number of `App Name`, the next number the table had free.
-    static constexpr ::agiru::FieldNo AppName{11};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo UseComments{7};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo UseNotes{8};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo UseRecordNotes{9};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo RecordNotebook{10};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo UsePageNotes{11};
+    /// \brief Original AL field number.
+    static constexpr ::agiru::FieldNo PageNotebook{12};
+    static constexpr ::agiru::FieldNo DisablePersonalization{13};
+    /// \brief Original AL field number of `App Name`.
+    static constexpr ::agiru::FieldNo AppName{14};
+    static constexpr ::agiru::FieldNo Enabled{15};
+    static constexpr ::agiru::FieldNo Caption{16};
+    static constexpr ::agiru::FieldNo Promoted{17};
   };
 
   static constexpr std::array<::agiru::FieldNo, 3> kKey1{
       {Field_No::Scope, Field_No::AppID, Field_No::ProfileID}};
-  static constexpr std::array<::agiru::FieldNo, 1> kKey2{{Field_No::RoleCenterID}};
 };
 
 using AllProfile = AllProfile_Table;
 
-inline constexpr std::array<FieldDef, 11> kAllProfileFields{{
+/// \brief Removal metadata shared by fields 7–12 in System 28 AllProfile.Table.al.
+inline constexpr Declared kAllProfileObsoleteNotes{
+    .obsoleteState = "Pending",
+    .obsoleteReason = "Capacity related to System profiles for which support has been removed.",
+};
+
+inline constexpr auto kAllProfileFields = WithSystemFields<AllProfile>(std::array<FieldDef, 17>{{
     Declare<&AllProfile::Scope>(
         AllProfile::Field_No::Scope, "Scope", "Scope", offsetof(AllProfile, Scope)),
     Declare<&AllProfile::AppID>(
@@ -111,23 +134,52 @@ inline constexpr std::array<FieldDef, 11> kAllProfileFields{{
                                             "Default Role Center",
                                             "Default Role Center",
                                             offsetof(AllProfile, DefaultRoleCenter)),
+    Declare<&AllProfile::UseComments>(AllProfile::Field_No::UseComments,
+                                      "Use Comments",
+                                      "Use Comments",
+                                      offsetof(AllProfile, UseComments),
+                                      kAllProfileObsoleteNotes),
+    Declare<&AllProfile::UseNotes>(AllProfile::Field_No::UseNotes,
+                                   "Use Notes",
+                                   "Use Notes",
+                                   offsetof(AllProfile, UseNotes),
+                                   kAllProfileObsoleteNotes),
+    Declare<&AllProfile::UseRecordNotes>(AllProfile::Field_No::UseRecordNotes,
+                                         "Use Record Notes",
+                                         "Use Record Notes",
+                                         offsetof(AllProfile, UseRecordNotes),
+                                         kAllProfileObsoleteNotes),
+    Declare<&AllProfile::RecordNotebook>(AllProfile::Field_No::RecordNotebook,
+                                         "Record Notebook",
+                                         "Record Notebook",
+                                         offsetof(AllProfile, RecordNotebook),
+                                         kAllProfileObsoleteNotes),
+    Declare<&AllProfile::UsePageNotes>(AllProfile::Field_No::UsePageNotes,
+                                       "Use Page Notes",
+                                       "Use Page Notes",
+                                       offsetof(AllProfile, UsePageNotes),
+                                       kAllProfileObsoleteNotes),
+    Declare<&AllProfile::PageNotebook>(AllProfile::Field_No::PageNotebook,
+                                       "Page Notebook",
+                                       "Page Notebook",
+                                       offsetof(AllProfile, PageNotebook),
+                                       kAllProfileObsoleteNotes),
     Declare<&AllProfile::DisablePersonalization>(AllProfile::Field_No::DisablePersonalization,
                                                  "Disable Personalization",
                                                  "Disable Personalization",
                                                  offsetof(AllProfile, DisablePersonalization)),
-    Declare<&AllProfile::Caption>(
-        AllProfile::Field_No::Caption, "Caption", "Caption", offsetof(AllProfile, Caption)),
-    Declare<&AllProfile::Enabled>(
-        AllProfile::Field_No::Enabled, "Enabled", "Enabled", offsetof(AllProfile, Enabled)),
-    Declare<&AllProfile::Promoted>(
-        AllProfile::Field_No::Promoted, "Promoted", "Promoted", offsetof(AllProfile, Promoted)),
     Declare<&AllProfile::AppName>(
         AllProfile::Field_No::AppName, "App Name", "App Name", offsetof(AllProfile, AppName)),
-}};
+    Declare<&AllProfile::Enabled>(
+        AllProfile::Field_No::Enabled, "Enabled", "Enabled", offsetof(AllProfile, Enabled)),
+    Declare<&AllProfile::Caption>(
+        AllProfile::Field_No::Caption, "Caption", "Caption", offsetof(AllProfile, Caption)),
+    Declare<&AllProfile::Promoted>(
+        AllProfile::Field_No::Promoted, "Promoted", "Promoted", offsetof(AllProfile, Promoted)),
+}});
 
-inline constexpr std::array<KeyDef, 2> kAllProfileKeys{{
-    KeyDef{.name = "Key1", .fields = AllProfile::kKey1, .clustered = true},
-    KeyDef{.name = "Key2", .fields = AllProfile::kKey2, .clustered = false},
+inline constexpr std::array<KeyDef, 1> kAllProfileKeys{{
+    KeyDef{.name = "PK", .fields = AllProfile::kKey1, .clustered = true},
 }};
 
 inline constexpr TableDef kAllProfileTable{
@@ -137,6 +189,7 @@ inline constexpr TableDef kAllProfileTable{
     .fields = kAllProfileFields,
     .keys = kAllProfileKeys,
     .dataPerCompany = false,
+    .inherentPermissions = "rX",
 };
 
 static_assert(FieldsAreSorted(kAllProfileTable), "the field table is searched by number");
