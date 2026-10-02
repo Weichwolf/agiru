@@ -11,7 +11,7 @@ Depends on: 0006 session identity; 0033 declaring app; 0013 company schema.
 ## Implementation
 
 1. Make authenticated user/company and declaring/caller app explicit runtime context. Compile permission decisions into bounded session caches keyed by a database-owned permission revision; invalidate across tiers.
-2. Generate permission sets/extensions and composition/exclusion with declaring app identity. Build effective permissions per user/company/session, including indirect and scoped inherent grants. No commercial license/entitlement gates: 0725 owns their retirement, not an unconditional SUPER grant.
+2. Generate permission sets/extensions, composition/exclusion and entitlement metadata with declaring app identity. Build effective permissions per user/company/session, including indirect and scoped inherent grants.
 3. Check reads, writes, executable objects and related-table/FlowField access at runtime boundaries; UI hiding is additional presentation, never authorization. Implement SecurityFiltering modes explicitly.
 4. Key isolated storage by extension plus documented DataScope dimensions. Replace plaintext SetEncrypted with a justified encryption/key-management mechanism, or refuse it explicitly until supported.
 5. Carry TestPermissions and temporary-record exceptions according to documentation, coordinated with 0039. Implement HTTP/API identity before multi-user exposure.

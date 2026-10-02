@@ -15,10 +15,12 @@
 #include <array>
 #include <cctype>
 #include <cstddef>
+#include <format>
 #include <functional>
 #include <map>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -603,7 +605,6 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
   for (const SystemFieldDecl &field : kSystemFields) {
     ref.fields.emplace(LowerKey(std::string(field.name)), std::string(field.name));
   }
-  ref.procedureDeclarations.reserve(table.procedures.size());
   for (const al::ProcedureDecl &procedure : table.procedures) {
     ref.procedures.emplace(LowerKey(procedure.name), ProcedureIdentifier(table, procedure.name));
     if (IsTryFunction(procedure)) { ref.tryFunctions.insert(LowerKey(procedure.name)); }
@@ -622,6 +623,98 @@ TableRef BindTable(const al::TableObject &table, std::string identifier, std::st
                                                           .body = {}});
   }
   return ref;
+}
+
+namespace {
+
+std::string NativeFieldAssertion(const al::TableObject &table,
+                                 const al::FieldDecl &field,
+                                 const TableRef &binding,
+                                 const OptionField *option) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string body = "  const auto *field = ::agiru::Field(" + metadata + ", ::agiru::FieldNo{" +
+                     std::to_string(field.number) + "});\n";
+  body += "  if (field == nullptr || field->name != " + Literal(field.name) +
+          " || field->caption != " + Literal(Caption(field)) +
+          " || field->type != ::agiru::FieldType::" + TypeName(field.type) +
+          " || field->length != " + std::to_string(field.length) + ") { return false; }\n";
+  if (option != nullptr) {
+    body += "  if (field->values.size() != " + std::to_string(option->members.size()) +
+            ") { return false; }\n";
+    for (std::size_t i = 0; i < option->members.size(); ++i) {
+      const std::string value = "field->values[" + std::to_string(i) + "]";
+      body += std::format("  if ({0}.ordinal != {1} || {0}.name != {2} || {0}.caption != {3}) "
+                          "{{ return false; }}\n",
+                          value,
+                          i,
+                          Literal(option->members[i]),
+                          Literal(option->captions[i]));
+    }
+  }
+  body += "  return true;\n";
+  return "static_assert([] {\n" + body + "}(), " +
+         Literal("native field declaration mismatch: " + table.name + "." + field.name) + ");\n";
+}
+
+std::string NativeKeyAssertions(const al::TableObject &table, const std::string &metadata) {
+  std::string out = "static_assert(" + metadata +
+                    ".keys.size() == " + std::to_string(table.keys.size()) + ", " +
+                    Literal("native key count mismatch: " + table.name) + ");\n";
+  for (std::size_t i = 0; i < table.keys.size(); ++i) {
+    const auto &key = table.keys[i];
+    const std::string access = metadata + ".keys[" + std::to_string(i) + "]";
+    std::string condition = std::format("{0}.keys.size() > {1} && {2}.name == {3} && "
+                                        "{2}.fields.size() == {4}",
+                                        metadata,
+                                        i,
+                                        access,
+                                        Literal(key.name),
+                                        key.fields.size());
+    for (std::size_t j = 0; j < key.fields.size(); ++j) {
+      const auto found = std::ranges::find_if(table.fields, [&](const al::FieldDecl &field) {
+        return LowerKey(field.name) == LowerKey(key.fields[j]);
+      });
+      if (found == table.fields.end()) {
+        throw std::runtime_error("native key names an absent field: " + table.name + "." +
+                                 key.fields[j]);
+      }
+      condition +=
+          std::format(" && {}.fields[{}] == ::agiru::FieldNo{{{}}}", access, j, found->number);
+    }
+    out += std::format("static_assert({}, {});\n",
+                       condition,
+                       Literal("native key declaration mismatch: " + table.name + "." + key.name));
+  }
+  return out;
+}
+
+}
+
+std::string NativeTableAssertions(const al::TableObject &table, const TableRef &binding) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string out = "#include \"" + binding.header + "\"\n";
+  out += "#include \"meta/Declare.h\"\n#include \"meta/Ids.h\"\n";
+  out += "#include \"meta/TableDef.h\"\n#include <cstddef>\n\n";
+  out += "static_assert(" + metadata + ".id == ::agiru::TableId{" + std::to_string(table.id) +
+         "} && " + metadata + ".name == " + Literal(table.name) + ", " +
+         Literal("native table identity mismatch: " + table.name) + ");\n";
+  out += "static_assert([] {\n  std::size_t declared = 0;\n  for (const auto &field : " + metadata +
+         ".fields) {\n    bool system = false;\n";
+  out += "    for (const auto &implicit : ::agiru::kSystemFields) {\n";
+  out += "      system = system || field.no == implicit.no;\n    }\n";
+  out += "    if (!system) { ++declared; }\n  }\n  return declared == " +
+         std::to_string(table.fields.size()) + ";\n}(), " +
+         Literal("native field count mismatch: " + table.name) + ");\n";
+  const auto options = OptionFields(table);
+  for (const auto &field : table.fields) {
+    out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
+  }
+  out += NativeKeyAssertions(table, metadata);
+  const auto *perCompany = al::Find(table.properties, "DataPerCompany");
+  const bool company = perCompany == nullptr || LowerKey(perCompany->text) != "false";
+  out += "static_assert(" + metadata + ".dataPerCompany == " + (company ? "true" : "false") + ", " +
+         Literal("native company scope mismatch: " + table.name) + ");\n";
+  return out + "\n";
 }
 
 namespace {
