@@ -2,8 +2,8 @@
 #include "BodyWriter.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "Parser.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "TableWriter.h"
 
@@ -63,11 +63,11 @@ void DeclarationsTakePrecedenceOverGetterNames() {
 void HeadersAreNotInsertedTwice() {
   const std::string declared = "#include \"dotnet/Generic.h\"\nGenericDictionary2 Value;\n";
   CHECK_TRUE("declared native headers are not inserted again",
-             !agiru::gen::DoorIncludes(declared, agiru::gen::ObjectKind::Codeunit)
+             !agiru::gen::RuntimeIncludes(declared, agiru::gen::ObjectKind::Codeunit)
                   .contains("#include \"dotnet/Generic.h\""));
   CHECK_TRUE(
       "a missing native header remains required",
-      agiru::gen::DoorIncludes("GenericDictionary2 Value;\n", agiru::gen::ObjectKind::Codeunit)
+      agiru::gen::RuntimeIncludes("GenericDictionary2 Value;\n", agiru::gen::ObjectKind::Codeunit)
           .contains("#include \"dotnet/Generic.h\""));
 }
 

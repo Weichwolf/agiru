@@ -1,8 +1,8 @@
-#include "Door.h"
+#include "RuntimeSurface.h"
 
 #include "EnumWriter.h"
 #include "Names.h"
-#include "Scope.h"
+#include "ObjectKind.h"
 
 #include <array>
 #include <cctype>
@@ -53,7 +53,7 @@ const std::set<std::string> &BaseMembers() {
   return members;
 }
 
-const std::map<std::string, std::string> &TestDoorHeaders() {
+const std::map<std::string, std::string> &TestRuntimeHeaders() {
   static const std::map<std::string, std::string> found = [] {
     const std::filesystem::path door =
         std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "runtime" / "test";
@@ -72,7 +72,7 @@ const std::map<std::string, std::string> &TestDoorHeaders() {
   return found;
 }
 
-std::vector<std::string> &DoorTypes() {
+std::vector<std::string> &RuntimeTypes() {
   static const std::vector<std::string> types = [] {
     const std::filesystem::path door = std::filesystem::path(AGIRU_SOURCE_DIR) / "include" / "type";
     if (!std::filesystem::is_directory(door)) {
@@ -193,7 +193,7 @@ std::map<std::string, std::string> ReadSpellings() {
   return found;
 }
 
-const std::map<std::string, std::string> &DoorSpellings() {
+const std::map<std::string, std::string> &RuntimeSpellings() {
   static const std::map<std::string, std::string> spellings = ReadSpellings();
   return spellings;
 }
@@ -217,7 +217,7 @@ constexpr std::array kXml{std::string_view{"XmlDocument"},
                           std::string_view{"XmlNameTable"},
                           std::string_view{"XmlNamespaceManager"}};
 
-std::span<const std::string_view> DoorFamily(char which) {
+std::span<const std::string_view> RuntimeTypeFamily(char which) {
   switch (which) {
     case 'j': return kJson;
     case 'h': return kHttp;
@@ -464,7 +464,7 @@ const std::set<std::string> &RebuiltDotNet() {
   return kRebuilt;
 }
 
-std::string DoorIncludes(std::string_view text, ObjectKind kind) {
+std::string RuntimeIncludes(std::string_view text, ObjectKind kind) {
   std::set<std::string> headers;
   headers.insert("meta/Ids.h");
   headers.insert("runtime/Error.h");
@@ -497,21 +497,21 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
     case ObjectKind::Enum: headers.insert("meta/EnumDef.h"); break;
     default: break;
   }
-  for (const std::string &type : DoorTypes()) {
+  for (const std::string &type : RuntimeTypes()) {
     if (!Mentions(text, type)) { continue; }
     const std::size_t bare = type.starts_with("agiru::") ? std::string_view{"agiru::"}.size() : 0;
     headers.insert("type/" + type.substr(bare) + ".h");
   }
   for (const auto &[member, family] : kFamilies) {
     if (!headers.contains("type/" + std::string(member) + ".h")) { continue; }
-    for (const std::string_view &beside : DoorFamily(family)) {
+    for (const std::string_view &beside : RuntimeTypeFamily(family)) {
       headers.insert("type/" + std::string(beside) + ".h");
     }
   }
   for (const auto &[name, header] : kElsewhere) {
     if (Mentions(text, name)) { headers.insert(std::string(header)); }
   }
-  for (const auto &[name, header] : TestDoorHeaders()) {
+  for (const auto &[name, header] : TestRuntimeHeaders()) {
     if (Mentions(text, name)) { headers.insert(header); }
   }
   if (text.find(") {\n") != std::string_view::npos) {
@@ -528,22 +528,22 @@ std::string DoorIncludes(std::string_view text, ObjectKind kind) {
   return out;
 }
 
-std::string WithDoor(std::string text, ObjectKind kind) {
-  const std::size_t at = text.find(kDoorMarker);
+std::string WithRuntimeIncludes(std::string text, ObjectKind kind) {
+  const std::size_t at = text.find(kRuntimeIncludeMarker);
   if (at == std::string::npos) { return text; }
   std::string without = text;
-  without.erase(at, kDoorMarker.size());
+  without.erase(at, kRuntimeIncludeMarker.size());
   const std::string whole =
-      without.substr(0, at) + DoorIncludes(without, kind) + "\n" + without.substr(at);
+      without.substr(0, at) + RuntimeIncludes(without, kind) + "\n" + without.substr(at);
   return WithoutEmptyNamespaces(whole);
 }
 
-bool DoorDeclares(std::string_view name) {
+bool RuntimeDeclares(std::string_view name) {
   std::string key;
   for (const char c : name) {
     key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
-  return DoorSpellings().contains(key);
+  return RuntimeSpellings().contains(key);
 }
 
 const std::map<std::string, std::string> &PlatformMembers(std::string_view table) {
@@ -647,13 +647,13 @@ bool DeclaredByBase(std::string_view header, std::string_view name) {
   return MembersOfBase(header).contains(std::string(name));
 }
 
-bool DoorCalls(std::string_view name) {
-  const std::string spelled = AsTheDoorSpellsIt(name);
+bool RuntimeCallable(std::string_view name) {
+  const std::string spelled = RuntimeSpelling(name);
   return Callables().contains(spelled);
 }
 
-bool DoorStaticCalls(const StaticMember &wanted) {
-  DoorSpellings();
+bool RuntimeStaticCallable(const StaticMember &wanted) {
+  RuntimeSpellings();
   return StaticCallables().contains(Folded(wanted.type) + "::" + Folded(wanted.member));
 }
 
@@ -665,16 +665,16 @@ std::string BuiltinSpelling(std::string_view name) {
   for (const auto &[al, door] : kSpelledApart) {
     if (al == key) { return std::string(door); }
   }
-  return AsTheDoorSpellsIt(name);
+  return RuntimeSpelling(name);
 }
 
-std::string AsTheDoorSpellsIt(std::string_view name) {
+std::string RuntimeSpelling(std::string_view name) {
   std::string key;
   for (const char c : name) {
     key += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
-  const auto found = DoorSpellings().find(key);
-  if (found == DoorSpellings().end() || found->second.empty()) { return std::string(name); }
+  const auto found = RuntimeSpellings().find(key);
+  if (found == RuntimeSpellings().end() || found->second.empty()) { return std::string(name); }
   return found->second;
 }
 }

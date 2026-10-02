@@ -115,7 +115,7 @@ def doxygen_xml() -> pathlib.Path:
 DOOR_NAME = {"record": "table", "testpart": "testpage", "requestpage": "page"}
 
 # THE ONE METHOD THE DOOR SPELLS APART FROM AL, and it is named here as well as in
-# `src/gen/Door.cpp` because a measure that does not know about the deviation counts it as a gap
+# `src/gen/RuntimeSurface.cpp` because a measure that does not know about the deviation counts it as a gap
 # for ever. `Time` is an AL data type AND an AL builtin, and C++ holds one name once per namespace.
 DOOR_METHOD = {("system", "time"): "currenttime"}
 

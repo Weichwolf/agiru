@@ -2,10 +2,10 @@
 
 #include "Ast.h"
 #include "BodyWriter.h"
-#include "Door.h"
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "Token.h"
 
@@ -580,7 +580,7 @@ std::string TypeOf(const al::VarDecl &declared, const Objects &objects, const st
 
 std::string Unhidden(const std::string &type) {
   const std::string bare = type.substr(0, type.find('<'));
-  return HiddenByABaseMember(bare) || ShadowsADoorType(bare) ? "::agiru::" + type : type;
+  return HiddenByABaseMember(bare) || ShadowsRuntimeType(bare) ? "::agiru::" + type : type;
 }
 
 struct Named {
@@ -808,8 +808,8 @@ bool HandleMember(const al::VarDecl &declared) {
 
 std::string DoorMemberSpelling(std::string_view field) {
   const std::string plain = Identifier(field);
-  const std::string spelled = AsTheDoorSpellsIt(plain);
-  return DoorCalls(field) && !IsAlTypeName(spelled) ? spelled : plain;
+  const std::string spelled = RuntimeSpelling(plain);
+  return RuntimeCallable(field) && !IsAlTypeName(spelled) ? spelled : plain;
 }
 
 bool IsSystemField(std::string_view name) {
@@ -928,7 +928,7 @@ std::string Prologue(const al::CodeunitObject &unit,
                      const Objects &objects,
                      const std::set<std::string> &headers,
                      const std::map<std::string, std::set<std::string>> &forward) {
-  std::string out = std::string(kDoorMarker);
+  std::string out = std::string(kRuntimeIncludeMarker);
   if (NamesAbsent(unit, objects)) { out += "#include \"absent/Types.h\"\n"; }
   if (DeclaresAnOption(unit.variables, unit.procedures)) {
     out += "#include \"options/Types.h\"\n";
@@ -1159,7 +1159,8 @@ public:
     if (MembersAreCalls(member.variable)) { return true; }
     if (const al::VarDecl *query = Declaration(member.variable);
         query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
-      return !QueryColumnOf(objects_, query, member.field).isColumn && DoorCalls(member.field);
+      return !QueryColumnOf(objects_, query, member.field).isColumn &&
+             RuntimeCallable(member.field);
     }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
@@ -1167,13 +1168,13 @@ public:
             : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) {
-      return !NamesAControl(*held, member.field) && DoorCalls(member.field);
+      return !NamesAControl(*held, member.field) && RuntimeCallable(member.field);
     }
     if (held != nullptr && NamesAPage(TypeName(held->type))) {
-      return !NamesAControl(*held, member.field) && DoorCalls(member.field);
+      return !NamesAControl(*held, member.field) && RuntimeCallable(member.field);
     }
     if (IsSystemField(member.field)) { return false; }
-    if (subtype.empty() || !DoorCalls(member.field)) { return false; }
+    if (subtype.empty() || !RuntimeCallable(member.field)) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
     if (table == objects_.tables.end() || table->second.fields.empty()) {
       return !PlatformFieldNamed(PlatformField{.table = subtype, .field = member.field});
@@ -1356,15 +1357,15 @@ public:
     }
     if (declared != nullptr && !NamesAnObject(*declared)) {
       const std::string control = ControlNamed(*declared, member.field);
-      return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
+      return control.empty() ? RuntimeSpelling(Identifier(member.field)) : control;
     }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
             ? TableNoOf(unit_)
             : SubtypeOfRecord(member.variable);
     if (subtype.empty()) {
-      return DoorCalls(member.field) ? AsTheDoorSpellsIt(Identifier(member.field))
-                                     : Identifier(member.field);
+      return RuntimeCallable(member.field) ? RuntimeSpelling(Identifier(member.field))
+                                           : Identifier(member.field);
     }
     std::string platform =
         PlatformFieldSpelling(PlatformField{.table = subtype, .field = member.field});
@@ -1377,7 +1378,7 @@ public:
     if (field != table->second.fields.end()) { return field->second; }
     const auto declaredThere = table->second.procedures.find(LowerKey(std::string(member.field)));
     if (declaredThere != table->second.procedures.end()) { return declaredThere->second; }
-    return AsTheDoorSpellsIt(Identifier(member.field));
+    return RuntimeSpelling(Identifier(member.field));
   }
 
   [[nodiscard]] std::string ObjectNamed(std::string_view kind,
@@ -1725,7 +1726,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   const std::size_t includeAt = out.size();
   const std::string catalogue =
       TestCatalogueOf(unit, ClassName(identifier, ObjectKind::Codeunit), objects) +
@@ -1801,7 +1802,7 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += CodeunitDefinition(unit, identifier);
   out += "} // namespace " + space + "\n";
   out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
-  return WithDoor(out, ObjectKind::Codeunit);
+  return WithRuntimeIncludes(out, ObjectKind::Codeunit);
 }
 
 std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
@@ -2210,7 +2211,7 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n#pragma once\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   for (const std::string &wider : object.extends) {
     const auto found = objects.interfaces.find(LowerKey(wider));
     if (found != objects.interfaces.end() && !found->second.header.empty()) {
@@ -2257,7 +2258,7 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   DotNetUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
-  return InterfaceHeader{.text = WithDoor(out, ObjectKind::Interface),
+  return InterfaceHeader{.text = WithRuntimeIncludes(out, ObjectKind::Interface),
                          .absent = std::move(missing),
                          .dotnet = std::move(dotnet)};
 }
@@ -2369,7 +2370,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
   DotNetUse dotnet;
   DotNetUse absent;
   GatherDotNet(unit, objects, dotnet, absent);
-  return CodeunitHeader{.text = WithDoor(out, ObjectKind::Codeunit),
+  return CodeunitHeader{.text = WithRuntimeIncludes(out, ObjectKind::Codeunit),
                         .unresolvedTables = Unresolved(unit, objects),
                         .dotnet = std::move(dotnet),
                         .absent = std::move(absent)};

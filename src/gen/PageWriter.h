@@ -2,7 +2,7 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
-#include "Scope.h"
+#include "ObjectKind.h"
 
 #include <map>
 #include <optional>

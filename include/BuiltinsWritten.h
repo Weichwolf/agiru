@@ -970,8 +970,8 @@ Evaluate(Any1 &Variable, std::string_view String, ::agiru::Integer Number = {}) 
 /// \note THE DOOR SPELLS IT APART FROM AL, and this is the one place in the door that does.
 ///       `Time` is an AL data type as well as an AL builtin, and C++ cannot hold a class and a
 ///       function of one name in one namespace. The generator translates AL's `Time` into this
-///       name (`kSpelledApart` in `src/gen/Door.cpp`); a reader who knows AL sees the deviation
-///       here rather than guessing at it.
+///       name (`kSpelledApart` in `src/gen/RuntimeSurface.cpp`); a reader who knows AL sees the
+///       deviation here rather than guessing at it.
 [[nodiscard]] ::agiru::Time CurrentTime();
 
 /// \brief AL `System.ClearCollectedErrors()`. Clears the errors collected so far.

@@ -2,8 +2,8 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "Names.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 
 #include <algorithm>
@@ -264,12 +264,12 @@ std::string WriteEnumExtensionSource(const al::EnumExtensionObject &extension,
   if (bodies.empty()) { return {}; }
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   out += BodyIncludes(bodies, objects);
   out += "\n#include <typeinfo>\n\nnamespace {\n\n";
   out += bodies;
   out += "}\n";
-  return WithDoor(out, ObjectKind::Enum);
+  return WithRuntimeIncludes(out, ObjectKind::Enum);
 }
 
 std::string WriteEnumSource(const al::EnumObject &object,
@@ -283,10 +283,10 @@ std::string WriteEnumSource(const al::EnumObject &object,
   std::string out;
   out += "// Generated from " + sourcePath + ". Do not edit.\n\n";
   out += "#include \"" + fileName + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   out += BodyIncludes(bodies, objects);
   out += bodies;
-  return WithDoor(out, ObjectKind::Enum);
+  return WithRuntimeIncludes(out, ObjectKind::Enum);
 }
 
 std::string
@@ -300,7 +300,7 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#pragma once\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   out += "\n";
   out += "#include <array>\n#include <cstdint>\n\n";
 
@@ -344,7 +344,7 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "              \"enum " + std::to_string(object.id) + " declares " +
          std::to_string(object.values.size()) + " values\");\n";
   out += ImplementationDeclarations(object, identifier, space, objects);
-  return WithDoor(out, ObjectKind::Enum);
+  return WithRuntimeIncludes(out, ObjectKind::Enum);
 }
 
 }

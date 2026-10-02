@@ -1,6 +1,7 @@
 #pragma once
 
-#include <cstdint>
+#include "ObjectKind.h"
+
 #include <filesystem>
 #include <span>
 #include <string>
@@ -8,19 +9,6 @@
 #include <vector>
 
 namespace agiru::gen {
-
-enum class ObjectKind : std::uint8_t {
-  Table,
-  Codeunit,
-  Page,
-  Report,
-  Query,
-  XmlPort,
-  Enum,
-  Interface,
-  PermissionSet,
-  Profile,
-};
 
 std::string_view DirectoryOf(ObjectKind kind);
 

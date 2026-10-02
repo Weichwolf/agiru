@@ -2,11 +2,11 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "EnumWriter.h"
 #include "Expr.h"
 #include "Names.h"
 #include "PageWriter.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "TableWriter.h"
 #include "Token.h"
@@ -367,8 +367,8 @@ private:
     if (!enumeration.starts_with("::agiru::") || enumeration.starts_with("::agiru::options::")) {
       return "::agiru::Option<" + enumeration + ">{" + enumeration + "::" + member_ + "}";
     }
-    return "::agiru::Option<" + enumeration + ">{" + enumeration +
-           "::" + AsTheDoorSpellsIt(member_) + "}";
+    return "::agiru::Option<" + enumeration + ">{" + enumeration + "::" + RuntimeSpelling(member_) +
+           "}";
   }
 
   static const al::Expr &Indexed(const al::Expr &expression) {
@@ -398,7 +398,7 @@ private:
     const std::string lowered = LowerKey(std::string(method));
     for (const auto &[name, option] : kMethodOptions) {
       if (lowered == name) {
-        return "::agiru::" + std::string(option) + "::" + AsTheDoorSpellsIt(EnumeratorName(member));
+        return "::agiru::" + std::string(option) + "::" + RuntimeSpelling(EnumeratorName(member));
       }
     }
     return {};
@@ -434,16 +434,17 @@ private:
       const std::string scoped =
           scope_.Resolve(base.text).empty() ? base.text : scope_.DeclaredType(base.text);
       if (IsAlTypeName(scoped) && !ScopesThroughItsSubtype(scoped)) {
-        const bool call = DoorStaticCalls(StaticMember{.type = scoped, .member = expression.text});
+        const bool call =
+            RuntimeStaticCallable(StaticMember{.type = scoped, .member = expression.text});
         return "::agiru::" + TypeName(scoped) +
-               "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text)) + (call ? "()" : "");
+               "::" + RuntimeSpelling(EnumeratorName(expression.text)) + (call ? "()" : "");
       }
       if (scope_.Resolve(base.text).empty()) {
         const std::string lowered = LowerKey(base.text);
         for (const auto &[method, option] : kMethodOptions) {
           if (lowered == method) {
             return "::agiru::" + std::string(option) +
-                   "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
+                   "::" + RuntimeSpelling(EnumeratorName(expression.text));
           }
         }
       }
@@ -463,7 +464,7 @@ private:
       return resolved + "::" + scope_.EnumMember(resolved, expression.text);
     }
     if (resolved.starts_with("::agiru::")) {
-      return resolved + "::" + AsTheDoorSpellsIt(EnumeratorName(expression.text));
+      return resolved + "::" + RuntimeSpelling(EnumeratorName(expression.text));
     }
     return resolved + "::" + EnumeratorName(expression.text);
   }
@@ -564,7 +565,7 @@ private:
     } else if (const std::string_view platform = PlatformObject(callee.children[0].text);
                !platform.empty()) {
       std::string out = std::string(platform) +
-                        "::" + (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
+                        "::" + (RuntimeCallable(member) ? RuntimeSpelling(member) : member) + "(";
       for (std::size_t i = 1; i < expression.children.size(); ++i) {
         if (i != 1) { out += ", "; }
         out += Expression(expression.children[i], 0);
@@ -572,7 +573,7 @@ private:
       return out + ")";
     }
     std::string out =
-        subject + "." + (DoorCalls(member) ? AsTheDoorSpellsIt(member) : member) + "(";
+        subject + "." + (RuntimeCallable(member) ? RuntimeSpelling(member) : member) + "(";
     for (std::size_t i = first; i < expression.children.size(); ++i) {
       if (i != first) { out += ", "; }
       out += Expression(expression.children[i], 0);
@@ -594,7 +595,7 @@ private:
       return SameName(qualifier.text, name);
     });
     if (qualifier.kind != al::ExprKind::Name || member.kind != al::ExprKind::Name || !qualifies ||
-        scope_.IsVariable(qualifier.text) || !DoorCalls(member.text)) {
+        scope_.IsVariable(qualifier.text) || !RuntimeCallable(member.text)) {
       return {};
     }
     return "::agiru::" + BuiltinSpelling(member.text);
@@ -623,7 +624,7 @@ private:
         return bare;
       }
     }
-    if (DoorCalls(callee.text) && !scope_.TakesArguments(callee.text, arguments)) {
+    if (RuntimeCallable(callee.text) && !scope_.TakesArguments(callee.text, arguments)) {
       return "::agiru::" + BuiltinSpelling(callee.text);
     }
     std::string known = scope_.Resolve(callee.text);
@@ -631,23 +632,23 @@ private:
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
         HiddenByABaseMember(callee.text) && BareBuiltin(callee.text).empty()) {
       return "this->::agiru::Table<" + scope_.ThisTable() +
-             ">::" + AsTheDoorSpellsIt(Identifier(callee.text));
+             ">::" + RuntimeSpelling(Identifier(callee.text));
     }
     if (!scope_.IsVariable(callee.text) && scope_.IsRecord("Rec") &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
-        !IsAlTypeName(callee.text) && DoorCalls(callee.text)) {
-      return "::agiru::" + AsTheDoorSpellsIt(Identifier(callee.text));
+        !IsAlTypeName(callee.text) && RuntimeCallable(callee.text)) {
+      return "::agiru::" + RuntimeSpelling(Identifier(callee.text));
     }
     if (!known.empty() && scope_.IsVariable(callee.text) && !BareBuiltin(callee.text).empty()) {
       return "::agiru::" + BuiltinSpelling(BareBuiltin(callee.text));
     }
-    if (!known.empty() && scope_.IsVariable(callee.text) && DoorCalls(callee.text)) {
+    if (!known.empty() && scope_.IsVariable(callee.text) && RuntimeCallable(callee.text)) {
       const std::string rec = scope_.Resolve("Rec");
-      if (!rec.empty()) { return rec + "." + AsTheDoorSpellsIt(Identifier(callee.text)); }
+      if (!rec.empty()) { return rec + "." + RuntimeSpelling(Identifier(callee.text)); }
     }
     if (!known.empty()) { return known; }
     const std::string_view builtin = BareBuiltin(callee.text);
-    if (builtin.empty()) { return AsTheDoorSpellsIt(Identifier(callee.text)); }
+    if (builtin.empty()) { return RuntimeSpelling(Identifier(callee.text)); }
     return scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text})
                ? "::agiru::" + BuiltinSpelling(builtin)
                : BuiltinSpelling(builtin);
@@ -788,7 +789,7 @@ private:
         const al::Expr *owner = &callee.children.front();
         if (owner->kind == al::ExprKind::Binary && owner->text == "." &&
             owner->children.size() == 2 && owner->children[1].kind == al::ExprKind::Name &&
-            DoorDeclares(owner->children[1].text) && !DoorCalls(owner->children[1].text)) {
+            RuntimeDeclares(owner->children[1].text) && !RuntimeCallable(owner->children[1].text)) {
           owner = &owner->children.front();
         }
         receiver = Expression(*owner, kPrimaryPrecedence);
@@ -974,7 +975,7 @@ private:
             BareBuiltin(expression.text).empty() &&
             scope_.HasField(OfVariable{.variable = "Rec", .field = expression.text})) {
           return "this->::agiru::Table<" + scope_.ThisTable() +
-                 ">::" + AsTheDoorSpellsIt(Identifier(expression.text)) + "()";
+                 ">::" + RuntimeSpelling(Identifier(expression.text)) + "()";
         }
         return Identifier(expression.text) + "()";
       }
@@ -1032,7 +1033,7 @@ private:
         return Parens::First;
       }
       if (YieldsADoorType(base)) { return Parens::First; }
-      if (last.kind == al::ExprKind::Name && DoorCalls(last.text)) { return Parens::Last; }
+      if (last.kind == al::ExprKind::Name && RuntimeCallable(last.text)) { return Parens::Last; }
       return Parens::None;
     }
     if (base.kind == al::ExprKind::Index && !base.children.empty() &&
@@ -1056,14 +1057,14 @@ private:
     if (base.kind == al::ExprKind::Binary && base.text == "." && base.children.size() == 2 &&
         base.children.back().kind == al::ExprKind::Name &&
         base.children.front().kind == al::ExprKind::Name && last.kind == al::ExprKind::Name &&
-        DoorCalls(last.text)) {
+        RuntimeCallable(last.text)) {
       return Parens::Last;
     }
     if (base.kind != al::ExprKind::Name) { return Parens::None; }
     if (scope_.MembersAreCalls(base.text)) { return Parens::First; }
     if (last.kind == al::ExprKind::Name && !scope_.IsVariable(base.text) &&
         IsAlTypeName(base.text) &&
-        DoorStaticCalls(StaticMember{.type = base.text, .member = last.text})) {
+        RuntimeStaticCallable(StaticMember{.type = base.text, .member = last.text})) {
       return Parens::Last;
     }
     if (last.kind == al::ExprKind::Name &&
@@ -1077,9 +1078,9 @@ private:
     if (expression.text != ":=" || expression.children.size() != 2) { return {}; }
     const al::Expr &target = expression.children.front();
     if (target.kind == al::ExprKind::Name && scope_.Resolve(target.text).empty() &&
-        DoorCalls(target.text) && !IsSystemFieldName(target.text)) {
+        RuntimeCallable(target.text) && !IsSystemFieldName(target.text)) {
       const std::string bare = scope_.BareRecordCall(target.text);
-      return (bare.empty() ? AsTheDoorSpellsIt(Identifier(target.text)) : bare) + "(" +
+      return (bare.empty() ? RuntimeSpelling(Identifier(target.text)) : bare) + "(" +
              Expression(expression.children.back(), 0) + ")";
     }
     if (target.kind == al::ExprKind::Name && !scope_.Resolve(target.text).empty() &&
@@ -1096,7 +1097,7 @@ private:
       const al::Expr &owner = target.children[0];
       const bool chained =
           owner.kind == al::ExprKind::Binary && owner.text == "." && owner.children.size() == 2;
-      if (!chained || !DoorCalls(target.children[1].text)) { return {}; }
+      if (!chained || !RuntimeCallable(target.children[1].text)) { return {}; }
       return Binary(target, kPrimaryPrecedence, true) + "(" +
              Expression(expression.children.back(), 0) + ")";
     }
@@ -1153,25 +1154,25 @@ private:
         const std::string table = scope_.TableOf(reach.base.text);
         if (!table.empty()) {
           besideAField =
-              "::agiru::Table<" + table + ">::" + AsTheDoorSpellsIt(Identifier(reach.link.text));
+              "::agiru::Table<" + table + ">::" + RuntimeSpelling(Identifier(reach.link.text));
         }
       }
     }
     const bool calledOnAQuery =
         how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
         reach.base.kind == al::ExprKind::Name &&
-        SameName(scope_.DeclaredType(reach.base.text), "Query") && DoorCalls(reach.link.text);
+        SameName(scope_.DeclaredType(reach.base.text), "Query") && RuntimeCallable(reach.link.text);
     if (calledOnAQuery && besideAField.empty()) {
-      besideAField = AsTheDoorSpellsIt(Identifier(reach.link.text));
+      besideAField = RuntimeSpelling(Identifier(reach.link.text));
     }
     const std::string baseType =
         reach.base.kind == al::ExprKind::Name ? scope_.DeclaredType(reach.base.text) : "";
     const bool calledOnATestPage =
         how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
         (SameName(baseType, "TestPage") || SameName(baseType, "TestRequestPage")) &&
-        DoorCalls(reach.link.text);
+        RuntimeCallable(reach.link.text);
     if (calledOnATestPage && besideAField.empty()) {
-      const std::string spelled = AsTheDoorSpellsIt(Identifier(reach.link.text));
+      const std::string spelled = RuntimeSpelling(Identifier(reach.link.text));
       if (scope_.MemberSpelling(member) != spelled) { besideAField = spelled; }
     }
     out += !besideAField.empty() ? besideAField
@@ -1256,7 +1257,7 @@ private:
     if (walk.kind == al::ExprKind::Scope && IsEnumMethod(chain.back()->text)) {
       const std::string named = Expression(walk, kPrimaryPrecedence);
       if (named.find('{') != std::string::npos) {
-        return named + "." + AsTheDoorSpellsIt(Identifier(chain.back()->text));
+        return named + "." + RuntimeSpelling(Identifier(chain.back()->text));
       }
       const std::size_t at = named.find("_Enum");
       if (at == std::string::npos) { return {}; }
@@ -1265,21 +1266,21 @@ private:
         return "::agiru::Enum<" + named + ">::" + Identifier(chain.back()->text);
       }
       return "::agiru::Enum<" + named.substr(0, member) + ">{" + named + "}." +
-             AsTheDoorSpellsIt(Identifier(chain.back()->text));
+             RuntimeSpelling(Identifier(chain.back()->text));
     }
     if (walk.kind != al::ExprKind::Name || !scope_.Resolve(walk.text).empty() ||
-        !DoorCalls(chain.back()->text)) {
+        !RuntimeCallable(chain.back()->text)) {
       return {};
     }
     if (IsBuiltinFamily(walk.text)) {
-      return chain.size() == 1 ? AsTheDoorSpellsIt(Identifier(chain.back()->text)) : std::string{};
+      return chain.size() == 1 ? RuntimeSpelling(Identifier(chain.back()->text)) : std::string{};
     }
     if (!IsAlTypeName(walk.text)) { return {}; }
     const std::string holder = KindNamespace(walk.text).empty() ? "" : "<>";
     std::string out = "::agiru::" + TypeName(walk.text) + holder +
-                      "::" + AsTheDoorSpellsIt(Identifier(chain.back()->text));
+                      "::" + RuntimeSpelling(Identifier(chain.back()->text));
     if (chain.size() == 1 && !asCallee &&
-        DoorStaticCalls(StaticMember{.type = walk.text, .member = chain.back()->text})) {
+        RuntimeStaticCallable(StaticMember{.type = walk.text, .member = chain.back()->text})) {
       out += "()";
     }
     for (std::size_t i = chain.size() - 1; i > 0; --i) {
@@ -1691,7 +1692,7 @@ public:
             (found->second.fields.contains(LowerKey(std::string(member.field))) ||
              (found->second.fields.empty() &&
               PlatformFieldNamed(PlatformField{.table = global->subtype, .field = member.field})));
-        return !field && DoorCalls(member.field);
+        return !field && RuntimeCallable(member.field);
       }
     }
     const al::VarDecl *held = local != nullptr ? local : Global(member.variable);
@@ -1699,7 +1700,7 @@ public:
       const auto query = objects_.queries.find(LowerKey(held->subtype));
       const bool column = query != objects_.queries.end() &&
                           query->second.fields.contains(LowerKey(std::string(member.field)));
-      return !column && DoorCalls(member.field);
+      return !column && RuntimeCallable(member.field);
     }
     if (held != nullptr && (TypeName(held->type) == "Page" || TypeName(held->type) == "TestPage" ||
                             TypeName(held->type) == "TestRequestPage")) {
@@ -1707,18 +1708,19 @@ public:
       const auto page = index.find(LowerKey(held->subtype));
       const bool control =
           page != index.end() && page->second.fields.contains(LowerKey(std::string(member.field)));
-      return !control && DoorCalls(member.field);
+      return !control && RuntimeCallable(member.field);
     }
-    if (local != nullptr && !DeclaresAnObject(*local)) { return DoorCalls(member.field); }
+    if (local != nullptr && !DeclaresAnObject(*local)) { return RuntimeCallable(member.field); }
     if (const auto *fields = FieldsOf(member.variable); fields != nullptr) {
-      return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
+      return RuntimeCallable(member.field) &&
+             !fields->contains(LowerKey(std::string(member.field)));
     }
     if (local != nullptr && TypeName(local->type) == "Record") {
-      return DoorCalls(member.field) &&
+      return RuntimeCallable(member.field) &&
              !PlatformFieldNamed(PlatformField{.table = local->subtype, .field = member.field});
     }
-    if (FieldNamed(table_, member.variable) != nullptr) { return DoorCalls(member.field); }
-    return IsRecord(member.variable) && DoorCalls(member.field) &&
+    if (FieldNamed(table_, member.variable) != nullptr) { return RuntimeCallable(member.field); }
+    return IsRecord(member.variable) && RuntimeCallable(member.field) &&
            FieldNamed(table_, member.field) == nullptr;
   }
 
@@ -1736,7 +1738,7 @@ public:
       const std::string named = NamedEnum(objects_, name);
       return named.empty() ? "absent::" + Identifier(name) : named;
     }
-    if (index == nullptr) { return "::agiru::" + AsTheDoorSpellsIt(Identifier(name)); }
+    if (index == nullptr) { return "::agiru::" + RuntimeSpelling(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
     return "absent::" + Identifier(name);
@@ -1959,7 +1961,7 @@ public:
       if (const std::string declaredThere = ProcedureOf(member); !declaredThere.empty()) {
         return declaredThere;
       }
-      return AsTheDoorSpellsIt(Identifier(member.field));
+      return RuntimeSpelling(Identifier(member.field));
     }
     if (const al::FieldDecl *own =
             IsRecord(member.variable) ? FieldNamed(table_, member.field) : nullptr;
@@ -1975,7 +1977,7 @@ public:
     if (const std::string declaredThere = ProcedureOf(member); !declaredThere.empty()) {
       return declaredThere;
     }
-    return MemberIsCall(member) ? AsTheDoorSpellsIt(Identifier(member.field))
+    return MemberIsCall(member) ? RuntimeSpelling(Identifier(member.field))
                                 : Identifier(member.field);
   }
 
@@ -2116,7 +2118,7 @@ public:
         !procedure.empty()) {
       return "Rec." + procedure;
     }
-    const std::string spelled = AsTheDoorSpellsIt(Identifier(name));
+    const std::string spelled = RuntimeSpelling(Identifier(name));
     return TableMembers().contains(spelled) ? "Rec." + spelled : std::string{};
   }
 
@@ -2146,7 +2148,7 @@ public:
       const std::string named = NamedEnum(objects_, name);
       return named.empty() ? "absent::" + Identifier(name) : named;
     }
-    if (index == nullptr) { return "::agiru::" + AsTheDoorSpellsIt(Identifier(name)); }
+    if (index == nullptr) { return "::agiru::" + RuntimeSpelling(Identifier(name)); }
     const auto found = index->find(LowerKey(std::string(name)));
     if (found != index->end()) { return found->second.identifier; }
     return "absent::" + Identifier(name);
@@ -2267,24 +2269,26 @@ public:
   [[nodiscard]] bool MemberIsCall(const OfVariable &member) const override {
     if (const al::VarDecl *query = DeclarationOf(member.variable);
         query != nullptr && TypeName(query->type) == "Query" && !query->subtype.empty()) {
-      return !QueryColumnOf(objects_, query, member.field).isColumn && DoorCalls(member.field);
+      return !QueryColumnOf(objects_, query, member.field).isColumn &&
+             RuntimeCallable(member.field);
     }
     if (IsRecord(member.variable) || RecordOf(member.variable) != nullptr) {
-      return DoorCalls(member.field) && RecordFieldOf(member).empty();
+      return RuntimeCallable(member.field) && RecordFieldOf(member).empty();
     }
     if (SameName("CurrPage", member.variable)) {
-      return DoorCalls(member.field) && ControlOf(member.field).empty();
+      return RuntimeCallable(member.field) && ControlOf(member.field).empty();
     }
     if (const auto *fields = FieldsOfRecord(member.variable); fields != nullptr) {
-      return DoorCalls(member.field) && !fields->contains(LowerKey(std::string(member.field)));
+      return RuntimeCallable(member.field) &&
+             !fields->contains(LowerKey(std::string(member.field)));
     }
     const al::VarDecl *declared = DeclarationOf(member.variable);
     if (declared == nullptr) {
       if (HasField(OfVariable{.variable = "Rec", .field = member.variable}) &&
-          DoorCalls(member.field)) {
+          RuntimeCallable(member.field)) {
         return true;
       }
-      return !ControlOf(member.variable).empty() && DoorCalls(member.field);
+      return !ControlOf(member.variable).empty() && RuntimeCallable(member.field);
     }
     const std::string type = TypeName(declared->type);
     if (type == "Page" || type == "TestPage" || type == "TestRequestPage") {
@@ -2292,13 +2296,13 @@ public:
       const auto page = index.find(LowerKey(declared->subtype));
       const bool control =
           page != index.end() && page->second.fields.contains(LowerKey(std::string(member.field)));
-      return !control && DoorCalls(member.field);
+      return !control && RuntimeCallable(member.field);
     }
     if (type == "Record" && !declared->subtype.empty()) {
-      return DoorCalls(member.field) &&
+      return RuntimeCallable(member.field) &&
              !PlatformFieldNamed(PlatformField{.table = declared->subtype, .field = member.field});
     }
-    return !DeclaresAnObject(*declared) && DoorCalls(member.field);
+    return !DeclaresAnObject(*declared) && RuntimeCallable(member.field);
   }
 
   [[nodiscard]] std::string ProcedureOf(const OfVariable &member) const override {
@@ -2484,15 +2488,15 @@ public:
     }
     if (MemberIsCall(member) && !IsRecord(member.variable) &&
         !SameName("CurrPage", member.variable) && FieldsOfRecord(member.variable) == nullptr) {
-      return AsTheDoorSpellsIt(Identifier(member.field));
+      return RuntimeSpelling(Identifier(member.field));
     }
     if (SameName("CurrPage", member.variable)) {
       const std::string control = ControlOf(member.field);
-      return control.empty() ? AsTheDoorSpellsIt(Identifier(member.field)) : control;
+      return control.empty() ? RuntimeSpelling(Identifier(member.field)) : control;
     }
     if (const auto *fields = FieldsOfRecord(member.variable); fields != nullptr) {
       const auto field = fields->find(LowerKey(std::string(member.field)));
-      return field != fields->end() ? field->second : AsTheDoorSpellsIt(Identifier(member.field));
+      return field != fields->end() ? field->second : RuntimeSpelling(Identifier(member.field));
     }
     if (const std::string platform = PlatformFieldOf(member); !platform.empty()) {
       return platform;
@@ -2504,7 +2508,7 @@ public:
       return FieldIdentifier(*source_, own->name);
     }
     if (!IsRecord(member.variable)) { return Identifier(member.field); }
-    return AsTheDoorSpellsIt(member.field);
+    return RuntimeSpelling(member.field);
   }
 
   [[nodiscard]] std::string ControlOf(std::string_view name) const {
@@ -2629,7 +2633,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   out += "\n";
   std::vector<al::ProcedureDecl> reaching = table.procedures;
   for (const al::FieldDecl &field : table.fields) {
@@ -2691,7 +2695,7 @@ WriteSource(const al::TableObject &table, const std::string &sourcePath, const O
 
   out += "} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
-  return WithDoor(out, ObjectKind::Table);
+  return WithRuntimeIncludes(out, ObjectKind::Table);
 }
 
 std::string WriteDefinitions(const al::TableObject &table,
@@ -2701,7 +2705,7 @@ std::string WriteDefinitions(const al::TableObject &table,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + Identifier(table.name) + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + TableDefinitions(table, objects);
   const std::string space = NamespaceOf(table.nameSpace);
@@ -2711,7 +2715,7 @@ std::string WriteDefinitions(const al::TableObject &table,
          "> kInCatalogue;\n} // namespace " + identifier +
          "_unit\n} // namespace\n\n} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
-  return WithDoor(out, ObjectKind::Table);
+  return WithRuntimeIncludes(out, ObjectKind::Table);
 }
 
 std::string QueryProcedureBodies(const al::TableObject &facade,
@@ -3603,7 +3607,7 @@ std::string WriteSource(const al::PageObject &page,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + identifier + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   out += "\n";
   std::string bodies;
   const std::string space = NamespaceOf(page.nameSpace);
@@ -3671,7 +3675,7 @@ std::string WriteSource(const al::PageObject &page,
   out += SourceIncludesOf(page.variables, page.procedures, objects);
   out += BodyIncludes(bodies, objects);
   out += bodies;
-  return WithDoor(out, PageKind(page));
+  return WithRuntimeIncludes(out, PageKind(page));
 }
 
 std::string WriteDefinitions(const al::PageObject &page,
@@ -3682,7 +3686,7 @@ std::string WriteDefinitions(const al::PageObject &page,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + Identifier(page.name) + ".h\"\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + PageDefinition(page, objects, source);
   const std::string space = NamespaceOf(page.nameSpace);
@@ -3762,7 +3766,7 @@ std::string WriteDefinitions(const al::PageObject &page,
                         : "> kInPageCatalogue;\n} // namespace ") +
          identifier + "_unit\n} // namespace\n\n} // namespace " + space + "\n";
   out.insert(bodyAt, BodyIncludes(out.substr(bodyAt), objects));
-  return WithDoor(out, PageKind(page));
+  return WithRuntimeIncludes(out, PageKind(page));
 }
 
 }

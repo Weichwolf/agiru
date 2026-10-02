@@ -3,10 +3,10 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "EnumWriter.h"
 #include "Lexer.h"
 #include "Names.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "Statements.h"
 #include "Token.h"
@@ -1439,7 +1439,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
   const std::vector<const al::PageControl *> dataItems = DataItemsOf(object);
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
-  out += kDoorMarker;
+  out += kRuntimeIncludeMarker;
   Controls sourceControls;
   Flatten(object.layout, sourceControls);
   const bool hasUserControl = std::ranges::any_of(
@@ -1694,7 +1694,8 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     const std::string sourceType = PartSource(*control);
     if (!sourceType.empty()) { absent[Identifier(sourceType)]; }
   }
-  return PageHeader{.text = WithDoor(out, PageKind(object)), .dotnet = dotnet, .absent = absent};
+  return PageHeader{
+      .text = WithRuntimeIncludes(out, PageKind(object)), .dotnet = dotnet, .absent = absent};
 }
 
 }

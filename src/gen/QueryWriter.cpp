@@ -3,8 +3,8 @@
 #include "Ast.h"
 #include "BodyWriter.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "Names.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "TableWriter.h"
 #include "Token.h"
@@ -364,7 +364,7 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   h += "#pragma once\n\n";
   for (const std::string &header : headers) { h += "#include \"" + header + "\"\n"; }
   h += SourceIncludesOf(facade.variables, facade.procedures, objects);
-  h += kDoorMarker;
+  h += kRuntimeIncludeMarker;
   h += "\n#include <cstddef>\n#include <string_view>\n\n";
   h += "namespace " + space + " {\n\n";
   h += "class " + className + ";\n\n";
@@ -399,12 +399,12 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
   h += "  static constexpr std::string_view kName{" + Literal(query.name) + "};\n";
   h += "  static constexpr const QueryDef &kQuery = " + space + "::" + symbol + ";\n";
   h += "};\n";
-  written.header = WithDoor(h, ObjectKind::Query);
+  written.header = WithRuntimeIncludes(h, ObjectKind::Query);
 
   std::string s;
   s += "// Generated from " + sourcePath + ". Do not edit.\n\n";
   s += "#include \"" + identifier + ".h\"\n\n";
-  s += kDoorMarker;
+  s += kRuntimeIncludeMarker;
   s += "\n" + SourceIncludesOf(facade.variables, facade.procedures, objects);
   s += "\n#include <array>\n#include <cstddef>\n\n";
   s += "namespace " + space + " {\n\nnamespace {\n\n";
@@ -491,7 +491,7 @@ WriteQuery(const al::QueryObject &query, const std::string &sourcePath, const Ob
        "Columns.size() == " + std::to_string(elements.columns.size()) + ", \"query " + number +
        " declares " + std::to_string(elements.columns.size()) + " columns and filters\");\n\n";
   s += "} // namespace " + space + "\n";
-  written.source = WithDoor(s, ObjectKind::Query);
+  written.source = WithRuntimeIncludes(s, ObjectKind::Query);
   return written;
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Scope.h"
+#include "ObjectKind.h"
 
 #include <map>
 #include <set>
@@ -9,25 +9,23 @@
 
 namespace agiru::gen {
 
-[[nodiscard]] std::string DoorIncludes(std::string_view text, ObjectKind kind);
+[[nodiscard]] std::string RuntimeIncludes(std::string_view text, ObjectKind kind);
 
-inline constexpr std::string_view kDoorMarker = "// @door\n";
+inline constexpr std::string_view kRuntimeIncludeMarker = "// @door\n";
 
-[[nodiscard]] std::string WithDoor(std::string text, ObjectKind kind);
+[[nodiscard]] std::string WithRuntimeIncludes(std::string text, ObjectKind kind);
 
-[[nodiscard]] std::string AsTheDoorSpellsIt(std::string_view name);
+[[nodiscard]] std::string RuntimeSpelling(std::string_view name);
 
 [[nodiscard]] std::string BuiltinSpelling(std::string_view name);
 
-[[nodiscard]] bool DoorDeclares(std::string_view name);
+[[nodiscard]] bool RuntimeDeclares(std::string_view name);
 
 [[nodiscard]] const std::set<std::string> &RebuiltDotNet();
 
 [[nodiscard]] const std::map<std::string, std::string> &PlatformMembers(std::string_view table);
 
-[[nodiscard]] const std::map<std::string, std::string> &PlatformMembers(std::string_view table);
-
-[[nodiscard]] bool DoorCalls(std::string_view name);
+[[nodiscard]] bool RuntimeCallable(std::string_view name);
 
 [[nodiscard]] bool DeclaredByBase(std::string_view header, std::string_view name);
 
@@ -36,7 +34,7 @@ struct StaticMember {
   std::string_view member;
 };
 
-[[nodiscard]] bool DoorStaticCalls(const StaticMember &wanted);
+[[nodiscard]] bool RuntimeStaticCallable(const StaticMember &wanted);
 
 struct PlatformField {
   std::string_view table;

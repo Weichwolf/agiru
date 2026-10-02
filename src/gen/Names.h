@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Scope.h"
+#include "ObjectKind.h"
 
 #include <set>
 #include <string>
@@ -39,7 +39,7 @@ void FixDotNetSpellings();
 
 std::string DotNetSpelling(std::string_view subtype);
 
-bool ShadowsADoorType(std::string_view name);
+bool ShadowsRuntimeType(std::string_view name);
 
 std::string Literal(std::string_view text);
 

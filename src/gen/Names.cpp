@@ -1,8 +1,8 @@
 #include "Names.h"
 
-#include "Door.h"
 #include "EnumWriter.h"
-#include "Scope.h"
+#include "ObjectKind.h"
+#include "RuntimeSurface.h"
 
 #include <algorithm>
 #include <array>
@@ -359,7 +359,7 @@ void NoteObjectName(std::string_view identifier) {
   if (IsAlTypeName(identifier)) { ObjectNames().emplace(identifier); }
 }
 
-bool ShadowsADoorType(std::string_view name) {
+bool ShadowsRuntimeType(std::string_view name) {
   return ObjectNames().contains(std::string(name));
 }
 
@@ -437,7 +437,9 @@ void FixDotNetSpellings() {
 
 std::string DotNetSpelling(std::string_view subtype) {
   const std::string identifier = Identifier(subtype);
-  if (const std::string door = AsTheDoorSpellsIt(identifier); door != identifier) { return door; }
+  if (const std::string runtimeName = RuntimeSpelling(identifier); runtimeName != identifier) {
+    return runtimeName;
+  }
   const auto found = DotNetChosen().find(LowerKey(identifier));
   return found == DotNetChosen().end() ? identifier : found->second;
 }

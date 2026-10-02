@@ -5,9 +5,9 @@
 
 #include "Ast.h"
 #include "CodeunitWriter.h"
-#include "Door.h"
 #include "EnumWriter.h"
 #include "Names.h"
+#include "RuntimeSurface.h"
 #include "Scope.h"
 #include "Token.h"
 
@@ -203,7 +203,7 @@ bool ShadowedByAField(const al::TableObject &table, std::string_view type) {
 }
 
 std::string Reach(const al::TableObject &table, const std::string &type, const std::string &bare) {
-  if (type == "FieldNo" || HiddenByABaseMember(type) || ShadowsADoorType(type)) {
+  if (type == "FieldNo" || HiddenByABaseMember(type) || ShadowsRuntimeType(type)) {
     return "::agiru::" + bare;
   }
   return ShadowedByAField(table, type) ? "::agiru::" + bare : bare;
@@ -244,7 +244,7 @@ std::string Includes(const al::TableObject &table,
     const auto found = enums.find(LowerKey(field.subtype));
     if (found != enums.end()) { headers.insert(found->second.header); }
   }
-  std::string out = std::string(kDoorMarker);
+  std::string out = std::string(kRuntimeIncludeMarker);
   for (const std::string &header : headers) {
     out += "#include \"";
     out += header;
@@ -1100,7 +1100,7 @@ TableHeader WriteHeader(const al::TableObject &declared,
   DotNetUse dotnet;
   DotNetUse absent;
   GatherAbsentIn(table.variables, bodies, objects, dotnet, absent);
-  return TableHeader{.text = WithDoor(out, ObjectKind::Table),
+  return TableHeader{.text = WithRuntimeIncludes(out, ObjectKind::Table),
                      .unresolvedEnums = Unresolved(table, enums),
                      .dotnet = dotnet,
                      .absent = absent};
