@@ -1,3 +1,5 @@
+#include "meta/ReportLayoutDef.h"
+
 #include "../report-layouts/Fixture.h"
 #include "Ast.h"
 #include "Check.h"
@@ -10,10 +12,15 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 namespace {
 
 constexpr std::size_t kSourceLayouts = 14;
+
+static_assert(std::is_trivially_copyable_v<agiru::ReportLayoutDef>);
+static_assert(std::is_trivially_copyable_v<agiru::ReportLayoutPropertyDef>);
+static_assert(std::is_trivially_copyable_v<agiru::ReportLayoutTokenDef>);
 
 std::string PropertyText(const agiru::al::ReportLayoutDecl &layout, std::string_view name) {
   const auto *property = agiru::al::Find(layout.properties, name);
@@ -128,8 +135,9 @@ void ActualCompositeSourceSurvives(const std::filesystem::path &root) {
   CHECK_TRUE("eleven header/footer parts survive", headers == 11);
 }
 
-void WriteFixture(const std::filesystem::path &root) {
+void WriteFixture(const std::filesystem::path &root, bool unknown) {
   std::filesystem::create_directories(root / "Fixture");
+  std::filesystem::create_directories(root / "Addon");
   const auto write = [&root](std::string_view name, std::string_view text) {
     const auto path = root / name;
     std::ofstream file(path);
@@ -137,13 +145,27 @@ void WriteFixture(const std::filesystem::path &root) {
     file.close();
     if (!file) { throw std::runtime_error("cannot write " + path.string()); }
   };
-  write("Fixture/LayoutContract.Report.al", report_layout_fixture::kReport);
-  write("Fixture/ExtraLayouts.ReportExt.al", report_layout_fixture::kExtension);
-  write("Fixture/UnresolvedLayout.ReportExt.al", report_layout_fixture::kUnresolved);
+  std::string report{report_layout_fixture::kReport};
+  if (!unknown) {
+    constexpr std::string_view line =
+        "            FutureProperty = 'Keep unknown declarations visible';\n";
+    const auto at = report.find(line);
+    if (at == std::string::npos || report.find(line, at + line.size()) != std::string::npos) {
+      throw std::runtime_error("unknown-property fixture marker is missing or ambiguous");
+    }
+    report.erase(at, line.size());
+  }
+  write("Fixture/LayoutContract.Report.al", report);
+  write("Addon/ExtraLayouts.ReportExt.al", report_layout_fixture::kExtension);
+  write("Addon/UnresolvedLayout.ReportExt.al", report_layout_fixture::kUnresolved);
   write(
       "Fixture/app.json",
       R"({"id":"12345678-1234-5678-9012-123456789012","name":"Layout fixture","publisher":"agiru","version":"1.0.0.0"})");
-  write("apps.json", R"({"apps":[{"name":"fixture","source":"Fixture"}]})");
+  write(
+      "Addon/app.json",
+      R"({"id":"98765432-1234-5678-9012-123456789012","name":"Layout addon","publisher":"agiru","version":"1.0.0.0"})");
+  write("apps.json",
+        R"({"apps":[{"name":"fixture","source":"Fixture"},{"name":"addon","source":"Addon"}]})");
 }
 
 }
@@ -154,6 +176,7 @@ int main(int argc, char **argv) {
     ExtensionDeclarationSurvives();
     MalformedRenderingRefuses();
     if (argc > 1) { ActualCompositeSourceSurvives(argv[1]); }
-    if (argc > 2) { WriteFixture(argv[2]); }
+    if (argc > 2) { WriteFixture(argv[2], false); }
+    if (argc > 3) { WriteFixture(argv[3], true); }
   });
 }

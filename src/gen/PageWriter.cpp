@@ -6,6 +6,7 @@
 #include "EnumWriter.h"
 #include "Lexer.h"
 #include "Names.h"
+#include "ReportLayoutsWriter.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
 #include "Statements.h"
@@ -826,6 +827,7 @@ PageDefinition(const al::PageObject &page, const Objects &objects, const al::Tab
                               : page.report ? "Report"
                                             : "");
   std::string out = "namespace " + space + " {\n\n";
+  out += ReportLayoutDefinitions(page);
   int counter = 0;
   const std::string layout =
       ControlArrays(page.layout, prefix, prefix + "Layout", objects, source, counter, out);
@@ -1440,6 +1442,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
   out += kRuntimeIncludeMarker;
+  out += ReportLayoutsIncludes(object);
   Controls sourceControls;
   Flatten(object.layout, sourceControls);
   const bool hasUserControl = std::ranges::any_of(
@@ -1649,6 +1652,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
           : object.report ? "ReportPage;\n"
                           : "Page;\n");
   if (object.xmlport) { out += "extern const XmlPortDef k" + identifier + "XmlPort;\n"; }
+  out += ReportLayoutsDeclaration(object);
   out += "\n";
   out += "} // namespace " + space + "\n\n";
   out += "template <> struct agiru::PageTraits<" + space + "::" + pageClass + "> {\n";
@@ -1668,6 +1672,7 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     out += "\ntemplate <> struct agiru::ReportTraits<" + space + "::" + pageClass + "> {\n";
     out += "  static constexpr ReportId kId{" + std::to_string(object.id) + "};\n";
     out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
+    out += ReportLayoutsTrait(object);
     out += "};\n";
   }
   if (object.xmlport) {

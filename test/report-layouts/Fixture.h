@@ -19,6 +19,9 @@ report 50080 "Layout Contract"
             LayoutFile = 'Layouts\Original.docx';
             Caption = 'Writer''s original', Comment = 'Keep localization metadata';
             Summary = 'A layout, not a dataset dump';
+            ObsoleteState = Pending;
+            ObsoleteReason = 'Use the replacement layout';
+            ObsoleteTag = '27.0';
             FutureProperty = 'Keep unknown declarations visible';
         }
     }
@@ -40,6 +43,7 @@ reportextension 50081 "Extra Layouts" extends "Layout Contract"
         {
             Type = Excel;
             LayoutFile = 'Layouts/Spreadsheet.xlsx';
+            ExcelLayoutMultipleDataSheets = true;
         }
     }
 })";

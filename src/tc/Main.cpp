@@ -607,10 +607,29 @@ constexpr std::string_view kTranslatedProperties[] = {
     std::string_view{"table.tabletype"},
 };
 
+constexpr std::string_view kLayoutPropertyStatus =
+    "bound declarations support immutable emission; unresolved declarations retained; "
+    "installation, selection and rendering pending (board:0063)";
+constexpr std::string_view kLayoutObsoletionStatus =
+    "immutable declaration retained; obsoletion diagnostics and layout catalogue rules "
+    "pending (board:0063,0033)";
+
 constexpr std::array kPartlyTranslatedProperties{
     std::pair{std::string_view{"field.tablerelation"},
               std::string_view{"the bare Table[.Field] form reaches the metadata and the "
                                "conditional grammar does not (board:0043)"}},
+    std::pair{std::string_view{"layout.type"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.layoutfile"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.caption"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.summary"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.subtype"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.mimetype"}, kLayoutPropertyStatus},
+    std::pair{std::string_view{"layout.obsoletestate"}, kLayoutObsoletionStatus},
+    std::pair{std::string_view{"layout.obsoletereason"}, kLayoutObsoletionStatus},
+    std::pair{std::string_view{"layout.obsoletetag"}, kLayoutObsoletionStatus},
+    std::pair{std::string_view{"layout.excellayoutmultipledatasheets"},
+              std::string_view{"layout-level override retained; report-level precedence and "
+                               "workbook rendering pending (board:0063)"}},
 };
 
 constexpr std::array kDroppedProperties{
@@ -783,6 +802,7 @@ void NotePropertiesOf(const agiru::al::TableObject &table,
 
 void NotePropertiesOf(const agiru::al::PageObject &page, std::map<std::string, std::size_t> &into) {
   NoteProperties(page.properties, "page", into);
+  for (const auto &layout : page.rendering) { NoteProperties(layout.properties, "layout", into); }
   const auto walk = [&into](auto &&self,
                             std::string_view owner,
                             const std::vector<agiru::al::PageControl> &controls) -> void {
@@ -2481,12 +2501,35 @@ void NoteProductExclusions(const Job &job, const agiru::gen::TranspileScope &sco
 struct LayoutCounts {
   std::size_t reports = 0;
   std::size_t bound = 0;
+  std::size_t emitted = 0;
 };
 
 std::size_t CountLayouts(const Pages &reports) {
   std::size_t total = 0;
   for (const auto &report : reports.objects) { total += report.rendering.size(); }
   return total;
+}
+
+void NoteUnwrittenReports(const Run &run, const Pages &reports, Gathered &gathered) {
+  if (!run.output.empty()) { return; }
+  for (const auto &report : reports.objects) {
+    NotePropertiesOf(report, gathered.properties);
+    Absorb(gathered.refused, agiru::gen::Refused(report));
+  }
+}
+
+void NoteUnresolvedLayouts(const Extensions &store, Gathered &gathered) {
+  for (const auto &[name, extensions] : store.reports) {
+    if (store.consumed.contains("report " + name)) { continue; }
+    for (const auto &extension : extensions) {
+      for (const auto &layout : extension.rendering) {
+        NoteProperties(layout.properties, "layout", gathered.properties);
+        agiru::gen::CollectRefused(layout.properties,
+                                   "reportextension " + extension.name + " layout " + layout.name,
+                                   gathered.refused);
+      }
+    }
+  }
 }
 
 void ReportLayouts(const Extensions &store, const LayoutCounts &counts) {
@@ -2500,12 +2543,71 @@ void ReportLayouts(const Extensions &store, const LayoutCounts &counts) {
       }
     }
   }
-  std::println("layouts   {} report / {} extension declarations; {} retained on bound AST "
-               "reports, {} on unresolved targets; not emitted, installed or rendered (board:0063)",
+  std::println("layouts   {} report / {} extension declarations; {} bound layouts, "
+               "{} immutable declarations emitted, {} retained on unresolved targets; "
+               "unresolved not emitted, none installed or "
+               "rendered (board:0063)",
                counts.reports,
                extensionLayouts,
                counts.bound,
+               counts.emitted,
                unresolvedLayouts);
+}
+
+struct PropertyAudit {
+  std::size_t silent = 0;
+  std::size_t refusedLayouts = 0;
+};
+
+PropertyAudit AuditProperties(const std::map<std::string, std::size_t> &properties) {
+  PropertyAudit result;
+  std::size_t counted = 0;
+  std::size_t decided = 0;
+  std::vector<std::pair<std::string, std::size_t>> silent;
+  std::vector<std::pair<std::string, std::size_t>> partial;
+  for (const auto &[name, found] : properties) {
+    counted += found;
+    if (std::ranges::find(kTranslatedProperties, name) != std::ranges::end(kTranslatedProperties)) {
+      continue;
+    }
+    const std::string_view bare = PropertyName(name);
+    if (std::ranges::find_if(kPartlyTranslatedProperties, [&name](const auto &known) {
+          return known.first == name;
+        }) != kPartlyTranslatedProperties.end()) {
+      partial.emplace_back(name, found);
+      continue;
+    }
+    if (agiru::gen::RefusedByName(bare)) {
+      if (name.starts_with("layout.")) { result.refusedLayouts += found; }
+      continue;
+    }
+    if (!name.starts_with("layout.") &&
+        std::ranges::find_if(kDroppedProperties, [bare](const auto &known) {
+          return known.first == bare;
+        }) != kDroppedProperties.end()) {
+      decided += found;
+      continue;
+    }
+    silent.emplace_back(name, found);
+  }
+  std::ranges::sort(silent, [](const auto &a, const auto &b) { return a.second > b.second; });
+  for (const auto &[name, found] : silent) { result.silent += found; }
+  std::println("properties {} declaration(s) of {} kind(s); {} dropped by decision, {} of {} "
+               "kind(s) read and dropped in silence (board:0067)",
+               counted,
+               properties.size(),
+               decided,
+               result.silent,
+               silent.size());
+  for (std::size_t i = 0; i < silent.size() && i < kSilentShown; ++i) {
+    std::println("          {:>7} x {}", silent[i].second, silent[i].first);
+  }
+  for (const auto &[name, found] : partial) {
+    const auto *const known = std::ranges::find_if(
+        kPartlyTranslatedProperties, [&name](const auto &one) { return one.first == name; });
+    std::println("partly    {:>7} x {} -- {}", found, name, known->second);
+  }
+  return result;
 }
 
 int Scan(const Job &job) {
@@ -2599,6 +2701,7 @@ int Scan(const Job &job) {
     for (agiru::al::PageObject &report : parsedReports.objects) {
       agiru::gen::PrepareReport(report);
     }
+    NoteUnwrittenReports(run, parsedReports, gathered);
     Pages parsedXmlPorts = IndexXmlPorts(run, objects);
     const Queries parsedQueries = IndexQueries(run, objects);
     Enums heldEnums;
@@ -2658,6 +2761,7 @@ int Scan(const Job &job) {
     }
     WritePages(run, parsed, objects, gathered, everyTable);
     WritePages(run, parsedReports, objects, gathered, everyTable);
+    layouts.emitted += run.output.empty() ? 0 : CountLayouts(parsedReports);
     allReports += parsedReports.objects.size();
     WritePages(run, parsedXmlPorts, objects, gathered, everyTable);
     allXmlPorts += parsedXmlPorts.objects.size();
@@ -2716,55 +2820,9 @@ int Scan(const Job &job) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
   }
-  std::size_t silentProperties = 0;
+  NoteUnresolvedLayouts(store, gathered);
+  const PropertyAudit propertyAudit = AuditProperties(gathered.properties);
   std::size_t silentAttributes = 0;
-  {
-    std::size_t counted = 0;
-    std::size_t decided = 0;
-    std::vector<std::pair<std::string, std::size_t>> silent;
-    std::vector<std::pair<std::string, std::size_t>> partial;
-    for (const auto &[name, found] : gathered.properties) {
-      counted += found;
-      if (std::ranges::find(kTranslatedProperties, name) !=
-          std::ranges::end(kTranslatedProperties)) {
-        continue;
-      }
-      const std::string_view bare = PropertyName(name);
-      if (std::ranges::find_if(kPartlyTranslatedProperties, [&name](const auto &known) {
-            return known.first == name;
-          }) != kPartlyTranslatedProperties.end()) {
-        partial.emplace_back(name, found);
-        continue;
-      }
-      if (agiru::gen::RefusedByName(bare)) { continue; }
-      if (std::ranges::find_if(kDroppedProperties, [bare](const auto &known) {
-            return known.first == bare;
-          }) != kDroppedProperties.end()) {
-        decided += found;
-        continue;
-      }
-      silent.emplace_back(name, found);
-    }
-    std::ranges::sort(silent, [](const auto &a, const auto &b) { return a.second > b.second; });
-    std::size_t dropped = 0;
-    for (const auto &[name, found] : silent) { dropped += found; }
-    std::println("properties {} declaration(s) of {} kind(s); {} dropped by decision, {} of {} "
-                 "kind(s) read and dropped in silence (board:0067)",
-                 counted,
-                 gathered.properties.size(),
-                 decided,
-                 dropped,
-                 silent.size());
-    for (std::size_t i = 0; i < silent.size() && i < kSilentShown; ++i) {
-      std::println("          {:>7} x {}", silent[i].second, silent[i].first);
-    }
-    if (dropped != 0) { silentProperties = dropped; }
-    for (const auto &[name, found] : partial) {
-      const auto *const known = std::ranges::find_if(
-          kPartlyTranslatedProperties, [&name](const auto &one) { return one.first == name; });
-      std::println("partly    {:>7} x {} -- {}", found, name, known->second);
-    }
-  }
   for (const auto &[what, found] : gathered.contradictions) {
     std::println("declared  {:>5} x {} -- carried as declared, and it cannot mean what it says "
                  "(board:0339)",
@@ -2895,11 +2953,17 @@ int Scan(const Job &job) {
                  collisions.size());
     for (const std::string &one : collisions) { std::println("          {}", one); }
   }
-  if (silentProperties != 0) {
+  if (propertyAudit.refusedLayouts != 0) {
+    std::println("ABORT     {} report-layout property declaration(s) explicitly refused "
+                 "(board:0063)",
+                 propertyAudit.refusedLayouts);
+    return 1;
+  }
+  if (propertyAudit.silent != 0) {
     std::println("");
     std::println("ABORT     {} property declaration(s) are read and dropped in silence, and the "
                  "count is 0 (board:0067)",
-                 silentProperties);
+                 propertyAudit.silent);
     std::println("          Every one belongs in `kTranslatedProperties` with a member behind it, "
                  "in");
     std::println(

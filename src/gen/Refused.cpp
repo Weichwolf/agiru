@@ -114,6 +114,10 @@ std::vector<RefusedProperty> Refused(const al::PageObject &page) {
   std::vector<RefusedProperty> found;
   const std::string where = "page " + page.name;
   CollectRefused(page.properties, where, found);
+  for (const auto &layout : page.rendering) {
+    const std::string owner = layout.owner.extension ? "reportextension " : "report ";
+    CollectRefused(layout.properties, owner + layout.owner.name + " layout " + layout.name, found);
+  }
   Walk(page.layout, where, found);
   Walk(page.actions, where, found);
   return found;

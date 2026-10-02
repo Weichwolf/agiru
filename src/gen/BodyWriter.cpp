@@ -3702,6 +3702,7 @@ std::string WriteDefinitions(const al::PageObject &page,
   out += "// Generated from " + sourcePath + ". Do not edit.\n";
   out += "\n";
   out += "#include \"" + Identifier(page.name) + ".h\"\n\n";
+  if (page.report && !page.rendering.empty()) { out += "#include \"meta/ReportLayoutDef.h\"\n"; }
   out += kRuntimeIncludeMarker;
   const std::size_t bodyAt = out.size();
   out += "\n" + PageDefinition(page, objects, source);

@@ -38,13 +38,14 @@ private:
   std::int32_t value_{0};
 };
 
-struct TableIdTag;    ///< \internal
-struct FieldNoTag;    ///< \internal
-struct CodeunitIdTag; ///< \internal
-struct PageIdTag;     ///< \internal
-struct ReportIdTag;   ///< \internal
-struct XmlPortIdTag;  ///< \internal
-struct QueryIdTag;    ///< \internal
+struct TableIdTag;           ///< \internal
+struct FieldNoTag;           ///< \internal
+struct CodeunitIdTag;        ///< \internal
+struct PageIdTag;            ///< \internal
+struct ReportIdTag;          ///< \internal
+struct ReportExtensionIdTag; ///< \internal
+struct XmlPortIdTag;         ///< \internal
+struct QueryIdTag;           ///< \internal
 
 using TableId = Id<TableIdTag>;       ///< An AL table number.
 using FieldNo = Id<FieldNoTag>;       ///< An AL field number, unique within its table.
@@ -52,13 +53,10 @@ using CodeunitId = Id<CodeunitIdTag>; ///< An AL codeunit number.
 using PageId = Id<PageIdTag>;         ///< An AL page number.
 
 /// \brief An AL report number.
-///
-/// \note THE IDENTITY IS ALL A REPORT HAS HERE, AND THAT IS THE WHOLE POINT. `Report::"X"` in AL is
-///       an object REFERENCE -- a number the caller hands to `Report.Run`, to a Job Queue Entry's
-///       `Object ID to Run`, or to a `TestField`. Nothing about the dataitems or the layout is
-///       needed for that, and board:0034 keeps the rest a hole with a count.
+/// \note Identifies the object independently of its dataset, layouts or execution capability.
 using ReportId = Id<ReportIdTag>;
-using XmlPortId = Id<XmlPortIdTag>; ///< An AL xmlport number.
-using QueryId = Id<QueryIdTag>;     ///< An AL query number.
+using ReportExtensionId = Id<ReportExtensionIdTag>; ///< An AL report-extension number.
+using XmlPortId = Id<XmlPortIdTag>;                 ///< An AL xmlport number.
+using QueryId = Id<QueryIdTag>;                     ///< An AL query number.
 
 }
