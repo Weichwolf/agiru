@@ -4,7 +4,11 @@
 
 #include "Check.h"
 
+#include <cstddef>
 #include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
 
 using agiru::Code;
 using agiru::MaxStrLen;
@@ -87,6 +91,57 @@ void CodeOrdersNumericallyWhereBothSidesAreDigits() {
   CHECK_TRUE("but they still order", Code<20>("01") < Code<20>("2"));
 }
 
+void ConcatenationPreservesTextTypeAndAssignmentLimits() {
+  const Text<2> left{"ab"};
+  const Text<2> right{"cd"};
+  const Code<2> code{"xy"};
+  const auto joined = left + right;
+  CHECK_TRUE("Text plus Text retains Text", (std::is_same_v<decltype(left + right), Text<0>>));
+  CHECK_TRUE("Text plus Code retains Text", (std::is_same_v<decltype(left + code), Text<0>>));
+  CHECK_TRUE("Code plus Text retains Text", (std::is_same_v<decltype(code + right), Text<0>>));
+  CHECK_TRUE("Text plus literal retains Text", (std::is_same_v<decltype(left + " "), Text<0>>));
+  CHECK_TRUE("literal plus Text retains Text", (std::is_same_v<decltype(" " + left), Text<0>>));
+  CHECK_TRUE("Text plus string retains Text",
+             (std::is_same_v<decltype(left + std::string{}), Text<0>>));
+  CHECK_TRUE("string plus Text retains Text",
+             (std::is_same_v<decltype(std::string{} + left), Text<0>>));
+  CHECK_TRUE("nested joins retain Text", (std::is_same_v<decltype(left + code + right), Text<0>>));
+  CHECK_TRUE(
+      "caption storage joins retain Text",
+      (std::is_same_v<decltype(agiru::operator+(std::string_view{}, std::string{})), Text<0>>));
+  CHECK_TRUE("native string joins remain standard strings",
+             (std::is_same_v<decltype(std::string{} + std::string{}), std::string>));
+  CHECK_TEXT("joining sized inputs imposes no input limit on the result", joined, "abcd");
+  CHECK_TEXT("Code changes only its own input", left + code, "abXY");
+  CHECK_TEXT("case and spaces are retained", Text<0>{" lower "} + "Mixed ", " lower Mixed ");
+  CHECK_TEXT("caption storage retains case and spaces",
+             agiru::operator+(std::string_view{" lower "}, std::string{"Mixed "}),
+             " lower Mixed ");
+  CHECK_TEXT("Unicode is retained",
+             Text<0>{"\xc3\xa4"} + Text<0>{"\xf0\x9f\x92\xa1"},
+             "\xc3\xa4\xf0\x9f\x92\xa1");
+  bool overflow = false;
+  try {
+    const Text<3> limited{joined};
+  } catch (const StringError &) { overflow = true; }
+  CHECK_TRUE("Text destination still rejects overflow", overflow);
+  overflow = false;
+  try {
+    const Code<3> limited{joined};
+  } catch (const StringError &) { overflow = true; }
+  CHECK_TRUE("Code destination still rejects overflow", overflow);
+  CHECK_TEXT("a Code destination still normalizes", Code<4>{Text<0>{" ab "} + "c"}, "AB C");
+}
+
+void AnOwnedUnboundedResultTransfersItsBuffer() {
+  constexpr std::size_t kHeapFixtureLength = 4096;
+  std::string storage(kHeapFixtureLength, 'x');
+  const char *const allocation = storage.data();
+  const Text<0> owned{std::move(storage)};
+  CHECK_TRUE("an owned result is not copied", owned.Value().data() == allocation);
+  CHECK_TRUE("all owned bytes remain present", owned.Value().size() == kHeapFixtureLength);
+}
+
 } // namespace
 
 int main() {
@@ -97,5 +152,7 @@ int main() {
     TextKeepsWhatCodeChanges();
     LengthCountsTheWayDotNetDoes();
     CodeOrdersNumericallyWhereBothSidesAreDigits();
+    ConcatenationPreservesTextTypeAndAssignmentLimits();
+    AnOwnedUnboundedResultTransfersItsBuffer();
   });
 }

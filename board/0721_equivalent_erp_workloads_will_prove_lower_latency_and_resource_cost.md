@@ -6,7 +6,6 @@ Depends on: G2 client parity; 0058 full-suite census; 0006 session bounds; 0045 
 ## Evidence
 
 - No matched BC/agiru ERP benchmark, 2 TB run, 10,000-user result or aarch64 result is recorded. C++ and PostgreSQL alone establish no performance advantage.
-- Predecessor observations: static test metadata cut discovery RSS 615→418 MB; lazy Python object loading cut image 812→405 MB; a concurrent CI/server/gate run was killed by memory pressure. None measures agiru or BC. Measure whether agiru's generated read-only metadata is loaded/paged on demand and whether page rendering repeats metadata probes or row fetches.
 
 ## Implementation
 
