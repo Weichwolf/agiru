@@ -1,6 +1,7 @@
 # System declaration regression inputs
 
-Five original System.app 28.0.53152.0 / runtime 17.0 declarations, normalized to LF.
+Eleven original System.app 28.0.53152.0 / runtime 17.0 declarations, with LF line
+endings and a final newline.
 Package SHA256: `5b72ba127cb2221722f02544bfb3f3bd5a50402bf92bfab6d7e584e049b9681d`.
 Original Microsoft notices and MIT permission text are retained in `License.txt`.
 
@@ -10,7 +11,12 @@ and compiler aliases. Negative controls mutate identity, field count/number/type
 length, key order and option population. `Field` checks all 24 fields, compact
 native Type codes, classification order and external-name identity/length; wrong
 codes and missing package fields fail. Reflection includes all implicit system
-fields and maximum-length text roundtrips.
+fields currently represented by the runtime and maximum-length text roundtrips.
+Company/User/Record Link/Date/Integer/All Profile retain original global scope,
+field types, lengths, keys and represented properties. Removed URL and pending
+profile-note fields retain their obsoletion metadata; retaining metadata does not
+authorize AL references to removed fields. Authentication email and record-link
+user identifiers preserve Text case. Each family's dropped-field control fails.
 
 Set `AGIRU_SYSTEM_SYMBOLS` when running `make test` to verify the package and audit
 its actual original sources through `test/platform-source.sh`. Missing or invalid
@@ -27,3 +33,6 @@ privacy tables. Report such mismatches; never replace the demo pin or weaken che
 These are declaration checks, not System-loader activation, SQL migration,
 Scope/fieldgroup dispatch, privacy workflows or live provider acceptance. A
 `Cloud` declaration is extension availability, not a product integration mandate.
+Runtime-18 audit FlowFields, timestamp metadata, implicit key authority and full
+property ownership remain separate gaps. Populated schemas must not silently
+change company ownership or reinterpret columns after a declaration correction.
