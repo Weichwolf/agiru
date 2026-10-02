@@ -15,6 +15,19 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
+Eight original consumers now have fresh production qualification: `make native-consumers`,
+`build/native-consumers.{lQd6ms,kZ3Ulx}/result.json`, dirty batch at HEAD `16ec345`.
+Both packages compile 7/8 ordinary units; PageFieldsSelectionList body still misbinds
+bare Caption because Main has no source-owned native binding. Additional native assertions
+compile 7/8 with System 28, 5/8 with System 29: both Objects units also reject field-count,
+Object Type and Name drift. These assertions do not activate the source-AST loader.
+All 24,389 generated paths are retained; raw census/80-codeunit, 2,314-method UT identities
+match, all AL methods remain unexecuted. Local replay: 115 cases/158 toolchain tests,
+zero red/skips (`build/native-consumers-tests.log`). Missing/duplicate consumer and wrong
+native field controls reject. Both Make runs exit 2; census exits 1 with the same seven
+conditional refusals. Next: verified production System input/common binding, then recheck
+all eight units and the full UT population; providers/full-app/G1 remain open (0034/0038).
+
 Latest metadata source batch: `2d3f2de`; snapshot override fix: `599597c`. Receipts
 were collected from the matching dirty batch at predecessor HEAD `8d65ae9`, not a
 new full frozen integration.
