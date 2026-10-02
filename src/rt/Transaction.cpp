@@ -2,7 +2,6 @@
 
 #include "runtime/Database.h"
 #include "runtime/Error.h"
-#include "runtime/ErrorValue.h"
 #include "runtime/Scopes.h"
 #include "runtime/Session.h"
 #include "type/CommitBehavior.h"
@@ -41,19 +40,18 @@ std::string NextName(std::size_t issued) {
 
 std::size_t Boundaries::Open(const Connection &connection) {
   if (isolationFloor_ > names_.size()) { throw Error(kLostIsolation); }
-  ++issued_;
-  Boundary next{NextName(issued_), inconsistent_};
-  names_.reserve(names_.size() + 1);
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
-  connection.Run("SAVEPOINT " + next.name);
-  names_.push_back(std::move(next));
+  ++issued_;
+  std::string name = NextName(issued_);
+  connection.Run("SAVEPOINT " + name);
+  names_.push_back(std::move(name));
   return names_.size();
 }
 
 void Boundaries::Release(const Connection &connection, std::size_t depth) {
   if (depth == 0 || depth > names_.size()) { return; }
   try {
-    connection.Run("RELEASE SAVEPOINT " + names_[depth - 1].name);
+    connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
   } catch (const DatabaseError &refused) {
     Rollback(connection, depth);
     throw Error(std::string("the transaction cannot be kept, a statement inside it failed and "
@@ -65,11 +63,10 @@ void Boundaries::Release(const Connection &connection, std::size_t depth) {
 
 void Boundaries::Rollback(const Connection &connection, std::size_t depth) {
   if (depth == 0 || depth > names_.size()) { return; }
-  connection.Run("ROLLBACK TO SAVEPOINT " + names_[depth - 1].name);
-  connection.Run("RELEASE SAVEPOINT " + names_[depth - 1].name);
-  std::vector<std::string> restored = std::move(names_[depth - 1].inconsistentBefore);
+  connection.Run("ROLLBACK TO SAVEPOINT " + names_[depth - 1]);
+  connection.Run("RELEASE SAVEPOINT " + names_[depth - 1]);
   names_.resize(depth - 1);
-  inconsistent_.swap(restored);
+  inconsistent_.clear();
   ++cursorEpoch_;
 }
 
@@ -89,11 +86,11 @@ void Boundaries::Commit(const Connection &connection) {
         " table. Check where and how the CONSISTENT function is used in the transaction "
         "to find the error.");
   }
-  std::vector<Boundary> renewed;
+  std::vector<std::string> renewed;
   renewed.reserve(names_.size() - isolationFloor_);
   for (std::size_t i = isolationFloor_; i < names_.size(); ++i) {
     ++issued_;
-    renewed.push_back(Boundary{NextName(issued_), inconsistent_});
+    renewed.push_back(NextName(issued_));
   }
   try {
     if (isolationFloor_ == 0) {
@@ -104,12 +101,12 @@ void Boundaries::Commit(const Connection &connection) {
       names_.clear();
       if (!renewed.empty()) { connection.Run("BEGIN"); }
     } else if (!renewed.empty()) {
-      connection.Run("RELEASE SAVEPOINT " + names_[isolationFloor_].name);
+      connection.Run("RELEASE SAVEPOINT " + names_[isolationFloor_]);
       names_.resize(isolationFloor_);
     }
-    for (Boundary &boundary : renewed) {
-      connection.Run("SAVEPOINT " + boundary.name);
-      names_.push_back(std::move(boundary));
+    for (std::string &name : renewed) {
+      connection.Run("SAVEPOINT " + name);
+      names_.push_back(std::move(name));
     }
   } catch (const DatabaseError &) {
     if (!connection.InTransaction()) {
@@ -139,15 +136,15 @@ void Scope::Keep() {
 
 void Scope::Discard(std::string_view why) {
   if (!open_) { return; }
-  Session::Current().Transaction().SetLastError(std::string(why));
   open_ = false;
+  Session::Current().Transaction().SetLastError(std::string(why));
   Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
 }
 
 void Scope::Discard(const Error &error) {
   if (!open_) { return; }
-  Session::Current().Transaction().SetLastError(error.what(), std::string(error.Code()));
   open_ = false;
+  Session::Current().Transaction().SetLastError(error.what(), std::string(error.Code()));
   Session::Current().Transaction().Rollback(Session::Current().Database(), depth_);
 }
 

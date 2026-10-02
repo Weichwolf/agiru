@@ -76,25 +76,6 @@ def copy_source(source, destination):
     remove_caches(destination)
 
 
-def has_links(root):
-    return root.is_symlink() or any(path.is_symlink() for path in root.rglob('*'))
-
-
-def freeze_input(source, destination, name):
-    if not source.is_dir():
-        raise RuntimeError(f'{name} input is not a directory: {source}')
-    if has_links(source):
-        raise RuntimeError(f'{name} input contains an unfrozen symlink')
-    before = digest(source)
-    copy_source(source, destination)
-    frozen = digest(destination)
-    if has_links(destination):
-        raise RuntimeError(f'{name} frozen input contains an unfrozen symlink')
-    if frozen != before or digest(source) != before:
-        raise RuntimeError(f'{name} source changed during snapshot; verification was not started')
-    return frozen
-
-
 def same_file(left, right):
     if right.is_symlink() or not right.is_file() or left.stat().st_size != right.stat().st_size:
         return False
@@ -175,7 +156,7 @@ def start(arguments):
         tracked = subprocess.check_output(['git', '-C', str(source), 'ls-files', '-z']).split(b'\0')
         for item in tracked:
             if item and not (ROOT / os.fsdecode(item)).exists():
-                (source / os.fsdecode(item)).unlink(missing_ok=True)
+                (source / os.fsdecode(item)).unlink()
         before = digest(ROOT)
         after = digest(source)
         if before != after:
@@ -187,23 +168,10 @@ def start(arguments):
         if 'ut' in arguments.targets or 'transpile' in arguments.targets:
             bc = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
             bc_copy = run / 'bc_source'
-            metadata['bc_source_sha256'] = freeze_input(bc, bc_copy, 'BCApps')
-            revision = subprocess.run(['git', '-C', str(bc), 'rev-parse',
-                                       '--show-toplevel', 'HEAD'],
-                                      capture_output=True, text=True, check=False)
-            lines = revision.stdout.splitlines()
-            metadata['bc_source_revision'] = (
-                lines[1] if revision.returncode == 0 and len(lines) == 2
-                and Path(lines[0]).resolve() != ROOT.resolve() else None)
-        if configured := os.environ.get('AGIRU_SYSTEM_SYMBOLS'):
-            symbols = Path(configured).resolve()
-            if not all((symbols / name).is_file() for name in
-                       ('NavxManifest.xml', 'SymbolReference.json')):
-                raise RuntimeError('System symbols input lacks its manifest or symbol reference')
-            if not (symbols / 'src').is_dir():
-                raise RuntimeError('System symbols input lacks its AL source directory')
-            metadata['system_symbols_sha256'] = freeze_input(
-                symbols, run / 'system_symbols', 'System symbols')
+            copy_source(bc, bc_copy)
+            if digest(bc) != digest(bc_copy):
+                raise RuntimeError('BCApps source changed during snapshot; verification was not started')
+            metadata['bc_source_sha256'] = digest(bc_copy)
     except Exception:
         subprocess.run(['git', '-C', str(ROOT), 'worktree', 'remove', '--force', str(source)],
                        check=False)
@@ -216,8 +184,10 @@ def start(arguments):
         command = [sys.executable, str(source / 'scripts/verify_snapshot.py'), 'run', str(run)]
         if arguments.detach:
             with (run / 'verify.log').open('w') as output:
-                subprocess.Popen(command, cwd=source, stdout=output,
-                                 stderr=subprocess.STDOUT, start_new_session=True)
+                process = subprocess.Popen(command, cwd=source, stdout=output,
+                                           stderr=subprocess.STDOUT, start_new_session=True)
+            metadata['pid'] = process.pid
+            write_json(run / 'result.json', metadata)
         (parent / 'latest').write_text(str(run) + '\n')
         if arguments.reuse:
             (parent / 'lane/latest').write_text(str(run) + '\n')
@@ -245,38 +215,19 @@ def start(arguments):
 def run_snapshot(run):
     metadata_path = run / 'result.json'
     metadata = json.loads(metadata_path.read_text())
-    metadata['pid'] = os.getpid()
     metadata['status'] = 'running'
-    metadata['artifacts'] = str(run / 'artifacts')
     write_json(metadata_path, metadata)
     environment = dict(os.environ)
-    environment.pop('AGIRU_BC_REVISION', None)
-    environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
     build_source = Path(metadata.get('build_source', run / 'source'))
     if (run / 'bc_source').exists():
         environment['AGIRU_BC_SOURCE'] = str(run / 'bc_source')
-        if metadata.get('bc_source_revision'):
-            environment['AGIRU_BC_REVISION'] = metadata['bc_source_revision']
     start_time = time.monotonic()
     outcomes = {}
-    symbols = run / 'system_symbols'
-    expected_symbols = metadata.get('system_symbols_sha256')
-    if expected_symbols:
-        if not symbols.is_dir() or has_links(symbols) or digest(symbols) != expected_symbols:
-            outcomes['system_symbols_immutable'] = 1
-        else:
-            environment['AGIRU_SYSTEM_SYMBOLS'] = str(symbols)
     with (run / 'verify.log').open('a') as output:
         for target in metadata['targets']:
             output.write(f'VERIFY TARGET {target}\n')
             output.flush()
-            if outcomes.get('system_symbols_immutable'):
-                output.write('VERIFY REFUSED: frozen System symbols identity differs\n')
-                outcomes[target] = 2
-                continue
             command = ['make', '-C', str(build_source), f'JOBS={metadata["jobs"]}', target]
-            if target == 'ut':
-                command.append(f'UT_LOG={run / "artifacts/ut.log"}')
             try:
                 outcomes[target] = subprocess.run(command, env=environment, stdout=output,
                                                    stderr=subprocess.STDOUT, check=False).returncode
@@ -287,10 +238,6 @@ def run_snapshot(run):
     metadata['post_source_sha256'] = digest(build_source)
     if metadata['post_source_sha256'] != metadata['source_sha256']:
         outcomes['source_immutable'] = 1
-    if expected_symbols:
-        metadata['post_system_symbols_sha256'] = digest(symbols)
-        if metadata['post_system_symbols_sha256'] != expected_symbols or has_links(symbols):
-            outcomes['system_symbols_immutable'] = 1
     status = 0 if all(code == 0 for code in outcomes.values()) else 1
     metadata['target_exits'] = outcomes
     metadata['status'] = 'passed' if status == 0 else 'failed'

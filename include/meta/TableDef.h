@@ -281,11 +281,12 @@ struct FieldDef {
 /// \param field The field.
 /// \return True when the database holds it.
 ///
-/// A FlowField is computed and a FlowFilter carries filters; neither is stored. Normal fields
-/// remain in the database even with ObsoleteState=Removed: AppSourceCop AS0016 and AS0002 retain
-/// those fields for schema synchronization. AL reference restrictions are a separate contract.
+/// A `FlowField` is computed and a `FlowFilter` holds a filter, so neither is stored -- 2 153 of
+/// them under `Layers/W1`, and a column for each would always read its default (board:0047). A
+/// field whose `ObsoleteState` is `Removed` is gone from the schema too, which is what removed
+/// means.
 [[nodiscard]] constexpr bool Stored(const FieldDef &field) {
-  return field.fieldClass == ::agiru::FieldClass::Normal;
+  return field.fieldClass == ::agiru::FieldClass::Normal && field.obsoleteState != "Removed";
 }
 
 /// \brief One key's declaration. The first key of a table is its primary key.
@@ -455,11 +456,6 @@ struct TableDef {
   ///       nothing, because an unbounded series is a loop AL ends with `CurrReport.Break` and this
   ///       runtime has no such brake yet (board:0697).
   FieldNo sequenceField{};
-
-  /// \brief Explicit missing-provider diagnostic; nonempty forbids physical storage access.
-  /// Temporary record-variable storage remains independent. Never provision an empty SQL
-  /// replacement for a declaration whose runtime projection is not implemented.
-  std::string_view providerRefusal{};
 };
 
 /// \brief Finds a field by its AL number.

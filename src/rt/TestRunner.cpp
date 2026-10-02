@@ -2,7 +2,6 @@
 
 #include "meta/Ids.h"
 #include "runtime/Error.h"
-#include "runtime/ErrorValue.h"
 #include "runtime/Transaction.h"
 #include "runtime/test/Handlers.h"
 #include "runtime/test/PageCore.h"
@@ -20,12 +19,10 @@
 #include <exception>
 #include <mutex>
 #include <new>
-#include <optional>
 #include <print>
 #include <span>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include <execinfo.h>
@@ -103,31 +100,16 @@ struct Driven {
   void *instance;
 };
 
-struct MethodResources {
-  MethodResources() { detail::ClearTraps(); }
-
-  MethodResources(const MethodResources &) = delete;
-  MethodResources &operator=(const MethodResources &) = delete;
-
-  ~MethodResources() {
-    HandlerTable::Reset();
-    detail::ClearTraps();
-  }
-};
-
-TestResult RunOne(const TestCatalogue &codeunit,
-                  const TestMethod &method,
-                  void *instance,
-                  bool commitOnSuccess) {
+TestResult RunOne(const TestCatalogue &codeunit, const TestMethod &method, void *instance) {
   TraceAllocationFailures_();
-  const MethodResources resources;
+  detail::ClearTraps();
   ClearLastError();
   Randomize(kSeedBeforeEachTest);
   detail::Scope scope;
-  const detail::AutoRollbackTest commitPolicy(method.model.has_value() &&
-                                              *method.model == TransactionModel::AutoRollback);
+  detail::AutoRollbackTest commitPolicy(method.model.has_value() &&
+                                        *method.model == TransactionModel::AutoRollback);
+  HandlerTable::Install(codeunit.Handlers(), method.handlers);
   try {
-    HandlerTable::Install(codeunit.Handlers(), method.handlers);
     method.invoke(instance);
   } catch (const Error &e) {
     static_cast<void>(HandlerTable::Uninstall());
@@ -156,46 +138,10 @@ TestResult RunOne(const TestCatalogue &codeunit,
   if (method.model.has_value() && *method.model == TransactionModel::AutoRollback) {
     scope.Discard("");
   } else {
-    if (commitOnSuccess) {
-      try {
-        Commit();
-      } catch (const Error &e) {
-        scope.Discard(e);
-        return TestResult{
-            .codeunit = codeunit.Name(), .method = method.name, .passed = false, .error = e.what()};
-      }
-    }
     scope.Keep();
   }
   return TestResult{
       .codeunit = codeunit.Name(), .method = method.name, .passed = true, .error = {}};
-}
-
-TestResult RunSelectedMethod(const TestCatalogue &codeunit,
-                             const TestMethod &method,
-                             void *instance,
-                             TestIsolation isolation) {
-  if (isolation == TestIsolation::Function) {
-    detail::Scope methodIsolation;
-    const detail::IsolationFloor methodFloor(methodIsolation.Depth());
-    TestResult result = RunOne(codeunit, method, instance, false);
-    methodIsolation.Discard("");
-    return result;
-  }
-  return RunOne(codeunit,
-                method,
-                instance,
-                isolation == TestIsolation::Disabled && method.model != TransactionModel::None);
-}
-
-void AppendResult(TestRun &run, TestResult result, void *context, ContextTestReport report) {
-  run.results.push_back(std::move(result));
-  if (run.results.back().passed) {
-    ++run.passed;
-  } else {
-    ++run.failed;
-  }
-  if (report != nullptr) { report(context, run.results.back()); }
 }
 
 }
@@ -253,10 +199,6 @@ TestRun RunRegisteredTests(std::string_view codeunit) {
   return RunRegisteredTests(codeunit, nullptr);
 }
 
-TestRun RunRegisteredTests(std::string_view codeunit, TestIsolation isolation) {
-  return RunRegisteredTests(codeunit, nullptr, nullptr, isolation);
-}
-
 TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
   return RunRegisteredTests(codeunit, &report, [](void *context, const TestResult &result) {
     const auto callback = *static_cast<TestReport *>(context);
@@ -264,44 +206,37 @@ TestRun RunRegisteredTests(std::string_view codeunit, TestReport report) {
   });
 }
 
-TestRun RunRegisteredTests(std::string_view codeunit,
-                           void *context,
-                           ContextTestReport report,
-                           TestIsolation isolationPolicy) {
+TestRun RunRegisteredTests(std::string_view codeunit, void *context, ContextTestReport report) {
   TestRun run;
   for (const TestCatalogue *catalogue : RegisteredTestCodeunits()) {
     if (!codeunit.empty() && catalogue->Name() != codeunit) { continue; }
-    std::optional<detail::Scope> isolation;
-    std::optional<detail::IsolationFloor> floor;
-    if (isolationPolicy == TestIsolation::Codeunit) {
-      isolation.emplace();
-      floor.emplace(isolation->Depth());
-    }
+    detail::Scope isolation;
+    detail::IsolationFloor floor(isolation.Depth());
     const Driven driven(*catalogue);
     if (catalogue->OnRun() != nullptr) {
       try {
         catalogue->OnRun()(driven.instance);
       } catch (const std::exception &e) {
-        if (isolation.has_value()) { isolation->Discard(e.what()); }
-        AppendResult(run,
-                     TestResult{.codeunit = catalogue->Name(),
-                                .method = "OnRun",
-                                .passed = false,
-                                .error = e.what()},
-                     context,
-                     report);
+        isolation.Discard(e.what());
+        run.results.push_back(TestResult{
+            .codeunit = catalogue->Name(), .method = "OnRun", .passed = false, .error = e.what()});
+        ++run.failed;
+        if (report != nullptr) { report(context, run.results.back()); }
         continue;
       }
     }
     static const char *const only = std::getenv("AGIRU_TEST_PROCEDURE");
     for (const TestMethod &method : catalogue->Methods()) {
       if (only != nullptr && !Named(only, method.name)) { continue; }
-      AppendResult(run,
-                   RunSelectedMethod(*catalogue, method, driven.instance, isolationPolicy),
-                   context,
-                   report);
+      run.results.push_back(RunOne(*catalogue, method, driven.instance));
+      if (run.results.back().passed) {
+        ++run.passed;
+      } else {
+        ++run.failed;
+      }
+      if (report != nullptr) { report(context, run.results.back()); }
     }
-    if (isolation.has_value()) { isolation->Discard(""); }
+    isolation.Discard("");
   }
   return run;
 }
