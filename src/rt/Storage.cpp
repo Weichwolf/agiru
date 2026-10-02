@@ -15,6 +15,7 @@
 #include "runtime/Codeunit.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/NumberSequenceStorage.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
@@ -464,6 +465,7 @@ void ProvisionSchema(const Connection &into) {
 }
 
 void ProvisionInstalled(const Connection &into) {
+  ProvisionNumberSequences(into);
   ProvisionSchema(into);
   if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
   const std::string_view company = Session::Current().CompanyName();
