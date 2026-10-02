@@ -255,7 +255,7 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
     # measured 14,209-source population. A root holds at most 32 sources; only an overfull root
     # splits, so adding one source never renumbers an unrelated object (board:0589).
     set_source_files_properties("${CMAKE_SOURCE_DIR}/apps/${slice_source}" PROPERTIES
-      UNITY_GROUP "${slice_group}")
+      GENERATED TRUE UNITY_GROUP "${slice_group}")
   endforeach()
   if(slice_sources)
     add_library(agiru_slice SHARED ${slice_sources})

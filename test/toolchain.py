@@ -713,6 +713,45 @@ esac
 
 
 class CompilerCacheGate(unittest.TestCase):
+    def test_missing_generated_slice_input_does_not_disable_handwritten_gates(self):
+        cmake = (SCRIPT.parents[1] / 'CMakeLists.txt').read_text()
+        properties = re.search(
+            r'set_source_files_properties\("\$\{CMAKE_SOURCE_DIR\}/apps/\$\{slice_source\}" '
+            r'PROPERTIES\s+[^)]+\)', cmake).group()
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'handwritten.cpp').write_text('int gate() { return 0; }\n')
+            prefix = '''cmake_minimum_required(VERSION 3.28)
+project(MissingGeneratedInput CXX)
+set(slice_source missing.cpp)
+set(slice_group root)
+'''
+            suffix = '''
+add_library(slice OBJECT "${CMAKE_SOURCE_DIR}/apps/${slice_source}")
+set_target_properties(slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP)
+add_library(handwritten OBJECT handwritten.cpp)
+'''
+            (root / 'CMakeLists.txt').write_text(prefix + properties + suffix)
+            build = root / 'build'
+            configured = subprocess.run(['cmake', '-S', str(root), '-B', str(build),
+                                         '-G', 'Ninja', '-DCMAKE_CXX_COMPILER=clang++-19'],
+                                        capture_output=True, text=True)
+            self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+            gate = subprocess.run(['cmake', '--build', str(build), '--target', 'handwritten'],
+                                  capture_output=True, text=True)
+            self.assertEqual(gate.returncode, 0, gate.stdout + gate.stderr)
+            slice_run = subprocess.run(['cmake', '--build', str(build), '--target', 'slice'],
+                                       capture_output=True, text=True)
+            self.assertNotEqual(slice_run.returncode, 0)
+            self.assertIn('missing.cpp', slice_run.stdout + slice_run.stderr)
+            (root / 'CMakeLists.txt').write_text(
+                prefix + properties.replace('GENERATED TRUE ', '') + suffix)
+            control = subprocess.run(['cmake', '-S', str(root), '-B', str(root / 'control'),
+                                      '-G', 'Ninja', '-DCMAKE_CXX_COMPILER=clang++-19'],
+                                     capture_output=True, text=True)
+            self.assertNotEqual(control.returncode, 0)
+            self.assertIn('missing.cpp', control.stdout + control.stderr)
+
     def test_unity_groups_are_bounded_and_stable_when_the_slice_grows(self):
         sources = [f'app/module/source-{number}.cpp' for number in range(160)]
         before = unity.group_sources(sources, root_groups=32, max_group_size=8)
