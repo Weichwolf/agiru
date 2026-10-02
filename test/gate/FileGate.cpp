@@ -1,3 +1,4 @@
+#include "runtime/Error.h"
 #include "type/File.h"
 #include "type/Integer.h"
 #include "type/Stream.h"

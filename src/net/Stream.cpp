@@ -1,6 +1,6 @@
 #include "type/Stream.h"
 
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Boolean.h"
 #include "type/Integer.h"

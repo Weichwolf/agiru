@@ -1,5 +1,5 @@
 #include "meta/Ids.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Table.h"
 #include "type/Integer.h"
 
