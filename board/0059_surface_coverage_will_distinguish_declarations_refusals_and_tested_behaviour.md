@@ -1,12 +1,11 @@
 # 0059 — Surface coverage will distinguish declarations, refusals and tested behaviour
 
-Status: open | Priority: P1 | Stage: UT refusal accounting; All semantic coverage | Reviewed: 2026-09-30
+Status: open | Priority: P1 | Stage: UT refusal accounting; All semantic coverage | Reviewed: 2026-09-28
 Depends on: 0034 object census; 0058 method results.
 
 ## Evidence
 
 - Name/signature and metadata-string counters can count refusing/no-op methods as present. Existing suppression baselines are not semantic coverage.
-- Integrated census repair counts observed acted-on kinds directly, not catalogue sizes. Six actual-transpiler controls cover empty, acknowledged/acted repetition, mixed and unknown populations: Clang/GCC green; frozen old binary six red. Own/main local suites 85 cases, final toolchain 65 tests green. `make test` builds the transpiler and carries B into its harness; missing binaries cannot skip census checks. Page fixture: zero changed files, truthful 0/0 count. No policy/suppression change. Changed-code lint: 174/185 units, 167 failed; existing diagnostics remain. Main `build/attribute-census-main-tests.log`, own `build/attribute-census-*`; next frozen proof pending native Field closure (0034).
 
 ## Implementation
 
@@ -22,6 +21,6 @@ Depends on: 0034 object census; 0058 method results.
 
 ## References
 
-Repository: `src/tc/Main.cpp`, `test/toolchain.py::TranspilerAttributeCensusGate`, `Makefile`, `test/run.sh`, scripts/al_surface.py, dropped_properties.py, test/triggers.py, doc/al-surface.json, public headers and baselines. Platform: methods-auto, properties and triggers-auto inventories. The former ledger is historical reading activity, not coverage proof.
+Repository: scripts/al_surface.py, dropped_properties.py, test/triggers.py, doc/al-surface.json, public headers and baselines. Platform: methods-auto, properties and triggers-auto inventories. The former ledger is historical reading activity, not coverage proof.
 
 Property scope: `assignmentcompatibility`, `replicatedata`.
