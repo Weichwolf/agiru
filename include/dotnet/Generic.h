@@ -1,23 +1,17 @@
 #pragma once
 
-#include "runtime/ErrorValue.h"
-#include "type/BigInteger.h"
+#include "runtime/Error.h"
 #include "type/Boolean.h"
-#include "type/Decimal.h"
-#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Variant.h"
 
 #include <concepts>
 #include <cstddef>
 #include <map>
-#include <memory>
-#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <variant>
 #include <vector>
 
 /// \file
@@ -67,155 +61,113 @@ private:
   std::vector<Variant> items_;
 };
 
-/// \brief A boxed System.Collections.Generic.KeyValuePair<TKey, TValue> value snapshot.
-class GenericKeyValuePair2 {
-public:
-  /// \brief The AL constructor spelling, preserving key/value boxing.
-  struct Binder {
-    /// \tparam Key The key representation. \tparam Value The value representation.
-    /// \param key The key snapshot. \param value The value snapshot.
-    /// \return A new value pair. \throws Error For unsupported CLR boxing.
-    template <typename Key, typename Value>
-    [[nodiscard]] GenericKeyValuePair2 operator()(const Key &key, const Value &value) const {
-      if constexpr (std::convertible_to<const Key &, Variant> &&
-                    std::convertible_to<const Value &, Variant>) {
-        return {Variant{key}, Variant{value}};
-      } else {
-        throw Error("KeyValuePair CLR boxing for this type is not implemented (board:0035)");
-      }
-    }
-  };
-
-  /// \brief `Pair.KeyValuePair(key, value)`, the constructor as AL calls it.
-  static constexpr Binder KeyValuePair{};
-
-  /// \brief A default pair with null erased key/value fields.
-  GenericKeyValuePair2() = default;
-
-  /// \param key The boxed key snapshot. \param value The value snapshot.
-  GenericKeyValuePair2(Variant key, Variant value)
-      : key_(std::move(key)), value_(std::move(value)) {}
-
-  /// \brief KeyValuePair.Key. \return The boxed key.
-  [[nodiscard]] const Variant &Key() const { return key_; }
-
-  /// \brief KeyValuePair.Value. \return The value.
-  [[nodiscard]] const Variant &Value() const { return value_; }
-
-private:
-  Variant key_;
-  Variant value_;
-};
-
 /// \brief `System.Collections.Generic.Dictionary<TKey, TValue>`.
 ///
-/// \note Copies share one dictionary. Boxed Boolean, Integer, BigInteger, Decimal, Text and Guid
-/// keys retain their type; equal numeric values of different boxed types are distinct. Unsupported
-/// CLR key representations refuse explicitly. Enumeration has no ordering guarantee. Following
-/// the .NET Core 3.0+ contract, Remove/Clear preserve enumeration; Add invalidates it.
+/// \note THE KEY IS A TEXT AND THE VALUE A VARIANT, which is what AL's erasure leaves reachable: a
+///       `dotnet` alias carries neither argument, and every use measured over BCApps keys by a
+///       name.
 class GenericDictionary2 {
-private:
-  using Key = std::variant<Boolean, Integer, BigInteger, Decimal, std::string, Guid>;
-  using Entries = std::map<Key, Variant>;
-
-  struct Store {
-    Entries entries;
-    std::size_t version = 0;
-  };
-
 public:
-  /// \brief A null .NET reference; use Dictionary() to construct a dictionary.
   GenericDictionary2() = default;
 
-  /// \brief The AL constructor spelling, with an optional nonnegative capacity hint.
+  /// \brief The binder behind the constructor call, `Dict := Dict.Dictionary([capacity])`, the way
+  ///        AL spells a .NET constructor; a capacity is accepted and ignored.
   struct Binder {
-    /// \brief Constructs an empty dictionary. \return A non-null independent store.
-    [[nodiscard]] GenericDictionary2 operator()() const;
-
-    /// \brief Constructs an empty dictionary; map allocation grows as entries are added.
-    /// \param capacity Nonnegative allocation hint. \return A non-null independent store.
-    /// \throws Error If capacity is negative.
-    [[nodiscard]] GenericDictionary2 operator()(Integer capacity) const;
+    /// \brief .NET `new Dictionary<K, V>()` / `new Dictionary<K, V>(capacity)`.
+    /// \tparam Arguments A capacity, or nothing.
+    /// \return An empty dictionary.
+    template <typename... Arguments>
+    [[nodiscard]] GenericDictionary2 operator()(Arguments &&...) const {
+      return GenericDictionary2{};
+    }
   };
 
   /// \brief `Dict.Dictionary(...)`, the constructor as AL calls it.
   Binder Dictionary;
 
-  /// \brief Adds a new typed key; never replaces an existing value.
-  /// \param key Non-null supported boxed key. \param value The value, including null.
-  /// \throws Error For null dictionaries, null/unsupported keys or duplicate keys.
-  void Add(const Variant &key, const Variant &value);
+  /// \brief .NET `Dictionary.Add(key, value)`; a Variant key reads as its text, which is how a
+  ///        `foreach` over an `ArrayList` hands keys over.
+  /// \param key   The key.
+  /// \param value The value.
+  void Add(std::string_view key, const Variant &value) {
+    entries_.insert_or_assign(std::string(key), value);
+  }
 
   /// \brief .NET `Dictionary.ContainsKey(key)`.
   /// \param key The key.
   /// \return Whether it is there.
-  /// \throws Error For null dictionaries or null/unsupported keys.
-  [[nodiscard]] Boolean ContainsKey(const Variant &key) const;
+  [[nodiscard]] Boolean ContainsKey(std::string_view key) const {
+    return entries_.contains(std::string(key));
+  }
 
   /// \brief .NET `Dictionary.Item(key)`.
   /// \param key The key.
   /// \return The value.
   /// \throws Error when the key is not there, as .NET's `KeyNotFoundException` does.
-  [[nodiscard]] const Variant &Item(const Variant &key) const;
-
-  /// \brief .NET Dictionary.TryGetValue(key, out value).
-  /// \param key The typed key. \param value The found value, or null on a miss.
-  /// \return Whether the key exists. \throws Error For null dictionaries or invalid keys.
-  Boolean TryGetValue(const Variant &key, Variant &value) const;
+  [[nodiscard]] const Variant &Item(std::string_view key) const;
 
   /// \brief .NET `Dictionary.Count`.
   /// \return How many entries.
-  [[nodiscard]] Integer Count() const;
+  [[nodiscard]] Integer Count() const { return static_cast<Integer>(entries_.size()); }
 
   /// \brief .NET `Dictionary.Remove(key)`.
   /// \param key The key.
   /// \return Whether it was there.
-  Boolean Remove(const Variant &key);
-
-  /// \brief Removes all entries, visible through every alias.
-  /// \throws Error If the dictionary is null.
-  void Clear();
-
-  /// \brief Whether this variable holds no .NET dictionary. \return The null state.
-  [[nodiscard]] Boolean IsNull() const { return store_ == nullptr; }
+  Boolean Remove(std::string_view key) { return entries_.erase(std::string(key)) != 0; }
 
   /// \brief One entry as AL's `foreach KeyValuePair in Dict` sees it: `.Key` and `.Value`.
-  using Entry = GenericKeyValuePair2;
+  class Entry {
+  public:
+    /// \brief An entry standing nowhere yet, which an iterator fills on the first read.
+    Entry() = default;
+
+    /// \param entry The map's entry.
+    explicit Entry(const std::pair<const std::string, Variant> &entry) : entry_(&entry) {}
+
+    /// \brief .NET `KeyValuePair.Key`. \return The key.
+    [[nodiscard]] const std::string &Key() const { return entry_->first; }
+
+    /// \brief .NET `KeyValuePair.Value`. \return The value.
+    [[nodiscard]] const Variant &Value() const { return entry_->second; }
+
+  private:
+    const std::pair<const std::string, Variant> *entry_ = nullptr;
+  };
 
   /// \brief Walks the entries as `Entry` objects, which is what a `foreach` needs.
   class Iterator {
   public:
-    /// \param store Retained dictionary. \param at The map position.
-    Iterator(std::shared_ptr<Store> store, Entries::const_iterator at);
+    /// \param at The map position.
+    explicit Iterator(std::map<std::string, Variant>::const_iterator at) : at_(at) {}
 
     /// \return The entry at this position, held by the iterator so a `foreach` can bind to it.
-    [[nodiscard]] Entry operator*() const;
+    [[nodiscard]] const Entry &operator*() const {
+      current_ = Entry(*at_);
+      return current_;
+    }
 
     /// \return This iterator, moved on.
-    Iterator &operator++();
+    Iterator &operator++() {
+      ++at_;
+      return *this;
+    }
 
     /// \param o The other. \return Whether both stand at the same place.
-    [[nodiscard]] bool operator==(const Iterator &o) const;
+    [[nodiscard]] bool operator==(const Iterator &o) const { return at_ == o.at_; }
 
   private:
-    void Validate() const;
-    void Set(Entries::const_iterator at);
-    std::shared_ptr<Store> store_;
-    std::optional<Key> at_;
-    Entry current_;
-    std::size_t version_;
+    std::map<std::string, Variant>::const_iterator at_;
+    mutable Entry current_;
   };
 
   /// \brief AL `foreach KeyValuePair in Dict`: the first entry. \return The iterator.
-  [[nodiscard]] Iterator begin() const;
+  [[nodiscard]] Iterator begin() const { return Iterator(entries_.begin()); }
 
   /// \brief AL `foreach KeyValuePair in Dict`: past the last entry. \return The iterator.
-  [[nodiscard]] Iterator end() const;
+  [[nodiscard]] Iterator end() const { return Iterator(entries_.end()); }
 
 private:
-  static Key KeyOf(const Variant &key);
-  [[nodiscard]] Store &Held() const;
-  std::shared_ptr<Store> store_;
+  std::map<std::string, Variant> entries_;
 };
 
 /// \brief .NET `System.Collections.ArrayList`, rebuilt: a list of Variants with the members the

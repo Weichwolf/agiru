@@ -1,6 +1,6 @@
 #include "dotnet/BinaryReader.h"
 #include "dotnet/BinaryWriter.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Integer.h"
 #include "type/Stream.h"
 #include "type/Text.h"

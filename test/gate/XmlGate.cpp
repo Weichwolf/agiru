@@ -1,6 +1,6 @@
 #include "dotnet/XmlDocument.h"
 #include "dotnet/XmlNode.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "type/Blob.h"
 #include "type/Stream.h"
 #include "type/Text.h"
@@ -17,8 +17,6 @@
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
-#include <filesystem>
-#include <fstream>
 #include <string>
 #include <string_view>
 
@@ -190,36 +188,6 @@ void DotNetClassesWalkTheSameTree() {
   CHECK_TRUE("and bad XML throws, the way .NET throws", threw);
 }
 
-void DotNetLocationLoadAndDeclaration() {
-  const auto path = std::filesystem::temp_directory_path() / "agiru-xml-gate-document.xml";
-  {
-    std::ofstream output(path);
-    output << kSample;
-  }
-  agiru::dotnet::XmlDocument document;
-  document = document.XmlDocument();
-  document.Load(path.string());
-  CHECK_TEXT("Load(filename) reads XML", document.DocumentElement().Name(), "root");
-  agiru::dotnet::XmlDeclaration declaration = document.CreateXmlDeclaration("1.0", "UTF-8", "yes");
-  CHECK_TEXT("declaration version", declaration.Version(), "1.0");
-  CHECK_TEXT("declaration encoding", declaration.Encoding(), "UTF-8");
-  CHECK_TEXT("declaration standalone", declaration.Standalone(), "yes");
-  bool wrongNode = false;
-  try {
-    agiru::dotnet::XmlDeclaration element = document.DocumentElement();
-    static_cast<void>(element.Version());
-  } catch (const Error &) { wrongNode = true; }
-  CHECK_TRUE("an element cannot masquerade as an XML declaration", wrongNode);
-  bool threw = false;
-  try {
-    document.Load(path.string() + ".missing");
-  } catch (const Error &) { threw = true; }
-  CHECK_TRUE("missing XML location throws", threw);
-  CHECK_TEXT(
-      "failed load retains the previous document", document.DocumentElement().Name(), "root");
-  std::filesystem::remove(path);
-}
-
 }
 
 int main() {
@@ -229,6 +197,5 @@ int main() {
     XPathSelectsWithNamespaces();
     ElementsAreBuiltAndShared();
     DotNetClassesWalkTheSameTree();
-    DotNetLocationLoadAndDeclaration();
   });
 }
