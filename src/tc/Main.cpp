@@ -9,6 +9,7 @@
 #include "QueryWriter.h"
 #include "Refused.h"
 #include "Scope.h"
+#include "TableKeys.h"
 #include "TableWriter.h"
 
 #include <algorithm>
@@ -1641,6 +1642,7 @@ Tables IndexTables(Run &run, Counts &counts) {
       }
       ++counts.parsed;
       counts.members += table.fields.size();
+      agiru::gen::CompletePrimaryKey(table);
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(table));
     } catch (const std::exception &e) {

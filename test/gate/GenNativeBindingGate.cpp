@@ -162,11 +162,18 @@ void RefusalsAndCodedOrdinals() {
   table = SourceTable();
   table.keys.clear();
   const auto binding = agiru::gen::BindTable(table, "::fixture::Row", "fixture/Row.h");
-  CHECK_TRUE("an unrepresented implicit key refuses rather than being guessed",
+  CHECK_TRUE(
+      "implicit native keys keep the lowest-ID field's original name",
+      agiru::gen::NativeTableAssertions(table, binding).contains(".name == \"Object Type\""));
+  CHECK_TRUE("implicit native keys use the lowest field ID",
              agiru::gen::NativeTableAssertions(table, binding)
-                 .contains("static_assert(false, \"native implicit primary key is unrepresented:"));
-  table =
-      agiru::al::ParseTable(R"(table 2000000058 AllObjWithCaption { DataPerCompany = Unknown; })");
+                 .contains(".fields[0] == ::agiru::FieldNo{1}"));
+  CHECK_TRUE(
+      "implicit native keys are clustered by default",
+      agiru::gen::NativeTableAssertions(table, binding).contains(".keys[0].clustered == true"));
+  table = agiru::al::ParseTable(R"(table 2000000058 AllObjWithCaption {
+        DataPerCompany = Unknown; fields { field(1; ID; Integer) {} }
+      })");
   refused = false;
   try {
     static_cast<void>(agiru::gen::NativeTableAssertions(table, binding));

@@ -1942,26 +1942,26 @@ class DiscoveryGate(unittest.TestCase):
             for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh',
                          'platform-source.sh', 'required-isolation.sh', 'header-dependencies.sh',
                          'slice-check.sh', 'interface-defaults.sh', 'report-layouts.sh',
-                         'number-sequences.sh'):
+                         'number-sequences.sh', 'table-keys.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('12 case(s), 1 red', result.stdout)
+            self.assertIn('13 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('12 case(s), 0 red', result.stdout)
-            for name in ('report-layouts.sh', 'number-sequences.sh'):
+            self.assertIn('13 case(s), 0 red', result.stdout)
+            for name in ('report-layouts.sh', 'number-sequences.sh', 'table-keys.sh'):
                 script = root / 'test' / name
                 script.rename(script.with_suffix('.saved'))
                 result = subprocess.run(command, env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('12 case(s), 1 red', result.stdout)
+                self.assertIn('13 case(s), 1 red', result.stdout)
                 script.with_suffix('.saved').rename(script)
 
 

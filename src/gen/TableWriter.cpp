@@ -10,6 +10,7 @@
 #include "ObjectKind.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
+#include "TableKeys.h"
 #include "Token.h"
 
 #include <algorithm>
@@ -274,6 +275,7 @@ bool IsSystemField(const al::FieldDecl &field) {
 }
 
 al::TableObject WithSystemFields(al::TableObject table) {
+  CompletePrimaryKey(table);
   for (const SystemFieldDecl &system : kSystemFields) {
     table.fields.push_back(al::FieldDecl{.number = system.no.Value(),
                                          .name = std::string(system.name),
@@ -797,11 +799,8 @@ NativeKeyProperties(const al::KeyDecl &key, const KeyFlags &flags, const std::st
 }
 
 std::string NativeKeyAssertions(const al::TableObject &declared, const std::string &metadata) {
-  const al::TableObject &table = declared;
-  if (table.keys.empty()) {
-    return "static_assert(false, " +
-           Literal("native implicit primary key is unrepresented: " + table.name) + ");\n";
-  }
+  al::TableObject table = declared;
+  CompletePrimaryKey(table);
   const auto flags = KeyFlagsOf(table);
   std::string out = "static_assert(" + metadata +
                     ".keys.size() == " + std::to_string(table.keys.size()) + ", " +
@@ -888,8 +887,8 @@ std::string NativeTableAssertions(const al::TableObject &table, const TableRef &
   for (const auto &field : table.fields) {
     out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
   }
-  out += NativeKeyAssertions(table, metadata);
   out += NativeTableProperties(table, metadata);
+  out += NativeKeyAssertions(table, metadata);
   return out + "\n";
 }
 
@@ -1114,6 +1113,58 @@ std::set<std::string> Shadowed(const al::TableObject &table) {
   return hidden;
 }
 
+namespace {
+
+std::string TableStorageAssertions(const al::TableObject &table,
+                                   const std::string &tableIdentifier,
+                                   const std::string &tableClass,
+                                   const std::string &qualified,
+                                   std::size_t declaredFields) {
+  std::string out = "static_assert(FieldsAreSorted(k";
+  out += tableIdentifier;
+  out += "Table),\n";
+  out += "              \"the field table is emitted sorted by field number, which is what lets ";
+  out += "Field() \"\n";
+  out += "              \"binary-search it\");\n";
+  out += "static_assert(offsetof(" + qualified;
+  out += ", State_Block) == 0,\n";
+  out += "              \"the record variable's state is the FIRST member, which is how the base ";
+  out += "reaches it \"\n";
+  out += "              \"through the address of the object\");\n";
+  out += "static_assert(std::is_standard_layout_v<";
+  out += tableClass;
+  out += ">,\n";
+  out += "              \"offsetof over the field table requires standard layout. The base ";
+  out += "carries NO data, \"\n";
+  out += "              \"which is what keeps it so\");\n";
+  out += "static_assert(k";
+  out += tableIdentifier;
+  out += "Fields.size() == ";
+  out += std::to_string(declaredFields);
+  out += " + kSystemFieldCount, \"table ";
+  out += std::to_string(table.id);
+  out += " declares ";
+  out += std::to_string(declaredFields);
+  out += " fields, and the platform adds its own\");\n\n";
+  out += "static_assert(k";
+  out += tableIdentifier;
+  out += "Keys.size() <= ::agiru::kMaximumKeys,\n";
+  out += "              \"a table declares at most 40 keys (devenv-table-keys.md)\");\n";
+  if (!table.keys.empty()) {
+    out += "static_assert(";
+    out += tableClass;
+    out += "::" + KeyArrayName(0) + ".size() <= ::agiru::kMaximumPrimaryKeyFields,\n";
+    out += "              \"a primary key names at most 16 fields "
+           "(devenv-table-keys.md)\");\n";
+    out += "static_assert(!k";
+    out += tableIdentifier;
+    out += "Keys.empty(), \"keys[0] IS the primary key, so a table has one\");\n";
+  }
+  return out;
+}
+
+}
+
 std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
   const std::string space = NamespaceOf(declared.nameSpace);
   const EnumIndex &enums = objects.enums;
@@ -1126,24 +1177,20 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   std::string out = "namespace " + space + " {\n\n";
   out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
 
+  const auto flags = KeyFlagsOf(table);
   out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
   for (std::size_t i = 0; i < table.keys.size(); ++i) {
-    const auto said = [&](std::string_view name, bool absent) {
-      const al::Property *found = Find(table.keys[i].properties, name);
-      return found == nullptr ? absent : LowerKey(found->text) == "true";
-    };
     const al::Property *sums = Find(table.keys[i].properties, "SumIndexFields");
     out += "    KeyDef{.name = " + Literal(table.keys[i].name) + ", .fields = " + tableClass +
-           "::" + KeyArrayName(i) +
-           ", .clustered = " + (said("Clustered", false) ? "true" : "false");
-    if (!said("Enabled", true)) { out += ", .enabled = false"; }
+           "::" + KeyArrayName(i) + ", .clustered = " + (flags[i].clustered ? "true" : "false");
+    if (!flags[i].enabled) { out += ", .enabled = false"; }
     if (sums != nullptr) {
       out += ", .sumIndexFields = " + tableClass + "::" + KeyArrayName(i) + "Sums";
     }
-    if (!said("MaintainSiftIndex", true)) { out += ", .maintainSiftIndex = false"; }
-    if (!said("MaintainSqlIndex", true)) { out += ", .maintainSqlIndex = false"; }
-    if (said("Unique", false)) { out += ", .unique = true"; }
+    if (!flags[i].maintainSiftIndex) { out += ", .maintainSiftIndex = false"; }
+    if (!flags[i].maintainSqlIndex) { out += ", .maintainSqlIndex = false"; }
+    if (flags[i].unique) { out += ", .unique = true"; }
     const al::Property *included = Find(table.keys[i].properties, "IncludedFields");
     if (included != nullptr) { out += ", .includedFields = " + Literal(included->text); }
     for (const auto &[name, member] :
@@ -1228,46 +1275,8 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
   out += "};\n\n";
 
-  out += "static_assert(FieldsAreSorted(k";
-  out += tableIdentifier;
-  out += "Table),\n";
-  out += "              \"the field table is emitted sorted by field number, which is what lets ";
-  out += "Field() \"\n";
-  out += "              \"binary-search it\");\n";
-  out += "static_assert(offsetof(" + qualified;
-  out += ", State_Block) == 0,\n";
-  out += "              \"the record variable's state is the FIRST member, which is how the base ";
-  out += "reaches it \"\n";
-  out += "              \"through the address of the object\");\n";
-  out += "static_assert(std::is_standard_layout_v<";
-  out += tableClass;
-  out += ">,\n";
-  out += "              \"offsetof over the field table requires standard layout. The base ";
-  out += "carries NO data, \"\n";
-  out += "              \"which is what keeps it so\");\n";
-  out += "static_assert(k";
-  out += tableIdentifier;
-  out += "Fields.size() == ";
-  out += std::to_string(sorted.size() - kSystemFieldCount);
-  out += " + kSystemFieldCount, \"table ";
-  out += std::to_string(table.id);
-  out += " declares ";
-  out += std::to_string(sorted.size() - kSystemFieldCount);
-  out += " fields, and the platform adds its own\");\n\n";
-  out += "static_assert(k";
-  out += tableIdentifier;
-  out += "Keys.size() <= ::agiru::kMaximumKeys,\n";
-  out += "              \"a table declares at most 40 keys (devenv-table-keys.md)\");\n";
-  if (!table.keys.empty()) {
-    out += "static_assert(";
-    out += tableClass;
-    out += "::" + KeyArrayName(0) + ".size() <= ::agiru::kMaximumPrimaryKeyFields,\n";
-    out += "              \"a primary key names at most 16 fields "
-           "(devenv-table-keys.md)\");\n";
-    out += "static_assert(!k";
-    out += tableIdentifier;
-    out += "Keys.empty(), \"keys[0] IS the primary key, so a table has one\");\n";
-  }
+  out += TableStorageAssertions(
+      table, tableIdentifier, tableClass, qualified, sorted.size() - kSystemFieldCount);
   out += "\n";
   out += "} // namespace " + space + "\n\n";
   return out;
