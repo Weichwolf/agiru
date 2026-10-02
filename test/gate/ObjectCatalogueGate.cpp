@@ -3,7 +3,6 @@
 #include "platform/AllObj.h"
 #include "platform/AllObjWithCaption.h"
 #include "runtime/RecordRef.h"
-#include "runtime/Table.h"
 #include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Variant.h"
@@ -24,31 +23,24 @@ struct FieldSpec {
   int length = 0;
 };
 
-// System.app 28.0.53152.0: Virtual Tables/AllObj{,WithCaption}.Table.al.
-constexpr int kBareTableId = 2000000038;
-constexpr int kCaptionedTableId = 2000000058;
-constexpr int kBareNamespaceField = 62;
-constexpr int kCaptionedNamespaceField = 63;
-constexpr int kApplicationField = 62;
-
 constexpr std::array<FieldSpec, 6> kBareFields{{
-    {.number = 1, .name = "Object Type", .type = agiru::FieldType::Option},
-    {.number = 3, .name = "Object ID", .type = agiru::FieldType::Integer},
-    {.number = 4, .name = "Object Name", .type = agiru::FieldType::Text, .length = 30},
-    {.number = 60, .name = "App Package ID", .type = agiru::FieldType::Guid},
-    {.number = 61, .name = "App Runtime Package ID", .type = agiru::FieldType::Guid},
-    {.number = 62, .name = "AL Namespace", .type = agiru::FieldType::Text, .length = 500},
+    {1, "Object Type", agiru::FieldType::Option},
+    {3, "Object ID", agiru::FieldType::Integer},
+    {4, "Object Name", agiru::FieldType::Text, 30},
+    {60, "App Package ID", agiru::FieldType::Guid},
+    {61, "App Runtime Package ID", agiru::FieldType::Guid},
+    {62, "AL Namespace", agiru::FieldType::Text, 500},
 }};
 constexpr std::array<FieldSpec, 9> kCaptionedFields{{
-    {.number = 1, .name = "Object Type", .type = agiru::FieldType::Option},
-    {.number = 3, .name = "Object ID", .type = agiru::FieldType::Integer},
-    {.number = 4, .name = "Object Name", .type = agiru::FieldType::Text, .length = 30},
-    {.number = 20, .name = "Object Caption", .type = agiru::FieldType::Text, .length = 249},
-    {.number = 30, .name = "Object Subtype", .type = agiru::FieldType::Text, .length = 30},
-    {.number = 60, .name = "App Package ID", .type = agiru::FieldType::Guid},
-    {.number = 61, .name = "App Runtime Package ID", .type = agiru::FieldType::Guid},
-    {.number = 62, .name = "App ID", .type = agiru::FieldType::Guid},
-    {.number = 63, .name = "AL Namespace", .type = agiru::FieldType::Text, .length = 500},
+    {1, "Object Type", agiru::FieldType::Option},
+    {3, "Object ID", agiru::FieldType::Integer},
+    {4, "Object Name", agiru::FieldType::Text, 30},
+    {20, "Object Caption", agiru::FieldType::Text, 249},
+    {30, "Object Subtype", agiru::FieldType::Text, 30},
+    {60, "App Package ID", agiru::FieldType::Guid},
+    {61, "App Runtime Package ID", agiru::FieldType::Guid},
+    {62, "App ID", agiru::FieldType::Guid},
+    {63, "AL Namespace", agiru::FieldType::Text, 500},
 }};
 constexpr std::array<std::string_view, 23> kObjectTypes{"TableData",
                                                         "Table",
@@ -161,8 +153,8 @@ template <typename Table> void IdentitiesRemainIndependent(int namespaceField, b
   if (reflected.FieldExist(namespaceField)) {
     reflected.Field(namespaceField).Value(agiru::Variant(full));
   }
-  if (captioned && reflected.FieldExist(kApplicationField)) {
-    reflected.Field(kApplicationField).Value(agiru::Variant(agiru::Guid(kApplication)));
+  if (captioned && reflected.FieldExist(62)) {
+    reflected.Field(62).Value(agiru::Variant(agiru::Guid(kApplication)));
   }
   reflected.SetTable(record);
   CHECK_TEXT(
@@ -180,9 +172,7 @@ template <typename Table> void IdentitiesRemainIndependent(int namespaceField, b
              "{" + std::string(kRuntimePackage) + "}");
   if (captioned) {
     CHECK_TEXT("application identity is not either package identity",
-               reflected.FieldExist(kApplicationField)
-                   ? record.FieldFormat(agiru::FieldNo{kApplicationField})
-                   : "<missing>",
+               reflected.FieldExist(62) ? record.FieldFormat(agiru::FieldNo{62}) : "<missing>",
                "{" + std::string(kApplication) + "}");
   }
 }
@@ -211,13 +201,13 @@ void UndeclaredFieldsRemainAbsent() {
 
 int main() {
   return gate::Run("ObjectCatalogue", [] {
-    DeclarationMatchesSource<agiru::platform::AllObj>(kBareTableId, "AllObj", kBareFields);
+    DeclarationMatchesSource<agiru::platform::AllObj>(2000000038, "AllObj", kBareFields);
     DeclarationMatchesSource<agiru::platform::AllObjWithCaption>(
-        kCaptionedTableId, "AllObjWithCaption", kCaptionedFields);
+        2000000058, "AllObjWithCaption", kCaptionedFields);
     ReflectionPreservesText<agiru::platform::AllObj>(kBareFields);
     ReflectionPreservesText<agiru::platform::AllObjWithCaption>(kCaptionedFields);
-    IdentitiesRemainIndependent<agiru::platform::AllObj>(kBareNamespaceField, false);
-    IdentitiesRemainIndependent<agiru::platform::AllObjWithCaption>(kCaptionedNamespaceField, true);
+    IdentitiesRemainIndependent<agiru::platform::AllObj>(62, false);
+    IdentitiesRemainIndependent<agiru::platform::AllObjWithCaption>(63, true);
     UndeclaredFieldsRemainAbsent();
   });
 }
