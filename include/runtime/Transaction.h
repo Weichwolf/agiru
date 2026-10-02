@@ -142,12 +142,7 @@ public:
   }
 
 private:
-  struct Boundary {
-    std::string name;
-    std::vector<std::string> inconsistentBefore;
-  };
-
-  std::vector<Boundary> names_;
+  std::vector<std::string> names_;
   std::vector<std::string> inconsistent_;
   std::string lastError_;
   std::size_t cursorEpoch_ = 0;
