@@ -139,10 +139,6 @@ private:
 ///        of measure there at once (4 cases of Record Set UT found nothing, 2026-09-12).
 inline constexpr int kCrossColumnGroup = -1;
 
-/// \brief The highest selectable group; `record-filtergroup-method.md` says values above 255
-///        are ignored.
-inline constexpr int kMaximumFilterGroup = 255;
-
 /// \brief One field's filter, as the record variable carries it.
 struct FieldFilter {
   ::agiru::FieldNo field; ///< The field it narrows.

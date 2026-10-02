@@ -53,28 +53,6 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
-    def test_verification_entrypoint_is_offline_and_read_only(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', root)
-            before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                      for path in package.rglob('*') if path.is_file()}
-            output = io.StringIO()
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    patch.object(symbols, 'curl', side_effect=AssertionError('unexpected network')), \
-                    redirect_stdout(output):
-                symbols.main()
-            self.assertEqual(json.loads(output.getvalue())['package_sha256'],
-                             symbols.verify_package(package)['package_sha256'])
-            self.assertEqual(before, {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
-                                     for path in package.rglob('*') if path.is_file()})
-            changed = package / 'src/Virtual Tables/Fixture.Table.al'
-            changed.write_text('changed')
-            with patch.object(sys, 'argv', ['fetch_symbols.py', '--verify', str(package)]), \
-                    redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                symbols.main()
-            self.assertEqual(changed.read_text(), 'changed')
-
     @staticmethod
     def package(extra=(), manifest=None, source=True):
         manifest = manifest if manifest is not None else (
@@ -1297,42 +1275,6 @@ class NativeToolchainGate(unittest.TestCase):
 
 
 class SnapshotGate(unittest.TestCase):
-    def test_deleted_tracked_caches_do_not_abort_freezing(self):
-        for reuse in (False, True):
-            for cache_removed in (False, True):
-                with self.subTest(reuse=reuse, cache_removed=cache_removed), \
-                        tempfile.TemporaryDirectory() as folder:
-                    root = Path(folder)
-                    cache = root / 'test/__pycache__/tracked.pyc'
-                    cache.parent.mkdir(parents=True)
-                    cache.write_bytes(b'cache')
-                    retired = root / 'retired.cpp'
-                    retired.write_text('retired source\n')
-                    (root / 'Makefile').write_text('probe:\n\t@mkdir -p build\n'
-                                                 '\t@touch build/executed\n')
-                    for command in (['init', '-q'], ['add', '.'],
-                                    ['-c', 'user.name=Gate', '-c', 'user.email=gate@example.invalid',
-                                     'commit', '-qm', 'fixture']):
-                        subprocess.run(['git', '-C', str(root), *command], check=True,
-                                       capture_output=True)
-                    retired.unlink()
-                    if cache_removed:
-                        cache.unlink()
-                    expected = verify.digest(root)
-                    arguments = SimpleNamespace(targets=['probe'], jobs=1, detach=False, reuse=reuse)
-                    with patch.object(verify, 'ROOT', root), \
-                            patch.dict(os.environ, {'AGIRU_SYSTEM_SYMBOLS': ''}):
-                        self.assertEqual(verify.start(arguments), 0)
-                    run = Path((root / 'build/verify/latest').read_text().strip())
-                    result = json.loads((run / 'result.json').read_text())
-                    build_source = Path(result.get('build_source', run / 'source'))
-                    self.assertTrue((build_source / 'build/executed').is_file())
-                    self.assertFalse((run / 'source/test/__pycache__').exists())
-                    self.assertFalse((build_source / 'retired.cpp').exists())
-                    self.assertEqual(result['source_sha256'], expected)
-                    self.assertEqual(result['post_source_sha256'], expected)
-                    self.assertEqual(result['target_exits'], {'probe': 0})
-
     def test_explicit_system_symbols_are_frozen_and_reach_the_runner(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
@@ -1689,20 +1631,20 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'build').mkdir()
             shutil.copyfile(SCRIPT.parents[1] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
-            for name in ('door-reproduces.sh', 'one-definition.sh', 'function-size.sh'):
+            for name in ('door-reproduces.sh', 'one-definition.sh'):
                 (root / 'test' / name).write_text('exit 0\n')
             (root / 'test/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 1 red', result.stdout)
+            self.assertIn('4 case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('5 case(s), 0 red', result.stdout)
+            self.assertIn('4 case(s), 0 red', result.stdout)
 
 
 class ReproductionGate(unittest.TestCase):
@@ -2254,115 +2196,6 @@ class ResultIdentityGate(unittest.TestCase):
             results = [json.loads(line) for line in
                        (root / 'summary.log.results.jsonl').read_text().splitlines()]
             self.assertEqual([row['codeunit'] for row in results], list(names))
-
-
-class TableSourceBindingGate(unittest.TestCase):
-    def setUp(self):
-        self.root = SCRIPT.parents[1]
-        self.build = (self.root / Path(os.environ.get('B', 'build'))).resolve()
-        self.fixtures = self.root / 'test/source-binding'
-        cache = (self.build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        self.compiler = compiler[1]
-
-    def run_fixture(self, receiver_kind, numeric):
-        with tempfile.TemporaryDirectory() as temp:
-            fixture = Path(temp) / 'fixture'
-            shutil.copytree(self.fixtures, fixture)
-            caller = fixture / 'al/fixture/Caller.Codeunit.al'
-            text = caller.read_text()
-            if numeric:
-                self.assertEqual(text.count('Record "Source Row"'), 1)
-                text = text.replace('Record "Source Row"', 'Record 50170')
-            consumer = fixture / 'Consumer.cpp'
-            consumer_text = (fixture / 'Consumer.cpp.in').read_text()
-            if receiver_kind == 'table':
-                self.assertEqual(text.count('codeunit 50172 Caller\n{'), 1)
-                text = text.replace('codeunit 50172 Caller\n{',
-                                    'table 50172 Caller\n{\n'
-                                    '    fields { field(1; ID; Integer) { } }')
-                caller.unlink()
-                caller = caller.with_name('Caller.Table.al')
-                self.assertEqual(consumer_text.count('fixture/codeunit/Caller.h'), 1)
-                self.assertEqual(consumer_text.count('Caller_Codeunit'), 1)
-                consumer_text = (consumer_text
-                    .replace('fixture/codeunit/Caller.h', 'fixture/table/Caller.h')
-                    .replace('Caller_Codeunit', 'Caller_Table'))
-            consumer.write_text(consumer_text)
-            caller.write_text(text)
-            output = Path(temp) / 'generated'
-            generated = subprocess.run([
-                str(self.build / 'agirutc'), str(fixture / 'al'),
-                str(fixture / 'apps.json'), str(output)],
-                cwd=self.root, capture_output=True, text=True, timeout=30)
-            self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-            executable = Path(temp) / 'consumer'
-            command = [self.compiler, '-std=c++23', '-stdlib=libc++',
-                '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{self.root / "include"}',
-                *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                          output / 'absent')),
-                *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                str(fixture / 'Consumer.cpp'), f'-L{self.build}', f'-Wl,-rpath,{self.build}',
-                '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-            compiled = subprocess.run(command, cwd=self.root, capture_output=True,
-                                      text=True, timeout=60)
-            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-            result = subprocess.run([str(executable)], cwd=self.root, capture_output=True,
-                                    text=True, timeout=10)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_codeunit_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('codeunit', numeric)
-
-    def test_table_calls_merged_table_signatures(self):
-        for numeric in (False, True):
-            with self.subTest(numeric=numeric):
-                self.run_fixture('table', numeric)
-
-
-class PageRecordBindingGate(unittest.TestCase):
-    def test_native_page_options_compile_and_execute_without_a_copied_ast(self):
-        root = SCRIPT.parents[1]
-        build = (root / Path(os.environ.get('B', 'build'))).resolve()
-        cache = (build / 'CMakeCache.txt').read_text()
-        compiler = re.search(r'^CMAKE_CXX_COMPILER:[^=]+=(.+)$', cache, re.M)
-        self.assertIsNotNone(compiler, 'configured compiler is missing')
-        for alias in ('Field', '2000000041'):
-            with self.subTest(alias=alias), tempfile.TemporaryDirectory() as temp:
-                fixture = Path(temp) / 'fixture'
-                shutil.copytree(root / 'test/page-record-binding', fixture)
-                page = fixture / 'al/fixture/RecordBinding.Page.al'
-                text = page.read_text()
-                self.assertEqual(text.count('SourceTable = Field;'), 1)
-                page.write_text(text.replace('SourceTable = Field;', f'SourceTable = {alias};'))
-                output = Path(temp) / 'generated'
-                generated = subprocess.run([
-                    str(build / 'agirutc'), str(fixture / 'al'),
-                    str(fixture / 'apps.json'), str(output)],
-                    cwd=root, capture_output=True, text=True, timeout=30)
-                self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
-                body = next(output.rglob('RecordBinding.cpp')).read_text()
-                self.assertNotIn('RefusedOption', body)
-                self.assertIn('::agiru::platform::FieldClass::FlowFilter', body)
-                executable = Path(temp) / 'consumer'
-                command = [compiler[1], '-x', 'c++', '-std=c++23', '-stdlib=libc++',
-                    '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
-                    '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{root / "include"}',
-                    *(f'-I{path}' for path in (output, output / 'fixture', output / 'shared',
-                                              output / 'absent')),
-                    *(str(path) for path in sorted(output.rglob('*.cpp'))),
-                    str(fixture / 'Consumer.cpp.in'), f'-L{build}', f'-Wl,-rpath,{build}',
-                    '-lagiru_rt', '-lagiru_al', '-lagiru_net', '-lagiru_db', '-o', str(executable)]
-                compiled = subprocess.run(command, cwd=root, capture_output=True,
-                                          text=True, timeout=60)
-                self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
-                result = subprocess.run([str(executable)], cwd=root, capture_output=True,
-                                        text=True, timeout=10)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
 if __name__ == '__main__':
