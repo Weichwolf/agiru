@@ -164,7 +164,7 @@ inc = "".join(f'#include "{h}"\n'
 
 # THE WRITTEN DOOR IS NOT INCLUDED FROM HERE, IT STANDS BESIDE IT. This header once pulled
 # `BuiltinsWritten.h` in so that one include reached every builtin, and nothing in it named anything
-# that header declares -- an include a client cannot see the reason for. `Door.cpp` names both
+# that header declares -- an include a client cannot see the reason for. `TypeMethods.cpp` names both
 # beside each other in a generated file instead, which is the same rule every other header follows:
 # a file includes what it names.
 head = '''#pragma once
@@ -195,11 +195,16 @@ namespace agiru {
 # survives there, so `} // namespace agiru` is written by this script and removed by the next
 # `make` -- forever. The door's precompiled header and every ccache entry behind it fall over on
 # each of those rewrites, and a `make tree` running beside one loses its whole census.
-# `RefuseDoor` IS DECLARED IN THE HEADER, because a body can land there. An AL `var Any` parameter
+# `RefuseUnimplemented` IS DECLARED IN THE HEADER, because a body can land there. An AL `var Any` parameter
 # becomes a TEMPLATE -- `Clear(var Any)` takes a record, a text, a list, anything at all by
 # reference -- and a template's body has to be visible where it is instantiated, so the refusal has
 # to be reachable from the header rather than hidden in an anonymous namespace in the source.
-refusal = ("[[noreturn]] void RefuseDoor(std::string_view what);\n\n")
+refusal = (
+    "/// \\brief Refuses a declared AL operation whose implementation is unavailable.\n"
+    "/// \\param what The AL operation signature reported without alteration.\n"
+    "/// \\throws Error always, retaining the operation identity and implementation-gap diagnostic.\n"
+    "[[noreturn]] void RefuseUnimplemented(std::string_view what);\n\n"
+)
 settle(OUTPUT / "include/Builtins.h", head + refusal + "\n\n".join(alldecls) + "\n}\n")
 
 # THE SOURCE INCLUDES WHAT ITS BODIES NAME, which is only what the signatures spell -- the header
@@ -210,7 +215,7 @@ bodytext = "\n".join(allbodies)
 # body mentions and no signature here does -- without a header, and kept `Integer.h` after the
 # function that used it moved to `BuiltinsWritten.cpp`.
 # AND NOT WHAT A STRING LITERAL NAMES. Every refusal carries its AL signature as text --
-# `RefuseDoor("Session.CurrentClientType()")` -- so searching the raw source found `Session` and
+# `RefuseUnimplemented("Session.CurrentClientType()")` -- so searching the raw source found `Session` and
 # `Any` and asked for headers no code uses.
 code = re.sub(r'"(?:[^"\\]|\\.)*"', '""', bodytext)
 # A PARAMETER NAME IS NOT A TYPE. AL names a parameter after its own subject -- `Company`,
@@ -224,7 +229,7 @@ guard = ("// NOLINTBEGIN(bugprone-easily-swappable-parameters,"
 src = ['#include "Builtins.h"', "", '#include "runtime/ErrorValue.h"'] + \
       [f'#include "{h}"' for h in sorted({existing[t] for t in inbody})] + \
       ["", "#include <string>", "#include <string_view>", "", "namespace agiru {", "",
-       "[[noreturn]] void RefuseDoor(std::string_view what) {",
+       "[[noreturn]] void RefuseUnimplemented(std::string_view what) {",
        '  throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");',
        "}", "", guard, ""] + allbodies + \
       ["", guard.replace("NOLINTBEGIN", "NOLINTEND"), "", "}", ""]

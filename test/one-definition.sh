@@ -1,5 +1,5 @@
 #!/bin/sh
-# ONE DEFINITION PER SYMBOL ACROSS THE TIERS. `src/rt/Door.cpp` carried a refusing body for every
+# ONE DEFINITION PER SYMBOL ACROSS THE TIERS. `src/rt/TypeMethods.cpp` carried a refusing body for every
 # `TextBuilder` method beside the real ones in `src/net/TextBuilder.cpp`, and the loader took the
 # refusal: a whole type answered "not implemented yet" while its implementation sat in the next
 # library (15 symbols, 2026-09-09). The linker cannot see it -- each shared object is consistent

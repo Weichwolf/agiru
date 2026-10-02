@@ -20,7 +20,7 @@ for file in include/Builtins.h src/rt/Builtins.cpp; do
   fi
 done
 
-# AND NOTHING WRITTEN REFUSES OUTRIGHT. A written function whose FIRST statement is `RefuseDoor` is
+# AND NOTHING WRITTEN REFUSES OUTRIGHT. A written function whose FIRST statement is `RefuseUnimplemented` is
 # one the generator took back, which is the failure this whole split exists to stop -- and it would
 # leave the digest above unchanged, because by then the refusal IS what is on disk.
 #
@@ -28,7 +28,7 @@ done
 # and refuses otherwise; `Hyperlink` hands the URL to a handler and refuses when none takes it.
 # Both compute first, and both are written precisely so the generator cannot take the computation
 # away. So the test is on the FIRST statement of the body, not on the presence of the word.
-outright=$(awk '/\{$/ { open = 1; next } open && /^  RefuseDoor\(/ { count++ } { open = 0 } \
+outright=$(awk '/\{$/ { open = 1; next } open && /^  RefuseUnimplemented\(/ { count++ } { open = 0 } \
   END { print count + 0 }' src/rt/written/BuiltinsWritten.cpp)
 if [ "$outright" -gt 0 ]; then
   printf 'door: %s written builtin(s) refuse outright. Overwritten by the generator.\n' \

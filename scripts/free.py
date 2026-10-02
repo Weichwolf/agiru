@@ -77,10 +77,10 @@ def emit(owner, methods, known):
             head = f"template <{names}> "
         decls.append("\n".join(doc) + f"\n{head}{ret} {m['method']}({args}) {{\n" +
                      "".join(f"  static_cast<void>({n});\n" for n, _, _ in ps) +
-                     f'  RefuseDoor("{al}");\n}}' if generic
+                     f'  RefuseUnimplemented("{al}");\n}}' if generic
                      else "\n".join(doc) + f"\n{ret} {m['method']}({args});")
         discard = "".join(f"  static_cast<void>({n});\n" for n, _, _ in ps)
         if not generic:
             bodies.append(f"{ret} {m['method']}({plain}) {{\n{discard}"
-                          f'  RefuseDoor("{al}");\n}}')
+                          f'  RefuseUnimplemented("{al}");\n}}')
     return decls, bodies

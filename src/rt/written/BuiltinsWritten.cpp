@@ -958,7 +958,7 @@ void SetDefaultTableConnection(const ::agiru::TableConnectionType &Type,
   static_cast<void>(Type);
   static_cast<void>(Name);
   static_cast<void>(Scoped);
-  RefuseDoor("Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)");
+  RefuseUnimplemented("Database.SetDefaultTableConnection(TableConnectionType, Text, Boolean)");
 }
 
 ::agiru::Text<0> UserId() {
@@ -1022,12 +1022,12 @@ StartSession(::agiru::Integer &SessionId, ::agiru::Integer CodeunitId, std::stri
 
 ::agiru::Boolean GuiAllowed() {
   if (HandlerTable::Installed()) { return true; }
-  RefuseDoor("System.GuiAllowed()");
+  RefuseUnimplemented("System.GuiAllowed()");
 }
 
 void Hyperlink(std::string_view URL) {
   if (AnsweredByHandler(3, URL, nullptr)) { return; }
-  RefuseDoor("System.Hyperlink(Text)");
+  RefuseUnimplemented("System.Hyperlink(Text)");
 }
 
 }

@@ -18,7 +18,7 @@ Depends on: 0034 object census; 0058 method results.
 
 ## Acceptance
 
-- Negative fixtures remove a real overload, replace a body with RefuseDoor, disconnect a trigger and drop a property consumer. Each changes the corresponding counter or gate. Missing docs or analyzer outputs fail the audit.
+- Negative fixtures remove a real overload, replace a body with RefuseUnimplemented, disconnect a trigger and drop a property consumer. Each changes the corresponding counter or gate. Missing docs or analyzer outputs fail the audit.
 
 ## References
 

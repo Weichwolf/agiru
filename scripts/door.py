@@ -202,7 +202,7 @@ def emit(name, methods, known):
         decls.append("\n".join(doc) + "\n  " + ("static " if m["static"] else "") +
                      f"{ret} {m['method']}({args});")
         callargs = "".join(f"  static_cast<void>({n});\n" for n, _, _ in ps)
-        bodies.append(f"{ret} {name}::{m['method']}({args}) {{\n{callargs}  detail::RefuseDoor(\"{al}\");\n}}")
+        bodies.append(f"{ret} {name}::{m['method']}({args}) {{\n{callargs}  detail::RefuseUnimplemented(\"{al}\");\n}}")
     used = set()
     for m in methods:
         for _, t, _ in m["params"]: used.add(t)

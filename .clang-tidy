@@ -34,7 +34,7 @@
 # the registration shape: every subscriber and every test is registered through a MEMBER FUNCTION
 # POINTER (`InvokeSubscriber<C, &C::M>`), which a static member cannot form.
 #
-# IT WAS ALREADY OFF, four times, in `NOLINT` regions -- `src/rt/Door.cpp`, `src/rt/RecordRef.cpp`,
+# IT WAS ALREADY OFF, four times, in `NOLINT` regions -- `src/rt/TypeMethods.cpp`, `src/rt/RecordRef.cpp`,
 # `include/type/Variant.h`, `include/runtime/RecordRef.h`. A reason repeated in four files is a
 # reason that belongs here once, and moving it lowers the silent-places count rather than raising
 # it (2026-09-08).

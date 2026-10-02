@@ -28,82 +28,82 @@
 
 namespace agiru {
 
-[[noreturn]] void RefuseDoor(std::string_view what) {
+[[noreturn]] void RefuseUnimplemented(std::string_view what) {
   throw Error(std::string(what) + " is declared and not implemented yet (board:0035)");
 }
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)
 
 std::string ApplicationPath() {
-  RefuseDoor("System.ApplicationPath()");
+  RefuseUnimplemented("System.ApplicationPath()");
 }
 
 std::string CaptionClassTranslate(std::string_view CaptionClassText) {
   static_cast<void>(CaptionClassText);
-  RefuseDoor("System.CaptionClassTranslate(Text)");
+  RefuseUnimplemented("System.CaptionClassTranslate(Text)");
 }
 
 void ClearAll() {
-  RefuseDoor("System.ClearAll()");
+  RefuseUnimplemented("System.ClearAll()");
 }
 
 void CodeCoverageLoad() {
-  RefuseDoor("System.CodeCoverageLoad()");
+  RefuseUnimplemented("System.CodeCoverageLoad()");
 }
 
 ::agiru::Boolean CodeCoverageLog(::agiru::Boolean NewIsActive, ::agiru::Boolean MultiSession) {
   static_cast<void>(NewIsActive);
   static_cast<void>(MultiSession);
-  RefuseDoor("System.CodeCoverageLog(Boolean, Boolean)");
+  RefuseUnimplemented("System.CodeCoverageLog(Boolean, Boolean)");
 }
 
 void CodeCoverageRefresh() {
-  RefuseDoor("System.CodeCoverageRefresh()");
+  RefuseUnimplemented("System.CodeCoverageRefresh()");
 }
 
 ::agiru::Integer CompressArray(const ::agiru::Variant &StringArray) {
   static_cast<void>(StringArray);
-  RefuseDoor("System.CompressArray(Array of [Text])");
+  RefuseUnimplemented("System.CompressArray(Array of [Text])");
 }
 
 ::agiru::Boolean CreateEncryptionKey() {
-  RefuseDoor("System.CreateEncryptionKey()");
+  RefuseUnimplemented("System.CreateEncryptionKey()");
 }
 
 ::agiru::Variant DaTi2Variant(::agiru::Date Date, ::agiru::Time Time) {
   static_cast<void>(Date);
   static_cast<void>(Time);
-  RefuseDoor("System.DaTi2Variant(Date, Time)");
+  RefuseUnimplemented("System.DaTi2Variant(Date, Time)");
 }
 
 std::string Decrypt(std::string_view EncryptedString) {
   static_cast<void>(EncryptedString);
-  RefuseDoor("System.Decrypt(Text)");
+  RefuseUnimplemented("System.Decrypt(Text)");
 }
 
 void DeleteEncryptionKey() {
-  RefuseDoor("System.DeleteEncryptionKey()");
+  RefuseUnimplemented("System.DeleteEncryptionKey()");
 }
 
 ::agiru::Date DWY2Date(::agiru::Integer WeekDay, ::agiru::Integer Week, ::agiru::Integer Year) {
   static_cast<void>(WeekDay);
   static_cast<void>(Week);
   static_cast<void>(Year);
-  RefuseDoor("System.DWY2Date(Integer, Integer, Integer)");
+  RefuseUnimplemented("System.DWY2Date(Integer, Integer, Integer)");
 }
 
 std::string Encrypt(std::string_view PlainTextString) {
   static_cast<void>(PlainTextString);
-  RefuseDoor("System.Encrypt(Text)");
+  RefuseUnimplemented("System.Encrypt(Text)");
 }
 
 ::agiru::Boolean EncryptionKeyExists() {
-  RefuseDoor("System.EncryptionKeyExists()");
+  RefuseUnimplemented("System.EncryptionKeyExists()");
 }
 
 std::string ExportEncryptionKey(std::string_view Password) {
   static_cast<void>(Password);
-  RefuseDoor("System.ExportEncryptionKey(Text)");
+  RefuseUnimplemented("System.ExportEncryptionKey(Text)");
 }
 
 void ExportObjects(std::string_view FileName,
@@ -112,42 +112,42 @@ void ExportObjects(std::string_view FileName,
   static_cast<void>(FileName);
   static_cast<void>(ObjectRecord);
   static_cast<void>(Format);
-  RefuseDoor("System.ExportObjects(Text, Record, Integer)");
+  RefuseUnimplemented("System.ExportObjects(Text, Record, Integer)");
 }
 
 std::string GetDocumentUrl(::agiru::Guid ID) {
   static_cast<void>(ID);
-  RefuseDoor("System.GetDocumentUrl(Guid)");
+  RefuseUnimplemented("System.GetDocumentUrl(Guid)");
 }
 
 ::agiru::Variant GetDotNetType(const ::agiru::Variant &Expression) {
   static_cast<void>(Expression);
-  RefuseDoor("System.GetDotNetType(Any)");
+  RefuseUnimplemented("System.GetDotNetType(Any)");
 }
 
 std::string GetLastErrorCallStack() {
-  RefuseDoor("System.GetLastErrorCallStack()");
+  RefuseUnimplemented("System.GetLastErrorCallStack()");
 }
 
 ::agiru::Variant GetLastErrorObject() {
-  RefuseDoor("System.GetLastErrorObject()");
+  RefuseUnimplemented("System.GetLastErrorObject()");
 }
 
 std::string GetLastErrorText(::agiru::Boolean ExcludeCustomerContent) {
   static_cast<void>(ExcludeCustomerContent);
-  RefuseDoor("System.GetLastErrorText(Boolean)");
+  RefuseUnimplemented("System.GetLastErrorText(Boolean)");
 }
 
 ::agiru::Boolean ImportEncryptionKey(std::string_view Path, std::string_view Password) {
   static_cast<void>(Path);
   static_cast<void>(Password);
-  RefuseDoor("System.ImportEncryptionKey(Text, Text)");
+  RefuseUnimplemented("System.ImportEncryptionKey(Text, Text)");
 }
 
 void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
   static_cast<void>(FileName);
   static_cast<void>(Format);
-  RefuseDoor("System.ImportObjects(Text, Integer)");
+  RefuseUnimplemented("System.ImportObjects(Text, Integer)");
 }
 
 ::agiru::Guid ImportStreamWithUrlAccess(const ::agiru::InStream &InStream,
@@ -156,57 +156,57 @@ void ImportObjects(std::string_view FileName, ::agiru::Integer Format) {
   static_cast<void>(InStream);
   static_cast<void>(Filename);
   static_cast<void>(MinutesToExpire);
-  RefuseDoor("System.ImportStreamWithUrlAccess(InStream, Text, Integer)");
+  RefuseUnimplemented("System.ImportStreamWithUrlAccess(InStream, Text, Integer)");
 }
 
 ::agiru::Boolean IsCollectingErrors() {
-  RefuseDoor("System.IsCollectingErrors()");
+  RefuseUnimplemented("System.IsCollectingErrors()");
 }
 
 ::agiru::Boolean IsServiceTier() {
-  RefuseDoor("System.IsServiceTier()");
+  RefuseUnimplemented("System.IsServiceTier()");
 }
 
 void Sleep(::agiru::Integer Duration) {
   static_cast<void>(Duration);
-  RefuseDoor("System.Sleep(Integer)");
+  RefuseUnimplemented("System.Sleep(Integer)");
 }
 
 std::string TemporaryPath() {
-  RefuseDoor("System.TemporaryPath()");
+  RefuseUnimplemented("System.TemporaryPath()");
 }
 
 ::agiru::Date Variant2Date(const ::agiru::Variant &Variant) {
   static_cast<void>(Variant);
-  RefuseDoor("System.Variant2Date(Variant)");
+  RefuseUnimplemented("System.Variant2Date(Variant)");
 }
 
 ::agiru::Time Variant2Time(const ::agiru::Variant &Variant) {
   static_cast<void>(Variant);
-  RefuseDoor("System.Variant2Time(Variant)");
+  RefuseUnimplemented("System.Variant2Time(Variant)");
 }
 
 void AlterKey(const ::agiru::KeyRef &KeyRef, ::agiru::Boolean Enable) {
   static_cast<void>(KeyRef);
   static_cast<void>(Enable);
-  RefuseDoor("Database.AlterKey(KeyRef, Boolean)");
+  RefuseUnimplemented("Database.AlterKey(KeyRef, Boolean)");
 }
 
 ::agiru::Boolean ChangeUserPassword(std::string_view OldPassword, std::string_view NewPassword) {
   static_cast<void>(OldPassword);
   static_cast<void>(NewPassword);
-  RefuseDoor("Database.ChangeUserPassword(Text, Text)");
+  RefuseUnimplemented("Database.ChangeUserPassword(Text, Text)");
 }
 
 void CheckLicenseFile(::agiru::Integer KeyNumber) {
   static_cast<void>(KeyNumber);
-  RefuseDoor("Database.CheckLicenseFile(Integer)");
+  RefuseUnimplemented("Database.CheckLicenseFile(Integer)");
 }
 
 ::agiru::Boolean CopyCompany(std::string_view SourceName, std::string_view DestinationName) {
   static_cast<void>(SourceName);
   static_cast<void>(DestinationName);
-  RefuseDoor("Database.CopyCompany(Text, Text)");
+  RefuseUnimplemented("Database.CopyCompany(Text, Text)");
 }
 
 ::agiru::Boolean DataFileInformation(::agiru::Boolean ShowDialog,
@@ -227,8 +227,8 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
   static_cast<void>(tenantId);
   static_cast<void>(exportDate);
   static_cast<void>(CompanyRecord);
-  RefuseDoor("Database.DataFileInformation(Boolean, Text, Text, Boolean, Boolean, Boolean, Text, "
-             "DateTime, Record)");
+  RefuseUnimplemented("Database.DataFileInformation(Boolean, Text, Text, Boolean, Boolean, "
+                      "Boolean, Text, DateTime, Record)");
 }
 
 ::agiru::Boolean ExportData(::agiru::Boolean ShowDialog,
@@ -245,19 +245,20 @@ void CheckLicenseFile(::agiru::Integer KeyNumber) {
   static_cast<void>(IncludeApplicationData);
   static_cast<void>(IncludeGlobalData);
   static_cast<void>(CompanyRecord);
-  RefuseDoor("Database.ExportData(Boolean, Text, Text, Boolean, Boolean, Boolean, Record)");
+  RefuseUnimplemented(
+      "Database.ExportData(Boolean, Text, Text, Boolean, Boolean, Boolean, Record)");
 }
 
 std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) {
   static_cast<void>(Type);
-  RefuseDoor("Database.GetDefaultTableConnection(TableConnectionType)");
+  RefuseUnimplemented("Database.GetDefaultTableConnection(TableConnectionType)");
 }
 
 ::agiru::Boolean HasTableConnection(const ::agiru::TableConnectionType &Type,
                                     std::string_view Name) {
   static_cast<void>(Type);
   static_cast<void>(Name);
-  RefuseDoor("Database.HasTableConnection(TableConnectionType, Text)");
+  RefuseUnimplemented("Database.HasTableConnection(TableConnectionType, Text)");
 }
 
 ::agiru::Boolean ImportData(::agiru::Boolean ShowDialog,
@@ -270,29 +271,29 @@ std::string GetDefaultTableConnection(const ::agiru::TableConnectionType &Type) 
   static_cast<void>(IncludeApplicationData);
   static_cast<void>(IncludeGlobalData);
   static_cast<void>(CompanyRecord);
-  RefuseDoor("Database.ImportData(Boolean, Text, Boolean, Boolean, Record)");
+  RefuseUnimplemented("Database.ImportData(Boolean, Text, Boolean, Boolean, Record)");
 }
 
 ::agiru::Boolean IsInWriteTransaction() {
-  RefuseDoor("Database.IsInWriteTransaction()");
+  RefuseUnimplemented("Database.IsInWriteTransaction()");
 }
 
 ::agiru::BigInteger LastUsedRowVersion() {
-  RefuseDoor("Database.LastUsedRowVersion()");
+  RefuseUnimplemented("Database.LastUsedRowVersion()");
 }
 
 ::agiru::Boolean LockTimeout(::agiru::Boolean LockTimeout) {
   static_cast<void>(LockTimeout);
-  RefuseDoor("Database.LockTimeout(Boolean)");
+  RefuseUnimplemented("Database.LockTimeout(Boolean)");
 }
 
 ::agiru::Integer LockTimeoutDuration(::agiru::Integer LockTimeoutDuration) {
   static_cast<void>(LockTimeoutDuration);
-  RefuseDoor("Database.LockTimeoutDuration(Integer)");
+  RefuseUnimplemented("Database.LockTimeoutDuration(Integer)");
 }
 
 ::agiru::BigInteger MinimumActiveRowVersion() {
-  RefuseDoor("Database.MinimumActiveRowVersion()");
+  RefuseUnimplemented("Database.MinimumActiveRowVersion()");
 }
 
 void RegisterTableConnection(const ::agiru::TableConnectionType &Type,
@@ -301,74 +302,74 @@ void RegisterTableConnection(const ::agiru::TableConnectionType &Type,
   static_cast<void>(Type);
   static_cast<void>(Name);
   static_cast<void>(Connection);
-  RefuseDoor("Database.RegisterTableConnection(TableConnectionType, Text, Text)");
+  RefuseUnimplemented("Database.RegisterTableConnection(TableConnectionType, Text, Text)");
 }
 
 void SelectLatestVersion() {
-  RefuseDoor("Database.SelectLatestVersion()");
+  RefuseUnimplemented("Database.SelectLatestVersion()");
 }
 
 void SelectLatestVersion(::agiru::Integer Table) {
   static_cast<void>(Table);
-  RefuseDoor("Database.SelectLatestVersion(Integer)");
+  RefuseUnimplemented("Database.SelectLatestVersion(Integer)");
 }
 
 std::string SerialNumber() {
-  RefuseDoor("Database.SerialNumber()");
+  RefuseUnimplemented("Database.SerialNumber()");
 }
 
 ::agiru::Boolean SetUserPassword(::agiru::Guid USID, std::string_view Password) {
   static_cast<void>(USID);
   static_cast<void>(Password);
-  RefuseDoor("Database.SetUserPassword(Guid, Text)");
+  RefuseUnimplemented("Database.SetUserPassword(Guid, Text)");
 }
 
 std::string SID(std::string_view UserAccount) {
   static_cast<void>(UserAccount);
-  RefuseDoor("Database.SID(Text)");
+  RefuseUnimplemented("Database.SID(Text)");
 }
 
 std::string TenantId() {
-  RefuseDoor("Database.TenantId()");
+  RefuseUnimplemented("Database.TenantId()");
 }
 
 void UnregisterTableConnection(const ::agiru::TableConnectionType &Type, std::string_view Name) {
   static_cast<void>(Type);
   static_cast<void>(Name);
-  RefuseDoor("Database.UnregisterTableConnection(TableConnectionType, Text)");
+  RefuseUnimplemented("Database.UnregisterTableConnection(TableConnectionType, Text)");
 }
 
 std::string ApplicationIdentifier() {
-  RefuseDoor("Session.ApplicationIdentifier()");
+  RefuseUnimplemented("Session.ApplicationIdentifier()");
 }
 
 ::agiru::Boolean BindSubscription(const ::agiru::Variant &Codeunit) {
   static_cast<void>(Codeunit);
-  RefuseDoor("Session.BindSubscription(Codeunit)");
+  RefuseUnimplemented("Session.BindSubscription(Codeunit)");
 }
 
 ::agiru::ExecutionMode CurrentExecutionMode() {
-  RefuseDoor("Session.CurrentExecutionMode()");
+  RefuseUnimplemented("Session.CurrentExecutionMode()");
 }
 
 ::agiru::ClientType DefaultClientType() {
-  RefuseDoor("Session.DefaultClientType()");
+  RefuseUnimplemented("Session.DefaultClientType()");
 }
 
 void EnableVerboseTelemetry(::agiru::Boolean EnableFullALFunctionTracing,
                             ::agiru::Duration Duration) {
   static_cast<void>(EnableFullALFunctionTracing);
   static_cast<void>(Duration);
-  RefuseDoor("Session.EnableVerboseTelemetry(Boolean, Duration)");
+  RefuseUnimplemented("Session.EnableVerboseTelemetry(Boolean, Duration)");
 }
 
 ::agiru::ExecutionContext GetCurrentModuleExecutionContext() {
-  RefuseDoor("Session.GetCurrentModuleExecutionContext()");
+  RefuseUnimplemented("Session.GetCurrentModuleExecutionContext()");
 }
 
 ::agiru::ExecutionContext GetModuleExecutionContext(::agiru::Guid AppId) {
   static_cast<void>(AppId);
-  RefuseDoor("Session.GetModuleExecutionContext(Guid)");
+  RefuseUnimplemented("Session.GetModuleExecutionContext(Guid)");
 }
 
 void LogSecurityAudit(std::string_view Description,
@@ -383,8 +384,8 @@ void LogSecurityAudit(std::string_view Description,
   static_cast<void>(AuditCategory);
   static_cast<void>(TargetType);
   static_cast<void>(TargetName);
-  RefuseDoor("Session.LogSecurityAudit(Text, SecurityOperationResult, Text, AuditCategory, Array "
-             "of [Text], Array of [Text])");
+  RefuseUnimplemented("Session.LogSecurityAudit(Text, SecurityOperationResult, Text, "
+                      "AuditCategory, Array of [Text], Array of [Text])");
 }
 
 void SendTraceTag(std::string_view Tag,
@@ -397,23 +398,23 @@ void SendTraceTag(std::string_view Tag,
   static_cast<void>(Verbosity);
   static_cast<void>(Message);
   static_cast<void>(DataClassification);
-  RefuseDoor("Session.SendTraceTag(Text, Text, Verbosity, Text, DataClassification)");
+  RefuseUnimplemented("Session.SendTraceTag(Text, Text, Verbosity, Text, DataClassification)");
 }
 
 void SetDocumentServiceToken(std::string_view Token) {
   static_cast<void>(Token);
-  RefuseDoor("Session.SetDocumentServiceToken(Text)");
+  RefuseUnimplemented("Session.SetDocumentServiceToken(Text)");
 }
 
 ::agiru::Boolean StopSession(::agiru::Integer SessionId, std::string_view Comment) {
   static_cast<void>(SessionId);
   static_cast<void>(Comment);
-  RefuseDoor("Session.StopSession(Integer, Text)");
+  RefuseUnimplemented("Session.StopSession(Integer, Text)");
 }
 
 ::agiru::Boolean UnbindSubscription(const ::agiru::Variant &Codeunit) {
   static_cast<void>(Codeunit);
-  RefuseDoor("Session.UnbindSubscription(Codeunit)");
+  RefuseUnimplemented("Session.UnbindSubscription(Codeunit)");
 }
 
 void LogInternalError(std::string_view Message,
@@ -422,7 +423,7 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(Message);
   static_cast<void>(DataClassificationInstance);
   static_cast<void>(VerbosityInstance);
-  RefuseDoor("Dialog.LogInternalError(Text, DataClassification, Verbosity)");
+  RefuseUnimplemented("Dialog.LogInternalError(Text, DataClassification, Verbosity)");
 }
 
 void LogInternalError(std::string_view Message,
@@ -433,7 +434,7 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(SubstitutionString);
   static_cast<void>(DataClassificationInstance);
   static_cast<void>(VerbosityInstance);
-  RefuseDoor("Dialog.LogInternalError(Text, Text, DataClassification, Verbosity)");
+  RefuseUnimplemented("Dialog.LogInternalError(Text, Text, DataClassification, Verbosity)");
 }
 
 ::agiru::Boolean DownloadFromStream(const ::agiru::InStream &InStream,
@@ -446,21 +447,21 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(ToFolder);
   static_cast<void>(ToFilter);
   static_cast<void>(ToFile);
-  RefuseDoor("File.DownloadFromStream(InStream, Text, Text, Text, Text)");
+  RefuseUnimplemented("File.DownloadFromStream(InStream, Text, Text, Text, Text)");
 }
 
 ::agiru::Boolean GetStamp(std::string_view Name, ::agiru::Date &Date, ::agiru::Time &Time) {
   static_cast<void>(Name);
   static_cast<void>(Date);
   static_cast<void>(Time);
-  RefuseDoor("File.GetStamp(Text, Date, Time)");
+  RefuseUnimplemented("File.GetStamp(Text, Date, Time)");
 }
 
 ::agiru::Boolean SetStamp(std::string_view Name, ::agiru::Date Date, ::agiru::Time Time) {
   static_cast<void>(Name);
   static_cast<void>(Date);
   static_cast<void>(Time);
-  RefuseDoor("File.SetStamp(Text, Date, Time)");
+  RefuseUnimplemented("File.SetStamp(Text, Date, Time)");
 }
 
 ::agiru::Boolean Upload(std::string_view DialogTitle,
@@ -473,13 +474,13 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(FromFilter);
   static_cast<void>(FromFile);
   static_cast<void>(ToFile);
-  RefuseDoor("File.Upload(Text, Text, Text, Text, Text)");
+  RefuseUnimplemented("File.Upload(Text, Text, Text, Text, Text)");
 }
 
 ::agiru::Boolean UploadIntoStream(std::string_view FromFilter, ::agiru::InStream &InStream) {
   static_cast<void>(FromFilter);
   static_cast<void>(InStream);
-  RefuseDoor("File.UploadIntoStream(Text, InStream)");
+  RefuseUnimplemented("File.UploadIntoStream(Text, InStream)");
 }
 
 ::agiru::Boolean UploadIntoStream(std::string_view DialogTitle,
@@ -492,13 +493,13 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(FromFilter);
   static_cast<void>(FromFile);
   static_cast<void>(InStream);
-  RefuseDoor("File.UploadIntoStream(Text, Text, Text, Text, InStream)");
+  RefuseUnimplemented("File.UploadIntoStream(Text, Text, Text, Text, InStream)");
 }
 
 ::agiru::Boolean View(std::string_view FromFile, ::agiru::Boolean AllowDownloadAndPrint) {
   static_cast<void>(FromFile);
   static_cast<void>(AllowDownloadAndPrint);
-  RefuseDoor("File.View(Text, Boolean)");
+  RefuseUnimplemented("File.View(Text, Boolean)");
 }
 
 ::agiru::Boolean ViewFromStream(const ::agiru::InStream &InStream,
@@ -507,7 +508,7 @@ void LogInternalError(std::string_view Message,
   static_cast<void>(InStream);
   static_cast<void>(FileName);
   static_cast<void>(AllowDownloadAndPrint);
-  RefuseDoor("File.ViewFromStream(InStream, Text, Boolean)");
+  RefuseUnimplemented("File.ViewFromStream(InStream, Text, Boolean)");
 }
 
 // NOLINTEND(bugprone-easily-swappable-parameters,performance-unnecessary-value-param)

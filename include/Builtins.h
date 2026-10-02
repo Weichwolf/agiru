@@ -41,7 +41,10 @@
 
 namespace agiru {
 
-[[noreturn]] void RefuseDoor(std::string_view what);
+/// \brief Refuses a declared AL operation whose implementation is unavailable.
+/// \param what The AL operation signature reported without alteration.
+/// \throws Error always, retaining the operation identity and implementation-gap diagnostic.
+[[noreturn]] void RefuseUnimplemented(std::string_view what);
 
 /// \brief AL `System.ApplicationPath()`. Returns the path of the directory where the executable
 /// file for the product is installed.
@@ -147,7 +150,7 @@ template <typename Any1>
   static_cast<void>(Variable);
   static_cast<void>(String);
   static_cast<void>(Number);
-  RefuseDoor("System.Evaluate(Any, Text, Integer)");
+  RefuseUnimplemented("System.Evaluate(Any, Text, Integer)");
 }
 
 /// \brief AL `System.ExportEncryptionKey(Text)`. Returns a password protected temporary filepath
