@@ -1,7 +1,7 @@
 #include "type/NumberSequence.h"
 
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/Session.h"
 #include "type/BigInteger.h"
 #include "type/Boolean.h"
