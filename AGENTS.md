@@ -43,6 +43,12 @@ state and execution order. Do not trade the full target for a green subset.
 
 ## References before semantic changes
 
+Use the local BC source and developer/user documentation repositories under `~/Git/`
+before web search. Update their clean tracking branches with `git pull --ff-only` when
+current upstream evidence is needed; preserve local edits and never reset or force a
+merge. Record the revisions used, and keep frozen verification inputs unchanged.
+Use web search only when the required reference is missing locally or local access fails.
+
 Read the relevant overload, trigger or property in this order:
 
 1. `~/Git/dynamics365smb-devitpro-pb/dev-itpro/developer/`: platform guarantees.
