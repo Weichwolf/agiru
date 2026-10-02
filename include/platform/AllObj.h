@@ -31,7 +31,6 @@ public:
   static constexpr TableId kId{2000000038};
   /// \brief The original AL table name.
   static constexpr std::string_view kName{"AllObj"};
-  /// \brief Per-record state owned by the common table runtime.
   detail::StateHandle State_Block;
   /// \brief Declared Object Name length, Text[30].
   static constexpr std::size_t kObjectNameLength = 30;
