@@ -53,6 +53,20 @@ inventory_spec.loader.exec_module(scope_inventory)
 
 
 class SymbolsPackageGate(unittest.TestCase):
+    def test_native_report_fixture_builds_runtime_without_an_existing_build(self):
+        root = Path(__file__).resolve().parents[1]
+        environment = os.environ.copy()
+        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+            environment.pop(name, None)
+        with tempfile.TemporaryDirectory() as folder:
+            result = subprocess.run(['make', '--no-print-directory', '-n', 'native-report-layouts',
+                                     f'B={folder}', 'JOBS=2'], cwd=root, env=environment,
+                                    text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        runtime = result.stdout.index('--target agiru_rt')
+        runner = result.stdout.index('test/native-report-layouts.sh')
+        self.assertLess(runtime, runner)
+
     def test_verification_entrypoint_is_offline_and_read_only(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

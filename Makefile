@@ -76,6 +76,7 @@ report-layout-metadata: ## compile all generated immutable layout declarations, 
 	@B="$(B)" bash "$(SELF)/scripts/report_layout_metadata.sh" "$(SELF)/apps"
 
 native-report-layouts: comments db tc ## prove native/extension declarations from explicit AGIRU_SYSTEM_SYMBOLS, not installation
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
 	@B="$(B)" bash "$(SELF)/test/native-report-layouts.sh"
 
 number-sequences: comments db ## prove atomic SQL reservations, process parity and negative controls
