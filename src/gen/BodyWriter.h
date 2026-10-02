@@ -175,6 +175,12 @@ public:
     return {};
   }
 
+  [[nodiscard]] virtual std::vector<std::string>
+  MemberLentParameters(const OfVariable &member) const {
+    static_cast<void>(member);
+    return {};
+  }
+
   [[nodiscard]] virtual std::vector<std::string> ParameterTypes(std::string_view name) const {
     static_cast<void>(name);
     return {};

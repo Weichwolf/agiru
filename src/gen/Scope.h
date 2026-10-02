@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,6 +23,10 @@ enum class ObjectKind : std::uint8_t {
 };
 
 std::string_view DirectoryOf(ObjectKind kind);
+
+[[nodiscard]] bool NamespaceInScope(std::string_view nameSpace,
+                                    std::span<const std::string> include,
+                                    std::span<const std::string> exclude);
 
 class Scope {
 public:

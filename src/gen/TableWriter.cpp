@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstddef>
 #include <functional>
 #include <map>
@@ -109,7 +110,7 @@ const FieldIdentifiers &IdentifiersOf(const al::TableObject &table) {
                             .name = table.name,
                             .byName = {},
                             .byBare = {}};
-  std::set<std::string> taken;
+  std::set<std::string> taken{"field_no", "state_block"};
   for (const SystemFieldDecl &system : kSystemFields) {
     taken.insert(LowerKey(std::string(system.name)));
   }
@@ -580,6 +581,47 @@ std::string ProcedureIdentifier(const al::TableObject &table, const std::string 
     return false;
   };
   return Disambiguated(Identifier(name), "_Proc", taken);
+}
+
+TableRef BindTable(const al::TableObject &table, std::string identifier, std::string header) {
+  TableRef ref{.identifier = std::move(identifier),
+               .header = std::move(header),
+               .id = table.id,
+               .fields = {},
+               .procedures = {},
+               .parts = {},
+               .name = table.name,
+               .dataItems = {},
+               .requestFields = {},
+               .columnSources = {},
+               .interfaceReturns = {},
+               .tryFunctions = {},
+               .procedureDeclarations = {}};
+  for (const al::FieldDecl &field : table.fields) {
+    ref.fields.emplace(LowerKey(field.name), FieldIdentifier(table, field.name));
+  }
+  for (const SystemFieldDecl &field : kSystemFields) {
+    ref.fields.emplace(LowerKey(std::string(field.name)), std::string(field.name));
+  }
+  ref.procedureDeclarations.reserve(table.procedures.size());
+  for (const al::ProcedureDecl &procedure : table.procedures) {
+    ref.procedures.emplace(LowerKey(procedure.name), ProcedureIdentifier(table, procedure.name));
+    if (IsTryFunction(procedure)) { ref.tryFunctions.insert(LowerKey(procedure.name)); }
+    ref.procedureDeclarations.push_back(al::ProcedureDecl{.attributes = procedure.attributes,
+                                                          .isLocal = procedure.isLocal,
+                                                          .isTrigger = procedure.isTrigger,
+                                                          .name = procedure.name,
+                                                          .parameters = procedure.parameters,
+                                                          .variables = {},
+                                                          .labels = {},
+                                                          .returnName = procedure.returnName,
+                                                          .returnType = procedure.returnType,
+                                                          .returnSubtype = procedure.returnSubtype,
+                                                          .returned = procedure.returned,
+                                                          .tokens = {},
+                                                          .body = {}});
+  }
+  return ref;
 }
 
 namespace {

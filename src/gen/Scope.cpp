@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -57,11 +58,17 @@ std::vector<std::string> JsonArrays::Read(std::string_view key) const {
 }
 
 bool Matches(std::string_view nameSpace, std::string_view prefix) {
-  return nameSpace == prefix || (nameSpace.size() > prefix.size() &&
-                                 nameSpace.starts_with(prefix) && nameSpace[prefix.size()] == '.');
+  if (prefix.empty() || nameSpace.size() < prefix.size()) { return false; }
+  for (std::size_t at = 0; at < prefix.size(); ++at) {
+    if (std::tolower(static_cast<unsigned char>(nameSpace[at])) !=
+        std::tolower(static_cast<unsigned char>(prefix[at]))) {
+      return false;
+    }
+  }
+  return nameSpace.size() == prefix.size() || nameSpace[prefix.size()] == '.';
 }
 
-std::size_t LongestMatch(const std::vector<std::string> &prefixes, std::string_view nameSpace) {
+std::size_t LongestMatch(std::span<const std::string> prefixes, std::string_view nameSpace) {
   std::size_t best = 0;
   for (const std::string &prefix : prefixes) {
     if (Matches(nameSpace, prefix) && prefix.size() > best) { best = prefix.size(); }
@@ -104,10 +111,15 @@ Scope Scope::FromFile(const std::filesystem::path &path) {
 }
 
 bool Scope::Contains(std::string_view nameSpace) const {
+  return NamespaceInScope(nameSpace, include_, exclude_);
+}
+
+bool NamespaceInScope(std::string_view nameSpace,
+                      std::span<const std::string> include,
+                      std::span<const std::string> exclude) {
   if (nameSpace.empty()) { return true; }
-  const std::string lowered = Lower(nameSpace);
-  const std::size_t included = LongestMatch(include_, lowered);
-  const std::size_t excluded = LongestMatch(exclude_, lowered);
+  const std::size_t included = LongestMatch(include, nameSpace);
+  const std::size_t excluded = LongestMatch(exclude, nameSpace);
   return included > excluded;
 }
 

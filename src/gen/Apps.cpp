@@ -1,10 +1,14 @@
 #include "Apps.h"
 
+#include "Scope.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -134,26 +138,10 @@ std::string Lowered(std::string_view text) {
   return out;
 }
 
-std::size_t LongestPrefix(std::string_view lowered, const std::vector<std::string> &table) {
-  std::size_t best = 0;
-  for (const std::string &entry : table) {
-    const std::string prefix = Lowered(entry);
-    const bool matches =
-        lowered == prefix || (lowered.starts_with(prefix) && lowered.size() > prefix.size() &&
-                              lowered[prefix.size()] == '.');
-    if (matches && prefix.size() > best) { best = prefix.size(); }
-  }
-  return best;
-}
-
 }
 
 bool Holds(const TranspileScope &scope, std::string_view nameSpace) {
-  if (nameSpace.empty()) { return true; }
-  const std::string lowered = Lowered(nameSpace);
-  const std::size_t included = LongestPrefix(lowered, scope.include);
-  if (included == 0) { return false; }
-  return LongestPrefix(lowered, scope.exclude) <= included;
+  return NamespaceInScope(nameSpace, scope.include, scope.exclude);
 }
 
 bool HoldsArea(const TranspileScope &scope, std::string_view area) {
@@ -162,6 +150,35 @@ bool HoldsArea(const TranspileScope &scope, std::string_view area) {
   const auto ends = [&lowered](const std::string &s) { return lowered.ends_with(Lowered(s)); };
   return !std::ranges::any_of(scope.areaExclude, named) &&
          !std::ranges::any_of(scope.areaExcludeSuffix, ends);
+}
+
+namespace {
+
+void RequireRelativeSource(std::string_view name) {
+  const std::filesystem::path source(name);
+  if (name.empty() || source.is_absolute() || name.find('\\') != std::string_view::npos ||
+      name.find("//") != std::string_view::npos) {
+    throw std::runtime_error("scope.json: product exclusions require relative source paths");
+  }
+  for (const auto &part : source) {
+    if (part == "." || part == "..") {
+      throw std::runtime_error("scope.json: product exclusions cannot traverse source roots");
+    }
+  }
+}
+
+}
+
+std::optional<std::string_view> ProductExclusion(const TranspileScope &scope,
+                                                 const std::filesystem::path &relativeSource) {
+  const std::string source = relativeSource.generic_string();
+  RequireRelativeSource(source);
+  for (const SourceExclusion &rule : scope.productExclude) {
+    if (source == rule.source || (rule.source.ends_with('/') && source.starts_with(rule.source))) {
+      return rule.reason;
+    }
+  }
+  return std::nullopt;
 }
 
 TranspileScope ReadScope(const std::filesystem::path &path) {
@@ -175,6 +192,24 @@ TranspileScope ReadScope(const std::filesystem::path &path) {
   scope.exclude = reader.At("\"exclude\"");
   scope.areaExclude = reader.At("\"area_exclude\"");
   scope.areaExcludeSuffix = reader.At("\"area_exclude_suffix\"");
+  std::set<std::string> selected;
+  for (const std::string &entry : reader.At("\"product_exclude\"")) {
+    const std::size_t colon = entry.find(':');
+    if (colon == std::string::npos) {
+      throw std::runtime_error("scope.json: product exclusions need a reason and source");
+    }
+    const std::string reason = entry.substr(0, colon);
+    const std::string source = entry.substr(colon + 1);
+    if (reason != "bc-licensing" && reason != "microsoft-cloud" &&
+        reason != "licensing-and-microsoft-cloud") {
+      throw std::runtime_error("scope.json: product exclusion reason is not approved");
+    }
+    RequireRelativeSource(source);
+    if (!selected.insert(source).second) {
+      throw std::runtime_error("scope.json: duplicate product exclusion source");
+    }
+    scope.productExclude.push_back(SourceExclusion{.reason = reason, .source = source});
+  }
   if (scope.include.empty()) {
     throw std::runtime_error("scope.json: the include list is empty, so nothing is in scope");
   }

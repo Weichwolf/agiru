@@ -1237,6 +1237,11 @@ public:
     return {};
   }
 
+  [[nodiscard]] std::vector<std::string>
+  MemberLentParameters(const OfVariable &member) const override {
+    return MemberLentParametersOf(objects_, Declaration(member.variable), member.field);
+  }
+
   [[nodiscard]] std::string DeclaredEnum(std::string_view variable) const override {
     const al::VarDecl *where = Declaration(variable);
     if (where == nullptr || TypeName(where->type) != "Enum" || where->subtype.empty()) {
@@ -2073,7 +2078,8 @@ TableIndex PlatformTables() {
                        .requestFields = {},
                        .columnSources = {},
                        .interfaceReturns = {},
-                       .tryFunctions = {}};
+                       .tryFunctions = {},
+                       .procedureDeclarations = {}};
     tables.insert_or_assign(LowerKey(std::string(name)), ref);
     tables.insert_or_assign(std::string(number), ref);
   };
@@ -2390,10 +2396,15 @@ std::string QueryColumnEnumeration(const Objects &objects,
   if (query == objects.queries.end()) { return {}; }
   const auto source = query->second.columnSources.find(LowerKey(std::string(member)));
   if (source == query->second.columnSources.end()) { return {}; }
-  const auto table = objects.fieldEnums.find(LowerKey(source->second.first));
-  if (table == objects.fieldEnums.end()) { return {}; }
-  const auto found = table->second.find(LowerKey(source->second.second));
-  return found == table->second.end() ? std::string{} : found->second;
+  return FieldEnumerationOf(objects, source->second.first, source->second.second);
+}
+
+std::string
+FieldEnumerationOf(const Objects &objects, std::string_view table, std::string_view field) {
+  const auto declared = objects.fieldEnums.find(LowerKey(std::string(table)));
+  if (declared == objects.fieldEnums.end()) { return {}; }
+  const auto found = declared->second.find(LowerKey(std::string(field)));
+  return found == declared->second.end() ? std::string{} : found->second;
 }
 
 void NoteObjectNames(const Objects &objects) {
@@ -2450,6 +2461,21 @@ std::vector<std::string> LentParametersOf(const std::vector<al::ProcedureDecl> &
     return lent;
   }
   return {};
+}
+
+std::vector<std::string>
+MemberLentParametersOf(const Objects &objects, const al::VarDecl *receiver, std::string_view name) {
+  if (receiver == nullptr || receiver->subtype.empty()) { return {}; }
+  const std::string type = TypeName(receiver->type);
+  const TableIndex *index = nullptr;
+  if (type == "Codeunit") { index = &objects.codeunits; }
+  if (type == "Record") { index = &objects.tables; }
+  if (index == nullptr) { return {}; }
+  const auto found = index->find(LowerKey(receiver->subtype));
+  if (found == index->end()) { return {}; }
+  const TableRef &ref = found->second;
+  return LentParametersOf(
+      ref.procedureDeclarations, name, objects, ref.name.empty() ? receiver->subtype : ref.name);
 }
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects) {

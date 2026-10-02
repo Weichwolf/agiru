@@ -27,7 +27,8 @@ agiru::gen::Objects Tables() {
                            .requestFields = {},
                            .columnSources = {},
                            .interfaceReturns = {},
-                           .tryFunctions = {}});
+                           .tryFunctions = {},
+                           .procedureDeclarations = {}});
   return objects;
 }
 

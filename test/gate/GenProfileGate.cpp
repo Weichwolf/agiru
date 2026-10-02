@@ -1,8 +1,7 @@
 #include "Ast.h"
+#include "Check.h"
 #include "CodeunitWriter.h"
 #include "Parser.h"
-
-#include "Check.h"
 
 #include <string>
 

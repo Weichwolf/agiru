@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -38,11 +39,24 @@ std::vector<std::string> Lines(const std::string &text) {
 /// care which -- that is what makes an enum or a table reachable across apps without qualification.
 agiru::gen::Objects Tables() {
   agiru::gen::Objects objects;
+  agiru::al::VarDecl textParameter{.byReference = true,
+                                   .temporary = false,
+                                   .name = "Value",
+                                   .type = "Text",
+                                   .subtype = {},
+                                   .length = 0,
+                                   .members = {},
+                                   .arguments = {},
+                                   .dimensions = {},
+                                   .attributes = {}};
+  agiru::al::ProcedureDecl setText;
+  setText.name = "SetText";
+  setText.parameters.push_back(std::move(textParameter));
   objects.tables.insert_or_assign(
       "line number buffer",
       // THE KIND IS PART OF THE NAME, as it is in the transpiler's own index: 51 objects in the
       // read roots are a table AND a codeunit at once, and `enums::` already told them apart.
-      agiru::gen::TableRef{.identifier = "tables::LineNumberBuffer",
+      agiru::gen::TableRef{.identifier = "::agiru::app::tables::LineNumberBuffer_Table",
                            .header = "LineNumberBuffer.h",
                            .fields = {},
                            .procedures = {},
@@ -52,12 +66,27 @@ agiru::gen::Objects Tables() {
                            .requestFields = {},
                            .columnSources = {},
                            .interfaceReturns = {},
-                           .tryFunctions = {}});
+                           .tryFunctions = {},
+                           .procedureDeclarations = {}});
   objects.enums.insert_or_assign("sales line type",
                                  agiru::gen::EnumRef{.identifier = "SalesLineType",
                                                      .header = "SalesLineType.h",
                                                      .ordinals = {},
                                                      .members = {}});
+  objects.codeunits.insert_or_assign(
+      "json management",
+      agiru::gen::TableRef{.identifier = "::agiru::app::codeunits::JsonManagement_Codeunit",
+                           .header = "JsonManagement.h",
+                           .fields = {},
+                           .procedures = {{"settext", "SetText"}},
+                           .parts = {},
+                           .name = {},
+                           .dataItems = {},
+                           .requestFields = {},
+                           .columnSources = {},
+                           .interfaceReturns = {},
+                           .tryFunctions = {},
+                           .procedureDeclarations = {std::move(setText)}});
   return objects;
 }
 
@@ -129,10 +158,11 @@ void AChangedSourceChangesTheOutput() {
   CHECK_TRUE("dropping `temporary` drops the wrapper",
              afterPermanent.find("Temporary<LineNumberBuffer> TempLineNumberBuffer") ==
                  std::string::npos);
-  // A MEMBER IS A HANDLE EITHER WAY (board:0037), so what `temporary` decides is the wrapper INSIDE
-  // it and nothing else.
+  // A MEMBER IS A HANDLE EITHER WAY (board:0037), so what `temporary` decides is the wrapper
+  // INSIDE it and nothing else.
   CHECK_TRUE("and leaves the table itself",
-             afterPermanent.find("Instance<tables::LineNumberBuffer> TempLineNumberBuffer") !=
+             afterPermanent.find(
+                 "Instance<::agiru::app::tables::LineNumberBuffer_Table> TempLineNumberBuffer") !=
                  std::string::npos);
 
   // A named return value is a return TYPE and nothing else in C++.
@@ -215,29 +245,18 @@ void AnInlineOptionGetsAnEnumerationOfItsOwn() {
 })";
   const std::string generated = Generated(source);
 
-  // AN OPTION IS NAMED BY ITS MEMBERS, not by the variable that declares it: `Option A,B` in two
-  // procedures of one codeunit is ONE type in AL, and naming it per variable gave every value that
-  // crossed a procedure boundary a conversion error (measured 2026-09-04: 19 over the UT suite).
-  CHECK_TRUE("a codeunit variable gets an enumeration named after the codeunit and its members",
-             generated.find("enum class SomeThingOptionDraftPosted") != std::string::npos);
-  CHECK_TRUE("a parameter gets one named the same way, with a blank member spelled Blank",
-             generated.find("enum class SomeThingOptionBlankItemResource") != std::string::npos);
-  CHECK_TRUE("and so does a local",
-             generated.find("enum class SomeThingOptionFirstSecond") != std::string::npos);
-  CHECK_TRUE("the member names are kept as AL wrote them",
-             generated.find("\"Draft\"") != std::string::npos &&
-                 generated.find("\"Posted\"") != std::string::npos);
-  CHECK_TRUE("a member that is no identifier is renamed and its ordinal kept",
-             generated.find("Blank = 0,") != std::string::npos);
-  CHECK_TRUE("the variable's type names its own enumeration",
-             generated.find("Option<SomeThingOptionDraftPosted> Mode") != std::string::npos);
-  CHECK_TRUE("and so does the parameter",
-             generated.find("Option<SomeThingOptionBlankItemResource> Kind") != std::string::npos);
-
-  // THE NEGATIVE CONTROL. A rule that named every option the same would pass every check above.
-  CHECK_TRUE("two options in one codeunit do not share an enumeration",
-             generated.find("SomeThingOptionBlankItemResource") !=
-                 generated.find("SomeThingOptionFirstSecond"));
+  CHECK_TRUE("inline option declarations include the shared option vocabulary",
+             generated.find("#include \"options/Types.h\"") != std::string::npos);
+  CHECK_TRUE("the member uses the content-addressed option type",
+             generated.find("Option<::agiru::options::OptionDraftPosted> Mode") !=
+                 std::string::npos);
+  CHECK_TRUE("the parameter's blank member participates in its type name",
+             generated.find("Option<::agiru::options::OptionBlankItemResource> Kind") !=
+                 std::string::npos);
+  CHECK_TRUE("different member lists retain distinct shared types",
+             generated.find("OptionDraftPosted") != generated.find("OptionBlankItemResource"));
+  CHECK_TRUE("shared option definitions are not duplicated inside a codeunit",
+             generated.find("enum class") == std::string::npos);
 }
 
 /// AL LETS A METHOD WITHOUT PARAMETERS BE CALLED WITHOUT PARENTHESES, and the BaseApp does so on a
@@ -267,6 +286,38 @@ void AStaticPlatformMemberWithoutParenthesesIsACall() {
   // THE NEGATIVE CONTROL: an enumerator on a type name is not a call, and `Normal` IS a callable
   // name elsewhere in the door.
   CHECK_TRUE("an enumerator stays one", generated.find("Verbosity::Normal;") != std::string::npos);
+}
+
+void ARelationalLeftOperandRetainsItsAlGrouping() {
+  const std::string source = R"(codeunit 50002 "Relational Grouping"
+{
+    procedure Check(SourceType: Integer; IsAssembleToOrder: Boolean): Boolean
+    begin
+        exit((SourceType = 900) = IsAssembleToOrder);
+    end;
+})";
+  const std::string generated = agiru::gen::WriteCodeunitSource(
+      agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables());
+  CHECK_TRUE("a nested equality is parenthesized before its next equality",
+             generated.find("(SourceType == 900) == IsAssembleToOrder") != std::string::npos);
+}
+
+void ARemoteVarParameterLendsTheVariantsStoredType() {
+  const std::string source = R"(codeunit 50003 "Remote Variant"
+{
+    var
+        JSONManagement: Codeunit "JSON Management";
+
+    procedure SetText(Held: Variant)
+    begin
+        JSONManagement.SetText(Held);
+    end;
+})";
+  const std::string generated = agiru::gen::WriteCodeunitSource(
+      agiru::al::ParseCodeunit(source), std::string(kAlPath), Tables());
+  CHECK_TRUE("a remote var Text parameter lends Variant storage",
+             generated.find("JSONManagement->SetText(Held.Lend<::agiru::Text<0>>())") !=
+                 std::string::npos);
 }
 
 /// A FIELD NAMED ON AN ARRAY ELEMENT BELONGS TO THAT ELEMENT. `CurrencyExchRate2[CacheNo].SetRange(
@@ -404,7 +455,8 @@ void AParameterNamedAfterItsTypeIsQualifiedWhereTheTypeLives() {
   // kind namespace solved the collision the qualification was invented for, and it solved the
   // table-against-codeunit collision with it.
   CHECK_TRUE("an AL object is reached through its kind",
-             generated.find("tables::LineNumberBuffer &LineNumberBuffer") != std::string::npos);
+             generated.find("::agiru::app::tables::LineNumberBuffer_Table &LineNumberBuffer") !=
+                 std::string::npos);
 
   // THE NEGATIVE CONTROL, and it is the whole point: a rule that sent everything to one namespace
   // would pass one of the three lines above and fail the tree. Neither wrong form may appear.
@@ -432,10 +484,11 @@ void ACodeunitIncludesEveryObjectItNames() {
   CHECK_TRUE("the enumeration a LOCAL variable names is included",
              generated.find("#include \"SalesLineType.h\"") != std::string::npos);
 
-  // THE NEGATIVE CONTROL: an include list that carried only what the old walk saw would still pass
-  // the second line, because a global table was always reached. The enumeration and the local are
-  // the two it missed, and the local is why the count of includes matters rather than their
-  // presence -- a set collapses the duplicate, so this asserts the file compiles as a whole.
+  // THE NEGATIVE CONTROL: an include list that carried only what the old walk saw would still
+  // pass the second line, because a global table was always reached. The enumeration and the
+  // local are the two it missed, and the local is why the count of includes matters rather than
+  // their presence -- a set collapses the duplicate, so this asserts the file compiles as a
+  // whole.
   CHECK_TRUE("the enumeration is included exactly once, however many places name it",
              generated.find("SalesLineType.h") == generated.rfind("SalesLineType.h"));
 }
@@ -455,6 +508,8 @@ int main() {
     AFieldRefsTypeScopesThroughFieldType();
     AForeachOverADotNetCollectionFillsTheDeclaredVariable();
     AStaticPlatformMemberWithoutParenthesesIsACall();
+    ARelationalLeftOperandRetainsItsAlGrouping();
+    ARemoteVarParameterLendsTheVariantsStoredType();
     ACodeunitIncludesEveryObjectItNames();
   });
 }

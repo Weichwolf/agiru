@@ -25,7 +25,8 @@ agiru::gen::Objects Tables() {
                            .requestFields = {},
                            .columnSources = {},
                            .interfaceReturns = {},
-                           .tryFunctions = {}});
+                           .tryFunctions = {},
+                           .procedureDeclarations = {}});
   objects.tables.insert_or_assign(
       "cust. ledger entry",
       agiru::gen::TableRef{.identifier = "::agiru::Sales::Receivables::CustLedgerEntry_Table",
@@ -40,7 +41,8 @@ agiru::gen::Objects Tables() {
                            .requestFields = {},
                            .columnSources = {},
                            .interfaceReturns = {},
-                           .tryFunctions = {}});
+                           .tryFunctions = {},
+                           .procedureDeclarations = {}});
   return objects;
 }
 

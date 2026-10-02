@@ -49,11 +49,12 @@ const agiru::al::EnumObject &SalesLineType() {
 
 agiru::gen::EnumIndex IndexOf(const agiru::al::EnumObject &object) {
   agiru::gen::EnumIndex index;
-  index.insert_or_assign(agiru::gen::LowerKey(object.name),
-                         agiru::gen::EnumRef{.identifier = agiru::gen::Identifier(object.name),
-                                             .header = agiru::gen::EnumHeaderPath(object),
-                                             .ordinals = {},
-                                             .members = {}});
+  index.insert_or_assign(
+      agiru::gen::LowerKey(object.name),
+      agiru::gen::EnumRef{.identifier = "enums::" + agiru::gen::Identifier(object.name),
+                          .header = agiru::gen::EnumHeaderPath(object),
+                          .ordinals = {},
+                          .members = {}});
   return index;
 }
 
@@ -148,7 +149,9 @@ void TheTypeNameIsCanonicalWhateverAlWrote() {
 void AnEnumFieldScopesThroughItsEnumeration() {
   const agiru::al::EnumObject &object = SalesLineType();
   const agiru::al::TableObject &table = SalesLine();
-  const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath), {});
+  agiru::gen::Objects objects;
+  objects.enums = IndexOf(object);
+  const std::string body = agiru::gen::WriteSource(table, std::string(kTablePath), objects);
 
   CHECK_TRUE("the enum object parses", !object.values.empty());
   CHECK_TRUE("a comparison against a member names the ENUMERATION",

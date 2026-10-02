@@ -5,6 +5,7 @@
 #include "Scope.h"
 
 #include <map>
+#include <optional>
 #include <string>
 
 namespace agiru::gen {
@@ -40,6 +41,10 @@ WithElements(std::map<std::string, std::string> named, const al::PageObject &por
 void SynthesizeRunObjectActions(al::PageObject &page, const Objects &objects);
 
 void SynthesizeDataCaption(al::PageObject &page);
+
+[[nodiscard]] std::optional<al::ProcedureDecl> SourceReadGetter(const al::PageControl &control,
+                                                                const al::PageObject &page,
+                                                                const Objects &objects);
 
 std::string
 PageDefinition(const al::PageObject &page, const Objects &objects, const al::TableObject *source);

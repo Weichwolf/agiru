@@ -74,6 +74,8 @@ void TheGeneratorReproducesTheTargetImage() {
       return;
     }
   }
+  CHECK_TRUE("an AL DateTime does not include the unrelated .NET DateTime",
+             generated.find("dotnet/DateTime.h") == std::string::npos);
   CHECK_TRUE("the generated header has as many lines as the target image",
              left.size() == right.size());
   if (left.size() != right.size()) {
@@ -185,7 +187,8 @@ void AChangedSourceChangesTheOutput() {
              afterRename.find("WorkKindCode{};") != std::string::npos &&
                  afterRename.find("FieldNo WorkKindCode{3}") != std::string::npos);
   CHECK_TRUE("and the AL name follows it into the field table",
-             afterRename.find("\"Work Kind Code\"") != std::string::npos);
+             agiru::gen::WriteDefinitions(agiru::al::ParseTable(renamed), std::string(kAlPath), {})
+                     .find("\"Work Kind Code\"") != std::string::npos);
 }
 
 /// The negative control for the bodies. A statement translator that emitted a constant would pass
@@ -224,6 +227,17 @@ void AChangedStatementChangesTheBody() {
 /// that member onward the class's own name wins and every Field_No entry below it fails to
 /// compile. The source is altered in memory; the repository under ~/Git/BCApps is never written to.
 void AFieldThatShadowsARuntimeTypeStillCompiles() {
+  const auto reserved = agiru::al::ParseTable(R"(table 90003 Reserved {
+    fields { field(1; Field_No; Integer) { } field(2; State_Block; Integer) { } }
+    keys { key(PK; Field_No) { } }
+  })");
+  const std::string reservedHeader =
+      agiru::gen::WriteHeader(reserved, "Reserved.Table.al", {}, {}).text;
+  CHECK_TRUE("a literal underscore cannot collide with generated field numbers",
+             reservedHeader.find("Field_No_1{};") != std::string::npos);
+  CHECK_TRUE("a field cannot replace the runtime state handle",
+             reservedHeader.find("State_Block_2{};") != std::string::npos);
+
   const std::string original = Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath);
 
   std::string collided = original;
@@ -234,7 +248,7 @@ void AFieldThatShadowsARuntimeTypeStillCompiles() {
   const std::string generated =
       agiru::gen::WriteHeader(agiru::al::ParseTable(collided), std::string(kAlPath), {}, {}).text;
   CHECK_TRUE("the field takes the name AL gave it",
-             generated.find("FieldNo{};") != std::string::npos);
+             generated.find("FieldNo_3{};") != std::string::npos);
   CHECK_TRUE("and the field numbers reach past it to the runtime type",
              generated.find("static constexpr ::agiru::FieldNo Code{") != std::string::npos);
   // AND IT IS QUALIFIED EVEN WITHOUT A FIELD OF THAT NAME, because the BASE CLASS hides it:
@@ -297,7 +311,8 @@ void ATableDeclaredTemporaryConstructsItsStore() {
       generated.find("::ResourceCost_Table() {\n  ::agiru::detail::RuntimeMakeTemporary(this, "
                      "&::agiru::kTempOps<") != std::string::npos);
   CHECK_TRUE("and the traits say so",
-             generated.find(".tableType = TableType::Temporary,") != std::string::npos);
+             agiru::gen::WriteDefinitions(agiru::al::ParseTable(declared), std::string(kAlPath), {})
+                     .find(".tableType = TableType::Temporary,") != std::string::npos);
 }
 
 /// A FIELD'S `OnLookup` TRIGGER IS IN THE MAP BESIDE ITS TABLE, like `OnValidate`: the method was
@@ -338,7 +353,8 @@ void AKeyNamedLikeAClassConstantStillCompiles() {
   CHECK_TRUE("and never by the AL key name",
              generated.find("static constexpr std::array kName{") == std::string::npos);
   CHECK_TRUE("while the AL name still stands beside it in the KeyDef",
-             generated.find(".name = \"Name\", .fields = ResourceCost::kKey1") !=
+             agiru::gen::WriteDefinitions(agiru::al::ParseTable(renamed), std::string(kAlPath), {})
+                     .find(".name = \"Name\", .fields = ResourceCost_Table::kKey1") !=
                  std::string::npos);
   CHECK_TRUE("and the table's own name constant is untouched",
              generated.find("std::string_view kName{\"Resource Cost\"}") != std::string::npos);

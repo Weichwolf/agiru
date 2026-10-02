@@ -16,6 +16,7 @@
 #include <cctype>
 #include <cstddef>
 #include <map>
+#include <optional>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -48,6 +49,10 @@ std::string Lowered(std::string_view text) {
     out += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
   return out;
+}
+
+bool IsUserControl(const al::PageControl &control) {
+  return Lowered(control.kind) == "usercontrol";
 }
 
 struct Controls {
@@ -152,76 +157,80 @@ struct TriggerRow {
   std::string enabled;
   std::string editable;
   std::string variable;
+  std::string sourceText;
 };
+
+bool NameToken(const al::Token &token) {
+  return token.kind == al::TokenKind::Identifier || token.kind == al::TokenKind::QuotedIdentifier;
+}
+
+std::string RecordVariableSource(std::span<const al::Token> tokens,
+                                 const al::VarDecl &declared,
+                                 std::string identifier,
+                                 const Objects &objects) {
+  constexpr std::size_t kIndexedRecordTokenCount = 6;
+  constexpr std::size_t kIndexedRecordFieldToken = 5;
+  const al::Token *field = nullptr;
+  if (tokens.size() == 3 && tokens[1].kind == al::TokenKind::Punctuation && tokens[1].text == "." &&
+      NameToken(tokens[2])) {
+    field = &tokens[2];
+    identifier += "->";
+  } else if (tokens.size() == kIndexedRecordTokenCount && !declared.dimensions.empty() &&
+             tokens[1].text == "[" && tokens[2].kind == al::TokenKind::Integer &&
+             tokens[3].text == "]" && tokens[4].text == "." &&
+             NameToken(tokens[kIndexedRecordFieldToken])) {
+    field = &tokens[kIndexedRecordFieldToken];
+    identifier += ".operator->()->operator[](";
+    identifier += tokens[2].text;
+    identifier += ").";
+  } else {
+    return {};
+  }
+  const auto table = objects.tables.find(LowerKey(declared.subtype));
+  if (table == objects.tables.end()) { return {}; }
+  const auto member = table->second.fields.find(LowerKey(field->text));
+  if (member == table->second.fields.end()) { return {}; }
+  identifier += member->second;
+  return identifier;
+}
+
+std::string ValueVariableSource(std::span<const al::Token> tokens,
+                                const al::VarDecl &declared,
+                                std::string identifier) {
+  const std::string type = TypeName(declared.type);
+  if (tokens.size() == 1) {
+    constexpr std::array<std::string_view, 8> kObjectTypes{
+        "Record", "Codeunit", "DotNet", "Interface", "Page", "Query", "Report", "XmlPort"};
+    if (std::ranges::find(kObjectTypes, type) != kObjectTypes.end()) { return {}; }
+    return identifier;
+  }
+  if (tokens.size() != 4 || declared.dimensions.empty() || type == "Codeunit" ||
+      tokens[1].text != "[" || tokens[2].kind != al::TokenKind::Integer || tokens[3].text != "]") {
+    return {};
+  }
+  identifier += ".operator[](";
+  identifier += tokens[2].text;
+  identifier += ")";
+  return identifier;
+}
 
 std::string
 VariableSource(const al::PageControl &control, const al::PageObject &page, const Objects &objects) {
-  if (LowerKey(control.kind) == "field" && control.source.size() == 3 &&
-      control.source[0].kind == al::TokenKind::Identifier &&
-      control.source[1].kind == al::TokenKind::Punctuation && control.source[1].text == "." &&
-      (control.source[2].kind == al::TokenKind::Identifier ||
-       control.source[2].kind == al::TokenKind::QuotedIdentifier)) {
-    for (const al::VarDecl &declared : page.variables) {
-      if (LowerKey(declared.name) != LowerKey(control.source[0].text) ||
-          TypeName(declared.type) != "Record") {
-        continue;
-      }
-      const auto table = objects.tables.find(LowerKey(declared.subtype));
-      if (table == objects.tables.end()) { return {}; }
-      const auto field = table->second.fields.find(LowerKey(control.source[2].text));
-      if (field == table->second.fields.end()) { return {}; }
-      return PageVariableIdentifier(page, declared.name) + "->" + field->second;
-    }
+  if (LowerKey(control.kind) != "field" || control.source.empty() ||
+      !NameToken(control.source.front()) ||
+      (control.source.size() != 1 && control.source.front().kind != al::TokenKind::Identifier)) {
     return {};
   }
-  if (LowerKey(control.kind) == "field" && control.source.size() == 6 &&
-      control.source[0].kind == al::TokenKind::Identifier && control.source[1].text == "[" &&
-      control.source[2].kind == al::TokenKind::Integer && control.source[3].text == "]" &&
-      control.source[4].text == "." &&
-      (control.source[5].kind == al::TokenKind::Identifier ||
-       control.source[5].kind == al::TokenKind::QuotedIdentifier)) {
-    for (const al::VarDecl &declared : page.variables) {
-      if (LowerKey(declared.name) != LowerKey(control.source[0].text) ||
-          TypeName(declared.type) != "Record" || declared.dimensions.empty()) {
-        continue;
-      }
-      const auto table = objects.tables.find(LowerKey(declared.subtype));
-      if (table == objects.tables.end()) { return {}; }
-      const auto field = table->second.fields.find(LowerKey(control.source[5].text));
-      if (field == table->second.fields.end()) { return {}; }
-      return PageVariableIdentifier(page, declared.name) + ".operator->()->operator[](" +
-             control.source[2].text + ")." + field->second;
-    }
-    return {};
+  const auto declared =
+      std::ranges::find_if(page.variables, [&control](const al::VarDecl &variable) {
+        return LowerKey(variable.name) == LowerKey(control.source.front().text);
+      });
+  if (declared == page.variables.end()) { return {}; }
+  std::string identifier = PageVariableIdentifier(page, declared->name);
+  if (TypeName(declared->type) == "Record") {
+    return RecordVariableSource(control.source, *declared, std::move(identifier), objects);
   }
-  if (LowerKey(control.kind) == "field" && control.source.size() == 4 &&
-      control.source[0].kind == al::TokenKind::Identifier && control.source[1].text == "[" &&
-      control.source[2].kind == al::TokenKind::Integer && control.source[3].text == "]") {
-    for (const al::VarDecl &declared : page.variables) {
-      if (LowerKey(declared.name) != LowerKey(control.source[0].text) ||
-          declared.dimensions.empty() || TypeName(declared.type) == "Record" ||
-          TypeName(declared.type) == "Codeunit") {
-        continue;
-      }
-      return PageVariableIdentifier(page, declared.name) + ".operator[](" + control.source[2].text +
-             ")";
-    }
-    return {};
-  }
-  if (LowerKey(control.kind) != "field" || control.source.size() != 1 ||
-      control.source.front().kind != al::TokenKind::Identifier) {
-    return {};
-  }
-  for (const al::VarDecl &declared : page.variables) {
-    if (LowerKey(declared.name) == LowerKey(control.source.front().text) &&
-        TypeName(declared.type) != "Record" && TypeName(declared.type) != "Codeunit" &&
-        TypeName(declared.type) != "DotNet" && TypeName(declared.type) != "Interface" &&
-        TypeName(declared.type) != "Page" && TypeName(declared.type) != "Query" &&
-        TypeName(declared.type) != "Report" && TypeName(declared.type) != "XmlPort") {
-      return PageVariableIdentifier(page, declared.name);
-    }
-  }
-  return {};
+  return ValueVariableSource(control.source, *declared, std::move(identifier));
 }
 
 void GatherTriggerRows(const std::vector<al::PageControl> &controls,
@@ -233,6 +242,10 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
     TriggerRow row;
     row.control = control.name;
     row.variable = VariableSource(control, page, objects);
+    if (const auto getter = SourceReadGetter(control, page, objects)) {
+      row.sourceText =
+          ControlTrigger(getter->name, ControlIdentifier(named, control.name), page.procedures);
+    }
     for (const al::ProcedureDecl &trigger : control.triggers) {
       const std::string lowered = LowerKey(trigger.name);
       const bool lookup = lowered == "onlookup" && trigger.parameters.size() == 1;
@@ -259,7 +272,7 @@ void GatherTriggerRows(const std::vector<al::PageControl> &controls,
     }
     if (!row.validate.empty() || !row.action.empty() || !row.drillDown.empty() ||
         !row.assistEdit.empty() || !row.visible.empty() || !row.enabled.empty() ||
-        !row.editable.empty() || !row.variable.empty()) {
+        !row.editable.empty() || !row.variable.empty() || !row.sourceText.empty()) {
       rows.push_back(std::move(row));
     }
     GatherTriggerRows(control.children, named, page, objects, rows);
@@ -293,6 +306,7 @@ std::string TriggerTable(const al::PageObject &page,
              row.variable + ", text)); }, .text = [](const " + pageClass +
              " &page) { return std::string(::agiru::AsText(page." + row.variable + ")); }";
     }
+    if (!row.sourceText.empty()) { out += ", .sourceText = " + member(row.sourceText); }
     out += "}";
   }
   out += rows.empty() ? "}};\n" : "\n  }};\n";
@@ -420,6 +434,15 @@ void ControlTriggerDeclarations(std::string &out,
           page.procedures,
           ControlTrigger(trigger.name, ControlIdentifier(named, control.name), page.procedures));
     }
+    if (const auto getter = SourceReadGetter(control, page, objects)) {
+      out += ProcedureDeclaration(
+          *getter,
+          objects,
+          page.name,
+          Shadowing(page.variables, page.procedures, page.labels),
+          page.procedures,
+          ControlTrigger(getter->name, ControlIdentifier(named, control.name), page.procedures));
+    }
     ControlTriggerDeclarations(out, control.children, named, page, objects);
   }
 }
@@ -446,7 +469,11 @@ std::map<std::string, std::string> ControlIdentifiers(const al::PageObject &obje
        {&all.fields, &all.actions, &all.parts}) {
     for (const al::PageControl *control : *group) { alNames.push_back(control->name); }
   }
-  const std::vector<std::string> made = Distinct(alNames, TestPageSurface());
+  std::set<std::string> taken = TestPageSurface();
+  for (const al::ProcedureDecl &procedure : object.procedures) {
+    taken.insert(Identifier(procedure.name));
+  }
+  const std::vector<std::string> made = Distinct(alNames, std::move(taken));
   std::map<std::string, std::string> named;
   std::size_t at = 0;
   for (const std::vector<const al::PageControl *> *group :
@@ -912,6 +939,43 @@ std::string SourceTableNameOf(const al::PageObject &object) {
   return named;
 }
 
+std::optional<al::ProcedureDecl> SourceReadGetter(const al::PageControl &control,
+                                                  const al::PageObject &page,
+                                                  const Objects &objects) {
+  if (LowerKey(control.kind) != "field" || control.name.empty() || control.source.empty() ||
+      !VariableSource(control, page, objects).empty()) {
+    return std::nullopt;
+  }
+  const auto table = objects.tables.find(LowerKey(SourceTableNameOf(page)));
+  if (table != objects.tables.end()) {
+    const auto &tokens = control.source;
+    const al::Token *field = nullptr;
+    if (tokens.size() == 1) {
+      field = &tokens.front();
+    } else if (tokens.size() == 3 && LowerKey(tokens[0].text) == "rec" && tokens[1].text == ".") {
+      field = &tokens[2];
+    }
+    if (field != nullptr && NameToken(*field) &&
+        table->second.fields.contains(LowerKey(field->text))) {
+      return std::nullopt;
+    }
+  }
+  al::ProcedureDecl getter;
+  getter.name = "OnSourceText";
+  getter.returnType = "Text";
+  getter.returned.type = "Text";
+  getter.tokens = {{.kind = al::TokenKind::Identifier, .text = "exit"},
+                   {.kind = al::TokenKind::Punctuation, .text = "("},
+                   {.kind = al::TokenKind::Identifier, .text = "Format"},
+                   {.kind = al::TokenKind::Punctuation, .text = "("}};
+  getter.tokens.insert(getter.tokens.end(), control.source.begin(), control.source.end());
+  getter.tokens.push_back({.kind = al::TokenKind::Punctuation, .text = ")"});
+  getter.tokens.push_back({.kind = al::TokenKind::Punctuation, .text = ")"});
+  getter.tokens.push_back({.kind = al::TokenKind::Punctuation, .text = ";"});
+  getter.body = al::ParseStatements(getter.tokens);
+  return getter;
+}
+
 std::string WithoutTheNamespace(const std::string &table) {
   std::string bare = table;
   for (std::size_t dot = bare.find('.'); dot != std::string::npos; dot = bare.find('.')) {
@@ -1344,11 +1408,16 @@ void SynthesizeDataCaption(al::PageObject &page) {
 
 namespace {
 
-std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
+std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page,
+                                                   const Objects &objects) {
   std::vector<al::ProcedureDecl> all = page.procedures;
-  const auto walk = [&all](auto &&self, const std::vector<al::PageControl> &controls) -> void {
+  const auto walk = [&all, &page, &objects](auto &&self,
+                                            const std::vector<al::PageControl> &controls) -> void {
     for (const al::PageControl &control : controls) {
       all.insert(all.end(), control.triggers.begin(), control.triggers.end());
+      if (auto getter = SourceReadGetter(control, page, objects)) {
+        all.push_back(std::move(*getter));
+      }
       self(self, control.children);
     }
   };
@@ -1362,7 +1431,7 @@ std::vector<al::ProcedureDecl> WithControlTriggers(const al::PageObject &page) {
 PageHeader
 WritePage(const al::PageObject &object, const std::string &source, const Objects &objects) {
   const std::string identifier = Identifier(object.name);
-  const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object);
+  const std::vector<al::ProcedureDecl> bodies = WithControlTriggers(object, objects);
   const std::string pageClass = ClassName(identifier, PageKind(object));
   const std::string controlsClass = identifier + (object.xmlport  ? "_XmlPort_Controls"
                                                   : object.report ? "_Report_Controls"
@@ -1371,8 +1440,12 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
 
   std::string out = "// Generated from " + source + ". Do not edit.\n#pragma once\n\n";
   out += kDoorMarker;
+  Controls sourceControls;
+  Flatten(object.layout, sourceControls);
+  const bool hasUserControl = std::ranges::any_of(
+      sourceControls.fields, [](const auto *control) { return IsUserControl(*control); });
   if (NamesAbsentIn(object.variables, bodies, objects) ||
-      SourceTable(object, objects).starts_with("absent::")) {
+      SourceTable(object, objects).starts_with("absent::") || hasUserControl) {
     out += "#include \"absent/Types.h\"\n";
   }
   std::string includes = Includes(object, objects);
@@ -1516,6 +1589,15 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     }
   }
 
+  for (const al::PageControl *control : sourceControls.fields) {
+    if (!IsUserControl(*control)) { continue; }
+    const std::string sourceType = PartSource(*control);
+    const std::string member = ControlIdentifier(named, control->name);
+    if (sourceType.empty() || member.empty()) { continue; }
+    out += "  absent::" + Identifier(sourceType) + " " + member + ";\n";
+  }
+  if (hasUserControl) { out += "\n"; }
+
   const std::set<std::string> shadowed =
       Shadowing(object.variables, object.procedures, object.labels);
   const std::string members = MemberDeclarations(
@@ -1607,6 +1689,11 @@ WritePage(const al::PageObject &object, const std::string &source, const Objects
     withRec.push_back(std::move(rec));
   }
   GatherAbsentIn(withRec, bodies, objects, dotnet, absent);
+  for (const al::PageControl *control : sourceControls.fields) {
+    if (!IsUserControl(*control)) { continue; }
+    const std::string sourceType = PartSource(*control);
+    if (!sourceType.empty()) { absent[Identifier(sourceType)]; }
+  }
   return PageHeader{.text = WithDoor(out, PageKind(object)), .dotnet = dotnet, .absent = absent};
 }
 
