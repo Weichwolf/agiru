@@ -1,0 +1,51 @@
+#pragma once
+
+#include "runtime/ErrorValue.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Byte.h"
+#include "type/Char.h"
+#include "type/Date.h"
+#include "type/DateFormula.h"
+#include "type/DateTime.h"
+#include "type/Decimal.h"
+#include "type/Duration.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
+#include "type/RecordId.h"
+#include "type/Time.h"
+#include "type/Variant.h"
+
+#include <string>
+#include <string_view>
+
+/// \file
+/// \brief AL `XmlReadOptions` -- the surface the platform documentation declares.
+
+namespace agiru {
+
+/// \brief AL `XmlReadOptions`.
+///
+/// \warning THE SURFACE IS REAL AND THE BEHAVIOUR IS NOT YET. Every signature below is the one
+///          `methods-auto/xmlreadoptions/` states, so a call site compiles and is CHECKED; the body
+///          refuses by name rather than returning a plausible wrong answer (board:0035).
+class XmlReadOptions {
+public:
+  /// \brief AL `XmlReadOptions.PreserveWhitespace(Boolean)`. Gets or sets a value that indicates
+  /// whether insignificant white space should be preserved during parsing.
+  /// \param NewValue The AL `Boolean`.
+  /// \return The AL `Boolean`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  /// \brief AL `XmlReadOptions.PreserveWhitespace()` -- the READING form, which the documentation's
+  /// syntax block brackets: `[X := ] XmlReadOptions.PreserveWhitespace([NewX])`.
+  /// \return The value it holds.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  ::agiru::Boolean PreserveWhitespace();
+
+  ::agiru::Boolean PreserveWhitespace(::agiru::Boolean NewValue);
+
+private:
+  ::agiru::Boolean preserveWhitespace_ = false;
+};
+
+}

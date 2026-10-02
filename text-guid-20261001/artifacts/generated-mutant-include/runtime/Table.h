@@ -1,0 +1,2783 @@
+#pragma once
+
+#include "meta/Declare.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "runtime/Events.h"
+#include "runtime/Record.h"
+#include "runtime/RecordState.h"
+#include "type/Boolean.h"
+#include "type/ErrorInfo.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
+#include "type/IsolationLevel.h"
+#include "type/Option.h"
+#include "type/RecordId.h"
+#include "type/SecurityFilter.h"
+
+#include <array>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+/// \file
+/// \brief The base every generated AL table stands on.
+
+namespace agiru {
+
+/// \brief The declaration belonging to a generated table.
+///
+/// The generator specialises this beside the table's field and key tables, so that the class itself
+/// carries nothing but what AL wrote: fields, triggers, procedures. Everything the runtime needs to
+/// work with the table is reached through here instead.
+///
+/// \tparam T The generated table class.
+template <typename T> struct TableTraits;
+
+/// \brief One field's `OnValidate` trigger, as the generator emits it beside its table.
+///
+/// \tparam T The generated table class.
+///
+/// \note IT IS A FUNCTION POINTER AND NOT A MEMBER POINTER, because a lambda over the record reads
+///       as what it does and needs no member-pointer syntax at the call site. The array is
+///       `constexpr` and lands in `.rodata` like every other piece of object metadata.
+template <typename T> struct OnValidateOf {
+  FieldNo field;    ///< The field the trigger belongs to.
+  void (*run)(T &); ///< What calls it.
+};
+
+/// \brief One field's `OnLookup` trigger, emitted beside its table the way `OnValidateOf` is: a
+///        page control with no `OnLookup` of its own runs the FIELD's before it falls back to the
+///        `TableRelation` lookup (`devenv-onlookup-field-trigger.md`; 549 in the BaseApp).
+/// \tparam T The generated table class.
+template <typename T> struct OnLookupOf {
+  FieldNo field;    ///< The field the trigger belongs to.
+  void (*run)(T &); ///< What calls it.
+};
+
+/// \brief The platform half of a record operation. Not part of the door's vocabulary.
+namespace detail {
+
+/// \brief What a `Find` hands back: the answer, and the REFUSAL when nobody reads it.
+///
+/// \note AL DECIDES AT CONSUMPTION. `record-findset--method.md`: "[Ok :=] ... If you omit this
+///       optional return value and the operation does not execute successfully, a runtime error
+///       will occur." So the same call is a question in `if Rec.FindSet() then` and an assertion
+///       as a bare statement, and only the CONSUMPTION tells the two apart -- which is what this
+///       wrapper carries (openerp WI-1385, board:0056).
+class Found {
+public:
+  /// \brief Holds the answer and the table it is about.
+  /// \param found Whether the row was there. \param table The table's AL name.
+  Found(bool found, std::string_view table) : found_(found), table_(table) {}
+
+  /// \brief A `Get` that missed: the statement form raises `DB:RecordNotFound` with the KEY it
+  ///        looked for, not the filter message (`webservices/dynamics-error-codes.md`;
+  ///        openerp WI-1403, board:0636).
+  /// \param found Whether the row was there.
+  /// \param table The table's AL name.
+  /// \param key   The primary key text, empty when found.
+  Found(bool found, std::string_view table, std::string key)
+      : found_(found), table_(table), key_(std::move(key)) {}
+
+  Found(const Found &) = delete;
+  Found &operator=(const Found &) = delete;
+  Found &operator=(Found &&) = delete;
+
+  /// \brief Moves, and the moved-from copy stops being an assertion.
+  /// \param other The one being moved.
+  Found(Found &&other) noexcept : found_(other.found_), table_(other.table_), read_(other.read_) {
+    other.read_ = true;
+  }
+
+  /// \brief Reading the answer makes it a QUESTION rather than an assertion.
+  /// \return Whether the row was there.
+  operator ::agiru::Boolean() {
+    read_ = true;
+    return found_;
+  }
+
+  /// \brief Raises when nobody read it and nothing was found.
+  /// \throws Error `DB:NothingInsideFilter` -- "There is no <Table> within the filter."
+  ~Found() noexcept(false);
+
+private:
+  bool found_;
+  std::string_view table_;
+  std::string key_;
+  bool read_ = false;
+};
+
+/// \brief Makes a record the `xRec` of the trigger about to run.
+///
+/// \param record The record as it was BEFORE the change, which the caller owns and must outlive
+///               the trigger.
+/// \param owner  The record variable the trigger runs on, so that its `xRec` can be found again.
+///
+/// \note THE PLATFORM PROVIDES `xRec`, NOT THE OBJECT. A table trigger takes no parameters and AL
+///       still names two records inside it, so what supplies the second one is whoever invoked the
+///       trigger -- which here is `Validate`, `Insert(true)`, `Modify(true)` and `Delete(true)`.
+void PushBefore(const void *record, const void *owner);
+
+/// \brief The before-image of the OUTERMOST trigger running on one record variable.
+/// \param owner The record variable.
+/// \return Its before-image, or `nullptr` when no trigger of it is running.
+///
+/// \warning `xRec` IS THE RECORD BEFORE THE CHANGES, NOT BEFORE THE INNERMOST CALL
+///          (`devenv-system-defined-variables.md`). An `OnValidate` that validates a second field
+///          is the BaseApp's normal shape, and the inner trigger's `xRec` still carries the values
+///          from before the outer one began; a snapshot per call handed the inner trigger a MIXED
+///          record, one field new and the rest old (openerp WI-1242). And it is not the stored
+///          image either: a `Modify` inside the trigger replaces that, and freeing it under a
+///          running trigger was the use-after-free of board:0625.
+[[nodiscard]] const void *OutermostBefore(const void *owner);
+
+/// \brief Ends what PushBefore began.
+void PopBefore();
+
+/// \brief How many before-images this session has taken so far -- one per `Validate`, and one
+///        per rename -- which is how a page harness tells that a control's trigger VALIDATED the
+///        record, rather than merely touched it.
+/// \return The count; it only grows.
+[[nodiscard]] std::size_t BeforeImagesTaken();
+
+/// \brief Whether two records of the same table carry the same values in every field.
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when no field differs.
+template <typename T> bool SameFields(const T &a, const T &b) {
+  for (const FieldDef &def : TableTraits<T>::kTable.fields) {
+    if (CompareField(&a, &b, def) != std::strong_ordering::equal) { return false; }
+  }
+  return true;
+}
+
+/// \brief The record the running trigger is changing FROM.
+/// \return It, or `nullptr` outside a trigger.
+[[nodiscard]] const void *CurrentBefore();
+
+/// \brief AL `xRec` -- the record as it was before the change.
+///
+/// \tparam T The generated table class.
+/// \return The record before the change.
+/// \throws Error outside a trigger, or where the invoker has no before-image yet (board:0042).
+///
+/// \warning IT IS NOT CONST, BECAUSE AL'S `xRec` IS NOT. `Currency.Table.al` declares
+///          `OnAfterInitRoundingPrecision(var Currency; var xCurrency; ...)` and passes `xRec` to
+///          that `var` parameter, so a const reference here refuses AL the language allows.
+///          Writing to it changes nothing that is written back -- the before-image is read by the
+///          trigger and discarded when it returns -- and that is AL's behaviour too, not a
+///          concession.
+template <typename T> T &Before() {
+  const void *before = CurrentBefore();
+  if (before == nullptr) {
+    throw Error("xRec is only defined inside a table trigger, and the trigger that is running was "
+                "invoked without a before-image (board:0042)");
+  }
+  return *const_cast<T *>(static_cast<const T *>(before));
+}
+
+/// \brief Holds a before-image for as long as a trigger runs.
+class BeforeImage {
+public:
+  /// \brief Makes a record the running trigger's `xRec`.
+  /// \param record The record before the change.
+  /// \param owner  The record variable the trigger runs on.
+  BeforeImage(const void *record, const void *owner) { PushBefore(record, owner); }
+
+  BeforeImage(const BeforeImage &) = delete;
+  BeforeImage(BeforeImage &&) = delete;
+  BeforeImage &operator=(const BeforeImage &) = delete;
+  BeforeImage &operator=(BeforeImage &&) = delete;
+
+  ~BeforeImage() { PopBefore(); }
+};
+
+/// \brief Writes the record as a new row.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \throws DatabaseError when the row cannot be written.
+/// \brief Holds a field's `TableRelation` against the table it points at.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field just assigned.
+/// \throws Error when the value names no row of the related table.
+///
+/// \note IT RUNS BEFORE THE TRIGGER, which is the documented order and not a choice: a field whose
+///       `OnValidate` raises on its own would otherwise never let the relation message appear.
+/// \warning THE RELATION IS NOT IN THE METADATA YET, so this is a no-op with a name rather than a
+///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
+void CheckRelation(const void *record, const TableDef &table, FieldNo no);
+
+/// \brief `DecimalPlaces` as an ENTRY rule: a Decimal field declared `0 : 5` takes at most five
+///        places from what a user TYPES, and the property "is evaluated on text boxes and fields
+///        during validation" (`devenv-decimalplaces-property.md`) the way `MinValue` and
+///        `NotBlank` are -- at the client, never on a `Validate` from code.
+///
+/// \note A CODE-DRIVEN `Validate` DOES NOT ROUND, and that is measured against the suite rather
+///       than read: `SCM Whse. UOM Rnding. UT` assigns `1 / 7` to a base unit's `Qty. Rounding
+///       Precision` (twenty places, by assignment) and validates `44 * (1 / 7)` into a `0 : 5`
+///       field, then requires `QtyPerUoM mod Precision = 0` -- which holds exactly when the
+///       validated value keeps its twenty places and fails for every rounding of it. The first
+///       reading here rounded on `Validate` (board:0677, 2026-09-10) and the nine cases stayed red
+///       with different digits.
+/// \param value The value typed. \param table The table. \param no The field.
+/// \return The value rounded to the declared maximum, or unchanged where none is declared.
+Decimal DeclaredPlaces(const Decimal &value, const TableDef &table, FieldNo no);
+
+/// \brief The rounding `DeclaredPlaces` applies, over the property's text. \param value The
+///        value. \param decimalPlaces `0 : 5`, `2:5`, `2`, `:3` or `2:` as AL wrote it.
+/// \return The value rounded to the maximum named, or unchanged where the text names none.
+Decimal DeclaredPlaces(const Decimal &value, std::string_view decimalPlaces);
+
+/// \brief The AL name of a field, by number.
+/// \param table The declaration.
+/// \param no    The field.
+/// \return The name.
+/// \throws Error when the table carries no such field.
+[[nodiscard]] std::string_view FieldNameOf(const TableDef &table, FieldNo no);
+
+/// \brief Writes the record as a new row.
+/// \param record The record.
+/// \param table  The declaration.
+/// \return False when a row with this primary key already exists; the transaction stays usable,
+///         because the write is `ON CONFLICT DO NOTHING` and never a failed statement.
+[[nodiscard]] bool RuntimeInsert(void *record, const TableDef &table);
+
+/// \brief Writes the record as a new row, keeping the `SystemId` it carries when `withSystemId`
+///        is set and the field is not blank (`record-insert-boolean-boolean-method.md`: "the
+///        SystemId field of the record is given a value that you explicitly assign. If a value is
+///        not assigned, then the platform assigns one").
+/// \param record       The record.
+/// \param table        The declaration.
+/// \param withSystemId AL `InsertWithSystemId`.
+/// \return False when a row with this primary key already exists.
+[[nodiscard]] bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId);
+
+/// \brief Overwrites the row this record's primary key selects.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return True when a row carried that key.
+bool RuntimeModify(void *record, const TableDef &table);
+
+/// \brief Removes the row this record's primary key selects.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return True when a row carried that key.
+bool RuntimeDelete(const void *record, const TableDef &table);
+
+/// \brief Reads the row this record's primary key selects into the record.
+/// \param record The record, with its key fields set.
+/// \param table  Its declaration.
+/// \return True when a row carried that key.
+bool RuntimeGet(void *record, const TableDef &table);
+
+/// \brief Opens a server-side cursor over the rows this record's filters and key select, and reads
+///        the first one into the record.
+///
+/// \param record The record, whose state carries the filters and the key.
+/// \param table  Its declaration.
+/// \return True when at least one row matched.
+///
+/// \note THE CURSOR STAYS OPEN AND THE ROWS DO NOT. `Next` steps it. A `FindSet` that read the
+///       whole result into memory would put a 100-million-row table in the session, which is what
+///       `DECLARE ... NO SCROLL CURSOR` exists to avoid -- SQL Server's own answer, and the one BC
+///       is written against.
+bool RuntimeFindSet(void *record, const TableDef &table);
+
+/// \brief Reads the ONE row `Which` names, out of the rows this record's filters and key select.
+///
+/// \param record The record, whose state carries the filters and the key, and whose key FIELDS
+///        carry the values `=`, `<` and `>` compare against.
+/// \param table  Its declaration.
+/// \param which  `-`, `+`, or any combination of `=`, `<` and `>`, tried in the written order.
+/// \return True when a row matched.
+/// \throws Error when `-` or `+` is combined with anything, which `record-find-method.md` forbids,
+///         and when a character is none of the five.
+///
+/// \note `-` IS `FindSet` AND NOT A SECOND READER. The page says `Find` pages where `FindSet` takes
+///        the set at once, and a server-side cursor IS paging -- so the first row of the set is the
+///        first row of the table, and `Next` steps on from it the way AL's own `Find('-')` does.
+///        `+` reads ONE row through a reversed sort and leaves NO cursor: it is the end of the set,
+///        which is where `Next` must answer 0.
+bool RuntimeFind(void *record, const TableDef &table, std::string_view which);
+
+/// \brief AL `Record.Init()` -- every field to its `InitValue` or its type's default.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+///
+/// \note THE PRIMARY KEY IS LEFT ALONE, and `record-init-method.md` says so outright: "Primary key
+///       and timestamp fields aren't initialized." That is what makes `Init` usable between two
+///       `Insert`s in a loop -- the caller has already set the key.
+///
+/// \note THE TIMESTAMP IS NOT AMONG THE FIVE SYSTEM FIELDS YET (board:0013), so the exception the
+///       page names for it has nothing to skip; the five it does carry are initialised, as the page
+///       says of `SystemId`.
+void RuntimeInit(void *record, const TableDef &table);
+
+/// \brief What a record VARIABLE holds before anything touches it: every field with an
+///        `InitValue` carries it (`devenv-initvalue-property.md`), the rest stay blank.
+///
+/// \warning A GENERATED TABLE WITH ANY `InitValue` CALLS THIS FROM ITS CONSTRUCTOR. `Item
+///          Jnl.-Post Line` rounds by `Currency."Unit-Amount Rounding Precision"` of a `Currency`
+///          global it never loads when there is no additional reporting currency, and the platform
+///          answers `0.00001` there because the field says so; a zero-initialised member answered
+///          0 and every item posting refused with "Round: precision is zero" (86 UT cases,
+///          measured 2026-09-10).
+/// \param record The record.
+/// \param table Its declaration.
+void RuntimeInitValues(void *record, const TableDef &table);
+
+/// \brief AL `Record.CurrentCompany()`: the company the session works in, which is the company
+///        every record of a per-company table belongs to here (`record-currentcompany-method.md`;
+///        21 UT cases refused, 2026-09-10).
+/// \return The company name.
+[[nodiscard]] std::string RuntimeCurrentCompany();
+
+/// \brief The current key's fields by AL name, comma-separated: `SetCurrentKey`'s fields when one
+///        ran, the primary key otherwise (`record-currentkey-method.md`).
+/// \param record The record.
+/// \param table Its declaration.
+/// \return The text, e.g. `Document Type,Document No.,Line No.`.
+[[nodiscard]] std::string RuntimeCurrentKey(const void *record, const TableDef &table);
+
+/// \brief A user's entry checked against a `MinValue` / `MaxValue` declaration.
+///
+/// `devenv-minvalue-property.md`: "Validation occurs only if the field or control value is
+/// updated through the UI ... If a field is updated through application code, then the MinValue
+/// property is not validated." So this is called from a PAGE'S entry and never from `Validate`
+/// (openerp WI-801 shipped the same gate after every `Rec.Validate` had checked it: GAINED 36).
+/// A bound that is not a number, or an entry that is not one, is left to the field's own parse.
+/// \param text     What the user entered.
+/// \param minValue The declared lower bound, as AL wrote it; empty when none.
+/// \param maxValue The declared upper bound; empty when none.
+/// \throws Error with the platform's wording, "The value must be greater than or equal to 0.
+///         Value: -1." and its `less than or equal to` twin, coded `TestValidation`.
+void CheckEntryRange(std::string_view text, std::string_view minValue, std::string_view maxValue);
+
+/// \brief AL `Record.Consistent(Boolean)`: marks the TABLE consistent or not for the running
+///        transaction, and a commit while any table is marked inconsistent is refused with BC's
+///        own message (`record-consistent-method.md`). `Gen. Jnl.-Post Line` marks `G/L Entry`
+///        inconsistent until the entries balance.
+/// \param table      The table.
+/// \param consistent Whether it is consistent now.
+void MarkConsistent(const TableDef &table, bool consistent);
+
+/// \brief AL `Clear(Record)` -- every field to its `InitValue` or its type's default, key and all.
+///
+/// \param record The record.
+/// \param table  Its declaration.
+///
+/// \note IT DIFFERS FROM `Init` IN EXACTLY ONE THING: the primary key. `system-clear-joker-`
+///       `method.md` says "For a composite data type, such as a record or an array, ALL elements
+///       are cleared. Furthermore, all fields in a record will be initialized with the InitValue
+///       Property of the field" -- no exception for the key, where `record-init-method.md` names
+///       one.
+void RuntimeClear(void *record, const TableDef &table);
+
+/// \brief The field the USER is editing, which is what `CurrFieldNo` answers; 0 when nobody is.
+///
+/// `devenv-system-defined-variables.md` gives `CurrFieldNo` as "the field number of the current
+/// field in the current table", and the BaseApp reads it 301 times as `CurrFieldNo <> 0` -- the
+/// discriminator between a value the user typed into a page field and one a `Validate` from code
+/// set. So a `Validate` from code LEAVES IT ALONE: the page's entry installs the field for the
+/// whole of the user's change, the triggers and events under it see that field however deep
+/// they nest, and `Item."Standard Cost"` validated from a test no longer asks a confirm meant for
+/// the web client (9 UT cases, measured 2026-09-10; openerp WI-1309 asked and never measured).
+std::int32_t &Validating();
+
+class ValidatingField {
+public:
+  /// \brief Makes this field the current one.
+  /// \param no The field being validated.
+  explicit ValidatingField(::agiru::FieldNo no);
+
+  ValidatingField(const ValidatingField &) = delete;
+  ValidatingField(ValidatingField &&) = delete;
+  ValidatingField &operator=(const ValidatingField &) = delete;
+  ValidatingField &operator=(ValidatingField &&) = delete;
+
+  /// \brief Restores whatever field was current before.
+  ~ValidatingField();
+
+private:
+  std::int32_t was_;
+};
+
+/// \brief Returns one field of the primary key to its type's default.
+///
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param position Which field of the primary key, counting from zero.
+/// \throws Error when the key names a field the table lacks.
+///
+/// AL's `Get` may be handed fewer values than the key has fields, and the page says the rest are
+/// "treated as default value" -- so the tail is cleared rather than left holding whatever the
+/// record carried.
+void ClearKeyField(void *record, const TableDef &table, std::size_t position);
+
+/// \brief Steps the open cursor and reads the row it lands on.
+///
+/// \param record The record, positioned by a previous `RuntimeFindSet`.
+/// \param table  Its declaration.
+/// \param steps  How far to step. AL passes 1 by default and a negative number to go back.
+/// \return The number of steps actually taken, which is 0 at the end -- AL's own `Next` value, and
+///         what `repeat ... until Next() = 0` reads.
+std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps);
+
+/// \brief How many rows this record's filters select.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return The count.
+///
+/// \warning IT COSTS A `count(*)` AND AL CALLS IT IN LOOP CONDITIONS. `IsEmpty` is the one to reach
+///          for when the question is whether there is any row at all; it asks for one row and
+///          stops.
+std::int32_t RuntimeCount(const void *record, const TableDef &table);
+
+/// \brief Whether this record's filters select no row at all.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return True when nothing matched.
+bool RuntimeIsEmpty(const void *record, const TableDef &table);
+
+/// \brief Removes every row this record's filters select.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return How many rows went.
+std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table);
+
+/// \brief The address of the RECORD a source names.
+///
+/// \tparam Source The source's type: a record, or a handle that holds one.
+/// \param from The source.
+/// \return The record's own address.
+///
+/// \note AN `Instance<T>` IS NOT ITS RECORD, AND IT CARRIES THE TABLE'S TRAITS. A codeunit that
+///       holds a record by handle (board:0018) declares what its table declares, so
+///       `Other.TransferFields(Held)` compiles with the handle's own address and reads a field
+///       table against a pointer holder -- garbage, and a `bad_alloc` on the first text field
+///       (11 UT cases, measured 2026-09-11). Every runtime entry that takes a source record's
+///       address goes through here.
+template <typename Source> [[nodiscard]] const void *RecordAddress(const Source &from) {
+  if constexpr (requires { from.operator->(); }) {
+    return from.operator->();
+  } else {
+    return &from;
+  }
+}
+
+/// \brief AL `Record.GetPosition([UseNames])` -- the primary key as text.
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param useNames Whether the parts are keyed by field name rather than by number.
+/// \return The position text.
+[[nodiscard]] std::string PositionText(const void *record, const TableDef &table, bool useNames);
+
+/// \brief The key a MARK is kept under (`record-mark-method.md`): the primary key's values, each
+///        as `FieldText` renders it, separated by the unit separator so that a value carrying a
+///        comma cannot collide with two values. `Mark`, `MarkedOnly` over a temporary record and
+///        the marked-only clause over a database read all key on it.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \return The key text.
+[[nodiscard]] std::string MarkKey(const void *record, const TableDef &table);
+
+/// \brief AL `Record.SetPosition(Position)` -- the primary key from text.
+/// \param record   The record.
+/// \param table    Its declaration.
+/// \param position The text `PositionText` wrote.
+/// \throws Error when a part names a field the table does not carry.
+void TakePosition(void *record, const TableDef &table, std::string_view position);
+
+/// \brief AL `Record.TransferFields` -- copies by field NUMBER between two tables.
+///
+/// \param into                 The destination record.
+/// \param table                Its declaration.
+/// \param from                 The source record.
+/// \param source               Its declaration.
+/// \param withPrimaryKey       Whether the primary key travels too.
+/// \param skipMismatchingTypes Whether a type mismatch is skipped rather than raised.
+/// \throws Error on a type mismatch, unless it is to be skipped.
+void RuntimeTransferFields(void *into,
+                           const TableDef &table,
+                           const void *from,
+                           const TableDef &source,
+                           bool withPrimaryKey,
+                           bool skipMismatchingTypes);
+
+/// \brief Gives a record its own empty set of temporary rows (board:0583).
+/// \param record The record.
+/// \param ops    How the runtime reaches rows of its type -- `kTempOps<T>`.
+void RuntimeMakeTemporary(void *record, const TempOps *ops);
+
+/// \brief AL `Record.IsTemporary()`.
+/// \param record The record.
+/// \return Whether its state carries temporary rows.
+[[nodiscard]] bool RuntimeIsTemporary(const void *record);
+
+/// \brief AL `Record.AddLink(URL [, Description])`: a `Record Link` row for the record.
+/// \param to The record's id.
+/// \param url The link.
+/// \param description What it shows.
+/// \return The new `Link ID`.
+Integer RuntimeAddLink(const RecordId &to, std::string_view url, std::string_view description);
+
+/// \brief AL `Record.CopyLinks(From)`: every `Record Link` row of `from` copied to `to`, which is
+///        how a posted document keeps the links of the one it came from.
+/// \param from The source record's id.
+/// \param to The target record's id.
+void RuntimeCopyLinks(const RecordId &from, const RecordId &to);
+
+/// \brief AL `Record.DeleteLinks()`.
+/// \param of The record's id.
+void RuntimeDeleteLinks(const RecordId &of);
+
+/// \brief AL `Record.HasLinks()`.
+/// \param of The record's id.
+/// \return Whether a `Record Link` row names it.
+[[nodiscard]] bool RuntimeHasLinks(const RecordId &of);
+
+/// \brief The record id a Variant carries when it holds a record or a RecordRef.
+/// \param held The Variant.
+/// \return Its record id.
+/// \throws Error when the Variant holds neither.
+[[nodiscard]] RecordId RecordIdInVariant(const class Variant &held);
+
+/// \brief AL `Record.Copy(From, true)`: the record shares `from`'s temporary rows from now on.
+/// \param record The record.
+/// \param from   The temporary record whose rows it joins.
+/// \throws Error when either is not temporary, which is what the platform refuses too.
+void RuntimeShareTemporary(void *record, const void *from);
+
+/// \brief AL `RecordRef.GetTable(TempRecord)`: the reference refers to the temporary rows the
+///        record holds, so `RecRef.FindSet` walks them and not the table -- `IsTemporary` is true
+///        on the reference afterwards (`recordref-gettable-method.md`). Unlike `Copy(From, true)`
+///        the target need not be temporary yet: it becomes so by adopting the store.
+/// \param record The reference's record.
+/// \param from The temporary record.
+void RuntimeAdoptTemporary(void *record, const void *from);
+
+/// rief Points a record at another's temporary rows and leaves its FILTERS alone, which is what
+///        a `var` parameter needs: the callee sees the caller's rows through its own view.
+/// \param record The record that borrows.
+/// \param from   The temporary record whose rows it borrows.
+void RuntimeBorrowTemporary(void *record, const void *from);
+
+/// \brief AL `Record.Reset()` on any record: the filters, marks, key and load selection go, and
+///        a temporary record's ROWS stay.
+/// \param record The record.
+///
+/// \warning A TEMPORARY RECORD STAYS TEMPORARY ACROSS A RESET. `record-reset-method.md` lists what
+///          `Reset` clears, and the temporary table is not on the list: `TempRec.Reset()` before a
+///          `FindSet` is the BaseApp's most common line. Dropping the whole state turned the
+///          variable into a DATABASE record, so the next `Insert` wrote a real row; 222 UT
+///          failures said `Copy(From, true)` found its source not temporary, and that was the
+///          visible half (measured 2026-09-08).
+void RuntimeReset(void *record);
+
+/// \brief AL `Record.SetRecFilter()`: a range on every primary key field, at the record's values.
+/// \param record The record.
+/// \param table  The declaration.
+void RuntimeSetRecFilter(void *record, const TableDef &table);
+
+/// \brief AL `Record.GetFilters()`: the current group's filters as `Caption: filter`, joined
+///        by `, `.
+/// \param state The record's state, or `nullptr`.
+/// \param table The declaration.
+/// \return The text; empty when nothing is filtered.
+[[nodiscard]] std::string FiltersText(const RecordState *state, const TableDef &table);
+
+/// \brief The filter on one field as `GetFilter` SHOWS it: a RecordId filter is held in the
+///        stored form the column compares (`RecordId::ToStorageText`, \see AsFilterText) and
+///        read back as `Format(RecordId)` -- `Caption: key` -- which is what `Activity Log.Filter
+///        .GetFilter("Record ID")` is compared with (Test OAuth 2.0 UT `UI_HttpLog`, 2026-09-12).
+///        Every other field's filter is shown as it was written.
+/// \param def  The field.
+/// \param text The filter as the state holds it.
+/// \return The text `GetFilter` answers.
+[[nodiscard]] std::string ShownFilter(const FieldDef &def, std::string_view text);
+
+/// \brief AL `Record.GetBySystemId(SystemId)`: the row whose `SystemId` this is, filters ignored.
+/// \param record   The record, which receives the row.
+/// \param table    The declaration.
+/// \param systemId The id.
+/// \return Whether a row carries it.
+[[nodiscard]] bool RuntimeGetBySystemId(void *record, const TableDef &table, const Guid &systemId);
+
+/// \brief Writes one field from the text a column returned.
+/// \param record The record.
+/// \param def    The field.
+/// \param text   The column value.
+/// \throws Error when the value does not fit the field, or the type has no reader yet.
+void SetFieldText(void *record, const FieldDef &def, std::string_view text);
+
+/// \brief Orders two records of the same table by their primary key.
+///
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when `a` sorts before `b`.
+///
+/// The key fields are read through the field table, in the order the primary key declares them,
+/// and compared BY TYPE, which is the ordering the database gives and the one AL walks in.
+template <typename T> bool ByKey(const T &a, const T &b) {
+  const TableDef &table = TableTraits<T>::kTable;
+  if (table.keys.empty()) { return false; }
+  for (const FieldNo no : table.keys[0].fields) {
+    const FieldDef *def = Field(table, no);
+    if (def == nullptr) { continue; }
+    const std::strong_ordering order = CompareField(&a, &b, *def);
+    if (order != std::strong_ordering::equal) { return order == std::strong_ordering::less; }
+  }
+  return false;
+}
+
+/// \brief Whether two records of the same table carry the same primary key.
+/// \tparam T The generated table class.
+/// \param  a One record.
+/// \param  b The other.
+/// \return True when neither sorts before the other.
+template <typename T> bool SameKey(const T &a, const T &b) {
+  return !ByKey(a, b) && !ByKey(b, a);
+}
+
+}
+
+/// \brief What every AL table can do, without the generated class saying any of it.
+///
+/// AL CODE NEVER NAMES A CONNECTION, A ROW OR A COLUMN. It writes `Rec.Insert()` and
+/// `Rec.Get(a, b)`, and the platform finds the session, builds the statement and moves the values.
+/// This base is that platform half, so the generated class stays a transcription of the `.al` file.
+///
+/// \tparam Derived The generated table class, whose fields this reaches through
+///         `TableTraits<Derived>::kTable`.
+///
+/// \note The base holds NO data. That is what leaves a generated record standard-layout, which is
+///       what lets the field table address a field by `offsetof`.
+// NOLINTNEXTLINE(bugprone-crtp-constructor-accessibility): see above.
+template <typename Derived> class Table {
+public:
+  /// \brief The platform half of this record, by name.
+  ///
+  /// \note A TABLE MAY DECLARE A PROCEDURE NAMED LIKE A PLATFORM METHOD -- `Total Value Insured`
+  ///       has its own `FindFirst(SearchString)` -- and in the generated class that hides the
+  ///       platform's. A caller that means the platform's says so:
+  ///       `static_cast<T::Platform_Half &>(rec).FindFirst()`.
+  using Platform_Half = Table<Derived>;
+
+private:
+  template <typename Field> [[nodiscard]] Field RangeBound_(const Field &member, bool upper) const {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    const std::string text = detail::RangeBoundText(Filtered(), no, upper);
+    if (text.empty()) { return Field{}; }
+    Derived bound{};
+    detail::EvaluateInto(&bound, TableTraits<Derived>::kTable, no, text);
+    const std::ptrdiff_t offset =
+        reinterpret_cast<const char *>(&member) - reinterpret_cast<const char *>(Self());
+    return *reinterpret_cast<const Field *>(reinterpret_cast<const char *>(&bound) + offset);
+  }
+
+public:
+  /// \brief AL `Record.Insert()`.
+  ///
+  /// \throws Error when the row cannot be written, a duplicate key included.
+  ///
+  /// THE STATEMENT FORM RAISES, and that is the documentation's own rule rather than a choice:
+  /// `record-insert-method.md` writes the signature as `[Ok := ] Record.Insert(...)` and says of
+  /// the return value, "If you omit this optional return value and the operation does not execute
+  /// successfully, a runtime error will occur." AL code writes `Rec.Insert();` far more often than
+  /// `if Rec.Insert() then`, so this is the form that carries the AL name. The value form belongs
+  /// to the generator, which knows the context (board:0014).
+  /// \warning IT REPLACES THE SystemId, EVEN ONE THE CALLER ASSIGNED, and that is the platform's
+  ///          documented default rather than a shortcut. `record-insert-boolean-boolean-method.md`
+  ///          on `InsertWithSystemId`: "If this parameter is false, the SystemId field is given a
+  ///          value that is auto-generated by the platform. The default value is false." The
+  ///          overload that honours an assigned one is `Insert(RunTrigger, InsertWithSystemId)`;
+  ///          `Sales-Post` writes a posted line with the sales line's own `SystemId` that way.
+  ///
+  /// \note IT IS NOT `const`, BECAUSE THE PLATFORM WRITES INTO THE RECORD.
+  ///       `devenv-table-system-fields.md`: "When a record is first inserted, the fields are
+  ///       populated with actual values ... the values written to the database are always provided
+  ///       by the platform." A `const` Insert could not do that, and a caller reading
+  ///       `Rec.SystemId` after `Rec.Insert()` -- which the BaseApp does -- would see the blank
+  ///       GUID it went in with.
+  /// \note EVERY OVERLOAD RETURNS `Ok`. `record-insert--method.md`,
+  ///       `record-modify-method.md` and `record-delete-method.md` all read
+  ///       `[Ok := ] Record.X(...)`, and AL writes `exit(Modify())` -- 226 sites under Layers/W1.
+  ///       A `void` here made every one of them a compile error.
+  Boolean Insert() { return Insert(false); }
+
+  /// \brief AL `Ok := Record.Insert()` -- THE VALUE FORM, which the generator spells when the
+  ///        result is consumed (`if Rec.Insert() then`).
+  /// \return False when a row with this primary key exists; true when the row was written.
+  /// \note `record-insert--method.md`: "No run-time error occurs if customer 1120 already
+  ///       exists" in the value form, against a run-time error in the statement form. The two are
+  ///       ONE method in AL, decided by whether the result is read, so the generator decides and
+  ///       the door carries both spellings -- `Insert` for the statement it is written as far more
+  ///       often, `Ok_Insert` for the value.
+  Boolean Ok_Insert() { return Ok_Insert(false); }
+
+  /// \brief AL `Ok := Record.Insert(RunTrigger)`, the value form.
+  /// \param RunTrigger Whether `OnInsert` runs.
+  /// \return False when the row exists.
+  Boolean Ok_Insert(Boolean RunTrigger) { return Insert_(RunTrigger); }
+
+  /// \brief AL `Ok := Record.Insert(RunTrigger, InsertWithSystemId)`, the value form.
+  /// \param RunTrigger Whether `OnInsert` runs.
+  /// \param InsertWithSystemId Whether an assigned `SystemId` is kept.
+  /// \return False when the row exists.
+  Boolean Ok_Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    return Insert_(RunTrigger, InsertWithSystemId);
+  }
+
+  /// \brief AL `Record.Insert(RunTrigger)`.
+  ///
+  /// \note AN EXTENSION'S TRIGGERS RUN BESIDE THE TABLE'S OWN. A `tableextension` declares
+  ///       `OnBeforeInsert`, `OnAfterInsert`, `OnBeforeModify`, `OnAfterModify`, `OnBeforeDelete`,
+  ///       `OnAfterDelete`, `OnBeforeRename` and `OnAfterRename` (`triggers-auto/`), and BC merges
+  ///       them into the table at build time -- which is what this tree does in the transpiler, so
+  ///       an extension's trigger is the merged table's trigger and needs no second path here.
+  /// \param RunTrigger True to run the table's `OnInsert` trigger first.
+  /// \throws Error when the row cannot be written, and whatever the trigger raises.
+  ///
+  /// \note THE TRIGGER RUNS BEFORE THE ROW IS WRITTEN, which the trigger's own page states:
+  ///       "This trigger is run before default insert behavior ... The new record is not inserted
+  ///       if an error occurs in the trigger code."
+  /// \note WHETHER THE TABLE HAS ONE IS A COMPILE-TIME QUESTION, not a registry lookup: the
+  ///       generated class declares `OnInsert` exactly when its `.al` does, so `requires` answers
+  ///       it and a table without the trigger compiles to the same code `Insert()` does.
+  /// \brief AL `Record.Insert(RunTrigger, InsertWithSystemId)` -- the row keeps the `SystemId`
+  ///        the caller put in it (`record-insert-boolean-boolean-method.md`).
+  /// \param RunTrigger         Whether `OnInsert` runs.
+  /// \param InsertWithSystemId Whether the record's own `SystemId` is written rather than a new
+  /// one.
+  /// \return Whether the row was written.
+  /// \throws Error when the row is already there.
+  ///
+  /// \note THE RULE LIVES IN THE TWO-ARGUMENT PAGE and not beside it, which is what the overload
+  ///       filenames are for: the predecessor paid three reverts for reading the wrong file.
+  Boolean Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    if (!Insert_(RunTrigger, InsertWithSystemId)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.caption) +
+                      " already exists. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordExists");
+    }
+    return true;
+  }
+
+  Boolean Insert(Boolean RunTrigger) { return Insert(RunTrigger, false); }
+
+private:
+  Boolean Insert_(Boolean RunTrigger) { return Insert_(RunTrigger, false); }
+
+  Boolean Insert_(Boolean RunTrigger, Boolean InsertWithSystemId) {
+    TableEvent("OnBeforeInsertEvent", RunTrigger);
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnInsert(); }) {
+        static_cast<Derived *>(this)->OnInsert();
+      }
+    }
+    if (!detail::RuntimeInsert(
+            Self(), TableTraits<Derived>::kTable, static_cast<bool>(InsertWithSystemId))) {
+      return false;
+    }
+    CaptureImage();
+    TableEvent("OnAfterInsertEvent", RunTrigger);
+    return true;
+  }
+
+public:
+  /// \brief AL `Record.Modify()`.
+  /// \return True. The FALSE answer is board:0055: it wants the duplicate-key and not-found cases
+  ///         told apart from a real database failure, and the SQL layer does not do that yet.
+  /// \throws Error when no row carries this primary key.
+  /// \see Insert() for why the statement form raises.
+  /// \note IT RAISES `OnBeforeModifyEvent` AND `OnAfterModifyEvent` WITH `RunTrigger` FALSE, the
+  ///       way `Insert()` raises its two: the event's page carries `RunTrigger` as a PARAMETER,
+  ///       so the event fires either way and the subscriber reads the flag. `API Update
+  ///       Referenced Fields` assigns a customer's `Payment Terms Id` from `OnBeforeModifyEvent`,
+  ///       and `Customer.Modify()` left it blank (API Setup UT, 4 cases, 2026-09-12). `Delete()`
+  ///       raises its two the same way; `DeleteAll()` without a trigger stays the set-based
+  ///       statement it is, which is the predecessor's line too.
+  /// \note Not `const`, for the reason Insert() gives: SystemModifiedAt and SystemModifiedBy are
+  ///       written by the platform on every modify.
+  Boolean Modify() { return Modify(false); }
+
+  /// \brief AL `Record.Modify(RunTrigger)`.
+  /// \param RunTrigger True to run the table's `OnModify` trigger first.
+  /// \throws Error when no row carries this primary key, and whatever the trigger raises.
+  /// \see Insert(Boolean) for why the trigger runs first and how it is found.
+  Boolean Modify(Boolean RunTrigger) {
+    Derived before = StoredImage();
+    TableEvent("OnBeforeModifyEvent", RunTrigger, before);
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnModify(); }) {
+        static_cast<Derived *>(this)->OnModify();
+      }
+    }
+    if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
+    }
+    CaptureImage();
+    TableEvent("OnAfterModifyEvent", RunTrigger, before);
+    return true;
+  }
+
+  /// \brief AL `Record.Delete()`.
+  /// \throws Error when no row carries this primary key.
+  /// \see Insert() for why the statement form raises.
+  Boolean Delete() { return Delete(false); }
+
+  /// \brief AL `Record.Delete(RunTrigger)`.
+  /// \param RunTrigger True to run the table's `OnDelete` trigger first.
+  /// \throws Error when no row carries this primary key, and whatever the trigger raises.
+  /// \see Insert(Boolean) for why the trigger runs first and how it is found.
+  /// \note NOT `const`, although the delete is: `OnDelete` is AL code that may write into the
+  ///       record it is about to remove, and a great many of them do.
+  Boolean Delete(Boolean RunTrigger) {
+    TableEvent("OnBeforeDeleteEvent", RunTrigger);
+    if (RunTrigger) {
+      if constexpr (requires(Derived &record) { record.OnDelete(); }) {
+        static_cast<Derived *>(this)->OnDelete();
+      }
+    }
+    if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
+    }
+    TableEvent("OnAfterDeleteEvent", RunTrigger);
+    return true;
+  }
+
+  /// \brief AL `Record.Get(...)` -- assigns the primary key and reads that record.
+  ///
+  /// \tparam Keys The key field types, in key order.
+  /// \param keys  The primary key values.
+  /// \return True when the record was found; the record is unchanged otherwise beyond the key.
+  ///         AS A STATEMENT IT RAISES when the record is not there (`record-get-method.md`:
+  ///         "If you omit this optional return value and the operation does not execute
+  ///         successfully, a runtime error will occur"), the way Find does -- the consumption
+  ///         tells a question from an assertion. Only `Record.Get` does: `Get` on a List,
+  ///         Dictionary or JsonObject is not a record read (openerp WI-1386 lost 45 cases keying
+  ///         on the name; WI-1403 keyed on the receiver).
+  /// \throws Error when the argument count does not match the primary key.
+  template <typename... Keys> detail::Found Get(const Keys &...keys) {
+    AssignPrimaryKey(keys...);
+    const bool found = Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
+    return detail::Found{
+        found, TableTraits<Derived>::kTable.name, found ? std::string{} : PrimaryKeyText()};
+  }
+
+  /// \brief AL `Record.Get(RecordId)` -- the row that id names.
+  ///
+  /// \param id The id, which carries the table and the primary key values.
+  /// \return True when the row was there.
+  /// \throws Error when the id is blank, and when it names another table.
+  ///
+  /// \note THE BASEAPP CALLS IT AND `record-get-method.md` DOES NOT SPELL IT OUT.
+  ///       `ItemCategoryManagement.GetLastChildCode` pushes `ItemCategory.RecordId()` onto a
+  ///       stack and reads each one back with `ItemCategory.Get(RecId)`, so the id's key values
+  ///       ARE the `Any...` the page names. What the page does say is the near miss: a key field
+  ///       of type RecordID cannot be fetched this way, "because RecordId already is the primary
+  ///       key itself and not one of the fields that forms it".
+  ///
+  /// \warning WITHOUT THIS OVERLOAD THE VARIADIC ONE TOOK IT and wrote a `RecordId` -- a string
+  ///          and a vector -- over a `Code[20]` field through a `reinterpret_cast`, which is a
+  ///          segmentation fault three frames later (measured 2026-09-08, `ERM VAT Tool - UT`).
+  ///          `AssignKey` now refuses a value whose type is not the field's, so the same mistake
+  ///          elsewhere is an error rather than a corrupted record.
+  detail::Found Get(const ::agiru::RecordId &id) {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (id.IsEmpty()) { throw Error("Get: the RecordId names no record"); }
+    if (id.TableNo() != table.id.Value()) {
+      throw Error("Get: the RecordId names table " + std::to_string(id.TableNo()) +
+                  " and this is " + std::to_string(table.id.Value()));
+    }
+    const std::span<const std::string> values = id.KeyValues();
+    if (table.keys.empty() || values.size() != table.keys[0].fields.size()) {
+      throw Error("Get: the RecordId carries " + std::to_string(values.size()) +
+                  " key value(s) and the primary key has " +
+                  std::to_string(table.keys.empty() ? 0 : table.keys[0].fields.size()));
+    }
+    for (std::size_t at = 0; at < values.size(); ++at) {
+      const FieldDef *def = Field(table, table.keys[0].fields[at]);
+      if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
+      detail::SetFieldText(Self(), *def, values[at]);
+    }
+    const bool found = Read(detail::RuntimeGet(Self(), table));
+    return detail::Found{found, table.name, found ? std::string{} : PrimaryKeyText()};
+  }
+
+  /// \brief AL `Record.FieldError(Field [, Text])`, naming the field itself.
+  ///
+  /// \tparam FieldType The field member's type.
+  /// \param member The field, written as AL writes it: `FieldError(Code)`.
+  /// \param text   Optional replacement for the default wording.
+  /// \throws Error always.
+  ///
+  /// The address of the member is enough to find its declaration, so the generated line reads like
+  /// the AL line instead of naming a field number.
+  /// \brief AL `Record.FieldError(Field, ErrorInfo)` -- the field's own refusal, with the caller's
+  ///        error (`record-fielderror-joker-errorinfo-method.md`).
+  /// \tparam Field The field member's type.
+  /// \param member The field.
+  /// \param info   The error, whose message is raised.
+  /// \throws Error always.
+  template <typename Field>
+    requires(!std::is_same_v<Field, ::agiru::FieldNo>)
+  [[noreturn]] void FieldError(const Field &member, const ::agiru::ErrorInfo &info) const {
+    ::agiru::ErrorInfo raised = info;
+    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), raised.Message());
+  }
+
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  [[noreturn]] void FieldError(const FieldType &member, std::string_view text = {}) const {
+    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), text);
+  }
+
+  /// \brief AL `Record.TestField(Field)`, naming the field itself.
+  /// \tparam FieldType The field member's type.
+  /// \param member The field.
+  /// \throws Error when the field holds its type's blank.
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  void TestField(const FieldType &member) const {
+    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, NumberOf(&member));
+  }
+
+  /// \brief AL `Record.TestField(Field, Value)`, naming the field itself.
+  /// \tparam FieldType The field member's type.
+  /// \tparam Value     The expected value's type.
+  /// \param member   The field.
+  /// \param expected The value it must hold, or the option member it must hold.
+  /// \throws Error when the values differ.
+  /// \brief AL `Record.TestField(Field, ErrorInfo)` -- the field must not hold its blank, and the
+  ///        refusal is the one the caller wrote (`record-testfield-joker-errorinfo-method.md`).
+  /// \tparam FieldType The field member's type.
+  /// \param member The field.
+  /// \param info   The error to raise.
+  /// \throws Error when the field holds its type's blank.
+  ///
+  /// \note THE SECOND ARGUMENT IS NOT AN EXPECTED VALUE. Without this overload an `ErrorInfo`
+  ///       landed in the value form and was COMPARED against the field, which is a compile error
+  ///       where the field cannot be compared to one and a wrong answer where it can.
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  void TestField(const FieldType &member, const ::agiru::ErrorInfo &info) const {
+    if (member != FieldType{}) { return; }
+    ::agiru::ErrorInfo raised = info;
+    throw Error(raised.Message());
+  }
+
+  template <typename FieldType, typename Value>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo> &&
+             !std::is_same_v<std::remove_cvref_t<Value>, ::agiru::ErrorInfo>)
+  /// \note THE FIELD'S OWN TYPE IS THE WRAPPER, and guessing `Option` was wrong for half of them.
+  ///       AL writes `TestField(Status, "Price Status"::Active)` -- a bare member -- and the
+  ///       holder it belongs in is whatever the field is declared as: `Option<E>` for a field with
+  ///       an `OptionMembers` list, `Enum<E>` for one whose type is an enum OBJECT. Wrapping every
+  ///       member in `Option<E>` asked for an `OptionTraits` the generator never specialises for an
+  ///       enum object, and the error landed in `Option.h` rather than at the call.
+  void TestField(const FieldType &member, const Value &expected) const {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
+    } else if constexpr (std::is_enum_v<Value>) {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
+    } else if constexpr (std::constructible_from<FieldType, const Value &>) {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
+    } else {
+      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
+    }
+  }
+
+  /// \brief AL `Record.TestField(Field, Value, ErrorInfo)` -- the same check, raising the
+  ///        caller's own error when the field does not hold the value
+  ///        (`record-testfield-*-errorinfo-method.md`).
+  /// \tparam FieldType The field's type. \tparam Value The value's type.
+  /// \param member   The field. \param expected The value it must hold.
+  /// \param info     The error to raise.
+  template <typename FieldType, typename Value>
+  void TestField(const FieldType &member, const Value &expected, const ErrorInfo &info) const {
+    bool same = false;
+    if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
+      same = member == FieldType{expected};
+    } else if constexpr (std::is_enum_v<Value>) {
+      same = member == Option<Value>{expected};
+    } else {
+      same = member == expected;
+    }
+    if (!same) { throw Error(info); }
+  }
+
+  /// \brief AL `Record.FieldCaption(Field)`, naming the field itself.
+  /// \tparam FieldType The field member's type.
+  /// \param member The field.
+  /// \return The field's `Caption` property.
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  [[nodiscard]] std::string_view FieldCaption(const FieldType &member) const {
+    return ::agiru::FieldCaption(TableTraits<Derived>::kTable, NumberOf(&member));
+  }
+
+  /// \brief AL `Record.FieldError(Field [, Text])`.
+  ///
+  /// \param no   The field the message is about.
+  /// \param text Optional replacement for the default wording.
+  /// \throws Error always.
+  /// \see agiru::FieldError
+  [[noreturn]] void FieldError(::agiru::FieldNo no, std::string_view text = {}) const {
+    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, no, text);
+  }
+
+  /// \brief AL `Record.TestField(Field)`.
+  /// \param no The field to test.
+  /// \throws Error when the field holds its type's blank.
+  void TestField(::agiru::FieldNo no) const {
+    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, no);
+  }
+
+  /// \brief Whether a field declares `NotBlank`, which the UI enforces and a `Validate` does not
+  ///        (`devenv-notblank-property.md`: "If a field is updated through application code, then
+  ///        the NotBlank property is not validated").
+  /// \param no The field.
+  /// \return True when the declaration says `NotBlank = true`.
+  [[nodiscard]] static bool FieldNotBlank(::agiru::FieldNo no) {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    return def != nullptr && def->notBlank;
+  }
+
+  /// \brief Runs the field's own `OnLookup` trigger, if the table declares one.
+  /// \param no The field.
+  /// \return Whether there was one to run.
+  bool RunOnLookup(::agiru::FieldNo no) {
+    if constexpr (requires { TableTraits<Derived>::kOnLookup; }) {
+      for (const auto &[field, run] : TableTraits<Derived>::kOnLookup) {
+        if (field == no) {
+          run(static_cast<Derived &>(*this));
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /// \brief A user's entry into this field checked against the field's `MinValue` / `MaxValue`,
+  ///        which a page does before it validates (`devenv-minvalue-property.md`: the UI checks,
+  ///        application code does not).
+  /// \param no   The field.
+  /// \param text What the user entered.
+  /// \throws Error when the entry lies outside the declared range.
+  static void CheckEntryRange(::agiru::FieldNo no, std::string_view text) {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    if (def != nullptr) { detail::CheckEntryRange(text, def->minValue, def->maxValue); }
+  }
+
+  /// \brief AL `Record.TestField(Field, Value)`.
+  /// \tparam Value The field's own type.
+  /// \param no       The field to test.
+  /// \param expected The value it must hold.
+  /// \throws Error when the values differ.
+  template <typename Value>
+    requires(!std::is_enum_v<Value>)
+  void TestField(::agiru::FieldNo no, const Value &expected) const {
+    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
+  }
+
+  /// \brief AL `Record.TestField(Field, Value)` against a named option member.
+  ///
+  /// \tparam E The option's enumeration.
+  /// \param no       The field to test.
+  /// \param expected The member it must hold.
+  /// \throws Error when the field holds another member.
+  ///
+  /// The overload exists so that generated code writes `TestField(Field_No::CostType,
+  /// ResourceCostCostType::Fixed)` for AL's AL's two-argument TestField, instead
+  /// of wrapping the member in its option type at the call site.
+  template <typename E>
+    requires std::is_enum_v<E>
+  void TestField(::agiru::FieldNo no, E expected) const {
+    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<E>{expected});
+  }
+
+  /// \brief AL `Record.FieldNo(Field)` -- the AL number of a field, named the way AL names it.
+  ///
+  /// \tparam Value The field's type.
+  /// \param member The field itself, which is how AL writes it: `Rec.FieldNo(Code)`.
+  /// \return The AL field number.
+  /// \throws Error when the address is not a field of this record.
+  /// \note IT RETURNS AN `Integer` BECAUSE AL'S DOES. `record-fieldno-method.md` gives the return
+  ///       as Integer, and AL code hands it straight to a procedure that takes one --
+  ///       `GenerateRandomCode(Rec.FieldNo(Code), DATABASE::X)`. The strong `agiru::FieldNo` stays
+  ///       where the METADATA uses it, which is where a wrong number cannot be caught any other
+  ///       way.
+  template <typename Value> [[nodiscard]] Integer FieldNo(const Value &member) const {
+    return NumberOf(&member).Value();
+  }
+
+  /// \brief AL `Record.FieldCaption(Field)`.
+  /// \param no The field.
+  /// \return The field's `Caption` property.
+  [[nodiscard]] std::string_view FieldCaption(::agiru::FieldNo no) const {
+    return ::agiru::FieldCaption(TableTraits<Derived>::kTable, no);
+  }
+
+  /// \brief AL `Record.AddLink(...)`. Adds a link to a record.
+  /// \param URL The link.
+  /// \param Description What it shows; empty when AL gives none.
+  /// \return The new link's `Link ID`.
+  Integer AddLink(std::string_view URL, std::string_view Description = {}) const {
+    return detail::RuntimeAddLink(RecordId(), URL, Description);
+  }
+
+  /// \brief AL `Record.AddLoadFields(...)`. Specifies fields to be initially loaded when the record
+  /// is retrieved from its data source. Subsequent calls to AddLoadFields will not overwrite fields
+  /// already selected for the initial load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AddLoadFields(...)` -- partial records (`record-addloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
+  template <typename... Arguments> Boolean AddLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.AreFieldsLoaded(...)`. Checks whether the specified fields are all initially
+  /// loaded.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.AreFieldsLoaded(...)` -- partial records
+  /// (`record-arefieldsloaded-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
+  template <typename... Arguments> Boolean AreFieldsLoaded(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.Ascending(...)`. Gets or sets the order in which the system searches through
+  /// a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  [[nodiscard]] Boolean Ascending() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr || state->ascending;
+  }
+
+  /// \brief AL `Record.Ascending(Value)` -- sets which way the current key runs.
+  /// \param value True for upwards.
+  /// \return The direction it now runs.
+  Boolean Ascending(Boolean value) {
+    State().ascending = value;
+    return value;
+  }
+
+  /// \brief AL `Record.CalcFields(Field, ...)` -- evaluates the named FlowFields into the record.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The FlowFields, named the way AL names them: `Rec.CalcFields(Balance)`.
+  /// \return True, as AL's statement form does; the value form has nothing to refuse.
+  /// \throws Error when a formula names what this build does not carry (board:0047).
+  ///
+  /// \note A FlowField is ZERO until calculated (`record-calcfields-method.md`): `Find` and `Next`
+  ///       leave it so, and only this, `SetAutoCalcFields`, or a page control whose source is the
+  ///       field itself, fills it. A stored field passed here is left alone.
+  template <typename... Fields> Boolean CalcFields(Fields &...members) {
+    (detail::CalcField(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.CalcSums(Field, ...)` -- the sum of each named column over the rows the
+  ///        record's filters select.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The stored, numeric fields to total; each result lands in that field.
+  /// \return True, as AL's statement form does.
+  /// \throws Error when a field is a FlowField or not numeric.
+  ///
+  /// \note IT USES THE CURRENT FILTERS and never the current row: `SetRange` first, then
+  ///       `CalcSums`, and the record's own values are not among what is summed
+  ///       (`devenv-calcfields-calcsums-...-methods.md`).
+  /// \note A TEMPORARY RECORD SUMS ITS OWN ROWS. `Create Pick` keeps the pick lines it is building
+  ///       in `TempWarehouseActivityLine` and asks `CalcSums("Qty. (Base)")` over them to learn
+  ///       what this run has already assigned; a sum that went to the database instead counted the
+  ///       pick already registered from the same bin, and every second pick found nothing to
+  ///       handle (SCM Available to Pick UT, 2026-09-12). The rows summed are the ones the
+  ///       record's filters and marks select, the same set `Count` counts (TemporaryGate).
+  template <typename... Fields> Boolean CalcSums(Fields &...members) {
+    (detail::CalcSum(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.ChangeCompany(...)`. Redirects references to table data from one company to
+  /// another.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ChangeCompany(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ChangeCompany is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ClearMarks()` -- takes every mark off this variable.
+  void ClearMarks() {
+    auto *state = const_cast<detail::RecordState *>(Filtered());
+    if (state != nullptr) { state->marks.clear(); }
+  }
+
+  /// \brief AL `Record.Consistent(...)`. Marks a table as being consistent or inconsistent.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  void Consistent(Boolean consistent) const {
+    detail::MarkConsistent(TableTraits<Derived>::kTable, static_cast<bool>(consistent));
+  }
+
+  /// \brief AL `Record.Copy(...)`. Makes this record refer to another's rows, or copies its
+  /// values.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.Copy(From [, ShareTable])` -- the fields, the filters and the position
+  ///        come across; with `ShareTable`, two temporary records share ONE set of rows from
+  ///        then on (`record-copy-method.md`).
+  /// \param from       The record copied from.
+  /// \param ShareTable Whether to share the temporary rows rather than keep this record's own.
+  void Copy(const Derived &from, Boolean ShareTable = false) {
+    static_cast<Derived &>(*this) = from;
+    reinterpret_cast<detail::StateHandle *>(Self())->CopyStateFrom(
+        *reinterpret_cast<const detail::StateHandle *>(&from));
+    if (ShareTable) { detail::RuntimeShareTemporary(Self(), &from); }
+  }
+
+  /// \brief AL `Record.CopyFilter(FromField, Record.ToField)`. Copies the filter that has been
+  ///        set for one field and applies it to another field, on another record.
+  /// \tparam From   The source field member's type.
+  /// \tparam Target The record that owns the target field.
+  /// \tparam To     The target field member's type.
+  /// \param from   The field the filter is copied from, this record's.
+  /// \param target The record whose field receives it.
+  /// \param to     That record's field.
+  /// \throws Error when `to` is not a field of `target`.
+  /// \note THE TARGET RECORD IS NAMED, which AL's `Rec.CopyFilter(F, Other.G)` does not: a member
+  ///       reference alone cannot say which record it belongs to, so the generator writes the
+  ///       owner beside it. `record-copyfilter-method.md`: the filter "remains in the assigned
+  ///       group number", so every group's filter on `from` lands in the same group on `to`.
+  template <typename From, typename Target, typename To>
+  void CopyFilter(const From &from, Target &target, const To &to) const {
+    using Declared = std::remove_cvref_t<Target>;
+    const auto offset = static_cast<std::size_t>(reinterpret_cast<const std::byte *>(&to) -
+                                                 reinterpret_cast<const std::byte *>(&target));
+    const FieldDef *def = FieldAtOffset(TableTraits<Declared>::kTable, offset);
+    if (def == nullptr) {
+      throw Error("CopyFilter: the target field is not a field of " +
+                  std::string(TableTraits<Declared>::kTable.name));
+    }
+    detail::RuntimeCopyFilter(Filtered(), NumberOf(&from), &target, def->no);
+  }
+
+  /// \brief AL `Record.CopyFilters(...)`. Copies all the filters set by the SETFILTER method
+  /// (Record) or the SETRANGE method (Record) from one record to another.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  void CopyFilters(const Derived &from) {
+    const detail::RecordState *source =
+        reinterpret_cast<const detail::StateHandle *>(&from)->Peek();
+    State().filters = source == nullptr ? std::vector<detail::FieldFilter>{} : source->filters;
+  }
+
+  /// \brief AL `Record.CopyLinks(FromRecord)`: the links of another record, or of the record a
+  ///        Variant or RecordRef carries, become this record's too.
+  /// \tparam From A record, a RecordRef or a Variant.
+  /// \param from The source.
+  template <typename From> void CopyLinks(const From &from) const {
+    if constexpr (requires { from.RecordId(); }) {
+      detail::RuntimeCopyLinks(from.RecordId(), RecordId());
+    } else {
+      detail::RuntimeCopyLinks(detail::RecordIdInVariant(from), RecordId());
+    }
+  }
+
+  /// \brief AL `Record.CountApprox(...)`. Returns an approximate count of the number of records in
+  /// the table, for example, for updating progress bars or displaying informational messages.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Integer CountApprox(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.CountApprox is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.CurrentCompany(...)`. Gets the current company of a database table record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string CurrentCompany() const { return detail::RuntimeCurrentCompany(); }
+
+  /// \brief AL `Record.CurrentKey(...)`. Gets the current key of a database table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.CurrentKey()`: the fields of the current key, by AL name, comma-separated
+  ///        -- `Document Type,Document No.,Line No.` -- the primary key when no `SetCurrentKey`
+  ///        has run (`record-currentkey-method.md`). `Type Helper.GetKeyAsString` hands this to
+  ///        `SortRecordRef`, which reads it back as a `SORTING(...)` view.
+  /// \return The key's text.
+  [[nodiscard]] std::string CurrentKey() const {
+    return detail::RuntimeCurrentKey(Self(), TableTraits<Derived>::kTable);
+  }
+
+  /// \brief AL `Record.DeleteLink(...)`. Deletes a specified link from a record in a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> void DeleteLink(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.DeleteLink is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.DeleteLinks()`: every link of this record goes.
+  void DeleteLinks() const { detail::RuntimeDeleteLinks(RecordId()); }
+
+  /// \brief AL `Record.FieldActive(Field)`. Whether the field is enabled.
+  /// \tparam FieldType The field member's type.
+  /// \param member The field, written as AL writes it: `FieldActive(DueDateCalculation)`.
+  /// \return Whether the table's declaration marks it enabled.
+  ///
+  /// \note IT IS THE `Enabled` PROPERTY AND THE DECLARATION ALREADY CARRIES IT.
+  ///       `devenv-enabled-property.md` makes a disabled field one that is declared and not
+  ///       maintained, and `FieldDef::enabled` is that bit -- so this is a lookup in `.rodata` and
+  ///       not a question for the database.
+  template <typename FieldType>
+    requires(!std::is_same_v<std::remove_cvref_t<FieldType>, ::agiru::FieldNo>)
+  [[nodiscard]] Boolean FieldActive(const FieldType &member) const {
+    return FieldActive(NumberOf(&member));
+  }
+
+  /// \brief AL `Record.FieldActive(FieldNo)` -- the same question by number.
+  /// \param no The field number.
+  /// \return Whether the table declares it and marks it enabled.
+  [[nodiscard]] Boolean FieldActive(::agiru::FieldNo no) const {
+    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    return def != nullptr && def->enabled;
+  }
+
+  /// \brief AL `Record.FieldName(Field)`. The field's AL name.
+  ///
+  /// \tparam FieldType The member's type, which names the field.
+  /// \param member The field, named the way AL names it: `Rec.FieldName("Document Type")`.
+  /// \return The name, spaces and all.
+  ///
+  /// \note IT IS THE NAME AND NOT THE CAPTION. `FieldCaption` beside it returns what a message
+  ///       quotes; this returns what the declaration spells, which is what a test comparing field
+  ///       lists needs.
+  template <typename FieldType>
+    requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
+  [[nodiscard]] std::string_view FieldName(const FieldType &member) const {
+    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, NumberOf(&member));
+  }
+
+  /// \brief AL `Record.FieldName(FieldNo)`.
+  /// \param no The field number.
+  /// \return The name.
+  [[nodiscard]] std::string_view FieldName(::agiru::FieldNo no) const {
+    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, no);
+  }
+
+  /// \brief AL `Record.FilterGroup()` -- which group `SetRange` and `SetFilter` write into.
+  /// \return The group in force.
+  [[nodiscard]] Integer FilterGroup() const {
+    const detail::RecordState *state = Filtered();
+    return state == nullptr ? 0 : state->group;
+  }
+
+  /// \brief AL `Record.FilterGroup(Integer)` -- moves the record into a filter group.
+  /// \param group The group.
+  /// \return The group that was in force before.
+  ///
+  /// \note EVERY GROUP IS ACTIVE AT ONCE AND THIS ONLY SAYS WHERE THE NEXT FILTER GOES, which is
+  ///       what the state already holds: the filters carry their group and are ANDed across them,
+  ///       with -1 the one whose own fields OR together.
+  Integer FilterGroup(Integer group) {
+    const Integer was = State().group;
+    State().group = group;
+    return was;
+  }
+
+  /// \brief AL `Record.Find([Which])` -- reads the one row `Which` names.
+  ///
+  /// \param which Which row: `-` the first, `+` the last, and `=`, `<`, `>` relative to the key
+  ///        values already in the record, combinable and tried in the written order.
+  /// \return True when a row matched.
+  /// \see `record-find-method.md`, which tabulates the five characters.
+  detail::Found Find(std::string_view which = "=") {
+    return detail::Found{Read(detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which)),
+                         TableTraits<Derived>::kTable.name};
+  }
+
+  /// \brief AL `Record.FindFirst()` -- the first row of the set.
+  /// \return True when a row matched.
+  /// \note The page says to use this rather than `Find('-')` when only the first row is wanted,
+  ///       and not to combine it with `repeat..until`. It is the same read either way.
+  detail::Found FindFirst() { return Find("-"); }
+
+  /// \brief AL `Record.FindLast()` -- the last row of the set.
+  /// \return True when a row matched.
+  detail::Found FindLast() { return Find("+"); }
+
+  /// \brief AL `Record.FindSet()`. Opens the set the filters and the key select and positions on
+  ///        its first row.
+  /// \return True when at least one row matched.
+  ///
+  /// \note IT OPENS A CURSOR AND DOES NOT READ THE SET. `record-findset-method.md` describes one
+  ///       request for the matching rows, and a table with a hundred million of them would put all
+  ///       of them in the session. SQL Server declares a cursor for this and BC is written against
+  ///       that behaviour, so PostgreSQL declares one too (board:0044, board:0045).
+  /// \brief AL `Record.FindSet(ForUpdate, UpdateKey)` -- the two-argument form
+  ///        (`record-findset-boolean-boolean-method.md`), whose flags are hints this runtime
+  ///        needs nothing from: a set is read through a cursor either way.
+  /// \param ForUpdate Whether the rows are to be modified; carried and acted on by nothing.
+  /// \param UpdateKey Whether the key is to be modified; the same.
+  /// \return As `FindSet()`.
+  detail::Found FindSet(Boolean ForUpdate, Boolean UpdateKey) {
+    static_cast<void>(ForUpdate);
+    static_cast<void>(UpdateKey);
+    return FindSet();
+  }
+
+  detail::Found FindSet() {
+    return detail::Found{Read(detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable)),
+                         TableTraits<Derived>::kTable.name};
+  }
+
+  /// \brief AL `Record.FindSet(ForUpdate)`.
+  /// \param ForUpdate Whether the rows are read for modification.
+  /// \return True when at least one row matched.
+  /// \warning `ForUpdate` DOES NOT RAISE THE LOCK YET. The tri-state locking a read owes AL is
+  ///          board:0012, and the argument is accepted rather than refused so the call site keeps
+  ///          its shape until it is.
+  detail::Found FindSet(Boolean ForUpdate) {
+    static_cast<void>(ForUpdate);
+    return FindSet();
+  }
+
+  /// \brief AL `Record.Next()`. Steps to the next row of the open set.
+  /// \return 1 when it moved, 0 at the end -- which is what `repeat ... until Next() = 0` reads.
+  Integer Next() { return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1)); }
+
+  /// \brief AL `Record.Next(Steps)`.
+  /// \param Steps How far to step: forward when positive, back when negative.
+  /// \return How many steps were taken, with the sign of the direction; 0 at either end.
+  ///
+  /// \note A STEP BACK, AND A STEP FROM A ROW `Get` OR `Find` LANDED ON, IS RELATIVE TO THE KEY.
+  ///       The open set streams through a forward-only cursor (board:0045), so what cannot be
+  ///       fetched backwards is found again: `Next(-1)` is `Find('<')` from the current row's key
+  ///       under the current filters, once per step, which is what `record-next-method.md`
+  ///       describes and how the predecessor moves (`_find_relative`). A forward `Next` on a row
+  ///       that `Get` reached -- `Item.Get(No); Item.Next` -- moves the same way, since there is
+  ///       no set open to step.
+  Integer Next(Integer Steps) {
+    return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps));
+  }
+
+  /// \brief AL `Record.Count()`. How many rows the filters select.
+  /// \return The count.
+  /// \warning IT COSTS A `count(*)`. `IsEmpty` is the one to reach for when the question is only
+  ///          whether any row matched.
+  [[nodiscard]] Integer Count() const {
+    return detail::RuntimeCount(Self(), TableTraits<Derived>::kTable);
+  }
+
+  /// \brief AL `Record.IsEmpty()`. Whether the filters select nothing.
+  /// \return True when no row matched.
+  [[nodiscard]] Boolean IsEmpty() const {
+    return detail::RuntimeIsEmpty(Self(), TableTraits<Derived>::kTable);
+  }
+
+  /// \brief AL `Record.DeleteAll()`. Removes every row the filters select.
+  /// \note THE TRIGGER DOES NOT RUN. That is AL's own rule for the no-argument form, and
+  ///       `DeleteAll(true)` is the one that runs `OnDelete` per row.
+  void DeleteAll() {
+    static_cast<void>(detail::RuntimeDeleteAll(Self(), TableTraits<Derived>::kTable));
+  }
+
+  /// \brief AL `Record.DeleteAll(RunTrigger)`.
+  /// \param RunTrigger Whether each row's `OnDelete` runs.
+  /// \throws Error when asked to run the triggers, which needs the row-by-row walk this does not
+  ///         do yet (board:0044).
+  void DeleteAll(Boolean RunTrigger) {
+    if (!RunTrigger) {
+      DeleteAll();
+      return;
+    }
+    while (FindFirst()) { Delete(true); }
+  }
+
+  /// \brief AL `Record.FullyQualifiedName(...)`. Gets the fully qualified name of a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> std::string FullyQualifiedName(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.FullyQualifiedName is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetAscending(...)`. Gets the sort order for the records returned. You can
+  /// use GETASCENDING to identify the sort order of the specified field because fields can be
+  /// sorted in ascending or descending order. For example, you can read data from an ODATA web
+  /// service where the data is sorted in ascending order on the Name field but in descending order
+  /// on the City field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean GetAscending(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.GetAscending is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.GetBySystemId(...)`. Gets a record by its SystemId.
+  /// \param SystemId The id.
+  /// \return True when a row carries it; `record-getbysystemid-method.md`: filters do not apply.
+  Boolean GetBySystemId(const Guid &SystemId) {
+    return Read(detail::RuntimeGetBySystemId(Self(), TableTraits<Derived>::kTable, SystemId));
+  }
+
+  /// \brief AL `Record.GetFilter(Field)`. The filter standing on one field.
+  ///
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it: `Rec.GetFilter("Document Type")`.
+  /// \return The filter expression as AL's own filter language spells it, or the empty string
+  ///         when nothing narrows that field.
+  ///
+  /// \note IT READS THE CURRENT FILTER GROUP AND NOTHING ELSE, which is what
+  ///       `record-getfilter-method.md` describes and what `SetFilter` wrote. A record that never
+  ///       filtered has no state at all and answers empty rather than allocating one.
+  template <typename Field> [[nodiscard]] ::agiru::Text<0> GetFilter(const Field &member) const {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr) { return {}; }
+    const ::agiru::FieldNo no = NumberOf(&member);
+    for (const detail::FieldFilter &one : state->filters) {
+      if (one.field == no && one.group == state->group) {
+        const FieldDef *def = ::agiru::Field(TableTraits<Derived>::kTable, no);
+        return def == nullptr ? std::string(one.text) : detail::ShownFilter(*def, one.text);
+      }
+    }
+    return {};
+  }
+
+  /// \brief AL `Record.GetFilters(...)`. Gets a string that contains a list of the filters within
+  /// the current filter group for all fields in a record. In addition, this method also returns the
+  /// state of the MARKEDONLY method (Record).
+  /// \return `Caption: filter, Caption: filter` over the current group; empty when unfiltered.
+  [[nodiscard]] ::agiru::Text<0> GetFilters() const {
+    return ::agiru::Text<0>(detail::FiltersText(Filtered(), TableTraits<Derived>::kTable));
+  }
+
+  /// \brief AL `Record.GetPosition([UseNames])`. The current record's primary key, as text.
+  ///
+  /// \param UseNames Whether each part is keyed by the field's NAME rather than its number.
+  /// \return `<key>=<'value'>` per primary-key field, comma separated.
+  ///
+  /// \note IT IS THE ROUND TRIP `SetPosition` TAKES BACK, so the value is quoted and an inner
+  ///       quote is doubled -- a key whose text carries a comma or an equals sign would otherwise
+  ///       come back as two parts.
+  [[nodiscard]] std::string GetPosition(Boolean UseNames = false) const {
+    return detail::PositionText(Self(), TableTraits<Derived>::kTable, UseNames);
+  }
+
+  /// \brief AL `Record.GetRangeMax(Field)`. The upper bound of the range standing on a field.
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it.
+  /// \return The bound as the field's own type; blank for an open upper end of an applied range.
+  /// \note `record-getrangemax-method.md`: it reads the CURRENT filter group, the way `GetFilter`
+  ///       does.
+  /// \throws Error when the field has no filter or the filter is not a single range (board:0044).
+  template <typename Field> [[nodiscard]] Field GetRangeMax(const Field &member) const {
+    return RangeBound_(member, true);
+  }
+
+  /// \brief AL `Record.GetRangeMin(Field)`. The lower bound of the range standing on a field.
+  /// \tparam Field The field member's type.
+  /// \param member The field, named the way AL names it.
+  /// \return The bound as the field's own type; blank for an open lower end of an applied range.
+  /// \throws Error when the field has no filter or the filter is not a single range (board:0044).
+  template <typename Field> [[nodiscard]] Field GetRangeMin(const Field &member) const {
+    return RangeBound_(member, false);
+  }
+
+  /// \brief AL `Record.GetView(...)`. Gets a string that describes the current sort order, key, and
+  /// filters on a table.
+  /// \param UseNames Captions when true (AL's default), `Field<no>` when false.
+  /// \return `VERSION(1) SORTING(...) ORDER(...) WHERE(...)`, what `SetView` reads back.
+  [[nodiscard]] std::string GetView(Boolean UseNames = true) const {
+    return detail::ViewOf(Filtered(), TableTraits<Derived>::kTable, static_cast<bool>(UseNames));
+  }
+
+  /// \brief AL `Record.HasFilter(...)`. Determines whether a filter is attached to a record within
+  /// the current filter group.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  [[nodiscard]] Boolean HasFilter() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && !state->filters.empty();
+  }
+
+  /// \brief AL `Record.HasLinks()`.
+  /// \return Whether a `Record Link` row names this record.
+  [[nodiscard]] Boolean HasLinks() const { return detail::RuntimeHasLinks(RecordId()); }
+
+  /// \brief AL `Record.Init()` -- every field to its default, the primary key excepted.
+  ///
+  /// \note IT IS NOT NEEDED BEFORE EVERY `Insert`: the page says the fields already carry their
+  ///       defaults or their `InitValue`. What it is for is the SECOND turn of a loop, and a record
+  ///       handed in as a parameter.
+  /// \see `record-init-method.md`, `properties/devenv-initvalue-property.md`
+  void Init() {
+    detail::RuntimeInit(Self(), TableTraits<Derived>::kTable);
+    BlankImage();
+  }
+
+  /// \brief AL `xRec` -- the record as it was last read, inserted or modified.
+  ///
+  /// \note IT IS NOT CALLED `XRec`, AND THAT IS THE ONE DEVIATION HERE. `xRec` is an AL VARIABLE
+  ///       and not a method, and the door's callable set is SCRAPED from these headers -- a method
+  ///       of that name made every bare `xRec` in a generated body a call, which is 200+ errors in
+  ///       one build (measured 2026-09-08). The generator binds the variable AL names from it.
+  ///
+  /// \return The image; a BLANK record when nothing has read, inserted or modified this variable.
+  ///
+  /// \note A FRESH VARIABLE'S `xRec` IS BLANK AND NOT AN ERROR, because AL has no such error:
+  ///       `xRec` is defined wherever a table's body runs. `OnInsert` is the case that says so --
+  ///       the row does not exist yet, so what it was before is the blank record, and
+  ///       `Rec.F <> xRec.F` is then true for every field the caller filled. Refusing instead cost
+  ///       965 UT failures in one measured run (2026-09-08) and 131 passes.
+  ///
+  /// \warning IT IS A BLANK RECORD AND NEVER A MIRROR OF `Rec`, which is openerp WI-1078: a mirror
+  ///          makes every `Rec.F <> xRec.F` trivially false and kills the idiom outright.
+  ///
+  /// \note IT IS NOT CONST, BECAUSE AL'S `xRec` IS NOT. `Currency.Table.al` declares
+  ///       `OnAfterInitRoundingPrecision(var Currency; var xCurrency; ...)` and passes `xRec` to
+  ///       that `var` parameter. Writing to it changes nothing that is written back, which is AL's
+  ///       behaviour too.
+  [[nodiscard]] Derived &StoredImage() {
+    if (const void *before = detail::OutermostBefore(Self()); before != nullptr) {
+      return *const_cast<Derived *>(static_cast<const Derived *>(before));
+    }
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr || state->image.Get() == nullptr) { BlankImage(); }
+    return *static_cast<Derived *>(State().image.Get());
+  }
+
+  /// \brief AL `Record.IsTemporary(...)`. Determines whether a record refers to a temporary table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record := RecordRef` -- the row the reference stands for.
+  /// \tparam R The reference's type, taken as a template because `RecordRef` is only declared
+  ///         here: the door's record base is what `RecordRef` itself is built on.
+  /// \param from The reference.
+  /// \return This record.
+  /// \throws Error when the reference is closed or names another table, which AL raises too.
+  ///
+  /// \note AL ASSIGNS A REFERENCE TO A RECORD in a lookup trigger -- `OnAfterLookup(Selected:
+  ///       RecordRef)` -- and what it copies is the ROW.
+  template <typename R>
+    requires requires(const R &ref) { ref.IsOpen(); }
+  Derived &operator=(const R &from) {
+    const Derived *row = from.template As<Derived>();
+    if (row == nullptr) {
+      throw Error("A RecordRef of another table cannot be assigned to " +
+                  std::string(TableTraits<Derived>::kTable.name));
+    }
+    if (row != static_cast<const Derived *>(Self())) { *static_cast<Derived *>(Self()) = *row; }
+    return *static_cast<Derived *>(Self());
+  }
+
+  Boolean IsTemporary() const { return detail::RuntimeIsTemporary(Self()); }
+
+  /// \brief AL `Record.LoadFields(...)`. Accesses the table's corresponding data source and loads
+  /// the values of the specified fields on the record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.LoadFields(...)` -- partial records (`record-loadfields-method.md`) are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
+  template <typename... Arguments> Boolean LoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.LockTable(...)`. Starts locking on a table to protect it from write
+  /// transactions that conflict with each other.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  ///
+  /// \note IT RAISES THE RECORD'S ISOLATION AND READS NOTHING. `devenv-tri-state-locking.md`
+  ///       makes the level a per-record state machine -- a read takes `READUNCOMMITTED` until the
+  ///       session writes, and `LockTable()` raises it to `UPDLOCK` -- so the whole of what the
+  ///       call does is move that state, and the next read carries it.
+  ///
+  /// \warning THE ARGUMENTS ARE DISCARDED. `LockTable(true, true)` asks the platform to WAIT and
+  ///          to read the record again; neither is expressible until the cursor layer carries a
+  ///          lock (board:0012), and refusing the whole call over that stopped 28 UT procedures
+  ///          that only ask for the lock before writing (measured 2026-09-08).
+  template <typename... Arguments> void LockTable(Arguments &&...arguments) {
+    (static_cast<void>(arguments), ...);
+    State().isolation = IsolationLevel::UpdLock;
+  }
+
+  /// \brief AL `Record.Mark()` -- whether the record the variable stands on is marked.
+  /// \return True when it carries a mark.
+  [[nodiscard]] Boolean Mark() const {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr) { return false; }
+    return state->marks.contains(detail::MarkKey(Self(), TableTraits<Derived>::kTable));
+  }
+
+  /// \brief AL `Record.Mark(Boolean)` -- marks or unmarks the record the variable stands on.
+  ///
+  /// \param mark True to mark it, false to take the mark off.
+  ///
+  /// \note A MARK BELONGS TO THE VARIABLE AND NOT TO THE ROW. `record-mark-method.md` and the
+  ///       `MarkedOnly` page describe a set carried by the record variable, so two variables over
+  ///       the same table mark independently and a mark dies with the variable. It is the primary
+  ///       key that is remembered, because that is what identifies the row again after a `Find`.
+  void Mark(Boolean mark) {
+    detail::RecordState &state = State();
+    const std::string key = detail::MarkKey(Self(), TableTraits<Derived>::kTable);
+    if (mark) {
+      state.marks.insert(key);
+    } else {
+      state.marks.erase(key);
+    }
+  }
+
+  /// \note NO `<algorithm>` IN THE DOOR. A linear walk over a handful of marks is written out
+  ///       rather than reached for, because one standard header here is parsed by every one of the
+  ///       generated translation units (CLAUDE.md: `<memory>` alone was 1.2 s of 3.4 s).
+
+  /// \brief AL `Record.MarkedOnly(...)`. Activates a special filter. After you use this function,
+  /// your view of the table includes only records marked by the Mark (Record) method.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  Boolean MarkedOnly() const {
+    const detail::RecordState *state = Filtered();
+    return state != nullptr && state->markedOnly;
+  }
+
+  /// \brief AL `Record.MarkedOnly(Value)` -- restricts reads to the marked records.
+  /// \param value True to restrict.
+  /// \return What it was set to.
+  Boolean MarkedOnly(Boolean value) {
+    State().markedOnly = value;
+    return value;
+  }
+
+  /// \brief AL `Record.ModifyAll(...)`. Modifies a field in all records within a range that you
+  /// specify.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.ModifyAll(Field, NewValue [, RunTrigger])` -- sets one field on every
+  ///        record the filters select (`record-modifyall-method.md`).
+  /// \tparam Field The field's type.
+  /// \tparam Value The value's type.
+  /// \param member     The field itself, the way AL names it: `Rec.ModifyAll(Status, X)`.
+  /// \param value      The new value.
+  /// \param RunTrigger Whether `OnModify` runs per record.
+  /// \note A WALK AND NOT ONE `UPDATE`, so the triggers and the rowversion are the ordinary
+  ///       ones; the single statement is the measured optimisation this can take later.
+  /// \warning THE FIELD IS ASSIGNED AND NEVER VALIDATED. `record-modifyall-method.md`: "The
+  ///          OnValidate field trigger is never run when ModifyAll is used", and `RunTrigger`
+  ///          is the `OnModify` trigger alone. `Price List Line.RenameNo` runs
+  ///          `ModifyAll("Product No.", NewNo, true)` from `Resource.OnRename`, before the
+  ///          resource's row carries the new number; a validation there could not find the
+  ///          resource and blanked the line (Price List Line UT, T130/T131, 2026-09-12).
+  template <typename Field, typename Value>
+  void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
+    if (!FindSet()) { return; }
+    do {
+      member = value;
+      Modify(RunTrigger);
+    } while (Next() != 0);
+  }
+
+  /// \brief AL `Record.ReadConsistency(...)`. Determines if the table supports read consistency.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean ReadConsistency(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.ReadConsistency is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.ReadIsolation(...)`. Gets or sets the read isolation level.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.ReadIsolation([IsolationLevel])` -- sets the isolation the record's
+  ///        reads ask for, and answers the level in force (`record-readisolation-method.md`).
+  /// \param level The level wanted; `Default` follows the table's tri-state (board:0012).
+  /// \return The level now set.
+  /// \note CARRIED, NOT ENFORCED YET: PostgreSQL has no dirty read and the tri-state per table is
+  ///       board:0012's; what a record asks for is kept in its state so the reads can honour it
+  ///       when that lands. The name is AL's exactly, getter and setter in one.
+  IsolationLevel ReadIsolation(IsolationLevel level = IsolationLevel::Default) {
+    if (level != IsolationLevel::Default) { State().isolation = level; }
+    return State().isolation;
+  }
+
+  /// \brief AL `Record.ReadPermission(...)`. Determines whether a user is granted read permission
+  /// to the table that contains a record. This method can test for both full read permission and
+  /// partial read permission that has been granted with a security filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  ///
+  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
+  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
+  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
+  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
+  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
+  ///       board:0030's family is where that lives.
+  [[nodiscard]] Boolean ReadPermission() const { return true; }
+
+  /// \brief AL `Record.RecordId(...)`. Gets the RecordId of the record that is currently selected
+  /// in the table. If no table is selected, an error is generated.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \note THE RETURN IS A `RecordId` AND NOT THE REFUSAL'S USUAL `Boolean`.
+  ///       `record-recordid-method.md` names the type, and AL hands the result straight to a
+  ///       parameter that takes one -- so a `Boolean` there is a compile error at every call site
+  ///       and the refusal never gets the chance to say what it is.
+  ///
+  /// \note IT IS THE TABLE AND THE PRIMARY KEY AND NOTHING ELSE, which is what the id IS: the
+  ///       declaration carries the key as `constexpr` data, so the id is assembled from the record
+  ///       in front of it rather than read from anywhere.
+  template <typename... Arguments>::agiru::RecordId RecordId(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    const TableDef &table = TableTraits<Derived>::kTable;
+    std::vector<std::string> key;
+    if (!table.keys.empty()) {
+      for (const ::agiru::FieldNo no : table.keys.front().fields) {
+        const FieldDef *def = ::agiru::Field(table, no);
+        if (def != nullptr) { key.push_back(::agiru::detail::StorageText(Self(), *def)); }
+      }
+    }
+    return ::agiru::RecordId{table.id, std::string(table.caption), std::move(key)};
+  }
+
+  /// \brief AL `Record.RecordLevelLocking(...)`. Determines whether the table supports record-level
+  /// locking.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean RecordLevelLocking(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.RecordLevelLocking is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Relation(...)`. Determines the table relationship of a given field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Integer Relation(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Relation is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Rename(Value1 [, Value2,...])`. Changes the value of a primary key.
+  /// \tparam Keys The new key values' types, one per primary-key field, in key order.
+  /// \param keys The new primary key.
+  /// \return True, as AL's statement form does.
+  /// \throws Error when no row carries the old key, and whatever the trigger or an event raises;
+  ///         the record is as it was on either.
+  ///
+  /// \note THE ORDER IS THE PLATFORM'S: `OnBeforeRenameEvent`, then the table's `OnRename` with
+  ///       `xRec` the row as it was and `Rec` carrying the new key, then the row operation, then
+  ///       `OnAfterRenameEvent` (`devenv-onrename-trigger.md`). The row operation is an UPDATE
+  ///       addressed by the OLD key, so the row keeps its `SystemId` and its version; a temporary
+  ///       row moves.
+  ///
+  /// \warning THE NEW KEY IS NOT CASCADED YET. BC rewrites every field that relates to the
+  ///          renamed key through its `TableRelation` (the customer number in every ledger
+  ///          entry); here those rows still carry the old value, which is a hole with a count
+  ///          (board:0231).
+  template <typename... Keys> Boolean Rename(const Keys &...keys) {
+    static_assert(sizeof...(Keys) > 0, "Rename takes the new primary key");
+    Derived before = static_cast<const Derived &>(*this);
+    std::size_t position = 0;
+    (AssignKey(TableTraits<Derived>::kTable, position++, keys), ...);
+    return RenameFrom(before);
+  }
+
+  /// \brief The rename once the NEW key stands in the record: `OnBeforeRenameEvent` with `Rec`
+  ///        on the new key and `xRec` on the old (board:0250), the table's `OnRename`, the row
+  ///        operation with its cascade, `OnAfterRenameEvent`. `Rename(Keys...)` assigns the key
+  ///        and comes here; a `RecordRef.Rename` does the same through the catalogue, which is
+  ///        why it is public.
+  /// \param before The record as it was, old key and all.
+  /// \return True.
+  /// \throws Error when no row carries the old key; the record is as it was then.
+  Boolean RenameFrom(const Derived &before) {
+    Derived was = before;
+    TableEvent("OnBeforeRenameEvent", true, was);
+    {
+      detail::BeforeImage image(&was, Self());
+      if constexpr (requires(Derived &record) { record.OnRename(); }) {
+        static_cast<Derived *>(this)->OnRename();
+      }
+    }
+    if (!detail::RuntimeRename(Self(), &was, TableTraits<Derived>::kTable)) {
+      static_cast<Derived &>(*this) = was;
+      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+                      " does not exist. Identification fields and values: " + PrimaryKeyText(),
+                  "DB:RecordNotFound");
+    }
+    TableEvent("OnAfterRenameEvent", true, was);
+    CaptureImage();
+    return true;
+  }
+
+  /// \brief AL `Record.Reset()` -- everything the variable held, gone.
+  ///
+  /// \note IT CLEARS MORE THAN THE FILTERS. `record-reset-method.md` lists the marks, `MarkedOnly`,
+  ///       the load-field selection, the isolation level and the current key -- which goes back to
+  ///       the PRIMARY key and not to whatever `SetCurrentKey` last chose.
+  void Reset() { detail::RuntimeReset(Self()); }
+
+  /// \brief AL `Record.SecurityFiltering(...)`. Gets or sets how security filters are applied to
+  /// the record.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.SecurityFiltering([SecurityFilter])` -- sets how security filters apply to
+  ///        this record and answers the setting (`record-securityfiltering-method.md`).
+  /// \param filtering The setting wanted.
+  /// \return The setting in force.
+  /// \note CARRIED, NOT ENFORCED: security filtering is board:0313's (permissions), and what a
+  ///       record asks for is kept in its state until that lands.
+  SecurityFilter SecurityFiltering(SecurityFilter filtering) {
+    State().securityFiltering = filtering;
+    return filtering;
+  }
+
+  /// \brief The getter half.
+  /// \return The setting in force, `Validated` unless set.
+  [[nodiscard]] SecurityFilter SecurityFiltering() const {
+    const detail::RecordState *state =
+        reinterpret_cast<const detail::StateHandle *>(static_cast<const Derived *>(this))->Peek();
+    return state == nullptr ? SecurityFilter::Validated : state->securityFiltering;
+  }
+
+  /// \brief AL `Record.SetAscending(...)`. Sets the sort order for the records returned. Use this
+  /// method after you have set the keys to sort after, using SETCURRENTKEY. The default sort order
+  /// is ascending. You can use SETASCENDING to change the sort order to descending for a specific
+  /// field, while the other fields in the specified key are sorted in ascending order.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename Member> void SetAscending(const Member &member, Boolean ascending) {
+    detail::RecordState &state = State();
+    if (state.key.empty()) {
+      const TableDef &table = TableTraits<Derived>::kTable;
+      if (!table.keys.empty()) {
+        for (const ::agiru::FieldNo no : table.keys[0].fields) {
+          state.key.push_back(detail::SortField{.field = no, .ascending = true});
+        }
+      }
+    }
+    const ::agiru::FieldNo no = NumberOf(&member);
+    for (detail::SortField &one : state.key) {
+      if (one.field == no) { one.ascending = static_cast<bool>(ascending); }
+    }
+  }
+
+  /// \brief AL `Record.SetAutoCalcFields(Field, ...)` -- the FlowFields every later read
+  ///        calculates by itself.
+  ///
+  /// \tparam Fields The fields' types.
+  /// \param members The FlowFields; with none, the list is cleared.
+  /// \return True, as AL's statement form does.
+  ///
+  /// \note IT IS PER VARIABLE AND TRAVELS WITH THE STATE, like the filters: `Find`, `Next`, and
+  ///       `Get` calculate the listed fields after loading the row, so a loop over ledger entries
+  ///       that reads a FlowField per row does one aggregate per row and not `CalcFields` by hand.
+  template <typename... Fields> Boolean SetAutoCalcFields(Fields &...members) {
+    State().autoCalc.clear();
+    (State().autoCalc.push_back(NumberOf(&members)), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.SetBaseLoadFields(...)`. Sets that only fields for the base table to be
+  /// initially loaded when the record is retrieved from its data source. This will overwrite fields
+  /// previously selected for initial load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean SetBaseLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetBaseLoadFields is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetCurrentKey(...)`. Selects a key for a table.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Fields> Boolean SetCurrentKey(const Fields &...members) {
+    detail::RecordState &state = State();
+    state.key.clear();
+    (state.key.push_back(detail::SortField{.field = NumberOf(&members), .ascending = true}), ...);
+    return detail::KeyMatches(TableTraits<Derived>::kTable, state.key);
+  }
+
+  /// \brief AL `Record.SetFilter(...)`. Assigns a filter to a field that you specify.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename Field, typename... Arguments>
+  void SetFilter(const Field &member, std::string_view expression, const Arguments &...arguments) {
+    detail::Narrow(State(), NumberOf(&member), StrSubstNo(expression, arguments...));
+  }
+
+  /// \brief AL `Record.SetFilter(Field, Value)` where the VALUE is the expression.
+  /// \tparam Field      The field member's type.
+  /// \tparam Expression The value's type -- anything AL renders into a filter.
+  /// \param member     The field.
+  /// \param expression The value, rendered the way `Format` renders it.
+  ///
+  /// \note AL DOES NOT REQUIRE A PLACEHOLDER. `SetFilter(Field, '%1', Value)` is one form and
+  ///       `SetFilter(Field, Value)` is another, and the second is what the BaseApp writes for a
+  ///       Guid or a Date it wants matched exactly.
+  template <typename Field, typename Expression>
+    requires(!std::convertible_to<const Expression &, std::string_view>)
+  void SetFilter(const Field &member, const Expression &expression) {
+    detail::Narrow(State(), NumberOf(&member), StrSubstNo("%1", expression));
+  }
+
+  /// \brief AL `Record.SetLoadFields(...)`. Sets the fields to be initially loaded when the record
+  /// is retrieved from its data source. This will overwrite fields previously selected for initial
+  /// load.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \brief AL `Record.SetLoadFields(...)` -- partial records (`record-setloadfields-method.md`)
+  /// are a
+  ///        LOAD optimisation: a record that loads every field satisfies every read the partial
+  ///        one would, so the declaration is accepted and the full load stands.
+  /// \return True, the way the platform answers when the fields can be loaded.
+  template <typename... Arguments> Boolean SetLoadFields(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    return true;
+  }
+
+  /// \brief AL `Record.SetPermissionFilter(...)`. Applies the user's security filter.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> void SetPermissionFilter(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.SetPermissionFilter is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.SetPosition(Position)`. Puts the primary key back from what `GetPosition`
+  ///        wrote and positions on that row.
+  /// \param Position The text `GetPosition` returned.
+  /// \throws Error when a part names a field the table does not carry.
+  void SetPosition(std::string_view Position) {
+    detail::TakePosition(Self(), TableTraits<Derived>::kTable, Position);
+  }
+
+  /// \brief AL `Record.SetRange(...)`. Sets a simple filter, such as a single range or a single
+  /// value, on a field.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename Field> void SetRange(const Field &member) {
+    detail::Narrow(State(), NumberOf(&member), {});
+  }
+
+  /// \brief AL `Record.SetRange(Field, Value)` -- the field must equal that value.
+  /// \tparam Field The field's type.
+  /// \tparam Value What it must equal.
+  /// \param member The field.
+  /// \param value  The value.
+  template <typename Field, typename Value> void SetRange(const Field &member, const Value &value) {
+    detail::Narrow(State(), NumberOf(&member), detail::Literally(FilterText(value)));
+  }
+
+  /// \brief AL `Record.SetRange(Field, From, To)` -- the field must lie in that range.
+  /// \tparam Field The field's type.
+  /// \tparam Value The bounds' type.
+  /// \param member The field.
+  /// \param from   The lower bound.
+  /// \param to     The upper bound.
+  template <typename Field, typename From, typename To>
+  void SetRange(const Field &member, const From &from, const To &to) {
+    detail::Narrow(State(),
+                   NumberOf(&member),
+                   detail::Literally(FilterText(from)) + ".." + detail::Literally(FilterText(to)));
+  }
+
+  /// \brief AL `Record.SetRecFilter(...)`. Sets the values in the current key of the current record
+  /// as a record filter.
+  /// \note `record-setrecfilter-method.md`: a filter on each primary key field at the record's
+  ///       current value, so a later `Find` selects this one row and `Count` answers one.
+  void SetRecFilter() { detail::RuntimeSetRecFilter(Self(), TableTraits<Derived>::kTable); }
+
+  /// \brief AL `Record.SetView(...)`. Sets the current sort order, key, and filters on a table.
+  /// \param String The view, in the `SourceTableView` form; empty clears the filters and
+  ///               returns to the primary key.
+  /// \throws Error when the view names a field the table does not have.
+  void SetView(std::string_view String) {
+    detail::ApplyView(State(), TableTraits<Derived>::kTable, String);
+  }
+
+  /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.
+  /// \return The `Caption` the table declares, which is its name when it declares none.
+  [[nodiscard]] ::agiru::Text<0> TableCaption() const {
+    return ::agiru::Text<0>(TableTraits<Derived>::kTable.caption);
+  }
+
+  /// \brief AL `Record.TableName()`. Gets the name of a table.
+  /// \return The AL name, spaces and all.
+  [[nodiscard]] std::string TableName() const {
+    return std::string(TableTraits<Derived>::kTable.name);
+  }
+
+  /// \brief AL `Record.TransferFields(FromRecord [, InitPrimaryKeyFields [, Skip]])`.
+  ///
+  /// \tparam Source The source record's class, which need not be this one's.
+  /// \param From                  The record to copy from.
+  /// \param InitPrimaryKeyFields  Whether the primary key travels too; true by default, which is
+  ///                              the page's own default.
+  /// \param SkipFieldsNotMatchingType Whether a type mismatch is skipped rather than raised.
+  ///
+  /// \note IT COPIES BY FIELD NUMBER AND NOT BY NAME, which the page states outright: "For each
+  ///       field in Record (the destination), the contents of the field that has the same field
+  ///       number in FromRecord (the source) will be copied, if such a field exists."
+  ///
+  /// \note THE TYPES MUST MATCH, WITH TWO EXCEPTIONS THE PAGE NAMES: "text and code are
+  ///       convertible, other types are not", and "Enum fields are considered being the same data
+  ///       type even on different enum types". Both are honoured here.
+  ///
+  /// \note `InitPrimaryKeyFields` DECIDES THE KEY AND NOT THE COPY. False leaves the destination's
+  ///       primary key where it was, which is what a caller writing `TransferFields(Other, false)`
+  ///       means: take the payload, keep my identity.
+  template <typename Source>
+    requires requires { TableTraits<Source>::kTable; }
+  void TransferFields(const Source &From,
+                      Boolean InitPrimaryKeyFields = true,
+                      Boolean SkipFieldsNotMatchingType = false) {
+    detail::RuntimeTransferFields(Self(),
+                                  TableTraits<Derived>::kTable,
+                                  detail::RecordAddress(From),
+                                  TableTraits<Source>::kTable,
+                                  InitPrimaryKeyFields,
+                                  SkipFieldsNotMatchingType);
+  }
+
+  /// \brief AL `Record.TransferFields(FromRecord ...)` where the SOURCE is a table this run does
+  ///        not carry.
+  /// \tparam Source The absent object's stub type.
+  /// \param From The stub.
+  /// \throws Error always -- there is no field table to copy by number from (board:0034).
+  ///
+  /// \note IT REFUSES BY NAME RATHER THAN FAILING TO COMPILE. A body that transfers from a table
+  ///       outside this run is still a body this tree translates, and the refusal names the table
+  ///       instead of the call site naming a missing template.
+  template <typename Source>
+    requires(!requires { TableTraits<Source>::kTable; })
+  void TransferFields(const Source &From,
+                      Boolean InitPrimaryKeyFields = true,
+                      Boolean SkipFieldsNotMatchingType = false) {
+    static_cast<void>(From);
+    static_cast<void>(InitPrimaryKeyFields);
+    static_cast<void>(SkipFieldsNotMatchingType);
+    throw Error("Record.TransferFields: the source is a table this run does not carry "
+                "(board:0034)");
+  }
+
+  /// \brief AL `Record.Truncate(...)`. Deletes all records in a table that fall within a specified
+  /// range, in an efficient maner. Keep in mind that Truncate allows for less concurrency than
+  /// DeleteAll, as the entire table will be locked until the transaction is committed.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  template <typename... Arguments> Boolean Truncate(Arguments &&...arguments) const {
+    (static_cast<void>(arguments), ...);
+    throw Error("Record.Truncate is declared and not implemented yet (board:0035)");
+  }
+
+  /// \brief AL `Record.Validate(Field, Value)` -- assigns, then runs the field's `OnValidate`.
+  ///
+  /// \tparam Field The field's type.
+  /// \tparam Value What is assigned, which need not be the field's type: AL hands a `Text` to a
+  ///               `Code` field and the assignment converts, the same as a plain one would.
+  /// \param member The field itself, the way AL names it: `Rec.Validate(Code, X)`.
+  /// \param value  What to assign.
+  /// \throws Error whatever the relation check or the trigger raises.
+  ///
+  /// \note THE ORDER IS THE PLATFORM'S AND IT WAS MEASURED. The relation check runs BEFORE the
+  ///       trigger: `Service Item Line."Variant Code"` has an `OnValidate` that raises outright
+  ///       once
+  ///       `"Service Item No."` is set, and BC's own test expects the RELATION message for a
+  ///       blocked variant on exactly such a line -- with the trigger first its error wins and the
+  ///       relation message can never appear (openerp WI, `test_validate_relation_before_trigger`).
+  /// \note IT IS ATOMIC ON THE RECORD. If the relation check or the trigger raises, the assigned
+  ///       field and every side effect of the trigger are rolled back to the state before the
+  ///       assignment -- BC's `WorkflowStepArgument "Custom Link"` test asserts `TestField` on the
+  ///       blank right after an `asserterror Validate(...)`.
+  /// \warning `MinValue`, `MaxValue` and `NotBlank` are INPUT bounds and are NOT checked here. The
+  ///          client refuses a value outside them before it takes it; a programmatic `Validate`
+  ///          does not (openerp WI, "MinValue/MaxValue sind Eingabe-Grenzen").
+  /// \brief AL `Record.Validate(Field, Value)` the way a PAGE runs it: the field by number, the
+  ///        value as the user typed it.
+  ///
+  /// \param no   The field.
+  /// \param text What was typed; it is evaluated into the field's type first.
+  /// \throws Error whatever the evaluation, the relation check or the trigger raises; the record
+  ///         is as it was before on any of them.
+  ///
+  /// \note A `TestPage.SetValue` IS A VALIDATE (board:0030): the platform assigns, then runs
+  ///       `OnValidate` with the same `xRec` a code-driven `Validate` gets. The page's own
+  ///       control trigger runs after this, in the page.
+  void ValidateText(::agiru::FieldNo no, std::string_view text) {
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
+    try {
+      detail::EvaluateInto(Self(), TableTraits<Derived>::kTable, no, text);
+      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      ValidateEvent("OnBeforeValidateEvent", no, before);
+      RunOnValidate(no);
+      ValidateEvent("OnAfterValidateEvent", no, before);
+    } catch (...) {
+      static_cast<Derived &>(*this) = before;
+      throw;
+    }
+  }
+
+  /// \brief A field as the user READS it on a page: `Format(Field)`, by number.
+  /// \param no The field.
+  /// \return The formatted text.
+  [[nodiscard]] std::string FieldFormat(::agiru::FieldNo no) const {
+    return detail::FieldFormat(Self(), TableTraits<Derived>::kTable, no);
+  }
+
+  /// \brief AL `Record.SetFilter(Field, Text)` by number, which a page's filter pane sets.
+  /// \param no         The field.
+  /// \param expression The filter, in AL's own language.
+  void SetFilterOn(::agiru::FieldNo no, std::string_view expression) {
+    detail::Narrow(State(), no, std::string(expression));
+  }
+
+  template <typename Field, typename Value> void Validate(Field &member, const Value &value) {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
+    if constexpr (requires { member = value; }) {
+      member = value;
+    } else if constexpr (requires { member = Field::FromInteger(value.AsInteger()); }) {
+      member = Field::FromInteger(value.AsInteger());
+    } else if constexpr (std::integral<Value> && requires { member = Field::FromInteger(value); }) {
+      member = Field::FromInteger(value);
+    } else {
+      member = static_cast<Field>(value);
+    }
+    try {
+      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      ValidateEvent("OnBeforeValidateEvent", no, before);
+      RunOnValidate(no);
+      ValidateEvent("OnAfterValidateEvent", no, before);
+    } catch (...) {
+      static_cast<Derived &>(*this) = before;
+      throw;
+    }
+  }
+
+  /// \brief AL `Record.Validate(Field)` -- runs the `OnValidate` without assigning.
+  ///
+  /// \tparam Field The field's type.
+  /// \param member The field.
+  /// \throws Error whatever the relation check or the trigger raises.
+  /// \note NOTHING IS ROLLED BACK, because nothing was assigned: AL's no-value form re-runs the
+  ///       trigger over the value the field already holds.
+  template <typename Field> void Validate(Field &member) {
+    const ::agiru::FieldNo no = NumberOf(&member);
+    Derived before = static_cast<Derived &>(*this);
+    detail::BeforeImage image(&before, Self());
+    detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+    RunOnValidate(no);
+  }
+
+  /// \brief AL `Record.WritePermission(...)`. Determines whether a user can write to a table. This
+  /// method can test for both full write permission and partial write permission that has been
+  /// granted with a security filter. A write permission consists of Insert, Delete, and Modify
+  /// permissions.
+  /// \tparam Arguments Whatever AL's overload set takes.
+  /// \param arguments The arguments, read only to be discarded.
+  /// \return Never.
+  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  ///
+  /// \note EVERY SESSION IS SUPER UNTIL THERE IS A PERMISSION SYSTEM, so this is `true` and says
+  ///       so rather than refusing. A refusal here stops 125 UT procedures that only ask the
+  ///       question before doing the work (measured 2026-09-08); an answer of `false` would send
+  ///       them down the branch AL takes when a user may not write, which is the wrong branch for
+  ///       a runtime that enforces nothing. When permissions arrive this reads the user's, and
+  ///       board:0030's family is where that lives.
+  [[nodiscard]] Boolean WritePermission() const { return true; }
+
+private:
+  friend Derived;
+
+  /// Runs the `OnValidate` trigger of one field, when the table declares one.
+  ///
+  /// WHICH TRIGGERS A TABLE HAS IS STATIC DATA, emitted beside the table as a sorted array of
+  /// {field number, thunk}. A table that declares none compiles to nothing at all here.
+  void RunOnValidate(::agiru::FieldNo no) {
+    if constexpr (requires { TableTraits<Derived>::kOnValidate; }) {
+      for (const auto &[field, run] : TableTraits<Derived>::kOnValidate) {
+        if (field == no) {
+          run(static_cast<Derived &>(*this));
+          return;
+        }
+      }
+    }
+  }
+
+  /// The AL field number of a member of this record, found by where it sits.
+  [[nodiscard]] ::agiru::FieldNo NumberOf(const void *member) const {
+    const auto offset = static_cast<std::size_t>(static_cast<const std::byte *>(member) -
+                                                 static_cast<const std::byte *>(Self()));
+    const FieldDef *def = FieldAtOffset(TableTraits<Derived>::kTable, offset);
+    if (def == nullptr) {
+      throw Error("this record, a " + std::string(TableTraits<Derived>::kTable.name) +
+                  ", declares no field at byte " + std::to_string(offset) +
+                  ": the member belongs to another record");
+    }
+    return def->no;
+  }
+
+  /// \note THE CRTP PAIRING IS CHECKED HERE AND NOT BY A PRIVATE CONSTRUCTOR. A private default
+  ///       constructor with `friend Derived` is the usual guard, and it makes the generated class a
+  ///       NON-INITIALISABLE AGGREGATE: a table has no user-declared constructor, so `X Rec{}` is
+  ///       aggregate initialisation, which initialises this base from the CALLER's context and is
+  ///       refused there. Every page and every local record hit it. The assertion below catches the
+  ///       same misuse -- `class Wrong : public Table<Right>` -- the moment any method is used, and
+  ///       costs nothing at run time.
+  /// \warning `Self()` IS `void *` -- it feeds the type-erased `Runtime*` bridge, so
+  ///          `Self()->OnInsert()` does not compile and never did. A trigger is called through
+  ///          `static_cast<Derived *>(this)`, which is the same address with the type kept.
+  [[nodiscard]] const void *Self() const {
+    static_assert(std::is_base_of_v<Table, Derived>, "a table must derive from Table of itself");
+    return static_cast<const Derived *>(this);
+  }
+
+protected:
+  /// \brief Writes the primary key fields from the values AL's `Get` was handed.
+  ///
+  /// \tparam Keys The key field types, in key order.
+  /// \param  keys The primary key values, which may be FEWER than the key has fields.
+  /// \throws Error when more values are handed than the key has fields.
+  ///
+  /// \note FEWER IS LEGAL AND THE PAGE SAYS SO. `record-get-method.md`: "Get doesn't require
+  ///       specifying all fields of the key in the call; any omitted field is treated as default
+  ///       value (for example, '' for text/code, false for boolean). You can only omit from the END
+  ///       of the key, not a field in the middle." So the omitted tail is CLEARED rather than left
+  ///       standing -- a record that already held a value there would otherwise search for a row
+  ///       the caller never named.
+  ///
+  /// \note `Get()` WITH NO ARGUMENTS AT ALL IS THE SETUP-TABLE IDIOM. Every `... Setup` table in
+  ///       the BaseApp has a single row under a blank primary key, and `GLSetup.Get()` is how AL
+  ///       reads it. Refusing it failed all 30 procedures of `ERM VAT Tool - UT` at once.
+  ///
+  /// \note Shared with the temporary store, which assigns the key the same way and then searches
+  ///       its own rows rather than the database. Doing it twice was the alternative.
+  [[nodiscard]] std::string PrimaryKeyText() const {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (table.keys.empty()) { return {}; }
+    std::string out;
+    for (const ::agiru::FieldNo no : table.keys[0].fields) {
+      const auto found = std::ranges::find_if(
+          table.fields, [no](const FieldDef &field) { return field.no == no; });
+      if (found == table.fields.end()) { continue; }
+      if (!out.empty()) { out += ", "; }
+      out += ::agiru::FieldText(Self(), *found);
+    }
+    return out;
+  }
+
+  template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
+    const TableDef &table = TableTraits<Derived>::kTable;
+    if (table.keys.empty() || table.keys[0].fields.size() < sizeof...(Keys)) {
+      throw Error("Get: more values than the primary key has fields");
+    }
+    std::size_t position = 0;
+    (AssignKey(table, position++, keys), ...);
+    for (std::size_t rest = sizeof...(Keys); rest < table.keys[0].fields.size(); ++rest) {
+      detail::ClearKeyField(Self(), table, rest);
+    }
+  }
+
+private:
+  [[nodiscard]] void *Self() {
+    static_assert(offsetof(Derived, State_Block) == 0,
+                  "a record's State_Block is its first member: the runtime reaches the state at "
+                  "offset 0 of whatever record it is handed, generated or platform");
+    return static_cast<Derived *>(this);
+  }
+
+  /// The record variable's own state, made on the first call.
+  ///
+  /// A STANDARD-LAYOUT OBJECT'S ADDRESS IS ITS FIRST MEMBER'S ADDRESS, and the generator emits the
+  /// state handle first and asserts the offset is zero beside every table. So the base reaches it
+  /// without the generated file declaring an accessor -- the language guarantees the cast, and the
+  /// assertion holds the layout it depends on (board:0018).
+  /// \brief Raises one of the database trigger events (`devenv-event-types.md:109`) with the
+  ///        parameters the page names: `Rec` is this record, `xRec` this record too until the
+  ///        before image is read from the row (board:0057, phase 2), `RunTrigger` the flag.
+  /// \brief Raises `OnBeforeValidateEvent` or `OnAfterValidateEvent` for one field, the field's
+  ///        AL name as the element, with `Rec`, `xRec` (the record before the assignment) and
+  ///        `CurrFieldNo` (`devenv-event-types.md:151`) -- the system variable, so 0 from code:
+  ///        the BaseApp compares it with `Rec.FieldNo(<the element>)` eleven times, which under
+  ///        the other reading would be a tautology (openerp WI-1309).
+  void ValidateEvent(std::string_view event, ::agiru::FieldNo no, const Derived &before) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "CurrFieldNo"};
+    std::string_view element;
+    for (const FieldDef &def : TableTraits<Derived>::kTable.fields) {
+      if (def.no == no) { element = def.name; }
+    }
+    auto &rec = static_cast<Derived &>(*this);
+    Derived xRec = before;
+    ::agiru::Integer currFieldNo = detail::Validating();
+    detail::RaiseEventOn(EventObject::Table,
+                         TableTraits<Derived>::kTable.id.Value(),
+                         TableTraits<Derived>::kTable.name,
+                         event,
+                         element,
+                         kNames,
+                         rec,
+                         xRec,
+                         currFieldNo);
+  }
+
+  /// THE EVENT'S `xRec` IS THE RECORD AS IT WAS: the stored image for a modify, the row under
+  /// the old key for a rename (`devenv-onafterrenameevent-table-trigger.md` declares
+  /// `var xRec`). Handing `Rec` twice made `Price Helper V16.AfterRenameItem` rename the
+  /// price lines from the NEW number to itself, and `Item.Rename` left every price line on the
+  /// old one (Price Worksheet Line UT and Price List Line UT, 14 cases, 2026-09-12).
+  void TableEvent(std::string_view event, Boolean RunTrigger) {
+    TableEvent(event, RunTrigger, StoredImage());
+  }
+
+  void TableEvent(std::string_view event, Boolean RunTrigger, Derived &before) {
+    static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "RunTrigger"};
+    auto &rec = static_cast<Derived &>(*this);
+    detail::RaiseEventFrom(static_cast<void *>(&rec),
+                           EventObject::Table,
+                           TableTraits<Derived>::kTable.id.Value(),
+                           TableTraits<Derived>::kTable.name,
+                           event,
+                           {},
+                           kNames,
+                           rec,
+                           before,
+                           RunTrigger);
+  }
+
+  /// Takes the image `xRec` reads: a copy of this record with no state of its own, so an image
+  /// never carries an image (board:0042). WI-1156 is why it is taken after an INSERT as well as
+  /// after a modify: without it, a second line's OnModify read the FIRST line's image.
+  /// A read that found a row leaves the record carrying that row as its image. WI-1078: `xRec` is
+  /// the record's own STORED image and not a trigger-scoped hand-in, so a plain `Get` gives it one.
+  bool Read(bool found) {
+    if (found) {
+      CalcAuto();
+      CaptureImage();
+    }
+    return found;
+  }
+
+  void CalcAuto() {
+    const detail::RecordState *state = Filtered();
+    if (state == nullptr || state->autoCalc.empty()) { return; }
+    for (const ::agiru::FieldNo no : state->autoCalc) {
+      detail::CalcField(Self(), TableTraits<Derived>::kTable, state, no);
+    }
+  }
+
+  /// The same, for a step whose answer is how many rows it moved.
+  Integer Stepped(Integer moved) {
+    if (moved != 0) {
+      CalcAuto();
+      CaptureImage();
+    }
+    return moved;
+  }
+
+  void CaptureImage() {
+    auto *copy =
+        new Derived(*static_cast<const Derived *>(this)); // NOLINT(cppcoreguidelines-owning-memory)
+    copy->State_Block = detail::StateHandle{};
+    State().image.Hold(copy);
+  }
+
+  /// A record that was Init'd or Cleared has a BLANK image and not a mirror of itself, which is
+  /// openerp WI-1078: a mirror makes every `Rec.F <> xRec.F` trivially false.
+  void BlankImage() {
+    State().image.Hold(new Derived{}); // NOLINT(cppcoreguidelines-owning-memory)
+  }
+
+  [[nodiscard]] detail::RecordState &State() {
+    return reinterpret_cast<detail::StateHandle *>(Self())->Ensure();
+  }
+
+  /// The state as it stands, or nothing when this record has never filtered.
+  [[nodiscard]] const detail::RecordState *Filtered() const {
+    return reinterpret_cast<const detail::StateHandle *>(static_cast<const Derived *>(this))
+        ->Peek();
+  }
+
+  template <typename Key>
+  void AssignKey(const TableDef &table, std::size_t position, const Key &value) {
+    const FieldDef *def = Field(table, table.keys[0].fields[position]);
+    if (def == nullptr) { throw Error("Get: the primary key names a field the table lacks"); }
+    if constexpr (std::convertible_to<const Key &, std::string_view>) {
+      detail::SetFieldText(Self(), *def, std::string_view(value));
+    } else {
+      if (def->type == FieldType::Option || def->type == FieldType::Enum ||
+          def->type == FieldType::Integer || def->type == FieldType::BigInteger) {
+        if constexpr (requires { value.AsInteger(); }) {
+          detail::SetFieldText(Self(), *def, std::to_string(value.AsInteger()));
+          return;
+        } else if constexpr (std::is_enum_v<Key>) {
+          detail::SetFieldText(Self(), *def, std::to_string(static_cast<std::int64_t>(value)));
+          return;
+        } else if constexpr (std::integral<Key> && !std::same_as<Key, bool>) {
+          detail::SetFieldText(Self(), *def, std::to_string(value));
+          return;
+        }
+      }
+      if constexpr (requires { FieldTypeOf<Key>::kType; }) {
+        if (def->type != FieldTypeOf<Key>::kType) {
+          throw Error("Get: " + std::string(def->name) +
+                      " is not the type this key value is, and writing it there would write past "
+                      "the field");
+        }
+      }
+      *reinterpret_cast<Key *>(static_cast<std::byte *>(Self()) + def->offset) = value;
+    }
+  }
+};
+
+/// \brief AL `CurrFieldNo` -- the field a `Validate` is running for, or 0 outside one.
+///
+/// \return The field number.
+///
+/// `devenv-system-defined-variables.md` lists it among the system-defined variables: "the field
+/// number of the current field in the current table". The BaseApp reads it to tell an interactive
+/// validation from a programmatic one -- `if CurrFieldNo <> 0 then` guards a dialog.
+///
+/// \note IT IS SPELLED WITH PARENTHESES AND AL SPELLS IT WITHOUT. AL has system VARIABLES and C++
+///       has none that could be per-session without a global; the generator adds the parentheses,
+///       which is a visible and uniform deviation rather than a clever one.
+[[nodiscard]] ::agiru::Integer CurrFieldNo();
+
+/// \brief AL `CurrFieldNo := FieldNo(...)` -- the BaseApp ASSIGNS the system variable to make a
+///        later `Validate` behave as if the user had entered that field.
+/// \param no The field number the running trigger should report.
+/// \throws Error always -- setting the current field outside the trigger machinery is board:0042.
+inline void CurrFieldNo(::agiru::Integer no) {
+  throw Error("CurrFieldNo := " + std::to_string(no) +
+              " needs the validating-field machinery (board:0042)");
+}
+
+/// \brief How the runtime reaches temporary rows of one table: a `std::vector` of the generated
+///        class, and a row is the record with its state left behind.
+/// \tparam T The generated table class.
+template <typename T> struct TempRows {
+  std::vector<T> rows; ///< In primary-key order, which is what AL walks.
+};
+
+/// \brief The `TempOps` for one table, one instance per type in `.rodata`.
+///
+/// \tparam T The generated table class.
+///
+/// \note A ROW CARRIES NO STATE. What goes into the store is the record's fields; its filters,
+///       its cursor and its own store pointer stay with the variable, and `load` copies the
+///       fields back out around the variable's state -- so a walk never inherits a row's filters.
+///
+/// \note A ROW CARRIES NO VARIABLES EITHER. A table's globals belong to the record VARIABLE and
+///       not to a row: `Sales Line` initialises its global `Currency` and then walks its own rows,
+///       and a load that assigned the whole object handed it the row's empty block -- every VAT
+///       amount was then rounded to a precision of zero (44 UT cases, measured 2026-09-09). The
+///       `Var_Block` handle is a `Globals`, which an assignment leaves alone and a copy starts
+///       unmade, so a stored row holds none and a load keeps the variable's.
+template <typename T>
+constexpr detail::TempOps kTempOps{
+    .make = []() -> void * { return new TempRows<T>{}; },
+    .destroy = [](void *rows) { delete static_cast<TempRows<T> *>(rows); },
+    .count = [](const void *rows) { return static_cast<const TempRows<T> *>(rows)->rows.size(); },
+    .at = [](const void *rows, std::size_t index) -> const void * {
+      return &static_cast<const TempRows<T> *>(rows)->rows[index];
+    },
+    .insert =
+        [](void *rows, std::size_t at, const void *record) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          held.insert(held.begin() + static_cast<std::ptrdiff_t>(at), std::move(copy));
+        },
+    .replace =
+        [](void *rows, std::size_t at, const void *record) {
+          T copy = *static_cast<const T *>(record);
+          reinterpret_cast<detail::StateHandle *>(&copy)->Forget();
+          static_cast<TempRows<T> *>(rows)->rows[at] = std::move(copy);
+        },
+    .erase =
+        [](void *rows, std::size_t at) {
+          std::vector<T> &held = static_cast<TempRows<T> *>(rows)->rows;
+          held.erase(held.begin() + static_cast<std::ptrdiff_t>(at));
+        },
+    .clear = [](void *rows) { static_cast<TempRows<T> *>(rows)->rows.clear(); },
+    .load =
+        [](void *record, const void *row) {
+          auto *state = reinterpret_cast<detail::StateHandle *>(record);
+          detail::StateHandle keep = std::move(*state);
+          *static_cast<T *>(record) = *static_cast<const T *>(row);
+          *state = std::move(keep);
+        },
+};
+
+/// \brief AL `Record "X" temporary` -- the same table with no database behind it.
+///
+/// From `SetTemporary` and the `temporary` keyword: the record keeps its fields, its keys and its
+/// triggers, and its rows live in the variable rather than in a table. **Temporariness is state,
+/// not type** (board:0583): the constructor installs the rows into the record's state, and from
+/// then on every `Insert`, `Find` and `SetRange` of the base class reads that state -- so a
+/// `T &` parameter bound to a temporary record keeps it temporary, which is what a `var X: Record
+/// T temporary` parameter is in AL.
+///
+/// \tparam T The generated table class.
+template <typename T> class Temporary : public T {
+public:
+  /// \brief A temporary record with a store of its own.
+  Temporary() { detail::RuntimeMakeTemporary(this, &kTempOps<T>); }
+
+  /// \brief AL `Temp := Other` -- the fields and filters come across, the rows stay this
+  ///        variable's own (`detail::StateHandle::operator=`).
+  Temporary &operator=(const T &o) {
+    T::operator=(o);
+    return *this;
+  }
+
+  /// \brief AL `TempRec := SomeVariant` -- the record the Variant refers to, copied in.
+  /// \param held The Variant, which must hold a record of this table.
+  /// \return This record.
+  ///
+  /// \note IT IS SPELLED OUT BECAUSE THE OTHER TWO ARE EQUALLY GOOD. A Variant reaches `T` through
+  ///       its own conversion and `T::operator=` takes one, so without this the assignment is
+  ///       ambiguous rather than wrong -- which a page whose source is temporary walks into
+  ///       (`ContractTrendLines`, measured 2026-09-08).
+  Temporary &operator=(const Variant &held) {
+    T::operator=(static_cast<const T &>(held));
+    return *this;
+  }
+
+  /// \brief AL `TempRec := GlobalRec` where the other record is held by handle.
+  /// \tparam H The handle's type.
+  /// \param held The handle, whose record is copied in.
+  /// \return This record.
+  ///
+  /// \note THE HANDLE IS AGIRU'S AND NOT AL'S, so it has to disappear here too: without this the
+  ///       assignment is ambiguous between the handle's conversion to `T` and the Variant one.
+  template <typename H>
+    requires std::convertible_to<H &, T &> && (!std::derived_from<H, T>)
+  Temporary &operator=(H &held) {
+    T::operator=(static_cast<T &>(held));
+    return *this;
+  }
+
+  Temporary(const Temporary &) = default;
+  Temporary(Temporary &&) noexcept = default;
+  Temporary &operator=(const Temporary &) = default;
+  Temporary &operator=(Temporary &&) noexcept = default;
+  ~Temporary() = default;
+};
+
+/// \brief A temporary record's declaration is its table's declaration.
+///
+/// `record-istemporary-method.md` makes temporary a property of the VARIABLE and not of the
+/// table, so the field table, the keys and the `OnValidate` map are the same.
+template <typename T> struct TableTraits<Temporary<T>> : TableTraits<T> {};
+
+template <typename T> class Instance;
+
+/// \brief A record a codeunit holds by handle (`Instance<T>`, board:0018) declares what its
+///        table declares, so `Rec.Copy(GlobalRec)` and `Variant(GlobalRec)` see the table.
+template <typename T>
+  requires requires { TableTraits<T>::kTable; }
+struct TableTraits<Instance<T>> : TableTraits<T> {};
+
+}

@@ -1,0 +1,230 @@
+#pragma once
+
+#include "type/Decimal.h"
+
+#include <compare>
+#include <concepts>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+
+/// \file
+/// \brief AL `Duration` -- how long, in milliseconds, and possibly negative.
+
+namespace agiru {
+
+/// \brief AL `Duration`.
+///
+/// From `duration-data-type.md`: "Represents the difference between two DateTimes. This value can
+/// be negative. It is stored as a 64-bit integer. The integer value is the number of milliseconds
+/// during the duration." The page also gives the algebra outright:
+///
+///     DateTime - DateTime = Duration
+///     DateTime - Duration = DateTime
+///     DateTime + Duration = DateTime
+///
+/// \note A CLASS RATHER THAN AN ALIAS, AND IT WAS AN ALIAS UNTIL SOMETHING NEEDED THE DIFFERENCE.
+///       `Duration` and `BigInteger` are both 64-bit integers, and while they were the same C++
+///       type nothing could tell them apart -- `Variant` could not hold both, because AL asks
+///       `IsDuration()` and `IsBigInteger()` as two questions and `std::variant` refuses a
+///       duplicate alternative. `FieldRef` needs the same distinction to render a field at all. The
+///       alias's argument was that generated AL code does arithmetic on durations constantly and a
+///       wrapper would forward every operator; that argument survives, because the operators below
+///       are exactly the ones it would have forwarded, and there are seven of them.
+///
+/// \note The construction from a number is IMPLICIT on purpose. The page says "the value of the
+///       Duration data type can also be explicitly defined in milliseconds", and AL writes
+///       `Wait := 1000;` -- so the generated line reads the way the AL line reads.
+class Duration {
+public:
+  /// \brief No time at all.
+  constexpr Duration() = default;
+
+  /// \brief A number of milliseconds.
+  /// \param milliseconds How long, negative for a duration that runs backwards.
+  constexpr Duration(std::int64_t milliseconds) : milliseconds_(milliseconds) {}
+
+  /// \brief AL assigns a `Decimal` to a `Duration` -- `Duration := Round(...)` is 40-odd call
+  ///        sites -- and a duration IS a number of milliseconds.
+  /// \tparam D The number's type, which must convert to one.
+  /// \param milliseconds The milliseconds, rounded to whole ones.
+  template <typename D>
+    requires(
+        !std::is_arithmetic_v<D> && !std::is_same_v<D, Duration> &&
+        !requires { typename D::IsAlRefusal; } && !requires { typename D::Held; } &&
+        std::is_convertible_v<const D &, std::int32_t>)
+  constexpr Duration(const D &milliseconds)
+      : milliseconds_(static_cast<std::int64_t>(static_cast<std::int32_t>(milliseconds))) {}
+
+  /// \brief Reads as its milliseconds, which is how AL assigns a Duration to a BigInteger.
+  /// \return The milliseconds.
+  /// \note `DurationAsInt := CurrentDateTime - StartTime` in `Config. Package Management`; the
+  ///       duration IS a number of milliseconds in AL (`duration-data-type.md`).
+  constexpr explicit(false) operator std::int64_t() const { return milliseconds_; }
+
+  /// \brief AL `DecimalVar := Duration`: the milliseconds as a Decimal, which AL converts on
+  ///        assignment and a procedure argument (`TelemetryLogMetrics.LogMeasure`).
+  explicit(false) operator Decimal() const { return Decimal(milliseconds_); }
+
+  /// \return The count of milliseconds, which is what the page says a Duration IS.
+  [[nodiscard]] constexpr std::int64_t Milliseconds() const { return milliseconds_; }
+
+  /// \return True when no time passes.
+  [[nodiscard]] constexpr bool IsZero() const { return milliseconds_ == 0; }
+
+  /// \brief AL `Format(Duration, 0, 9)` -- the invariant text.
+  ///
+  /// \return The count of milliseconds as digits.
+  ///
+  /// \note Named for what it is rather than `ToText()`, because `duration-totext-method.md` says
+  ///       ToText() is "equivalent to calling Format(value, 0, 0)", and format 0 renders a duration
+  ///       in words -- `2 days 3 hours` -- in the session's language. There is no language here.
+  [[nodiscard]] std::string ToInvariantString() const;
+
+  /// \brief Adds two durations.
+  /// \param o The other.
+  /// \return Their sum.
+  [[nodiscard]] constexpr Duration operator+(const Duration &o) const {
+    return Duration{milliseconds_ + o.milliseconds_};
+  }
+
+  /// \brief Subtracts two durations.
+  /// \param o The other.
+  /// \return Their difference.
+  [[nodiscard]] constexpr Duration operator-(const Duration &o) const {
+    return Duration{milliseconds_ - o.milliseconds_};
+  }
+
+  /// \brief Reverses a duration.
+  /// \return The same length, running the other way.
+  [[nodiscard]] constexpr Duration operator-() const { return Duration{-milliseconds_}; }
+
+  /// \brief AL `Duration - Integer` -- milliseconds.
+  /// \param milliseconds The milliseconds.
+  /// \return The shorter duration.
+  ///
+  /// \note IT IS AN EXACT OVERLOAD SO THE SUBTRACTION IS NOT AMBIGUOUS. A `Duration` converts to
+  ///       `std::int64_t` and takes one, so `Duration - 1440 * 1000 * 60` had a built-in reading
+  ///       and a member one, equally good. The `int` overload beside it is what an AL literal
+  ///       actually is, and an exact match beats the built-in outright.
+  [[nodiscard]] constexpr Duration operator-(std::int64_t milliseconds) const {
+    return Duration{milliseconds_ - milliseconds};
+  }
+
+  /// \brief AL `Duration + Integer` -- milliseconds.
+  /// \param milliseconds The milliseconds.
+  /// \return The longer duration.
+  [[nodiscard]] constexpr Duration operator+(std::int64_t milliseconds) const {
+    return Duration{milliseconds_ + milliseconds};
+  }
+
+  /// \brief AL `Duration - Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The shorter duration.
+  [[nodiscard]] constexpr Duration operator-(std::int32_t milliseconds) const {
+    return Duration{milliseconds_ - milliseconds};
+  }
+
+  /// \brief AL `Duration + Integer` with the literal's own type.
+  /// \param milliseconds The milliseconds.
+  /// \return The longer duration.
+  [[nodiscard]] constexpr Duration operator+(std::int32_t milliseconds) const {
+    return Duration{milliseconds_ + milliseconds};
+  }
+
+  /// \brief Repeats a duration.
+  /// \param factor How many times.
+  /// \return The product.
+  [[nodiscard]] constexpr Duration operator*(std::int64_t factor) const {
+    return Duration{milliseconds_ * factor};
+  }
+
+  /// \brief Divides a duration.
+  /// \param divisor By how much.
+  /// \return The quotient, truncated toward zero as integer division is.
+  [[nodiscard]] constexpr Duration operator/(std::int64_t divisor) const {
+    return Duration{milliseconds_ / divisor};
+  }
+
+  /// \brief AL `Duration * Decimal` -- the BaseApp scales a remaining duration by a ratio
+  ///        (`Change Global Dim. Log Entry`), and the answer is a Duration to the millisecond.
+  /// \param factor The ratio.
+  /// \return The product, rounded to whole milliseconds.
+  [[nodiscard]] Duration operator*(const Decimal &factor) const;
+
+  /// \brief AL `Decimal * Duration`. \param factor The ratio. \param d The duration.
+  /// \return The product.
+  friend Duration operator*(const Decimal &factor, const Duration &d) { return d * factor; }
+
+  /// \brief AL `Duration / Decimal`. \param divisor The ratio. \return The quotient in whole ms.
+  [[nodiscard]] Duration operator/(const Decimal &divisor) const;
+
+  /// \brief Adds to this duration.
+  /// \param o The other.
+  /// \return This duration.
+  constexpr Duration &operator+=(const Duration &o) {
+    milliseconds_ += o.milliseconds_;
+    return *this;
+  }
+
+  /// \brief Subtracts from this duration.
+  /// \param o The other.
+  /// \return This duration.
+  constexpr Duration &operator-=(const Duration &o) {
+    milliseconds_ -= o.milliseconds_;
+    return *this;
+  }
+
+  /// \brief Orders two durations.
+  /// \param o The other.
+  /// \return The ordering.
+  [[nodiscard]] constexpr std::strong_ordering operator<=>(const Duration &o) const = default;
+
+  /// \brief Compares two durations.
+  /// \param o The other.
+  /// \return True when they are the same length.
+  [[nodiscard]] constexpr bool operator==(const Duration &o) const = default;
+
+  /// \brief AL `Duration >= Integer`, `Duration / Integer` and the rest, with an integral operand
+  ///        -- exact, so the `int64` conversion above and the constructor from one never compete.
+  template <std::integral I> [[nodiscard]] constexpr std::strong_ordering operator<=>(I o) const {
+    return milliseconds_ <=> static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr bool operator==(I o) const {
+    return milliseconds_ == static_cast<std::int64_t>(o);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator/(I divisor) const {
+    return *this / static_cast<std::int64_t>(divisor);
+  }
+
+  template <std::integral I> [[nodiscard]] constexpr Duration operator*(I factor) const {
+    return *this * static_cast<std::int64_t>(factor);
+  }
+
+private:
+  std::int64_t milliseconds_{0};
+};
+
+/// \brief Repeats a duration, with the count written first.
+/// \param factor How many times.
+/// \param d      The duration.
+/// \return The product.
+[[nodiscard]] constexpr Duration operator*(std::int64_t factor, const Duration &d) {
+  return d * factor;
+}
+
+/// \brief Repeats a duration, with an `Integer` written first.
+/// \param factor How many times.
+/// \param d      The duration.
+/// \return The product.
+///
+/// \note IT IS THE `int` OVERLOAD AND IT EARNS ITS PLACE. AL's literal and its `Integer` are
+///       `int`, and only an exact match on both operands beats the built-in arithmetic the
+///       duration's own conversion to a number offers.
+[[nodiscard]] constexpr Duration operator*(std::int32_t factor, const Duration &d) {
+  return d * static_cast<std::int64_t>(factor);
+}
+
+}

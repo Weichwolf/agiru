@@ -1,0 +1,520 @@
+#pragma once
+
+#include "meta/EnumDef.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Error.h"
+#include "type/Boolean.h"
+#include "type/Decimal.h"
+#include "type/Option.h"
+#include "type/StringValue.h"
+#include "type/Variant.h"
+
+#include <compare>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <vector>
+
+/// \file
+/// \brief The AL record operations that raise the platform's own error messages.
+
+namespace agiru {
+
+/// \brief Reads one field of a record as the text AL would put in a message.
+///
+/// \param record The record, addressed as raw storage.
+/// \param def    The field to read.
+/// \return The value as AL renders it: a string as itself, a decimal in invariant notation, an
+///         option by its member name.
+/// \throws Error when the field's type has no rendering yet. That is loud on purpose -- a silent
+///         empty string here becomes an error message missing its value, which reads as a defect
+///         somewhere else entirely.
+///
+/// Addressing the record as bytes plus an offset is what makes this work for every table without a
+/// virtual call and without the runtime knowing a single AL object.
+[[nodiscard]] std::string FieldText(const void *record, const FieldDef &def);
+
+namespace detail {
+
+/// \brief One field as the DATABASE holds it, which is not always how a message shows it.
+///
+/// \param record The record, addressed as raw storage.
+/// \param def    The field.
+/// \return The value in its round-tripping form.
+///
+/// \warning AN OPTION IS ITS ORDINAL HERE AND ITS MEMBER NAME IN `FieldText`, and a value that
+///          has to be READ BACK must come through this one. The pair is what `TransferFields`
+///          moves a value with, and what a `RecordId` carries so that `Get(RecordId)` finds the
+///          row again.
+[[nodiscard]] std::string StorageText(const void *record, const FieldDef &def);
+
+/// \brief What `Format(Any)` makes of a value, reached from where `Format` is not yet declared.
+///
+/// \param value The value, held in a Variant.
+/// \return Its text.
+///
+/// \note IT EXISTS TO BREAK A CYCLE AND NOT TO ADD A SPELLING. `AsText` renders what `Format`
+///       renders, and the door's `Format(Any, ...)` is declared in `BuiltinsWritten.h`, which
+///       includes this header -- so `AsText` cannot name it. Calling the OTHER `Format`, the
+///       constrained template beneath it, is what a fallback here means, and that one is defined
+///       as `AsText`: the two recursed until the stack ran out (board:0616).
+[[nodiscard]] std::string VariantText(const Variant &value);
+
+}
+
+/// \brief Orders one field of two records of the same table.
+///
+/// \param a   One record.
+/// \param b   The other.
+/// \param def The field, which decides how the two values are compared.
+/// \return The ordering.
+///
+/// \warning BY TYPE AND NEVER BY TEXT. Rendering both sides and comparing the strings orders "10"
+///          before "9", which is the wrong walk order for every table keyed on an entry number --
+///          and wrong silently, because both orders look plausible until the numbers reach ten.
+[[nodiscard]] std::strong_ordering CompareField(const void *a, const void *b, const FieldDef &def);
+
+/// \brief Tests whether a field holds the blank of its type.
+///
+/// \param record The record, addressed as raw storage.
+/// \param def    The field to test.
+/// \return True for an empty string, a zero number, or ordinal zero.
+///
+/// From `record-testfield-joker-method.md`: "If you omit this parameter and the contents of Field
+/// is zero or blank (empty string), then an error message is displayed."
+[[nodiscard]] bool IsBlank(const void *record, const FieldDef &def);
+
+/// \brief AL `Record.FieldCaption(Field)`.
+///
+/// \param table The record's table.
+/// \param no    The field number.
+/// \return The field's `Caption` property.
+/// \throws Error when the table declares no such field.
+/// \see `record-fieldcaption-method.md`
+[[nodiscard]] std::string_view FieldCaption(const TableDef &table, FieldNo no);
+
+/// \brief AL `Record.FieldError(Field [, Text])` -- raises an error naming a field.
+///
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field the message is about.
+/// \param text   Optional replacement for the default wording.
+/// \throws Error always.
+///
+/// The three forms are the documentation's own worked examples, and the trailing full stop is the
+/// platform's ("Note that a period is automatically inserted at the end of a FieldError"):
+///
+/// \verbatim
+/// FieldError("No.")                  blank  -> You must specify No. in Customer No.=''.
+/// FieldError("No.")                  valued -> No. must not be NEW 3500 in Customer No.='NEW
+/// 3500'. FieldError("No.", 'is not valid')         -> No. is not valid in Customer No.='NEW 3500'.
+/// \endverbatim
+///
+/// \warning The primary key is rendered with one leading space and commas with NO space after
+///          them. TestField() renders it differently, and that difference is load-bearing rather
+///          than a slip.
+/// \see `record-fielderror-joker-string-method.md`
+[[noreturn]] void
+FieldError(const void *record, const TableDef &table, FieldNo no, std::string_view text = {});
+
+/// \brief AL `Record.TestField(Field)` -- raises when the field holds its type's blank.
+///
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field to test.
+/// \throws Error when the field is blank, with the message
+///
+/// \verbatim
+/// Code must have a value in Resource Cost: Type='Resource', Code=''. It cannot be zero or empty.
+/// \endverbatim
+///
+/// \warning The primary key is rendered after a COLON, with commas that DO carry a space. That is
+///          not what FieldError() does. The form is in no document; it comes from the predecessor,
+///          where it was verified against the official BC test suite, and it matters because BC
+///          test code matches the message text.
+/// \see `record-testfield-joker-method.md`
+/// \note IT LIVES IN `detail` BECAUSE `TestField` IS ALSO AN AL TYPE. The test framework's
+///       `TestField` is one control of a page, and a class and a function of the same name in one
+///       namespace make every use of the class ambiguous. The door keeps the TYPE, because that is
+///       what AL code writes; this is the platform half behind `Record::TestField`, which no
+///       generated file ever names.
+namespace detail {
+
+/// \brief The platform half of `Record.TestField(Field)` -- raises when the field holds its blank.
+/// \param record The record whose primary key the message quotes.
+/// \param table  The record's table.
+/// \param no     The field to test.
+/// \throws Error with BC's own wording when the field holds its type's zero.
+void TestField(const void *record, const TableDef &table, FieldNo no);
+
+}
+
+/// \brief Internals of the record operations. Not part of the door.
+namespace detail {
+
+/// \brief Raises TestField's mismatch message.
+///
+/// \param record   The record whose primary key the message quotes.
+/// \param table    The record's table.
+/// \param def      The field that did not match.
+/// \param expected The expected value, already rendered.
+/// \param actual   The stored value, already rendered.
+/// \throws Error always.
+///
+/// \warning The DOUBLE SPACE before the word "in" is BC-faithful and not a typo. It comes from the
+///          predecessor, verified there against the official test suite; removing it stops an
+///          `Assert.ExpectedError` substring from matching.
+[[noreturn]] void RaiseTestFieldMismatch(const void *record,
+                                         const TableDef &table,
+                                         const FieldDef &def,
+                                         std::string_view expected,
+                                         std::string_view actual);
+
+/// \brief Renders an option ordinal through its field's member table.
+///
+/// \param def     The field, which carries the member names.
+/// \param ordinal The zero-based member number.
+/// \return The member name, or the ordinal as digits when it is undeclared.
+[[nodiscard]] std::string MemberText(const FieldDef &def, std::int32_t ordinal);
+
+/// \brief The member of an Option or Enum field spelled by NAME, as a filter spells it.
+///
+/// \param def  The field, which carries the member names.
+/// \param text The name or the CAPTION, matched without regard to case, or the ordinal as digits;
+///             `%1` of an enum in `StrSubstNo` renders the caption, and a filter built that way
+///             carries `Project Usage` for the member named `Job Usage`.
+/// \return The ordinal as digits, or `text` unchanged when it names no member -- the database
+///         then refuses it loudly rather than this layer guessing.
+///
+/// \note `SetFilter(Status, '%1|%2', Status::Open, Status::Created)` reaches the filter as
+///       `Open|Created`, because `%1` of an enum renders its NAME; SQL wants the column's
+///       integer. 114 UT failures were `invalid input syntax for type integer: "Open"`
+///       (measured 2026-09-08).
+[[nodiscard]] std::string MemberOrdinal(const FieldDef &def, std::string_view text);
+
+struct RecordState;
+
+/// \brief AL `Record.CalcFields(Field)` for ONE FlowField: evaluates its `CalcFormula` and writes
+///        the result into the record.
+///
+/// \param record The record, whose ordinary fields and FlowFilters the formula reads.
+/// \param table  Its declaration.
+/// \param state  Its filters, or `nullptr` when it never filtered; a `FIELD(FlowFilter)` term
+///               reads the filter standing on that FlowFilter.
+/// \param no     The FlowField. A stored field is left as it is, which is what AL does for a
+///               `CalcFields` over a BLOB: the row already carried it.
+/// \throws Error when the formula names a table or field this build does not carry, or a shape
+///         the reader does not know -- loudly, never as a zero.
+///
+/// \note THE FORMULA IS THE DOCUMENTATION'S GRAMMAR (`devenv-calcformula-property.md`): seven
+///       kinds -- `Sum`, `Average`, `Exist`, `Count`, `Min`, `Max`, `Lookup` -- over a table and
+///       a field, narrowed by `CONST`, `FILTER`, `FIELD`, `FIELD(FILTER)`, `FIELD(UPPERLIMIT)`
+///       and `FIELD(UPPERLIMIT(FILTER))`, with a leading `-` for `ReverseSign`. It is evaluated
+///       as ONE aggregate statement over the target table (board:0047); SIFT (board:0019) is the
+///       index that makes that statement fast, not a second code path.
+void CalcField(void *record, const TableDef &table, const RecordState *state, FieldNo no);
+
+/// \brief `CalcField` the way a PAGE calculates what it shows: a stored field, or a FlowField whose
+///        formula names a table this build does not carry, is left alone rather than refused --
+///        the page shows the field whether or not a test reads it, and a refusal there would stop
+///        every landing on the page.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param state  Its filters, for the formula's `FIELD(FILTER(...))` terms.
+/// \param no     The field.
+/// \return Whether the field was calculated.
+/// \throws Error what `CalcField` throws for a formula this runtime cannot read.
+bool CalcFieldIfCarried(void *record, const TableDef &table, const RecordState *state, FieldNo no);
+
+/// \brief AL `Record.CalcSums(Field)` for ONE field: the sum of that column over the rows the
+///        record's filters select.
+///
+/// \param record The record; the sum lands in the field.
+/// \param table  Its declaration.
+/// \param state  Its filters, or `nullptr`.
+/// \param no     The field, which must be stored and numeric.
+/// \throws Error when the field is a FlowField or not numeric.
+void CalcSum(void *record, const TableDef &table, const RecordState *state, FieldNo no);
+
+/// \brief AL `Record.Rename(NewKeys...)`'s row operation: the row `before` identifies moves to
+///        the key `record` now carries.
+/// \param record The record, its key fields already holding the NEW key.
+/// \param before The same record as it was, whose key finds the row.
+/// \param table  The declaration.
+/// \return Whether a row was there to rename.
+bool RuntimeRename(void *record, const void *before, const TableDef &table);
+
+/// \brief AL `Record.FilterGroup(NewGroup)` on any record: sets the group later filters land in.
+/// \param record The record.
+/// \param group  The group.
+/// \return The group that was current.
+Integer RuntimeFilterGroup(void *record, Integer group);
+
+/// \brief AL `Record.GetRangeMax` / `GetRangeMin`: the bound of the filter standing on a field.
+/// \param state The record's filters, or `nullptr`.
+/// \param no    The field.
+/// \param upper True for the maximum, false for the minimum.
+/// \return The bound as filter text; empty for an open end of an applied range.
+/// \throws Error when the field has no filter or the filter is not a single range --
+///         `A|B`, `<>A`, a wildcard -- which is
+///         what `devenv-setcurrentkey-setrange-setfilter-getrangemin-and-getrangemax-methods.md`
+///         documents as a runtime error (board:0508).
+/// \note THE RANGE IS READ ACROSS FILTER GROUPS when the current group holds none: the BaseApp
+///       sets a journal's template in group 2 and reads it back with `GetRangeMax` in group 0
+///       (`GenJnlManagement.OpenJnl`), which is what BC does and what 16 `ERM General Journal UT`
+///       cases opened the wrong template over (2026-09-09).
+[[nodiscard]] std::string RangeBoundText(const RecordState *state, FieldNo no, bool upper);
+
+/// \brief The one value a field's filters allow, when every active filter on it is the SAME single
+///        equality and nothing else -- what `PopulateAllFields` calls "a filter expression that
+///        evaluates to exactly one value" (`devenv-populateallfields-property.md`).
+/// \param state The filters, or nothing.
+/// \param no The field.
+/// \return The value, or nothing where the field is unfiltered or filtered by anything wider.
+[[nodiscard]] std::optional<std::string> SingleFilterValue(const RecordState *state, FieldNo no);
+
+/// \brief Fills a NEW record's fields from the single-value filters standing on it, which is what
+///        a page does when it creates a row: `devenv-populateallfields-property.md` -- "Values are
+///        inserted in those fields where a currently active filter expression evaluates to exactly
+///        one value", and "Key fields are always populated", whatever the property says.
+/// \param record The record.
+/// \param table Its table.
+/// \param state Its filters.
+/// \param populateAllFields The page's `PopulateAllFields`; the primary key is seeded either way.
+/// \note IT ASSIGNS AND DOES NOT VALIDATE. The property page names no trigger, and `Init` -- the
+///       other place the platform fills a field it was not asked to -- assigns as well.
+void SeedFromFilters(void *record, const TableDef &table, bool populateAllFields);
+
+/// \brief A field's value as a USER reads it: `Format(Field)`, which is what a `TestField.Value`
+///        answers and an `AssertEquals` compares against.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \return The formatted text; an Option or Enum shows its caption, a Boolean `Yes`/`No`.
+/// \throws Error when the table lacks the field.
+[[nodiscard]] std::string FieldFormat(const void *record, const TableDef &table, FieldNo no);
+
+/// \brief An Option or Enum field's ORDINAL as text, which is what an AL `Option` value passed
+///        through a Variant renders as -- `TestField.AssertEquals(EntryType)` with an `Option`
+///        parameter compares `1` against the control, whose text is the caption.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \return The ordinal; empty for a field of any other type or a table without the field.
+[[nodiscard]] std::string FieldOrdinalText(const void *record, const TableDef &table, FieldNo no);
+
+/// \brief Writes a field the way a user TYPES it: `Evaluate` for the field's type, so `100` lands
+///        in a Decimal, `Yes` in a Boolean, a member's name or caption in an Option.
+/// \param record The record.
+/// \param table  Its declaration.
+/// \param no     The field.
+/// \param text   What was typed.
+/// \throws Error when the text does not evaluate into the field's type, with AL's wording.
+void EvaluateInto(void *record, const TableDef &table, FieldNo no, std::string_view text);
+
+/// \brief Replaces the numbered placeholders in a pattern.
+///
+/// \param pattern The text carrying the placeholders.
+/// \param values  The replacements, in order.
+/// \return The substituted text.
+[[nodiscard]] std::string SubstituteInto(std::string_view pattern,
+                                         std::span<const std::string_view> values);
+
+/// \brief Renders a value about to appear in a message, choosing by what the value is.
+///
+/// \tparam T    The value's type.
+/// \param value The value.
+/// \param def   The field it is compared against, which carries an enumeration's value names.
+/// \return The rendered text.
+template <typename T> [[nodiscard]] std::string TextOf(const T &value, const FieldDef &def) {
+  if constexpr (std::is_base_of_v<OrdinalValue, T>) {
+    return MemberText(def, value.AsInteger());
+  } else if constexpr (std::is_base_of_v<StringValue, T>) {
+    return std::string(value.Value());
+  } else if constexpr (std::is_same_v<T, Decimal>) {
+    return value.ToInvariantString();
+  } else if constexpr (std::is_same_v<T, Boolean>) {
+    return ToText(value);
+  } else if constexpr (std::is_enum_v<T>) {
+    return MemberText(def, static_cast<std::int32_t>(value));
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return std::to_string(value);
+  } else if constexpr (requires { typename T::IsAlRefusal; }) {
+    return std::to_string(value.AsInteger());
+  } else if constexpr (requires { value.ToText(); }) {
+    return std::string(value.ToText());
+  } else if constexpr (requires { value.ToInvariantString(); }) {
+    return value.ToInvariantString();
+  } else {
+    return std::string(value);
+  }
+}
+
+}
+
+/// \brief AL `Record.TestField(Field, Value)` -- raises when the field does not hold that value.
+///
+/// \tparam T       The field's own type, which is what makes the comparison the type's own: a Code
+///                 literal is Code-normalised before it is compared, because handing it to a
+///                 `Code<N>` parameter is what AL does with the argument.
+/// \param record   The record whose primary key the message quotes.
+/// \param table    The record's table.
+/// \param no       The field to test.
+/// \param expected The value it must hold.
+/// \throws Error when the values differ, or when the table declares no such field.
+/// \see `record-testfield-joker-joker-method.md`, detail::RaiseTestFieldMismatch
+/// \note Named apart from the AL type `TestField`, for the reason the blank form gives above.
+template <typename T>
+void TestFieldValue(const void *record, const TableDef &table, FieldNo no, const T &expected) {
+  const FieldDef *def = Field(table, no);
+  if (def == nullptr) { throw Error("TestField: the table declares no such field"); }
+  const auto *actual =
+      reinterpret_cast<const T *>(static_cast<const std::byte *>(record) + def->offset);
+  if (*actual == expected) { return; }
+  detail::RaiseTestFieldMismatch(
+      record, table, *def, detail::TextOf(expected, *def), FieldText(record, *def));
+}
+
+/// \brief AL `Format(Any)`, declared here because `TextOf` below calls it.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return Its text.
+///
+/// \warning THE DECLARATION HAS TO PRECEDE THE CALL AND ADL DOES NOT SAVE IT. `TextOf` falls back
+///          to `Format` for a value that is neither string-like, `ToText`-able nor arithmetic, and
+///          the value that reaches that branch is usually a GENERATED enum -- which lives in
+///          `agiru::app::tables`, so argument-dependent lookup never reaches `agiru`. Defined
+///          below; only the declaration belongs up here.
+template <typename T>
+  requires(!std::convertible_to<const T &, const Variant &>)
+[[nodiscard]] ::agiru::Text<0> Format(const T &value);
+
+/// \brief AL `Format(Value)` for an option -- its caption.
+///
+/// \tparam E The option's enumeration.
+/// \param value The option.
+/// \return The caption of the member it holds.
+///
+/// \warning A first step only. AL's `Format` takes a length and a format number and is locale
+///          dependent; the full function is board:0007. What is here covers `Format(<option>)`,
+///          which is what an error message uses.
+template <typename E> [[nodiscard]] std::string Format(const Option<E> &value) {
+  if constexpr (std::is_void_v<E>) {
+    return std::to_string(value.AsInteger());
+  } else {
+    return std::string(value.Caption());
+  }
+}
+
+/// \brief One argument of `StrSubstNo`, rendered the way AL renders it.
+///
+/// \tparam T The argument's type.
+/// \param value The argument.
+/// \return Its text.
+///
+/// \note AL's `StrSubstNo` TAKES `Any`, AND EVERY TYPE HAS A RENDERING. Requiring a string view
+///       made `StrSubstNo(Msg, Amount)` -- a Decimal in a message, which the BaseApp writes
+///       constantly -- fail to compile. What reads as text is used as it is; everything else goes
+///       through `Format`, which is what AL does with it.
+/// \warning A `Variant` IS TESTED FIRST, because it converts to `string_view` implicitly and that
+///          conversion REFUSES when it holds an Integer -- `Assert.AreEqual(1, Count, Msg)` renders
+///          its message through here and read `the Variant does not hold Text` instead of the
+///          number (26 UT cases, 2026-09-09).
+template <typename T> [[nodiscard]] ::agiru::Text<0> AsText(const T &value) {
+  if constexpr (std::same_as<std::remove_cvref_t<T>, Variant>) {
+    return detail::VariantText(value);
+  } else if constexpr (std::convertible_to<const T &, std::string_view>) {
+    return std::string(std::string_view(value));
+  } else if constexpr (requires { value.ToText(); }) {
+    return std::string(std::string_view(value.ToText()));
+  } else if constexpr (std::is_arithmetic_v<T>) {
+    return std::to_string(value);
+  } else if constexpr (Enumeration<T>) {
+    const EnumValueDef *member = ValueOf(MembersOf<T>(), static_cast<std::int32_t>(value));
+    return member == nullptr
+               ? std::to_string(static_cast<std::int32_t>(value))
+               : std::string(member->caption.empty() ? member->name : member->caption);
+  } else if constexpr (std::is_enum_v<T>) {
+    return std::to_string(static_cast<std::underlying_type_t<T>>(value));
+  } else if constexpr (std::convertible_to<const T &, const Variant &>) {
+    return detail::VariantText(Variant(value));
+  } else {
+    throw Error("there is no text form for this value yet");
+  }
+}
+
+/// \brief One value as a FILTER writes it, which is not always how a message writes it.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return The text the filter language holds.
+///
+/// \warning A RECORDID FILTERS BY ITS STORED FORM, for the same reason: `Format(RecordId)` is a
+///          caption and a key that nothing can read back into a table number, while the column
+///          holds `<table>\x1f<caption>\x1f<key>` (`RecordId::ToStorageText`). A `SetRange(Value,
+///          RecRef.RecordId)` against a `RecordID` column therefore binds the stored form, and a
+///          temporary row is compared on the same form (`Record Set UT`, measured 2026-09-10).
+///
+/// \warning AN ENUMERATION FILTERS BY ITS ORDINAL AND RENDERS BY ITS CAPTION, AND THE TWO ARE NOT
+///          THE SAME TEXT. `option-data-type.md` calls an option "a zero-based enumerator type" and
+///          the column holds that number, so `SetRange(Type, Type::Resource)` is `"Type" = 0`;
+///          `Format(Type)` is `Resource`, which is what an error message says. The predecessor put
+///          one function on both jobs and the caption reached the value side: its RequestPage XML
+///          carried `Email` where the column wanted `3`, and `Evaluate` refused it (openerp
+///          WI-1008). Here the filter asks for this and a message asks for `AsText`.
+template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
+  if constexpr (Enumeration<T>) {
+    return std::to_string(static_cast<std::int32_t>(value));
+  } else if constexpr (requires { value.AsInteger(); }) {
+    return std::to_string(value.AsInteger());
+  } else if constexpr (requires { value.ToStorageText(); }) {
+    return value.ToStorageText();
+  } else {
+    return std::string(std::string_view(AsText(value)));
+  }
+}
+
+/// \brief AL `Format(Any)` for a value that is not a Variant.
+///
+/// \tparam T The value's type.
+/// \param value The value.
+/// \return Its text.
+///
+/// \note THE DOCUMENTED SIGNATURE TAKES AN `Any` AND A VARIANT HOLDS ONLY SOME TYPES. A `Char`, an
+///       array element, a generated option -- AL formats all of them and none of them is a Variant
+///       alternative. This is the same rendering `StrSubstNo` uses on its arguments, under the name
+///       AL calls it by.
+template <typename T>
+  requires(!std::convertible_to<const T &, const Variant &>)
+[[nodiscard]] ::agiru::Text<0> Format(const T &value) {
+  return AsText(value);
+}
+
+/// \brief AL `StrSubstNo(Text [, Any,...])`.
+///
+/// \tparam Args    The argument types, each convertible to a string view.
+/// \param pattern  The text carrying `%1` to `%9` or `#1` to `#9`.
+/// \param args     The replacements, in order.
+/// \return The substituted text.
+///
+/// \note A placeholder with no argument is LEFT STANDING, so a message missing a parameter is
+///       visible rather than merely wrong.
+/// \see `text-strsubstno-method.md`
+template <typename... Args>
+[[nodiscard]] std::string StrSubstNo(std::string_view pattern, const Args &...args) {
+  const std::initializer_list<std::string> rendered{std::string(std::string_view(AsText(args)))...};
+  std::vector<std::string_view> values;
+  values.reserve(rendered.size());
+  for (const std::string &one : rendered) { values.emplace_back(one); }
+  return detail::SubstituteInto(pattern, std::span<const std::string_view>(values));
+}
+
+}

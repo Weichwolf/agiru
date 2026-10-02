@@ -1,0 +1,223 @@
+#pragma once
+
+#include "runtime/Error.h"
+#include "runtime/Record.h"
+#include "runtime/test/PageCore.h"
+#include "type/Boolean.h"
+
+#include <concepts>
+#include <string_view>
+
+/// \file
+/// \brief AL `TestField` -- one control of a page, driven by a test.
+///
+/// \note IT IS NOT PART OF A PAGE. A page has CONTROLS; `TestField` is how a TEST reaches one, and
+/// the
+///       generated page declares its controls as a class TEMPLATE so that nothing test-shaped
+///       lands in `apps/` outside the test app.
+
+namespace agiru {
+
+/// \brief AL `TestField` -- one control of a page, reached by the name AL gave it.
+///
+/// \note A CONTROL IS NOT TYPED HERE, AND THAT IS AL'S OWN SHAPE RATHER THAN A SIMPLIFICATION.
+///       `TestField.SetValue` takes `Any` and `TestField.Value` returns `Text`: the platform moves
+///       the value through its string form and the CONTROL decides how to read it. The typed
+///       readers are the `AsX()` family, which is exactly the set the page documents.
+///
+/// \warning WHAT IS BEHIND IT IS NOT CONNECTED YET. A control that is not bound to a running page
+///          refuses rather than answering with a blank, because a test that reads `Value()` and
+///          gets `""` from an unopened page is green for the wrong reason (board:0030).
+class TestField {
+public:
+  /// \brief A control with the name AL gave it.
+  /// \param name The control name.
+  explicit constexpr TestField(std::string_view name) : name_(name) {}
+
+  /// \brief The control's AL name.
+  /// \return The name.
+  [[nodiscard]] constexpr std::string_view Name() const { return name_; }
+
+  /// \brief Binds the control to the page it sits on; `TestPage` does this when the page opens.
+  /// \param core The page.
+  void Bind(PageCore &core) { core_ = &core; }
+
+  /// \brief AL `TestField.SetValue(Value)`.
+  ///
+  /// \tparam T The value's type -- the page documents the parameter as `Any`.
+  /// \param value The value, rendered the way the platform moves it: as text.
+  /// \throws Error until a page can be opened.
+  ///
+  /// \note `Any` IS THE DOCUMENTED PARAMETER and it is not a courtesy. A test writes
+  ///       `Line."Unit Price".SetValue(9.79)` and `Header.Blocked.SetValue(true)`, so a
+  ///       `std::string_view` parameter refuses the two commonest calls there are.
+  template <typename T> void SetValue(const T &value) { SetValueText(AsText(value)); }
+
+  /// \brief AL `TestField.SetValue(Value)` for a value that is already text.
+  /// \param value The value.
+  /// \throws Error until a page can be opened.
+  void SetValue(std::string_view value) { SetValueText(value); }
+
+  /// \brief AL `TestField.Value(Text)` -- the setter half of `[Value := ]
+  /// TestField.Value([Value])`,
+  ///        `testfield-value-method.md`: "Gets or sets the value of this field."
+  /// \param value The text to set, the way `SetValue` sets it.
+  void Value(std::string_view value) { SetValueText(value); }
+
+  /// \brief AL `TestField.Value := Any` for a value that is not text -- a Guid, a date, a number.
+  /// \tparam T The value's type.
+  /// \param value The value, rendered the way `SetValue` renders it.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>)
+  void Value(const T &value) {
+    SetValue(value);
+  }
+
+  /// \brief AL `TestField.Value()`.
+  /// \return The control's value as text.
+  /// \throws Error until a page can be opened.
+  std::string Value() const;
+
+  /// \brief AL `TestField.AssertEquals(Expected)`.
+  ///
+  /// \tparam T What the control should hold -- the page documents it as `Any`.
+  /// \param expected The value.
+  /// \throws Error when it holds something else, and until a page can be opened.
+  template <typename T> void AssertEquals(const T &expected) const {
+    AssertEqualsText(AsText(expected));
+  }
+
+  /// \brief AL `TestField.AssertEquals(Expected)` for a value that is already text.
+  /// \param expected The value.
+  /// \throws Error when it holds something else, and until a page can be opened.
+  void AssertEquals(std::string_view expected) const { AssertEqualsText(expected); }
+
+  /// \brief AL `TestField.AsInteger()`. \return The value as an Integer. \throws Error as Value
+  /// does.
+  /// \note AN OPTION OR ENUM CONTROL ANSWERS ITS ORDINAL, the way `Enum.AsInteger()` does and
+  ///       the way `SCM Available to Pick UT` compares `"Source Document".AsInteger()` against
+  ///       `SourceDocument.AsInteger()` (15 cases, 2026-09-12); a text control that spells no
+  ///       Integer refuses.
+  [[nodiscard]] Integer AsInteger() const;
+
+  /// \brief AL `TestField.AsBoolean()`. \return The value as a Boolean. \throws Error as Value
+  /// does.
+  [[nodiscard]] Boolean AsBoolean() const;
+
+  /// \brief AL `TestField.Activate()` -- puts the focus on the control.
+  /// \throws Error until a page can be opened.
+  void Activate();
+
+  /// \brief AL `TestField.Lookup()` -- opens the control's lookup.
+  /// \throws Error until a page can be opened.
+  void Lookup();
+
+  /// \brief AL `TestField.DrillDown()` -- follows the control's drilldown.
+  /// \throws Error until a page can be opened.
+  void DrillDown();
+
+  /// \brief AL `TestField.Editable()`. \return Whether the control takes input.
+  /// \throws Error until a page can be opened.
+  [[nodiscard]] Boolean Editable() const;
+
+  /// \brief AL `TestField.Enabled()`. \return Whether the control is enabled.
+  /// \throws Error until a page can be opened.
+  [[nodiscard]] Boolean Enabled() const;
+
+  /// \brief AL `TestField.Visible()`. \return Whether the control is shown.
+  /// \throws Error until a page can be opened.
+  [[nodiscard]] Boolean Visible() const;
+
+  /// \brief AL `TestField.AsDate()`. Converts the value in a field on a test page to a Date data
+  /// type.
+  /// \return The AL `Date`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Date AsDate() const;
+
+  /// \brief AL `TestField.AsDateTime()`. Converts the value in a field on a test page to a DateTime
+  /// data type.
+  /// \return The AL `DateTime`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::DateTime AsDateTime() const { Unbound(); }
+
+  /// \brief AL `TestField.AsDecimal()`. Converts the value in a field on a test page to a Date data
+  /// type.
+  /// \return The AL `Decimal`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Decimal AsDecimal() const;
+
+  /// \brief AL `TestField.AssistEdit()`. Provides assist-edit functionality to a field on a test
+  /// page.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void AssistEdit() const;
+
+  /// \brief AL `TestField.AsTime()`. Converts the value in a field on a test page to a Time data
+  /// type.
+  /// \return The AL `Time`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Time AsTime() const { Unbound(); }
+
+  /// \brief AL `TestField.Caption()`. Gets the current caption of the field as a String.
+  /// \return The AL `Text`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string Caption() const;
+
+  /// \brief AL `TestField.Drilldown()`. Applies drill-down capability for a field on a test page.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void Drilldown() const;
+
+  /// \brief AL `TestField.GetOption(Integer)`. Gets the options for a field on a test page.
+  /// \param Index The AL `Integer`.
+  /// \return The AL `Text`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string GetOption(::agiru::Integer Index = {}) const {
+    static_cast<void>(Index);
+    Unbound();
+  }
+
+  /// \brief AL `TestField.GetValidationError(Integer)`. Gets the validation error that occurred on
+  /// a test page.
+  /// \param Index The AL `Integer`.
+  /// \return The AL `Text`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] std::string GetValidationError(::agiru::Integer Index = {}) const {
+    static_cast<void>(Index);
+    Unbound();
+  }
+
+  /// \brief AL `TestField.HideValue()`. Gets the hide value state for the field.
+  /// \return The AL `Boolean`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean HideValue() const { Unbound(); }
+
+  /// \brief AL `TestField.Invoke()`. Invokes the default action on the field.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  void Invoke() const { Unbound(); }
+
+  /// \brief AL `TestField.OptionCount()`. Gets the number of options in a field on a test page.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer OptionCount() const { Unbound(); }
+
+  /// \brief AL `TestField.ShowMandatory()`. Gets the ShowMandatory state for the field.
+  /// \return The AL `Boolean`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Boolean ShowMandatory() const { Unbound(); }
+
+  /// \brief AL `TestField.ValidationErrorCount()`. Gets the number of validation errors that
+  /// occurred on the test page.
+  /// \return The AL `Integer`.
+  /// \throws Error always -- the surface is declared, the behaviour is not (board:0035).
+  [[nodiscard]] ::agiru::Integer ValidationErrorCount() const { Unbound(); }
+
+private:
+  void SetValueText(std::string_view value);
+  void AssertEqualsText(std::string_view expected) const;
+
+  [[noreturn]] void Unbound() const;
+
+  std::string_view name_;
+  PageCore *core_ = nullptr;
+};
+
+}

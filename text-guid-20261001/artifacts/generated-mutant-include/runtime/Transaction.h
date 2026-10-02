@@ -1,0 +1,229 @@
+#pragma once
+
+#include "type/TransactionType.h"
+
+#include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
+
+/// \file
+/// \brief AL's transaction boundary -- what an error rolls back to, and what `Commit` moves.
+
+namespace agiru {
+
+class Error;
+
+class Connection;
+
+/// \brief The nested boundaries a session is inside, innermost last.
+///
+/// AL DOES NOT CATCH ERRORS, IT ROLLS THEM BACK. `Error()` does not unwind to a handler that
+/// decides what to do; it abandons the write set and returns control to whoever opened the
+/// boundary. `Codeunit.Run` opens one and reports `false`; `asserterror` opens one and expects it
+/// to be used. That is why `IF NOT CODEUNIT.RUN(...) THEN` is AL's idiom for "try this" and why a
+/// test can assert an error and then count rows.
+///
+/// Each boundary is a PostgreSQL `SAVEPOINT` on the session's own pinned connection -- the same
+/// connection the statements run on, because a savepoint taken on another one rolls back nothing
+/// (board:0012).
+class Boundaries {
+public:
+  /// \brief Opens a boundary.
+  /// \param connection The session's connection.
+  /// \return The new depth, which the closer must be handed back.
+  /// \throws DatabaseError when the savepoint cannot be taken.
+  std::size_t Open(const Connection &connection);
+
+  /// \brief Closes a boundary, keeping everything written inside it.
+  /// \param connection The session's connection.
+  /// \param depth      The depth Open() returned.
+  void Release(const Connection &connection, std::size_t depth);
+
+  /// \brief Closes a boundary, discarding everything written inside it.
+  /// \param connection The session's connection.
+  /// \param depth      The depth Open() returned.
+  void Rollback(const Connection &connection, std::size_t depth);
+
+  /// \brief AL `Commit()` -- everything written so far survives any later rollback.
+  ///
+  /// \param connection The session's connection.
+  ///
+  /// \warning Production Commit ends the PostgreSQL transaction. Open logical boundaries are
+  ///          recreated in the next transaction so later errors only discard later writes. Under
+  ///          a test isolation floor, the floor remains open and takes explicit Commits back at
+  ///          the end of the test codeunit, as the platform TestIsolation property requires.
+  void Commit(const Connection &connection);
+
+  /// \return How many boundaries are open.
+  [[nodiscard]] std::size_t Depth() const { return names_.size(); }
+
+  /// \brief The transaction generation a cursor belongs to.
+  ///
+  /// \warning `ROLLBACK TO SAVEPOINT` DESTROYS EVERY CURSOR DECLARED AFTER THE SAVEPOINT, and the
+  ///          depth alone cannot tell: the next boundary opens at the SAME depth, so a cursor
+  ///          from the rolled-back one looked alive, its `CLOSE` failed with "cursor does not
+  ///          exist", and PostgreSQL aborted the transaction the next test was running in
+  ///          (`Incoming Doc. To Data Exch.UT`, 11 cases, 2026-09-10). Production Commit also
+  ///          closes non-holdable cursors. A cursor opened under a different generation is gone.
+  /// \return The generation, advanced by rollback or production Commit.
+  [[nodiscard]] std::size_t CursorEpoch() const { return cursorEpoch_; }
+
+  /// \brief Sets the outer rollback boundary of a test runner.
+  /// \param depth The runner's boundary depth; zero restores production behaviour.
+  /// \return The previous floor for nested runner invocations.
+  std::size_t IsolationFloor(std::size_t depth) {
+    const std::size_t previous = isolationFloor_;
+    isolationFloor_ = depth;
+    return previous;
+  }
+
+  /// \brief Sets whether the current AutoRollback test method refuses AL Commit.
+  /// \param active Whether the refusal applies inside this method.
+  /// \return The previous setting for nested test execution.
+  bool AutoRollbackTest(bool active) {
+    const bool previous = autoRollbackTest_;
+    autoRollbackTest_ = active;
+    return previous;
+  }
+
+  /// \return Whether AL Commit is refused by the current AutoRollback test method.
+  [[nodiscard]] bool IsAutoRollbackTest() const { return autoRollbackTest_; }
+
+  /// \brief The message of the last error a boundary rolled back, for AL `GetLastErrorText()`.
+  /// \return The text, or empty when nothing has failed in this session.
+  [[nodiscard]] std::string_view LastError() const { return lastError_; }
+
+  /// \brief The last error's code, `Dialog` when the error carried none.
+  /// \return The code, empty when no error stands.
+  [[nodiscard]] std::string_view LastErrorCode() const {
+    return lastError_.empty() ? std::string_view{}
+                              : (lastErrorCode_.empty() ? std::string_view{"Dialog"}
+                                                        : std::string_view(lastErrorCode_));
+  }
+
+  /// \brief Records the message a boundary is rolling back, and the code it carried.
+  /// \param text The error's text.
+  /// \param code The error's code, empty for an AL `Error(...)`.
+  /// \brief AL `Record.Consistent(false)` on a table, and `Consistent(true)` to lift it.
+  /// \param table      The table's AL name.
+  /// \param consistent Whether it is consistent.
+  void MarkConsistent(std::string_view table, bool consistent);
+
+  /// \return The tables marked inconsistent, for the commit that refuses.
+  [[nodiscard]] const std::vector<std::string> &Inconsistent() const { return inconsistent_; }
+
+  void SetLastError(std::string text, std::string code = {}) {
+    lastError_ = std::move(text);
+    lastErrorCode_ = std::move(code);
+  }
+
+  /// \brief AL `ClearLastError()`.
+  /// \brief AL `Database.CurrentTransactionType()` -- the type in force.
+  /// \return The type this transaction is running under.
+  [[nodiscard]] TransactionType CurrentType() const { return type_; }
+
+  /// \brief AL `Database.CurrentTransactionType(TransactionType)` -- takes a new type.
+  /// \param wanted The type to run under from here on.
+  /// \return The type that was in force before the call, which is what AL's form returns.
+  ///
+  /// \note THE TYPE IS CARRIED AND NOT MAPPED. BC's isolation is a state machine per table
+  ///       (`devenv-tri-state-locking.md`, board:0012) and PostgreSQL has no dirty read, so a type
+  ///       mapped onto an isolation level would mean something else; what a caller sets, it reads.
+  TransactionType CurrentType(TransactionType wanted) {
+    const TransactionType held = type_;
+    type_ = wanted;
+    return held;
+  }
+
+  void ClearLastError() {
+    lastError_.clear();
+    lastErrorCode_.clear();
+  }
+
+private:
+  struct Boundary {
+    std::string name;
+    std::vector<std::string> inconsistentBefore;
+  };
+
+  std::vector<Boundary> names_;
+  std::vector<std::string> inconsistent_;
+  std::string lastError_;
+  std::size_t cursorEpoch_ = 0;
+  std::size_t isolationFloor_ = 0;
+  bool autoRollbackTest_ = false;
+  std::string lastErrorCode_;
+  std::size_t issued_ = 0;
+  TransactionType type_ = TransactionType::UpdateNoLocks;
+};
+
+}
+
+/// \brief The platform half of a transaction boundary. Not part of the door's vocabulary.
+namespace agiru::detail {
+
+/// \brief One transaction boundary, opened on the current session and closed by whichever way the
+///        block leaves.
+///
+/// AL DOES NOT CATCH ERRORS, IT ROLLS THEM BACK, so this is not a try/catch with a different name.
+/// Nothing here decides what an error MEANS; it decides what happens to the write set, and the
+/// caller reports `false` or captures the text.
+class Scope {
+public:
+  Scope();
+  ~Scope();
+
+  Scope(const Scope &) = delete;
+  Scope(Scope &&) = delete;
+  Scope &operator=(const Scope &) = delete;
+  Scope &operator=(Scope &&) = delete;
+
+  /// \brief Keeps everything written inside.
+  void Keep();
+
+  /// \brief Discards everything written inside, and remembers why.
+  /// \param why The error's text, which AL `GetLastErrorText()` returns afterwards.
+  void Discard(std::string_view why);
+
+  /// \brief Discards everything written inside, and remembers the error with its code.
+  /// \param error The error.
+  void Discard(const Error &error);
+
+  /// \return The boundary depth, for an enclosing test isolation policy.
+  [[nodiscard]] std::size_t Depth() const { return depth_; }
+
+private:
+  std::size_t depth_;
+  bool open_ = true;
+};
+
+/// \brief Restores the previous test isolation floor when a runner returns or raises.
+class IsolationFloor {
+public:
+  /// \param depth The runner's outer rollback boundary.
+  explicit IsolationFloor(std::size_t depth);
+  ~IsolationFloor();
+
+  IsolationFloor(const IsolationFloor &) = delete;
+  IsolationFloor &operator=(const IsolationFloor &) = delete;
+
+private:
+  std::size_t previous_;
+};
+
+/// \brief Restores the enclosing test method's Commit policy on return or error.
+class AutoRollbackTest {
+public:
+  /// \param active Whether this test method refuses AL Commit.
+  explicit AutoRollbackTest(bool active);
+  ~AutoRollbackTest();
+
+  AutoRollbackTest(const AutoRollbackTest &) = delete;
+  AutoRollbackTest &operator=(const AutoRollbackTest &) = delete;
+
+private:
+  bool previous_;
+};
+
+}

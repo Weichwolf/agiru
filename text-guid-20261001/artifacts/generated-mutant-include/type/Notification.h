@@ -1,0 +1,155 @@
+#pragma once
+
+#include "type/Boolean.h"
+#include "type/Dictionary.h"
+#include "type/Guid.h"
+#include "type/Integer.h"
+#include "type/NotificationScope.h"
+#include "type/Text.h"
+
+#include <concepts>
+#include <cstdint>
+#include <string>
+#include <string_view>
+
+/// \file
+/// \brief AL `Notification` -- a message the client shows beside the user's work.
+
+namespace agiru {
+
+/// \brief AL `Notification`.
+///
+/// From `notification-data-type.md`: a message the client shows in the context of what the user is
+/// doing, carrying data and actions.
+///
+/// \note IT IS BUILT WHEREVER BUSINESS LOGIC RUNS AND SHOWN WHERE A CLIENT IS, and those are not
+///       the same place. The BaseApp constructs and sends notifications deep inside posting and
+///       validation code -- 40 generated headers name the type -- so the type has to EXIST for that
+///       code to translate even where nothing is watching.
+///
+/// \note `Send()` AND `Recall()` REACH A CLIENT, and there is none yet. They record what was sent
+/// so
+///       a test can read it back, which is what the BaseApp's own test libraries do
+///       (`LibraryVariableStorage` collects them), rather than refusing and stopping code whose
+///       notification is a side effect.
+class Notification {
+public:
+  /// \brief A notification with no identifier yet.
+  Notification() = default;
+
+  /// \brief AL `Notification.Id` -- reading it.
+  /// \return The identifier; a blank GUID until one is assigned.
+  const Guid &Id() const { return id_; }
+
+  /// \brief AL `Notification.Id(Id)` -- setting it.
+  ///
+  /// \param Id The identifier, which `Recall` matches on.
+  /// \return The identifier it now carries.
+  ///
+  /// \note ONE METHOD WITH AN OPTIONAL ARGUMENT, which is what `notification-id-method.md`
+  ///       documents: `[Id := ] Notification.Id([Id: Guid])`, and "this method can be invoked using
+  ///       property access syntax". AL writes `Notification.ID := X` for it, and 365 documented
+  ///       methods work the same way -- so a `SetId` here would be a name AL never uses, and the
+  ///       mechanical check against the documentation would look for it in vain.
+  template <typename G>
+    requires std::constructible_from<Guid, const G &>
+  const Guid &Id(const G &Id) {
+    id_ = Id;
+    return id_;
+  }
+
+  /// \brief AL `Notification.Message` -- reading it.
+  /// \return The text the client shows.
+  std::string_view Message() const { return message_; }
+
+  /// \brief AL `Notification.Message(Message)` -- setting it.
+  /// \param Message The text the client shows.
+  /// \return The text it now carries.
+  std::string_view Message(std::string_view Message) {
+    message_ = Message;
+    return message_;
+  }
+
+  /// \brief AL `Notification.Scope` -- reading it.
+  /// \return Where the notification appears.
+  NotificationScope Scope() const { return scope_; }
+
+  /// \brief AL `Notification.Scope(Scope)` -- setting it.
+  /// \param Scope Where the notification appears.
+  /// \return Where it now appears.
+  NotificationScope Scope(NotificationScope Scope) {
+    scope_ = Scope;
+    return scope_;
+  }
+
+  /// \brief AL `Notification.SetData(Key, Value)`.
+  /// \param key   The name.
+  /// \param value The value.
+  /// \brief AL `Notification.SetData(Key, Value)` with a value AL converts to `Text` on the way in.
+  /// \tparam V The value's type; anything `Format` renders.
+  /// \param key   The key.
+  /// \param value The value.
+  template <typename V>
+    requires(!std::convertible_to<V, std::string_view>) && requires(const V &v) {
+      { v.ToText() } -> std::convertible_to<std::string_view>;
+    }
+  void SetData(std::string_view key, const V &value) {
+    SetData(key, std::string_view(value.ToText()));
+  }
+
+  void SetData(std::string_view key, std::string_view value) {
+    data_.Set(std::string(key), std::string(value));
+  }
+
+  /// \brief AL `Notification.GetData(Key)`.
+  /// \param key The name.
+  /// \return The value, or the empty string when nothing was set under it.
+  [[nodiscard]] std::string GetData(std::string_view key) const;
+
+  /// \brief AL `Notification.HasData(Key)`.
+  /// \param key The name.
+  /// \return True when something was set under it.
+  [[nodiscard]] Boolean HasData(std::string_view key) const {
+    return data_.ContainsKey(std::string(key));
+  }
+
+  /// \brief AL `Notification.AddAction(Caption, CodeunitId, MethodName [, Tooltip])`.
+  ///
+  /// \param caption    What the action reads as.
+  /// \param codeunitId The codeunit the client calls.
+  /// \param methodName The procedure it calls.
+  ///
+  /// \note THE ACTION IS RECORDED AND NOT WIRED. Invoking it is the client's half, and there is no
+  ///       client; recording it lets a test see that the action was offered, which is what the
+  ///       BaseApp's own tests assert.
+  void AddAction(std::string_view caption, Integer codeunitId, std::string_view methodName);
+
+  /// \brief AL `Notification.Send()`.
+  ///
+  /// \note IT RECORDS RATHER THAN REACHING A CLIENT, for the reason the type's own note gives.
+  ::agiru::Boolean Send();
+
+  /// \brief AL `Notification.Recall()`.
+  ///
+  /// \note It withdraws what `Send` recorded, so a test sees the same sequence a client would.
+  ::agiru::Boolean Recall();
+
+  /// \brief What a sent notification is handed to: the test runner installs the
+  ///        `[SendNotificationHandler]` dispatch here, since this value type reaches no runtime.
+  using Sink = void (*)(Notification &sent);
+
+  /// \brief Installs the sink `Send` hands every notification to; null uninstalls it.
+  /// \param sink The sink, or null.
+  static void OnSend(Sink sink);
+
+private:
+  [[nodiscard]] static Sink &Sink_();
+
+  Guid id_;
+  std::string message_;
+  NotificationScope scope_ = NotificationScope::LocalScope;
+  Dictionary<::agiru::Text<0>, std::string> data_;
+  Integer actions_ = 0;
+};
+
+}

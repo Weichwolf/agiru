@@ -1,0 +1,145 @@
+#pragma once
+
+#include "runtime/ErrorValue.h"
+#include "runtime/Transaction.h"
+
+#include <cstdint>
+#include <string>
+#include <string_view>
+
+/// \file
+/// \brief The base of every error the agiru runtime raises.
+
+namespace agiru {
+
+/// \brief AL `asserterror <statement>` -- the statement is expected to raise.
+///
+/// \tparam Body The statement, as a callable.
+/// \param  body The statement.
+/// \throws Error when the statement does NOT raise, because that is what asserterror asserts.
+///
+/// From the AL test framework: the error is EXPECTED. Instead of propagating, its text is captured
+/// where `GetLastErrorText()` reads it and execution carries on with the next statement -- and the
+/// write set the statement made is discarded, which is the half a try/catch would not do. A test
+/// that asserts an error and then counts rows depends on both.
+///
+/// \note IT RAISES WHEN NOTHING RAISED. "The statement did not observe an error" is itself a test
+///       failure, and a silent pass there would make an asserterror that stopped working invisible.
+/// \brief AL's `[TryFunction]` call where the return value IS used -- the error is caught.
+///
+/// \tparam Body The call, as a callable.
+/// \param  body The call.
+/// \return True when it completed, false when it raised.
+///
+/// `devenv-handling-errors-using-try-methods.md`: "A method that is designated as a try method has
+/// a Boolean return value" and "if a try method call uses the return value in an `OK:=` statement
+/// or a conditional statement such as `if-then`, errors are caught."
+///
+/// \note WHETHER THE VALUE IS USED IS A PROPERTY OF THE CALL AND NOT OF THE METHOD, and the same
+///       page is explicit about the other half: "if a try method call doesn't use the return value,
+///       the try method operates like an ordinary method, and errors are exposed as usual". So the
+///       generator wraps the CALL and the method itself always raises.
+///
+/// \note IT DOES NOT ROLL BACK, WHICH IS WHERE IT DIFFERS FROM `asserterror`. The page says
+///       "changes to the database that are made with a try method aren't rolled back" -- and that
+///       is why this is not the same function with a different name.
+namespace detail {
+
+/// \brief Keeps an error's text where `GetLastErrorText()` reads it.
+/// \param text The message.
+void RememberError(std::string_view text);
+
+/// \brief Keeps an error's text AND CODE where `GetLastErrorText()` and `GetLastErrorCode()` read
+///        them.
+/// \param error The error.
+void RememberError(const Error &error);
+
+}
+
+template <typename Body> [[nodiscard]] bool Tried(Body body) {
+  try {
+    body();
+  } catch (const Error &e) {
+    detail::RememberError(e);
+    return false;
+  }
+  return true;
+}
+
+template <typename Body> void AssertError(Body body) {
+  detail::Scope scope;
+  try {
+    body();
+  } catch (const Error &e) {
+    scope.Discard(e);
+    return;
+  }
+  scope.Keep();
+  throw Error("the asserterror statement did not observe an error");
+}
+
+/// \brief AL `GetLastErrorText()`.
+/// \return The text of the last error a boundary rolled back, or empty.
+[[nodiscard]] std::string GetLastErrorText();
+
+/// \brief AL `ClearLastError()`.
+void ClearLastError();
+
+/// \brief A date, time or datetime literal AL wrote in a shape this reader does not accept.
+///
+/// \tparam T    The literal's type, which its SUFFIX decides: `D`, `T` or `DT`.
+/// \param what  The literal, spelled as AL wrote it.
+/// \return Never.
+/// \throws Error always.
+///
+/// \note IT IS TYPED, because the suffix already says what the value would have been. A refusal
+///       that had to be converted afterwards would be a second guess on top of the first.
+template <typename T> [[noreturn]] T RefusedTemporal(std::string_view what) {
+  throw Error("the literal " + std::string(what) + " is not a shape AL writes");
+}
+
+/// \brief AL `Commit()` -- everything written so far survives any later rollback.
+/// \note It MOVES the enclosing boundaries rather than releasing them; `runtime/Transaction.h`
+///       says why, and the predecessor paid for the difference.
+void Commit();
+
+/// \brief AL `Database::"X"` for a table this run does not carry -- refused where it is read.
+/// \param name The AL name of the table.
+/// \return Never.
+/// \throws Error always, naming the table: an object number for a table that is not translated
+///         would be a number nothing can check (board:0034).
+[[noreturn]] inline std::int32_t AbsentObjectId(std::string_view name) {
+  throw Error("Database::" + std::string(name) +
+              " names a table this run does not carry (board:0034)");
+}
+
+/// \brief AL `Error(...)` -- raises, unless a `[ErrorBehavior(ErrorBehavior::Collect)]` scope is
+///        standing, in which case the error is COLLECTED and the call returns.
+/// \param message The text AL wrote.
+/// \throws Error unless a collecting scope took it.
+///
+/// \note IT IS WHY THE GENERATOR NO LONGER WRITES `throw`. AL's `Error` ends the path in the
+///       ordinary case and does NOT end it inside a collecting scope, so the decision belongs to
+///       the runtime rather than to the emitted statement (board:0195).
+void RaiseOrCollect(std::string_view message);
+
+/// \brief AL `Error(ErrorInfo)` -- the same, with the info's own message.
+/// \tparam Info Anything carrying a `Message()`, which is what `ErrorInfo` is here.
+/// \param info The error's description.
+/// \throws Error unless a collecting scope took it.
+template <typename Info>
+  requires requires(Info info) { std::string_view{info.Message()}; }
+void RaiseOrCollect(Info info) {
+  RaiseOrCollect(std::string_view(info.Message()));
+}
+
+/// \brief Preserves an explicit refusal when AL passes an unsupported .NET result to `Error`.
+/// \tparam Refusal A refusal value.
+/// \param refusal The unsupported member result.
+/// \throws Error always.
+template <typename Refusal>
+  requires requires { typename Refusal::IsAlRefusal; }
+void RaiseOrCollect(Refusal refusal) {
+  refusal();
+}
+}

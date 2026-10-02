@@ -1,0 +1,14 @@
+#include "fixture/codeunit/Probe.h"
+
+#include <cstdio>
+#include <exception>
+
+int main() {
+  try {
+    agiru::Fixture::Probe_Codeunit probe;
+    return probe.VerifyContract() ? 0 : 1;
+  } catch (const std::exception &error) {
+    std::fputs(error.what(), stderr);
+    return 1;
+  }
+}

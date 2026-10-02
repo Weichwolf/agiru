@@ -1,0 +1,319 @@
+#pragma once
+
+#include "runtime/ErrorValue.h"
+
+#include <compare>
+#include <concepts>
+#include <cstdint>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+/// \file
+/// \brief AL's Decimal -- the .NET CLR decimal, digit for digit.
+
+namespace agiru {
+
+/// \brief An error raised by decimal arithmetic, such as an overflow or a division by zero.
+class DecimalError : public Error {
+public:
+  using Error::Error;
+};
+
+/// \brief AL `Decimal`.
+///
+/// The platform documentation fixes the representation; it is not a choice.
+/// `decimal-data-type.md`: "The Decimal data type is mapped to the Microsoft .NET Framework common
+/// language runtime (CLR) Decimal data type, which controls the precision and limits", with a
+/// maximum calculating value of 79'228'162'514'264'337'593'543'950'335 (two to the ninety-sixth
+/// less one).
+///
+/// The value is the mantissa divided by ten to the power of the scale, with a sign.
+///
+/// \note THE SCALE STOPS AT TWENTY PLACES, NOT AT THE CLR'S TWENTY-EIGHT. The platform stores a
+///       Decimal as `DECIMAL(38,20)` (`fieldtype-option.md`), and a value the runtime holds must
+///       be the value the database gives back, or the same expression evaluates differently on
+///       either side of a `Modify` -- which `SCM Whse. UOM Rnding. UT` requires: `1 / 7` is
+///       written to a base unit's rounding precision, `44 * (1 / 7)` validated into another unit,
+///       and the check is `QtyPerUoM mod Precision = 0` against the precision READ BACK. With
+///       twenty-eight places the product carries digits the column cannot, and the remainder is
+///       a hundred-quintillionth (nine cases, 2026-09-11). So division fills twenty places, a
+///       product's scale is reduced to twenty, and a parsed text with more is rounded to twenty.
+///
+/// \note THE SCALE IS PART OF THE VALUE. `0.10` and `0.1` compare equal but are not the same
+///       decimal: CLR arithmetic carries the scale through addition, subtraction and
+///       multiplication, and only division normalises. Ten thousand additions of `0.01` therefore
+///       yield `100.00` rather than `100`, and a gate case states exactly that, because it is the
+///       first thing anyone assumes wrongly.
+class Decimal {
+public:
+  /// \return The largest representable magnitude, two to the ninety-sixth less one.
+  static const Decimal &MaxValue();
+
+  /// \return The negative of MaxValue().
+  static const Decimal &MinValue();
+
+  /// \brief Zero.
+  constexpr Decimal() = default;
+
+  /// \brief Constructs from a whole number.
+  ///
+  /// \param value The integer value.
+  ///
+  /// \note NOT EXPLICIT, BECAUSE AL WIDENS AN INTEGER TO A DECIMAL SILENTLY. `exit(0)` in a
+  ///       procedure returning Decimal is ordinary AL, and so is `Amount := 5`. The conversion is
+  ///       LOSSLESS in that direction -- a 64-bit integer is inside the 96-bit mantissa -- so
+  ///       nothing about the amount invariant is weakened by it. The direction that would weaken
+  ///       it, a binary float reaching a Decimal, does not exist here at all.
+  Decimal(std::int64_t value);
+
+  /// \brief Renders the value for round-tripping: sign, digits, a full stop, scale preserved.
+  ///
+  /// \return The invariant notation, with no grouping.
+  ///
+  /// \warning This is NOT AL `Decimal.ToText()`, and it does not carry that name for exactly that
+  ///          reason. `decimal-totext--method.md` defines `ToText()` as `Format(value, 0, 0)`, and
+  ///          `devenv-format-property.md` shows Standard Format 0 to be locale dependent WITH
+  ///          thousands separators. AL's `ToText` needs a locale and a field's `DecimalPlaces`;
+  ///          neither exists at this layer (board:0007).
+  [[nodiscard]] std::string ToInvariantString() const;
+
+  /// \brief Reads the invariant notation.
+  ///
+  /// \param text The text, optionally signed, with at most one full stop.
+  /// \return The value, preserving the written scale as CLR parsing does, so `1.2300` keeps four
+  ///         decimal places.
+  /// \throws DecimalError when the text is not a number; more than twenty places are rounded.
+  static Decimal FromInvariantString(std::string_view text);
+
+  /// \return True when the value is zero, whatever its scale.
+  [[nodiscard]] bool IsZero() const { return units_ == 0; }
+
+  /// \return True when the value is negative and not zero.
+  [[nodiscard]] bool IsNegative() const { return negative_ && units_ != 0; }
+
+  /// \return The number of decimal places the value currently carries.
+  [[nodiscard]] std::uint8_t Scale() const { return scale_; }
+
+  /// \return The magnitude, with the same scale.
+  [[nodiscard]] Decimal Abs() const;
+
+  /// \brief The same value with its trailing fractional zeros dropped: `10.500` as `10.5`, `10.00`
+  ///        as `10`. AL's standard format shows a Decimal that way (a quantity read back from a
+  ///        `numeric(38,20)` column prints as `10`, never as twenty zeros), while
+  ///        `ToInvariantString` keeps the scale for the database and for round trips.
+  /// \return The trimmed value; equal to this one.
+  [[nodiscard]] Decimal Trimmed() const;
+
+  /// \return The value with its sign flipped; zero stays unsigned.
+  [[nodiscard]] Decimal operator-() const;
+
+  /// \brief Adds, aligning the scales and keeping the wider one.
+  /// \param o The addend.
+  /// \return This object.
+  /// \throws DecimalError on overflow.
+  Decimal &operator+=(const Decimal &o);
+
+  /// \brief Subtracts, aligning the scales and keeping the wider one.
+  /// \param o The subtrahend.
+  /// \return This object.
+  /// \throws DecimalError on overflow.
+  Decimal &operator-=(const Decimal &o);
+
+  /// \brief Multiplies, carrying the sum of the two scales as CLR does.
+  /// \param o The multiplier.
+  /// \return This object.
+  /// \throws DecimalError on overflow.
+  Decimal &operator*=(const Decimal &o);
+
+  /// \brief Divides, filling up to twenty decimal places and normalising the result.
+  /// \param o The divisor.
+  /// \return This object.
+  /// \throws DecimalError when the divisor is zero, or on overflow.
+  Decimal &operator/=(const Decimal &o);
+
+  /// \brief Adds two values.
+  /// \param a Left operand.
+  /// \param b Right operand.
+  /// \return The sum.
+  friend Decimal operator+(Decimal a, const Decimal &b) { return a += b; }
+
+  /// \brief Subtracts two values.
+  /// \param a Left operand.
+  /// \param b Right operand.
+  /// \return The difference.
+  friend Decimal operator-(Decimal a, const Decimal &b) { return a -= b; }
+
+  /// \brief Multiplies two values.
+  /// \param a Left operand.
+  /// \param b Right operand.
+  /// \return The product.
+  friend Decimal operator*(Decimal a, const Decimal &b) { return a *= b; }
+
+  /// \brief Divides two values.
+  /// \param a Left operand.
+  /// \param b Right operand.
+  /// \return The quotient.
+  friend Decimal operator/(Decimal a, const Decimal &b) { return a /= b; }
+
+  /// \brief AL `a mod b` over decimals: the remainder of the truncated quotient, with the sign of
+  ///        `a`, the way .NET `decimal` computes it -- `10.5 mod 3` is `1.5`.
+  /// \param o The divisor.
+  /// \return This value, now the remainder.
+  /// \throws DecimalError on a zero divisor, the way `/` does.
+  /// \warning WITHOUT THIS OPERATOR THE CALL STILL COMPILED, through the `Integer` conversion
+  /// below:
+  ///          `Qty mod 0.00001` became `int % 0` and the process died of SIGFPE (SCM Whse. UOM
+  ///          Rnding. UT lost whole, 2026-09-09).
+  Decimal &operator%=(const Decimal &o);
+
+  friend Decimal operator%(Decimal a, const Decimal &b) { return a %= b; }
+
+  /// \brief AL `Integer := Decimal` -- rounds to the nearest whole number, 5 away from zero, the
+  ///        way `Round(Value, 1)` does (`system-round-method.md`, board:0582).
+  /// \return The rounded value as an Integer.
+  /// \note THE MIXED OPERATORS BELOW EXIST BECAUSE OF THIS CONVERSION: without them `Decimal / int`
+  ///       is ambiguous between `Decimal / Decimal` and `int / int`, which is how the first attempt
+  ///       was refuted. An exact overload for each integral operand settles the overload set.
+  operator std::int32_t() const;
+
+  /// \brief Mixed arithmetic with an integral operand, exact so the conversion above cannot
+  /// compete.
+  template <std::integral I> friend Decimal operator+(Decimal a, I b) { return a += Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator-(Decimal a, I b) { return a -= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator*(Decimal a, I b) { return a *= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator/(Decimal a, I b) { return a /= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator%(Decimal a, I b) { return a %= Decimal{b}; }
+
+  template <std::integral I> friend Decimal operator+(I a, const Decimal &b) {
+    return Decimal{a} + b;
+  }
+
+  template <std::integral I> friend Decimal operator-(I a, const Decimal &b) {
+    return Decimal{a} - b;
+  }
+
+  template <std::integral I> friend Decimal operator*(I a, const Decimal &b) {
+    return Decimal{a} * b;
+  }
+
+  template <std::integral I> friend Decimal operator/(I a, const Decimal &b) {
+    return Decimal{a} / b;
+  }
+
+  template <std::integral I> friend Decimal operator%(I a, const Decimal &b) {
+    return Decimal{a} % b;
+  }
+
+  template <std::integral I> Decimal &operator+=(I o) { return *this += Decimal{o}; }
+
+  template <std::integral I> Decimal &operator-=(I o) { return *this -= Decimal{o}; }
+
+  template <std::integral I> Decimal &operator*=(I o) { return *this *= Decimal{o}; }
+
+  template <std::integral I> Decimal &operator/=(I o) { return *this /= Decimal{o}; }
+
+  template <std::integral I> [[nodiscard]] std::strong_ordering operator<=>(I o) const {
+    return *this <=> Decimal{o};
+  }
+
+  template <std::integral I> [[nodiscard]] bool operator==(I o) const {
+    return *this == Decimal{o};
+  }
+
+  /// \brief Orders by value rather than by representation, so `1.50` equals `1.5`.
+  /// \param o The other value.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(const Decimal &o) const;
+
+  /// \brief Compares by value rather than by representation.
+  /// \param o The other value.
+  /// \return True when the values are numerically equal.
+  [[nodiscard]] bool operator==(const Decimal &o) const {
+    return (*this <=> o) == std::strong_ordering::equal;
+  }
+
+private:
+  friend class DecimalAccess;
+  __extension__ using U128 = unsigned __int128;
+
+  struct Repr {
+    U128 units;
+    std::uint8_t scale;
+    bool negative;
+  };
+
+  explicit Decimal(Repr r);
+
+  U128 units_{0};
+  std::uint8_t scale_{0};
+  bool negative_{false};
+};
+
+/// \brief AL's three rounding directions.
+///
+/// From `system-round-method.md`: "'=' rounds up or down to the nearest value (default). Values of
+/// 5 or greater are rounded up. ... '>' rounds up ... '<' rounds down".
+///
+/// \warning THEY ROUND BY MAGNITUDE, not mathematically. The trap is recorded in the predecessor
+///          (openerp `builtins/_math.py:_al_round`), measured and paid for: for -1234.56789 at
+///          0.001, Down yields -1234.567 (toward zero) and Up yields -1234.568 (away from zero).
+///          Ceiling and floor invert both for negative numbers, and negative amounts are the rule
+///          in an ERP rather than the exception: credit memos, reversals, negative deltas.
+enum class RoundDirection : std::uint8_t {
+  Nearest, ///< '=' -- nearest multiple; exactly five rounds away from zero.
+  Up,      ///< '>' -- away from zero.
+  Down,    ///< '<' -- toward zero.
+};
+
+/// \brief AL `System.Round(Number, Precision, Direction)`.
+///
+/// \param number    The value to round.
+/// \param precision The MULTIPLE to round to -- 0.01 for hundredths, 0.05 for five-cent steps.
+///                  Both occur in BC.
+/// \param direction Which way to go when the value falls between two multiples.
+/// \return The rounded value.
+/// \throws DecimalError when the precision is zero.
+///
+/// \note The documentation names the default precision as `Amount Rounding Precision` from GLSetup
+///       via Codeunit 45, falling back to two decimal places. That default is known to the runtime,
+///       not to the value type, so it is not defaulted here.
+/// \see `system-round-method.md`
+Decimal Round(const Decimal &number,
+              const Decimal &precision,
+              RoundDirection direction = RoundDirection::Nearest);
+
+/// \brief AL `Round(Number, Precision, Direction)` with the direction as TEXT.
+///
+/// \param number    The value.
+/// \param precision The multiple to round to.
+/// \param direction `'='` nearest, `'>'` up, `'<'` down -- one character, as AL spells it.
+/// \return The rounded value.
+/// \throws DecimalError when the precision is zero, or the direction is none of the three.
+///
+/// \note THE DOCUMENTED PARAMETER IS A TEXT. `system-round-method.md` gives
+///       `Round(Number: Decimal [, Precision: Decimal] [, Direction: Text])`, and the BaseApp
+///       passes `Currency.InvoiceRoundingDirection()`, which returns one of those characters. The
+///       enumeration beside this is the runtime's own vocabulary and not AL's.
+Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction);
+
+/// \brief AL `Round(Number)` -- rounded to the precision the platform decides.
+///
+/// \param number The value.
+/// \return The rounded value.
+///
+/// \warning IT ROUNDS TO TWO DECIMAL PLACES, WHICH IS THE DOCUMENTED FALLBACK AND NOT THE FIRST
+///          CHOICE. `system-round-method.md` gives two steps for an absent precision: "The method
+///          ReadRounding in Codeunit 45 ... returns the Amount Rounding Precision field from the
+///          GLSetup table", and "if you have customized Codeunit 45 and it does not implement the
+///          ReadRounding method, then the precision is specified as 2 digits after the decimal."
+///          Nothing wires that codeunit into the runtime yet, so this tree is in the second case --
+///          and it may not name Codeunit 45 or GLSetup itself, because the runtime knows no AL
+///          object. What it needs is a SLOT the transpiled codeunit registers into (board:0007).
+[[nodiscard]] Decimal Round(const Decimal &number);
+
+}

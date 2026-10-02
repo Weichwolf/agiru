@@ -1,0 +1,1082 @@
+#pragma once
+
+#include "runtime/ErrorValue.h"
+#include "type/BigInteger.h"
+#include "type/Boolean.h"
+#include "type/Char.h"
+#include "type/Integer.h"
+#include "type/List.h"
+
+#include <compare>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+/// \file
+/// \brief What AL's two string types share.
+///
+/// `StringValue` and the helpers below have no AL counterpart, so they are free to be named what
+/// they are. The AL types themselves live one per header, as the documentation lists them:
+/// agiru/Text.h and agiru/Code.h.
+
+namespace agiru {
+
+class Variant;
+
+/// \brief An error raised by a string assignment, such as an over-length value.
+class StringError : public Error {
+public:
+  using Error::Error;
+};
+
+/// \brief Internals of the string types. Not part of the door.
+namespace detail {
+
+/// \brief Lets the runtime write a value it read from a column.
+///
+/// The storage layer reaches a field as an offset and a type tag, so it cannot use the typed
+/// assignment. This is the one way in, named so that every caller can be found, and it applies
+/// the same rules assignment does.
+class ValueAccess;
+
+/// \brief Counts a UTF-8 string the way .NET counts a string: in UTF-16 code units.
+///
+/// \param s The UTF-8 text.
+/// \return The number of UTF-16 code units, so a character outside the Basic Multilingual Plane
+///         counts two while occupying four bytes.
+///
+/// BC's strings are .NET strings, and `text-strlen-method.md` gives the length of one. Storage here
+/// is UTF-8; the counting rule is .NET's.
+std::size_t Utf16Length(std::string_view s);
+
+/// \brief The code point at a ZERO-BASED UTF-16 unit position.
+/// \param s    The text.
+/// \param unit The position.
+/// \return The code point.
+/// \throws StringError when the position is outside the text or inside a surrogate pair.
+std::int32_t CodePointAt(std::string_view s, std::size_t unit);
+
+/// \brief The byte offset of a ONE-BASED UTF-16 unit position, clamped to the end.
+/// \param s    The text.
+/// \param unit The position, counting from one.
+/// \return The byte offset.
+std::size_t ByteOfUnit(std::string_view s, std::size_t unit);
+
+/// \brief The one-based UTF-16 unit position of a byte offset.
+/// \param s  The text.
+/// \param at The byte offset.
+/// \return The position, counting from one.
+std::size_t UnitOfByte(std::string_view s, std::size_t at);
+
+/// \brief AL `Text.IndexOf`.
+/// \param s          The text.
+/// \param value      The string to seek.
+/// \param startIndex The one-based position to start at.
+/// \return The one-based position, or 0.
+Integer IndexOfText(std::string_view s, std::string_view value, Integer startIndex);
+
+/// \brief AL `Text.LastIndexOf`.
+/// \param s          The text.
+/// \param value      The string to seek.
+/// \param startIndex The one-based position the backward search starts at; 0 means the end.
+/// \return The one-based position, or 0.
+Integer LastIndexOfText(std::string_view s, std::string_view value, Integer startIndex);
+
+/// \brief AL `Text.IndexOfAny`.
+/// \param s          The text.
+/// \param values     The characters to seek.
+/// \param startIndex The one-based position to start at.
+/// \return The one-based position, or 0.
+Integer IndexOfAnyText(std::string_view s, std::string_view values, Integer startIndex);
+
+/// \brief Which end a text is padded at.
+enum class PadSide : std::uint8_t {
+  Left,  ///< AL `Text.PadLeft` -- the text is right-aligned.
+  Right, ///< AL `Text.PadRight` -- the text is left-aligned.
+};
+
+/// \brief Which ends a text is trimmed at.
+enum class TrimSides : std::uint8_t {
+  Start, ///< AL `Text.TrimStart`.
+  End,   ///< AL `Text.TrimEnd`.
+  Both,  ///< AL `Text.Trim`.
+};
+
+/// \brief What `Text.Replace` replaces, and with what.
+struct Replacement {
+  std::string_view from; ///< What is replaced.
+  std::string_view to;   ///< What replaces it.
+};
+
+/// \brief AL `Text.PadLeft` and `Text.PadRight`.
+/// \param s     The text.
+/// \param count The length to pad to.
+/// \param side  Which end to pad at.
+/// \param pad   The padding character.
+/// \return The padded text.
+std::string PadText(std::string_view s, Integer count, PadSide side, Char pad);
+
+/// \brief AL `Text.Remove`.
+/// \param s          The text.
+/// \param startIndex The one-based position to delete from.
+/// \param count      How many characters to delete, or nothing for everything after the position.
+/// \return What is left.
+std::string RemoveText(std::string_view s, Integer startIndex, std::optional<Integer> count);
+
+/// \brief AL `Text.Substring`.
+/// \param s          The text.
+/// \param startIndex The one-based position the substring starts at.
+/// \param count      How many characters it holds, or nothing for the rest of the text.
+/// \return The substring.
+std::string SubstringText(std::string_view s, Integer startIndex, std::optional<Integer> count);
+
+/// \brief AL `Text.Replace` -- every occurrence.
+/// \param s    The text.
+/// \param what What is replaced, and with what.
+/// \return The result.
+std::string ReplaceText(std::string_view s, Replacement what);
+
+/// \brief AL `Text.Split`.
+/// \param s          The text.
+/// \param separators The separators; empty means white space.
+/// \return The pieces, in order.
+List<std::string> SplitText(std::string_view s, std::span<const std::string> separators);
+
+/// \brief Each character of a `List of [Char]` as its own one-character string.
+/// \param values The characters.
+/// \return The strings.
+std::vector<std::string> EachChar(const List<Char> &values);
+
+/// \brief A `List of [Char]` as one string.
+/// \param values The characters.
+/// \return The string.
+std::string TextOfChars(const List<Char> &values);
+
+/// \brief The elements of a `List of [Text]`, contiguously.
+/// \param values The list.
+/// \return The elements.
+std::vector<std::string> EachText(const List<std::string> &values);
+
+/// \brief AL `Text.ToLower`.
+/// \param s The text.
+/// \return It in lower case.
+std::string LowerText(std::string_view s);
+
+/// \brief AL `Text.ToUpper`.
+/// \param s The text.
+/// \return It in upper case.
+std::string UpperText(std::string_view s);
+
+/// \brief AL `Text.Trim`, `Text.TrimStart` and `Text.TrimEnd`.
+/// \param s     The text.
+/// \param sides Which ends to strip.
+/// \param chars The characters to strip; empty means white space.
+/// \return The trimmed text.
+std::string TrimText(std::string_view s, TrimSides sides, std::string_view chars);
+
+/// \brief Raises the platform's own over-length message.
+///
+/// \param value  The offending text, quoted in the message.
+/// \param actual Its length.
+/// \param max    The declared maximum.
+/// \throws StringError always.
+///
+/// \warning The wording is load-bearing: BC test code matches substrings of it through
+///          `Assert.ExpectedError`, so a paraphrase would turn a green case red.
+[[noreturn]] void RaiseTooLong(std::string_view value, std::size_t actual, std::size_t max);
+
+/// \brief Raises when a value is longer than a declared length.
+/// \param s   The text to measure.
+/// \param max The declared maximum, in UTF-16 code units; 0 means UNBOUNDED.
+///
+/// \note Zero is no limit rather than a limit of nothing, because that is what AL means by a bare
+///       `Text` with no brackets after it.
+void CheckLength(std::string_view s, std::size_t max);
+
+/// \brief Applies AL's Code normalisation.
+///
+/// \param s The raw text.
+/// \return The text uppercased, with leading and trailing spaces removed.
+///
+/// Verbatim from `code-data-type.md`: a Code is "a special type of string that is converted to
+/// uppercase and removes any trailing or leading spaces", and "the length of a Code variable equals
+/// the number of characters in the text without leading or trailing spaces" -- so the trim happens
+/// BEFORE the length is checked. The document's own example turns `' 2 '` into `'2'`.
+///
+/// \note Only ASCII letters are uppercased. .NET's ToUpper is culture-aware and would fold
+///       non-ASCII letters too; no BC document states which culture applies, and guessing one would
+///       be a silent semantic (board:0010).
+std::string NormaliseCode(std::string_view s);
+
+/// \brief Compares two Code values the way AL orders them.
+///
+/// \param a Left operand.
+/// \param b Right operand.
+/// \return Numeric ordering when both sides consist entirely of digits, so `"109003"` is less than
+///         `"1010999"`; plain string ordering otherwise.
+///
+/// \warning NOT IN THE PLATFORM DOCUMENTATION -- searched, absent. It rests on the predecessor
+///          (openerp `runtime/fields.py:_Code`), which measured it against the BC test suite, and
+///          on the mechanism that needs it:
+///          `Business Foundation/App/NoSeries/src/Single/NoSeriesStatelessImpl.Codeunit.al:109`,
+///          which compares number-series codes with less-than and greater-than. Marked a conjecture
+///          on purpose until a document or a real BC confirms it (board:0011).
+/// \note Only the ordering is numeric. Equality stays exact string comparison, so `"01"` and `"1"`
+///       remain different primary keys.
+std::strong_ordering CompareCode(std::string_view a, std::string_view b);
+
+}
+
+/// \brief AL `Text[N]`; `Text<0>` is the unbounded one and is defined below.
+/// \tparam N The declared length, in UTF-16 code units.
+template <std::size_t N> class Text;
+
+/// \brief The part of a string field that does not depend on its declared length.
+///
+/// It exists so the runtime can read any Text[N] or Code[N] through one pointer: the field table
+/// addresses a field by offset and type, and without a common base it would need one branch per
+/// declared length. Keeping the data only here also leaves a generated record standard-layout,
+/// which is what `offsetof` over the field table requires.
+class StringValue {
+public:
+  /// \return The stored text.
+  [[nodiscard]] std::string_view Value() const { return value_; }
+
+  /// \brief One step of AL `foreach Ch in Text`: the characters, one code point each, the way
+  ///        `Text[i]` counts them and never the bytes (`Base64 Convert Impl.RemoveUrlUnsafeChars`
+  ///        walks a text this way, 2026-09-12).
+  class CharIterator {
+  public:
+    /// \brief The iterator at a byte position. \param text The text. \param at The byte.
+    CharIterator(std::string_view text, std::size_t at) : text_(text), at_(at) { Decode_(); }
+
+    /// \brief The character under the iterator. \return It, as a reference the loop may bind.
+    [[nodiscard]] Char &operator*() { return current_; }
+
+    /// \brief Steps to the next character. \return This iterator.
+    CharIterator &operator++() {
+      at_ += width_;
+      Decode_();
+      return *this;
+    }
+
+    /// \brief Two iterators over one text compare by position. \param o The other.
+    /// \return Whether they differ.
+    [[nodiscard]] bool operator!=(const CharIterator &o) const { return at_ != o.at_; }
+
+  private:
+    void Decode_() {
+      width_ = 0;
+      if (at_ >= text_.size()) { return; }
+      const auto lead = static_cast<unsigned char>(text_[at_]);
+      width_ = lead < 0x80U ? 1 : (lead & 0xE0U) == 0xC0U ? 2 : (lead & 0xF0U) == 0xE0U ? 3 : 4;
+      if (at_ + width_ > text_.size()) { width_ = text_.size() - at_; }
+      current_ = Char{text_.substr(at_, width_)};
+    }
+
+    std::string_view text_;
+    std::size_t at_ = 0;
+    std::size_t width_ = 0;
+    Char current_{};
+  };
+
+  /// \brief AL `foreach Ch in Text`: the first character. \return The iterator.
+  [[nodiscard]] CharIterator begin() const { return CharIterator{value_, 0}; }
+
+  /// \brief AL `foreach Ch in Text`: past the last character. \return The iterator.
+  [[nodiscard]] CharIterator end() const { return CharIterator{value_, value_.size()}; }
+
+  /// \return True when the field holds the empty string.
+  [[nodiscard]] bool IsEmpty() const { return value_.empty(); }
+
+  /// \return The length in UTF-16 code units, as AL's `StrLen` counts it.
+  ///
+  /// \note AN `Integer` AND NOT A `std::size_t`, because AL's `StrLen` returns one and a body
+  ///       hands the result straight to something that takes an Integer -- or to an `Any`, where a
+  ///       `std::size_t` is not an alternative at all.
+  [[nodiscard]] Integer Length() const { return static_cast<Integer>(detail::Utf16Length(value_)); }
+
+  /// \brief AL `X[i]` on text -- the character at a ONE-BASED position.
+  ///
+  /// \param index The position, counting from one as AL counts.
+  /// \return The character.
+  /// \throws StringError when the index is outside the text.
+  [[nodiscard]] Char operator[](Integer index) const;
+
+  /// \brief AL `Text.Contains(Text)`.
+  /// \param Value The string to seek.
+  /// \return True when this text holds it.
+  /// \see `text-contains-method.md`
+  [[nodiscard]] Boolean Contains(std::string_view Value) const {
+    return value_.find(Value) != std::string::npos;
+  }
+
+  /// \brief AL `Text.EndsWith(Text)`.
+  /// \param Value The string to match.
+  /// \return True when this text ends with it.
+  /// \see `text-endswith-method.md`
+  [[nodiscard]] Boolean EndsWith(std::string_view Value) const { return value_.ends_with(Value); }
+
+  /// \brief AL `Text.StartsWith(Text)`.
+  /// \param Value The string to match.
+  /// \return True when this text begins with it.
+  /// \see `text-startswith-method.md`
+  [[nodiscard]] Boolean StartsWith(std::string_view Value) const {
+    return value_.starts_with(Value);
+  }
+
+  /// \brief AL `Text.IndexOf(Text)`.
+  /// \param Value The string to seek.
+  /// \return Its one-based position, or 0 when the text does not hold it.
+  /// \see `text-indexof-method.md`
+  [[nodiscard]] Integer IndexOf(std::string_view Value) const {
+    return detail::IndexOfText(value_, Value, 1);
+  }
+
+  /// \brief AL `Text.IndexOf(Text, Integer)`.
+  /// \param Value      The string to seek.
+  /// \param StartIndex The one-based position to start at.
+  /// \return Its one-based position, or 0 when the text does not hold it from there on.
+  /// \see `text-indexof-method.md`
+  [[nodiscard]] Integer IndexOf(std::string_view Value, Integer StartIndex) const {
+    return detail::IndexOfText(value_, Value, StartIndex);
+  }
+
+  /// \brief AL `Text.LastIndexOf(Text)`.
+  /// \param Value The string to seek.
+  /// \return The one-based position of its LAST occurrence, or 0.
+  /// \see `text-lastindexof-method.md`
+  [[nodiscard]] Integer LastIndexOf(std::string_view Value) const {
+    return detail::LastIndexOfText(value_, Value, 0);
+  }
+
+  /// \brief AL `Text.LastIndexOf(Text, Integer)`.
+  /// \param Value      The string to seek.
+  /// \param StartIndex The one-based position the backward search starts from.
+  /// \return The one-based position of the last occurrence at or before it, or 0.
+  /// \see `text-lastindexof-method.md`
+  [[nodiscard]] Integer LastIndexOf(std::string_view Value, Integer StartIndex) const {
+    return detail::LastIndexOfText(value_, Value, StartIndex);
+  }
+
+  /// \brief AL `Text.IndexOfAny(Text)`.
+  /// \param Values The characters to seek, as a string.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-text-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(std::string_view Values) const {
+    return detail::IndexOfAnyText(value_, Values, 1);
+  }
+
+  /// \brief AL `Text.IndexOfAny(Text, Integer)`.
+  /// \param Values     The characters to seek, as a string.
+  /// \param StartIndex The one-based position to start at.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-text-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(std::string_view Values, Integer StartIndex) const {
+    return detail::IndexOfAnyText(value_, Values, StartIndex);
+  }
+
+  /// \brief AL `Text.IndexOfAny(List of [Char])`.
+  /// \param Values The characters to seek.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-list[char]-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(const List<Char> &Values) const {
+    return detail::IndexOfAnyText(value_, detail::TextOfChars(Values), 1);
+  }
+
+  /// \brief AL `Text.IndexOfAny(List of [Char], Integer)`.
+  /// \param Values     The characters to seek.
+  /// \param StartIndex The one-based position to start at.
+  /// \return The one-based position of the first of them, or 0.
+  /// \see `text-indexofany-list[char]-integer-method.md`
+  [[nodiscard]] Integer IndexOfAny(const List<Char> &Values, Integer StartIndex) const {
+    return detail::IndexOfAnyText(value_, detail::TextOfChars(Values), StartIndex);
+  }
+
+  /// \brief AL `Text.PadLeft(Integer)` -- right-aligns by padding with spaces.
+  /// \param Count The length the result is padded to.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padleft-method.md`
+  [[nodiscard]] Text<0> PadLeft(Integer Count) const;
+
+  /// \brief AL `Text.PadLeft(Integer, Char)`.
+  /// \param Count   The length the result is padded to.
+  /// \param Padding The padding character.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padleft-method.md`
+  [[nodiscard]] Text<0> PadLeft(Integer Count, Char Padding) const;
+
+  /// \brief AL `Text.PadRight(Integer)` -- left-aligns by padding with spaces.
+  /// \param Count The length the result is padded to.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padright-method.md`
+  [[nodiscard]] Text<0> PadRight(Integer Count) const;
+
+  /// \brief AL `Text.PadRight(Integer, Char)`.
+  /// \param Count   The length the result is padded to.
+  /// \param Padding The padding character.
+  /// \return The padded text, or this text when it is already that long.
+  /// \see `text-padright-method.md`
+  [[nodiscard]] Text<0> PadRight(Integer Count, Char Padding) const;
+
+  /// \brief AL `Text.Remove(Integer)` -- everything from a position onwards.
+  /// \param StartIndex The one-based position to begin deleting at.
+  /// \return What is left.
+  /// \see `text-remove-method.md`
+  [[nodiscard]] Text<0> Remove(Integer StartIndex) const;
+
+  /// \brief AL `Text.Remove(Integer, Integer)`.
+  /// \param StartIndex The one-based position to begin deleting at.
+  /// \param Count      How many characters to delete.
+  /// \return What is left.
+  /// \see `text-remove-method.md`
+  [[nodiscard]] Text<0> Remove(Integer StartIndex, Integer Count) const;
+
+  /// \brief AL `Text.Replace(Text, Text)` -- every occurrence.
+  /// \param OldValue The string to replace.
+  /// \param NewValue What replaces it.
+  /// \return The result.
+  /// \see `text-replace-method.md`
+  [[nodiscard]] Text<0> Replace(std::string_view OldValue, std::string_view NewValue) const;
+
+  /// \brief AL `Text.Substring(Integer)` -- everything from a position onwards.
+  /// \param StartIndex The one-based position the substring starts at.
+  /// \return The substring.
+  /// \see `text-substring-method.md`
+  [[nodiscard]] Text<0> Substring(Integer StartIndex) const;
+
+  /// \brief AL `Text.Substring(Integer, Integer)`.
+  /// \param StartIndex The one-based position the substring starts at.
+  /// \param Count      How many characters it holds.
+  /// \return The substring.
+  /// \see `text-substring-method.md`
+  /// \note A COUNT PAST THE END IS NOT AN ERROR since application version 27.1, which the page
+  ///       states outright; it yields the rest of the text.
+  [[nodiscard]] Text<0> Substring(Integer StartIndex, Integer Count) const;
+
+  /// \brief AL `Text.Split()` -- at white space.
+  /// \return The pieces, in order.
+  /// \see `text-split-text-method.md`
+  [[nodiscard]] List<std::string> Split() const { return detail::SplitText(value_, {}); }
+
+  /// \brief AL `Text.Split(Text)`.
+  /// \param Separators The separator.
+  /// \return The pieces, in order.
+  /// \see `text-split-text-method.md`
+  [[nodiscard]] List<std::string> Split(std::string_view Separators) const {
+    const std::string one{Separators};
+    return detail::SplitText(value_, std::span<const std::string>{&one, 1});
+  }
+
+  /// \brief AL `Text.Split(List of [Text])`.
+  /// \param Separators The separators.
+  /// \return The pieces, in order.
+  /// \see `text-split-list[text]-method.md`
+  [[nodiscard]] List<std::string> Split(const List<std::string> &Separators) const {
+    return detail::SplitText(value_, detail::EachText(Separators));
+  }
+
+  /// \brief AL `Text.Split(List of [Char])`.
+  /// \param Separators The separators, one character each.
+  /// \return The pieces, in order.
+  /// \see `text-split-list[char]-method.md`
+  [[nodiscard]] List<std::string> Split(const List<Char> &Separators) const {
+    return detail::SplitText(value_, detail::EachChar(Separators));
+  }
+
+  /// \brief AL `Text.ToLower()`.
+  /// \return This text in lower case.
+  /// \see `text-tolower-method.md`
+  /// \warning IT LOWERS ASCII ONLY. The platform lowers by the invariant culture, which covers
+  /// every
+  ///          cased script; anything above 127 is left alone here and is board:0041.
+  [[nodiscard]] Text<0> ToLower() const;
+
+  /// \brief AL `Text.ToUpper()`.
+  /// \return This text in upper case.
+  /// \see `text-toupper-method.md`
+  /// \warning IT RAISES ASCII ONLY, for the reason ToLower gives.
+  [[nodiscard]] Text<0> ToUpper() const;
+
+  /// \brief AL `Text.Trim()` -- white space off both ends.
+  /// \return The trimmed text.
+  /// \see `text-trim-method.md`
+  [[nodiscard]] Text<0> Trim() const;
+
+  /// \brief AL `Text.TrimStart()` -- white space off the front.
+  /// \return The trimmed text.
+  /// \see `text-trimstart-method.md`
+  [[nodiscard]] Text<0> TrimStart() const;
+
+  /// \brief AL `Text.TrimStart(Text)`.
+  /// \param Chars The characters to strip.
+  /// \return The trimmed text.
+  /// \see `text-trimstart-method.md`
+  [[nodiscard]] Text<0> TrimStart(std::string_view Chars) const;
+
+  /// \brief AL `Text.TrimStart(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimStart(const C &Chars) const;
+
+  /// \brief AL `Text.TrimEnd()` -- white space off the back.
+  /// \return The trimmed text.
+  /// \see `text-trimend-method.md`
+  [[nodiscard]] Text<0> TrimEnd() const;
+
+  /// \brief AL `Text.TrimEnd(Text)`.
+  /// \param Chars The characters to strip.
+  /// \return The trimmed text.
+  /// \see `text-trimend-method.md`
+  [[nodiscard]] Text<0> TrimEnd(std::string_view Chars) const;
+
+  /// \brief AL `Text.TrimEnd(Char)` -- a character is one character of text.
+  /// \tparam C The character's type, taken as a template because `Char` is a door type this
+  ///         header stands under.
+  /// \param Chars The character.
+  /// \return The trimmed text.
+  ///
+  /// \note AL CONVERTS A CHAR TO A TEXT WHEREVER ONE IS EXPECTED, and C++ will not chain the two
+  ///       conversions that would take, so the overload says it instead.
+  template <typename C>
+    requires requires(const C &one) { one.AsInteger(); } && (!std::is_enum_v<C>)
+  [[nodiscard]] Text<0> TrimEnd(const C &Chars) const;
+
+  /// \brief AL `+=` on text -- appends.
+  ///
+  /// \tparam T The other side, which must read as a `std::string_view`.
+  /// \param value The text to append.
+  /// \return This value.
+  ///
+  /// \note THE LENGTH IS CHECKED BY WHOEVER OWNS IT. `StringValue` carries no declared length --
+  ///       `Text<N>` and `Code<N>` do -- so the append goes through the derived type's `Assign`,
+  ///       which is what raises when the result no longer fits.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  StringValue &operator+=(const T &value) {
+    value_ += std::string_view(value);
+    return *this;
+  }
+
+  /// \brief AL `+=` where the other side is a member the runtime has not rebuilt.
+  ///
+  /// \tparam T The refusal's type, which marks itself with `IsAlRefusal`.
+  /// \param refusal The refused member.
+  /// \return Never.
+  /// \throws Error always, naming the member -- which is what reading it does anywhere else.
+  ///
+  /// \warning IT READS THE REFUSAL AS A NUMBER TO MAKE IT THROW, and that is not an accident: a
+  ///          refusal deliberately does NOT convert to `std::string_view`, because a `Code<N>`
+  ///          assignment then had two equally good conversions. So the append cannot go through
+  ///          text, and any conversion the refusal offers raises the same error.
+  template <typename T>
+    requires requires { typename T::IsAlRefusal; }
+  StringValue &operator+=(const T &refusal) {
+    static_cast<void>(static_cast<std::int32_t>(refusal));
+    return *this;
+  }
+
+  /// \brief Reads as text wherever text is wanted.
+  ///
+  /// \return The stored text.
+  ///
+  /// \note AL HANDS A `Code` TO A `Text` PARAMETER WITHOUT CEREMONY, and every builtin that takes
+  ///       text takes it. Without this the door refuses what AL writes constantly -- and the LENGTH
+  ///       check that matters is on the way IN, not on the way out.
+  operator std::string_view() const { return value_; }
+
+  /// \brief The DECLARED length, which is not the current one.
+  ///
+  /// \return The maximum this string accepts, or 0 when it was declared without a length.
+  ///
+  /// \note IT IS A FIELD AND NOT A TEMPLATE ARGUMENT, and the predecessor is why. AL passes a
+  ///       `Text[30]` field to a `var Text` parameter -- `PostCode.LookupPostCode(City, ...)` in
+  ///       Customer.Table.al -- so the callee holds a reference whose STATIC type has no length and
+  ///       whose value has one. `~/Git/openerp/` had the same question and no value to ask, so its
+  ///       `MaxStrLen` PARSED THE CALLING SOURCE LINE to recover the declaration; the comment there
+  ///       lists what that cost when it guessed wrong. Eight bytes per string buys the right answer
+  ///       at the point of use.
+  [[nodiscard]] std::size_t Max() const { return max_; }
+
+protected:
+  friend class detail::ValueAccess;
+
+  /// \brief A string with a declared length.
+  /// \param max The declared length, or 0 for none.
+  explicit StringValue(std::size_t max) : max_(max) {}
+
+  /// \brief A string with no declared length.
+  StringValue() = default;
+
+  /// \brief Copies the value AND the declared length, which is what constructing one is.
+  StringValue(const StringValue &) = default;
+
+  /// \brief Moves the value and the declared length.
+  StringValue(StringValue &&) = default;
+
+  ~StringValue() = default;
+
+  /// \brief Copies the VALUE and keeps this string's own declared length.
+  ///
+  /// \param o The other string.
+  /// \return This string.
+  ///
+  /// \note ASSIGNMENT DOES NOT MOVE THE DECLARATION. `Customer.City := SomeUnboundedText` leaves
+  ///       City a `Text[30]`; copying the source's length would quietly widen the target and the
+  ///       next over-long value would go in unchecked.
+  StringValue &operator=(const StringValue &o) {
+    if (this != &o) { value_ = o.value_; }
+    return *this;
+  }
+
+  /// \brief The same, moving the value.
+  /// \param o The other string.
+  /// \return This string.
+  StringValue &operator=(StringValue &&o) noexcept {
+    if (this != &o) { value_ = std::move(o.value_); }
+    return *this;
+  }
+
+  /// \brief Stores an already validated value.
+  /// \param value The text, checked and normalised by the derived type.
+  void Set(std::string value) { value_ = std::move(value); }
+
+  /// \return The stored text, for a derived type's own comparisons.
+  [[nodiscard]] const std::string &Stored() const { return value_; }
+
+private:
+  std::string value_;
+  std::size_t max_ = 0;
+};
+
+/// \brief What a door parameter takes where AL's page says `Text`.
+///
+/// \note AL'S CONVERSIONS ARE THE SPECIFICATION AND `std::string_view` IS NOT. A page that says
+///       `FilterPageBuilder.AddTable(Name: Text, TableNo: Integer)` accepts everything AL accepts
+///       at a `Text` parameter -- a literal, a `Text` or `Code`, and a `Guid`, which
+///       `guid-data-type.md` says plainly may be assigned to and compared with `Text`. Typed
+///       `std::string_view`, the door takes the first two and refuses the rest, and 433 parameters
+///       are typed that way (board:0605).
+///
+/// \warning IT IS A PARAMETER AND NEVER A MEMBER. It may hold a view INTO its argument, so it is
+///          taken by `const &`, lives for the call and is not copyable -- a stored one would
+///          outlive what it points at.
+class TextArgument {
+public:
+  /// \brief From an AL string literal or any view of one.
+  /// \param text The characters.
+  constexpr TextArgument(std::string_view text) : view_(text) {} // NOLINT(*-explicit-constructor)
+
+  /// \brief From a `std::string` a door method already returns -- `TableCaption()` is one.
+  /// \param text The characters, which outlive the call they are an argument to.
+  /// \note IT IS ITS OWN CONSTRUCTOR AND NOT A CONVERSION CHAIN. `std::string` reaches
+  ///       `std::string_view` through a conversion of its own, and C++ takes only ONE
+  ///       user-defined step -- so without this the call does not compile at all.
+  TextArgument(const std::string &text) : view_(text) {} // NOLINT(*-explicit-constructor)
+
+  /// \brief From AL's own `Text` and `Code`, which share `StringValue`.
+  /// \param value The AL string.
+  TextArgument(const StringValue &value) // NOLINT(*-explicit-constructor)
+      : view_(value.Value()) {}
+
+  /// \brief From any AL value that renders itself as text -- `Guid` is the one the door needs.
+  /// \tparam T The value's type.
+  /// \param value The value, rendered once and held for the call.
+  /// \note A REFUSAL IS NOT TAKEN HERE, and it says so itself: `dotnet::Refused` carries
+  ///       `IsAlRefusal` for exactly this. Without the exclusion its `operator T()` and this
+  ///       constructor are equally viable and the call is ambiguous; with it the refusal converts
+  ///       and THROWS at the call site, which is where a member nobody rebuilt should be heard.
+  template <typename T>
+    requires requires(const T &value) { value.ToText(); } && (!std::is_base_of_v<StringValue, T>) &&
+                 (!requires { typename T::IsAlRefusal; })
+  TextArgument(const T &value) // NOLINT(*-explicit-constructor)
+      : owned_(value.ToText()), view_(owned_) {}
+
+  TextArgument(const TextArgument &) = delete;
+  TextArgument(TextArgument &&) = delete;
+  TextArgument &operator=(const TextArgument &) = delete;
+  TextArgument &operator=(TextArgument &&) = delete;
+  ~TextArgument() = default;
+
+  /// \brief What the door reads.
+  /// \return The characters, for as long as the call lasts.
+  [[nodiscard]] constexpr operator std::string_view() const {
+    return view_;
+  } // NOLINT(*-explicit-constructor)
+
+private:
+  std::string owned_;
+  std::string_view view_;
+};
+
+/// \brief AL `Text` -- a text with no declared length, and the base every sized one derives from.
+///
+/// \note THE SIZED ONES DERIVE FROM IT BECAUSE AL PASSES ONE FOR THE OTHER. `var CityTxt: Text`
+///       takes `Customer.City`, a `Text[30]`, in the BaseApp's own Customer table -- so a reference
+///       to the unbounded type must bind to the sized one, and only a base can do that. What keeps
+///       the assignment honest through such a reference is `Max()`, which is the VALUE's and not
+///       the reference's.
+template <> class Text<0> : public StringValue {
+public:
+  /// \brief The declared length, which is none.
+  static constexpr std::size_t kMaxLength = 0;
+
+  /// \brief An empty text.
+  Text() = default;
+
+  /// \brief Takes ownership of an unbounded text result without copying its buffer.
+  /// \param value The owned characters; no length or Code normalization is imposed.
+  explicit(false) Text(std::string &&value) { Set(std::move(value)); }
+
+  /// \brief Constructs from anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
+  /// \param value The text.
+  ///
+  /// \note ONE CONSTRAINED TEMPLATE AND NOT TWO OVERLOADS, because two were ambiguous: a string
+  ///       literal reaches `std::string_view` and `const std::string &` equally well. And NOT
+  ///       EXPLICIT, because AL assigns text without ceremony -- a body writes
+  ///       `AssignCompany(X, CompanyName())` where the parameter is a `Text` and the builtin
+  ///       returns a string.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Text(const T &value) {
+    Assign(std::string_view(value));
+  }
+
+  /// \brief Copies the text, keeping this one's declared length.
+  /// \param o The other text.
+  Text(const Text &o) = default;
+
+  /// \brief Moves the text.
+  /// \param o The other text.
+  Text(Text &&o) = default;
+
+  ~Text() = default;
+
+  /// \brief Assigns anything that reads as text.
+  ///
+  /// \tparam T The source, which must read as a `std::string_view`.
+  /// \param value The text.
+  /// \return This object.
+  /// \throws StringError when it does not fit the declared length.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view>
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value));
+    return *this;
+  }
+
+  /// \brief Makes a text from anything that RENDERS as text -- a `Guid` handed to a `Text`
+  ///        parameter, which `guid-data-type.md` allows.
+  /// \tparam T The source, which must carry a `ToText()` and must not already read as text.
+  /// \param value The value.
+  /// \throws StringError when the rendering does not fit the declared length.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  explicit(false) Text(const T &value) : Text() {
+    Assign(std::string_view(value.ToText()));
+  }
+
+  /// \brief Assigns anything that RENDERS as text, which is how AL assigns a GUID to a Text.
+  ///
+  /// \tparam T The source, which must carry a `ToText()`.
+  /// \param value The value.
+  /// \return This object.
+  /// \throws StringError when the rendering does not fit the declared length.
+  ///
+  /// \note `guid-data-type.md`: "You can assign and compare the Text data type and the GUID data
+  ///       type." A `Guid` is not convertible to `std::string_view` -- it holds sixteen bytes --
+  ///       so the conversion is its documented TEXT and never its storage.
+  template <typename T>
+    requires(!std::convertible_to<const T &, std::string_view>) &&
+            (!std::convertible_to<const T &, int>) &&
+            requires(const T &value) { std::string_view{value.ToText()}; }
+  Text &operator=(const T &value) {
+    Assign(std::string_view(value.ToText()));
+    return *this;
+  }
+
+  /// \brief Assigns another text, checking THIS one's declared length.
+  ///
+  /// \param o The other text.
+  /// \return This object.
+  /// \throws StringError when it does not fit.
+  ///
+  /// \note IT IS DECLARED RATHER THAN DEFAULTED, and that is the whole point of the hierarchy: the
+  ///       compiler's own copy assignment would take the source's bytes without asking whether they
+  ///       fit the target, which is exactly the check AL makes.
+  Text &operator=(const Text &o) {
+    if (this != &o) { Assign(o.Value()); }
+    return *this;
+  }
+
+  /// \brief The same, moving nothing: the length still has to be checked.
+  /// \param o The other text.
+  /// \return This object.
+  Text &operator=(Text &&o) noexcept(false) {
+    if (this != &o) { Assign(o.Value()); }
+    return *this;
+  }
+
+  /// \brief Assigns text, checking the declared length.
+  /// \param value The text.
+  /// \throws StringError when it is longer than the declared length.
+  void Assign(std::string_view value) {
+    detail::CheckLength(value, Max());
+    Set(std::string(value));
+  }
+
+  /// \brief Orders two texts lexicographically.
+  /// \param o The other text.
+  /// \return The ordering.
+  [[nodiscard]] std::strong_ordering operator<=>(const Text &o) const {
+    return Stored().compare(o.Stored()) <=> 0;
+  }
+
+  /// \brief Compares two texts for equality.
+  /// \param o The other text.
+  /// \return True when the stored text is identical.
+  [[nodiscard]] bool operator==(const Text &o) const { return Stored() == o.Stored(); }
+
+  /// \brief Compares against a literal, which is how AL writes an emptiness test.
+  /// \param value The text.
+  /// \return True when the stored text is identical.
+  /// \note CONSTRAINED, for the reason the constructor is: with a converting constructor in
+  ///       place, a plain equality against a string view is ambiguous with the one against another
+  ///       Text for anything that reaches both, and a string literal reaches both.
+  /// \tparam T The source, which must read as a `std::string_view` and must not be a string type
+  ///           itself: a sized `Text` reaches both this and the one above, and C++20's reversed
+  ///           candidate then makes the two ambiguous.
+  template <typename T>
+    requires std::convertible_to<const T &, std::string_view> &&
+             (!std::derived_from<T, StringValue>)
+  [[nodiscard]] bool operator==(const T &value) const {
+    return Stored() == std::string_view(value);
+  }
+
+protected:
+  /// \brief A text with a declared length, for the sized specialisation.
+  /// \param max The declared length.
+  explicit Text(std::size_t max) : StringValue(max) {}
+};
+
+/// \brief The out-of-line half of `StringValue::ToLower`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::ToLower() const {
+  return detail::LowerText(value_);
+}
+
+/// \brief The out-of-line half of `StringValue::ToUpper`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::ToUpper() const {
+  return detail::UpperText(value_);
+}
+
+/// \brief The out-of-line half of `StringValue::PadLeft`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadLeft(Integer Count) const {
+  return detail::PadText(value_, Count, detail::PadSide::Left, Char{' '});
+}
+
+/// \brief The out-of-line half of `StringValue::PadLeft`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadLeft(Integer Count, Char Padding) const {
+  return detail::PadText(value_, Count, detail::PadSide::Left, Padding);
+}
+
+/// \brief The out-of-line half of `StringValue::PadRight`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadRight(Integer Count) const {
+  return detail::PadText(value_, Count, detail::PadSide::Right, Char{' '});
+}
+
+/// \brief The out-of-line half of `StringValue::PadRight`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::PadRight(Integer Count, Char Padding) const {
+  return detail::PadText(value_, Count, detail::PadSide::Right, Padding);
+}
+
+/// \brief The out-of-line half of `StringValue::Remove`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Remove(Integer StartIndex) const {
+  return detail::RemoveText(value_, StartIndex, std::nullopt);
+}
+
+/// \brief The out-of-line half of `StringValue::Remove`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Remove(Integer StartIndex, Integer Count) const {
+  return detail::RemoveText(value_, StartIndex, Count);
+}
+
+/// \brief The out-of-line half of `StringValue::Replace`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Replace(std::string_view OldValue, std::string_view NewValue) const {
+  return detail::ReplaceText(value_, {.from = OldValue, .to = NewValue});
+}
+
+/// \brief The out-of-line half of `StringValue::Substring`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Substring(Integer StartIndex) const {
+  return detail::SubstringText(value_, StartIndex, std::nullopt);
+}
+
+/// \brief The out-of-line half of `StringValue::Substring`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Substring(Integer StartIndex, Integer Count) const {
+  return detail::SubstringText(value_, StartIndex, Count);
+}
+
+/// \brief The out-of-line half of `StringValue::Trim`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::Trim() const {
+  return detail::TrimText(value_, detail::TrimSides::Both, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimStart`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimStart() const {
+  return detail::TrimText(value_, detail::TrimSides::Start, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimStart`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimStart(std::string_view Chars) const {
+  return detail::TrimText(value_, detail::TrimSides::Start, Chars);
+}
+
+/// \brief The out-of-line half of `StringValue::TrimEnd`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimEnd() const {
+  return detail::TrimText(value_, detail::TrimSides::End, {});
+}
+
+/// \brief The out-of-line half of `StringValue::TrimEnd`.
+/// \return What the declaration above promises.
+inline Text<0> StringValue::TrimEnd(std::string_view Chars) const {
+  return detail::TrimText(value_, detail::TrimSides::End, Chars);
+}
+
+/// \brief AL `+` on text -- concatenation.
+///
+/// \param left  The left side.
+/// \param right The right side.
+/// \return The joined storage; this erased-string overload does not establish an AL result type.
+[[nodiscard]] inline std::string operator+(const StringValue &left, const StringValue &right) {
+  return std::string(left.Value()) + std::string(right.Value());
+}
+
+/// \brief AL concatenation with at least one Text operand produces Text.
+/// \tparam Left The declared Text or Code type of the left operand.
+/// \tparam Right The declared Text or Code type of the right operand.
+/// \param left The left characters.
+/// \param right The right characters.
+/// \return Unbounded Text, preserving case and spaces; destination limits apply on assignment.
+/// \see `devenv-al-type-conversion-expressions.md`, example 2.
+template <typename Left, typename Right>
+  requires std::derived_from<Left, StringValue> && std::derived_from<Right, StringValue> &&
+           (std::derived_from<Left, Text<0>> || std::derived_from<Right, Text<0>>)
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(left.Value()) + std::string(right.Value())};
+}
+
+/// \brief AL `+` on text and a literal.
+///
+/// \tparam T The other side, which must read as a `std::string_view`.
+/// \param left  The text.
+/// \param right The literal, or anything else that reads as text.
+/// \return The two joined.
+///
+/// \note AL WRITES `X + '@' + Y` and means text. Without this the literal reaches neither side --
+///       `std::string_view` and `const StringValue &` are both one user-defined conversion away and
+///       neither is chosen.
+template <typename T>
+  requires std::convertible_to<const T &, std::string_view> && (!std::derived_from<T, StringValue>)
+[[nodiscard]] Text<0> operator+(const StringValue &left, const T &right) {
+  return Text<0>{std::string(left.Value()) + std::string(std::string_view(right))};
+}
+
+/// \brief AL `+` on a literal and text.
+/// \tparam T The other side, which must read as a `std::string_view`.
+/// \param left  The literal.
+/// \param right The text.
+/// \return The two joined.
+/// \note THE RIGHT SIDE IS A TEMPLATE AND NOT `const StringValue &`, WHICH IS NOT A STYLE CHOICE.
+///       A base reference accepts anything CONVERTIBLE to one, and the door's refusal placeholder
+///       for an object this run does not have converts to everything -- so `"x" + Absent.Member`
+///       materialised a `StringValue` temporary, whose destructor is protected, and the error named
+///       the base class rather than the absent object. Requiring the right side to BE a
+///       StringValue-derived type takes only the real ones.
+template <typename Left, typename Right>
+  requires std::convertible_to<const Left &, std::string_view> &&
+           (!std::derived_from<Left, StringValue>) && std::derived_from<Right, StringValue>
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(std::string_view(left)) + std::string(right.Value())};
+}
+
+/// \brief AL `+` where NEITHER side is a `Text[N]` or `Code[N]` field.
+///
+/// \tparam Left  The left side, which must read as a `std::string_view`.
+/// \tparam Right The right side, same.
+/// \param left  The left side.
+/// \param right The right side.
+/// \return The two joined.
+///
+/// \note IT CLOSES A HOLE THAT PRODUCED A NULL GUID. `Record.TableCaption()` returns a
+///       `std::string` and `Record.FieldCaption()` a `std::string_view`, and the standard library
+///       joins neither pair -- so `TableCaption() + ' ' + FieldCaption(No)` found
+///       `operator+(const Text<0> &, const Guid &)` instead, one user-defined conversion on each
+///       side, and wrote `Family {00000000-0000-0000-0000-000000000000}` where AL writes
+///       `Family No.` (measured 2026-09-07, 33 call sites). The operator AL means has to exist, or
+///       overload resolution finds one AL does not mean.
+///
+/// \note BOTH SIDES MUST BE CLASS TYPES, and neither may be a `std::string` when the other is one:
+///       the standard library already joins `string + string`, `string + const char *` and their
+///       mirrors, and a template that is exact on both sides would take those over.
+template <typename Left, typename Right>
+  requires std::convertible_to<const Left &, std::string_view> &&
+           std::convertible_to<const Right &, std::string_view> &&
+           (!std::derived_from<Left, StringValue>) && (!std::derived_from<Right, StringValue>) &&
+           std::is_class_v<Left> && std::is_class_v<Right> &&
+           (!std::same_as<Left, std::string> || !std::same_as<Right, std::string>)
+[[nodiscard]] Text<0> operator+(const Left &left, const Right &right) {
+  return Text<0>{std::string(std::string_view(left)) + std::string(std::string_view(right))};
+}
+
+/// \brief Compares two string values of DIFFERENT declared shapes -- a `Code<100>` against a
+///        `Text<0>` -- by their stored text.
+/// \param a One.
+/// \param b The other.
+/// \return True when the stored text is identical.
+///
+/// \note A FREE TEMPLATE ON THE EXACT TYPES, and that is the whole trick: each class's own
+///       `operator==` takes its own type, so `Code == Text` needs a user-defined conversion on one
+///       side whichever member is chosen -- and a free function on the BASE was no better, since
+///       the member is exact on its own side. Deduced to the two exact types it is exact on both,
+///       which beats every candidate that converts anything.
+/// \tparam A One string value's type.
+/// \tparam B The other's, which must differ -- the class's own `operator==` takes the same type.
+template <typename A, typename B>
+  requires std::derived_from<A, StringValue> && std::derived_from<B, StringValue> &&
+           (!std::same_as<A, B>)
+[[nodiscard]] bool operator==(const A &a, const B &b) {
+  return a.Value() == b.Value();
+}
+
+}

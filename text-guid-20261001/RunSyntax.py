@@ -1,0 +1,29 @@
+from pathlib import Path
+import json
+import subprocess
+
+root = Path(__file__).resolve().parent
+source = root / 'source'
+old = Path(json.loads((root / 'source-identity.json').read_text())['origin'])
+rows = []
+for compiler, cxx in [('clang', 'clang++-19'), ('gcc', 'g++-14')]:
+    for label, image in [('old', old), ('current', source)]:
+        for consumer, unit in [('reduced', root / 'TextGuidProbe.cpp'),
+                               ('consolidation', source / 'apps/base/finance/consolidation/codeunit/ImportConsolidationFromAPI.cpp')]:
+            command = [cxx, '-std=c++23', '-Wall', '-Wextra', '-Wpedantic', '-Werror',
+                       '-fsyntax-only', '-I' + str(image / 'include')]
+            command += ['-I' + str(source / 'apps' / app) for app in
+                        ('base', 'system', 'foundation', 'shared', 'absent')]
+            command.append(str(unit))
+            result = subprocess.run(command, text=True, capture_output=True, timeout=90)
+            valid = (result.returncode == 0 if label == 'current' else
+                     result.returncode != 0 and 'Guid.h:' in result.stderr and
+                     'return left + right.ToText();' in result.stderr)
+            rows.append({'compiler': compiler, 'image': label, 'consumer': consumer,
+                         'command': command, 'exit': result.returncode,
+                         'diagnostics': result.stderr, 'valid': valid})
+receipt = {'results': rows, 'success': all(row['valid'] for row in rows),
+           'no_pch': True, 'execution_proof': False, 'business_source_changed': False}
+(root / 'artifacts/syntax-controls.json').write_text(json.dumps(receipt, indent=2) + '\n')
+print(json.dumps({'checks': len(rows), 'valid': receipt['success']}), flush=True)
+raise SystemExit(0 if receipt['success'] else 1)
