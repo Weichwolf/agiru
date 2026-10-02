@@ -159,6 +159,10 @@ what a file names; no master header or macros. Measure build cost before widenin
   `fixture-commands/`; run `make test` before analysing those consumers. Analysis
   includes every handwritten test `.cpp` outside `test/target/`; a missing command
   remains a refusal. Intentionally invalid compile fixtures use `.cpp.in` templates.
+- `make native-report-layouts` needs explicit `AGIRU_SYSTEM_SYMBOLS` containing the
+  original native report source. It inventories the full package, then compiles the
+  native/extension declaration fixture and records its analysis command. Run it before
+  analysing that consumer; this is not native-loader activation or asset installation.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source
