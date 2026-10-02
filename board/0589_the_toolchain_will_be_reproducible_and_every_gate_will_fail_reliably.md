@@ -5,6 +5,8 @@ Depends on: none.
 
 ## Evidence
 
+- Latest frozen main `47f9a2b`: `build/verify/20261002T112727Z-2478547`, terminal failed/137 seconds; all/test/UT/census exit 2, core/System hashes unchanged. Complete AL manifest remains exactly 80 codeunits/2,314 methods; zero executed/all incomplete. Fresh generation exposes two stale slice entries: `base/upgrade/codeunit/UpgradeCompositeReportParts.cpp` (104067) and `tests/core/codeunit/AmountAutoFormatCurrency.cpp` (134833). `build/platform-source-slice-missing.log` retains both; do not restore stale generated code or silently reduce the slice.
+- BCApps upstream `bf484e587` deletes upgrade codeunit 104067 and moves Composite Report Parts initialization to `Foundation/Reporting/CompositeLayout.ReportExt.al` (generic report-extension support remains 0034). `0a602a248` replaces Amount AutoFormat Currency with nine formatting codeunits; 134833 is now `AmtAutoFormatCurrFCYCodeAft`, not an absent test identity. Prove explicit successor/retirement and full method mappings before migrating the slice; keep required feature/test gaps counted. Old/new compilers on the same current BC source emit 24,375 byte-identical outputs and the same RequiredTestIsolation refusal (0039); no compiler-specific source loss.
 - Frozen verification now writes each raw census to its own `artifacts/census/scope-inventory.json`, not the mutable reusable lane. Same-lane two-run regression retains both receipts and unchanged source hashes; the actual predecessor loses them and fails with FileNotFoundError. Current local replay: 98 cases/zero red, 146 toolchain tests, build/local-test-receipts.log. Complete frozen replay and native binding remain separate gates.
 
 - Verification probes now isolate `MAKEFLAGS`, `MFLAGS`, `MAKEOVERRIDES` and `VERIFY_TARGETS` in `test/toolchain.py`. Inherited target override negative control: unchanged source fails both default probes; corrected source passes while preserving explicit overrides and exit 23. Full frozen build/local tests/AL UT replay remains separate pending proof.
@@ -31,7 +33,7 @@ Depends on: none.
 
 ## Implementation
 
-1. Preserve actual nonzero statuses and complete inventories in frozen integration; keep one six-job lane and focused two-job gates. Check core/BCApps/System/generated hashes and every missing/refused/crashed result.
+1. Reconcile the two named stale slice entries with current AL identities/successors and explicit upstream retirement evidence, without suppressing missing features/tests or shrinking coverage. Preserve actual nonzero statuses and complete inventories in frozen integration; keep one six-job lane and focused two-job gates. Check core/BCApps/System/generated hashes and every missing/refused/crashed result.
 2. Finish compiler-input ownership: core files()/digest() still treat directory/file links differently from the strict dependency freezer. Current src/include/cmake have no links. Serialize lint with command-database reconfiguration; alternate B directories retarget the shared symlink.
 3. Add full generated-app Clang and standalone no-PCH/no-unity checks with 0038 on Linux x86_64/aarch64. Check actual symbol/header edges and reaches/app cycles; retain independent foundation links.
 4. Isolate formatter input per invocation or stream it to the process; check formatter input/output/status. Exercise two worktrees without touching user data. Activate the checked writer only with frozen verification; keep all failure/no-sweep controls.
