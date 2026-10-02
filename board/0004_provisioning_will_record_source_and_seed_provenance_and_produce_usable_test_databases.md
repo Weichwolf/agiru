@@ -18,7 +18,6 @@ Depends on: 0013 schema contract; 0589 reproducible inputs.
    Include System.app package identity/runtime/symbol hash separately from the demo version and BCApps commit. Validate field/enum/schema compatibility rather than assuming all version strings coincide.
 3. Support provenance inspection through maintenance metadata when template connections are disabled; clone only a complete sealed identity. Do not retrofit identity onto the legacy seed.
 4. Make provisioning resume by checked stages. Populate AllObj, Field and Page Metadata independently; an existing AllObj row must not skip the others. Record work-date policy.
-   Supply deployment tenant facts and the versioned platform feature catalogue through one provenance-bearing PostgreSQL authority. Do not guess tenant IDs from a database name, invent AAD identifiers, or seed every feature disabled. 0006 owns session selection, 0035 native setting signatures, 0034 declarations and 0044 virtual-table access; no second mutable configuration store.
 
 ## Acceptance
 

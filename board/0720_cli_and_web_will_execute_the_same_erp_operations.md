@@ -35,6 +35,4 @@ Depends on: G1 all UT green; 0030 page dispatcher; 0006 session ownership; 0062 
 
 Code: `src/cli/Main.cpp`, `include/meta/PageDef.h`, `include/runtime/test/PageCore.h`, `src/gen/PageWriter.cpp`; extract production lifecycle under 0030. Platform: `devenv-testing-pages.md`, TransactionModel attribute and page/control methods. Predecessor: WI-1113/1401/1411; do not replay load triggers indiscriminately. New ID: all-history maximum 0719 checked on 2026-09-28.
 
-Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/Linux x86_64/aarch64 builds, bounded executor and cancellation before adoption.
-
-Browser-only demo delivery is owned by 0724; both targets share the production dispatcher and typed operation contract above.
+Stack proposals (2026-09-28): [Drogon](https://github.com/drogonframework/drogon), [daisyUI build integration](https://daisyui.com/docs/install/), [Oat++ DTO alternative](https://oatpp.io/docs/components/dto/). No dependency installed by this review; compare dependency footprint, Clang/GCC/aarch64 builds, bounded executor and cancellation before adoption.

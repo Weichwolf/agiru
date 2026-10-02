@@ -3,7 +3,7 @@
 #include "meta/TableDef.h"
 #include "platform/Field.h"
 #include "runtime/Catalogue.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"

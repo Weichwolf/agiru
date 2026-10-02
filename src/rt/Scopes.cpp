@@ -1,7 +1,6 @@
 #include "runtime/Scopes.h"
 
 #include "runtime/Error.h"
-#include "runtime/ErrorValue.h"
 #include "type/CommitBehavior.h"
 #include "type/ErrorBehavior.h"
 
