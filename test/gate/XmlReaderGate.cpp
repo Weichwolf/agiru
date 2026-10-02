@@ -1,5 +1,5 @@
 #include "dotnet/XmlReader.h"
-#include "runtime/ErrorValue.h"
+#include "runtime/Error.h"
 
 #include "Check.h"
 

@@ -1,32 +1,22 @@
-# 0006 — Mutable runtime state will belong to the session
+# 0006 — Session ownership and performance will have measured portable bounds
 
-Status: open | Priority: P0 | Stage: UT session correctness; Clients ownership | Reviewed: 2026-09-30
-Depends on: 0012 transaction lease contract.
+Status: open | Priority: P2 | Reviewed: 2026-09-22
 
-## Evidence
+## Current evidence
 
-- SingleInstance storage is now owned by a private, lazy SessionState, with typed CodeunitId keys and owning deleters. Session close releases its own map; nested and sequential sessions cannot adopt a worker's prior map. InstanceGate now opens a real session rather than treating a thread as one.
-- SessionInstanceGate: 12 checks green under Clang 19/GCC 14 (nesting, parent state survival, exact disposal, worker reuse, a second thread and sessionless refusal). Matching frozen headers/runtime negative control: 5 red, also 12 checks. Full local suite: 81 cases, 0 red; InstanceGate 35/35 under both compilers. Logs: `build/development-session/`; the completed frozen UT run does not include this patch.
-- Targeted analysis still fails inherited public-header findings, with no finding in the changed functions or new gate; unused direct includes were repaired. No suppression/baseline increase. A matched full-milestone run on a sealed seed is still required before attributing UT effects.
-- Manual event bindings now belong to SessionState, with no parallel TLS registry. Handlers, page traps, error/commit scopes, validation context and random state still require ownership review. `Session` holds a PostgreSQL connection for its entire lifetime.
-- Predecessor audit missed a process-global mutable PRNG because it looked only for containers; a web session also leaked test-isolation policy across process state. Audit C++ static objects with mutable methods and policy state, not only `thread_local` declarations. Native Session ownership, not Python ContextVar mechanics, is the target.
-- Non-SingleInstance automatic subscribers use fresh instances per invocation (0057). SingleInstance subscribers and Manual bindings use SessionState. SessionBindingGate: 18/18 under Clang 19/GCC 14; old Events.cpp: 10 red. Full local suite: 83 cases, 0 red. Instance destruction removes bindings from the current and nested ancestor sessions. Cross-worker object escape, company-close invalidation and other mutable state remain open; full UT effects are unmeasured.
+`Session` uses a thread-local current pointer, while Events.cpp holds thread-local instance maps. Nested sessions restore the pointer but release thread-owned instances, so thread-local storage is not by itself session ownership. Catalogue registration uses startup vectors despite the intended immutable metadata design. No current aarch64 result was established by this review.
 
-## Implementation
+## Implementation for Sol
 
-1. Extend the existing private SessionState: move remaining maps/stacks from `Handlers.cpp`, `TestPage.cpp`, `Scopes.cpp`, `Table.cpp` and `BuiltinsWritten.cpp` into it, after checking each lifetime contract. Keep TLS only as a scoped current-session locator; preserve the completed SingleInstance and binding gates.
-2. Separate Session lifetime from worker activation. Serialize commands for one session; allow different sessions on reused workers. Restore parent state on nested activation; clear company-bound instances on company close.
-   TenantSettings: production facts come from one tenant-keyed PostgreSQL authority provisioned by 0004; session-local test overrides are an explicit separate policy. Keep session-dependent .NET bridges in rt (0589), not a callback/global map in net. Missing tenant context/provider refuses; configured empty facts remain distinct from missing infrastructure (0035).
-3. Lease a connection for each active transaction, including its live cursors; return it after commit/rollback and reset. Bound pool size independently of logged-in users; retain no transaction during user think time.
+1. Move mutable subscriber instances, manual bindings, random state and page traps under explicit Session ownership. Test nested sessions and sequential sessions reusing one worker thread.
+2. Measure sizeof/session arena usage, marginal RSS/PSS per active session and shared-library relocation pages. Distinguish constexpr declarations from actual .rodata versus .data.rel.ro placement.
+3. Benchmark indexed Get, bounded FindSet and posting against equivalent SQL with AGIRU_FAST_LOOP=OFF. Record compiler, architecture, row count, concurrency and database settings.
+4. Only then optimize decimal division, allocation and code layout. Do not adopt a prescribed divider/layout merely because an old WI proposed it.
 
 ## Acceptance
 
-- Nested and sequential sessions never share subscribers, handlers, traps, language, random/error/validation state; parent instances survive child destruction.
-- Two sessions for one tenant read the same provisioned facts; a test override cannot alter another session or survive worker reuse. A missing provider cannot masquerade as an empty tenant identity.
-- Closed sessions release resources; idle users do not reserve DB connections. Memory grows with active session state and bounded blocks, not table size.
+Two concurrent and two nested sessions never see each other's mutable state. Publish x86_64 and aarch64 measurements with comparable workloads; no guessed portability claim. Metadata initialization and transaction-pool costs are counted separately.
 
 ## References
 
-Code: `include/runtime/Session.h`, `src/rt/{Session,SingleInstance,Events,Scopes,Cursor}.cpp`. Platform: `properties/devenv-singleinstance-property.md`. Predecessor: WI-768/772/976 (ownership/races); old 0008/0009 are optimization hypotheses. Performance comparison: 0721.
-
-SingleInstance references: platform `properties/devenv-singleinstance-property.md` and `methods-auto/system/system-clear-joker-method.md`; BCApps main `src/System Application/App/Environment Information/src/EnvironmentInformationImpl.Codeunit.al` holds testability flags in a SingleInstance codeunit. Predecessor `772_free-threading-legt-4-echte-races-frei-die-der-gil-verdeckt.md` measured cold-cache losses after removing shared instances: investigate any full-population loss rather than restoring leakage. `976_mem-project-thread-safety.md` establishes session-private state; native C++ ownership replaces Python ContextVar machinery.
+Repository: src/rt/Session.cpp, Events.cpp, SingleInstance.cpp, Catalogue.cpp; include/runtime/Session.h; src/net/Decimal.cpp. Platform: session and SingleInstance contracts. Original WIs 0006, 0008, 0009, 0596 describe hypotheses, not measured completion.
