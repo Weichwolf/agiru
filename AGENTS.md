@@ -183,6 +183,8 @@ what a file names; no master header or macros. Measure build cost before widenin
   the snapshot's `artifacts/` directory, independently of lane reuse.
   Use `VERIFY_TARGETS='all test ut'` when the AL milestone and its database are ready.
   The snapshot and lane content hashes must match; the snapshot records Git HEAD.
+  The runner discards inherited Make override flags; explicit jobs/targets and frozen
+  dependency paths are authoritative.
   Edits in the active tree may
   continue after snapshot creation. A changed source during copying refuses the run.
 - `make verify` runs the same frozen verification in the foreground. Bare `make`
