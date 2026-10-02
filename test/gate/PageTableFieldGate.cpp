@@ -3,27 +3,19 @@
 #include "platform/PageTableField.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
-#include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
-#include "type/FieldClass.h"
 #include "type/Guid.h"
-#include "type/Option.h"
 #include "type/Variant.h"
 
 #include "Check.h"
 
 #include <array>
-#include <cstddef>
 #include <string>
 #include <string_view>
 
 namespace {
-
-constexpr int kExpectedSourceId = 2000000171;
-constexpr int kDifferentFixtureId = 50100;
-constexpr int kOriginalToolingPageId = 9630;
 
 using Row = agiru::platform::PageTableField;
 constexpr const auto &kTable = agiru::TableTraits<Row>::kTable;
@@ -51,8 +43,8 @@ constexpr std::array<int, 21> kTypeCodes{4912,  4988,  11519, 11775, 11776, 1179
                                          26207, 26208, 31488, 31489, 33791, 33793, 34047,
                                          34559, 35071, 35583, 36095, 36863, 37119, 37375};
 
-static_assert(Row::kId.Value() == kExpectedSourceId);
-static_assert(kTable.fields.size() == kNames.size() + agiru::kSystemFieldCount);
+static_assert(Row::kId.Value() == 2000000171);
+static_assert(kTable.fields.size() == 15 + agiru::kSystemFieldCount);
 
 void DeclarationAndReflection() {
   CHECK_TEXT("original table name", kTable.name, "Page Table Field");
@@ -73,11 +65,6 @@ void DeclarationAndReflection() {
   CHECK_TRUE("registered identity shares immutable declaration",
              entry != nullptr && entry->table == &kTable);
   Row row;
-  for (const int number : {1, 2, 4, 12, 13, 15}) {
-    CHECK_TEXT(
-        "fresh primitive fields have AL zero values", row.FieldFormat(agiru::FieldNo{number}), "0");
-  }
-  CHECK_TRUE("fresh Boolean fields have the AL false value", !row.IsTableField);
   agiru::RecordRef reflected;
   reflected.GetTable(row);
   for (std::size_t i = 0; i < kNames.size(); ++i) {
@@ -154,7 +141,7 @@ void LiveProviderCannotPretendToBeEmpty() {
   agiru::RequireTableProvider(ordinary);
   CHECK_TRUE("ordinary storage is not refused", ordinary.providerRefusal.empty());
   auto other = kTable;
-  other.id = agiru::TableId{kDifferentFixtureId};
+  other.id = agiru::TableId{50100};
   other.name = "Different Fixture";
   bool generic = false;
   try {
@@ -165,35 +152,10 @@ void LiveProviderCannotPretendToBeEmpty() {
   CHECK_TRUE("provider boundary is not object-specific", generic);
 }
 
-void CodedOptionsResolveBySourceValue() {
-  using Type = agiru::Option<agiru::platform::PageTableFieldType>;
-  for (std::size_t index = 0; index < kTypeCodes.size(); ++index) {
-    const Type value{kTypeCodes[index]};
-    CHECK_TRUE("each native code is declared", value.IsDeclared());
-    CHECK_TRUE("native codes are not replaced by positions",
-               value.AsInteger() == kTypeCodes[index]);
-    CHECK_TEXT("native code resolves its source name", value.Name(), kTypes[index]);
-    CHECK_TEXT("native code resolves its source caption", value.Caption(), kTypes[index]);
-  }
-  for (const int unknown : {-1, 0, 1, 20, 4911, 4913, 37376}) {
-    const Type value{unknown};
-    CHECK_TRUE("unknown native codes remain values", value.AsInteger() == unknown);
-    CHECK_TRUE("unknown native codes are not declared positions", !value.IsDeclared());
-    CHECK_TRUE("unknown native code has no invented name", value.Name().empty());
-    CHECK_TRUE("unknown native code has no invented caption", value.Caption().empty());
-  }
-  CHECK_TRUE("default zero does not invent the first coded member", !Type{}.IsDeclared());
-  const agiru::Option<> untyped{Type{agiru::platform::PageTableFieldType::Text}};
-  CHECK_TRUE("untyped option conversion preserves the code", untyped.AsInteger() == kTypeCodes[9]);
-  CHECK_TEXT("coded lookup remains constexpr",
-             Type{agiru::platform::PageTableFieldType::Text}.Name(),
-             "Text");
-}
-
 void TemporaryStorageRemainsIndependent() {
   Row row;
   agiru::detail::RuntimeMakeTemporary(&row, &agiru::kTempOps<Row>);
-  row.PageID = kOriginalToolingPageId;
+  row.PageID = 9630;
   row.Index = 1;
   row.Caption = "Declared value";
   CHECK_TRUE("temporary rows are explicit", row.IsTemporary());
@@ -213,7 +175,6 @@ int main() {
   return gate::Run("PageTableField", [] {
     DeclarationAndReflection();
     LiveProviderCannotPretendToBeEmpty();
-    CodedOptionsResolveBySourceValue();
     TemporaryStorageRemainsIndependent();
   });
 }

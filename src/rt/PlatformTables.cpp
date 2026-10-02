@@ -1,6 +1,7 @@
 #include "platform/AllObj.h"
 #include "platform/AllObjWithCaption.h"
 #include "platform/AllProfile.h"
+#include "platform/Chart.h"
 #include "platform/Company.h"
 #include "platform/Date.h"
 #include "platform/FeatureKey.h"
@@ -25,6 +26,7 @@ namespace {
 const RegisterTable<platform::AllObj> kAllObj;
 const RegisterTable<platform::AllObjWithCaption> kAllObjWithCaption;
 const RegisterTable<platform::AllProfile> kAllProfile;
+const RegisterTable<platform::Chart> kChart;
 const RegisterTable<platform::FeatureKey> kFeatureKey;
 const RegisterTable<platform::Company> kCompany;
 const RegisterTable<platform::Date> kDate;
