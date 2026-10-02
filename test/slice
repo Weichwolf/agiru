@@ -14227,3 +14227,5 @@ tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYCdAft.cpp
 tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYSymAf.cpp
 tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYSymBf.cpp
 tests/finance/test/codeunit/AmtAutoFormatCurrNeverShow.cpp
+peppol/peppol/interface/PEPPOLTaxInfoProvider.cpp
+base/integration/dataverse/interface/DataverseCloudEndpoints.cpp
