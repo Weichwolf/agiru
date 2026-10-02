@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <ranges>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -838,7 +839,10 @@ void IndexedHeader(const Index &index, const std::string &subtype, std::set<std:
   }
 }
 
-std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &objects) {
+template <typename Procedures>
+std::string SourceIncludes(std::span<const al::VarDecl> variables,
+                           Procedures &&procedures,
+                           const Objects &objects) {
   std::set<std::string> headers;
   const auto reach = [&](const al::VarDecl &declared) {
     if (!NamesAnObject(declared)) { return; }
@@ -859,8 +863,8 @@ std::string SourceIncludes(const al::CodeunitObject &unit, const Objects &object
       IndexedHeader(PageIndexFor(objects, TypeName(declared.type)), declared.subtype, headers);
     }
   };
-  for (const al::VarDecl &declared : unit.variables) { named(declared); }
-  for (const al::ProcedureDecl &procedure : unit.procedures) {
+  for (const al::VarDecl &declared : variables) { named(declared); }
+  for (const al::ProcedureDecl &procedure : procedures) {
     for (const al::VarDecl &declared : procedure.parameters) { named(declared); }
     for (const al::VarDecl &declared : procedure.variables) { named(declared); }
     named(procedure.returned);
@@ -1111,12 +1115,88 @@ std::vector<std::string> Unresolved(const al::CodeunitObject &unit, const Object
   return missing;
 }
 
-class CodeunitNames : public Names {
+void InterfaceDefaults(const TableRef &face,
+                       const Objects &objects,
+                       std::set<std::string> &visited,
+                       std::set<std::string> &names) {
+  if (!visited.insert(face.identifier).second) { return; }
+  for (const al::ProcedureDecl &procedure : face.procedureDeclarations) {
+    if (procedure.hasBody) { names.insert(Identifier(procedure.name)); }
+  }
+  for (const std::string &base : face.interfaceBases) {
+    const auto found = objects.interfaces.find(LowerKey(base));
+    if (found != objects.interfaces.end()) {
+      InterfaceDefaults(found->second, objects, visited, names);
+    }
+  }
+}
+
+std::set<std::string> InterfaceDefaults(const std::string &face, const Objects &objects) {
+  std::set<std::string> names;
+  std::set<std::string> visited;
+  const auto found = objects.interfaces.find(LowerKey(face));
+  if (found != objects.interfaces.end()) {
+    InterfaceDefaults(found->second, objects, visited, names);
+  }
+  return names;
+}
+
+struct ProcedureContext {
+  const std::string &name;
+  const std::vector<al::ProcedureDecl> &procedures;
+  std::span<const al::VarDecl> variables;
+  std::span<const al::LabelDecl> labels;
+  std::span<const std::string> interfaces;
+  std::string tableNo;
+  bool hasImplicitRecord = false;
+};
+
+class ProcedureNames : public Names {
 public:
-  CodeunitNames(const al::CodeunitObject &unit,
-                const al::ProcedureDecl &procedure,
-                const Objects &objects)
-      : unit_(unit), procedure_(procedure), objects_(objects) {}
+  ProcedureNames(const al::CodeunitObject &unit,
+                 const al::ProcedureDecl &procedure,
+                 const Objects &objects)
+      : unit_{.name = unit.name,
+              .procedures = unit.procedures,
+              .variables = unit.variables,
+              .labels = unit.labels,
+              .interfaces = unit.implements,
+              .tableNo = TableNoOf(unit),
+              .hasImplicitRecord = al::Find(unit.properties, "TableNo") != nullptr},
+        procedure_(procedure),
+        objects_(objects) {}
+
+  ProcedureNames(const al::InterfaceObject &object,
+                 const al::ProcedureDecl &procedure,
+                 const Objects &objects)
+      : unit_{.name = object.name,
+              .procedures = object.procedures,
+              .variables = {},
+              .labels = {},
+              .interfaces = {},
+              .tableNo = {}},
+        procedure_(procedure),
+        objects_(objects) {}
+
+  [[nodiscard]] const ProcedureContext &Context() const { return unit_; }
+
+  void ValidateProcedureCall(std::string_view name, std::size_t arguments) const override {
+    if (std::ranges::any_of(unit_.procedures, [&](const al::ProcedureDecl &procedure) {
+          return SameName(procedure.name, name) && procedure.parameters.size() == arguments;
+        })) {
+      return;
+    }
+    for (const std::string &face : unit_.interfaces) {
+      const auto defaults = InterfaceDefaults(face, objects_);
+      if (!std::ranges::any_of(defaults, [&](const std::string &candidate) {
+            return SameName(candidate, Identifier(name));
+          })) {
+        continue;
+      }
+      throw std::runtime_error("interface default " + std::string(name) +
+                               " is not a declared codeunit method; use an Interface variable");
+    }
+  }
 
   [[nodiscard]] std::string ReturnedType() const override { return procedure_.returnType; }
 
@@ -1128,7 +1208,7 @@ public:
 
   [[nodiscard]] bool IsRecord(std::string_view variable) const override {
     if (LowerKey(std::string(variable)) == "rec") {
-      return !TableNoOf(unit_).empty() || !SubtypeOfRecord(variable).empty();
+      return !unit_.tableNo.empty() || !SubtypeOfRecord(variable).empty();
     }
     const al::VarDecl *declared = Declaration(variable);
     return declared != nullptr && TypeName(declared->type) == "Record";
@@ -1165,7 +1245,7 @@ public:
     }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
-            ? TableNoOf(unit_)
+            ? unit_.tableNo
             : SubtypeOfRecord(member.variable);
     const al::VarDecl *held = Declaration(member.variable);
     if (held != nullptr && !NamesAnObject(*held)) {
@@ -1297,7 +1377,7 @@ public:
     }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
-            ? TableNoOf(unit_)
+            ? unit_.tableNo
             : SubtypeOfRecord(member.variable);
     if (subtype.empty()) { return false; }
     const auto table = objects_.tables.find(LowerKey(subtype));
@@ -1314,7 +1394,7 @@ public:
   [[nodiscard]] std::string TableOf(std::string_view variable) const override {
     const std::string subtype =
         SubtypeOfRecord(variable).empty() && LowerKey(std::string(variable)) == "rec"
-            ? TableNoOf(unit_)
+            ? unit_.tableNo
             : SubtypeOfRecord(variable);
     if (subtype.empty()) { return {}; }
     const auto table = objects_.tables.find(LowerKey(subtype));
@@ -1362,7 +1442,7 @@ public:
     }
     const std::string subtype =
         SubtypeOfRecord(member.variable).empty() && LowerKey(std::string(member.variable)) == "rec"
-            ? TableNoOf(unit_)
+            ? unit_.tableNo
             : SubtypeOfRecord(member.variable);
     if (subtype.empty()) {
       return RuntimeCallable(member.field) ? RuntimeSpelling(Identifier(member.field))
@@ -1416,7 +1496,7 @@ public:
     }
     const std::string subtype =
         SubtypeOfRecord(field.variable).empty() && LowerKey(std::string(field.variable)) == "rec"
-            ? TableNoOf(unit_)
+            ? unit_.tableNo
             : SubtypeOfRecord(field.variable);
     if (subtype.empty()) { return {}; }
     const auto table = objects_.fieldEnums.find(LowerKey(subtype));
@@ -1533,9 +1613,7 @@ public:
         return HiddenByALocal(spelled) ? "this->" + spelled : spelled;
       }
     }
-    if (LowerKey(std::string(name)) == "rec" && al::Find(unit_.properties, "TableNo") != nullptr) {
-      return "Rec";
-    }
+    if (LowerKey(std::string(name)) == "rec" && unit_.hasImplicitRecord) { return "Rec"; }
     return {};
   }
 
@@ -1555,7 +1633,7 @@ public:
   }
 
 private:
-  const al::CodeunitObject &unit_;
+  ProcedureContext unit_;
   const al::ProcedureDecl &procedure_;
   const Objects &objects_;
 };
@@ -1717,6 +1795,25 @@ std::string CodeunitDefinition(const al::CodeunitObject &unit, const std::string
   out += "};\n\n";
   return out;
 }
+
+std::string MethodSource(const al::ProcedureDecl &procedure,
+                         const ProcedureContext &owner,
+                         const std::string &className,
+                         const Objects &objects,
+                         const std::string &body) {
+  const auto shadowed = Shadowing(owner.variables, owner.procedures, owner.labels);
+  std::string out =
+      Returns(procedure, objects) + " " + className + "::" + Identifier(procedure.name) + "(" +
+      Parameters(procedure, objects, true, owner.name, shadowed, owner.procedures, body) + ") {";
+  const std::string locals =
+      IsPublisher(procedure)
+          ? std::string{}
+          : Locals(procedure, objects, owner.name, owner.procedures, body, shadowed);
+  if (locals.empty() && body.empty()) { return out + "}\n\n"; }
+  out += "\n" + locals;
+  if (!locals.empty() && !body.empty()) { out += "\n"; }
+  return out + body + "}\n\n";
+}
 }
 
 std::string WriteCodeunitSource(const al::CodeunitObject &unit,
@@ -1742,39 +1839,14 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
 
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     const bool publisher = IsPublisher(procedure);
-    const CodeunitNames names(unit, procedure, objects);
+    const ProcedureNames names(unit, procedure, objects);
     const std::string body =
         publisher ? RaisingBody(procedure,
                                 "EventObject::Codeunit",
                                 TraitsOf("CodeunitTraits", space, unitClass) + "::kId.Value()",
                                 TraitsOf("CodeunitTraits", space, unitClass) + "::kName")
                   : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
-    out += Returns(procedure, objects) + " " + unitClass + "::" + Identifier(procedure.name) + "(" +
-           Parameters(procedure,
-                      objects,
-                      true,
-                      unit.name,
-                      Shadowing(unit.variables, unit.procedures, unit.labels),
-                      unit.procedures,
-                      body) +
-           ") {";
-    const std::string locals =
-        publisher ? std::string{}
-                  : Locals(procedure,
-                           objects,
-                           unit.name,
-                           unit.procedures,
-                           body,
-                           Shadowing(unit.variables, unit.procedures, unit.labels));
-    if (locals.empty() && body.empty()) {
-      out += "}\n\n";
-      continue;
-    }
-    out += "\n";
-    out += locals;
-    if (!locals.empty() && !body.empty()) { out += "\n"; }
-    out += body;
-    out += "}\n\n";
+    out += MethodSource(procedure, names.Context(), unitClass, objects, body);
   }
 
   if (!DeclaresClearAll(unit)) {
@@ -1802,13 +1874,15 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
   out += catalogue;
   out += CodeunitDefinition(unit, identifier);
   out += "} // namespace " + space + "\n";
-  out.insert(includeAt, SourceIncludes(unit, objects) + BodyIncludes(out.substr(bodyAt), objects));
+  out.insert(includeAt,
+             SourceIncludes(unit.variables, unit.procedures, objects) +
+                 BodyIncludes(out.substr(bodyAt), objects));
   return WithRuntimeIncludes(out, ObjectKind::Codeunit);
 }
 
-std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
-                                const std::vector<al::ProcedureDecl> &procedures,
-                                const std::vector<al::LabelDecl> &labels) {
+std::set<std::string> Shadowing(std::span<const al::VarDecl> variables,
+                                std::span<const al::ProcedureDecl> procedures,
+                                std::span<const al::LabelDecl> labels) {
   std::set<std::string> names;
   for (const al::VarDecl &declared : variables) { names.insert(Identifier(declared.name)); }
   for (const al::ProcedureDecl &procedure : procedures) {
@@ -1973,10 +2047,7 @@ std::string BodyIncludes(const std::string &text, const Objects &objects) {
 std::string SourceIncludesOf(const std::vector<al::VarDecl> &variables,
                              const std::vector<al::ProcedureDecl> &procedures,
                              const Objects &objects) {
-  al::CodeunitObject unit;
-  unit.variables = variables;
-  unit.procedures = procedures;
-  return SourceIncludes(unit, objects);
+  return SourceIncludes(variables, procedures, objects);
 }
 
 std::string ProcedureDeclaration(const al::ProcedureDecl &procedure,
@@ -2203,9 +2274,36 @@ std::string FaceDeclarations(const al::InterfaceObject &object, const Objects &o
   return out;
 }
 
+std::string InterfaceSource(const al::InterfaceObject &object,
+                            const std::string &sourcePath,
+                            const Objects &objects) {
+  std::string body;
+  const std::string className = ClassName(Identifier(object.name), ObjectKind::Interface);
+  for (const al::ProcedureDecl &procedure : object.procedures) {
+    if (!procedure.hasBody) { continue; }
+    const ProcedureNames names(object, procedure, objects);
+    const std::string statements =
+        WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
+    body += MethodSource(procedure, names.Context(), className, objects, statements);
+  }
+  if (body.empty()) { return {}; }
+  const std::string space = NamespaceOf(object.nameSpace);
+  std::string out = "// Generated from " + sourcePath + ". Do not edit.\n\n";
+  out += "#include \"" + Identifier(object.name) + ".h\"\n\n";
+  out += kRuntimeIncludeMarker;
+  out += SourceIncludes({},
+                        object.procedures | std::views::filter([](const al::ProcedureDecl &method) {
+                          return method.hasBody;
+                        }),
+                        objects) +
+         BodyIncludes(body, objects);
+  out += "\nnamespace " + space + " {\n\n" + body + "} // namespace " + space + "\n";
+  return WithRuntimeIncludes(out, ObjectKind::Interface);
 }
 
-InterfaceHeader WriteInterface(const al::InterfaceObject &object,
+}
+
+InterfaceOutput WriteInterface(const al::InterfaceObject &object,
                                const std::string &sourcePath,
                                const Objects &objects) {
   const std::string identifier = Identifier(object.name);
@@ -2253,13 +2351,15 @@ InterfaceHeader WriteInterface(const al::InterfaceObject &object,
   if (!object.extends.empty()) { out += "\n"; }
   for (const al::ProcedureDecl &procedure : object.procedures) {
     out += "  virtual " + Returns(procedure, objects) + " " + Identifier(procedure.name) + "(" +
-           Parameters(procedure, objects, true, object.name) + ") = 0;\n";
+           Parameters(procedure, objects, true, object.name) +
+           (procedure.hasBody ? ");\n" : ") = 0;\n");
   }
   out += "};\n\n} // namespace " + space + "\n";
   DotNetUse missing;
   DotNetUse dotnet;
   GatherAbsentIn({}, object.procedures, objects, dotnet, missing);
-  return InterfaceHeader{.text = WithRuntimeIncludes(out, ObjectKind::Interface),
+  return InterfaceOutput{.text = WithRuntimeIncludes(out, ObjectKind::Interface),
+                         .source = InterfaceSource(object, sourcePath, objects),
                          .absent = std::move(missing),
                          .dotnet = std::move(dotnet)};
 }
@@ -2284,6 +2384,29 @@ std::string HiddenMembers(const al::CodeunitObject &unit,
               Literal(label.text) + "};\n";
   }
   return hidden;
+}
+
+std::string PrivateCodeunitMembers(const al::CodeunitObject &unit,
+                                   const Objects &objects,
+                                   const std::set<std::string> &shadowed) {
+  const std::string hidden = HiddenMembers(unit, objects, shadowed);
+  std::string locals;
+  for (const al::ProcedureDecl &procedure : unit.procedures) {
+    if (!procedure.isLocal || al::HasAttribute(procedure, "EventSubscriber")) { continue; }
+    locals += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
+  }
+  std::string defaults;
+  for (const std::string &face : unit.implements) {
+    const auto found = objects.interfaces.find(LowerKey(face));
+    if (found == objects.interfaces.end()) { continue; }
+    for (const std::string &name : InterfaceDefaults(face, objects)) {
+      defaults += "  using " + found->second.identifier + "::" + name + ";\n";
+    }
+  }
+  if (hidden.empty() && locals.empty() && defaults.empty()) { return {}; }
+  std::string out = "\nprivate:\n" + hidden;
+  if (!hidden.empty() && !locals.empty()) { out += "\n"; }
+  return out + locals + defaults;
 }
 
 }
@@ -2342,18 +2465,7 @@ CodeunitHeader WriteCodeunit(const al::CodeunitObject &unit,
 
   if (!DeclaresClearAll(unit)) { out += "\n  void ClearAll();\n"; }
 
-  const std::string hidden = HiddenMembers(unit, objects, shadowed);
-  std::string locals;
-  for (const al::ProcedureDecl &procedure : unit.procedures) {
-    if (!procedure.isLocal || platformCalls(procedure)) { continue; }
-    locals += Declaration(procedure, objects, unit.name, shadowed, unit.procedures);
-  }
-  if (!hidden.empty() || !locals.empty()) {
-    out += "\nprivate:\n";
-    out += hidden;
-    if (!hidden.empty() && !locals.empty()) { out += "\n"; }
-    out += locals;
-  }
+  out += PrivateCodeunitMembers(unit, objects, shadowed);
   out += "};\n\n";
   out += "extern const CodeunitDef k" + identifier + "Codeunit;\n\n";
   out += "} // namespace " + space + "\n\n";

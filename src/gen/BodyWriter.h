@@ -28,6 +28,11 @@ public:
 
   [[nodiscard]] virtual std::string Resolve(std::string_view name) const = 0;
 
+  virtual void ValidateProcedureCall(std::string_view name, std::size_t arguments) const {
+    static_cast<void>(name);
+    static_cast<void>(arguments);
+  }
+
   [[nodiscard]] virtual std::string Enumeration(std::string_view name) const = 0;
 
   [[nodiscard]] virtual std::string FieldEnumeration(const OfVariable &field) const {

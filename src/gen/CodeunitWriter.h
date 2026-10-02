@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -36,6 +37,7 @@ struct TableRef {
   std::set<std::string> tryFunctions;
 
   std::vector<al::ProcedureDecl> procedureDeclarations;
+  std::vector<std::string> interfaceBases{};
 };
 
 const TableRef *ReachOf(const al::VarDecl &declared, const Objects &objects);
@@ -113,14 +115,15 @@ std::string OptionTypeName(const std::string &owner,
 
 [[nodiscard]] FieldEnums PlatformFieldEnums();
 
-struct InterfaceHeader {
+struct InterfaceOutput {
   std::string text;
+  std::string source;
 
   DotNetUse absent;
   DotNetUse dotnet;
 };
 
-InterfaceHeader WriteInterface(const al::InterfaceObject &object,
+InterfaceOutput WriteInterface(const al::InterfaceObject &object,
                                const std::string &sourcePath,
                                const Objects &objects);
 
@@ -165,9 +168,9 @@ bool IsTryFunction(const al::ProcedureDecl &procedure);
 
 bool DefaultsToTrue(const al::ProcedureDecl &procedure);
 
-std::set<std::string> Shadowing(const std::vector<al::VarDecl> &variables,
-                                const std::vector<al::ProcedureDecl> &procedures,
-                                const std::vector<al::LabelDecl> &labels);
+std::set<std::string> Shadowing(std::span<const al::VarDecl> variables,
+                                std::span<const al::ProcedureDecl> procedures,
+                                std::span<const al::LabelDecl> labels);
 
 struct Spelling {
   std::string spelled;

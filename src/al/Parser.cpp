@@ -254,9 +254,22 @@ public:
       }
     }
     Expect("{");
+    std::vector<std::string> attributes;
     while (!AtEnd() && !AtPunctuation("}")) {
+      if (AtPunctuation("[")) {
+        attributes.push_back(ReadAttribute());
+        continue;
+      }
       if (AtKeyword("procedure")) {
-        object.procedures.push_back(ParseSignature());
+        ProcedureDecl procedure = ParseSignature();
+        procedure.attributes = std::move(attributes);
+        attributes.clear();
+        if (AtKeyword("var") || AtKeyword("begin")) {
+          procedure.tokens = SkipBeginEnd(procedure.labels, procedure.variables);
+          procedure.body = ParseStatements(procedure.tokens);
+          procedure.hasBody = true;
+        }
+        object.procedures.push_back(std::move(procedure));
         continue;
       }
       Advance();
@@ -688,6 +701,7 @@ public:
         computed.tokens.push_back(Token{.kind = TokenKind::Punctuation, .text = ")"});
         computed.tokens.push_back(Token{.kind = TokenKind::Punctuation, .text = ";"});
         computed.body = ParseStatements(computed.tokens);
+        computed.hasBody = true;
         control.triggers.push_back(std::move(computed));
       }
     }
@@ -742,6 +756,7 @@ private:
     if (AtPunctuation(";")) { Advance(); }
     procedure.tokens = SkipBeginEnd(procedure.labels, procedure.variables);
     procedure.body = ParseStatements(procedure.tokens);
+    procedure.hasBody = true;
     return procedure;
   }
 
@@ -1170,6 +1185,7 @@ private:
         }
         trigger.tokens = SkipBeginEnd();
         trigger.body = ParseStatements(trigger.tokens);
+        trigger.hasBody = true;
         field.triggers.push_back(std::move(trigger));
       } else {
         field.properties.push_back(ParseProperty());

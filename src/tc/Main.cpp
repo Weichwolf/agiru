@@ -916,7 +916,8 @@ Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &object
               .columnSources = {},
               .interfaceReturns = InterfaceReturnsOf(object),
               .tryFunctions = {},
-              .procedureDeclarations = {}});
+              .procedureDeclarations = object.procedures,
+              .interfaceBases = object.extends});
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -930,9 +931,10 @@ void WriteInterfaces(Run &run,
                      const Interfaces &kept,
                      Gathered &gathered,
                      const agiru::gen::Objects &objects) {
-  if (run.output.empty()) { return; }
   for (std::size_t i = 0; i < kept.objects.size(); ++i) {
-    const agiru::gen::InterfaceHeader written =
+    CountAttributes(kept.objects[i], gathered.attributes, gathered.deprecatedScopes);
+    if (run.output.empty()) { continue; }
+    const agiru::gen::InterfaceOutput written =
         agiru::gen::WriteInterface(kept.objects[i], kept.paths[i], objects);
     Absorb(gathered.dotnet, written.dotnet);
     Absorb(gathered.absent, written.absent);
@@ -943,6 +945,14 @@ void WriteInterfaces(Run &run,
                                                         agiru::gen::ObjectKind::Interface) +
                             "/" + identifier + ".h"},
          written.text);
+    ++run.written;
+    if (written.source.empty()) { continue; }
+    Keep(run,
+         Output{.directory = run.output,
+                .relative = agiru::gen::OutputDirectory(kept.objects[i].nameSpace,
+                                                        agiru::gen::ObjectKind::Interface) +
+                            "/" + identifier + ".cpp"},
+         written.source);
     ++run.written;
   }
 }
@@ -2542,6 +2552,9 @@ int Scan(const Job &job) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }
     const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
+    for (const auto &face : parsedInterfaces.objects) {
+      NoteOptions({}, face.procedures, gathered.options);
+    }
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       everyTable.insert_or_assign(agiru::gen::LowerKey(table.name), &table);
     }
@@ -2615,7 +2628,7 @@ int Scan(const Job &job) {
   }
 
   if (!job.output.empty()) {
-    const std::size_t swept = Sweep(job.output, kept);
+    const std::size_t swept = failures.empty() && refusals.empty() ? Sweep(job.output, kept) : 0;
     std::println("written   {} objects into {}; {} changed, {} swept",
                  written,
                  job.output.string(),
@@ -2835,7 +2848,7 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return 0;
+  return failures.empty() && refusals.empty() ? 0 : 1;
 }
 
 }

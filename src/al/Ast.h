@@ -45,6 +45,7 @@ struct ProcedureDecl {
   std::vector<std::string> attributes;
   bool isLocal = false;
   bool isTrigger = false;
+  bool hasBody = false;
   std::string name;
   std::vector<Parameter> parameters;
   std::vector<VarDecl> variables;

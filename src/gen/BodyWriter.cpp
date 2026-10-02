@@ -616,9 +616,23 @@ private:
     return "::agiru::Guid(" + written + ")";
   }
 
+  void ValidateSelfCall(const al::Expr &callee, std::size_t arguments) const {
+    if (callee.text != "." || callee.children.size() != 2) { return; }
+    const al::Expr &receiver = callee.children.front();
+    const al::Expr &member = callee.children.back();
+    if (receiver.kind != al::ExprKind::Name || !SameName(receiver.text, "this") ||
+        member.kind != al::ExprKind::Name) {
+      return;
+    }
+    scope_.ValidateProcedureCall(member.text, arguments);
+  }
+
   std::string Callee(const al::Expr &callee, std::size_t arguments) {
     if (const std::string platform = PlatformCall(callee); !platform.empty()) { return platform; }
-    if (callee.kind == al::ExprKind::Binary) { return Binary(callee, kPrimaryPrecedence, true); }
+    if (callee.kind == al::ExprKind::Binary) {
+      ValidateSelfCall(callee, arguments);
+      return Binary(callee, kPrimaryPrecedence, true);
+    }
     if (callee.kind != al::ExprKind::Name) { return Expression(callee, kPrimaryPrecedence); }
     if (!scope_.IsVariable(callee.text) && scope_.Resolve(callee.text).empty()) {
       if (const std::string bare = scope_.BareRecordCall(callee.text); !bare.empty()) {
@@ -628,6 +642,7 @@ private:
     if (RuntimeCallable(callee.text) && !scope_.TakesArguments(callee.text, arguments)) {
       return "::agiru::" + BuiltinSpelling(callee.text);
     }
+    scope_.ValidateProcedureCall(callee.text, arguments);
     std::string known = scope_.Resolve(callee.text);
     if (!scope_.IsVariable(callee.text) && !scope_.ThisTable().empty() &&
         scope_.HasField(OfVariable{.variable = "Rec", .field = callee.text}) &&
