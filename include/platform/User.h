@@ -45,14 +45,11 @@ template <> struct agiru::OptionTraits<agiru::platform::UserState> {
 
 namespace agiru::platform {
 
-/// \brief AL `User` -- the platform's own user table, which no `.al` file declares.
+/// \brief AL `User` -- the tenant-wide account table declared by the System symbols.
 ///
-/// \note THE DECLARATION IS THE SYSTEM SYMBOLS', not a measurement.
-///       `work/symbols/src/Tenant Database Tables/User.Table.al` (`make symbols`) carries every
-///       number, length and option member. The predecessor's measured layout, which this file
-///       carried until 2026-09-07, was off by one from field 2 onwards and put `Application ID` at
-///       13 where the declaration says 16 -- a column order cannot see a gap, and this table has
-///       four (6, 9, 12, 13) (board:0607).
+/// \note `work/symbols/src/Tenant Database Tables/User.Table.al` (`make symbols`) owns the
+///       field numbers, types, lengths, options and company scope. Authentication Email is
+///       Text[250], not a normalized Code value.
 class User_Table : public Table<User_Table> {
 public:
   /// \brief The AL table number.
@@ -89,7 +86,7 @@ public:
   /// \brief AL `User."License Type"`.
   Option<UserLicenseType> LicenseType;
   /// \brief AL `User."Authentication Email"`.
-  Code<kEmailLength> AuthenticationEmail;
+  Text<kEmailLength> AuthenticationEmail;
   /// \brief AL `User."Contact Email"`.
   Text<kEmailLength> ContactEmail;
   /// \brief AL `User."Exchange Identifier"`.
@@ -202,6 +199,7 @@ inline constexpr TableDef kUserTable{
     .caption = User::kName,
     .fields = kUserFields,
     .keys = kUserKeys,
+    .dataPerCompany = false,
 };
 
 static_assert(FieldsAreSorted(kUserTable), "the field table is searched by number");

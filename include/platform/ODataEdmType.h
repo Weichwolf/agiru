@@ -3,6 +3,7 @@
 #include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Table.h"
 #include "type/Blob.h"
 #include "type/Code.h"
@@ -15,20 +16,20 @@
 #include <string_view>
 
 /// \file
-/// \brief The platform table `OData Edm Type` (2000000203): the EDM definitions the OData layer
-///        publishes, which `Graph Mgt - General Tools` writes and the OData EDM pages show.
+/// \brief The original System table `OData Edm Type` (2000000179).
+/// \see System symbols `src/Application Database Tables/ODataEdmType.Table.al`.
 
 namespace agiru::platform {
 
-/// \brief The platform table `OData Edm Type` (2000000203).
+/// \brief The native record for System.Integration.`OData Edm Type` (2000000179).
 ///
-/// \note THE PLATFORM DECLARES IT AND NO `.al` FILE DOES, so the shape is written here from what
-///       the BaseApp reads of it: `Key`, `Description` and the `Edm Xml` blob its pages and
-///       `GraphMgtGeneralTools` name.
+/// \note Retains the original declaration's fields, key and represented properties.
+///       Declaration metadata is not proof of publishing, permissions or populated-schema
+///       migration.
 class ODataEdmType_Table : public Table<ODataEdmType_Table> {
 public:
   /// \brief The table number.
-  static constexpr TableId kId{2000000203};
+  static constexpr TableId kId{2000000179};
   /// \brief The AL name.
   static constexpr std::string_view kName{"OData Edm Type"};
 
@@ -62,7 +63,7 @@ public:
   struct Field_No {
     static constexpr ::agiru::FieldNo Key{1};
     static constexpr ::agiru::FieldNo Description{2};
-    static constexpr ::agiru::FieldNo EdmXml{3};
+    static constexpr ::agiru::FieldNo EdmXml{10};
   };
 
   /// \brief The primary key.
@@ -80,8 +81,11 @@ inline constexpr auto kODataEdmTypeFields = WithSystemFields<ODataEdmType>(std::
                                         "Description",
                                         "Description",
                                         offsetof(ODataEdmType, Description)),
-    Declare<&ODataEdmType::EdmXml>(
-        ODataEdmType::Field_No::EdmXml, "Edm Xml", "Edm Xml", offsetof(ODataEdmType, EdmXml)),
+    Declare<&ODataEdmType::EdmXml>(ODataEdmType::Field_No::EdmXml,
+                                   "Edm Xml",
+                                   "Edm Xml",
+                                   offsetof(ODataEdmType, EdmXml),
+                                   Declared{.subtype = "UserDefined"}),
 }});
 
 /// \brief The keys.
