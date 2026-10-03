@@ -11,6 +11,16 @@ Depends on: 0033 app/object identity; 0058 independent source manifest.
 
 ## Evidence
 
+- UT recovery: two exact private implementations are now product-excluded in
+  `scope.json`: System Application/App/{Tenant License State/src/TenantLicenseStateImpl,
+  Azure AD Tenant/src/AzureADTenantImpl}.Codeunit.al (2301/3705). The former implements
+  commercial trial/paid state; the latter calls Microsoft Entra/Graph and Power Platform.
+  BCApps `bb7111877f`: incoming public wrappers and mixed User Settings,
+  MyPlatformNotifications and CDSIntTableSubscriber remain selected. Their commercial/
+  service dependency calls must refuse, not manufacture Paid/tenant results. No UT
+  identity is excluded: generation retains 80 codeunits/2,314 methods. Complete mixed
+  caller separation remains open. Original native licence declaration failures remain
+  in the raw audit; no licensing SDK repair is made.
 - Main's new source-bound replay confirms query 774 Users in Plans is newly emitted: exactly two paths added, zero removed, all 80/2,314 UT identities retained (`build/native-source-paths28-{before,after}.txt`, `build/native-consumers.{vWqQvV,dE8PA4}/result.json`). Incoming source remains AzureADPlanImpl and PlanUserDetails; Essential/Premium plan fields are not an agiru feature gate. This reconfirms the prototype classification below; do not remove required User/authentication or the whole namespace. No commercial repair or new scope exclusion applied.
 - Generic record context now also compiles IncomingDocumentApprovers' existing SaaS-only License Type filter; UserCard loses its FilterGroup errors but retains IsWSKeyAllowed. Page 192 still owns core incoming-document approver selection. Audit/separate BC commercial/cloud classification before product activation; do not exclude approvals/User/authentication wholesale or invent license values. BCApps src/Layers/W1/BaseApp/eServices/EDocument/IncomingDocumentApprovers.Page.al::HideExternalUsers; build/native-record-context-integration-20261002/artifacts/{generation,consumers}.json. No new scope exclusion or service implementation.
 - Current-origin native-source prototype newly emits query 774 Users in Plans after User source binding. Its source reads Plan/User Plan entitlements plus User.State; classify and audit incoming references at BCApps src/System Application/App/Azure AD Plan/src/UsersInPlans.Query.al before product activation. Do not retire the required User/authentication declaration or exclude System.Azure.Identity wholesale. Exact added outputs and unchanged UT identities: build/native-source-binding-integration-20261002/artifacts/generation.json. Native Tenant License State still fails its source guard; retire its selected commercial dependency via this WI, never repair a Paid gate.
@@ -39,6 +49,6 @@ Depends on: 0033 app/object identity; 0058 independent source manifest.
 
 ## References
 
-Code: scope.json, src/gen/{Scope.cpp,Apps.cpp}, src/tc/Main.cpp, scripts/{scope_inventory.py,ut_manifest.py,ut_milestone.py,ut_results.py}, src/rt/{Storage,PlatformTables}.cpp, include/platform/TenantLicenseState.h, test/gate/GenScopeGate.cpp, test/toolchain.py::{ProductSourceGate,SourceInventoryGate,ManifestGate}.
+Code: scope.json, src/gen/{Scope.cpp,Apps.cpp}, src/tc/Main.cpp, scripts/{scope_inventory.py,ut_manifest.py,ut_milestone.py,ut_results.py}, src/rt/{Storage,PlatformTables}.cpp, include/platform/TenantLicenseState.h, test/gate/GenScopeGate.cpp, test/tooling/toolchain.py::{ProductSourceGate,SourceInventoryGate,ManifestGate}.
 AL: BCApps src/Layers/W1/Tests/SMB/O365RoleCenterNotifications.Codeunit.al; src/Layers/W1/BaseApp/{Integration/Graph,System/Notifications/MyPlatformNotifications.Codeunit.al}; src/System Application/App/User Settings/src/UserSettingsImpl.Codeunit.al; src/System Application/{App,Test}/Tenant License State/; System symbol TenantLicenseState.Table.al. Platform: devenv-test-codeunits-and-test-methods.md, devenv-namespaces-overview.md; user intent: admin-extend-trial.md. Predecessor: board/990_mem-scope-whitelist.md, no Tenant/O365 finding; disabled-test subtraction is not adopted. Declaration references remain in 0034; permission semantics remain in 0062.
 ID: all-history maximum 0719 and current open maximum 0724 checked on 2026-10-01.

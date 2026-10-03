@@ -1,9 +1,26 @@
 # 0723 — Number-sequence ranges will be atomic and portably addressed
 
-Status: open | Priority: P0 | Stage: UT primitive; Clients multi-user safety | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT primitive; Clients multi-user safety | Reviewed: 2026-10-03
 Depends on: 0006 connection ownership; 0013 company identity.
 
 ## Evidence
+
+- Current full UT: 2,062/2,314, zero incomplete/crashed; 116 direct aborted-transaction
+  failures. PostgreSQL logs identify missing sequence errors before the cascades.
+  Original `NoSeriesSequenceImpl.Codeunit.al::{GetCurrentSequenceNo,GetNextNoInternal}`
+  catches Current/Next through TryFunction and then calls Exists/Insert; server RAISE
+  poisoned that recovery. The primitive now returns zero rows for a missing identity,
+  releases its allocator lock and raises the original AL error in C++; no extra RPC,
+  broad rollback or commit. `make number-sequences JOBS=2`: 396 checks, 300 cross-process
+  ranges and all controls pass; restoring server RAISE fails the prior-write/recovery
+  check; four extra checks reject leaked allocator locks inside an open transaction.
+  `/tmp/agiru-ut-recovery-sequence-controls-final.log`; full replay
+  `20261003T132242Z-466167`: 2,159/2,314, 155 failed, zero incomplete/crashed,
+  zero aborted transactions; 97 gains/zero losses against the same previous 2,314
+  identities (diagnostic legacy seed, not sealed A/B proof). Other SQL
+  errors, including caught duplicate Insert/range errors, still need statement-error
+  recovery; do not claim complete TryFunction transaction parity. Targeted analysis adds
+  no finding to NumberSequence.cpp; existing Char.h diagnostics remain red.
 
 - `NumberSequence.cpp` binds one seven-parameter request; Next and both Range forms share checked, constant-work allocation. PostgreSQL owns real sequences and a unique `(company_specific, company, name)` registry with numeric physical IDs; no persisted C++ hash or string-literal identity interpolation.
 - `NumberSequenceStorage.cpp` separates shared transaction-lifetime guards from short exclusive allocation locks; transactional Insert/Delete/Restart use exclusive lifetime guards. Exists does not lock out concurrent creation. Session locks release on success/error/cancellation; the acquisition is inside the exception boundary. Exact numeric arithmetic checks the entire range before setval; CACHE 1/NO CYCLE are enforced.
@@ -26,6 +43,6 @@ Depends on: 0006 connection ownership; 0013 company identity.
 
 ## References
 
-Code: `src/rt/{NumberSequence,NumberSequenceStorage,Storage}.cpp`, `include/{type/NumberSequence,runtime/NumberSequenceStorage}.h`, `test/gate/NumberSequenceGate.cpp`, `test/number-sequences.sh`. Platform docs at `ff5939a46e`: `devenv-number-sequences.md`, every `methods-auto/numbersequence/` overload and `methods-auto/biginteger/biginteger-data-type.md` (the indirect signed minimum is valid). AL at `bb7111877f`: `src/Layers/W1/BaseApp/Foundation/NoSeries/SequenceNoMgt.Codeunit.al::{TryGetRange,CreateSequence}`; `src/Layers/W1/Tests/ERM/TestSequenceNoMgt.codeunit.al`. User docs at `0ff62b2266`: `business-central/ui-create-number-series.md`; this primitive does not replace gapless business number-series rules. Predecessor board: 1158 (var Increment), 819 (seed/Next evidence), 976 (database-owned authority).
+Code: `src/rt/{NumberSequence,NumberSequenceStorage,Storage}.cpp`, `include/{type/NumberSequence,runtime/NumberSequenceStorage}.h`, `test/gate/NumberSequenceGate.cpp`, `test/runtime/number-sequences.sh`. Platform docs at `ff5939a46e`: `devenv-number-sequences.md`, every `methods-auto/numbersequence/` overload and `methods-auto/biginteger/biginteger-data-type.md` (the indirect signed minimum is valid). AL at `bb7111877f`: `src/Layers/W1/BaseApp/Foundation/NoSeries/SequenceNoMgt.Codeunit.al::{TryGetRange,CreateSequence}`; `src/Layers/W1/Tests/ERM/TestSequenceNoMgt.codeunit.al`. User docs at `0ff62b2266`: `business-central/ui-create-number-series.md`; this primitive does not replace gapless business number-series rules. Predecessor board: 1158 (var Increment), 819 (seed/Next evidence), 976 (database-owned authority).
 
 PostgreSQL 17: [sequence state/rollback](https://www.postgresql.org/docs/17/functions-sequence.html), [transactional restart](https://www.postgresql.org/docs/17/sql-altersequence.html), [exception conditions](https://www.postgresql.org/docs/17/plpgsql-control-structures.html#PLPGSQL-ERROR-TRAPPING). SQL Server: [range bounds](https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-sequence-get-range-transact-sql), [nonzero signed increment](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-sequence-transact-sql). The SQL lock mask is `2^63−2`: even lifetime and odd allocation keys; hashes coordinate locks only, never persisted identity.

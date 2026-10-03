@@ -156,129 +156,59 @@ prove the narrow header's dependency profile with negative controls.
   and portability. XML uses libxml2. Reporting must preserve BC layout semantics and produce
   genuine PDF/workbook output through the layout/Cairo architecture above. Verify native
   Linux performance/resources and browser-only WASM compatibility; no Java/desktop-Office engine.
-- Artefacts go to `build/` or a temporary directory. Golden files in `test/target/` are
-  specifications: edit them deliberately, never regenerate them from observed output.
+- Incremental compiler outputs may use `build/`. Temporary fixtures, probes, source
+  copies and verification snapshots must use `/tmp`, never accumulate in the repository.
+  Inspect the current mount and available space first; `/tmp` may be a bounded tmpfs.
+  Remove disposable inputs/binaries after use; retain only current verification receipts.
+  Golden files in `test/transpiler/golden/` are specifications: edit them deliberately,
+  never regenerate them from observed output.
 
 ## Build and verification
 
-`make` is the entry point. Use `make help` for the current target list.
+Use Make for builds/tests and existing repository scripts; `make help` lists specialist
+targets. One editable tree: bundle coherent fixes → build/test → inspect results → repeat.
+No mandatory snapshots or development worktrees. Keep compiler inputs unchanged during a
+direct build; freeze only when continued editing or reproducible isolation requires it.
 
-- `make census` inventories the raw BCApps AL tree independently of the transpiler's
-  parser/linker, without filtering by namespace/app membership. `build/scope-inventory.json` retains source hashes,
-  object/test identities, conditional variants, omitted app roots and unmeasured files.
-  Namespace selection is diagnostic only; this is not an executable test manifest.
-  An incomplete census fails while preserving the report. Use 0725 for product exclusions.
-- Hot loop in the development tree: `make gate GATE=RecordRefGate JOBS=2`
-  builds and runs one affected C++ gate. Use `B=build/sanitizers` for an already
-  configured sanitizer build. Run `make test JOBS=2` for the complete local gates,
-  `make tc JOBS=2` for generator edits, then `make gap` for one generated root.
-  `make lint-one UNIT=src/rt/Transaction.cpp` analyses one configured unit without compiling objects and writes
-  `build/lint/targeted.log`; `make lint` checks all changed handwritten code before
-  integration. These targets do not rebuild the slice. Generated execution fixtures
-  record their actual successful compiler commands under the configured build's
-  `fixture-commands/`; run `make test` before analysing those consumers. Analysis
-  includes every handwritten test `.cpp` outside `test/target/`; a missing command
-  remains a refusal. Intentionally invalid compile fixtures use `.cpp.in` templates.
-- `make native-report-layouts` needs explicit `AGIRU_SYSTEM_SYMBOLS` containing the
-  original native report source. It inventories the full package and compiles both the
-  ordinary declaration fixture and the production `--system-symbols` variant, without
-  copying native AL into an application. Retain ownership/property/asset controls and
-  compiler/source hashes. Build the separate platform library in both app and slice modes;
-  prove registry-only lookup without native class references, retained Linux registrations
-  under `--as-needed`, and rejected library-drop/missing-module controls. Native definitions
-  must not become slice refusal stubs; zero missing procedures emit no helper. The authored
-  two-source slice is a linking fixture, not the production slice denominator. Run this
-  target before analysing its consumers. This proves declaration loading/fixture linking,
-  and byte-preserving packaging of the original named assets, not complete native activation,
-  full-tree linking, asset installation, approval, selection, rendering or G1.
-- Translation emits `layout-assets.json` for named `rendering` layouts, retaining declaring
-  app/version/source ownership and unresolved targets. Use `make layout-assets REQUESTS=<manifest>
-  OUTPUT=<new-directory>` with the matching `AGIRU_BC_SOURCE` and explicit native package when
-  required. `NOTICES=<JSON-array-of-original-notice-files>` preserves notices outside frozen
-  source roots; the qualifiers require the original BC source notice, with an explicit
-  `AGIRU_LAYOUT_SOURCE_NOTICE` override for relocated source copies. Do not omit third-party
-  notices or replace them with agiru's license. It refuses unresolved identities, owner/version drift, missing files, unsafe paths
-  and symlinks; preserves original assets/declarations/notices and records SHA256/size.
-  `scripts/verify_layout_assets.sh` verifies a standalone bundle; `make layout-assets-check`
-  proves loss, ownership, path, byte-integrity and output-failure controls. Bundle completeness
-  applies only to its named-layout population, not legacy layout coverage or ERP/G1. Installation,
-  approval and selected defaults belong to the production catalogue, not this offline packager.
-- `make native-bindings AGIRU_SYSTEM_SYMBOLS=<verified-package>` inventories every
-  original native table independently, emits production-generator contracts and compiles
-  every bound candidate without PCH. Unbound/refused/crashed/mismatched identities remain
-  red in `build/native-bindings.<id>/result.json`; non-table objects stay counted and
-  business-unexecuted. The original Page Fields Selection List also compiles and reads
-  its bound control through the production field primitive; source-expression mutants
-  must fail. This is not the full eight-consumer replay. The raw declaration audit is not
-  product selection, provider, complete native declaration, production-loader or G1 proof.
-  Retire commercial families
-  through 0725; do not repair licensing to make the raw audit green.
-- `make native-consumers AGIRU_SYSTEM_SYMBOLS=<verified-package>
-  AGIRU_NATIVE_AUDIT=<matching-native-bindings-receipt>` freezes the entire BCApps source
-  and retranslates all configured apps without editing root `apps/`. It retains all eight
-  original page body/definition results in three variants: ordinary compilation, additional
-  native assertions, and actual source-bound compilation. Use no PCH and declared app includes.
-  The fixed consumer manifest rejects missing/duplicate identities; a wrong native field number
-  must fail an original consumer. Reusing an audit requires matching package/source/library hashes.
-  Additional assertions alone are not source-AST binding. The source-bound variant activates
-  only the known native table declarations, not a complete native loader, provider, business
-  execution, full-app or G1 proof. Keep the raw native matrix and unexecuted UT manifest.
-- `make transpile AGIRU_SYSTEM_SYMBOLS=<verified-package>` verifies original package provenance
-  before/after translation and retains a raw native inventory in `build/transpile.<id>/`.
-  The compiler's explicit `--system-symbols <root>` reads AL table/report declarations through
-  the existing AST/binder, retains keys/options/source field numbers, and merges extensions.
-  Native reports emit into the separate `apps/platform/` library; their module/layout owners
-  come from the original namespaced `NavxManifest.xml`, using private compiler-side libxml2.
-  Preserve extension ownership and selected defaults; do not treat declaration loading as
-  asset installation. Malformed/duplicate/DTD/symlink manifests and report-ID collisions refuse.
-  Unbound tables, refused sources and other unactivated AL files keep translation nonzero.
-  Native/app table-ID collisions refuse. Direct compiler fixtures accept raw source roots;
-  they are not package authenticity checks. Make is the verified package entry point.
-- Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
-  generated inputs into `build/verify/<id>/source`, then runs `all test` in a
-  serialized reusable lane under `build/verify/lane/source`. Only changed source
-  files replace lane inputs, so unchanged build objects retain their timestamps.
-  `make verify-status` reports the latest result; `verify.log` holds diagnostics. Raw census reports, AL manifests, provenance and method results stay in
-  the snapshot's `artifacts/` directory, independently of lane reuse.
-  Use `VERIFY_TARGETS='all test ut'` when the AL milestone and its database are ready.
-  The snapshot and lane content hashes must match; the snapshot records Git HEAD.
-  The runner discards inherited Make override flags; explicit jobs/targets and frozen
-  dependency paths are authoritative.
-  Edits in the active tree may
-  continue after snapshot creation. A changed source during copying refuses the run.
-- `make verify` runs the same frozen verification in the foreground. Bare `make`
-  still builds the full slice in the current tree; use it only for a deliberate
-  integration check when that tree will remain unchanged until the build ends.
-- `make transpile` regenerates `apps/`; `make tree` and `make apps` check the
-  complete generated tree. Set `TRANSPILE_OUTPUT=<new-build-directory>` to inspect complete
-  generation without changing root `apps/`. `FULL=1 make lint` checks the whole handwritten surface.
+1. For generator changes: `make tc JOBS=2`, then `make transpile
+   AGIRU_SYSTEM_SYMBOLS=<verified-package>`. Never edit generated `apps/`.
+2. Run affected C++ gates: `make gate GATE=RecordRefGate JOBS=2`.
+3. Integrate: `make slice-check`, `make all JOBS=6`, `make test JOBS=2`,
+   `make lint JOBS=2`, then `make ut JOBS=6`. Inspect every exit status and UT result;
+   fix failures and repeat. Local gates do not replace the source-counted AL UT.
+4. For focused analysis use `make lint-one UNIT=src/rt/Transaction.cpp JOBS=2`;
+   `FULL=1 make lint JOBS=2` covers the complete handwritten surface.
+5. Use `make apps JOBS=6` for complete generated-app compilation/linking, independently
+   of the diagnostic slice. `make tree` diagnoses coverage; neither replaces AL execution.
 
-Append new entries to `test/slice` without sorting existing entries. Unity groups are
-content-addressed into 896 stable roots capped at 32 sources; only an overfull root
-splits. An insertion therefore changes its own Unity file without renumbering unrelated
-objects. Keep the slice monotonic so its history remains reviewable (WI 0589).
-Make exports the installed ccache PCH settings; Clang slice/app builds disable PCH
-timestamps. Keep compile-time date/time macros out of cached sources, and measure
-per-run cache hits before attributing a build-time change to the cache.
-
-Use one editable development tree. Bundle coherent fixes and features, freeze the
-batch, compile/test it, inspect the results and repeat. Separate development worktrees
-are optional and require a concrete isolation need; keep them outside `build/`.
-Source copies under `build/` are frozen verification inputs, never development trees.
-Before a requested clean rebuild, stop or finish verification, preserve any unmerged
-source outside `build/`, then clear build artefacts and run the build and UT through
-Make. Record build refusals and every unexecuted UT; a clean directory is not a pass.
-Build/test results identify the frozen Git HEAD and content hashes; development may
-continue in the editable tree after freezing. On this six-core host, run at
-most one six-job integration build at a time; use two jobs for local gates while
-one is active. Do not edit compiler inputs of a live build's source snapshot.
-Inspect `build/times.log` and snapshot results rather than historical timings.
-Preserve exit statuses through pipelines. Keep patches anchored and fail on a missing match.
-
-No test denominator may shrink unnoticed. Defect/suppression baselines may only decrease;
-coverage and the compiling slice may only grow. Never raise a baseline to make a gate pass.
-Prove new gates with a meaningful negative control. For changes that activate previously
-unreachable AL, compare the same full UT population before and after and investigate losses.
+- Optional frozen run: `make verify-start JOBS=6
+  VERIFY_TARGETS='slice-check all test ut'`; inspect `make verify-status` and its artifacts.
+  Snapshots/lane sources under `/tmp` are immutable inputs, never development trees.
+  Receipts identify Git HEAD, content/dependency hashes, target exits and test population.
+- At most one six-job integration lane. Local gates use two jobs; never overlap mutating
+  tests on the same gate database. Serialize lint with build-database reconfiguration.
+  Before a requested clean rebuild, finish/stop verification and preserve any unmerged
+  source outside `build/`; clearing artifacts is not a test pass.
+- Keep tests grouped under `test/{gate,runtime,transpiler,reporting,tooling}`;
+  client parity belongs in `test/ui/` after G1. Boundaries: `test/README.md`.
+  Bash orchestrates tests; Python tooling and AL transpiler fixtures are allowed.
+  Fixture consumers need successful compile-command receipts before lint; missing
+  commands refuse. Deliberately invalid compile inputs use `.cpp.in`.
+- `make census` counts raw AL independently; `scope.json` owns approved exclusions.
+  Retain missing/refused/crashed/skipped/unexecuted identities. Compare the same full UT
+  population after semantic activation and investigate losses. Never raise a defect or
+  suppression baseline to obtain green; prove new gates with meaningful negative controls.
+- Append to `test/slice` without sorting/deleting identities. Retain stable bounded unity
+  groups. Slice compilation is not full-app or G1 proof.
+- Include only named dependencies; measure header/consumer cost with `make include-cost`.
+  Keep Clang PCH/ccache settings and timestamp-free PCH builds; avoid compile-time date/time
+  macros. Measure per-run hits/timings before claiming cache or performance improvements.
+- Native package/layout qualifiers use original verified sources, owners and notices.
+  Keep raw inventories, provenance hashes and explicit refusals; declaration/fixture
+  success is not a live provider, layout installation/rendering or ERP milestone.
+  Specialist acceptance belongs in 0034/0063/0589 and the owning WI, not this workflow.
+- Preserve pipeline exit statuses; patches must fail on missing anchors. Use
+  `build/times.log` and current receipts, not historical timing/pass claims.
 
 ## Database environment
 

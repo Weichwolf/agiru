@@ -22,6 +22,6 @@ Depends on: 0034 object census; 0058 method results.
 
 ## References
 
-Repository: `src/tc/Main.cpp`, `test/toolchain.py::TranspilerAttributeCensusGate`, `Makefile`, `test/run.sh`, scripts/al_surface.py, dropped_properties.py, test/triggers.py, doc/al-surface.json, public headers and baselines. Platform: methods-auto, properties and triggers-auto inventories. The former ledger is historical reading activity, not coverage proof.
+Repository: `src/tc/Main.cpp`, `test/tooling/toolchain.py::TranspilerAttributeCensusGate`, `Makefile`, `test/run.sh`, scripts/al_surface.py, test/tooling/triggers.py, doc/al-surface.json, public headers and baselines. Platform: methods-auto, properties and triggers-auto inventories. The unused property/string-count heuristic is removed; production transpiler diagnostics remain authoritative for parsed declarations. The former ledger is historical reading activity, not coverage proof.
 
 Property scope: `assignmentcompatibility`, `replicatedata`.

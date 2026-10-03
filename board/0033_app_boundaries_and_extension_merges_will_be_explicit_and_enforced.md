@@ -5,6 +5,17 @@ Depends on: 0034 source identities.
 
 ## Evidence
 
+- UT bootstrap repair (2026-10-03): `Main::TakeFields` no longer keeps a moved source
+  ahead of its destination. Match field ID/name/type/length and reciprocal
+  MovedTo/MovedFrom against original app IDs, in either extension order. The three
+  original Business Foundation legacy extensions contain 113 moved fields: 82
+  takeovers resolve; 31 have no W1 destination and are logged individually as
+  inactive sources, not mapped into Field.ObsoleteState's three SDK options.
+  Existing SQL columns are not dropped. Raw source inventory and 80/2,314 UT remain
+  unchanged. Complete regeneration changes 16 files/removes two obsolete outputs;
+  slice remains 14,222/zero missing. Existing NativeSourceCompilerGate passes 14
+  tests; the previous frozen compiler fails all three takeover controls. This is
+  not complete app ownership, localization, migration or G1 proof.
 - Ordinary tables now bind once after extension merging, using the writer's field/procedure allocator. Four original generated AL cases prove post-merge procedure renaming, extension procedures and numeric/name aliases; the old transpiler fails all four. App/namespace ownership, duplicate identities and other object kinds remain open; README indexes current receipts.
 - `apps.json` declares dependencies; the slice shares all include roots and does not prove them.
 - Own Chart/header proof: `src/gen/{CodeunitWriter,PageWriter}.cpp` shares native alias dependency ownership; locals stay in sources. Door adds only missing owned directives. Six added native includes name their types; redundant directives fall 70,298→66,718, not zero. GenCodeunit retains all 37 checks; old owner control one red. `build/chart-20261001/artifacts/{declaration-proof,dependencies,native-headers,bodies,codeunit-owner-control}.json`; no PCH or full-app/G1 claim.
@@ -33,6 +44,15 @@ Depends on: 0034 source identities.
 - Two distinct AL names that normalize alike retain both IDs, fields and references. Archived emitter is red; conflicting output ownership refuses, never last-writer-wins. Successful repeat keeps bytes and mtimes without declaration loss.
 
 ## References
+
+Moved fields: developer `ff5939a46e`, `devenv-move-table-fields-between-extensions.md`
+and `properties/devenv-{movedfrom,movedto,obsoletestate}-property.md`; BCApps
+`bb7111877f`, Business Foundation `AuditCodes/src/Legacy/ObsoleteSourceCode{,Setup}Ext.TableExt.al`,
+`NoSeries/src/Legacy/NoSeriesObsolete.TableExt.al`, W1
+`Foundation/AuditCodes/SourceCodeSetupExt.TableExt.al` and original app manifests.
+Predecessor board 913 identified duplicate moved-source merging, not a general
+permission or No. Series bypass. Receipts:
+`/tmp/agiru-ut-recovery-moved-{all-controls,old-control,transpile,slice}.log`.
 
 Code: `src/al/Parser.cpp::ReadSubtypeName`, `src/gen/Apps.cpp`, `src/gen/Scope.cpp`, `src/gen/Names.cpp`, `src/tc/Main.cpp`.
 Collision sources: current BCApps main `Layers/W1/Tests/{TestLibraries/TestTableC.Table.al,Monitor Sensitive Fields/TestTableC.table.al}`; output proof above, independent source UT 80/2,310 unchanged and unexecuted.

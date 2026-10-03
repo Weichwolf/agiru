@@ -5,6 +5,26 @@ Depends on: none.
 
 ## Evidence
 
+- Current UT integration freezes the original BC source notice separately: file/directory
+  dependency hashes use the same freezer, mutated frozen notices refuse before target
+  execution and after-run hashes remain recorded. The existing SnapshotGate retains
+  16 tests; no toolchain denominator grows or shrinks. The missing notice caused the
+  previous frozen layout qualifier to refuse, not a rendering failure.
+- Cache/include diagnostic: the actual Clang-19 unity-088 command compiles with PCH,
+  then hits the direct cache in about 70 ms. Current builds inherit
+  `pch_defines,time_macros`; the historical uncacheable-PCH counter does not increase
+  during this run. The same unity input syntax-checks without PCH under its configured
+  flags. Generated sources do not include/name runtime/Storage.h's API; the unnecessary
+  PCH include is now removed. Frozen `20261003T135330Z-494713` is running
+  `slice-check all test ut` on the whole slice and unchanged 80/2,314 UT population;
+  no whole-slice/PCH speed or pass claim yet. Keep `/tmp/agiru-cache-probe{,-no-pch}.log`; the disposable
+  19.6 MB probe object is removed. Global cache statistics are not per-run hit rates.
+- AGENTS.md now states the ordinary one-tree Make repair loop, optional frozen
+  verification and compact safety/cache rules, as requested on 2026-10-03. Specialist
+  targets stay in make help/the owning WI; no wrappers or test policies were added.
+  Documentation cleanup is not UT recovery: the last completed result remains
+  2,159/2,314, below the requested 2,204 minimum (README).
+
 - Native source batch: 115 local cases/170 toolchain tests green, no skips (`build/native-source-tests-final.log`). Actual production page primitive passes six checks; source-expression/field-number/extension-ABI controls reject, as do duplicate native/app IDs, symlinks, damaged/comment-only sources and malformed flags. Make wrapper validates package before/after, inventories raw native population and preserves compiler exit (7 control). Native consumer receipts retain three eight-unit variants and full raw/UT counts. Reader analysis 1/217 clean; Main 1/217 red and changed-code lint red (`build/native-source-{reader,main}-tidy.log`, `lint.log`); no suppression/baseline increase.
 - `make native-consumers` freezes/hashes the complete BCApps input, emits the full configured tree, retains all eight unit results in two explicitly separate compile variants, and carries raw native/AL inventories plus unexecuted UT identities. Reused audit package/source/library hashes must match. Missing/duplicate consumer and wrong native field controls reject; no PCH or undeclared app include roots. `build/native-consumers.{lQd6ms,kZ3Ulx}/result.json`, 115 local cases/158 toolchain tests green (`build/native-consumers-tests.log`). Extra assertions are not source-AST binding or G1 proof; actual red compiler/census results remain visible.
 - Running the complete local suite with command-line `AGIRU_SYSTEM_SYMBOLS` exposed two real snapshot isolation failures: GNU Make's inherited overrides replaced the frozen symbol path or reintroduced an undeclared live input (`build/reflection-metadata-tests-original28.log`). `scripts/verify_snapshot.py::run_snapshot` now clears MAKEFLAGS/MFLAGS/MAKEOVERRIDES before launching its explicitly configured Make jobs/targets. Both existing source-freezing controls now inject all three override channels; no denominator or expectation is removed. Final replay receipts are indexed in README.
@@ -24,7 +44,7 @@ Depends on: none.
 - BCApps `bf484e587` retires upgrade codeunit 104067 into reportextension 9666 with fourteen Word layouts. Verified System-29 source supplies report 2000000001 and two native parts despite SymbolReference omission. Production source loading now preserves all sixteen declarations/registration and distinct module owners; compiler/source/package hashes and original/source-loaded negative controls are retained (0063). CMake wiring is configuration-only proof; assets are not installed/rendered. Keep the missing slice entry until actual generic successor installation/migration/selection is proved, not an empty compatibility codeunit or source-denominator shrink.
 - Frozen verification now writes each raw census to its own `artifacts/census/scope-inventory.json`, not the mutable reusable lane. Same-lane two-run regression retains both receipts and unchanged source hashes; the actual predecessor loses them and fails with FileNotFoundError. Current local replay: 98 cases/zero red, 146 toolchain tests, build/local-test-receipts.log. Complete frozen replay and native binding remain separate gates.
 
-- Verification probes now isolate `MAKEFLAGS`, `MFLAGS`, `MAKEOVERRIDES` and `VERIFY_TARGETS` in `test/toolchain.py`. Inherited target override negative control: unchanged source fails both default probes; corrected source passes while preserving explicit overrides and exit 23. Full frozen build/local tests/AL UT replay remains separate pending proof.
+- Verification probes now isolate `MAKEFLAGS`, `MFLAGS`, `MAKEOVERRIDES` and `VERIFY_TARGETS` in `test/tooling/toolchain.py`. Inherited target override negative control: unchanged source fails both default probes; corrected source passes while preserving explicit overrides and exit 23. Full frozen build/local tests/AL UT replay remains separate pending proof.
 
 - Stable native-prototype repeat regeneration exits zero and preserves all 24,348 file bytes/paths and its whole source hash, but rewrites seventeen mtimes. The stricter byte/mtime helper exits one; retain this failed gate. Reaches/absent/shared outputs and the three duplicate TestTableC outputs need unchanged-write/ownership repair with 0033, not a raised baseline. build/native-source-binding-integration-20261002/artifacts/{repeat-generation,final-identity}.json.
 - Offline package-verification CLI promoted with its exact tested regression: fresh main 139 Python tests, 96 local cases/same 26 DB failures; all old bodies/counts/statuses retained. No native binding or generated output promoted. Current-origin native prototype retains 143 Python tests/97 cases, forty new binding checks and the same DB failures. Five-unit corrected analysis adds none: TableWriter 20→20, CodeunitWriter 9→9, PageWriter 15→15, Main 9→7, new gate zero. Initial complexity/magic-number defects are fixed, not suppressed. First gate build's make-formatting changed its image; only later stable receipts prove immutability. Normal own lint still aborts on eight legacy unconsumed headers. README indexes images, controls and diagnostics; no full-lint/integration/G1 claim.

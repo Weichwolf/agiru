@@ -15,6 +15,152 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
+- UT recovery in progress: BCApps `bb7111877f`, System 29.0.55365.0 and unchanged
+  source population 80 codeunits/2,314 methods. Frozen HEAD `49ce9c0` plus source
+  `38f5fd2d3c0ebddf8d09018a51022098040c7ab7d4e93ad44af78a1404aaa18a`,
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T132242Z-466167/result.json`, targets
+  `all ut test`: build/link green, local 120 cases/215 tooling tests green;
+  actual UT 2,159/2,314, 155 failed, zero incomplete/crashed (1,310 seconds).
+  Previous `20261003T125201Z-421497`: 2,062 passed/252 failed on the same identities;
+  97 gains, zero losses. Minimum 2,204 is not restored. Integer projection now
+  retains stored system columns and has an actual-SQL negative
+  control: CursorGate 230/zero red, FilterGate 122/zero red. Source-owned VIES
+  quota codeunit 247/table 243 were missing from the old slice: all
+  three original generated units are now appended, making 14,225/zero missing.
+  VIES now passes 41/43; two new audit consumers remain missing, and the existing
+  audit primitive must not be activated as a successful no-op. No AL source,
+  method or failing result is removed. Missing NumberSequence identities poison
+  PostgreSQL despite AL TryFunction recovery (116 direct aborted-transaction failures
+  in the previous image). The primitive now returns absence without an SQL error
+  and raises the original AL error after releasing its allocator lock: zero aborted
+  transactions in the full replay. Root sequence checks are 396/green; prior-write,
+  recovery and allocator-lock controls reject the mutant; one RPC remains (0723).
+  Table Metadata provider refusals grow 41→43 after activation; tracking/warehouse
+  gaps replace some earlier cascades and remain counted (0044). The unused Storage.h
+  PCH include is removed; complete slice/local/UT comparison is pending.
+  AGENTS.md's workflow is shortened by user request; the UT minimum/G1 remain unmet.
+  Previous `20261003T111104Z-333469`: build/link green;
+  UT 0/2,314, all 80 incomplete before methods
+  because moved source fields reach the native metadata option mapper. All C++
+  gates pass; local test total is 120/one red in a snapshot fixture inheriting the
+  production notice override. The fixture now isolates that environment; all 16
+  snapshot tests pass with an inherited override. Moved-field merging now validates
+  actual source/destination app IDs: 82 takeovers resolve, 31 unavailable W1
+  destinations stay individually reported; no SDK option invented (0033).
+  NativeSourceCompilerGate passes 14 tests; old compiler fails the three new
+  controls. Regeneration preserves 80/2,314 UT and 14,222 slice inputs/zero missing.
+  Previous `20261003T105744Z-318804` builds/links successfully,
+  but all 80 runners refuse before executing a method: legacy All Profile.Description
+  is varchar(250), original metadata declares Text[2048]. Current schema bootstrap
+  widens existing bounded Text/Code columns generically; never narrows or truncates.
+  StorageGate passes 63 checks; the source notice is now independently frozen/hashed
+  for the layout qualifier. Existing snapshot controls pass all 16 tests.
+  Previous `20261003T102008Z-256835` refuses at linking
+  after compilation: Environment Information table 3703
+  and Users in Plans query 774 lack their generated metadata units in the slice.
+  Both original units are now appended; no current executed-UT pass count yet.
+- Previous recovery attempts `20261003T100138Z-227433` and `20261003T100605Z-230255`
+  refuse on privacy permission metadata and initializer order respectively. Every
+  one of the 2,314 methods remains incomplete; neither is an executed-test result.
+  Current root PlatformSourceGate passes 2,917 checks; ObjectCatalogueGate 345;
+  NativeSourceCompilerGate 11 tests. Original System-29 definitions repair source
+  guards; no suppression or licensing SDK repair.
+- `20261003T100816Z-231331` refuses on a generic native-field/record-method collision
+  in the unchanged CRMNotesSynchJob source: RecordId property syntax called the
+  Record ID value. `BodyWriter::Link` now preserves method identity for explicit/
+  implicit calls independently of quoted field access. GenCodeunitGate passes 41
+  checks, including four controls; GenScopeGate passes 300. Regeneration retains
+  80/2,314 UT. Targeted BodyWriter analysis remains nonzero on existing findings;
+  Link complexity increases to 41 and needs simplification in 0073. No baseline raised.
+  Full local replay finds unnecessary base qualification of an ordinary TableCaption
+  property; the refined call/value distinction preserves its existing regression.
+  GenSourceBinding passes 159 checks and GenCodeunit 41. The complete root replay
+  `/tmp/agiru-ut-recovery-local-tests-final.log` passes all 120 local cases and 212
+  toolchain tests, including verified original System-29 definitions.
+- Test organization: `test/{gate,runtime,transpiler,reporting,tooling}`, with original
+  AL fixtures and C++ golden specifications retained. Frozen `20261003T094423Z-212143`
+  (`1b1c63a87f525737a9b32ee7fd51b3ec47c3161a0ef8e2f7ddd0bcdb5c702b43`)
+  passes `tc test`: 121 local cases/212 toolchain tests, zero red/skips, 271 seconds.
+  The redundant PlatformSource shell wrapper is subsequently removed; its gate runs
+  once with verified package arguments when supplied. Expected local total is now
+  120, with the same 105 C++ gate sources and 212 toolchain tests. Discovery controls
+  pass. The unused `scripts/dropped_properties.py` heuristic is also removed;
+  production property diagnostics and their controls remain. The disconnected historical
+  `scripts/compile_cost.sh` recipe is removed; `make include-cost`, compiler time traces
+  and current build receipts remain the measurement entry points. No AL UT identity is removed.
+- Slice reconciliation: 14,222 → 14,220 → 14,222 explicit inputs, zero missing. One upstream
+  retired upgrade codeunit is replaced by source-generated platform layout declarations
+  (0063); one pure commercial implementation is explicitly excluded by `scope.json`
+  (0725). Original identities/reasons remain slice comments. Original generated
+  Environment Information metadata and Users in Plans query are appended to satisfy
+  actual link dependencies; no provider/cloud/licensing functionality is fabricated.
+  Original UT population
+  and mixed callers remain selected; runtime commercial/service calls still refuse.
+
+- Previous native-signature dependency batch: frozen `49ce9c0` plus source hash
+  `fce9a2314e1c35a87f1644ee2ac18169c18276e2603ce8cb7b526fc7c97e3e2a`,
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T082641Z-59227/result.json`:
+  `tc test` passes in 242 seconds; 119 local cases/210 toolchain tests, zero red/skips.
+  GenInterface passes 35 checks; its targeted analysis is clean. Writer analysis retains
+  exactly eight identical before/after diagnostics; no baseline/suppression increase.
+- `/tmp/agiru-native-interface-package.Wya3h7/result.json`: independent original
+  interface population 10/10 headers/six default-body files compile without PCH;
+  missing-include control rejects. Full-generated native interface replay improves
+  13/16 to 16/16 files (`/tmp/agiru-original-interface-{before.sp23BC,after.gnCGsT}/result.json`).
+  Unknown parameters, returns and nested arguments now retain declaration dependencies
+  and refusal counts. Context types/providers/hooks/data-driven execution remain unimplemented
+  (0034/0039); compilation is not native business execution.
+- `/tmp/agiru-native-signatures-full/comparison.json`: full generation retains all
+  24,444 paths, zero additions/losses; only ITestHandler/ITestDataSource headers change.
+  Compiler 1/Make 2 remain: 215 unbound native tables, 125 other unactivated sources,
+  221 absent AL types/1,864 members and 399 .NET types/1,379 members.
+  `/tmp/agiru-native-signatures-census/scope-inventory.json`: fresh independent census
+  retains 113,013 raw/112,998 required methods, zero unmeasured files; the same three
+  errors/seven conditional variants still refuse. Source revision/hash, scope, populations
+  and errors match the previous census. Configured UT retains 80/2,314 methods,
+  unexecuted; root apps/scope/slice stay unchanged. Full linking/UT/G1 remain open.
+
+- Previous native enum/interface batch: frozen `49ce9c0` plus source hash
+  `9160608ae427f0afb0331d28baf432516010044227d3a45219dacd25acc2a178`,
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T080855Z-26079/result.json`:
+  `tc test` passes in 231 seconds; 119 local cases/210 toolchain tests, zero skips/red.
+  Authored native interface inheritance/AL dispatch/var effects pass 15 runtime checks;
+  changed argument mode, sparse ordinal and caption controls reject. Actual app/slice
+  objects compile. These are authored-consumer proofs, not native provider/business/G1 proof.
+- `/tmp/agiru-native-enum-package.DJ63ew/result.json`: all 28 original System-29 enum
+  contracts compile; wrong-ID control rejects, source/compiler/package hashes agree.
+  Independent raw inventory retains 398 AL files/368 objects/10 interfaces/28 enums.
+  Full generation in `/tmp/agiru-native-interface-full/generated` writes 24,444 paths;
+  native interfaces emit ten headers/six default-body sources, native enums 28 headers/three
+  sources. Tables retain 19 bound/215 unbound, other unactivated AL files are 125; full
+  translation remains compiler 1/Make 2. Method-type/implementor activation remains
+  open; original interface declaration/body compilation is proved above, not business execution.
+- `/tmp/agiru-native-interface-census/scope-inventory.json`: fresh independent census
+  retains 113,013 raw/112,998 required methods, zero unmeasured files; three errors/seven
+  conditional variants still refuse. Independent `scripts/ut_manifest.py` and full
+  translation both retain 80/2,314 UT; root apps/scope/
+  slice are unchanged. Targeted analysis now checks an explicitly configured unit without
+  requiring unrelated fixture commands; full analysis still refuses missing handwritten
+  commands. Its two new controls and existing tooling pass 35 tests. NativeSource analysis
+  is clean; Main retains seven diagnostics (including oversized Scan), none names the
+  new interface helpers. This is not a full analysis pass; no suppression/baseline increase.
+  Next: 0034 native types/
+  original-consumer closure and full AL compile/link/UT, not client work.
+
+- Requested cleanup (2026-10-03): removed 45 GB `build/` and 11 GB `build-asan/`;
+  all `build/` receipts referenced below are historical and no longer present.
+  Handwritten sources, uncommitted changes, generated `apps/`, downloaded `work/`
+  inputs and external development worktrees are preserved. New temporary fixtures and
+  frozen verification sources use `/tmp` (inspect its current mount/space); incremental objects
+  may use `build/`. `make verify-check` passes all 19 snapshot/tooling checks after
+  relocation; shell syntax and patch whitespace checks pass. No full rebuild or AL
+  milestone pass follows from this cleanup.
+- Before cleanup, the current native-enum batch passed 119 local cases and 200 toolchain
+  tests, zero red; original System-28/29 enum contracts passed 16/16 and 28/28 with
+  wrong-ID controls. The full raw/required population remains 113,013/112,998 and exact
+  configured UT identities remain 80/2,314, business-unexecuted. Full translation and
+  changed-code lint remain nonzero; native interface execution/full linking/G1 are open.
+
 - Current code `cb5d127`: fifteen native classes inherit the common base system field numbers; AllObj/AllObjWithCaption/Feature Key metadata now retain the five already-present typed members. Original declared fields/keys/indexed FieldCount stay unchanged. Native source contracts check implicit names/types/numbers/member offsets and refuse explicitly declared reserved IDs. Commercial Tenant License State is untouched. Runtime-18's additional Normal/Temporary FlowFields, complete native SDK/providers/schema and G1 remain open (0034/0013).
 - `build/platform-system-fields-{before,after,gate-qualified,generator,catalogue}.log`: base-system gate 828 checks, actual predecessor 195 red/current zero; native binder 77 and catalogue 294 green. `platform-system-fields-tests-committed.log`: 118 local cases/188 toolchain tests green, zero skips. Native matrices `build/native-bindings.{W7K9m3,08I5l6}/result.json` retain all System-28/29 identities/statuses: 18/14 pass, 1/5 fail, 204/215 unbound. Original package and source/library hashes verify; wrong implicit number/type/offset controls reject. Receipts were frozen from `83931af` plus the byte-identical committed source batch; no provider/business-execution claim.
 - `build/native-consumers.{iMqCyA,sEZXNe}/result.json`: every original eight-unit result is unchanged in all three variants. System 28: ordinary 7/8, extra contracts 7/8, source-bound 8/8; System 29: 7/8, 5/8, 6/8. Exact 80/2,314 UT identities and full 113,013 raw/112,998 required population match predecessors; all AL methods remain unexecuted. `platform-system-fields-population-comparison.json` records equality. Both replay targets remain nonzero. `platform-system-fields-slice.log` retains all 14,222 inputs and the missing retired report-upgrade source; no removal/stub.
@@ -149,6 +295,7 @@ Latest immutable layout/capability code: `c62879f`; receipts below describe this
 - One transaction lease holds the connection and live cursors. No connection or open transaction is retained during user think time.
 - Production Commit is durable. Test isolation floors and TryFunction/Codeunit.Run/asserterror boundaries remain distinct.
 - One C++ production page dispatcher executes TestPage, agent CMD/MCP and htmx commands. Generated immutable metadata supplies one typed page/action model, semantic HTML and exact values; adapters contain no business rules. The agent-only Node.js/TypeScript client renders the declared HTML profile as ASCII and shares a client library between CMD/MCP; no full browser/htmx implementation or Node.js ERP-server dependency (0720).
+- Development: one editable tree, coherent fix batches → Make build/gates/test/clang-tidy/UT → inspect and repeat. Frozen verification is optional for continued editing or reproducibility, not a prerequisite to each repair cycle; AGENTS.md holds the short workflow and make help/owning WIs hold specialist targets.
 - One library per BC app; public headers plus declared dependency roots. PCH/unity/slice remain build optimizations, not dependency or completeness proof.
 - Exact Decimal values, bounded blocks/streams and observed-version writes precede optimization. Proposed performance thresholds and matched-BC proof live in 0721.
 
@@ -189,7 +336,7 @@ Diagnostic sources/logs: `build/review-20260928/`: RuntimeProbe, ScopeProbe, Jso
 | Filter-group runtime, promoted | Nine curated files; typed Record/RecordRef share pure getters, >255 ignore and current-group HasFilter. Main LLVM make tc test: 137 FilterGroup checks/140 unchanged Python identities green, 97 cases/same 26 DB failures; all old C++ counts/statuses retained. Tested complete image SHA256 93842a7fe732b74ce1e482b89854d61987583f4b71936efc3f2a92069d294f72. Two generated AL alias pages execute getters, limit checks, clearing and free-group search. Getter-reset/unbounded-setter/group-blind controls: 21/34/9 red. All 54 emitted parameterless call-site bodies plus definitions/setter/regression consumers: 139 units, 135→135 green without PCH/no loss/new diagnosis. Four old failing bodies stay counted; SCMProductionOrdersII overload-spelling gap is recorded in 0073. All 24,346 generated files, slice 14,212 and configured source UT 80/2,310 unchanged; zero AL methods executed/all missing. Raw census reused only after frozen AL/scanner/policy hash equivalence; one unmeasured GB report remains red. Runtime analysis 20→20/27→27; new gate has only 21 inherited-header findings, no new finding or suppression. Normal lint retains the same eight-header abort. build/filter-group-integration-20261002/artifacts/{main-proof,main-tests,proof,consumers,stable-controls,stable-targeted-lint,full-lint,ut-manifest,ut-statuses}.json. Consumed setter return, SQL, complete-tree/link/full UT/G1 remain unproved (0044/0058). |
 | Native record context, promoted | Four curated files; SourceTable/TableRef owns Rec/xRec/named-record properties and native alias spelling; exact quoted fields precede methods. Main make tc test: 159 binding checks/140 unchanged Python identities green; same 96 cases/26 DB failures, zero skips. Reviewed/regenerated SHA256 e4a301d8feda89c48eb475a72cbe9b7a913cb9c6343c98520c527607fe6cd8be. Two generated AL alias pages execute without PCH: property getters/setters, selected-group filters, named field-argument ownership and instance isolation. Old compiler: 41 checks red/both alias cases fail; normalized-field mutant: one red. All 58 changed/regression body/definition units: 54→55 green, only IncomingDocumentApprovers gains; no loss/new diagnosis, UserCard retains IsWSKeyAllowed. Draft DefaultDimensionsMultiple loss repaired and retained. Generation: 28 changed bodies, 24,346 files/none added or removed; slice 14,212/UT 80/2,310 unchanged, all AL methods missing. Raw census byte-identical; later corrections change no frozen AL/scanner/policy input. BodyWriter analysis 22→21/no new findings; normal lint retains eight-header abort. build/native-record-context-integration-20261002/artifacts/{main-proof,main-tests,main-generation,proof,consumers,census-comparison,final-controls,normalized-field-mutant,targeted-lint-current,full-lint}.json. The original no-DB filter-group-probe.json exposed getter-reset/>255 runtime gaps; the promoted repair is indexed above (0044). No native System input, full Field/provider, full-tree/link/SQL/G1 proof. |
 | Shared page record binding, promoted | Nine curated code/test files; Rec/xRec/bare fields and options share declared bindings, preserving local shadowing, ordinary collisions and report dataitems. Fresh main: 89 binding checks/140 Python tests green; 96 local cases/same 26 DB failures, no previous test/body/status loss. Tested/regenerated SHA256 08b40363d8e2a3591c5d8db39d768eff0dab2a15fc5c34e8588291769ea00fcb. Old compiler: 36 checks red/both generated AL alias cases fail. Eight bodies change; all 24,346 files match the reviewed image, no path loss. All sixteen changed body/definition units: 14→14 green without PCH/no added diagnostics; two failing bodies retained. RefusedOption 1,278→1,253/no additions. Complete raw census bytes match; UT 80/2,310 and slice 14,212 unchanged. Targeted analysis adds none; normal lint retains eight-header abort. build/page-record-binding-integration-20261002/artifacts/{main-proof,main-tests,main-generation,proof,consumers,census-comparison,current-controls,full-lint}.json; targeted-lint-current.json. No native System loader/contracts, Field layout/provider, AL runner, SQL, full-tree or G1 proof. |
-| Offline System package verifier, promoted | Only scripts/fetch_symbols.py and its regression in test/toolchain.py: --verify reuses the canonical ledger/hash/identity verification without network or writes; changed packages refuse. Fresh main make tc test: 139 Python tests, 96 local cases/same 26 DB failures, all prior bodies/counts/statuses retained. Unchanged source SHA256 7ce5032858af8b517a81a53c2381b7b38260ac73b4b7beedbf7a5a5df039a90f. No binder, Make/Main or generated output promoted. build/native-source-binding-integration-20261002/artifacts/{main-tests,main-proof}.json. |
+| Offline System package verifier, promoted | Only scripts/fetch_symbols.py and its regression in test/tooling/toolchain.py: --verify reuses the canonical ledger/hash/identity verification without network or writes; changed packages refuse. Fresh main make tc test: 139 Python tests, 96 local cases/same 26 DB failures, all prior bodies/counts/statuses retained. Unchanged source SHA256 7ce5032858af8b517a81a53c2381b7b38260ac73b4b7beedbf7a5a5df039a90f. No binder, Make/Main or generated output promoted. build/native-source-binding-integration-20261002/artifacts/{main-tests,main-proof}.json. |
 | Current-origin native source binder, own only | Source at build/native-source-binding-integration-20261002/source; stable SHA256 7e3d0acb2c17cea02cc9eb7b5971327b7fc7b73b804697c9fe40ce010d214a7c. Explicit System input, common BindTable, native ABI includes and source contracts; Make verifies the original package. Forty new C++ checks/143 Python tests green; 97 cases/same 26 DB failures, all old bodies/counts/statuses retained. Original tooling page compiles/executes; nine declaration mutants refuse; same five predecessor controls have seventeen failures/one error, current zero. Independent raw System: 362 files/333 objects/223 tables, zero unmeasured; fifteen candidates (five contract-green/ten red), four wrong-ID refusals plus 204 unsupported. Actual eight-consumer comparison 7→5: PageFieldsSelectionList gains, three Field/source-binding losses retained. Full generation 24,346→24,348, 1,942 changed/none removed; slice 14,212 and configured UT 80/2,310 unchanged, no AL methods executed. UsersInPlans query requires 0725 classification. Five-unit corrected analysis adds no findings; normal lint retains the eight-header abort. artifacts/{proof,stable-tests,generation,system-raw-inventory,native-contracts,consumers,controls,full-lint}.json; stable-analysis/targeted-lint.json. Field declarations, common Rec/option binding, other native defects and licensing retirement precede promotion. No live provider/direct compiler package provenance/full-tree/G1 proof. |
 | Ordinary source binding, promoted to main | Thirteen curated code/test files; one table binding after extension merge, declaration-only signatures and name/number aliases. Fresh main make tc test: 36 new binding checks and all 138 Python tests green/zero skipped; 96 local cases, same 26 DB failures, no prior test/body/status loss. Tested source SHA256 17262c1f42bda5ab4d11cddbcc543d5d4e71a8e8f13ba28d9938bf325dd092a0, unchanged and equal to reviewed image. Four identical generated AL cases compile/execute without PCH; sealed old compiler fails all four. Main regeneration matches all 24,346 reviewed files: eighteen bodies change, none added/removed; all 14,212 slice paths present. Complete changed/tooling consumer comparison 20→22/23, only PurchaseBatchPostMgt/SalesBatchPostMgt gain, zero losses/new diagnostics. Five-unit analysis adds none; Main 24→9, new gate zero; normal lint aborts on the same eight legacy unconsumed headers. Fresh raw census retains 112,055 methods and the unmeasured GB report. Configured W1 UT 80/2,310 unchanged/unexecuted; not a whole-source runnable denominator. Native System input/contracts, root 785 Caption, live metadata providers, SQL posting and G1 remain open. build/source-binding-integration-20261002/artifacts/{main-proof,main-tests,main-generation,generation,consumers,final-analysis,full-lint,source-census}.json; sealed-controls/ and before-source/. |
 | Page Table Field runtime family, promoted to main | Ten curated files; no older compiler image copied. Independent source comparison matches all fifteen fields, four options/37 values, original key, Pending reasons, OnPrem and Brick constants. Fresh main `make tc test JOBS=2`: 312 new checks, 136 Python tests/zero skipped; 95 local cases and the identical 26 DB failures, no existing suite count/status loss. Tested source SHA256 `ddf45666f81f08cb6137a4d197890f29606a047789bd6b6f8311be92216e4104`, unchanged and equal to isolated current-main image. Provider no-op mutant fails fourteen checks; twelve option controls retain dense-option refusal and reject malformed native codes. Seven-unit analysis adds no findings; ProvisionInstalled complexity 79→71, full lint still red. All 24,346 generated files and 14,212 slice paths unchanged; W1 runner UT 80/2,310 remains unexecuted, not a whole-source denominator. Six original generated tooling units have identical before/after compiler results/diagnostics: root 785 remains blocked on Caption because source binding is absent. Live projection, common Scope/fieldgroups and G1 remain open. Rebuild all generated consumers for the extended TableDef ABI before AL execution. `build/page-table-field-integration-20261002/artifacts/{proof,main-tests,source-contract,option-controls,provider-control,targeted-lint,population,actual-blocker}.json`. |

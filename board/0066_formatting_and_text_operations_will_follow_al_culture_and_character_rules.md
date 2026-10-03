@@ -1,10 +1,15 @@
 # 0066 — Formatting and text operations will follow AL culture and character rules
 
-Status: open | Priority: P1 | Stage: UT | Reviewed: 2026-09-30
+Status: open | Priority: P1 | Stage: UT | Reviewed: 2026-10-03
 Depends on: 0043 field assignment boundaries; 0013 persistence schema.
 
 ## Evidence
 
+- Typed Boolean StrSubstNo now delegates to the same formatter as boxed Boolean;
+  canonical FilterText remains 1/0. RecordErrorGate and actual generated context AL
+  cover both outcomes; the prior generator fixture failed two exact string checks.
+  Existing display policy is unchanged. This is typed/boxed parity, not complete
+  locale/standard-format conformance (`20261003T090518Z-178436`, README receipts).
 - Format/Text/DateFormula/CultureInfo exist; TextBuilder getter/CRLF repairs have gates.
 - UTF positions, Code uppercase, caption identity and explicit/session culture selection remain separate contracts.
 - `src/net/Decimal.cpp::kMaxScale = 20` truncates the calculation domain: parsing, multiplication and division round to 20 places. The platform's Decimal contract requires CLR calculation scale 28 and a 96-bit mantissa; SQL storage does not redefine pure arithmetic.
@@ -29,6 +34,13 @@ Depends on: 0043 field assignment boundaries; 0013 persistence schema.
 ## References
 
 Code: `include/type/Decimal.h`, `src/net/{Text,Decimal,DateFormula,CultureInfo}.cpp`, `src/rt/written/BuiltinsWritten.cpp`.
+
+Boolean parity: `include/runtime/Record.h::{AsText,FilterText}`; developer `ff5939a46e`,
+`methods-auto/text/text-strsubstno-method.md`, `methods-auto/boolean/boolean-totext-method.md`
+and root `devenv-format-property.md` (not the XMLport property page). BCApps
+`bb7111877f`, `Layers/W1/Tests/Cost Accounting/ERMCostAccountingCodeunit.Codeunit.al`
+passes Boolean values to StrSubstNo. Predecessor 853 requires typed/boxed/value-context
+formatting consistency; its runtime/locale implementation is not the specification.
 
 Platform: `methods-auto/decimal/decimal-data-type.md` (calculation versus Format/field limits), `methods-auto/fieldtype/fieldtype-option.md`, Format/Evaluate overloads, devenv-format-property.md, Text/Code/Char methods, DateFormula and DateTime contracts. Current BCApps: `Layers/W1/Tests/SCM-Warehouse/SCMWhseUOMRndingUT.Codeunit.al`, TypeHelper and expected-error tests. User intent: `business-central/finance-sustainability-setup.md` distinguishes displayed decimal places and rounding precision. Predecessor: 1015 (TestField.Value is display Text, not raw Decimal), 1713 (high DecimalPlaces formatting); culture/format findings are not Python locale guarantees.
 

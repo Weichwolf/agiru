@@ -1,9 +1,25 @@
 # 0044 — Record operations will share one correct SQL and temporary contract
 
-Status: open | Priority: P1 | Stage: UT | Reviewed: 2026-10-03
+Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-10-03
 Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
+
+- Full frozen UT `20261003T132242Z-466167`: 43 Table Metadata provider refusals
+  across ten codeunits, with every 80/2,314 identity retained (README). The native
+  System-29 source declares 23 fields plus implicit system fields. `TableDef` still
+  lacks declaring app/namespace, Scope, ObsoleteReason and table DataClassification;
+  existing defaults cannot truthfully fill a live row. Preserve the provider guard
+  until source-owned metadata and read-only execution are implemented together.
+- Predecessor findings 1017/1080/1417: direct-ID lookup from the shared registry,
+  Name separate from Caption, and typed table-kind mapping. Its
+  `runtime/base/virtual_metadata.py` has only nine fields, different source field
+  numbers and unverified option ordinals; do not copy it as the System-29 contract.
+  Extend `src/gen/TableWriter.cpp::TableDefinitions` and the shared declaration
+  metadata, using `src/tc/Main.cpp::EmitModule`/`NativeManifest` for real owners.
+  Keep immutable definitions shared; direct Get must not materialize every table.
+  Reuse bounded filtering/navigation/count primitives, reject persistence, and prove
+  all source properties/owners plus unsupported mappings before removing the guard.
 
 - Integrated one FilterGroup/HasFilter primitive below typed Record and RecordRef. Getters do not allocate/reset state; >255 is ignored; HasFilter reads only the selected group instead of all groups/refusing. Main FilterGroupGate: 137 green; getter-reset/unbounded-setter/group-blind controls: 21/34/9 red. Two generated AL alias pages execute free-group search and preserve independent filters. All 139 no-PCH consumers retain results (135 green/four red); 140 Python identities and every old C++ count/status retained, same 26 DB failures. Receipts: build/filter-group-integration-20261002/artifacts/{main-proof,stable-controls,consumers,stable-targeted-lint,proof}.json. SQL/full UT remain unproved.
 - Consumed setter return remains unproved: current platform examples describe the new group, while BCApps WorkflowResponseFactBox.OnFindRecord saves/restores the returned group. Existing prior-group return is unchanged; neither example nor source usage is a BC runtime oracle. Group -1 FlowField behaviour also needs its own refusal/SQL proof.
@@ -40,7 +56,7 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## References
 
-Filter groups: include/runtime/{Record,RecordState,Table,RecordRef}.h, src/rt/{RecordRef,Temporary}.cpp, test/gate/FilterGroupGate.cpp and test/page-record-binding/. Platform methods-auto/{record,recordref}/*-{filtergroup,hasfilter}-method.md and record/record-getfilter-method.md; current official FilterGroup pages checked 2026-10-02. BCApps main a9ea4d84534cebba852c44bf0f841c2ea149de4e, src/Layers/W1/BaseApp/Foundation/Reporting/CustomLayoutReporting.Codeunit.al::{FindNextEmptyFilterGroup,SetGroupFilter,GetNextGroupFilters}; System/Workflow/WorkflowResponseFactBox.Page.al::OnFindRecord. User business-central/ui-enter-criteria-filters.md. Earlier 1063/1103 expose shared-group storage and five item-tracking regressions; preserve independent filters and investigate every loss, not the predecessor's one-dictionary compromise. Generator property syntax is 0073; runtime remains this WI.
+Filter groups: include/runtime/{Record,RecordState,Table,RecordRef}.h, src/rt/{RecordRef,Temporary}.cpp, test/gate/FilterGroupGate.cpp and test/transpiler/page-record-binding/. Platform methods-auto/{record,recordref}/*-{filtergroup,hasfilter}-method.md and record/record-getfilter-method.md; current official FilterGroup pages checked 2026-10-02. BCApps main a9ea4d84534cebba852c44bf0f841c2ea149de4e, src/Layers/W1/BaseApp/Foundation/Reporting/CustomLayoutReporting.Codeunit.al::{FindNextEmptyFilterGroup,SetGroupFilter,GetNextGroupFilters}; System/Workflow/WorkflowResponseFactBox.Page.al::OnFindRecord. User business-central/ui-enter-criteria-filters.md. Earlier 1063/1103 expose shared-group storage and five item-tracking regressions; preserve independent filters and investigate every loss, not the predecessor's one-dictionary compromise. Generator property syntax is 0073; runtime remains this WI.
 
 Unindexed sorting: platform `methods-auto/record/record-setcurrentkey-method.md` (2026-02-23); BCApps current main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `System Application/App/User Settings/src/UserSettingsImpl.Codeunit.al::PopulateProfiles`; original System `Virtual Tables/AllProfile.Table.al` has only Scope/App ID/Profile ID PK. User intent `business-central/admin-users-profiles-roles.md`. Predecessor 1464 separates optional Boolean contracts by overload/type, but its claim that SetCurrentKey cannot fail is not adopted; the platform explicitly excludes unsortable fields. No Python call-context maps are transplanted.
 

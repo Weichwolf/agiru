@@ -5,6 +5,24 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 ## Evidence
 
+- Executed UT recovery (2026-10-03): the Integer sequence provider emitted only
+  Number while the cursor selected all declared fields, including system fields.
+  `Selection::SeriesColumns` now supplies the complete typed projection with the
+  same SQL defaults as schema creation; unpersisted virtual rows have no insertion
+  identity/audit stamp. Unexpected additional stored fields refuse rather than
+  becoming invented data. CursorGate passes 230 checks, including actual SQL and
+  removal of the identity projection as a failing control; FilterGate remains
+  122/zero red. Public headers, declared fields and range policy are unchanged.
+  Full 80/2,314 replay remains required; this does not close virtual write policy,
+  audit applicability or Integer's existing range-cap/report-loop gaps.
+- Actual UT bootstrap refuses all 80 codeunits before their 2,314 methods: imported
+  All Profile.Description is varchar(250), while original System declares Text[2048].
+  `Storage.cpp::EnsureColumns` now widens bounded Text/Code columns to generated
+  declarations, preserving rows and never narrowing larger columns. StorageGate has
+  63 checks, including the old-width rejection, retained values and repeated provisioning.
+  No seed/master is changed; AL runs adapt disposable clones. Other type migrations
+  remain unsupported by this bootstrap; full production migration is not proved.
+
 - `Storage.cpp` generates keys and system fields, but writes lack observed-rowversion predicates. Field presence is not a uniqueness/audit/concurrency guarantee.
 - Page/Table Metadata declarations now match System 28/29 (0034), but their corrected lengths/options/key must not reinterpret existing persisted snapshots. The old seeding loops are removed; live access/provisioning is guarded until provider and schema identity are qualified. Existing rows were not deleted or migrated. Temporary records retain the source contract; 0044 owns computed read-only authority.
 - AllObj/AllObjWithCaption now retain their source sole pk and original field numbers (0034); this is declaration proof only. Retire the old invented name index and wrong caption/package columns through explicit populated-schema activation, not blind ProvisionInstalled. Scope/fieldgroups, system-field visibility and live read-only catalogue authority remain open; no SQL migration was run.
@@ -29,11 +47,19 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 ## References
 
+Integer projection: developer `ff5939a46e`, `devenv-{integer-virtual-table,virtual-tables,table-system-fields}.md`
+(virtual rows are computed; audit values are blank before Insert); verified System
+29 `src/Virtual Tables/Integer.Table.al`; `src/rt/{Selection,Storage}.cpp` share
+`ColumnZero` through the private selection contract. Predecessor board 936 warns
+that changing range/MaxIteration behaviour activates unrelated report defects;
+this repair leaves those bounds unchanged. Receipts:
+`/tmp/agiru-ut-recovery-integer-{cursor,filter-final,lint}.log`.
+
 Code: `src/rt/Storage.cpp`, `src/gen/TableWriter.cpp`, `include/meta/TableDef.h`.
 
-Base field declarations: `include/meta/Declare.h::SystemFieldNumbers`, `test/gate/PlatformSystemFieldsGate.cpp`, `test/native-bindings.sh`; developer `ff5939a46e`, `devenv-table-system-fields.md` separates the five base fields from Runtime-18's additional Normal/Temporary FlowFields. Typed-member/metadata availability does not prove SQL audit generation or provider contents.
+Base field declarations: `include/meta/Declare.h::SystemFieldNumbers`, `test/gate/PlatformSystemFieldsGate.cpp`, `test/transpiler/native-bindings.sh`; developer `ff5939a46e`, `devenv-table-system-fields.md` separates the five base fields from Runtime-18's additional Normal/Temporary FlowFields. Typed-member/metadata availability does not prove SQL audit generation or provider contents.
 
-Default keys: `src/gen/{TableKeys,TableWriter,TableDefinitions,NativeKeyAssertions}.cpp`, `src/tc/Main.cpp::IndexTables`, `test/gate/{GenKeyGate,GenNativeBindingGate}.cpp`, `test/table-keys.sh`, `test/table-keys/`. Platform: `analyzers/appsourcecop-as{0010,0118,0123}.md`, `diagnostics/diagnostic-al{256,450,464,527}.md`, `methods-auto/recordref/recordref-keyindex-method.md`. BCApps current main: UserSettings, CreatePickParameters, WordTemplatesTestTable4; pinned System TableMetadata. AL0325's explanatory whitelist contradicts actual Code primary keys; do not adopt it. Focused predecessor search found no default-primary finding; 980/1244's emitted-contract guidance applies.
+Default keys: `src/gen/{TableKeys,TableWriter,TableDefinitions,NativeKeyAssertions}.cpp`, `src/tc/Main.cpp::IndexTables`, `test/gate/{GenKeyGate,GenNativeBindingGate}.cpp`, `test/transpiler/table-keys.sh`, `test/transpiler/table-keys/`. Platform: `analyzers/appsourcecop-as{0010,0118,0123}.md`, `diagnostics/diagnostic-al{256,450,464,527}.md`, `methods-auto/recordref/recordref-keyindex-method.md`. BCApps current main: UserSettings, CreatePickParameters, WordTemplatesTestTable4; pinned System TableMetadata. AL0325's explanatory whitelist contradicts actual Code primary keys; do not adopt it. Focused predecessor search found no default-primary finding; 980/1244's emitted-contract guidance applies.
 
 Platform: `devenv-table-keys.md`, `properties/devenv-{clustered,enabled,maintainsiftindex,maintainsqlindex,unique,sumindexfields,includedfields,sqlindex,obsoletestate}-property.md`, system-field/Insert guarantees and `analyzers/appsourcecop-as{0002,0016}.md`. AL: BCApps main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `Layers/W1/BaseApp/Finance/GeneralLedger/{Journal/PostedGenJournalLine,Ledger/GLEntry}.Table.al`, ResourceCost and CopilotSettings; pinned UserPersonalization/FeatureKey. User intent: `business-central/database-missing-indexes.md`. Predecessor 980/1244 show property loss and unreliable name-only audits; their correctness-neutral clustering label is not a metadata contract. Fixtures: `test/gate/{GenKeyGate,UserPersonalizationGate}.cpp`; preserved `artifacts/{old-generator-control-final.log,wrong-key-clang.log,wrong-key-gcc.log,transpile-first-control.log,transpile.log}`. Earlier obsolete-column control remains `build/user-personalization-proof/stored-negative-runtime.log`; Moved/merge identity is 0033.
 
