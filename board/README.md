@@ -113,12 +113,12 @@ Latest immutable layout/capability code: `c62879f`; receipts below describe this
 | Gate | Required outcome | Owner |
 |---|---|---|
 | G1 — UT first | Complete in-scope generated tree compiles/links; every source-counted UT method passes through `agiru run-tests`; no missing/refused/crashed/skipped/incomplete cases. Reproducible seed, runner and image identities. | 0038, 0039, 0058, 0004 |
-| G2 — usable clients | After G1, build ERP CLI and htmx web UI over the same production page/command runtime. Prove every operation's parity, including database effects and errors; browser checks are representative samples. | 0030, 0720, 0006, 0062 |
+| G2 — usable clients | After G1, build the agent-only Node.js/TypeScript HTML/ASCII client with shared CMD/MCP adapters and htmx web UI over one production page/command runtime. Prove operation parity, database effects and errors; browser checks are representative samples. | 0030, 0720, 0006, 0062 |
 | G3 — complete ERP | After G2, execute the complete in-scope AL test population and CLI workflows; close all in-scope object/extension/integration gaps. Prove multi-user correctness and BC-relative performance/resource targets at scale. | 0058, 0034, 0721 |
 | Browser demo | After G2, ship single-user agiru/WASM with embedded PostgreSQL entirely on GitHub Pages; shared runtime and proved demo workflow/SQL parity. Not a production scale/durability proof. | 0724 |
 
 - Existing `run-tests` CLI and TestPage repairs belong to G1. Business CLI/HTTP construction starts only after G1.
-- CLI becomes the exhaustive business-operation/testing client. Sampling applies to browser rendering/interaction, never to the UT or full AL denominator.
+- Agent CMD/MCP becomes the exhaustive business-operation/testing client. Sampling applies to browser rendering/interaction, never to the UT or full AL denominator.
 - User scope decision (2026-10-01): agiru-owned code is MIT; no license keys, trials, subscriptions or commercial feature locks; no O365/Microsoft 365 or other Microsoft cloud integrations. Permissions, isolation, generic protocols and complete core ERP remain required (0725).
 - Report raw, selected and explicitly excluded source/test identities with reasons. Only the approved product exclusions above may leave the selected denominator; other namespace exclusions, unlinked fallbacks and unsupported providers remain coverage gaps. A green subset is not complete core ERP.
 - P0: unsafe state or unreliable proof. P1: UT/semantic blockers. P2: clients and their bounds. P3: complete-suite/ERP/scale work. Promote any later task when a measured UT failure requires it.
@@ -132,7 +132,7 @@ Latest immutable layout/capability code: `c62879f`; receipts below describe this
 | 2 | Correct execution boundaries | 0718 record ownership; 0722 JSON; 0035 XML safety; 0012 transactions; 0006 sessions; 0723 atomic sequence ranges; 0039 runner hooks/isolation |
 | 3 | Compile/semantic closure | First: consume verified native report authority without 0034's native-contract/consumer losses; 0063 installs owned layouts/proves successor; then 0033 app/type identity → 0073 lowering → 0038 full-app link; 0035 only genuine native/.NET contracts |
 | 4 | Remaining UT failures | 0044 navigation/company; 0018 filters; 0043 validation/events; 0061 original errors; 0030 page lifecycle; 0063 datasets; 0065 encoding/import; 0719 context drilldown |
-| 5 | Clients after G1 | 0062 enforced identity/permissions + 0006 session ownership → 0030 production dispatcher → 0720 CLI/htmx/parity |
+| 5 | Clients after G1 | 0062 enforced identity/permissions + 0006 session ownership → 0030 production dispatcher → 0720 agent CMD/MCP + HTML/ASCII/htmx parity |
 | 6 | Complete suite and ERP qualification | 0058 full manifest; remaining object/extension/lifecycle/media/background work; 0721 multi-user and matched BC benchmarks |
 | After G2 | Browser-only single-user demo | 0724 Emscripten/PGlite, static Pages deployment, exact values and transaction/workflow parity |
 
@@ -148,7 +148,7 @@ Latest immutable layout/capability code: `c62879f`; receipts below describe this
 - `SessionState` owns mutable AL state; TLS only selects an active session. PostgreSQL owns shared authority, permissions/version state, durable writes and worker claims.
 - One transaction lease holds the connection and live cursors. No connection or open transaction is retained during user think time.
 - Production Commit is durable. Test isolation floors and TryFunction/Codeunit.Run/asserterror boundaries remain distinct.
-- One typed production page dispatcher executes TestPage, CLI JSON and htmx commands. Generated immutable metadata supplies identity, factories and typed accessors; adapters contain no business rules.
+- One C++ production page dispatcher executes TestPage, agent CMD/MCP and htmx commands. Generated immutable metadata supplies one typed page/action model, semantic HTML and exact values; adapters contain no business rules. The agent-only Node.js/TypeScript client renders the declared HTML profile as ASCII and shares a client library between CMD/MCP; no full browser/htmx implementation or Node.js ERP-server dependency (0720).
 - One library per BC app; public headers plus declared dependency roots. PCH/unity/slice remain build optimizations, not dependency or completeness proof.
 - Exact Decimal values, bounded blocks/streams and observed-version writes precede optimization. Proposed performance thresholds and matched-BC proof live in 0721.
 
@@ -304,7 +304,7 @@ Diagnostic sources/logs: `build/review-20260928/`: RuntimeProbe, ScopeProbe, Jso
 | [0589](0589_the_toolchain_will_be_reproducible_and_every_gate_will_fail_reliably.md) | P0 | The toolchain will be reproducible and every gate will fail reliably | 0005, 0046, 0050, 0616 |
 | [0718](0718_record_images_and_temporary_handles_will_survive_copies_without_dangling_references.md) | P0 | Record images and temporary handles will survive copies without dangling references | 0037, 0042, 0526, 0624, 0640 |
 | [0719](0719_error_message_drilldown_will_retrieve_the_logged_record_context.md) | P1 | Error-message drilldown will retrieve the logged record context | — |
-| [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md) | P2 | CLI and web will execute the same ERP operations | Client delivery/parity split from 0030 |
+| [0720](0720_cli_and_web_will_execute_the_same_erp_operations.md) | P2 | Agent CMD/MCP and web will execute the same ERP operations | Shared HTML/ASCII client and operation parity; page semantics remain 0030 |
 | [0721](0721_equivalent_erp_workloads_will_prove_lower_latency_and_resource_cost.md) | P3 | Equivalent ERP workloads will prove lower latency and resource cost | Performance qualification split from 0006; 0008/0009/0596 retained |
 | [0722](0722_json_numbers_and_aliases_will_preserve_values_and_lifetimes.md) | P0 | JSON numbers and aliases will preserve values and lifetimes | Shared JSON safety split from 0035 |
 | [0723](0723_number_sequence_ranges_will_be_atomic_and_portably_addressed.md) | P0 | Number-sequence ranges will be atomic and portably addressed | New concurrency finding; related boundary ownership remains in 0012 |

@@ -27,10 +27,11 @@ documentation and commits are English.
 1. Compile the complete in-scope AL tree and make the UT milestone pass through
    `agiru run-tests`. Count the denominator from AL source text, independently of parsing
    and linking. Report missing, refused and crashed cases; they never disappear from totals.
-2. After every UT is green, build the ERP CLI and real htmx HTTP UI over one production
-   page/command runtime and generated metadata. Prove operation parity under `test/ui/`:
-   messages, rows, typed values, permissions and database effects. Use the CLI for exhaustive
-   business workflows; verify the actual web client through representative browser samples.
+2. After every UT is green, build the agent-only Node.js/TypeScript HTML-to-ASCII client
+   with CMD/MCP adapters and the htmx web UI over one production page/command runtime.
+   Prove CMD/MCP/web operation parity under `test/ui/`: messages, rows, exact typed values,
+   dialogs, permissions and database effects. Use the agent client for exhaustive business
+   workflows; verify the actual web client through representative browser samples.
 3. Run the complete AL test suite and CLI workflows; prove multi-user behaviour and complete
    BC ERP functionality. Measure performance and resource use against equivalent BC workloads.
 4. After G2, deliver a browser-only, single-user Emscripten/WASM demo of agiru with embedded
@@ -100,6 +101,20 @@ what a file names; no master header or macros. Measure build cost before widenin
 Registry-only report consumers use `runtime/ReportRegistry.h`; dataset/request-page
 execution stays in `runtime/Report.h`. Keep one registry, preserve its entry ABI and
 prove the narrow header's dependency profile with negative controls.
+
+## Client contract (after G1)
+
+- C++ owns ERP execution, authorization and sessions. Node.js/TypeScript is a thin
+  agent-client dependency, not a production ERP-server dependency (0720).
+- One generated typed page/action model supplies semantic HTML and exact machine values.
+  Web uses htmx; agents render its declared HTML profile as compact ASCII with unchanged
+  Unicode data. No separate CLI masks, business rules or full browser/htmx implementation.
+- CMD and MCP share one client library and operation contract. Discover valid actions;
+  use explicit session/page/dialog handles, revisions and command IDs across calls.
+- Output is bounded, deterministic and noninteractive: text/JSON for CMD, structured
+  results plus compact text for MCP. No TTY/ANSI requirement or automatic confirmations.
+  Preserve Decimal/Int64 exactly, treat content as untrusted, and reconcile uncertain writes
+  before retries. HTTP wiring and independent SQL effects are part of parity proof.
 
 ## Layouts, charts and analysis
 
