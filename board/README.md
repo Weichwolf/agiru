@@ -15,24 +15,36 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-Explicit native table source binding is implemented in the dirty batch at HEAD `14fe6ac`.
-`make native-consumers`: `build/native-consumers.{vWqQvV,dE8PA4}/result.json` retains
-all three eight-unit variants. Source-bound System 28 compiles 8/8; System 29 6/8,
-with both Objects units still rejecting AllObjWithCaption drift. The unchanged
-ordinary baseline is 7/8; extra assertions alone remain 7/8 and 5/8. Production
-table parsing retains 223/234 originals, nineteen bound and 204/215 unbound; 139/164
-other AL files remain unactivated. No provider/schema/full native loader or AL business proof.
-Full raw matrices remain unchanged (`build/native-bindings.{3VaR4I,S2Ku76}/result.json`),
-all 333/368 objects business-unexecuted. Native translation exits 1; both Make runs exit 2.
-Generated paths grow 24,389→24,391 with zero losses: query 774 Users in Plans header/body
-becomes reachable, still subject to 0725's commercial incoming-reference classification.
-Raw census and exact 80/2,314 UT identities match; no additional original AL method execution.
-Local final replay: 115 cases/170 toolchain tests, zero red/skips; original production-page
-primitive six checks pass, source-expression/field-number and extension-ABI controls reject
-(`build/native-source-tests-final.log`). SourceReader analysis 1/217 clean; Main 1/217 red
-and changed-code lint still red (`build/native-source-{reader,main}-tidy.log`, `lint.log`).
-Next: qualify frozen whole-tree generation/link and native report/object coverage; keep
-providers, namespace/app identity, package SymbolReference joins and G1 open (0034/0038).
+Compiler `aecca9a`: native report loading shares the original AST/report binder with ordinary apps.
+The original XML manifest supplies module/layout owners; native reports emit into a separate
+platform library. `build/native-report-layouts.75aME5/result.json`: original/source-loaded variants
+each pass 562 checks for sixteen layouts. Ownership/property/asset and CMake missing-module
+controls reject; compiler/source/package hashes agree. CMake configuration is qualified, not
+its full build. Assets installed/documents rendered: zero; all 368 native objects business-unexecuted.
+
+Full source replay: `build/native-consumers.wSWttg/result.json`, System 29 retains all
+three eight-unit variants: ordinary 7/8, extra assertions 5/8, source-bound 6/8, no losses.
+Both Objects units still reject AllObjWithCaption drift. Native parsing retains 234 tables,
+nineteen bound/215 unbound, plus one bound report; 163 other AL files remain unactivated.
+The raw table matrix remains 14 pass/five fail/215 unbound
+(`build/native-bindings.wlGUVy/result.json`). Native translation exits 1; Make exits 2.
+Full generation retains 24,389→24,396 paths, zero lost; seven additions are the platform
+module/report/reaches and query 774 header/body (0725 classification still open).
+Layouts grow 407→423 immutable declarations; all fourteen extension layouts are now bound.
+Raw census remains 113,013 raw/112,998 required methods; exact 80/2,314 UT identities match,
+all unexecuted. Previous System-28 eight-unit qualification: `native-consumers.vWqQvV`, 8/8
+source-bound; this batch's full replay used System 29, without changing demo 28.4.
+
+Local final replay: 115 cases/181 toolchain tests, zero red/skips
+(`build/native-report-loader-tests-final.log`); eleven new loader controls pass.
+Targeted Manifest/SourceReader/NativeRunner analysis is clean; Main remains red on eight
+diagnostics, including Scan complexity 95/382 lines. Denominator 218 handwritten units;
+`make lint` checks four units/one failed, formatting green. No full-analysis pass or
+suppression/baseline increase. Receipts:
+`build/native-report-loader-{manifest-tidy-qualified,reader-tidy-final,runner-tidy-final,main-tidy-qualified}.log`.
+Next: qualify full platform/tree linking, install owned layout assets and prove the retired
+report-upgrade successor before slice reconciliation. Providers, native kinds/methods,
+namespace/app identity, SymbolReference joins and G1 remain open (0034/0038/0063/0589).
 
 Latest metadata source batch: `2d3f2de`; snapshot override fix: `599597c`. Receipts
 were collected from the matching dirty batch at predecessor HEAD `8d65ae9`, not a

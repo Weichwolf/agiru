@@ -162,9 +162,12 @@ what a file names; no master header or macros. Measure build cost before widenin
   includes every handwritten test `.cpp` outside `test/target/`; a missing command
   remains a refusal. Intentionally invalid compile fixtures use `.cpp.in` templates.
 - `make native-report-layouts` needs explicit `AGIRU_SYSTEM_SYMBOLS` containing the
-  original native report source. It inventories the full package, then compiles the
-  native/extension declaration fixture and records its analysis command. Run it before
-  analysing that consumer; this is not native-loader activation or asset installation.
+  original native report source. It inventories the full package and compiles both the
+  ordinary declaration fixture and the production `--system-symbols` variant, without
+  copying native AL into an application. Retain ownership/property/asset controls and
+  compiler/source hashes. CMake must recognize the separate platform app and refuse a
+  missing module. Run it before analysing that consumer. This proves report declaration
+  loading, not complete native activation, asset installation, rendering or G1.
 - `make native-bindings AGIRU_SYSTEM_SYMBOLS=<verified-package>` inventories every
   original native table independently, emits production-generator contracts and compiles
   every bound candidate without PCH. Unbound/refused/crashed/mismatched identities remain
@@ -187,8 +190,12 @@ what a file names; no master header or macros. Measure build cost before widenin
   execution, full-app or G1 proof. Keep the raw native matrix and unexecuted UT manifest.
 - `make transpile AGIRU_SYSTEM_SYMBOLS=<verified-package>` verifies original package provenance
   before/after translation and retains a raw native inventory in `build/transpile.<id>/`.
-  The compiler's explicit `--system-symbols <root>` reads AL table declarations through the
-  existing AST/binder, retains keys/options/source field numbers, and merges native extensions.
+  The compiler's explicit `--system-symbols <root>` reads AL table/report declarations through
+  the existing AST/binder, retains keys/options/source field numbers, and merges extensions.
+  Native reports emit into the separate `apps/platform/` library; their module/layout owners
+  come from the original namespaced `NavxManifest.xml`, using private compiler-side libxml2.
+  Preserve extension ownership and selected defaults; do not treat declaration loading as
+  asset installation. Malformed/duplicate/DTD/symlink manifests and report-ID collisions refuse.
   Unbound tables, refused sources and other unactivated AL files keep translation nonzero.
   Native/app table-ID collisions refuse. Direct compiler fixtures accept raw source roots;
   they are not package authenticity checks. Make is the verified package entry point.
