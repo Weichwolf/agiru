@@ -8,6 +8,7 @@ SHELL := /bin/bash
 SELF := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 B    := $(SELF)/build
 JOBS ?= $(shell nproc)
+TRANSPILE_OUTPUT ?= $(SELF)/apps
 ifeq ($(origin CXX),default)
 CXX := clang++-19
 endif
@@ -16,7 +17,7 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata native-report-layouts native-bindings native-consumers number-sequences table-keys reflection-metadata
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-consumers number-sequences table-keys reflection-metadata
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -75,6 +76,16 @@ report-layouts: comments db tc ## retain named report layouts, actual assets and
 report-layout-metadata: ## compile all generated immutable layout declarations, not complete apps
 	@B="$(B)" bash "$(SELF)/scripts/report_layout_metadata.sh" "$(SELF)/apps"
 
+layout-assets: ## package every declared layout from REQUESTS into a new OUTPUT directory, not install
+	@test -n "$(REQUESTS)" -a -n "$(OUTPUT)" || { printf 'REQUESTS and new OUTPUT are required\n' >&2; exit 2; }
+	@bash "$(SELF)/scripts/layout_assets.sh" "$(REQUESTS)" \
+	  "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" "$(OUTPUT)" "$${AGIRU_SYSTEM_SYMBOLS:-}" "$(NOTICES)"
+
+layout-assets-check: comments db tc ## prove layout population, ownership, paths and byte integrity
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReportLayoutGate gate_ReportAssetGate
+	@"$(B)/gate_ReportAssetGate"
+	@B="$(B)" bash "$(SELF)/test/layout-assets.sh"
+
 native-report-layouts: comments db tc ## prove native/extension declarations from explicit AGIRU_SYSTEM_SYMBOLS, not installation
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
 	@B="$(B)" bash "$(SELF)/test/native-report-layouts.sh"
@@ -120,8 +131,8 @@ census:           ## raw AL inventory; namespace selection is diagnostic, never 
 tc: db             ## just the transpiler
 	@cmake --build $(B) -j $(JOBS) --target agirutc
 
-transpile: tc      ## every app in apps.json through the transpiler into apps/
-	@B="$(B)" bash "$(SELF)/scripts/transpile.sh" "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" "$(SELF)/apps.json" "$(SELF)/apps"
+transpile: tc      ## every app in apps.json; TRANSPILE_OUTPUT defaults to apps/
+	@B="$(B)" bash "$(SELF)/scripts/transpile.sh" "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" "$(SELF)/apps.json" "$(TRANSPILE_OUTPUT)"
 
 gap: db            ## a ranked header gap (SOURCE=1: bodies; SWEEP=1: complete header sweep)
 	@if [ -z "$(SOURCE)" ] && [ "$(SWEEP)" != 1 ] && [ ! -s $(B)/tree-syntax/roots ]; then \

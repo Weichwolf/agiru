@@ -10,6 +10,7 @@
 #include "Parser.h"
 #include "QueryWriter.h"
 #include "Refused.h"
+#include "ReportAssets.h"
 #include "Scope.h"
 #include "TableKeys.h"
 #include "TableWriter.h"
@@ -231,6 +232,8 @@ bool WriteFile(const Output &where, const std::string &text) {
   std::filesystem::create_directories(path.parent_path());
   std::ofstream file(path, std::ios::binary);
   file << text;
+  file.close();
+  if (!file) { throw std::runtime_error("cannot write generated output: " + path.string()); }
   return true;
 }
 
@@ -271,6 +274,7 @@ bool IsMoved(const std::vector<agiru::al::Property> &properties) {
 }
 
 struct Gathered {
+  agiru::gen::ReportAssetRequests reportAssets;
   agiru::gen::DotNetUse dotnet;
   agiru::gen::DotNetUse absent;
   std::vector<agiru::gen::RefusedProperty> refused;
@@ -1051,6 +1055,29 @@ void NoteTargets(const Extensions &store) {
 
 std::string JsonValue(std::string_view text, std::string_view key);
 
+agiru::gen::NativeAppIdentity AppIdentity(const std::filesystem::path &root) {
+  const auto manifest = root / "app.json";
+  if (!std::filesystem::is_regular_file(manifest)) { return {}; }
+  const auto text = Read(manifest);
+  return {.id = JsonValue(text, "id"),
+          .name = JsonValue(text, "name"),
+          .publisher = JsonValue(text, "publisher"),
+          .version = JsonValue(text, "version")};
+}
+
+agiru::gen::ReportAssetApp LayoutApp(const std::filesystem::path &root,
+                                     const std::filesystem::path &declaration) {
+  for (auto directory = declaration.parent_path(); !directory.empty();) {
+    if (std::filesystem::is_regular_file(directory / "app.json")) {
+      return {.identity = AppIdentity(directory),
+              .source = std::filesystem::relative(directory, root).generic_string()};
+    }
+    if (directory == root || directory == directory.parent_path()) { break; }
+    directory = directory.parent_path();
+  }
+  return {};
+}
+
 void NoteLayoutOwners(std::vector<agiru::al::ReportLayoutDecl> &layouts,
                       std::string_view appId,
                       const std::filesystem::path &source) {
@@ -1068,10 +1095,6 @@ Extensions ReadExtensions(Run &run,
   for (const agiru::gen::App &app : apps) {
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
-    const auto manifest = run.root / "app.json";
-    const std::string appId = std::filesystem::is_regular_file(manifest)
-                                  ? JsonValue(Read(manifest), "id")
-                                  : std::string{};
     const auto read = [&](std::string_view suffix, auto parse, auto &into, auto note) {
       for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
@@ -1101,7 +1124,9 @@ Extensions ReadExtensions(Run &run,
          agiru::al::ParseReportExtension,
          store.reports,
          [&](agiru::al::PageExtensionObject &extension, const std::filesystem::path &path) {
-           NoteLayoutOwners(extension.rendering, appId, std::filesystem::relative(path, source));
+           NoteLayoutOwners(extension.rendering,
+                            LayoutApp(source, path).identity.id,
+                            std::filesystem::relative(path, source));
          });
   }
   return store;
@@ -1917,23 +1942,17 @@ void EmitModule(Run &run,
   objects.moduleHeader = identifier + "Module.h";
 }
 
-void WriteModule(Run &run,
-                 const agiru::gen::App &app,
-                 const std::filesystem::path &source,
-                 agiru::gen::Objects &objects) {
+agiru::gen::NativeAppIdentity WriteModule(Run &run,
+                                          const agiru::gen::App &app,
+                                          const std::filesystem::path &source,
+                                          agiru::gen::Objects &objects) {
   objects.module.clear();
   objects.moduleHeader.clear();
   const auto manifest = source / "app.json";
-  if (!std::filesystem::is_regular_file(manifest)) { return; }
-  const auto text = Read(manifest);
-  EmitModule(run,
-             app,
-             {.id = JsonValue(text, "id"),
-              .name = JsonValue(text, "name"),
-              .publisher = JsonValue(text, "publisher"),
-              .version = JsonValue(text, "version")},
-             app.source + "/app.json",
-             objects);
+  if (!std::filesystem::is_regular_file(manifest)) { return {}; }
+  const auto identity = AppIdentity(source);
+  EmitModule(run, app, identity, app.source + "/app.json", objects);
+  return identity;
 }
 
 void BindReportDeclaration(const agiru::al::PageObject &report, agiru::gen::Objects &objects) {
@@ -2004,9 +2023,6 @@ Pages IndexReports(Run &run,
                    agiru::gen::Objects &objects,
                    const agiru::gen::NativeSources &native) {
   Pages reports;
-  const auto manifest = run.root / "app.json";
-  const std::string appId =
-      std::filesystem::is_regular_file(manifest) ? JsonValue(Read(manifest), "id") : std::string{};
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Report.al")) {
     const std::string text = Read(path);
     const agiru::gen::ObjectDeclaration declared =
@@ -2029,7 +2045,9 @@ Pages IndexReports(Run &run,
     declaration.report = true;
     BindReportDeclaration(parsed.has_value() ? *parsed : declaration, objects);
     if (parsed.has_value()) {
-      NoteLayoutOwners(parsed->rendering, appId, std::filesystem::relative(path, run.sourceRoot));
+      NoteLayoutOwners(parsed->rendering,
+                       LayoutApp(run.sourceRoot, path).identity.id,
+                       std::filesystem::relative(path, run.sourceRoot));
       reports.paths.push_back(std::filesystem::relative(path, run.root).string());
       reports.objects.push_back(std::move(*parsed));
     }
@@ -2665,6 +2683,11 @@ NativeReportOutput WriteNativeReports(const Job &job,
              native.app,
              "platform/NavxManifest.xml",
              objects);
+  gathered.reportAssets.apps.push_back(
+      {.identity = native.app, .source = "platform", .platform = true});
+  for (const auto &report : reports.objects) {
+    agiru::gen::AddReportAssets(gathered.reportAssets, report);
+  }
   RefreshReportControls(reports, objects);
   NoteUnwrittenReports(run, reports, gathered);
   for (const auto &report : reports.objects) { NoteObjectOptions(report, gathered.options); }
@@ -2685,6 +2708,7 @@ void NoteUnresolvedLayouts(const Extensions &store, Gathered &gathered) {
     if (store.consumed.contains("report " + name)) { continue; }
     for (const auto &extension : extensions) {
       for (const auto &layout : extension.rendering) {
+        gathered.reportAssets.layouts.push_back({.report = 0, .target = name, .layout = layout});
         NoteProperties(layout.properties, "layout", gathered.properties);
         agiru::gen::CollectRefused(layout.properties,
                                    "reportextension " + extension.name + " layout " + layout.name,
@@ -2692,6 +2716,30 @@ void NoteUnresolvedLayouts(const Extensions &store, Gathered &gathered) {
       }
     }
   }
+}
+
+void WriteReportAssets(const Job &job,
+                       agiru::gen::ReportAssetRequests &requests,
+                       std::set<std::filesystem::path> &kept) {
+  if (job.output.empty()) { return; }
+  for (const auto &request : requests.layouts) {
+    if (std::ranges::any_of(requests.apps, [&](const auto &known) {
+          return known.platform && known.identity.id == request.layout.owner.appId;
+        })) {
+      continue;
+    }
+    const auto app = LayoutApp(job.source, job.source / request.layout.owner.source);
+    if (app.identity.id.empty()) { continue; }
+    if (std::ranges::none_of(requests.apps, [&](const auto &known) {
+          return known.identity.id == app.identity.id && known.source == app.source;
+        })) {
+      requests.apps.push_back(app);
+    }
+  }
+  const auto path = job.output / "layout-assets.json";
+  WriteFile({.directory = job.output, .relative = "layout-assets.json"},
+            agiru::gen::ReportAssetsManifest(requests));
+  kept.insert(path);
 }
 
 void ReportLayouts(const Extensions &store, const LayoutCounts &counts) {
@@ -2855,7 +2903,8 @@ int Scan(const Job &job) {
             .written = 0,
             .changed = 0,
             .kept = {}};
-    WriteModule(run, app, source, objects);
+    gathered.reportAssets.apps.push_back(
+        {.identity = WriteModule(run, app, source, objects), .source = app.source});
     Counts enums;
     Counts interfaces;
     Counts tables;
@@ -2874,6 +2923,7 @@ int Scan(const Job &job) {
     layouts.bound += CountLayouts(parsedReports);
     for (agiru::al::PageObject &report : parsedReports.objects) {
       agiru::gen::PrepareReport(report);
+      agiru::gen::AddReportAssets(gathered.reportAssets, report);
     }
     NoteUnwrittenReports(run, parsedReports, gathered);
     Pages parsedXmlPorts = IndexXmlPorts(run, objects);
@@ -2971,6 +3021,9 @@ int Scan(const Job &job) {
   changed += nativeOutput.changed;
   allReports += nativeReports.objects.size();
 
+  NoteUnresolvedLayouts(store, gathered);
+  WriteReportAssets(job, gathered.reportAssets, kept);
+
   if (!job.output.empty()) {
     const std::size_t swept = failures.empty() && refusals.empty() ? Sweep(job.output, kept) : 0;
     std::println("written   {} objects into {}; {} changed, {} swept",
@@ -3001,7 +3054,6 @@ int Scan(const Job &job) {
     const auto taken = store.consumed.find(name);
     if (taken == store.consumed.end()) { orphans.insert_or_assign(name, total); }
   }
-  NoteUnresolvedLayouts(store, gathered);
   const PropertyAudit propertyAudit = AuditProperties(gathered.properties);
   std::size_t silentAttributes = 0;
   for (const auto &[what, found] : gathered.contradictions) {

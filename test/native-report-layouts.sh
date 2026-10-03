@@ -9,12 +9,15 @@ if [ -z "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
 fi
 package=$(realpath "$AGIRU_SYSTEM_SYMBOLS")
 python3 scripts/fetch_symbols.py --verify "$package"
-base="${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}/Layers/W1/BaseApp"
+source_root=${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}
+base="$source_root/Layers/W1/BaseApp"
+notice=${AGIRU_LAYOUT_SOURCE_NOTICE:-"$(dirname "$source_root")/LICENSE"}
+[[ -f "$notice" ]]
 proof=$(mktemp -d "$B/native-report-layouts.XXXXXX")
 printf '%s\n' "$proof" > "$B/native-report-layouts.latest"
 git rev-parse HEAD > "$proof/head.txt"
 rg --files src/gen src/tc include cmake test/report-layouts test/native-report-layouts.sh \
-  scripts/unlinked.py CMakeLists.txt \
+  scripts/unlinked.py scripts/layout_assets.sh scripts/verify_layout_assets.sh CMakeLists.txt Makefile \
   | LC_ALL=C sort | xargs -d '\n' sha256sum > "$proof/compiler-inputs.sha256"
 sha256sum "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" >> "$proof/compiler-inputs.sha256"
@@ -44,6 +47,8 @@ base_id=$(jq -er '.id' "$input/base/app.json")
 sha256sum "$package/System.app" "$package/NavxManifest.xml" "$package/SymbolReference.json" \
   "$package/layout/LayoutManifest.xml" "$base/app.json" \
   "$base/Foundation/Reporting/CompositeLayout.ReportExt.al" > "$proof/originals.sha256"
+sha256sum "$notice" >> "$proof/originals.sha256"
+jq -n --arg notice "$notice" '[$notice]' > "$proof/notices.json"
 rg --files --no-ignore "$package/layout" "$base/Foundation/Reporting/ReportParts" \
   | LC_ALL=C sort | xargs -d '\n' sha256sum >> "$proof/originals.sha256"
 "$B/agirutc" "$input" "$input/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
@@ -126,6 +131,7 @@ mkdir -p "$source_input/base/Foundation/Reporting"
 cp "$input/base/app.json" "$source_input/base/app.json"
 cp "$input/base/Foundation/Reporting/CompositeLayout.ReportExt.al" \
   "$source_input/base/Foundation/Reporting/"
+cp -a "$base/Foundation/Reporting/ReportParts" "$source_input/base/Foundation/Reporting/"
 cp test/report-layouts/LinkConsumer.Report.al "$source_input/base/"
 cp "$input/scope.json" "$source_input/scope.json"
 printf '%s\n' '{"apps":[{"name":"base","source":"base"}]}' > "$source_input/apps.json"
@@ -137,6 +143,22 @@ printf '%s\n' "$loader_status" > "$proof/source-bound.status"
 rg -q 'native 1 report sources bound; 3 objects written into the platform app' "$proof/source-bound.log"
 rg -q '16 bound layouts, 16 immutable declarations emitted, 0 retained on unresolved targets' \
   "$proof/source-bound.log"
+AGIRU_BC_SOURCE="$source_input" AGIRU_SYSTEM_SYMBOLS="$package" \
+  make --no-print-directory layout-assets REQUESTS="$proof/source-bound/layout-assets.json" \
+    OUTPUT="$proof/layout-bundle" NOTICES="$proof/notices.json" > "$proof/layout-package.log" 2>&1
+bash scripts/verify_layout_assets.sh "$proof/layout-bundle" > "$proof/layout-verify.log" 2>&1
+jq -e '.complete and .declared == 16 and .packaged == 16 and .unresolved == 0
+  and .installed == 0 and .rendered == 0' "$proof/layout-bundle/result.json" > /dev/null
+notice_copy=$(jq -er '.[0].file' "$proof/layout-bundle/notices.json")
+cmp "$notice" "$proof/layout-bundle/$notice_copy"
+mapfile -t owned_layouts < <(jq -c '.[]' "$proof/layout-bundle/layouts.json")
+for layout in "${owned_layouts[@]}"; do
+  original_root="$base"
+  if [[ $(jq -r '.owner.appId' <<< "$layout") == "$native_id" ]]; then original_root="$package/layout"; fi
+  original_file=$(jq -r '.file' <<< "$layout")
+  packaged_file=$(jq -r '.asset' <<< "$layout")
+  cmp "$original_root/$original_file" "$proof/layout-bundle/$packaged_file"
+done
 compile "$proof/source-bound" "$proof/source-bound-runner"
 "$proof/source-bound-runner" "$package" "$base" "$native_id" "$base_id" \
   platform/src/Reports/TenantReportDefaults.Report.al > "$proof/source-bound-runner.log"
@@ -254,6 +276,7 @@ sha256sum --check --status "$proof/originals.sha256"
 python3 scripts/fetch_symbols.py --verify "$package" > "$proof/package-verified.json"
 jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile package "$package/provenance.json" \
   --slurpfile symbols "$package/SymbolReference.json" --slurpfile base "$base/app.json" \
+  --slurpfile assets "$proof/layout-bundle/result.json" \
   --arg demo_version "$(tr -d '\n' < BC_VERSION)" \
   --arg base_revision "$(git -C "$base" rev-parse HEAD)" \
   '{package:$package[0].identity,package_sha256:$package[0].package_sha256,platform_version:$package[0].bc_version,
@@ -261,6 +284,7 @@ jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile package "$package/
     symbol_reports:($symbols[0].Reports | length),raw_native:$raw[0].summary,
     selected_reports:1,selected_extensions:1,
     native_layouts:2,extension_layouts:14,compiled_layouts:16,
+    packaged_assets:16,asset_package:$assets[0],
     native_objects_outside_compiled_fixture:($raw[0].summary.objects-1),
     unexecuted_native_objects:$raw[0].summary.objects,installed_assets:0,rendered_documents:0,
     production_native_report_loader_activated:true,complete_native_loader_activated:false,
