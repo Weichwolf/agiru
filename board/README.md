@@ -15,9 +15,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-Code `d16fafb`; receipts use the matching dirty batch at frozen HEAD `e4fe675`, not a new
+Code `91190e8`; receipts use the matching dirty batch at frozen HEAD `4cbe2a8`, not a new
 full integration. Native report loading shares the original AST/binder and XML module/layout
-owners. `build/native-report-layouts.oqGu1z/result.json`: original/source-loaded variants each
+owners. `build/native-report-layouts.RBEaVo/result.json`: original/source-loaded variants each
 pass 562 checks for sixteen layouts. Frozen CMake builds the platform library and actual CLI
 in app and authored two-source slice modes. Registry-only lookup passes three checks per mode;
 Linux `--as-needed` library-drop and ownership/property/asset/missing-module controls reject.
@@ -25,7 +25,7 @@ Static archive retention also passes its negative control. Direct generated-libr
 dependencies are fixed; slice refusal generation subtracts platform definitions and emits no
 helper for zero missing procedures. Compiler/source/package hashes agree. Root apps/scope/slice
 are unchanged; this is not full-tree linking. Installed assets/rendered documents: zero;
-all 368 native objects remain business-unexecuted. Log: `build/native-platform-link-complete-proof.log`.
+all 368 native objects remain business-unexecuted. Log: `build/report-registry-native-link-proof-final.log`.
 
 Full source replay: `build/native-consumers.wSWttg/result.json`, System 29 retains all
 three eight-unit variants: ordinary 7/8, extra assertions 5/8, source-bound 6/8, no losses.
@@ -40,16 +40,21 @@ Raw census remains 113,013 raw/112,998 required methods; exact 80/2,314 UT ident
 all unexecuted. Previous System-28 eight-unit qualification: `native-consumers.vWqQvV`, 8/8
 source-bound; this batch's full replay used System 29, without changing demo 28.4.
 
-Local final replay: 115 cases/186 toolchain tests, zero red/skips
-(`build/native-platform-link-tests-final.log`); five new registration/stub controls pass.
-Changed lint checks one of 219 handwritten units and fails on 44 diagnostics in unchanged
-public headers reached by the frozen CMake consumer; none is in RegistryRunner.cpp.
-Formatting passes; no suppression/baseline increase or full-analysis pass.
-Receipts: `build/native-platform-link-{lint.log,tidy.log,lint-units.json,controls-final.log}`.
+ReportRegistry.h now owns the existing entry/lookup declarations without dataset/page
+dependencies. Signature, size, alignment and field-offset controls pass; forced full-report
+inclusion fails the dependency profile. One registry/unchanged ABI, not new execution semantics.
+Local final replay: 115 cases/188 toolchain tests, zero red/skips
+(`build/report-registry-tests-final.log`). Both registry/native consumers analyse cleanly;
+changed lint checks five of 219 handwritten units, three still fail on unchanged public
+headers and XmlPort findings. No own finding remains in changed Report.cpp/ReportGate code.
+Formatting and new public documentation pass; no suppression/baseline increase or full-analysis pass.
+Receipts: `build/report-registry-{lint-final.log,tidy-final.log,lint-units-final.json,targeted-tidy.log,doc.log}`.
+Three-round/no-PCH header frontend sample: Report.h 1,794.5 ms, ReportRegistry.h 213.8 ms
+(`build/include-cost.WqMlqU/results.tsv`); consumer syntax-only wall time averages 1.561→0.385 s
+(`build/report-registry-header-{before,after}-bash.log`). Concurrent probes; not an ERP performance claim.
 Earlier Manifest/SourceReader/NativeRunner analysis is clean; Main still has eight findings,
 including Scan complexity 95/382 lines (`build/native-report-loader-main-tidy-qualified.log`).
-Next: split the lightweight report registry API, qualify full platform/tree linking,
-install owned layout assets and prove the retired
+Next: qualify full platform/tree linking, install owned layout assets and prove the retired
 report-upgrade successor before slice reconciliation. Providers, native kinds/methods,
 namespace/app identity, SymbolReference joins and G1 remain open (0034/0038/0063/0589).
 

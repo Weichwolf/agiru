@@ -97,6 +97,9 @@ Emit immutable declarations as `constexpr` metadata; use `static_assert` for com
 facts. Generated headers contain declarations and sources contain bodies. Include only
 what a file names; no master header or macros. Measure build cost before widening headers.
 `cmake/Precompiled.h` is a build optimization, not an implicit source dependency.
+Registry-only report consumers use `runtime/ReportRegistry.h`; dataset/request-page
+execution stays in `runtime/Report.h`. Keep one registry, preserve its entry ABI and
+prove the narrow header's dependency profile with negative controls.
 
 ## Layouts, charts and analysis
 
