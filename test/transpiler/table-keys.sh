@@ -37,7 +37,7 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/transpiler/table-keys/Runner.
   > "$proof/compile_commands.json"
 cp "$proof/compile_commands.json" "$B/fixture-commands/table-keys.json"
 
-for control in wrong-name wrong-clustering; do
+for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
   cp -a "$proof/generated" "$proof/$control"
   source="$proof/$control/fixture/fixture/table/ImplicitRow.def.cpp"
   if [ "$control" = wrong-name ]; then
@@ -46,10 +46,27 @@ for control in wrong-name wrong-clustering; do
       { print }
       END { if (changed != 1) exit 2 }
     ' "$source" > "$proof/$control.cpp"
-  else
+  elif [ "$control" = wrong-clustering ]; then
     awk '
       /\.name = "Primary ID"/ { selected=1 }
       selected && /\.clustered = true/ { sub(/\.clustered = true/, ".clustered = false"); changed++; selected=0 }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' "$source" > "$proof/$control.cpp"
+  elif [ "$control" = wrong-owner ]; then
+    source="$proof/$control/fixture/FixtureModule.h"
+    awk '
+      /118874ab-44bc-4ccb-9daf-59763539ab16/ {
+        sub(/118874ab-44bc-4ccb-9daf-59763539ab16/, "85a884cd-20d8-4d18-91bd-e6c1baaa3a32"); changed++
+      }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' "$source" > "$proof/$control.cpp"
+  else
+    awk '
+      /\.dataClassification = "AccountData"/ {
+        sub(/AccountData/, "CustomerContent"); changed++
+      }
       { print }
       END { if (changed != 1) exit 2 }
     ' "$source" > "$proof/$control.cpp"
@@ -73,4 +90,4 @@ if [ -n "${AGIRU_KEYS_PREVIOUS:-}" ]; then
   rg -q 'extension keys never replace the implicit primary key' "$proof/previous.run.log"
   rg -q 'the primary key belongs to the base table' "$proof/previous.run.log"
 fi
-printf 'table-keys: original key identity and temporary operations pass; controls reject; %s\n' "$proof"
+printf 'table-keys: source owner/properties, original keys and temporary operations pass; controls reject; %s\n' "$proof"

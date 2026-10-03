@@ -2,6 +2,7 @@
 #include "Check.h"
 #include "Format.h"
 #include "Parser.h"
+#include "Refused.h"
 #include "TableWriter.h"
 
 #include <cstddef>
@@ -398,6 +399,70 @@ void ACollidingNameCarriesASeam() {
              generated.find("SystemId_3{};") != std::string::npos);
 }
 
+void ReflectionDeclarationsRetainSourceAuthority() {
+  const auto table = agiru::al::ParseTable(R"(namespace Microsoft.Fixture;
+table 60003 "Reflection Source"
+{
+    Caption = 'Different caption';
+    Scope = Cloud;
+    ObsoleteState = Pending;
+    ObsoleteReason = 'Use the successor table';
+    DataClassification = AccountData;
+    LinkedObject = true;
+    fields { field(1; ID; Integer) { } }
+})");
+  agiru::gen::Objects objects;
+  objects.module = "::agiru::app::Fixture::kModule";
+  objects.moduleHeader = "FixtureModule.h";
+  const std::string definitions = agiru::gen::WriteDefinitions(table, "fixture.al", objects);
+  for (const std::string_view declaration : {".module = &::agiru::app::Fixture::kModule",
+                                             ".nameSpace = \"Microsoft.Fixture\"",
+                                             ".scope = \"Cloud\"",
+                                             ".obsoleteReason = \"Use the successor table\"",
+                                             ".dataClassification = \"AccountData\"",
+                                             ".linkedObject = true",
+                                             ".caption = \"Different caption\"",
+                                             ".name = ReflectionSource_Table::kName"}) {
+    CHECK_TRUE("reflection definitions retain " + std::string(declaration),
+               definitions.contains(declaration));
+  }
+  CHECK_TRUE("the definition unit includes its source-owned module",
+             definitions.contains("#include \"FixtureModule.h\""));
+  const std::string header = agiru::gen::WriteHeader(table, "fixture.al", {}, objects).text;
+  CHECK_TRUE("table headers do not depend on the owning module header",
+             !header.contains("FixtureModule.h"));
+  const auto refusals = agiru::gen::Refused(table);
+  CHECK_TRUE("linked-object metadata does not activate unimplemented external SQL storage",
+             refusals.size() == 1 && refusals.front().property == "LinkedObject");
+
+  const auto unqualified =
+      agiru::al::ParseTable("table 60004 Bare { fields { field(1; ID; Integer) {} } }");
+  const std::string absent = agiru::gen::WriteDefinitions(unqualified, "bare.al", {});
+  for (const std::string_view property :
+       {".module =", ".nameSpace =", ".scope =", ".obsoleteReason =", ".dataClassification ="}) {
+    CHECK_TRUE("absent source authority is not invented: " + std::string(property),
+               !absent.contains(property));
+  }
+  auto changed = table;
+  for (auto &property : changed.properties) {
+    if (property.name == "LinkedObject") { property.text = "false"; }
+  }
+  const auto alternate = agiru::gen::WriteDefinitions(changed, "fixture.al", objects);
+  CHECK_TRUE("changed source properties change their metadata",
+             alternate.contains(".linkedObject = false") &&
+                 !alternate.contains(".linkedObject = true"));
+  for (auto &property : changed.properties) {
+    if (property.name == "LinkedObject") { property.text = "unverified"; }
+  }
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::WriteDefinitions(changed, "fixture.al", objects));
+  } catch (const std::invalid_argument &error) {
+    refused = std::string_view(error.what()).contains("LinkedObject");
+  }
+  CHECK_TRUE("an invalid linked-object property refuses instead of becoming false", refused);
+}
+
 } // namespace
 
 int main() {
@@ -413,5 +478,6 @@ int main() {
     ATableDeclaredTemporaryConstructsItsStore();
     AFieldWithAnOnLookupTriggerIsInTheLookupMap();
     ACollidingNameCarriesASeam();
+    ReflectionDeclarationsRetainSourceAuthority();
   });
 }

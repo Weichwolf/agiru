@@ -1,11 +1,13 @@
 #pragma once
 
+#include "meta/ModuleDef.h"
 #include "type/Guid.h"
 #include "type/List.h"
 #include "type/Text.h"
 #include "type/Version.h"
 
 #include <string>
+#include <string_view>
 
 /// \file
 /// \brief AL `ModuleInfo` and `ModuleDependencyInfo` -- what an installed app says about itself.
@@ -40,21 +42,6 @@ private:
   Guid id_;
   std::string name_;
   std::string publisher_;
-};
-
-/// \brief What an installed app says about itself, as the transpiler emits it from `app.json`:
-///        one `constexpr` per app, in `apps/<app>/<App>Module.h`.
-///
-/// \note THE CALLER IS THE OBJECT, NOT A FRAME. `NavApp.GetCurrentModuleInfo` is documented against
-///       the call stack; this runtime keeps no per-frame module, and the transpiler knows the app
-///       of every object it writes -- so a call site passes its own app's module. That is exact
-///       for `GetCurrentModuleInfo` and, for `GetCallerModuleInfo`, exact within one app and the
-///       CALLEE's app across a boundary (board:0638).
-struct ModuleDef {
-  std::string_view id;        ///< The app id, a Guid in text.
-  std::string_view name;      ///< The app name.
-  std::string_view publisher; ///< The publisher.
-  std::string_view version;   ///< The app version, `30.0.0.0`.
 };
 
 /// \brief AL `ModuleInfo` -- the app a piece of code belongs to.

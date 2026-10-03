@@ -30,6 +30,16 @@ for header in ObjectKind.h RuntimeSurface.h Names.h; do
 done
 compile_header dotnet/Regex.h "$proof/Regex.h.d"
 reject_dependency "$proof/Regex.h.d" regex
+compile_header meta/ModuleDef.h "$proof/ModuleDef.h.d"
+for forbidden in ModuleInfo.h Guid.h List.h Text.h Version.h vector; do
+  reject_dependency "$proof/ModuleDef.h.d" "$forbidden"
+done
+compile_header meta/ModuleDef.h "$proof/forced-ModuleInfo.h.d" -include type/ModuleInfo.h
+if reject_dependency "$proof/forced-ModuleInfo.h.d" ModuleInfo.h \
+  > "$proof/forced-ModuleInfo.h.log" 2>&1; then
+  printf 'header-dependencies: AL module state escaped the declaration control\n' >&2
+  exit 1
+fi
 compile_header runtime/ReportRegistry.h "$proof/ReportRegistry.h.d"
 for forbidden in Report.h Page.h RecordRef.h Variant.h vector; do
   reject_dependency "$proof/ReportRegistry.h.d" "$forbidden"
@@ -50,4 +60,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: five standalone headers; filesystem/regex/report controls refused\n'
+printf 'header-dependencies: six standalone headers; filesystem/regex/report/module controls refused\n'

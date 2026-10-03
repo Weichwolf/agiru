@@ -15,6 +15,8 @@
 
 namespace agiru {
 
+struct ModuleDef;
+
 /// \brief An AL field's data type, as far as the generator can emit it.
 ///
 /// This list grows as the generator learns types. A type it cannot emit is a translation error
@@ -460,6 +462,26 @@ struct TableDef {
   /// Temporary record-variable storage remains independent. Never provision an empty SQL
   /// replacement for a declaration whose runtime projection is not implemented.
   std::string_view providerRefusal{};
+
+  /// \brief Original declaring application, or nullptr when source ownership is unavailable.
+  /// Extensions do not replace the base table owner. The immutable definition is shared per app.
+  const ModuleDef *module{};
+
+  /// \brief Original AL namespace, without conversion into a C++ namespace.
+  std::string_view nameSpace{};
+
+  /// \brief Source Scope property; empty means absent, not an inferred deployment target.
+  std::string_view scope{};
+
+  /// \brief Original table-level ObsoleteReason property, independent of field obsoletion.
+  std::string_view obsoleteReason{};
+
+  /// \brief Original table-level DataClassification property; empty means absent in source.
+  std::string_view dataClassification{};
+
+  /// \brief Source LinkedObject property; its documented default is false.
+  /// Carrying this declaration does not implement external SQL object access.
+  bool linkedObject = false;
 };
 
 /// \brief Finds a field by its AL number.

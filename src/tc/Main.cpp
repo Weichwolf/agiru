@@ -627,6 +627,15 @@ constexpr std::string_view kLayoutObsoletionStatus =
     "pending (board:0063,0033)";
 
 constexpr std::array kPartlyTranslatedProperties{
+    std::pair{std::string_view{"table.scope"},
+              std::string_view{"source scope retained; availability enforcement and live table "
+                               "metadata pending (board:0034,0044)"}},
+    std::pair{std::string_view{"table.dataclassification"},
+              std::string_view{"source table classification retained; live metadata projection "
+                               "pending (board:0044)"}},
+    std::pair{std::string_view{"table.obsoletereason"},
+              std::string_view{"source reason retained; obsoletion diagnostics and live metadata "
+                               "pending (board:0033,0044)"}},
     std::pair{std::string_view{"enum.defaultimplementation"},
               std::string_view{"source mapping retained; native interface/implementor activation "
                                "pending (board:0034)"}},
@@ -2074,7 +2083,7 @@ void EmitModule(Run &run,
   };
   std::string header;
   header += "// Generated from " + std::string(source) + ". Do not edit.\n\n#pragma once\n\n";
-  header += "#include \"type/ModuleInfo.h\"\n\nnamespace agiru::app::" + identifier + " {\n\n";
+  header += "#include \"meta/ModuleDef.h\"\n\nnamespace agiru::app::" + identifier + " {\n\n";
   header += "inline constexpr ::agiru::ModuleDef kModule{\n";
   header += "    .id = " + literal(identity.id) + ",\n";
   header += "    .name = " + literal(identity.name) + ",\n";

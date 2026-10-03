@@ -1201,18 +1201,12 @@ std::string TableStorageAssertions(const al::TableObject &table,
 
 }
 
-std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
-  const std::string space = NamespaceOf(declared.nameSpace);
-  const EnumIndex &enums = objects.enums;
-  const al::TableObject table = WithSystemFields(declared);
-  const std::string tableIdentifier = Identifier(table.name);
-  const std::vector<OptionField> options = OptionFields(table);
-  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
-  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
-  const std::string qualified = space + "::" + tableClass;
-  std::string out = "namespace " + space + " {\n\n";
-  out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
+namespace {
 
+std::string TableKeyDeclarations(const al::TableObject &table,
+                                 const std::string &tableIdentifier,
+                                 const std::string &tableClass) {
+  std::string out;
   const auto flags = KeyFlagsOf(table);
   out += "constexpr std::array<KeyDef, " + std::to_string(table.keys.size()) + "> k" +
          tableIdentifier + "Keys{{\n";
@@ -1238,6 +1232,47 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
     out += "},\n";
   }
   out += "}};\n\n";
+  return out;
+}
+
+std::string TableReflectionProperties(const al::TableObject &table, const Objects &objects) {
+  std::string out;
+  if (!objects.module.empty()) { out += "    .module = &" + objects.module + ",\n"; }
+  if (!table.nameSpace.empty()) { out += "    .nameSpace = " + Literal(table.nameSpace) + ",\n"; }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"Scope", "scope"},
+        std::pair<std::string_view, std::string_view>{"ObsoleteReason", "obsoleteReason"},
+        std::pair<std::string_view, std::string_view>{"DataClassification",
+                                                      "dataClassification"}}) {
+    if (const auto *found = Find(table.properties, name); found != nullptr) {
+      out += "    ." + std::string(member) + " = " + Literal(found->text) + ",\n";
+    }
+  }
+  if (const auto *found = Find(table.properties, "LinkedObject"); found != nullptr) {
+    const std::string value = LowerKey(found->text);
+    if (value != "true" && value != "false") {
+      throw std::invalid_argument("LinkedObject must be true or false: " + found->text);
+    }
+    out += "    .linkedObject = " + value + ",\n";
+  }
+  return out;
+}
+
+}
+
+std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
+  const std::string space = NamespaceOf(declared.nameSpace);
+  const EnumIndex &enums = objects.enums;
+  const al::TableObject table = WithSystemFields(declared);
+  const std::string tableIdentifier = Identifier(table.name);
+  const std::vector<OptionField> options = OptionFields(table);
+  const std::vector<const al::FieldDecl *> sorted = ByNumber(table);
+  const std::string tableClass = ClassName(tableIdentifier, ObjectKind::Table);
+  const std::string qualified = space + "::" + tableClass;
+  std::string out = "namespace " + space + " {\n\n";
+  out += FieldTable(table, sorted, tableIdentifier, options, enums, objects.pages);
+
+  out += TableKeyDeclarations(table, tableIdentifier, tableClass);
 
   out += "constexpr TableDef k" + tableIdentifier + "Table{\n";
   out += "    .id = " + tableClass + "::kId,\n";
@@ -1309,6 +1344,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   }
   const std::string obsolete = property("ObsoleteState");
   if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
+  out += TableReflectionProperties(table, objects);
   out += "};\n\n";
 
   out += TableStorageAssertions(

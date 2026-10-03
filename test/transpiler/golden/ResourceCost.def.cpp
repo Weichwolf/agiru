@@ -66,6 +66,8 @@ constexpr TableDef kResourceCostTable{
     .caption = "Resource Cost",
     .fields = kResourceCostFields,
     .keys = kResourceCostKeys,
+    .nameSpace = "Microsoft.Projects.Resources.Pricing",
+    .dataClassification = "CustomerContent",
 };
 
 static_assert(FieldsAreSorted(kResourceCostTable),

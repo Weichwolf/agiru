@@ -1,4 +1,5 @@
 #include "meta/Ids.h"
+#include "meta/ModuleDef.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Table.h"
@@ -54,8 +55,35 @@ void CheckKeys() {
              row.PrimaryID == 3);
 }
 
+void CheckSourceIdentity() {
+  const auto &table = agiru::TableTraits<Row>::kTable;
+  CHECK_TRUE("table metadata retains the original app identity", table.module != nullptr);
+  if (table.module == nullptr) { return; }
+  CHECK_TEXT("table owner comes from the source manifest",
+             table.module->id,
+             "118874ab-44bc-4ccb-9daf-59763539ab16");
+  CHECK_TEXT("the original app name is not the configured output name",
+             table.module->name,
+             "Table Declaration Fixture");
+  CHECK_TEXT("the original app publisher is retained", table.module->publisher, "agiru tests");
+  CHECK_TEXT("the original app version is retained", table.module->version, "1.0.0.0");
+  CHECK_TEXT(
+      "table namespace is AL spelling, not C++ spelling", table.nameSpace, "Microsoft.Fixture");
+  CHECK_TEXT("table name is independent of the caption", table.name, "Implicit Row");
+  CHECK_TEXT("table caption is retained separately", table.caption, "Different table caption");
+  CHECK_TEXT("table scope is retained from source", table.scope, "Cloud");
+  CHECK_TEXT(
+      "table obsolete reason is retained", table.obsoleteReason, "Source-owned reflection fixture");
+  CHECK_TEXT("table classification is retained", table.dataClassification, "AccountData");
+  CHECK_TRUE("an absent linked-object declaration keeps the documented default",
+             !table.linkedObject);
+}
+
 }
 
 int main() {
-  return gate::Run("GeneratedTableKeys", CheckKeys);
+  return gate::Run("GeneratedTableKeys", [] {
+    CheckKeys();
+    CheckSourceIdentity();
+  });
 }
