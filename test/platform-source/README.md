@@ -1,9 +1,14 @@
 # System declaration regression inputs
 
-Thirteen original System.app 28.0.53152.0 / runtime 17.0 declarations, with LF line
+Fourteen original System.app 28.0.53152.0 / runtime 17.0 declarations, with LF line
 endings and a final newline.
 Package SHA256: `5b72ba127cb2221722f02544bfb3f3bd5a50402bf92bfab6d7e584e049b9681d`.
 Original Microsoft notices and MIT permission text are retained in `License.txt`.
+
+Page Table Field supplies the production native-source compiler tests, including
+original bare/numeric page bindings, arbitrary filenames, refused source/identity
+controls and native-extension ABI checks. It is separate from the thirteen-family
+PlatformSourceGate population below.
 
 `make gate GATE=PlatformSourceGate JOBS=2` compares every declared field, option
 position, key and represented property with the handwritten/runtime declarations

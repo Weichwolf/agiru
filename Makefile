@@ -121,7 +121,7 @@ tc: db             ## just the transpiler
 	@cmake --build $(B) -j $(JOBS) --target agirutc
 
 transpile: tc      ## every app in apps.json through the transpiler into apps/
-	@$(B)/agirutc $${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} $(SELF)/apps.json $(SELF)/apps
+	@B="$(B)" bash "$(SELF)/scripts/transpile.sh" "$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src}" "$(SELF)/apps.json" "$(SELF)/apps"
 
 gap: db            ## a ranked header gap (SOURCE=1: bodies; SWEEP=1: complete header sweep)
 	@if [ -z "$(SOURCE)" ] && [ "$(SWEEP)" != 1 ] && [ ! -s $(B)/tree-syntax/roots ]; then \

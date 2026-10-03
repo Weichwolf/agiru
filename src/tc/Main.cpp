@@ -4,6 +4,7 @@
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Names.h"
+#include "NativeSource.h"
 #include "PageWriter.h"
 #include "Parser.h"
 #include "QueryWriter.h"
@@ -235,6 +236,7 @@ struct Job {
   std::filesystem::path source;
   std::filesystem::path output;
   std::filesystem::path apps;
+  std::filesystem::path systemSymbols;
 };
 
 void Keep(Run &run, const Output &where, const std::string &text) {
@@ -1335,6 +1337,44 @@ std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
 
 using TableByName = std::map<std::string, const agiru::al::TableObject *>;
 
+void AddNativeSourceTables(const agiru::gen::NativeTableSources &sources,
+                           const agiru::gen::TableIndex &bindings,
+                           TableByName &tables) {
+  for (const auto &table : sources.tables) {
+    const auto name = agiru::gen::LowerKey(table.name);
+    if (!bindings.contains(name)) { continue; }
+    tables.emplace(name, &table);
+    tables.emplace(std::to_string(table.id), &table);
+    if (!table.nameSpace.empty()) {
+      tables.emplace(agiru::gen::LowerKey(table.nameSpace + "." + table.name), &table);
+    }
+  }
+}
+
+std::size_t ReportNativeSources(const agiru::gen::NativeTableSources &sources,
+                                const agiru::gen::TableIndex &bindings) {
+  std::size_t unbound = 0;
+  for (std::size_t at = 0; at < sources.tables.size(); ++at) {
+    if (bindings.contains(std::to_string(sources.tables[at].id))) { continue; }
+    ++unbound;
+    std::println("native-unbound {} {}: {}",
+                 sources.tables[at].id,
+                 sources.tables[at].name,
+                 sources.paths[at]);
+  }
+  for (const auto &issue : sources.issues) {
+    std::println("native-refused {}: {}", issue.source, issue.reason);
+  }
+  std::println("native {} table sources parsed, {} bound, {} unbound, {} source refusals; "
+               "{} other AL sources not activated; no provider or business execution proof",
+               sources.tables.size(),
+               sources.tables.size() - unbound,
+               unbound,
+               sources.issues.size(),
+               sources.otherSources.size());
+  return unbound + sources.issues.size() + sources.otherSources.size();
+}
+
 const agiru::al::TableObject *SourceOf(const agiru::al::PageObject &page,
                                        const TableByName &tables) {
   const agiru::al::Property *source = agiru::al::Find(page.properties, "SourceTable");
@@ -1562,6 +1602,18 @@ struct Tables {
   std::vector<std::string> paths;
 };
 
+void CheckNativeTableIdentities(const Tables &tables,
+                                const agiru::gen::NativeTableSources &sources) {
+  std::set<int> nativeIds;
+  for (const auto &table : sources.tables) { nativeIds.insert(table.id); }
+  for (const auto &table : tables.objects) {
+    if (nativeIds.contains(table.id)) {
+      throw std::runtime_error("AL table duplicates declared System table ID " +
+                               std::to_string(table.id) + ": " + table.name);
+    }
+  }
+}
+
 void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
   for (const agiru::al::TableObject &table : tables.objects) {
     const agiru::gen::TableRef ref =
@@ -1679,6 +1731,26 @@ std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
     }
   }
   return merged;
+}
+
+std::size_t BindNativeSources(const std::filesystem::path &package,
+                              agiru::gen::NativeTableSources &sources,
+                              const Extensions &store,
+                              agiru::gen::Objects &objects,
+                              TableByName &tables,
+                              Counts &extensions) {
+  if (package.empty()) {
+    objects.tables = agiru::gen::PlatformTables();
+    objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+    return 0;
+  }
+  Tables nativeTables{.objects = std::move(sources.tables), .paths = sources.paths};
+  extensions.emitted += MergeExtensions(store, nativeTables);
+  sources.tables = std::move(nativeTables.objects);
+  objects.tables = agiru::gen::PlatformTables(sources.tables);
+  objects.fieldEnums = agiru::gen::PlatformFieldEnums(sources.tables, objects.tables);
+  AddNativeSourceTables(sources, objects.tables, tables);
+  return ReportNativeSources(sources, objects.tables);
 }
 
 void WriteTables(Run &run,
@@ -2617,6 +2689,9 @@ int Scan(const Job &job) {
   const agiru::gen::TranspileScope scope =
       agiru::gen::ReadScope(job.apps.parent_path() / "scope.json");
   NoteProductExclusions(job, scope);
+  agiru::gen::NativeTableSources nativeSources =
+      job.systemSymbols.empty() ? agiru::gen::NativeTableSources{}
+                                : agiru::gen::ReadNativeTables(job.systemSymbols);
   ClaimOutput(job.output);
 
   Counts allExtensionsRead;
@@ -2661,8 +2736,8 @@ int Scan(const Job &job) {
   std::size_t column = 0;
   for (const agiru::gen::App &app : apps) { column = std::max(column, app.name.size() + 1); }
 
-  objects.tables = agiru::gen::PlatformTables();
-  objects.fieldEnums = agiru::gen::PlatformFieldEnums();
+  const std::size_t nativeGaps = BindNativeSources(
+      job.systemSymbols, nativeSources, store, objects, everyTable, allExtensions);
 
   std::map<std::string, std::string> symbols;
   std::vector<std::string> collisions;
@@ -2710,6 +2785,7 @@ int Scan(const Job &job) {
     ScanEnums(run, enums, store, index, heldEnums);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
+    CheckNativeTableIdentities(parsedTables, nativeSources);
     extensions.emitted += MergeExtensions(store, parsedTables);
     RefreshTableIndex(parsedTables, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
@@ -2974,7 +3050,7 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return failures.empty() && refusals.empty() ? 0 : 1;
+  return failures.empty() && refusals.empty() && nativeGaps == 0 ? 0 : 1;
 }
 
 }
@@ -2982,14 +3058,25 @@ int Scan(const Job &job) {
 int main(int argc, char **argv) {
   const std::span<char *> arguments(argv, static_cast<std::size_t>(argc));
   if (arguments.size() < 3) {
-    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>]\n", stderr);
+    std::fputs("agirutc <bcapps-src-root> <apps.json> [<output-root>] "
+               "[--system-symbols <package-root>]\n",
+               stderr);
     return 2;
   }
   try {
-    return Scan(Job{.source = std::filesystem::path(arguments[1]),
-                    .output = arguments.size() > 3 ? std::filesystem::path(arguments[3])
-                                                   : std::filesystem::path{},
-                    .apps = std::filesystem::path(arguments[2])});
+    Job job{.source = arguments[1], .output = {}, .apps = arguments[2], .systemSymbols = {}};
+    std::size_t at = 3;
+    if (at < arguments.size() && !std::string_view(arguments[at]).starts_with("--")) {
+      job.output = arguments[at++];
+    }
+    if (at < arguments.size()) {
+      if (std::string_view(arguments[at]) != "--system-symbols" || at + 2 != arguments.size()) {
+        throw std::runtime_error("expected --system-symbols <package-root>");
+      }
+      job.systemSymbols = arguments[at + 1];
+      if (job.systemSymbols.empty()) { throw std::runtime_error("System package path is empty"); }
+    }
+    return Scan(job);
   } catch (const std::exception &e) {
     std::fputs("agirutc: ", stderr);
     std::fputs(e.what(), stderr);

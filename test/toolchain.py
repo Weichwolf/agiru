@@ -52,7 +52,207 @@ scope_inventory = importlib.util.module_from_spec(inventory_spec)
 inventory_spec.loader.exec_module(scope_inventory)
 
 
+class NativeSourceCompilerGate(unittest.TestCase):
+    def setUp(self):
+        self.repository = Path(__file__).resolve().parents[1]
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.source = self.root / 'source'
+        self.source.mkdir()
+        self.package = self.root / 'native'
+        (self.package / 'src').mkdir(parents=True)
+        self.native = self.package / 'src/unusual-name.aL'
+        shutil.copyfile(self.repository / 'test/platform-source/PageTableField.Table.al', self.native)
+        self.apps = self.root / 'apps.json'
+        self.apps.write_text(json.dumps({'apps': [{'name': 'fixture', 'source': 'source'}]}))
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['System', 'Microsoft'], 'exclude': []}))
+        original = Path(os.environ.get('AGIRU_BC_SOURCE', str(Path.home() / 'Git/BCApps/src'))) / \
+            'Layers/W1/BaseApp/Modules/System/PageDesigner/PageFieldsSelectionList.Page.al'
+        shutil.copyfile(original, self.source / 'Original.Page.al')
+        (self.source / 'Numeric.Page.al').write_text('namespace System.Tooling;\n'
+            'page 50171 "Numeric Source" { SourceTable = 2000000171; '
+            'layout { area(Content) { field(Caption; Caption) {} } } }')
+        (self.source / 'Population.Codeunit.al').write_text('namespace Microsoft.Fixture;\n'
+            'codeunit 50172 "Native Source UT"\n{ Subtype = Test; [Test] procedure Kept() begin end; }')
+        self.transpiler = (self.repository / os.environ.get('B', 'build') / 'agirutc').resolve()
+        self.generated = self.root / 'generated'
+
+    def run_compiler(self, extra=None):
+        arguments = [str(self.transpiler), str(self.root), str(self.apps), str(self.generated)]
+        arguments += ['--system-symbols', str(self.package)] if extra is None else extra
+        return subprocess.run(arguments, text=True, capture_output=True, timeout=30)
+
+    def page_body(self):
+        return self.generated / 'fixture/system/tooling/page/PageFieldsSelectionList.cpp'
+
+    def compile_page(self):
+        arguments = [os.environ.get('CXX', 'clang++-19'), '-std=c++23', '-stdlib=libc++',
+            '-Wall', '-Wextra', '-Wpedantic', '-Werror', '-fsyntax-only',
+            f'-I{self.repository / "include"}']
+        arguments += [f'-I{self.generated / name}' for name in ('fixture', 'shared', 'absent')]
+        arguments += [str(self.page_body()), str(self.page_body().with_suffix('.def.cpp'))]
+        return subprocess.run(arguments, text=True, capture_output=True, timeout=60)
+
+    def run_original_primitive(self):
+        build = (self.repository / os.environ.get('B', 'build')).resolve()
+        executable = self.root / 'reader'
+        arguments = [os.environ.get('CXX', 'clang++-19'), '-std=c++23', '-stdlib=libc++',
+            '--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19',
+            '-Wall', '-Wextra', '-Wpedantic', '-Werror', f'-I{self.repository / "include"}',
+            f'-I{self.repository / "test/gate"}']
+        arguments += [f'-I{self.generated / name}' for name in ('fixture', 'shared', 'absent')]
+        arguments += [str(self.repository / 'test/native-binding/PageRunner.cpp'),
+            str(self.page_body()), str(self.page_body().with_suffix('.def.cpp')),
+            f'-L{build}', f'-Wl,-rpath,{build}', '-lagiru_rt', '-lagiru_net', '-lagiru_db',
+            '-o', str(executable)]
+        compiled = subprocess.run(arguments, text=True, capture_output=True, timeout=60)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        return subprocess.run([str(executable)], text=True, capture_output=True, timeout=30)
+
+    def test_original_bare_and_numeric_fields_use_the_source_ast(self):
+        before = self.run_compiler([])
+        self.assertEqual(before.returncode, 0, before.stdout + before.stderr)
+        self.assertIn('Format(Caption)', self.page_body().read_text())
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('1 table sources parsed, 1 bound, 0 unbound', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+        self.assertNotIn('Format(Caption)', self.page_body().read_text())
+        definitions = self.page_body().with_suffix('.def.cpp').read_text()
+        self.assertIn('native field declaration mismatch: Page Table Field.Caption', definitions)
+        self.assertIn('::agiru::FieldNo{5}', definitions)
+        numeric = self.generated / 'fixture/system/tooling/page/NumericSource.def.cpp'
+        self.assertIn('::agiru::FieldNo{5}', numeric.read_text())
+        compiled = self.compile_page()
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        executed = self.run_original_primitive()
+        self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
+        self.assertIn('6 check(s), 0 red', executed.stdout)
+
+    def test_original_source_expression_mutant_fails_the_production_primitive(self):
+        page = self.source / 'Original.Page.al'
+        original = page.read_text()
+        self.assertEqual(original.count('field(Caption; Caption)'), 1)
+        page.write_text(original.replace('field(Caption; Caption)', 'field(Caption; Name)'))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        executed = self.run_original_primitive()
+        self.assertNotEqual(executed.returncode, 0)
+        self.assertIn('6 check(s), 4 red', executed.stdout)
+
+    def test_original_native_field_number_mutant_refuses_at_compilation(self):
+        original = self.native.read_text()
+        self.assertEqual(original.count('field(5; Caption;'), 1)
+        self.native.write_text(original.replace('field(5; Caption;', 'field(99999; Caption;'))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        compiled = self.compile_page()
+        self.assertNotEqual(compiled.returncode, 0)
+        self.assertIn('native field declaration mismatch: Page Table Field.Caption', compiled.stderr)
+
+    def test_unbound_and_non_table_sources_remain_red_and_counted(self):
+        (self.package / 'src/Unknown.al').write_text('table 50199 Unknown { fields { field(1; ID; Integer) {} } }')
+        (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated { }')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('native-unbound 50199 Unknown', result.stdout)
+        self.assertIn('2 table sources parsed, 1 bound, 1 unbound', result.stdout)
+        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+
+    def test_comments_cannot_manufacture_a_native_declaration(self):
+        self.native.write_text('// table 2000000171 "Page Table Field" { fields {} }\n')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('0 table sources parsed, 0 bound, 0 unbound', result.stdout)
+        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertNotIn('Format(Rec.Caption)', self.page_body().read_text())
+
+    def test_broken_source_refuses_without_losing_the_ut_population(self):
+        self.native.write_text('table 2000000171 "Page Table Field" { fields {')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('native-refused src/unusual-name.aL', result.stdout)
+        self.assertIn('1 source refusals', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+
+    def test_duplicate_source_identity_refuses(self):
+        shutil.copyfile(self.native, self.package / 'src/Duplicate.al')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('duplicate System table declaration', result.stderr)
+        self.assertFalse(self.page_body().exists())
+
+    def test_an_app_cannot_replace_a_declared_native_table_id(self):
+        (self.source / 'Conflict.Table.al').write_text('namespace Microsoft.Fixture;\n'
+            'table 2000000171 Conflict { fields { field(1; ID; Integer) {} } }')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('duplicates declared System table ID 2000000171', result.stderr)
+        self.assertFalse(self.page_body().exists())
+
+    def test_source_symlinks_and_missing_roots_refuse_before_output(self):
+        (self.package / 'src/Symlink.al').symlink_to(self.native)
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('symlink', result.stderr)
+        self.assertFalse(self.generated.exists())
+        result = self.run_compiler(['--system-symbols', str(self.root / 'missing')])
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('source directory is missing', result.stderr)
+        self.assertFalse(self.generated.exists())
+
+    def test_empty_duplicate_and_unknown_options_are_not_silently_ignored(self):
+        for extra in (['--system-symbols', ''], ['--system-symbols'],
+                      ['--unknown'], ['--system-symbols', str(self.package), '--extra']):
+            with self.subTest(extra=extra):
+                result = self.run_compiler(extra)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(self.generated.exists())
+
+    def test_native_extension_keeps_the_source_contract_and_cannot_pass_the_old_abi(self):
+        (self.source / 'Extension.TableExt.al').write_text('namespace Microsoft.Fixture;\n'
+            'tableextension 50173 Added extends "Page Table Field" { fields { '
+            'field(60000; Extra; Integer) {} } }')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        definitions = self.page_body().with_suffix('.def.cpp').read_text()
+        self.assertIn('native field declaration mismatch: Page Table Field.Extra', definitions)
+        self.assertIn('return declared == 16;', definitions)
+        compiled = self.compile_page()
+        self.assertNotEqual(compiled.returncode, 0)
+        self.assertIn('native field count mismatch: Page Table Field', compiled.stderr)
+
+
 class SymbolsPackageGate(unittest.TestCase):
+    def test_transpile_wrapper_verifies_before_compiling_and_preserves_the_exit_status(self):
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as folder:
+            work = Path(folder)
+            package = symbols.publish(self.package(), '28.4.1.0', 'url', 'System.app', work)
+            build = work / 'build'
+            build.mkdir()
+            compiler = build / 'agirutc'
+            compiler.write_text('#!/bin/sh\nprintf "compiler-started\\n"\nexit 7\n')
+            compiler.chmod(0o755)
+            apps = work / 'apps.json'
+            apps.write_text('{"apps":[]}')
+            (work / 'scope.json').write_text('{"include":["System"],"exclude":[]}')
+            environment = dict(os.environ, B=str(build), AGIRU_SYSTEM_SYMBOLS=str(package))
+            command = ['bash', 'scripts/transpile.sh', str(work), str(apps), str(work / 'generated')]
+            result = subprocess.run(command, cwd=root, env=environment, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+            receipt = Path((build / 'transpile.latest').read_text().strip())
+            self.assertEqual((receipt / 'status').read_text().strip(), '7')
+            invocation = json.loads((receipt / 'command.json').read_text())
+            self.assertEqual(invocation[-2:], ['--system-symbols', str(package)])
+            self.assertEqual(json.loads((receipt / 'native-inventory.json').read_text())['summary']['objects'], 1)
+            (package / 'src/Virtual Tables/Fixture.Table.al').write_text('changed')
+            result = subprocess.run(command, cwd=root, env=environment, text=True, capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn('compiler-started', result.stdout)
+
     def test_native_consumers_build_the_compiler_before_qualification(self):
         root = Path(__file__).resolve().parents[1]
         environment = os.environ.copy()

@@ -74,6 +74,9 @@ jq -e '.summary.unmeasured_files == 0' "$proof/scope-inventory.json" > /dev/null
 translation=0
 "$B/agirutc" "$proof/bc_source" "$proof/apps.json" "$proof/generated" \
   > "$proof/translation.log" 2>&1 || translation=$?
+native_translation=0
+"$B/agirutc" "$proof/bc_source" "$proof/apps.json" "$proof/native-generated" \
+  --system-symbols "$package" > "$proof/native-translation.log" 2>&1 || native_translation=$?
 jq '.[1:]' "$manifest" > "$proof/missing-consumer.json"
 jq '. + [.[0]]' "$manifest" > "$proof/duplicate-consumer.json"
 if validate_manifest "$proof/missing-consumer.json" || validate_manifest "$proof/duplicate-consumer.json"; then
@@ -92,10 +95,6 @@ jq -c '.[]' "$manifest" | while IFS= read -r page; do
     printf 'native-consumers: original page identity differs: %s\n' "$original" >&2
     exit 2
   fi
-  includes=("-I$proof/generated/shared" "-I$proof/generated/absent" "-I$proof/generated/$app")
-  while IFS= read -r dependency; do
-    includes+=("-I$proof/generated/$dependency")
-  done < <(jq -r --arg app "$app" '.apps[] | select(.name == $app) | .depends[]' "$proof/apps.json")
   contract="$proof/$id-contract.h"
   : > "$contract"
   while IFS= read -r table; do
@@ -104,11 +103,17 @@ jq -c '.[]' "$manifest" | while IFS= read -r page; do
   done < <(jq -r '.tables[]' <<< "$page")
   sha256sum "$contract" >> "$proof/inputs.sha256"
   for suffix in cpp def.cpp; do
-    generated="$proof/generated/$app/$unit.$suffix"
-    for variant in production native-contract; do
+    for variant in production native-contract source-bound; do
+      root="$proof/generated"
+      if [ "$variant" = source-bound ]; then root="$proof/native-generated"; fi
+      generated="$root/$app/$unit.$suffix"
+      includes=("-I$root/shared" "-I$root/absent" "-I$root/$app")
+      while IFS= read -r dependency; do
+        includes+=("-I$root/$dependency")
+      done < <(jq -r --arg app "$app" '.apps[] | select(.name == $app) | .depends[]' "$proof/apps.json")
       status=0
       extra=()
-      if [ "$variant" = native-contract ]; then extra=(-include "$contract"); fi
+      if [ "$variant" != production ]; then extra=(-include "$contract"); fi
       log="$proof/$id.$suffix.$variant.log"
       jq -n --args '$ARGS.positional' -- "$CXX" "${flags[@]}" "${includes[@]}" "${extra[@]}" "$generated" \
         > "$proof/$id.$suffix.$variant.command.json"
@@ -141,9 +146,10 @@ if "$CXX" "${flags[@]}" "-I$proof/generated/base" "-I$proof/generated/system" \
 fi
 rg -q 'native field declaration mismatch' "$proof/wrong-field.log"
 jq -s '.' "$proof/results.jsonl" > "$proof/results.json"
-jq -e 'length == 16 and ([.[] | select(.variant == "production")] | length) == 8
+jq -e 'length == 24 and ([.[] | select(.variant == "production")] | length) == 8
   and ([.[] | select(.variant == "native-contract")] | length) == 8
-  and (map([.unit,.variant]) | unique | length) == 16' "$proof/results.json" > /dev/null
+  and ([.[] | select(.variant == "source-bound")] | length) == 8
+  and (map([.unit,.variant]) | unique | length) == 24' "$proof/results.json" > /dev/null
 sha256sum --check --status "$proof/inputs.sha256"
 sha256sum --check --status "$proof/generated-consumers.sha256"
 sha256sum --check --status "$audit/source-inputs.sha256"
@@ -151,15 +157,18 @@ sha256sum --check --status "$audit/libraries.sha256"
 sha256sum --check --status "$audit/originals.sha256"
 source_hashes "$proof/bc_source" > "$proof/bc-frozen-after.sha256"
 cmp "$proof/bc-source.sha256" "$proof/bc-frozen-after.sha256"
-jq -n --argjson translation "$translation" --argjson census "$census" \
+jq -n --argjson translation "$translation" --argjson native_translation "$native_translation" \
+  --argjson census "$census" \
   --slurpfile inventory "$proof/scope-inventory.json" --slurpfile results "$proof/results.json" \
   --slurpfile raw "$proof/native-audit.json" --slurpfile ut "$proof/ut-manifest.json" \
-  '{translation_exit:$translation,census_exit:$census,raw_al_inventory:$inventory[0].summary,
+  '{translation_exit:$translation,native_translation_exit:$native_translation,
+    census_exit:$census,raw_al_inventory:$inventory[0].summary,
     census_errors:$inventory[0].errors,results:$results[0],raw_native_audit:$raw[0],ut_manifest:$ut[0],
-    denominator:8,variants:2,negative_controls:{missing_consumer:"rejected",duplicate_consumer:"rejected",wrong_field_number:"rejected"},
-    native_contracts_are_additional_compile_assertions:true,source_ast_loader_activated:false,
+    denominator:8,variants:3,negative_controls:{missing_consumer:"rejected",duplicate_consumer:"rejected",wrong_field_number:"rejected"},
+    native_contracts_are_additional_compile_assertions:true,source_ast_table_binding_activated:true,
+    complete_native_loader_activated:false,
     business_execution_proved:false,complete_app_proved:false,g1_proved:false}' > "$proof/result.json"
-jq '{translation_exit,denominator,statuses:(.results | group_by([.variant,.status]) |
+jq '{translation_exit,native_translation_exit,denominator,statuses:(.results | group_by([.variant,.status]) |
   map({variant:.[0].variant,status:.[0].status,count:length})),negative_controls}' "$proof/result.json"
-printf 'native-consumers: %s; no loader, provider, business execution or G1 proof\n' "$proof"
+printf 'native-consumers: %s; no complete loader, provider, business execution or G1 proof\n' "$proof"
 jq -e '.translation_exit == 0 and all(.results[]; .status == "compile-pass")' "$proof/result.json" > /dev/null
