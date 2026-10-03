@@ -102,10 +102,7 @@ BEGIN
         'MINVALUE -9223372036854775808 MAXVALUE 9223372036854775807 CACHE 1 NO CYCLE',
         physical_name, step, seed);
       present := true;
-    ELSIF operation <> 'exists' THEN
-      IF NOT present THEN
-        RAISE EXCEPTION 'the number sequence % does not exist', sequence_name;
-      END IF;
+    ELSIF operation <> 'exists' AND present THEN
       physical_name := 'sequence_' || entry_id;
       sequence_oid := pg_catalog.to_regclass(pg_catalog.format('agiru_platform.%I', physical_name));
       IF sequence_oid IS NULL THEN
@@ -136,6 +133,7 @@ BEGIN
       RAISE;
   END;
   IF allocation THEN PERFORM pg_catalog.pg_advisory_unlock(identity_key | 1); END IF;
+  IF entry_id IS NULL AND operation <> 'exists' THEN RETURN; END IF;
   RETURN NEXT;
 END
 $function$

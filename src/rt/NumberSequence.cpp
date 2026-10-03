@@ -41,10 +41,14 @@ Result Operate(const Request &request) {
       std::to_string(request.seed),
       std::to_string(request.increment),
       std::to_string(request.count)};
-  return session.Database().Execute(
+  Result result = session.Database().Execute(
       "SELECT value, increment, present FROM agiru_platform.number_sequence_v1("
       "$1::text, $2::text, $3::boolean, $4::text, $5::bigint, $6::bigint, $7::integer)",
       parameters);
+  if (result.Rows() == 0) {
+    throw Error("the number sequence " + std::string(request.name) + " does not exist");
+  }
+  return result;
 }
 
 BigInteger RequiredValue(const Result &row, std::size_t column) {

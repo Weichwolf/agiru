@@ -1,4 +1,5 @@
 #include "runtime/Database.h"
+#include "runtime/Error.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/NumberSequenceStorage.h"
 #include "runtime/Session.h"
@@ -223,6 +224,41 @@ void ExistsDoesNotLockOutCreation() {
   NumberSequence::Delete(name);
 }
 
+void MissingIdentityKeepsTransactionUsable() {
+  constexpr std::string_view name = "number-sequence-gate-missing-transaction";
+  if (NumberSequence::Exists(name)) { NumberSequence::Delete(name); }
+  const auto &database = Session::Current().Database();
+  database.Run("BEGIN");
+  database.Run("CREATE TEMP TABLE sequence_gate_prior_write (value integer)");
+  database.Run("INSERT INTO sequence_gate_prior_write VALUES (1)");
+  for (const auto operation : {"current", "next", "delete", "restart"}) {
+    const bool success = agiru::Tried([&] {
+      if (operation == std::string_view{"current"}) { NumberSequence::Current(name); }
+      if (operation == std::string_view{"next"}) { NumberSequence::Next(name); }
+      if (operation == std::string_view{"delete"}) { NumberSequence::Delete(name); }
+      if (operation == std::string_view{"restart"}) { NumberSequence::Restart(name); }
+    });
+    CHECK_TRUE("missing sequence remains an AL error", !success);
+    CHECK_TRUE("caught missing sequence leaves PostgreSQL usable", !database.InFailedTransaction());
+    CHECK_TRUE("missing sequence releases its session allocation lock",
+               database.Execute("SELECT count(*) FROM pg_catalog.pg_locks "
+                                "WHERE locktype = 'advisory' AND pid = pg_catalog.pg_backend_pid() "
+                                "AND (objid::bigint & 1) = 1")
+                       .Value(0, 0) == "0");
+    CHECK_TRUE("the original missing identity remains in GetLastErrorText",
+               agiru::GetLastErrorText() ==
+                   "the number sequence " + std::string(name) + " does not exist");
+  }
+  CHECK_TRUE("TryFunction preserves writes made before the missing-sequence error",
+             database.Execute("SELECT value FROM sequence_gate_prior_write").Value(0, 0) == "1");
+  CHECK_TRUE("Exists remains callable after a caught Current error", !NumberSequence::Exists(name));
+  NumberSequence::Insert(name, 10);
+  CHECK_TRUE("original AL recovery can create and consume its missing sequence",
+             NumberSequence::Next(name) == 10);
+  database.Run("ROLLBACK");
+  CHECK_TRUE("recovery does not commit the caller's writes", !NumberSequence::Exists(name));
+}
+
 struct Reservation {
   BigInteger first;
   agiru::Integer count;
@@ -417,6 +453,10 @@ void CancellationCleanup() {
 namespace {
 
 bool RunMode(std::string_view mode) {
+  if (mode == "--missing-transaction") {
+    MissingIdentityKeepsTransactionUsable();
+    return true;
+  }
   if (mode == "--cancellation") {
     CancellationCleanup();
     return true;
@@ -469,6 +509,7 @@ int main(int argc, char **argv) {
     NamesAndCompanyIdentity();
     SignedStepsAndBounds();
     TransactionBoundaries();
+    MissingIdentityKeepsTransactionUsable();
     ExistsDoesNotLockOutCreation();
     ConcurrentReservations();
     ErrorCleanupAndStoragePolicy();
