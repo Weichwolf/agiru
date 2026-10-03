@@ -15,30 +15,21 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-- UT recovery in progress: BCApps `bb7111877f`, System 29.0.55365.0 and unchanged
-  source population 80 codeunits/2,314 methods. Frozen HEAD `49ce9c0` plus source
-  `38f5fd2d3c0ebddf8d09018a51022098040c7ab7d4e93ad44af78a1404aaa18a`,
-  `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T132242Z-466167/result.json`, targets
-  `all ut test`: build/link green, local 120 cases/215 tooling tests green;
-  actual UT 2,159/2,314, 155 failed, zero incomplete/crashed (1,310 seconds).
-  Previous `20261003T125201Z-421497`: 2,062 passed/252 failed on the same identities;
-  97 gains, zero losses. Minimum 2,204 is not restored. Integer projection now
-  retains stored system columns and has an actual-SQL negative
-  control: CursorGate 230/zero red, FilterGate 122/zero red. Source-owned VIES
-  quota codeunit 247/table 243 were missing from the old slice: all
-  three original generated units are now appended, making 14,225/zero missing.
-  VIES now passes 41/43; two new audit consumers remain missing, and the existing
-  audit primitive must not be activated as a successful no-op. No AL source,
-  method or failing result is removed. Missing NumberSequence identities poison
-  PostgreSQL despite AL TryFunction recovery (116 direct aborted-transaction failures
-  in the previous image). The primitive now returns absence without an SQL error
-  and raises the original AL error after releasing its allocator lock: zero aborted
-  transactions in the full replay. Root sequence checks are 396/green; prior-write,
-  recovery and allocator-lock controls reject the mutant; one RPC remains (0723).
-  Table Metadata provider refusals grow 41→43 after activation; tracking/warehouse
-  gaps replace some earlier cascades and remain counted (0044). The unused Storage.h
-  PCH include is removed; complete slice/local/UT comparison is pending.
-  AGENTS.md's workflow is shortened by user request; the UT minimum/G1 remain unmet.
+- Confirmed UT baseline: BCApps `bb7111877f`, System 29.0.55365.0;
+  80 codeunits/2,314 source-counted methods. Frozen HEAD `49ce9c0` plus source
+  `ae8dfcc314d84c62ae046f9f0079b732b4f63ba1e49ba97464ea51afcc72d176`,
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T135330Z-494713/result.json`,
+  finished 2026-10-03 14:48:19 UTC, 3,254 seconds. Target exits:
+  `slice-check/all/test=0`, `ut=2`; 14,225 slice inputs/zero missing,
+  local 120 cases/215 tooling tests green. UT: 2,159 passed/155 failed,
+  zero incomplete/crashed, 1,200 seconds. Every identity and status matches
+  `20261003T132242Z-466167`; zero gains/losses after removing the unused Storage.h
+  PCH include. Source/package/notice pre/post hashes agree. Legacy seed identity
+  is null: diagnostic baseline, not sealed-seed causal A/B proof (0718).
+  Earlier 2,062→2,159 recovery gained 97 without losses. Minimum 2,204 and G1
+  remain unmet. Table Metadata refuses 43 methods across eleven codeunits (0044);
+  zero aborted SQL transactions after the NumberSequence fix (0723).
+  VIES remains 41/43 with two missing audit consumers; no successful no-op accepted.
   Previous `20261003T111104Z-333469`: build/link green;
   UT 0/2,314, all 80 incomplete before methods
   because moved source fields reach the native metadata option mapper. All C++

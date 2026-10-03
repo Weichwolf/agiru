@@ -5,12 +5,24 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
-- Full frozen UT `20261003T132242Z-466167`: 43 Table Metadata provider refusals
-  across ten codeunits, with every 80/2,314 identity retained (README). The native
-  System-29 source declares 23 fields plus implicit system fields. `TableDef` still
-  lacks declaring app/namespace, Scope, ObsoleteReason and table DataClassification;
-  existing defaults cannot truthfully fill a live row. Preserve the provider guard
-  until source-owned metadata and read-only execution are implemented together.
+- Full frozen UT `20261003T135330Z-494713`: 43 Table Metadata provider refusals
+  across eleven codeunits; every 80/2,314 identity/status matches the preceding
+  replay (README). Original System-29 TableMetadata declares 23 fields plus
+  implicit system fields. The live-provider guard remains; no UT gain claimed.
+- Declaration batch `2458f19`: generated `TableDef` retains available source app identity, original AL
+  namespace, Scope, ObsoleteReason, table DataClassification and LinkedObject.
+  `meta/ModuleDef.h` shares immutable app declarations without AL state/includes.
+  Missing owners/properties are explicit null/empty, not fabricated defaults.
+  Nested app roots and bound native definitions still need per-declaration owners;
+  deployment target is not Scope and extensions must not replace the base owner.
+  Live projection/filtering/read-only execution remain unimplemented.
+  GenTableGate 64/zero red; actual generated table-keys fixture 26/zero red,
+  four wrong-key/clustering/owner/classification controls reject. LinkedObject
+  storage remains refused. Receipts: `/tmp/agiru-table-metadata-commit-controls.log`
+  and `/tmp/agiru-table-metadata-gen-final.log`. No full generated rebuild/UT
+  replay of this declaration batch yet; the confirmed baseline is separate.
+  Complete local replay: 120 cases/215 tooling tests green, zero red/skips
+  (`/tmp/agiru-table-metadata-commit-tests.log`).
 - Predecessor findings 1017/1080/1417: direct-ID lookup from the shared registry,
   Name separate from Caption, and typed table-kind mapping. Its
   `runtime/base/virtual_metadata.py` has only nine fields, different source field
@@ -65,5 +77,17 @@ Range bounds: platform `methods-auto/{record,fieldref}/*-getrangemin-method.md` 
 Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Predecessor `openerp/board/1102_persistentes-next-ignoriert-filteraenderungen-im-ergebnissat.md` identifies filter/key invalidation; that separate gap remains open here.
 
 Code: `src/rt/{Record,Navigate,Temporary,Selection,RecordRef,PlatformTables}.cpp`, `include/runtime/Table.h`. Platform: `methods-auto/record/record-next-method.md`, `methods-auto/recordref/recordref-next-method.md`, other Record/RecordRef overloads, devenv-temporary-tables.md, devenv-integer-virtual-table.md. AL: `src/Layers/RU/Tests/Local/ERMVATReinstatement.Codeunit.al::SuggestVATSettlement` explicitly calls temporary Next(0); No. Series temporary filters and platform table users. No dedicated user-facing Next(0) contract; platform method documentation governs. Predecessor board searched for Next(0), with no matching finding; WI-1063/1136/1173/1206/1229 cover adjacent record contracts. Retain source usage as a fixture, never a hardcoded runtime branch.
+
+Table declaration authority: developer docs `ff5939a46e`,
+`devenv-json-files.md`, `properties/devenv-{scope-table,linkedobject,obsoletereason}-property.md`
+and `methods-auto/moduleinfo/moduleinfo-data-type.md`; BCApps `bb7111877f`,
+`Business Foundation/App/app.json`,
+`Business Foundation/App/NoSeries/src/Setup/NoSeries.Table.al`,
+`Layers/W1/BaseApp/Projects/Resources/Pricing/ResourceCost.Table.al`.
+Original verified System `29.0.55365.0`: `src/Virtual Tables/TableMetadata.Table.al`.
+User docs `0ff62b2266`, `business-central/admin-classifying-data-sensitivity.md`:
+developer classification is not user-maintained sensitivity. Predecessor 1017/1080/1417
+are findings, not schema authority. No default classification inferred from the
+unavailable local `devenv-classifying-data.md` reference.
 
 Property scope: `enableexternalassemblies`, `externalaccess`, `externaltype`, `initvalue`, `iscontroladdin`, `optionordinalvalues`, `provider`, `publickeytoken`, `tabletype`, `usetemporary`, `usetemporary-report`, `usetemporary-xmlport`.

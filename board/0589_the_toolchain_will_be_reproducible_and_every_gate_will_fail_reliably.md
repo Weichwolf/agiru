@@ -15,10 +15,24 @@ Depends on: none.
   `pch_defines,time_macros`; the historical uncacheable-PCH counter does not increase
   during this run. The same unity input syntax-checks without PCH under its configured
   flags. Generated sources do not include/name runtime/Storage.h's API; the unnecessary
-  PCH include is now removed. Frozen `20261003T135330Z-494713` is running
-  `slice-check all test ut` on the whole slice and unchanged 80/2,314 UT population;
-  no whole-slice/PCH speed or pass claim yet. Keep `/tmp/agiru-cache-probe{,-no-pch}.log`; the disposable
-  19.6 MB probe object is removed. Global cache statistics are not per-run hit rates.
+  PCH include is now removed. Frozen `20261003T135330Z-494713` completed:
+  `slice-check/all/test=0`, `ut=2`; 14,225 slice inputs, local 120/215 green,
+  unchanged 80/2,314 identities and every status: 2,159 passed/155 failed.
+  The full all target took 1,802 seconds; no speed improvement claimed.
+  Observed cache interval covering frozen all/local tests: 906 misses/zero hits,
+  zero new uncacheable-PCH events, 330 cleanups with the 5 GiB cache full.
+  This is not an isolated per-object cache measurement. Keep
+  `/tmp/agiru-cache-probe{,-no-pch}.log`; the disposable 19.6 MB object is removed.
+- Module declarations now use standalone `meta/ModuleDef.h`, not AL ModuleInfo
+  state. Six-header dependency proof passes and rejects forced filesystem, regex,
+  report and module-state includes (`/tmp/agiru-table-metadata-header-controls.log`).
+  Targeted TableWriter analysis remains red on inherited header/older-function
+  findings (`/tmp/agiru-table-metadata-tidy.log`, `build/lint/targeted.log`);
+  no new helper finding or suppression/baseline increase, not a lint pass.
+  Full local replay passes 120 cases/215 tooling tests. `make lint JOBS=2`
+  passes formatting but refuses five specialist consumers without compiler-command
+  receipts (NativeRunner, RegistryRunner, native-binding Emit/PageRunner,
+  native-enums EmitContracts); `/tmp/agiru-table-metadata-commit-lint.log`.
 - AGENTS.md now states the ordinary one-tree Make repair loop, optional frozen
   verification and compact safety/cache rules, as requested on 2026-10-03. Specialist
   targets stay in make help/the owning WI; no wrappers or test policies were added.
