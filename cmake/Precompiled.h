@@ -35,7 +35,6 @@
 #include "runtime/Record.h"
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
-#include "runtime/Storage.h"
 #include "runtime/Table.h"
 #include "runtime/test/TestAction.h"
 #include "runtime/test/TestField.h"
