@@ -12,6 +12,11 @@ python3 scripts/fetch_symbols.py --verify "$package"
 base="${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}/Layers/W1/BaseApp"
 proof=$(mktemp -d "$B/native-report-layouts.XXXXXX")
 printf '%s\n' "$proof" > "$B/native-report-layouts.latest"
+git rev-parse HEAD > "$proof/head.txt"
+rg --files src/gen src/tc include cmake test/report-layouts test/native-report-layouts.sh CMakeLists.txt \
+  | LC_ALL=C sort | xargs -d '\n' sha256sum > "$proof/compiler-inputs.sha256"
+sha256sum "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
+  "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" >> "$proof/compiler-inputs.sha256"
 jq '{apps:[{name:"native",source:"src"}]}' "$package/provenance.json" > "$proof/inventory-apps.json"
 printf '%s\n' '{"include":["System","Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/scope.json"
 python3 scripts/scope_inventory.py "$package" --apps "$proof/inventory-apps.json" \
@@ -45,7 +50,7 @@ rg -q 'layouts +2 report / 14 extension declarations; 16 bound layouts, 16 immut
 "$B/agirutc" "$input" "$input/apps.json" > "$proof/source-only.log" 2>&1
 rg -q '16 bound layouts, 0 immutable declarations emitted, 0 retained on unresolved targets' "$proof/source-only.log"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
-  -Iinclude -Itest/gate -Isrc/al "-I$proof/generated/native" "-I$proof/generated/shared")
+  -Iinclude -Itest/gate -Isrc/al)
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db -lagiru_al)
 compile() {
@@ -54,8 +59,9 @@ compile() {
   rg --files --no-ignore "$generated" -g '*.cpp' | LC_ALL=C sort > "$output.sources"
   mapfile -t sources < "$output.sources"
   [ "${#sources[@]}" -gt 0 ]
-  "$CXX" "${flags[@]}" -c test/report-layouts/NativeRunner.cpp -o "$output.runner.o"
-  "$CXX" "${flags[@]}" "$output.runner.o" "${sources[@]}" "${links[@]}" -o "$output"
+  local includes=("-I$generated/native" "-I$generated/platform" "-I$generated/shared")
+  "$CXX" "${flags[@]}" "${includes[@]}" -c test/report-layouts/NativeRunner.cpp -o "$output.runner.o"
+  "$CXX" "${flags[@]}" "${includes[@]}" "$output.runner.o" "${sources[@]}" "${links[@]}" -o "$output"
 }
 compile "$proof/generated" "$proof/runner"
 "$proof/runner" "$package" "$base" "$native_id" "$base_id" > "$proof/runner.log"
@@ -63,7 +69,8 @@ cat "$proof/runner.log"
 mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/test/report-layouts/NativeRunner.cpp" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
-  "$CXX" "${flags[@]}" -c test/report-layouts/NativeRunner.cpp -o "$proof/runner.runner.o" \
+  "$CXX" "${flags[@]}" "-I$proof/generated/native" "-I$proof/generated/shared" \
+  -c test/report-layouts/NativeRunner.cpp -o "$proof/runner.runner.o" \
   > "$B/fixture-commands/native-report-layouts.json"
 
 definitions="$proof/generated/native/system/administration/reports/report/TenantReportDefaults.def.cpp"
@@ -112,6 +119,89 @@ if "$proof/runner" "$proof/missing-asset" "$base" "$native_id" "$base_id" > "$pr
   exit 1
 fi
 rg -q 'original owned asset exists' "$proof/missing-asset.log"
+
+source_input="$proof/source-bound-input"
+mkdir -p "$source_input/base/Foundation/Reporting"
+cp "$input/base/app.json" "$source_input/base/app.json"
+cp "$input/base/Foundation/Reporting/CompositeLayout.ReportExt.al" \
+  "$source_input/base/Foundation/Reporting/"
+cp "$input/scope.json" "$source_input/scope.json"
+printf '%s\n' '{"apps":[{"name":"base","source":"base"}]}' > "$source_input/apps.json"
+loader_status=0
+"$B/agirutc" "$source_input" "$source_input/apps.json" "$proof/source-bound" \
+  --system-symbols "$package" > "$proof/source-bound.log" 2>&1 || loader_status=$?
+printf '%s\n' "$loader_status" > "$proof/source-bound.status"
+[ "$loader_status" = 1 ]
+rg -q 'native 1 report sources bound; 3 objects written into the platform app' "$proof/source-bound.log"
+rg -q '16 bound layouts, 16 immutable declarations emitted, 0 retained on unresolved targets' \
+  "$proof/source-bound.log"
+compile "$proof/source-bound" "$proof/source-bound-runner"
+"$proof/source-bound-runner" "$package" "$base" "$native_id" "$base_id" \
+  platform/src/Reports/TenantReportDefaults.Report.al > "$proof/source-bound-runner.log"
+cat "$proof/source-bound-runner.log"
+rg -F -q "$native_id" "$proof/source-bound/platform/PlatformModule.h"
+loader_source_status=0
+"$B/agirutc" "$source_input" "$source_input/apps.json" --system-symbols "$package" \
+  > "$proof/source-bound-source-only.log" 2>&1 || loader_source_status=$?
+[ "$loader_source_status" = 1 ]
+rg -q '16 bound layouts, 0 immutable declarations emitted, 0 retained on unresolved targets' \
+  "$proof/source-bound-source-only.log"
+for control in wrong-native-owner wrong-extension-owner dropped-property; do
+  mutant="$proof/source-bound-$control"
+  cp -a "$proof/source-bound" "$mutant"
+  changed="$mutant/platform/system/administration/reports/report/TenantReportDefaults.def.cpp"
+  case "$control" in
+    wrong-native-owner)
+      [ "$(rg -F -o "$native_id" "$changed" | wc -l)" = 2 ]
+      sed -i "s/$native_id/$base_id/g" "$changed";;
+    wrong-extension-owner)
+      [ "$(rg -F -o "$base_id" "$changed" | wc -l)" = 14 ]
+      sed -i "s/$base_id/$native_id/g" "$changed";;
+    dropped-property)
+      [ "$(rg -F -c '.name = "SubType", .text = "Theme"' "$changed")" = 1 ]
+      awk '
+        /^constexpr ::agiru::ReportLayoutTokenDef kTenantReportDefaultsReportLayouts1Tokens1\[\]\{/ {
+          if (++tokens != 1) exit 1
+          dropping=1; next
+        }
+        dropping { if ($0 == "};") dropping=0; next }
+        /[.]name = "SubType", [.]text = "Theme"/ { properties++; next }
+        { print }
+        END { if (tokens != 1 || properties != 1 || dropping) exit 1 }
+      ' "$changed" > "$mutant/definition.changed"
+      mv "$mutant/definition.changed" "$changed";;
+  esac
+  compile "$mutant" "$proof/source-bound-$control-runner"
+  if "$proof/source-bound-$control-runner" "$package" "$base" "$native_id" "$base_id" \
+    platform/src/Reports/TenantReportDefaults.Report.al > "$proof/source-bound-$control.log" 2>&1; then
+    printf 'native-report-layouts: source-bound %s escaped comparison\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'original declaring app identity survives|complete original property population survives' \
+    "$proof/source-bound-$control.log"
+done
+cmake_input="$proof/cmake-source"
+mkdir -p "$cmake_input"
+cp CMakeLists.txt "$cmake_input/"
+cp -a src include cmake third_party test scripts "$cmake_input/"
+cp -a "$proof/source-bound" "$cmake_input/apps"
+cp "$source_input/apps.json" "$cmake_input/apps.json"
+cmake -S "$cmake_input" -B "$proof/cmake-build" -G Ninja \
+  -DCMAKE_CXX_COMPILER="$CXX" -DAGIRU_BUILD_SLICE=OFF -DAGIRU_BUILD_APPS=ON \
+  > "$proof/cmake-configure.log" 2>&1
+cmake --build "$proof/cmake-build" --target help > "$proof/cmake-targets.log"
+rg -q 'agiru_app_platform' "$proof/cmake-targets.log"
+jq -e '[.[] | select(.file | contains("/apps/platform/"))] | length == 2' \
+  "$proof/cmake-build/compile_commands.json" > /dev/null
+mv "$cmake_input/apps/platform/PlatformModule.h" "$cmake_input/apps/platform/PlatformModule.h.absent"
+if cmake -S "$cmake_input" -B "$proof/cmake-missing-module" -G Ninja \
+  -DCMAKE_CXX_COMPILER="$CXX" -DAGIRU_BUILD_SLICE=OFF -DAGIRU_BUILD_APPS=ON \
+  > "$proof/cmake-missing-module.log" 2>&1; then
+  printf 'native-report-layouts: CMake accepted native reports without their module\n' >&2
+  exit 1
+fi
+rg -q 'lack their source-owned platform module' "$proof/cmake-missing-module.log"
+sha256sum --check --status "$proof/compiler-inputs.sha256"
 sha256sum --check --status "$proof/originals.sha256"
 python3 scripts/fetch_symbols.py --verify "$package" > "$proof/package-verified.json"
 jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile package "$package/provenance.json" \
@@ -125,5 +215,8 @@ jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile package "$package/
     native_layouts:2,extension_layouts:14,compiled_layouts:16,
     native_objects_outside_compiled_fixture:($raw[0].summary.objects-1),
     unexecuted_native_objects:$raw[0].summary.objects,installed_assets:0,rendered_documents:0,
-    production_native_loader_activated:false,complete_app_proof:false}' > "$proof/result.json"
-printf 'native-report-layouts: original native source and fourteen extension layouts compile; ownership/property controls fail; no installation/rendering or G1 claim; %s\n' "$proof"
+    production_native_report_loader_activated:true,complete_native_loader_activated:false,
+    source_bound_compiled_layouts:16,source_bound_translation_exit:1,
+    cmake_platform_configured:true,cmake_platform_build_executed:false,
+    complete_app_proof:false}' > "$proof/result.json"
+printf 'native-report-layouts: original source and production-loader variants compile all sixteen layouts; ownership/property controls fail; native gaps keep translation red; no installation/rendering or G1 claim; %s\n' "$proof"

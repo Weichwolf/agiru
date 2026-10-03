@@ -13,6 +13,7 @@
 #include <fstream>
 #include <ios>
 #include <iterator>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -23,15 +24,16 @@ namespace agiru::gen {
 
 namespace {
 
-bool DeclaresTable(std::string_view source) {
+std::string_view DeclaredKind(std::string_view source) {
   const auto tokens = al::Tokenize(source);
   for (std::size_t at = 0; at + 1 < tokens.size(); ++at) {
-    if (al::IsPunctuation(tokens[at], "{")) { return false; }
-    if (al::IsKeyword(tokens[at], "table") && tokens[at + 1].kind == al::TokenKind::Integer) {
-      return true;
+    if (al::IsPunctuation(tokens[at], "{")) { return {}; }
+    if (tokens[at + 1].kind != al::TokenKind::Integer) { continue; }
+    for (const auto *const kind : {"table", "report"}) {
+      if (al::IsKeyword(tokens[at], kind)) { return kind; }
     }
   }
-  return false;
+  return {};
 }
 
 std::vector<std::filesystem::path> Sources(const std::filesystem::path &package) {
@@ -55,7 +57,7 @@ std::vector<std::filesystem::path> Sources(const std::filesystem::path &package)
 
 void ReadOne(const std::filesystem::path &package,
              const std::filesystem::path &path,
-             NativeTableSources &into) {
+             NativeSources &into) {
   const auto relative = std::filesystem::relative(path, package).generic_string();
   try {
     std::ifstream stream(path, std::ios::binary);
@@ -63,14 +65,20 @@ void ReadOne(const std::filesystem::path &package,
     const std::string source{std::istreambuf_iterator<char>(stream),
                              std::istreambuf_iterator<char>()};
     if (stream.bad()) { throw std::runtime_error("cannot finish reading System source"); }
-    if (!DeclaresTable(source)) {
+    const auto kind = DeclaredKind(source);
+    if (kind.empty()) {
       into.otherSources.push_back(relative);
       return;
     }
-    auto table = al::ParseTable(source);
-    CompletePrimaryKey(table);
-    into.tables.push_back(std::move(table));
-    into.paths.push_back(relative);
+    if (kind == "table") {
+      auto table = al::ParseTable(source);
+      CompletePrimaryKey(table);
+      into.tables.push_back(std::move(table));
+      into.paths.push_back(relative);
+    } else {
+      into.reports.push_back(al::ParseReport(source));
+      into.reportPaths.push_back(relative);
+    }
   } catch (const std::exception &error) {
     into.issues.push_back({.source = relative, .reason = error.what()});
   }
@@ -78,12 +86,21 @@ void ReadOne(const std::filesystem::path &package,
 
 }
 
-NativeTableSources ReadNativeTables(const std::filesystem::path &package) {
+NativeSources ReadNativeSources(const std::filesystem::path &package) {
   if (std::filesystem::is_symlink(package) || std::filesystem::is_symlink(package / "src")) {
     throw std::runtime_error("System source root is a symlink");
   }
-  NativeTableSources into;
+  NativeSources into;
   for (const auto &path : Sources(package)) { ReadOne(package, path, into); }
+  std::set<int> reportIds;
+  std::set<std::string> reportNames;
+  for (const auto &report : into.reports) {
+    if (!reportIds.insert(report.id).second ||
+        !reportNames.insert(LowerKey(report.nameSpace + "." + report.name)).second) {
+      throw std::runtime_error("System source duplicates report identity: " + report.name);
+    }
+  }
+  if (!into.reports.empty()) { into.app = ReadNativeIdentity(package); }
   return into;
 }
 

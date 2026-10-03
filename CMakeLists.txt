@@ -201,6 +201,11 @@ if(TARGET agiru_net)
   target_include_directories(agiru_net PRIVATE "${CMAKE_SOURCE_DIR}/third_party")
 endif()
 
+if(TARGET agiru_gen)
+  find_package(LibXml2 REQUIRED)
+  target_link_libraries(agiru_gen PRIVATE LibXml2::LibXml2)
+endif()
+
 
 set(AGIRU_AL_SOURCE "$ENV{HOME}/Git/BCApps/src/Layers/W1/BaseApp"
     CACHE STRING "The AL source the gate parses")
@@ -318,6 +323,19 @@ endif()
 # `absent` IS EVERY APP'S, because it is not an app: it is the one file naming every AL object and
 # .NET type this run does not have, written by the transpiler for the whole run (board:0035).
 if(AGIRU_BUILD_APPS)
+  file(GLOB_RECURSE platform_sources CONFIGURE_DEPENDS "apps/platform/*.cpp")
+  if(platform_sources)
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/apps/platform/PlatformModule.h")
+      message(FATAL_ERROR "Generated native reports lack their source-owned platform module.")
+    endif()
+    add_library(agiru_app_platform SHARED ${platform_sources})
+    target_include_directories(agiru_app_platform PRIVATE
+      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+      "${CMAKE_SOURCE_DIR}/apps/shared" "${CMAKE_SOURCE_DIR}/apps/platform")
+    target_link_libraries(agiru_app_platform PRIVATE agiru_rt)
+    target_compile_options(agiru_app_platform PRIVATE ${AGIRU_GENERATED_FLAGS})
+    target_link_libraries(agiru PRIVATE agiru_app_platform)
+  endif()
   file(READ "${CMAKE_SOURCE_DIR}/apps.json" apps_json)
   string(JSON app_count LENGTH "${apps_json}" apps)
   math(EXPR app_last "${app_count} - 1")
@@ -333,6 +351,10 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/apps/shared"
       "${CMAKE_SOURCE_DIR}/apps/${app}")
     target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
+    if(TARGET agiru_app_platform)
+      target_include_directories(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/apps/platform")
+      target_link_libraries(agiru_app_${app} PRIVATE agiru_app_platform)
+    endif()
     target_precompile_headers(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/cmake/Precompiled.h")
     target_compile_options(agiru_app_${app} PRIVATE -Xclang -fno-pch-timestamp)
     target_compile_options(agiru_app_${app} PRIVATE ${AGIRU_GENERATED_FLAGS})

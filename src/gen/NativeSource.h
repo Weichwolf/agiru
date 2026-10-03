@@ -13,13 +13,25 @@ struct NativeSourceIssue {
   std::string reason;
 };
 
-struct NativeTableSources {
+struct NativeAppIdentity {
+  std::string id;
+  std::string name;
+  std::string publisher;
+  std::string version;
+};
+
+struct NativeSources {
   std::vector<al::TableObject> tables;
   std::vector<std::string> paths;
+  std::vector<al::PageObject> reports;
+  std::vector<std::string> reportPaths;
+  NativeAppIdentity app;
   std::vector<NativeSourceIssue> issues;
   std::vector<std::string> otherSources;
 };
 
-NativeTableSources ReadNativeTables(const std::filesystem::path &package);
+NativeAppIdentity ReadNativeIdentity(const std::filesystem::path &package);
+
+NativeSources ReadNativeSources(const std::filesystem::path &package);
 
 }

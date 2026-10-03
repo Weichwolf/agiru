@@ -27,6 +27,7 @@ constexpr auto kLayouts = Traits::kLayouts;
 constexpr std::size_t kNativeLayouts = 2;
 constexpr std::size_t kExtensionLayouts = 14;
 constexpr int kArgumentCount = 5;
+constexpr int kArgumentCountWithSource = 6;
 
 static_assert(kLayouts.size() == kNativeLayouts + kExtensionLayouts);
 
@@ -109,7 +110,8 @@ void Layouts(std::span<const agiru::ReportLayoutDef> emitted,
 void OriginalContract(const std::filesystem::path &package,
                       const std::filesystem::path &base,
                       std::string_view nativeAppId,
-                      std::string_view baseAppId) {
+                      std::string_view baseAppId,
+                      std::string_view nativeSource) {
   const auto report =
       agiru::al::ParseReport(Read(package / "src/Reports/TenantReportDefaults.Report.al"));
   const auto extension = agiru::al::ParseReportExtension(
@@ -136,7 +138,7 @@ void OriginalContract(const std::filesystem::path &package,
   Layouts(kLayouts.first(kNativeLayouts),
           report.rendering,
           nativeAppId,
-          "native/src/Reports/TenantReportDefaults.Report.al",
+          nativeSource,
           package / "layout");
   Layouts(kLayouts.subspan(kNativeLayouts),
           extension.rendering,
@@ -149,9 +151,15 @@ void OriginalContract(const std::filesystem::path &package,
 
 int main(int argc, char **argv) {
   return gate::Run("Native Report Layouts", [argc, argv] {
-    if (argc != kArgumentCount) {
+    if (argc != kArgumentCount && argc != kArgumentCountWithSource) {
       throw std::invalid_argument("expected package, BaseApp and both app identities");
     }
-    OriginalContract(argv[1], argv[2], argv[3], argv[4]);
+    OriginalContract(argv[1],
+                     argv[2],
+                     argv[3],
+                     argv[4],
+                     argc == kArgumentCountWithSource
+                         ? argv[kArgumentCount]
+                         : "native/src/Reports/TenantReportDefaults.Report.al");
   });
 }

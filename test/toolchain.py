@@ -225,6 +225,162 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertIn('native field count mismatch: Page Table Field', compiled.stderr)
 
 
+class NativeReportSourceCompilerGate(unittest.TestCase):
+    def setUp(self):
+        self.repository = Path(__file__).resolve().parents[1]
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.package = self.root / 'package'
+        (self.package / 'src').mkdir(parents=True)
+        self.source = self.root / 'source'
+        self.source.mkdir()
+        self.generated = self.root / 'generated'
+        self.transpiler = (self.repository / os.environ.get('B', 'build') / 'agirutc').resolve()
+        self.apps = self.root / 'apps.json'
+        self.apps.write_text(json.dumps({'apps': [{'name': 'fixture', 'source': 'source'}]}))
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['System', 'Microsoft'], 'exclude': []}))
+        (self.source / 'app.json').write_text(json.dumps({'id': '118874ab-44bc-4ccb-9daf-59763539ab16',
+            'name': 'Fixture', 'publisher': 'Tests', 'version': '1.0.0.0'}))
+        (self.source / 'Population.Codeunit.al').write_text('namespace Microsoft.Fixture;\n'
+            'codeunit 50231 "Native Report UT"\n{ Subtype = Test; [Test] procedure Kept() begin end; }')
+        self.report = self.package / 'src/not-a-report-filename.aL'
+        self.report.write_text('namespace System.Fixture;\n'
+            'report 50230 "Native Fixture" { DefaultRenderingLayout = Original; dataset {} '
+            'rendering { layout(Original) { Type = Word; LayoutFile = \'original.docx\'; } } }')
+        self.manifest = self.package / 'NavxManifest.xml'
+        self.manifest.write_text('<Package xmlns="http://schemas.microsoft.com/navx/2015/manifest">'
+            '<App Id="85a884cd-20d8-4d18-91bd-e6c1baaa3a32" Name="Native &amp; Fixture" '
+            'Publisher="Test Publisher" Version="1.2.3.4"/></Package>')
+        (self.source / 'Layout.ReportExt.al').write_text('namespace Microsoft.Fixture;\n'
+            'reportextension 50232 Extra extends "Native Fixture" { rendering { layout(Extra) '
+            '{ Type = Word; LayoutFile = \'extra.docx\'; } } }')
+
+    def run_compiler(self, output=True):
+        arguments = [str(self.transpiler), str(self.root), str(self.apps)]
+        if output:
+            arguments.append(str(self.generated))
+        arguments += ['--system-symbols', str(self.package)]
+        return subprocess.run(arguments, text=True, capture_output=True, timeout=30)
+
+    def definitions(self):
+        return self.generated / 'platform/system/fixture/report/NativeFixture.def.cpp'
+
+    def test_original_ast_and_extension_keep_separate_source_owned_modules(self):
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('1 report sources bound; 3 objects written into the platform app', result.stdout)
+        self.assertIn('2 bound layouts, 2 immutable declarations emitted', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+        definitions = self.definitions().read_text()
+        self.assertIn('platform/src/not-a-report-filename.aL', definitions)
+        self.assertIn('85a884cd-20d8-4d18-91bd-e6c1baaa3a32', definitions)
+        self.assertIn('118874ab-44bc-4ccb-9daf-59763539ab16', definitions)
+        module = (self.generated / 'platform/PlatformModule.h').read_text()
+        self.assertIn('Native & Fixture', module)
+        self.assertIn('1.2.3.4', module)
+        arguments = [os.environ.get('CXX', 'clang++-19'), '-std=c++23', '-stdlib=libc++',
+            '-Wall', '-Wextra', '-Wpedantic', '-Werror', '-fsyntax-only',
+            f'-I{self.repository / "include"}', f'-I{self.generated / "platform"}']
+        arguments += [str(path) for path in sorted((self.generated / 'platform').rglob('*.cpp'))]
+        compiled = subprocess.run(arguments, text=True, capture_output=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+
+    def test_source_only_retains_layouts_without_claiming_emission(self):
+        result = self.run_compiler(output=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('2 bound layouts, 0 immutable declarations emitted', result.stdout)
+        self.assertFalse(self.generated.exists())
+
+    def test_missing_or_malformed_native_identity_refuses_before_output(self):
+        for text in (None, '<Package>', '<Package><App/></Package>',
+                     '<Package xmlns="http://schemas.microsoft.com/navx/2015/manifest"><App/></Package>'):
+            with self.subTest(text=text):
+                if text is None:
+                    self.manifest.unlink()
+                else:
+                    self.manifest.write_text(text)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(self.generated.exists())
+
+    def test_duplicate_app_manifest_and_dtd_refuse_before_output(self):
+        original = self.manifest.read_text()
+        app = re.search(r'<App .*/>', original).group()
+        for text in (original.replace('</Package>', app + '</Package>'),
+                     '<!DOCTYPE Package [<!ENTITY name "Unsafe">]>' + original):
+            with self.subTest(text=text):
+                self.manifest.write_text(text)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertFalse(self.generated.exists())
+
+    def test_manifest_symlink_and_invalid_guid_refuse_before_output(self):
+        original = self.manifest.read_text()
+        held = self.package / 'held.xml'
+        held.write_text(original)
+        self.manifest.unlink()
+        self.manifest.symlink_to(held)
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('manifest is a symlink', result.stderr)
+        self.assertFalse(self.generated.exists())
+        self.manifest.unlink()
+        self.manifest.write_text(original.replace('85a884cd-20d8-4d18-91bd-e6c1baaa3a32', 'not-a-guid'))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('invalid App Id', result.stderr)
+        self.assertFalse(self.generated.exists())
+
+    def test_duplicate_native_report_identity_refuses_before_output(self):
+        (self.package / 'src/duplicate.al').write_text(self.report.read_text())
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('duplicates report identity', result.stderr)
+        self.assertFalse(self.generated.exists())
+
+    def test_an_application_cannot_replace_the_native_report_id(self):
+        (self.source / 'Conflict.Report.al').write_text('namespace Microsoft.Fixture;\n'
+            'report 50230 Conflict { dataset {} }')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('duplicates declared System report ID 50230', result.stderr)
+        self.assertFalse(self.definitions().exists())
+
+    def test_unclassified_sources_keep_translation_red_and_population_counted(self):
+        (self.package / 'src/other.al').write_text('codeunit 50233 Unactivated {}')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+        self.assertTrue(self.definitions().exists())
+
+    def test_reserved_generated_platform_name_cannot_be_an_application(self):
+        self.apps.write_text(json.dumps({'apps': [{'name': 'platform', 'source': 'source'}]}))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('platform is reserved', result.stderr)
+        self.assertFalse(self.generated.exists())
+
+    def test_native_report_parse_failure_retains_the_original_source(self):
+        self.report.write_text('report 50230 "Native Fixture" { dataset {')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('native-refused src/not-a-report-filename.aL', result.stdout)
+        self.assertIn('1 source refusals', result.stdout)
+        self.assertIn('1 codeunits, 1 [Test] methods', result.stdout)
+        self.assertFalse(self.definitions().exists())
+
+    def test_comment_text_is_not_a_native_report_declaration(self):
+        self.report.write_text('// report 50230 "Native Fixture" { dataset {} }\n'
+            'codeunit 50230 "Not A Report" {}')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertNotIn('report sources bound', result.stdout)
+        self.assertFalse(self.definitions().exists())
+
+
 class SymbolsPackageGate(unittest.TestCase):
     def test_transpile_wrapper_verifies_before_compiling_and_preserves_the_exit_status(self):
         root = Path(__file__).resolve().parents[1]
