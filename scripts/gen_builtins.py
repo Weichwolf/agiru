@@ -191,7 +191,7 @@ head = '''#pragma once
 namespace agiru {
 
 '''
-# NO CLOSING COMMENT. `test/strip-comments.py` deletes every `//` in the door and only Doxygen
+# NO CLOSING COMMENT. `test/tooling/strip-comments.py` deletes every `//` in the door and only Doxygen
 # survives there, so `} // namespace agiru` is written by this script and removed by the next
 # `make` -- forever. The door's precompiled header and every ccache entry behind it fall over on
 # each of those rewrites, and a `make tree` running beside one loses its whole census.

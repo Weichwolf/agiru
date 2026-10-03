@@ -4,7 +4,7 @@ cd "$(dirname "$0")/.."
 B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 input=$(realpath "${1:-apps}")
-proof=$(mktemp -d "$B/report-layout-metadata.XXXXXX")
+proof=$(mktemp -d /tmp/agiru-report-layout-metadata.XXXXXX)
 rg -l --no-ignore '^constexpr ::agiru::ReportLayoutDef ' "$input" -g '*.def.cpp' \
   | LC_ALL=C sort > "$proof/sources"
 mapfile -t sources < "$proof/sources"

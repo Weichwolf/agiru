@@ -13,19 +13,25 @@ for source in test/gate/*.cpp; do
   if [ ! -x "$case" ]; then
     printf 'test: missing executable %s; run make\n' "$case" >&2
     red=$((red + 1))
+  elif [ "$name" = PlatformSourceGate ] && [ "${AGIRU_SYSTEM_SYMBOLS+x}" = x ]; then
+    if ! python3 scripts/fetch_symbols.py --verify "$AGIRU_SYSTEM_SYMBOLS"; then
+      red=$((red + 1))
+    elif ! "$case" "$AGIRU_SYSTEM_SYMBOLS"; then
+      red=$((red + 1))
+    fi
   elif ! "$case"; then
     red=$((red + 1))
   fi
 done
-for script in test/door-reproduces.sh test/one-definition.sh; do
+for script in test/transpiler/builtins-reproduce.sh test/tooling/one-definition.sh; do
   n=$((n + 1))
   if ! sh "$script"; then red=$((red + 1)); fi
 done
-for script in test/function-size.sh test/platform-source.sh test/required-isolation.sh test/header-dependencies.sh test/slice-check.sh test/interface-defaults.sh test/report-layouts.sh test/layout-assets.sh test/number-sequences.sh test/table-keys.sh test/reflection-metadata.sh; do
+for script in test/tooling/function-size.sh test/runtime/required-isolation.sh test/tooling/header-dependencies.sh test/tooling/slice-check.sh test/transpiler/interface-defaults.sh test/reporting/report-layouts.sh test/reporting/layout-assets.sh test/runtime/number-sequences.sh test/transpiler/table-keys.sh test/runtime/reflection-metadata.sh test/transpiler/native-enums.sh test/runtime/test-contexts.sh; do
   n=$((n + 1))
   if ! B="$B" bash "$script"; then red=$((red + 1)); fi
 done
 n=$((n + 1))
-if ! B="$B" python3 test/toolchain.py; then red=$((red + 1)); fi
+if ! B="$B" python3 test/tooling/toolchain.py; then red=$((red + 1)); fi
 printf '\ntest: %s case(s), %s red\n' "$n" "$red"
 [ "$red" -eq 0 ]

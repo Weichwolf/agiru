@@ -17,7 +17,9 @@ CCACHE_SLOPPINESS ?= pch_defines,time_macros
 export CCACHE_SLOPPINESS
 
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
-.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-consumers number-sequences table-keys reflection-metadata
+.PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences table-keys reflection-metadata
+.PHONY: verify-check
+.PHONY: test-contexts
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -33,8 +35,8 @@ all: comments db   ## strip the comments, then the library, the transpiler and t
 
 # Formatting is idempotent and failures are not swallowed.
 comments:          ## strip source comments and format changed handwritten C++
-	@python3 $(SELF)/test/strip-comments.py $(SELF)/src $(SELF)/include
-	@python3 $(SELF)/test/format-changed.py
+	@python3 $(SELF)/test/tooling/strip-comments.py $(SELF)/src $(SELF)/include
+	@python3 $(SELF)/test/tooling/format-changed.py
 
 db: $(B)/CMakeCache.txt   ## compile_commands.json for clangd and clang-tidy
 	@selected=$$(command -v "$(CXX)") || exit 2; \
@@ -52,10 +54,10 @@ $(B)/CMakeCache.txt:
 	  -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
 lint: lint-config gates tc ## format and analysis over what changed (FULL=1: the whole tree and the baselines)
-	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/lint.sh
+	@AGIRU_AL_SOURCE=$${AGIRU_AL_SOURCE:-$$HOME/Git/BCApps/src/Layers/W1/BaseApp} AGIRU_BC_SOURCE=$${AGIRU_BC_SOURCE:-$$HOME/Git/BCApps/src} JOBS=$(JOBS) FULL=$(FULL) sh $(SELF)/test/tooling/lint.sh
 
 lint-config:       ## prove the clang-tidy function line limit at its boundary
-	@B="$(B)" bash "$(SELF)/test/function-size.sh"
+	@B="$(B)" bash "$(SELF)/test/tooling/function-size.sh"
 
 include-cost:      ## measure standalone header frontend cost without PCH
 	@B="$(B)" bash "$(SELF)/scripts/include_cost.sh" $(HEADERS)
@@ -66,12 +68,12 @@ slice-check:       ## count every slice source and refuse missing inputs without
 interface-defaults: comments db tc ## execute generated interface defaults and refusal controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_GenInterfaceGate
 	@"$(B)/gate_GenInterfaceGate"
-	@B="$(B)" bash "$(SELF)/test/interface-defaults.sh"
+	@B="$(B)" bash "$(SELF)/test/transpiler/interface-defaults.sh"
 
 report-layouts: comments db tc ## retain named report layouts, actual assets and extension counts
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReportLayoutGate
 	@"$(B)/gate_ReportLayoutGate"
-	@B="$(B)" bash "$(SELF)/test/report-layouts.sh"
+	@B="$(B)" bash "$(SELF)/test/reporting/report-layouts.sh"
 
 report-layout-metadata: ## compile all generated immutable layout declarations, not complete apps
 	@B="$(B)" bash "$(SELF)/scripts/report_layout_metadata.sh" "$(SELF)/apps"
@@ -84,38 +86,53 @@ layout-assets: ## package every declared layout from REQUESTS into a new OUTPUT 
 layout-assets-check: comments db tc ## prove layout population, ownership, paths and byte integrity
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReportLayoutGate gate_ReportAssetGate
 	@"$(B)/gate_ReportAssetGate"
-	@B="$(B)" bash "$(SELF)/test/layout-assets.sh"
+	@B="$(B)" bash "$(SELF)/test/reporting/layout-assets.sh"
 
 native-report-layouts: comments db tc ## prove native/extension declarations from explicit AGIRU_SYSTEM_SYMBOLS, not installation
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
-	@B="$(B)" bash "$(SELF)/test/native-report-layouts.sh"
+	@B="$(B)" bash "$(SELF)/test/reporting/native-report-layouts.sh"
 
 native-bindings: comments db tc ## audit every original native table binding; unbound/refused/mismatched stay red
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
-	@B="$(B)" bash "$(SELF)/test/native-bindings.sh"
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-bindings.sh"
+
+native-enum-package: comments db tc ## audit every original enum from explicit AGIRU_SYSTEM_SYMBOLS
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-enum-package.sh"
+
+native-interface-package: comments db tc ## compile every original interface header/default body without PCH
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-interface-package.sh"
+
+test-contexts: comments db tc ## execute Runtime-18 context getters and scoped skip through generated AL
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_TestContextGate
+	@"$(B)/gate_TestContextGate"
+	@B="$(B)" bash "$(SELF)/test/runtime/test-contexts.sh"
+
+native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-enums.sh"
 
 native-consumers: comments db tc ## retranslate and qualify all eight original native-table page units
-	@B="$(B)" bash "$(SELF)/test/native-consumers.sh"
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-consumers.sh"
 
 number-sequences: comments db ## prove atomic SQL reservations, process parity and negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_NumberSequenceGate
 	@"$(B)/gate_NumberSequenceGate"
-	@B="$(B)" bash "$(SELF)/test/number-sequences.sh"
+	@B="$(B)" bash "$(SELF)/test/runtime/number-sequences.sh"
 
 table-keys: comments db tc ## prove implicit primary keys before extension merging and generated operations
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenTableKeysGate gate_GenNativeBindingGate
 	@"$(B)/gate_GenTableKeysGate"
 	@"$(B)/gate_GenNativeBindingGate"
-	@B="$(B)" bash "$(SELF)/test/table-keys.sh"
+	@B="$(B)" bash "$(SELF)/test/transpiler/table-keys.sh"
 
 reflection-metadata: comments db ## prove original metadata vocabulary, refusal and temporary records
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_ReflectionMetadataGate gate_PlatformSourceGate
 	@"$(B)/gate_PlatformSourceGate"
-	@B="$(B)" bash "$(SELF)/test/reflection-metadata.sh"
+	@B="$(B)" bash "$(SELF)/test/runtime/reflection-metadata.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)
-	@python3 $(SELF)/test/lint-analysis.py --tidy clang-tidy-19 --jobs 1 --require-unit
+	@python3 $(SELF)/test/tooling/lint-analysis.py --tidy clang-tidy-19 --jobs 1 --require-unit
 
 test: gates tc     ## the fast gate
 	@B="$(B)" sh $(SELF)/test/run.sh
@@ -145,7 +162,7 @@ gap: db            ## a ranked header gap (SOURCE=1: bodies; SWEEP=1: complete h
 # 5 835 generated translation units must never be in the way of the one-second loop that repairs
 # them. Ninja stops at the first failing edge, which is the point -- every error in `apps/` is one
 # generic gap in `src/`, so the second error is almost always the first one again.
-apps: all          ## the generated tree, stopping at the first error
+apps: comments db  ## the complete generated app tree, independently of the diagnostic slice
 	@cmake -S $(SELF) -B $(B)/apps -G Ninja \
 	  -DCMAKE_CXX_COMPILER=$(CXX) -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
 	  -DAGIRU_BUILD_APPS=ON > /dev/null
@@ -205,6 +222,10 @@ ut:                ## count source tests, build, then run the UT milestone on di
 	@bash "$(SELF)/scripts/ut-milestone.sh" "$(UT_LOG)" "$(JOBS)" --build
 
 VERIFY_TARGETS ?= all test
+VERIFY_CHECKS ?= SnapshotGate NativeToolchainGate
+verify-check:       ## check snapshot isolation and tooling without rebuilding C++
+	@B="$(B)" PYTHONDONTWRITEBYTECODE=1 python3 $(SELF)/test/tooling/toolchain.py $(VERIFY_CHECKS)
+
 verify:             ## freeze this worktree and verify the copy (VERIFY_TARGETS overrides jobs)
 	@python3 $(SELF)/scripts/verify_snapshot.py start --reuse --jobs $(JOBS) $(VERIFY_TARGETS)
 

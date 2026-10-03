@@ -228,10 +228,13 @@ option(AGIRU_BUILD_SLICE "Build the generated slice in the CLI" ON)
 
 include(cmake/GeneratedLink.cmake)
 file(GLOB_RECURSE platform_sources CONFIGURE_DEPENDS "apps/platform/*.cpp")
-if(platform_sources)
+file(GLOB_RECURSE platform_headers CONFIGURE_DEPENDS "apps/platform/*.h")
+if(platform_sources OR platform_headers)
   if(NOT EXISTS "${CMAKE_SOURCE_DIR}/apps/platform/PlatformModule.h")
-    message(FATAL_ERROR "Generated native reports lack their source-owned platform module.")
+    message(FATAL_ERROR "Generated native objects lack their source-owned platform module.")
   endif()
+endif()
+if(platform_sources)
   add_library(agiru_app_platform SHARED ${platform_sources})
   target_include_directories(agiru_app_platform PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
@@ -239,14 +242,17 @@ if(platform_sources)
   target_link_libraries(agiru_app_platform PRIVATE agiru_rt agiru_net agiru_db)
   target_compile_options(agiru_app_platform PRIVATE ${AGIRU_GENERATED_FLAGS})
   agiru_link_generated(agiru agiru_app_platform)
+elseif(platform_headers)
+  add_library(agiru_app_platform INTERFACE)
+  target_include_directories(agiru_app_platform INTERFACE "${CMAKE_SOURCE_DIR}/apps/platform")
 endif()
 
 option(AGIRU_NATIVE_LINK_PROOF "Build the registry-only native-library verification consumer" OFF)
 if(AGIRU_NATIVE_LINK_PROOF)
-  if(NOT TARGET agiru_app_platform)
+  if(NOT platform_sources)
     message(FATAL_ERROR "The native linking proof requires source-generated platform reports.")
   endif()
-  add_executable(native_report_registry test/report-layouts/RegistryRunner.cpp)
+  add_executable(native_report_registry test/reporting/report-layouts/RegistryRunner.cpp)
   target_include_directories(native_report_registry PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate")
   target_link_libraries(native_report_registry PRIVATE agiru_rt)
@@ -335,7 +341,7 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
     # `ENABLE_EXPORTS` is what puts the definitions where the shared object's lazy lookup finds
     # them.
     set(slice_definitions agiru_rt agiru_net agiru_db)
-    if(TARGET agiru_app_platform)
+    if(platform_sources)
       list(APPEND slice_definitions agiru_app_platform)
     endif()
     set(slice_definition_files)
@@ -420,10 +426,10 @@ endif()
 # a case references, and a table's catalogue registration -- a namespace-scope `RegisterTable` in
 # its own definition unit -- is referenced by nothing, so it was dropped and `RecordRef.Open(202)`
 # found "no table 202" in every gate that opened one (measured 2026-09-10).
-file(GLOB target_image CONFIGURE_DEPENDS "test/target/*.cpp")
+file(GLOB target_image CONFIGURE_DEPENDS "test/transpiler/golden/*.cpp")
 add_library(gate_image OBJECT ${target_image})
 target_include_directories(gate_image PUBLIC
-  "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/target")
+  "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/transpiler/golden")
 
 file(GLOB gate_cases CONFIGURE_DEPENDS "test/gate/*.cpp")
 add_custom_target(gates)
@@ -436,7 +442,7 @@ foreach(case IN LISTS gate_cases)
   # parser or a generator has no public door to be tested through.
   target_include_directories(gate_${name} PRIVATE
     "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate"
-    "${CMAKE_SOURCE_DIR}/test/target")
+    "${CMAKE_SOURCE_DIR}/test/transpiler/golden")
   foreach(tier IN LISTS TIERS)
     target_include_directories(gate_${name} PRIVATE "${CMAKE_SOURCE_DIR}/src/${tier}")
   endforeach()

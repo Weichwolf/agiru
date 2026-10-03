@@ -59,7 +59,7 @@
 # `requires { value.ToInvariantString(); }` share a BODY and not a condition. The order decides
 # which of a type's two renderings is used, so merging them would change the answer.
 
-# `clang-analyzer-optin.performance.Padding` IS ON, WITH ITS THRESHOLD SET IN `test/lint.sh`. It found 57 padding bytes in `FieldDef` -- stored once per field -- and the
+# `clang-analyzer-optin.performance.Padding` IS ON, WITH ITS THRESHOLD SET IN `test/tooling/lint.sh`. It found 57 padding bytes in `FieldDef` -- stored once per field -- and the
 # reorder took it from 568 to 512 bytes and the library from 938.40 to 936.53 MB over 27 666 fields
 # (measured 2026-09-07). What it names now is `Declared`, and that one is NEVER STORED: it is the
 # parameter object `Declare()` takes, so its 48 bytes cost nothing at rest. Following it there means
@@ -67,7 +67,7 @@
 # declaration order -- 101 lines of generator, a transpile and a full build, for zero bytes.
 #
 # `optin.performance.Padding:AllowedPad` is the threshold, and it travels the way the node budget
-# travels -- as an `-analyzer-config` argument in `test/lint.sh`. Under `CheckOptions` it never
+# travels -- as an `-analyzer-config` argument in `test/tooling/lint.sh`. Under `CheckOptions` it never
 # arrives, because the analyser reads its own configuration and not clang-tidy's.
 #
 # THE OLD TEXT, kept because it says what the check is worth:: it found 57 padding bytes

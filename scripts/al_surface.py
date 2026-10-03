@@ -86,7 +86,7 @@ def doxygen_xml() -> pathlib.Path:
     IT REGENERATES RATHER THAN RETURNING NOTHING. This directory is not build output anybody makes
     on the way here: `make` does not run doxygen, so a fresh checkout or a `make clean` leaves it
     absent, and a counter that reads an absent directory reports 0 of 1 253 implemented and calls
-    it a measurement. That is CLAUDE.md's blind gate, and it was live: `test/surface-baseline`
+    it a measurement. That is CLAUDE.md's blind gate, and it was live: `test/tooling/baselines/surface`
     says 1173 and this script answered 0 (measured 2026-09-07).
     """
     xml = ROOT / "build" / "doc" / "xml"

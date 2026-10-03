@@ -17,6 +17,11 @@ EXCLUDED = {'.git', 'build', 'build-asan', 'work', 'compile_commands.json'}
 CACHE_DIRS = {'__pycache__', '.pytest_cache'}
 
 
+def verification_root(root=None):
+    identity = hashlib.sha256(str((root or ROOT).resolve()).encode()).hexdigest()[:16]
+    return Path('/tmp/agiru-verify') / identity
+
+
 def files(root):
     for base, directories, names in os.walk(root, followlinks=False):
         if Path(base) == root:
@@ -80,17 +85,24 @@ def has_links(root):
     return root.is_symlink() or any(path.is_symlink() for path in root.rglob('*'))
 
 
+def input_digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else digest(path)
+
+
 def freeze_input(source, destination, name):
-    if not source.is_dir():
-        raise RuntimeError(f'{name} input is not a directory: {source}')
+    if not source.is_dir() and not source.is_file():
+        raise RuntimeError(f'{name} input is not a file or directory: {source}')
     if has_links(source):
         raise RuntimeError(f'{name} input contains an unfrozen symlink')
-    before = digest(source)
-    copy_source(source, destination)
-    frozen = digest(destination)
+    before = input_digest(source)
+    if source.is_dir():
+        copy_source(source, destination)
+    else:
+        shutil.copy2(source, destination)
+    frozen = input_digest(destination)
     if has_links(destination):
         raise RuntimeError(f'{name} frozen input contains an unfrozen symlink')
-    if frozen != before or digest(source) != before:
+    if frozen != before or input_digest(source) != before:
         raise RuntimeError(f'{name} source changed during snapshot; verification was not started')
     return frozen
 
@@ -129,13 +141,31 @@ def sync_source(source, destination):
         (destination / relative).unlink()
 
 
+def receipt_state(path):
+    result = json.loads(path.read_text())
+    pid = result.get('pid')
+    if result['status'] != 'running' or not isinstance(pid, int) or pid <= 0:
+        return result['status']
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        result.update(status='failed', exit_code=2,
+                      interruption='runner PID no longer exists; verification is incomplete',
+                      finished_utc=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()))
+        result.setdefault('target_exits', {})['interrupted'] = 2
+        write_json(path, result)
+    except PermissionError:
+        pass
+    return result['status']
+
+
 def prepare_lane(parent, archive, head, expected):
     lane = parent / 'lane'
     lane.mkdir(exist_ok=True)
     latest = lane / 'latest'
     if latest.exists():
         previous = Path(latest.read_text().strip()) / 'result.json'
-        if json.loads(previous.read_text())['status'] not in ('passed', 'failed'):
+        if receipt_state(previous) not in ('passed', 'failed'):
             raise RuntimeError('the integration lane is still running')
     source = lane / 'source'
     if not source.exists():
@@ -161,7 +191,7 @@ def write_json(path, value):
 
 def start(arguments):
     stamp = time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())
-    parent = ROOT / 'build/verify'
+    parent = verification_root()
     parent.mkdir(parents=True, exist_ok=True)
     run = parent / f'{stamp}-{os.getpid()}'
     source = run / 'source'
@@ -195,6 +225,10 @@ def start(arguments):
             metadata['bc_source_revision'] = (
                 lines[1] if revision.returncode == 0 and len(lines) == 2
                 and Path(lines[0]).resolve() != ROOT.resolve() else None)
+            notice = Path(os.environ.get('AGIRU_LAYOUT_SOURCE_NOTICE', bc.parent / 'LICENSE'))
+            if notice.exists() or 'AGIRU_LAYOUT_SOURCE_NOTICE' in os.environ:
+                metadata['layout_source_notice_sha256'] = freeze_input(
+                    notice, run / 'layout_source_notice', 'BC source notice')
         if configured := os.environ.get('AGIRU_SYSTEM_SYMBOLS'):
             symbols = Path(configured).resolve()
             if not all((symbols / name).is_file() for name in
@@ -254,6 +288,7 @@ def run_snapshot(run):
         environment.pop(name, None)
     environment.pop('AGIRU_BC_REVISION', None)
     environment.pop('AGIRU_SYSTEM_SYMBOLS', None)
+    environment.pop('AGIRU_LAYOUT_SOURCE_NOTICE', None)
     build_source = Path(metadata.get('build_source', run / 'source'))
     if (run / 'bc_source').exists():
         environment['AGIRU_BC_SOURCE'] = str(run / 'bc_source')
@@ -261,6 +296,13 @@ def run_snapshot(run):
             environment['AGIRU_BC_REVISION'] = metadata['bc_source_revision']
     start_time = time.monotonic()
     outcomes = {}
+    notice = run / 'layout_source_notice'
+    expected_notice = metadata.get('layout_source_notice_sha256')
+    if expected_notice:
+        if not notice.is_file() or has_links(notice) or input_digest(notice) != expected_notice:
+            outcomes['layout_source_notice_immutable'] = 1
+        else:
+            environment['AGIRU_LAYOUT_SOURCE_NOTICE'] = str(notice)
     symbols = run / 'system_symbols'
     expected_symbols = metadata.get('system_symbols_sha256')
     if expected_symbols:
@@ -272,8 +314,8 @@ def run_snapshot(run):
         for target in metadata['targets']:
             output.write(f'VERIFY TARGET {target}\n')
             output.flush()
-            if outcomes.get('system_symbols_immutable'):
-                output.write('VERIFY REFUSED: frozen System symbols identity differs\n')
+            if outcomes.get('system_symbols_immutable') or outcomes.get('layout_source_notice_immutable'):
+                output.write('VERIFY REFUSED: frozen dependency identity differs\n')
                 outcomes[target] = 2
                 continue
             command = ['make', '-C', str(build_source), f'JOBS={metadata["jobs"]}', target]
@@ -295,6 +337,11 @@ def run_snapshot(run):
         metadata['post_system_symbols_sha256'] = digest(symbols)
         if metadata['post_system_symbols_sha256'] != expected_symbols or has_links(symbols):
             outcomes['system_symbols_immutable'] = 1
+    if expected_notice:
+        metadata['post_layout_source_notice_sha256'] = (
+            input_digest(notice) if notice.is_file() else None)
+        if metadata['post_layout_source_notice_sha256'] != expected_notice or has_links(notice):
+            outcomes['layout_source_notice_immutable'] = 1
     status = 0 if all(code == 0 for code in outcomes.values()) else 1
     metadata['target_exits'] = outcomes
     metadata['status'] = 'passed' if status == 0 else 'failed'
@@ -307,7 +354,7 @@ def run_snapshot(run):
 
 
 def clean_snapshots():
-    parent = ROOT / 'build/verify'
+    parent = verification_root()
     if not parent.exists():
         return 0
     runs = sorted(path for path in parent.iterdir() if path.is_dir() and path.name != 'lane')
@@ -315,7 +362,7 @@ def clean_snapshots():
         result = run / 'result.json'
         if not result.exists():
             raise RuntimeError(f'{run} has no result; inspect it before cleaning')
-        state = json.loads(result.read_text())['status']
+        state = receipt_state(result)
         if state not in ('passed', 'failed'):
             raise RuntimeError(f'{run} is {state}; wait for it before cleaning')
     for run in runs:
@@ -355,7 +402,7 @@ def main():
         return run_snapshot(arguments.snapshot)
     if arguments.command == 'clean':
         return clean_snapshots()
-    snapshot = arguments.snapshot or Path((ROOT / 'build/verify/latest').read_text().strip())
+    snapshot = arguments.snapshot or Path((verification_root() / 'latest').read_text().strip())
     print((snapshot / 'result.json').read_text(), end='')
     return 0
 

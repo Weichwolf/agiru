@@ -3,7 +3,7 @@ set -euo pipefail
 root=$(realpath "${1:-$(dirname "$0")/..}")
 B=${B:-$root/build}
 mkdir -p "$B"
-proof=$(mktemp -d "$B/slice-check.XXXXXX")
+proof=$(mktemp -d /tmp/agiru-slice-check.XXXXXX)
 python3 "$root/scripts/unity_groups.py" "$root/test/slice" > "$proof/sources.tsv"
 count=0
 missing=0

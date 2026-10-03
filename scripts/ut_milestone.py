@@ -116,7 +116,7 @@ def require_current_image():
             raise ValueError(f'cannot refresh the build graph: {configured.stderr}')
         # CMake's always-dirty glob edge makes a dry run of build.ninja stop at
         # regeneration. An alternate manifest checks actual image dependencies.
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.ninja', dir=build) as manifest:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.ninja', dir='/tmp') as manifest:
             manifest.write((build / 'build.ninja').read_text())
             manifest.flush()
             result = subprocess.run(['ninja', '-C', str(build), '-f', manifest.name, '-n', 'agiru'],

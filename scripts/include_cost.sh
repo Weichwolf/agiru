@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 B=${B:-build}
 mkdir -p "$B"
-proof=$(mktemp -d "$B/include-cost.XXXXXX")
+proof=$(mktemp -d /tmp/agiru-include-cost.XXXXXX)
 CXX=${CXX:-clang++-19}
 input_root=$(realpath "${INCLUDE_ROOT:-$PWD}")
 rounds=${ROUNDS:-3}

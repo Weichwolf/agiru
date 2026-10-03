@@ -6,7 +6,7 @@ if [ "$#" -ne 3 ]; then
   exit 2
 fi
 B=$(realpath "${B:-build}")
-proof=$(mktemp -d "$B/transpile.XXXXXX")
+proof=$(mktemp -d /tmp/agiru-transpile.XXXXXX)
 printf '%s\n' "$proof" > "$B/transpile.latest"
 arguments=("$1" "$2" "$3")
 sha256sum "$B/agirutc" "$2" "$(dirname "$2")/scope.json" > "$proof/inputs.sha256"
