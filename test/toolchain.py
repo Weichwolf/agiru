@@ -1198,6 +1198,144 @@ esac
         self.assertIn('the seed is incomplete', errors.getvalue())
 
 
+class GeneratedRegistrationLinkGate(unittest.TestCase):
+    def prove_registration(self, kind):
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            shutil.copyfile(repository / 'cmake/GeneratedLink.cmake', root / 'GeneratedLink.cmake')
+            (root / 'registry.cpp').write_text(
+                'namespace { int stored = 0; }\n'
+                'int Remember(int value) { stored = value; return value; }\n'
+                'int Observed() { return stored; }\n')
+            (root / 'generated.cpp').write_text(
+                'int Remember(int);\n'
+                'namespace { [[maybe_unused]] const int registration = Remember(42); }\n')
+            (root / 'consumer.cpp').write_text(
+                'int Observed();\nint main() { return Observed() == 42 ? 0 : 1; }\n')
+            (root / 'CMakeLists.txt').write_text('''cmake_minimum_required(VERSION 3.28)
+project(GeneratedRegistration CXX)
+set(CMAKE_CXX_STANDARD 23)
+add_compile_options(-stdlib=libc++ -Wall -Wextra -Wpedantic -Werror)
+add_link_options(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
+include(GeneratedLink.cmake)
+add_library(registry SHARED registry.cpp)
+add_library(generated ''' + kind + ''' generated.cpp)
+target_link_libraries(generated PRIVATE registry)
+add_library(dependency INTERFACE)
+target_link_libraries(dependency INTERFACE generated)
+add_executable(retained consumer.cpp)
+target_link_options(retained PRIVATE "LINKER:--as-needed")
+target_link_libraries(retained PRIVATE dependency registry)
+agiru_link_generated(retained generated)
+add_executable(dropped consumer.cpp)
+target_link_options(dropped PRIVATE "LINKER:--as-needed")
+target_link_libraries(dropped PRIVATE generated registry)
+''')
+            build = root / 'build'
+            configured = subprocess.run(['cmake', '-S', str(root), '-B', str(build),
+                                         '-G', 'Ninja', '-DCMAKE_CXX_COMPILER=clang++-19'],
+                                        capture_output=True, text=True, timeout=60)
+            self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+            compiled = subprocess.run(['cmake', '--build', str(build), '-j', '2'],
+                                      capture_output=True, text=True, timeout=60)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+            retained = subprocess.run([str(build / 'retained')], capture_output=True, timeout=10)
+            self.assertEqual(retained.returncode, 0, retained.stderr)
+            dropped = subprocess.run([str(build / 'dropped')], capture_output=True, timeout=10)
+            self.assertEqual(dropped.returncode, 1, dropped.stderr)
+            if kind == 'SHARED':
+                for binary, expected in (('retained', True), ('dropped', False)):
+                    needed = subprocess.run(['readelf', '-d', str(build / binary)],
+                                            capture_output=True, text=True, check=True)
+                    self.assertEqual('libgenerated.so' in needed.stdout, expected)
+
+    def test_shared_registration_survives_as_needed_and_transitive_edges(self):
+        self.prove_registration('SHARED')
+
+    def test_static_registration_survives_archive_extraction(self):
+        self.prove_registration('STATIC')
+
+
+class UnlinkedProceduresGate(unittest.TestCase):
+    def setUp(self):
+        self.repository = Path(__file__).resolve().parents[1]
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.flags = ['clang++-19', '-std=c++23', '-stdlib=libc++', '-Wall', '-Wextra',
+                      '-Wpedantic', '-Werror']
+        self.links = ['--rtlib=compiler-rt', '--unwindlib=libunwind', '-fuse-ld=lld-19']
+
+    def shared(self, name, source):
+        path = self.root / f'{name}.cpp'
+        path.write_text(source)
+        library = self.root / f'lib{name}.so'
+        result = subprocess.run(self.flags + self.links + ['-fPIC', '-shared', str(path), '-o', str(library)],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return library
+
+    def generate(self, library, definitions=()):
+        self.output = self.root / 'unlinked.cpp'
+        return subprocess.run([sys.executable, str(self.repository / 'scripts/unlinked.py'),
+                               str(self.output), str(library), *map(str, definitions)],
+                              capture_output=True, text=True, timeout=30)
+
+    def test_no_missing_procedures_emit_no_unused_helper(self):
+        library = self.shared('slice', 'namespace agiru { void Present() {} }\n')
+        generated = self.generate(library)
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        self.assertIn('0 AL procedure(s)', generated.stdout)
+        self.assertNotIn('void Unlinked', self.output.read_text())
+        compiled = subprocess.run(self.flags + ['-c', str(self.output), '-o', str(self.root / 'empty.o')],
+                                  capture_output=True, text=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        self.output.write_text('namespace { void Unlinked() {} }\n')
+        control = subprocess.run(self.flags + ['-c', str(self.output), '-o', str(self.root / 'control.o')],
+                                 capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(control.returncode, 0)
+        self.assertIn('-Wunused-function', control.stderr)
+
+    def test_missing_procedure_raises_but_linked_definition_is_not_replaced(self):
+        library = self.shared('slice', 'namespace agiru { void Missing(); void Call() { Missing(); } }\n')
+        generated = self.generate(library)
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        self.assertIn('1 AL procedure(s)', generated.stdout)
+        consumer = self.root / 'consumer.cpp'
+        consumer.write_text('''#include "runtime/ErrorValue.h"
+#include <string_view>
+namespace agiru { void Call(); }
+int main() {
+  try { agiru::Call(); }
+  catch (const agiru::Error& error) {
+    return std::string_view(error.what()).find("agiru::Missing()") == std::string_view::npos;
+  }
+  return 2;
+}
+''')
+        executable = self.root / 'consumer'
+        compiled = subprocess.run(self.flags + self.links + ['-I' + str(self.repository / 'include'),
+            str(consumer), str(self.output), str(library), '-Wl,--export-dynamic',
+            '-Wl,-rpath,' + str(self.root), '-o', str(executable)],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stderr)
+        executed = subprocess.run([str(executable)], capture_output=True, timeout=10)
+        self.assertEqual(executed.returncode, 0, executed.stderr)
+        definition = self.shared('platform', 'namespace agiru { void Missing() {} }\n')
+        resolved = self.generate(library, [definition])
+        self.assertEqual(resolved.returncode, 0, resolved.stderr)
+        self.assertIn('0 AL procedure(s)', resolved.stdout)
+        self.assertNotIn('agiru_unlinked_', self.output.read_text())
+
+    def test_missing_data_refuses_instead_of_emitting_a_function(self):
+        library = self.shared('slice', 'namespace agiru { extern int MissingData; int Call() { return MissingData; } }\n')
+        refused = self.generate(library)
+        self.assertNotEqual(refused.returncode, 0)
+        self.assertIn('agiru::MissingData is DATA', refused.stderr)
+        self.assertFalse(self.output.exists())
+
+
 class CompilerCacheGate(unittest.TestCase):
     def test_missing_generated_slice_input_does_not_disable_handwritten_gates(self):
         cmake = (SCRIPT.parents[1] / 'CMakeLists.txt').read_text()

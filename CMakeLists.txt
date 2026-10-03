@@ -226,6 +226,34 @@ set(AGIRU_BC_SOURCE "$ENV{HOME}/Git/BCApps/src"
 option(AGIRU_BUILD_APPS "Build the transpiled apps under apps/" OFF)
 option(AGIRU_BUILD_SLICE "Build the generated slice in the CLI" ON)
 
+include(cmake/GeneratedLink.cmake)
+file(GLOB_RECURSE platform_sources CONFIGURE_DEPENDS "apps/platform/*.cpp")
+if(platform_sources)
+  if(NOT EXISTS "${CMAKE_SOURCE_DIR}/apps/platform/PlatformModule.h")
+    message(FATAL_ERROR "Generated native reports lack their source-owned platform module.")
+  endif()
+  add_library(agiru_app_platform SHARED ${platform_sources})
+  target_include_directories(agiru_app_platform PRIVATE
+    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
+    "${CMAKE_SOURCE_DIR}/apps/shared" "${CMAKE_SOURCE_DIR}/apps/platform")
+  target_link_libraries(agiru_app_platform PRIVATE agiru_rt agiru_net agiru_db)
+  target_compile_options(agiru_app_platform PRIVATE ${AGIRU_GENERATED_FLAGS})
+  agiru_link_generated(agiru agiru_app_platform)
+endif()
+
+option(AGIRU_NATIVE_LINK_PROOF "Build the registry-only native-library verification consumer" OFF)
+if(AGIRU_NATIVE_LINK_PROOF)
+  if(NOT TARGET agiru_app_platform)
+    message(FATAL_ERROR "The native linking proof requires source-generated platform reports.")
+  endif()
+  add_executable(native_report_registry test/report-layouts/RegistryRunner.cpp)
+  target_include_directories(native_report_registry PRIVATE
+    "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/test/gate")
+  target_link_libraries(native_report_registry PRIVATE agiru_rt)
+  target_link_options(native_report_registry PRIVATE "LINKER:--as-needed")
+  agiru_link_generated(native_report_registry agiru_app_platform)
+endif()
+
 # THE SLICE, while AGIRU_BUILD_APPS is off: the generated sources named in `test/slice` are built
 # and linked into `agiru`, so the CLI has real AL objects to run. Comments and blank lines are
 # skipped; every other line is a path under `apps/`. A named file that does not compile makes `make`
@@ -275,6 +303,10 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
       target_include_directories(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/apps/${slice_app}")
     endforeach()
     target_link_libraries(agiru_slice PRIVATE agiru_rt agiru_net agiru_db)
+    if(TARGET agiru_app_platform)
+      target_include_directories(agiru_slice PRIVATE "${CMAKE_SOURCE_DIR}/apps/platform")
+      target_link_libraries(agiru_slice PRIVATE agiru_app_platform)
+    endif()
     # THE DOOR IS PARSED ONCE AND NOT ONCE PER FILE. `cmake/Precompiled.h` is the union of it, and
     # generated source takes (measured 2026-09-03 on the previous toolchain), and 5 835 of them
     # read it. A precompiled header is 1.1 s built once. It is not a substitute for a generated file
@@ -289,7 +321,7 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
     set_target_properties(agiru_slice PROPERTIES UNITY_BUILD ON UNITY_BUILD_MODE GROUP
                                                  UNITY_BUILD_BATCH_SIZE 32)
     target_compile_options(agiru_slice PRIVATE ${AGIRU_GENERATED_FLAGS})
-    target_link_libraries(agiru PRIVATE agiru_slice)
+    agiru_link_generated(agiru agiru_slice)
 
     # AN AL PROCEDURE THE SLICE CALLS AND NO LINKED SOURCE DEFINES RAISES, rather than killing the
     # process. Those calls leave undefined FUNCTION symbols, which the loader binds lazily -- and a
@@ -302,12 +334,20 @@ if(AGIRU_BUILD_SLICE AND NOT AGIRU_BUILD_APPS AND EXISTS "${CMAKE_SOURCE_DIR}/te
     # the file is generated FROM `libagiru_slice.so` and compiled into `agiru` afterwards.
     # `ENABLE_EXPORTS` is what puts the definitions where the shared object's lazy lookup finds
     # them.
+    set(slice_definitions agiru_rt agiru_net agiru_db)
+    if(TARGET agiru_app_platform)
+      list(APPEND slice_definitions agiru_app_platform)
+    endif()
+    set(slice_definition_files)
+    foreach(definition IN LISTS slice_definitions)
+      list(APPEND slice_definition_files "$<TARGET_FILE:${definition}>")
+    endforeach()
     add_custom_command(
       OUTPUT "${CMAKE_BINARY_DIR}/unlinked.cpp"
       COMMAND "${CMAKE_COMMAND}" -E env python3 "${CMAKE_SOURCE_DIR}/scripts/unlinked.py"
               "${CMAKE_BINARY_DIR}/unlinked.cpp" "$<TARGET_FILE:agiru_slice>"
-              "$<TARGET_FILE:agiru_rt>" "$<TARGET_FILE:agiru_net>" "$<TARGET_FILE:agiru_db>"
-      DEPENDS agiru_slice agiru_rt agiru_net agiru_db "${CMAKE_SOURCE_DIR}/scripts/unlinked.py"
+              ${slice_definition_files}
+      DEPENDS agiru_slice ${slice_definitions} "${CMAKE_SOURCE_DIR}/scripts/unlinked.py"
       COMMENT "the AL procedures the slice calls and no linked source defines")
     target_sources(agiru PRIVATE "${CMAKE_BINARY_DIR}/unlinked.cpp")
     set_source_files_properties("${CMAKE_BINARY_DIR}/unlinked.cpp" PROPERTIES
@@ -323,19 +363,6 @@ endif()
 # `absent` IS EVERY APP'S, because it is not an app: it is the one file naming every AL object and
 # .NET type this run does not have, written by the transpiler for the whole run (board:0035).
 if(AGIRU_BUILD_APPS)
-  file(GLOB_RECURSE platform_sources CONFIGURE_DEPENDS "apps/platform/*.cpp")
-  if(platform_sources)
-    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/apps/platform/PlatformModule.h")
-      message(FATAL_ERROR "Generated native reports lack their source-owned platform module.")
-    endif()
-    add_library(agiru_app_platform SHARED ${platform_sources})
-    target_include_directories(agiru_app_platform PRIVATE
-      "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
-      "${CMAKE_SOURCE_DIR}/apps/shared" "${CMAKE_SOURCE_DIR}/apps/platform")
-    target_link_libraries(agiru_app_platform PRIVATE agiru_rt)
-    target_compile_options(agiru_app_platform PRIVATE ${AGIRU_GENERATED_FLAGS})
-    target_link_libraries(agiru PRIVATE agiru_app_platform)
-  endif()
   file(READ "${CMAKE_SOURCE_DIR}/apps.json" apps_json)
   string(JSON app_count LENGTH "${apps_json}" apps)
   math(EXPR app_last "${app_count} - 1")
@@ -350,7 +377,7 @@ if(AGIRU_BUILD_APPS)
       "${CMAKE_SOURCE_DIR}/include" "${CMAKE_SOURCE_DIR}/apps/absent"
       "${CMAKE_SOURCE_DIR}/apps/shared"
       "${CMAKE_SOURCE_DIR}/apps/${app}")
-    target_link_libraries(agiru_app_${app} PRIVATE agiru_rt)
+    target_link_libraries(agiru_app_${app} PRIVATE agiru_rt agiru_net agiru_db)
     if(TARGET agiru_app_platform)
       target_include_directories(agiru_app_${app} PRIVATE "${CMAKE_SOURCE_DIR}/apps/platform")
       target_link_libraries(agiru_app_${app} PRIVATE agiru_app_platform)
@@ -374,7 +401,7 @@ if(AGIRU_BUILD_APPS)
         endforeach()
       endif()
     endif()
-    target_link_libraries(agiru PRIVATE agiru_app_${app})
+    agiru_link_generated(agiru agiru_app_${app})
   endforeach()
 endif()
 

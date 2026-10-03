@@ -13,7 +13,8 @@ base="${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}/Layers/W1/BaseApp"
 proof=$(mktemp -d "$B/native-report-layouts.XXXXXX")
 printf '%s\n' "$proof" > "$B/native-report-layouts.latest"
 git rev-parse HEAD > "$proof/head.txt"
-rg --files src/gen src/tc include cmake test/report-layouts test/native-report-layouts.sh CMakeLists.txt \
+rg --files src/gen src/tc include cmake test/report-layouts test/native-report-layouts.sh \
+  scripts/unlinked.py CMakeLists.txt \
   | LC_ALL=C sort | xargs -d '\n' sha256sum > "$proof/compiler-inputs.sha256"
 sha256sum "$B/agirutc" "$B/libagiru_gen.so" "$B/libagiru_al.so" \
   "$B/libagiru_rt.so" "$B/libagiru_net.so" "$B/libagiru_db.so" >> "$proof/compiler-inputs.sha256"
@@ -59,7 +60,7 @@ compile() {
   rg --files --no-ignore "$generated" -g '*.cpp' | LC_ALL=C sort > "$output.sources"
   mapfile -t sources < "$output.sources"
   [ "${#sources[@]}" -gt 0 ]
-  local includes=("-I$generated/native" "-I$generated/platform" "-I$generated/shared")
+  local includes=("-I$generated/native" "-I$generated/platform" "-I$generated/base" "-I$generated/shared")
   "$CXX" "${flags[@]}" "${includes[@]}" -c test/report-layouts/NativeRunner.cpp -o "$output.runner.o"
   "$CXX" "${flags[@]}" "${includes[@]}" "$output.runner.o" "${sources[@]}" "${links[@]}" -o "$output"
 }
@@ -125,6 +126,7 @@ mkdir -p "$source_input/base/Foundation/Reporting"
 cp "$input/base/app.json" "$source_input/base/app.json"
 cp "$input/base/Foundation/Reporting/CompositeLayout.ReportExt.al" \
   "$source_input/base/Foundation/Reporting/"
+cp test/report-layouts/LinkConsumer.Report.al "$source_input/base/"
 cp "$input/scope.json" "$source_input/scope.json"
 printf '%s\n' '{"apps":[{"name":"base","source":"base"}]}' > "$source_input/apps.json"
 loader_status=0
@@ -186,13 +188,59 @@ cp CMakeLists.txt "$cmake_input/"
 cp -a src include cmake third_party test scripts "$cmake_input/"
 cp -a "$proof/source-bound" "$cmake_input/apps"
 cp "$source_input/apps.json" "$cmake_input/apps.json"
+cp test/report-layouts/link-slice "$cmake_input/test/slice"
 cmake -S "$cmake_input" -B "$proof/cmake-build" -G Ninja \
-  -DCMAKE_CXX_COMPILER="$CXX" -DAGIRU_BUILD_SLICE=OFF -DAGIRU_BUILD_APPS=ON \
+  -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  -DAGIRU_BUILD_SLICE=OFF -DAGIRU_BUILD_APPS=ON -DAGIRU_NATIVE_LINK_PROOF=ON \
   > "$proof/cmake-configure.log" 2>&1
 cmake --build "$proof/cmake-build" --target help > "$proof/cmake-targets.log"
 rg -q 'agiru_app_platform' "$proof/cmake-targets.log"
 jq -e '[.[] | select(.file | contains("/apps/platform/"))] | length == 2' \
   "$proof/cmake-build/compile_commands.json" > /dev/null
+cmake --build "$proof/cmake-build" -j "${JOBS:-2}" --target native_report_registry agiru \
+  > "$proof/cmake-build.log" 2>&1
+"$proof/cmake-build/native_report_registry" 2000000001 'Tenant Report Defaults' \
+  > "$proof/shared-registry.log"
+readelf -d "$proof/cmake-build/native_report_registry" > "$proof/shared-registry-needed.log"
+rg -q 'Shared library: \[libagiru_app_platform.so\]' "$proof/shared-registry-needed.log"
+readelf -d "$proof/cmake-build/agiru" > "$proof/cli-apps-needed.log"
+rg -q 'Shared library: \[libagiru_app_platform.so\]' "$proof/cli-apps-needed.log"
+"$proof/cmake-build/agiru" --help > "$proof/cli-apps-help.log"
+"$CXX" "${flags[@]}" -c test/report-layouts/RegistryRunner.cpp -o "$proof/registry-runner.o"
+"$CXX" "$proof/registry-runner.o" -stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind \
+  -fuse-ld=lld-19 -Wl,--as-needed "-L$proof/cmake-build" "-Wl,-rpath,$proof/cmake-build" \
+  -lagiru_app_platform -lagiru_rt -o "$proof/dropped-registry"
+if "$proof/dropped-registry" 2000000001 'Tenant Report Defaults' > "$proof/dropped-registry.log" 2>&1; then
+  printf 'native-report-layouts: dropping unreferenced registration escaped the lookup control\n' >&2
+  exit 1
+fi
+rg -q 'registry-only lookup finds the linked native report' "$proof/dropped-registry.log"
+readelf -d "$proof/dropped-registry" > "$proof/dropped-registry-needed.log"
+if rg -q 'Shared library: \[libagiru_app_platform.so\]' "$proof/dropped-registry-needed.log"; then
+  printf 'native-report-layouts: negative control did not actually drop the library\n' >&2
+  exit 1
+fi
+cmake -S "$cmake_input" -B "$proof/cmake-build" -G Ninja \
+  -DCMAKE_CXX_COMPILER="$CXX" -DAGIRU_BUILD_SLICE=ON -DAGIRU_BUILD_APPS=OFF \
+  -DAGIRU_NATIVE_LINK_PROOF=ON > "$proof/cmake-slice-configure.log" 2>&1
+cmake --build "$proof/cmake-build" -j "${JOBS:-2}" --target native_report_registry agiru \
+  > "$proof/cmake-slice-build.log" 2>&1
+rg -q 'unlinked: 0 AL procedure\(s\)' "$proof/cmake-slice-build.log"
+if rg -q 'agiru_unlinked_|void Unlinked' "$proof/cmake-build/unlinked.cpp"; then
+  printf 'native-report-layouts: a linked native entrypoint was replaced by a refusal\n' >&2
+  exit 1
+fi
+"$proof/cmake-build/native_report_registry" 2000000001 'Tenant Report Defaults' \
+  > "$proof/shared-registry-slice.log"
+readelf -d "$proof/cmake-build/agiru" > "$proof/cli-slice-needed.log"
+rg -q 'Shared library: \[libagiru_app_platform.so\]' "$proof/cli-slice-needed.log"
+rg -q 'Shared library: \[libagiru_slice.so\]' "$proof/cli-slice-needed.log"
+"$proof/cmake-build/agiru" --help > "$proof/cli-slice-help.log"
+mkdir -p "$B/fixture-commands"
+jq --arg repository "$PWD" \
+  '[.[] | select(.file | endswith("/test/report-layouts/RegistryRunner.cpp")) |
+    .file = ($repository + "/test/report-layouts/RegistryRunner.cpp")]' \
+  "$proof/cmake-build/compile_commands.json" > "$B/fixture-commands/native-registry.json"
 mv "$cmake_input/apps/platform/PlatformModule.h" "$cmake_input/apps/platform/PlatformModule.h.absent"
 if cmake -S "$cmake_input" -B "$proof/cmake-missing-module" -G Ninja \
   -DCMAKE_CXX_COMPILER="$CXX" -DAGIRU_BUILD_SLICE=OFF -DAGIRU_BUILD_APPS=ON \
@@ -217,6 +265,9 @@ jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile package "$package/
     unexecuted_native_objects:$raw[0].summary.objects,installed_assets:0,rendered_documents:0,
     production_native_report_loader_activated:true,complete_native_loader_activated:false,
     source_bound_compiled_layouts:16,source_bound_translation_exit:1,
-    cmake_platform_configured:true,cmake_platform_build_executed:false,
+    cmake_platform_configured:true,cmake_platform_build_executed:true,
+    shared_registry_proved:true,registration_drop_control:"rejected",
+    fixture_slice_sources:2,fixture_cli_apps_linked:true,fixture_cli_slice_linked:true,
+    complete_root_slice_proof:false,
     complete_app_proof:false}' > "$proof/result.json"
 printf 'native-report-layouts: original source and production-loader variants compile all sixteen layouts; ownership/property controls fail; native gaps keep translation red; no installation/rendering or G1 claim; %s\n' "$proof"
