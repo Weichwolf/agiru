@@ -165,9 +165,13 @@ what a file names; no master header or macros. Measure build cost before widenin
   original native report source. It inventories the full package and compiles both the
   ordinary declaration fixture and the production `--system-symbols` variant, without
   copying native AL into an application. Retain ownership/property/asset controls and
-  compiler/source hashes. CMake must recognize the separate platform app and refuse a
-  missing module. Run it before analysing that consumer. This proves report declaration
-  loading, not complete native activation, asset installation, rendering or G1.
+  compiler/source hashes. Build the separate platform library in both app and slice modes;
+  prove registry-only lookup without native class references, retained Linux registrations
+  under `--as-needed`, and rejected library-drop/missing-module controls. Native definitions
+  must not become slice refusal stubs; zero missing procedures emit no helper. The authored
+  two-source slice is a linking fixture, not the production slice denominator. Run this
+  target before analysing its consumers. This proves declaration loading/fixture linking,
+  not complete native activation, full-tree linking, asset installation, rendering or G1.
 - `make native-bindings AGIRU_SYSTEM_SYMBOLS=<verified-package>` inventories every
   original native table independently, emits production-generator contracts and compiles
   every bound candidate without PCH. Unbound/refused/crashed/mismatched identities remain

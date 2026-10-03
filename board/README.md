@@ -15,12 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-Compiler `aecca9a`: native report loading shares the original AST/report binder with ordinary apps.
-The original XML manifest supplies module/layout owners; native reports emit into a separate
-platform library. `build/native-report-layouts.75aME5/result.json`: original/source-loaded variants
-each pass 562 checks for sixteen layouts. Ownership/property/asset and CMake missing-module
-controls reject; compiler/source/package hashes agree. CMake configuration is qualified, not
-its full build. Assets installed/documents rendered: zero; all 368 native objects business-unexecuted.
+Code `d16fafb`; receipts use the matching dirty batch at frozen HEAD `e4fe675`, not a new
+full integration. Native report loading shares the original AST/binder and XML module/layout
+owners. `build/native-report-layouts.oqGu1z/result.json`: original/source-loaded variants each
+pass 562 checks for sixteen layouts. Frozen CMake builds the platform library and actual CLI
+in app and authored two-source slice modes. Registry-only lookup passes three checks per mode;
+Linux `--as-needed` library-drop and ownership/property/asset/missing-module controls reject.
+Static archive retention also passes its negative control. Direct generated-library foundation
+dependencies are fixed; slice refusal generation subtracts platform definitions and emits no
+helper for zero missing procedures. Compiler/source/package hashes agree. Root apps/scope/slice
+are unchanged; this is not full-tree linking. Installed assets/rendered documents: zero;
+all 368 native objects remain business-unexecuted. Log: `build/native-platform-link-complete-proof.log`.
 
 Full source replay: `build/native-consumers.wSWttg/result.json`, System 29 retains all
 three eight-unit variants: ordinary 7/8, extra assertions 5/8, source-bound 6/8, no losses.
@@ -35,14 +40,16 @@ Raw census remains 113,013 raw/112,998 required methods; exact 80/2,314 UT ident
 all unexecuted. Previous System-28 eight-unit qualification: `native-consumers.vWqQvV`, 8/8
 source-bound; this batch's full replay used System 29, without changing demo 28.4.
 
-Local final replay: 115 cases/181 toolchain tests, zero red/skips
-(`build/native-report-loader-tests-final.log`); eleven new loader controls pass.
-Targeted Manifest/SourceReader/NativeRunner analysis is clean; Main remains red on eight
-diagnostics, including Scan complexity 95/382 lines. Denominator 218 handwritten units;
-`make lint` checks four units/one failed, formatting green. No full-analysis pass or
-suppression/baseline increase. Receipts:
-`build/native-report-loader-{manifest-tidy-qualified,reader-tidy-final,runner-tidy-final,main-tidy-qualified}.log`.
-Next: qualify full platform/tree linking, install owned layout assets and prove the retired
+Local final replay: 115 cases/186 toolchain tests, zero red/skips
+(`build/native-platform-link-tests-final.log`); five new registration/stub controls pass.
+Changed lint checks one of 219 handwritten units and fails on 44 diagnostics in unchanged
+public headers reached by the frozen CMake consumer; none is in RegistryRunner.cpp.
+Formatting passes; no suppression/baseline increase or full-analysis pass.
+Receipts: `build/native-platform-link-{lint.log,tidy.log,lint-units.json,controls-final.log}`.
+Earlier Manifest/SourceReader/NativeRunner analysis is clean; Main still has eight findings,
+including Scan complexity 95/382 lines (`build/native-report-loader-main-tidy-qualified.log`).
+Next: split the lightweight report registry API, qualify full platform/tree linking,
+install owned layout assets and prove the retired
 report-upgrade successor before slice reconciliation. Providers, native kinds/methods,
 namespace/app identity, SymbolReference joins and G1 remain open (0034/0038/0063/0589).
 
