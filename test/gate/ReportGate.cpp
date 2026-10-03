@@ -1,22 +1,24 @@
+#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
 #include "runtime/Report.h"
+#include "runtime/ReportRegistry.h"
 #include "runtime/Table.h"
 #include "type/Boolean.h"
 #include "type/Code.h"
 #include "type/Date.h"
 #include "type/Decimal.h"
+#include "type/FieldClass.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
 #include "Check.h"
 
 #include <array>
 #include <cstddef>
-#include <exception>
 #include <string>
 #include <string_view>
 
@@ -140,10 +142,11 @@ void TheDatasetWritesRowsAndASchema() {
 /// `Report.Run(Number)` resolves the number at run time through the catalogue; a number this
 /// build carries no report for refuses with the number, never a missing symbol (board:0034).
 void ARunByUnknownNumberRefusesWithTheNumber() {
-  CHECK_TRUE("no report 999999", agiru::FindReport(agiru::ReportId{999999}) == nullptr);
+  constexpr agiru::ReportId kUnregisteredReport{999999};
+  CHECK_TRUE("no report 999999", agiru::FindReport(kUnregisteredReport) == nullptr);
   std::string message;
   try {
-    agiru::Report<>::Run(999999);
+    agiru::Report<>::Run(kUnregisteredReport.Value());
   } catch (const agiru::Error &e) { message = e.what(); }
   CHECK_TRUE("the refusal names the number and the item",
              message.find("Report.Run(999999)") != std::string::npos &&

@@ -1,6 +1,6 @@
 #include "meta/Ids.h"
 #include "meta/ReportLayoutDef.h"
-#include "runtime/Report.h"
+#include "runtime/ReportRegistry.h"
 
 #include "Ast.h"
 #include "Check.h"

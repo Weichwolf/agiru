@@ -1198,6 +1198,52 @@ esac
         self.assertIn('the seed is incomplete', errors.getvalue())
 
 
+class ReportRegistryHeaderGate(unittest.TestCase):
+    def prove_contract(self, before, after):
+        repository = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            header = repository / 'include/runtime/ReportRegistry.h'
+            source = root / 'contract.cpp.in'
+            source.write_text('''#include "runtime/ReportRegistry.h"
+#include <cstddef>
+#include <string_view>
+#include <type_traits>
+struct PreviousEntry {
+  agiru::ReportId id;
+  std::string_view name;
+  void (*run)(const agiru::ReportRequest&);
+};
+static_assert(std::is_same_v<decltype(agiru::ReportEntry::run), decltype(PreviousEntry::run)>);
+static_assert(std::is_standard_layout_v<agiru::ReportEntry>);
+static_assert(sizeof(agiru::ReportEntry) == sizeof(PreviousEntry));
+static_assert(alignof(agiru::ReportEntry) == alignof(PreviousEntry));
+static_assert(offsetof(agiru::ReportEntry, id) == offsetof(PreviousEntry, id));
+static_assert(offsetof(agiru::ReportEntry, name) == offsetof(PreviousEntry, name));
+static_assert(offsetof(agiru::ReportEntry, run) == offsetof(PreviousEntry, run));
+''')
+            arguments = ['clang++-19', '-std=c++23', '-stdlib=libc++', '-Wall', '-Wextra',
+                         '-Wpedantic', '-Werror', '-x', 'c++', '-fsyntax-only', str(source)]
+            compiled = subprocess.run(arguments + ['-I' + str(repository / 'include')],
+                                      capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stderr)
+            original = header.read_text()
+            self.assertEqual(original.count(before), 1)
+            (root / 'runtime').mkdir()
+            (root / 'runtime/ReportRegistry.h').write_text(original.replace(before, after))
+            control = subprocess.run(arguments + ['-I' + str(root), '-I' + str(repository / 'include')],
+                                     capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(control.returncode, 0)
+            self.assertIn('static assertion failed', control.stderr)
+
+    def test_entrypoint_keeps_the_original_const_request_signature(self):
+        self.prove_contract('void (*run)(const ReportRequest &request);',
+                            'void (*run)(ReportRequest &request);')
+
+    def test_entry_keeps_original_field_offsets_and_layout(self):
+        self.prove_contract('  ReportId id;', '  std::string_view extra;\n  ReportId id;')
+
+
 class GeneratedRegistrationLinkGate(unittest.TestCase):
     def prove_registration(self, kind):
         repository = Path(__file__).resolve().parents[1]

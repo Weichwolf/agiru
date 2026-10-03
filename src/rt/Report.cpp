@@ -1,15 +1,21 @@
 #include "runtime/Report.h"
 
+#include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "runtime/ReportRegistry.h"
+#include "type/Integer.h"
 #include "type/Variant.h"
 
 #include "BuiltinsWritten.h"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
+#include <ios>
 #include <mutex>
 #include <string>
 #include <string_view>

@@ -30,6 +30,16 @@ for header in ObjectKind.h RuntimeSurface.h Names.h; do
 done
 compile_header dotnet/Regex.h "$proof/Regex.h.d"
 reject_dependency "$proof/Regex.h.d" regex
+compile_header runtime/ReportRegistry.h "$proof/ReportRegistry.h.d"
+for forbidden in Report.h Page.h RecordRef.h Variant.h vector; do
+  reject_dependency "$proof/ReportRegistry.h.d" "$forbidden"
+done
+compile_header runtime/ReportRegistry.h "$proof/forced-Report.h.d" -include runtime/Report.h
+if reject_dependency "$proof/forced-Report.h.d" Report.h \
+  > "$proof/forced-Report.h.log" 2>&1; then
+  printf 'header-dependencies: full report header escaped the registry control\n' >&2
+  exit 1
+fi
 
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
@@ -40,4 +50,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: four standalone headers; filesystem/regex controls refused\n'
+printf 'header-dependencies: five standalone headers; filesystem/regex/report controls refused\n'

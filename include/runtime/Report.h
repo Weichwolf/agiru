@@ -24,6 +24,7 @@
 #include "runtime/Error.h"
 #include "runtime/Page.h"
 #include "runtime/RecordRef.h"
+#include "runtime/ReportRegistry.h"
 #include "runtime/test/Handlers.h"
 #include "type/Action.h"
 #include "type/Boolean.h"
@@ -150,23 +151,6 @@ struct ReportRequest {
   ///          and never alone (board:0704, 2026-09-11). The handle lives here, beside the pointer.
   RecordRef held{};
 };
-
-/// \brief What the runtime knows about a generated report: its number, its name and how to run it.
-struct ReportEntry {
-  ReportId id;           ///< The AL report number.
-  std::string_view name; ///< The AL name.
-  /// \brief Constructs the report and runs the request. \param request The request.
-  void (*run)(const ReportRequest &request);
-};
-
-/// \brief Puts a report in the catalogue, once per generated report, at load time.
-/// \param entry The entry, which lives for the program.
-void RegisterReportEntry(const ReportEntry *entry);
-
-/// \brief Finds a report by its number.
-/// \param id The number.
-/// \return The entry, or `nullptr` when this build carries no such report.
-[[nodiscard]] const ReportEntry *FindReport(ReportId id);
 
 namespace detail {
 

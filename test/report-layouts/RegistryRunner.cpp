@@ -1,5 +1,5 @@
 #include "meta/Ids.h"
-#include "runtime/Report.h"
+#include "runtime/ReportRegistry.h"
 
 #include "Check.h"
 
