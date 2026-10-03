@@ -178,12 +178,20 @@ what a file names; no master header or macros. Measure build cost before widenin
 - `make native-consumers AGIRU_SYSTEM_SYMBOLS=<verified-package>
   AGIRU_NATIVE_AUDIT=<matching-native-bindings-receipt>` freezes the entire BCApps source
   and retranslates all configured apps without editing root `apps/`. It retains all eight
-  original page body/definition results, both ordinary production compilation and compilation
-  with additional source-derived native assertions, without PCH and with declared app includes.
+  original page body/definition results in three variants: ordinary compilation, additional
+  native assertions, and actual source-bound compilation. Use no PCH and declared app includes.
   The fixed consumer manifest rejects missing/duplicate identities; a wrong native field number
   must fail an original consumer. Reusing an audit requires matching package/source/library hashes.
-  Additional assertions are not source-AST binding, production-loader activation, provider,
-  business execution, full-app or G1 proof. Keep the raw native matrix and unexecuted UT manifest.
+  Additional assertions alone are not source-AST binding. The source-bound variant activates
+  only the known native table declarations, not a complete native loader, provider, business
+  execution, full-app or G1 proof. Keep the raw native matrix and unexecuted UT manifest.
+- `make transpile AGIRU_SYSTEM_SYMBOLS=<verified-package>` verifies original package provenance
+  before/after translation and retains a raw native inventory in `build/transpile.<id>/`.
+  The compiler's explicit `--system-symbols <root>` reads AL table declarations through the
+  existing AST/binder, retains keys/options/source field numbers, and merges native extensions.
+  Unbound tables, refused sources and other unactivated AL files keep translation nonzero.
+  Native/app table-ID collisions refuse. Direct compiler fixtures accept raw source roots;
+  they are not package authenticity checks. Make is the verified package entry point.
 - Integration: `make verify-start JOBS=6` freezes the current tracked, untracked and
   generated inputs into `build/verify/<id>/source`, then runs `all test` in a
   serialized reusable lane under `build/verify/lane/source`. Only changed source

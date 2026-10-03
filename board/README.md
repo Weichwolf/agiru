@@ -15,18 +15,24 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-Eight original consumers now have fresh production qualification: `make native-consumers`,
-`build/native-consumers.{lQd6ms,kZ3Ulx}/result.json`, dirty batch at HEAD `16ec345`.
-Both packages compile 7/8 ordinary units; PageFieldsSelectionList body still misbinds
-bare Caption because Main has no source-owned native binding. Additional native assertions
-compile 7/8 with System 28, 5/8 with System 29: both Objects units also reject field-count,
-Object Type and Name drift. These assertions do not activate the source-AST loader.
-All 24,389 generated paths are retained; raw census/80-codeunit, 2,314-method UT identities
-match, all AL methods remain unexecuted. Local replay: 115 cases/158 toolchain tests,
-zero red/skips (`build/native-consumers-tests.log`). Missing/duplicate consumer and wrong
-native field controls reject. Both Make runs exit 2; census exits 1 with the same seven
-conditional refusals. Next: verified production System input/common binding, then recheck
-all eight units and the full UT population; providers/full-app/G1 remain open (0034/0038).
+Explicit native table source binding is implemented in the dirty batch at HEAD `14fe6ac`.
+`make native-consumers`: `build/native-consumers.{vWqQvV,dE8PA4}/result.json` retains
+all three eight-unit variants. Source-bound System 28 compiles 8/8; System 29 6/8,
+with both Objects units still rejecting AllObjWithCaption drift. The unchanged
+ordinary baseline is 7/8; extra assertions alone remain 7/8 and 5/8. Production
+table parsing retains 223/234 originals, nineteen bound and 204/215 unbound; 139/164
+other AL files remain unactivated. No provider/schema/full native loader or AL business proof.
+Full raw matrices remain unchanged (`build/native-bindings.{3VaR4I,S2Ku76}/result.json`),
+all 333/368 objects business-unexecuted. Native translation exits 1; both Make runs exit 2.
+Generated paths grow 24,389→24,391 with zero losses: query 774 Users in Plans header/body
+becomes reachable, still subject to 0725's commercial incoming-reference classification.
+Raw census and exact 80/2,314 UT identities match; no additional original AL method execution.
+Local final replay: 115 cases/170 toolchain tests, zero red/skips; original production-page
+primitive six checks pass, source-expression/field-number and extension-ABI controls reject
+(`build/native-source-tests-final.log`). SourceReader analysis 1/217 clean; Main 1/217 red
+and changed-code lint still red (`build/native-source-{reader,main}-tidy.log`, `lint.log`).
+Next: qualify frozen whole-tree generation/link and native report/object coverage; keep
+providers, namespace/app identity, package SymbolReference joins and G1 open (0034/0038).
 
 Latest metadata source batch: `2d3f2de`; snapshot override fix: `599597c`. Receipts
 were collected from the matching dirty batch at predecessor HEAD `8d65ae9`, not a
