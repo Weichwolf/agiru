@@ -17,7 +17,7 @@
 #include <string_view>
 
 /// \file
-/// \brief Privacy declarations from System.app 28.0.53152.0,
+/// \brief Privacy declarations from System.app 29.0.55365.0,
 ///        `src/Tenant Database Tables/PrivacyNotice.Table.al`; not service integration support.
 
 namespace agiru::platform {
@@ -118,6 +118,8 @@ inline constexpr TableDef kPrivacyNoticeTable{
     .keys = kPrivacyNoticeKeys,
     .dataPerCompany = false,
     .replicateData = false,
+    .inherentPermissions = "rX",
+    .inherentEntitlements = "RIMdX",
 };
 
 static_assert(FieldsAreSorted(kPrivacyNoticeTable), "the field table is searched by number");

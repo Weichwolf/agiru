@@ -266,10 +266,10 @@ Checks Compare(const agiru::al::TableObject &source, const Family &family) {
 }
 
 std::string Read(const Family &family, const std::filesystem::path &root) {
-  const auto path = !root.empty()
-                        ? root / "src" / family.path
-                        : std::filesystem::path(AGIRU_SOURCE_DIR) / "test/platform-source" /
-                              std::filesystem::path(family.path).filename();
+  const auto path = !root.empty() ? root / "src" / family.path
+                                  : std::filesystem::path(AGIRU_SOURCE_DIR) /
+                                        "test/transpiler/platform-source" /
+                                        std::filesystem::path(family.path).filename();
   std::ifstream stream(path);
   if (!stream) { throw std::runtime_error("missing System declaration: " + path.string()); }
   return {std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>()};

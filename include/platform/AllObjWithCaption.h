@@ -21,7 +21,7 @@
 /// each.
 ///
 /// \note Fields and the primary key follow System.app's
-///       `src/Virtual Tables/AllObjWithCaption.Table.al` (28.0.53152.0).
+///       `src/Virtual Tables/AllObjWithCaption.Table.al` (29.0.55365.0).
 ///       Row providers and installed-object provenance are separate runtime contracts.
 
 namespace agiru::platform {
@@ -47,6 +47,8 @@ public:
   ::agiru::Integer ObjectID{};
   /// \brief Original AL name; independent of its caption.
   Text<kObjectNameLength> ObjectName;
+  /// \brief Full AL Name, field 5, Text[100]; independent of the legacy Object Name.
+  Text<100> Name;
   /// \brief Source object caption, not an alternative object identity.
   Text<kObjectCaptionLength> ObjectCaption;
   /// \brief Source object subtype.
@@ -79,6 +81,8 @@ public:
     static constexpr ::agiru::FieldNo ObjectID{3};
     /// \brief Object Name field number.
     static constexpr ::agiru::FieldNo ObjectName{4};
+    /// \brief Full Name field number.
+    static constexpr ::agiru::FieldNo Name{5};
     /// \brief Object Caption field number.
     static constexpr ::agiru::FieldNo ObjectCaption{20};
     /// \brief Object Subtype field number.
@@ -101,9 +105,9 @@ public:
 /// \brief The native ABI name for AL AllObjWithCaption.
 using AllObjWithCaption = AllObjWithCaption_Table;
 
-/// \brief All nine source fields followed by the common implicit system fields.
+/// \brief All ten source fields followed by the common implicit system fields.
 inline constexpr auto kAllObjWithCaptionFields =
-    WithSystemFields<AllObjWithCaption>(std::array<FieldDef, 9>{{
+    WithSystemFields<AllObjWithCaption>(std::array<FieldDef, 10>{{
         Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
                                                 "Object Type",
                                                 "Object Type",
@@ -116,6 +120,8 @@ inline constexpr auto kAllObjWithCaptionFields =
                                                 "Object Name",
                                                 "Object Name",
                                                 offsetof(AllObjWithCaption, ObjectName)),
+        Declare<&AllObjWithCaption::Name>(
+            AllObjWithCaption::Field_No::Name, "Name", "Name", offsetof(AllObjWithCaption, Name)),
         Declare<&AllObjWithCaption::ObjectCaption>(AllObjWithCaption::Field_No::ObjectCaption,
                                                    "Object Caption",
                                                    "Object Caption",

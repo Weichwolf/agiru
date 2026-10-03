@@ -10,7 +10,7 @@
 # `Integer` in `devenv-field-virtual-table.md`. `TableId` and `FieldNo` exist and are the right
 # types EVERYWHERE ELSE; at this boundary the signature is AL's.
 #
-# It is a directory rather than a NOLINT because a NOLINT costs a number in `test/todo-baseline`,
+# It is a directory rather than a NOLINT because a NOLINT costs a number in `test/tooling/baselines/todo`,
 # and that number may only fall. It is narrowed to a directory rather than to `src/rt` because a
 # directory whose whole contents are AL signatures is the narrowest point available -- the same
 # move as `misc-include-cleaner.IgnoreHeaders` in the root config, at the same scale.

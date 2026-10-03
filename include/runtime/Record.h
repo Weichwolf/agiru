@@ -445,6 +445,8 @@ template <typename T> [[nodiscard]] ::agiru::Text<0> AsText(const T &value) {
     return std::string(std::string_view(value));
   } else if constexpr (requires { value.ToText(); }) {
     return std::string(std::string_view(value.ToText()));
+  } else if constexpr (std::same_as<std::remove_cvref_t<T>, Boolean>) {
+    return detail::VariantText(Variant(value));
   } else if constexpr (std::is_arithmetic_v<T>) {
     return std::to_string(value);
   } else if constexpr (Enumeration<T>) {
@@ -481,7 +483,9 @@ template <typename T> [[nodiscard]] ::agiru::Text<0> AsText(const T &value) {
 ///          carried `Email` where the column wanted `3`, and `Evaluate` refused it (openerp
 ///          WI-1008). Here the filter asks for this and a message asks for `AsText`.
 template <typename T> [[nodiscard]] std::string FilterText(const T &value) {
-  if constexpr (Enumeration<T>) {
+  if constexpr (std::same_as<std::remove_cvref_t<T>, Boolean>) {
+    return value ? "1" : "0";
+  } else if constexpr (Enumeration<T>) {
     return std::to_string(static_cast<std::int32_t>(value));
   } else if constexpr (requires { value.AsInteger(); }) {
     return std::to_string(value.AsInteger());

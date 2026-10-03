@@ -33,6 +33,9 @@ void CreateTable(const Connection &connection, const TableDef &table);
 void DropTable(const Connection &connection, const TableDef &table);
 
 /// \brief Creates every table this binary carries that the database does not have.
+/// \note Adds missing stored fields and widens existing bounded Text/Code columns to the
+///       declared length without truncating values or narrowing wider columns. Other type
+///       migrations are not implemented by this bootstrap operation.
 ///
 /// \param into The database.
 /// \throws DatabaseError when a statement fails.

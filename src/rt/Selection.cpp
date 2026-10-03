@@ -1,5 +1,6 @@
 #include "Selection.h"
 
+#include "meta/Declare.h"
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
@@ -10,6 +11,7 @@
 #include "Where.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -70,6 +72,23 @@ Intervals Both(const Intervals &left, const Intervals &right) {
   return both;
 }
 
+std::string SeriesColumns(const TableDef &table, const FieldDef &number) {
+  std::string columns = "g::int AS " + Quoted(number.name);
+  for (const auto &field : table.fields) {
+    if (!Stored(field) || field.no == number.no) { continue; }
+    const auto system = std::ranges::find_if(kSystemFields, [&](const auto &declared) {
+      return declared.no == field.no &&
+             ((declared.alType == "Guid" && field.type == FieldType::Guid) ||
+              (declared.alType == "DateTime" && field.type == FieldType::DateTime));
+    });
+    if (system == kSystemFields.end()) {
+      throw Error("sequence provider cannot synthesize field " + std::string(field.name));
+    }
+    columns += ", " + ColumnZero(field) + "::" + ColumnType(field) + " AS " + Quoted(field.name);
+  }
+  return columns;
+}
+
 std::string Series(const RecordState *state, const TableDef &table) {
   const FieldDef &field = FieldOf(table, table.sequenceField);
   Intervals admitted{{kSeriesDomain}};
@@ -90,11 +109,12 @@ std::string Series(const RecordState *state, const TableDef &table) {
     capped.push_back(one);
   }
   admitted = capped;
+  const auto columns = SeriesColumns(table, field);
   std::string series;
   for (const Interval &one : admitted) {
     if (!series.empty()) { series += " UNION ALL "; }
-    series += "SELECT g::int AS " + Quoted(field.name) + " FROM generate_series(" +
-              std::to_string(one.low) + ", " + std::to_string(one.high) + ") AS g";
+    series += "SELECT " + columns + " FROM generate_series(" + std::to_string(one.low) + ", " +
+              std::to_string(one.high) + ") AS g";
   }
   return "(" + series + ") AS " + Quoted(table.name);
 }

@@ -25,6 +25,8 @@ struct Selection {
 
 [[nodiscard]] std::string Columns(const TableDef &table);
 
+[[nodiscard]] std::string ColumnZero(const FieldDef &field);
+
 [[nodiscard]] std::string Name(const TableDef &table);
 
 [[nodiscard]] std::string Quoted(std::string_view identifier);

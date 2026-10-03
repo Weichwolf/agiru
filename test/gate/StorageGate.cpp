@@ -72,6 +72,35 @@ void TheDeclarationBecomesAColumnPerField() {
 /// EVERY LINE BELOW IS THE AL LINE. `Rec.Insert()`, `Rec.Get(a, b, c)`, `Rec.Modify()` -- no
 /// connection, no column, no row. That is the point of the base class: the generated table says
 /// what the `.al` file says and the platform half is somewhere else.
+void ProvisioningPreservesAndWidensBoundedColumns() {
+  const agiru::Connection connection(AGIRU_TEST_DSN);
+  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Code\" TYPE varchar(5)");
+  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Work Type Code\" TYPE varchar(25)");
+  connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('KEEP')");
+  bool refused = false;
+  try {
+    connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('TWENTY-CHARACTER-123')");
+  } catch (const agiru::DatabaseError &) { refused = true; }
+  CHECK_TRUE("the old physical width rejects a valid declared value", refused);
+  agiru::ProvisionInstalled(connection);
+  const auto widths = connection.Execute(
+      "SELECT column_name, character_maximum_length FROM information_schema.columns "
+      "WHERE table_schema = 'public' AND table_name = 'Resource Cost' "
+      "AND column_name IN ('Code', 'Work Type Code') ORDER BY column_name");
+  CHECK_TEXT("a narrower Code column grows to its declaration", Column(widths, 0, 1), "20");
+  CHECK_TEXT("a wider existing column is never narrowed", Column(widths, 1, 1), "25");
+  CHECK_TEXT("existing stored values survive widening",
+             Column(connection.Execute("SELECT \"Code\" FROM \"Resource Cost\""), 0, 0),
+             "KEEP");
+  connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('TWENTY-CHARACTER-123')");
+  agiru::ProvisionInstalled(connection);
+  CHECK_TEXT("repeated provisioning preserves all rows",
+             Column(connection.Execute("SELECT count(*) FROM \"Resource Cost\""), 0, 0),
+             "2");
+  connection.Run("DELETE FROM \"Resource Cost\"");
+  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Work Type Code\" TYPE varchar(10)");
+}
+
 void ARecordSurvivesTheRoundTrip() {
   ResourceCost written = Sample();
   written.Insert();
@@ -360,6 +389,7 @@ int main() {
     {
       const Session session(AGIRU_TEST_DSN);
       TheDeclarationBecomesAColumnPerField();
+      ProvisioningPreservesAndWidensBoundedColumns();
       ARecordSurvivesTheRoundTrip();
       AMissingKeyIsAnAnswerRatherThanAnError();
       ModifyOverwritesTheRowItsKeySelects();

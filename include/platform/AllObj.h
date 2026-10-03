@@ -19,12 +19,12 @@
 /// \file
 /// \brief The System `AllObj` declaration (2000000038), without caption-only fields.
 ///
-/// \note `src/Virtual Tables/AllObj.Table.al` in System.app (28.0.53152.0) owns the fields/key.
+/// \note `src/Virtual Tables/AllObj.Table.al` in System.app (29.0.55365.0) owns the fields/key.
 ///       The read-only provider and installed-object provenance are separate runtime contracts.
 
 namespace agiru::platform {
 
-/// \brief AL AllObj with its six declared fields and tenant-wide scope.
+/// \brief AL AllObj with its seven declared fields and tenant-wide scope.
 class AllObj_Table : public Table<AllObj_Table> {
 public:
   /// \brief The System table number.
@@ -43,6 +43,8 @@ public:
   ::agiru::Integer ObjectID{};
   /// \brief Original AL Object Name, without Code normalization.
   Text<kObjectNameLength> ObjectName;
+  /// \brief Full AL Name, field 5, Text[100]; independent of the legacy Object Name.
+  Text<100> Name;
   /// \brief AL App Package ID, field 60.
   Guid AppPackageID;
   /// \brief AL App Runtime Package ID, field 61.
@@ -68,6 +70,8 @@ public:
     static constexpr ::agiru::FieldNo ObjectID{3};
     /// \brief Object Name field number.
     static constexpr ::agiru::FieldNo ObjectName{4};
+    /// \brief Full Name field number.
+    static constexpr ::agiru::FieldNo Name{5};
     /// \brief App Package ID field number.
     static constexpr ::agiru::FieldNo AppPackageID{60};
     /// \brief App Runtime Package ID field number.
@@ -84,14 +88,15 @@ public:
 /// \brief The native ABI name for AL AllObj.
 using AllObj = AllObj_Table;
 
-/// \brief All six source fields followed by the common implicit system fields.
-inline constexpr auto kAllObjFields = WithSystemFields<AllObj>(std::array<FieldDef, 6>{{
+/// \brief All seven source fields followed by the common implicit system fields.
+inline constexpr auto kAllObjFields = WithSystemFields<AllObj>(std::array<FieldDef, 7>{{
     Declare<&AllObj::ObjectType>(
         AllObj::Field_No::ObjectType, "Object Type", "Object Type", offsetof(AllObj, ObjectType)),
     Declare<&AllObj::ObjectID>(
         AllObj::Field_No::ObjectID, "Object ID", "Object ID", offsetof(AllObj, ObjectID)),
     Declare<&AllObj::ObjectName>(
         AllObj::Field_No::ObjectName, "Object Name", "Object Name", offsetof(AllObj, ObjectName)),
+    Declare<&AllObj::Name>(AllObj::Field_No::Name, "Name", "Name", offsetof(AllObj, Name)),
     Declare<&AllObj::AppPackageID>(AllObj::Field_No::AppPackageID,
                                    "App Package ID",
                                    "App Package ID",

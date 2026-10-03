@@ -16,7 +16,7 @@
 #include <string_view>
 
 /// \file
-/// \brief Approval declarations from System.app 28.0.53152.0,
+/// \brief Approval declarations from System.app 29.0.55365.0,
 ///        `src/Tenant Database Tables/PrivacyNoticeApproval.Table.al`.
 
 namespace agiru::platform {
@@ -98,6 +98,8 @@ inline constexpr TableDef kPrivacyNoticeApprovalTable{
     .keys = kPrivacyNoticeApprovalKeys,
     .dataPerCompany = false,
     .replicateData = false,
+    .inherentPermissions = "rX",
+    .inherentEntitlements = "RIMDX",
 };
 
 static_assert(FieldsAreSorted(kPrivacyNoticeApprovalTable),

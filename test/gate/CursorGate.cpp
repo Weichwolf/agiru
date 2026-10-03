@@ -1,4 +1,5 @@
 #include "meta/TableDef.h"
+#include "platform/Integer.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
@@ -7,6 +8,7 @@
 #include "Check.h"
 #include "Cursor.h"
 #include "Filter.h"
+#include "Selection.h"
 #include "Where.h"
 
 #include <cstddef>
@@ -26,6 +28,43 @@ using agiru::detail::Where;
 namespace {
 
 constexpr std::size_t kRows = 200;
+
+void ComputedRowsProjectTheirDeclaredSystemFields(const Connection &connection) {
+  agiru::detail::RecordState state;
+  state.filters.push_back(
+      {.field = agiru::platform::Integer::Field_No::Number, .group = 0, .text = "1..3"});
+  const auto &table = agiru::platform::kIntegerTable;
+  const auto selection = agiru::detail::Select(&state, table);
+  const auto select = "SELECT " + agiru::detail::Columns(table) + " FROM " + selection.from +
+                      " WHERE " + selection.where + " ORDER BY " + selection.order;
+  const auto rows = connection.Execute(select, selection.binds);
+  CHECK_TRUE("the native series returns its bounded population", rows.Rows() == 3);
+  CHECK_TRUE("the computed projection matches the declared row width",
+             rows.Columns() == table.fields.size());
+  for (std::size_t index = 0; index < rows.Rows(); ++index) {
+    CHECK_TEXT("native numbers retain order", *rows.Value(index, 0), std::to_string(index + 1));
+    CHECK_TEXT("an unpersisted virtual row has no stored system identity",
+               *rows.Value(index, 1),
+               "00000000-0000-0000-0000-000000000000");
+    CHECK_TEXT("a virtual row has no insertion audit instant",
+               *rows.Value(index, 2),
+               "1753-01-01 00:00:00");
+  }
+  auto invalid = select;
+  const std::string column = "'00000000-0000-0000-0000-000000000000'::uuid AS \"SystemId\"";
+  const auto start = invalid.find(", " + column);
+  CHECK_TRUE("the control removes exactly the system identity projection",
+             start != std::string::npos);
+  if (start == std::string::npos) { return; }
+  invalid.erase(start, column.size() + 2);
+  agiru::detail::Scope control;
+  bool refused = false;
+  try {
+    static_cast<void>(connection.Execute(invalid, selection.binds));
+  } catch (const agiru::DatabaseError &) { refused = true; }
+  control.Discard("");
+  CHECK_TRUE("the previous narrow series shape fails actual SQL", refused);
+}
 
 void Fill(const Connection &connection) {
   connection.Run("DROP TABLE IF EXISTS cursor_gate");
@@ -156,6 +195,7 @@ int main() {
       // be used in transaction blocks". A session is always inside one -- board:0012 pins the
       // connection for exactly that -- so the gate opens the same boundary the runtime does.
       agiru::detail::Scope boundary;
+      ComputedRowsProjectTheirDeclaredSystemFields(connection);
       ItWalksMoreRowsThanItHolds(connection);
       AnEmptySetStepsNowhere(connection);
       AFullBlockPreservesItsLastRow(connection);

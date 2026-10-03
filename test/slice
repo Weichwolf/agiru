@@ -10697,7 +10697,8 @@ base/upgrade/codeunit/UpdateNameInLedgerEntries.cpp
 base/upgrade/codeunit/UpgDefaultCalcBasedOn.cpp
 base/upgrade/codeunit/UpgLoadNamedForwardLinks.cpp
 base/upgrade/codeunit/UpgradeAppIDPermissions.cpp
-base/upgrade/codeunit/UpgradeCompositeReportParts.cpp
+# Retired upstream in bf484e5871: fourteen Composite Layout layouts now register through the native platform report library.
+# base/upgrade/codeunit/UpgradeCompositeReportParts.cpp
 base/upgrade/codeunit/UpgradeCustomReportImpl.cpp
 base/upgrade/codeunit/UpgradeCustomReportLayouts.cpp
 base/upgrade/codeunit/UpgradeErrorMessage.cpp
@@ -11825,7 +11826,8 @@ system/system/environment/codeunit/EnvironmentInformation.cpp
 system/system/environment/codeunit/EnvironmentInformationImpl.cpp
 system/system/environment/codeunit/TenantInformation.cpp
 system/system/environment/codeunit/TenantLicenseState.cpp
-system/system/environment/codeunit/TenantLicenseStateImpl.cpp
+# Product-excluded commercial licence implementation; scope.json retains the exact original source identity.
+# system/system/environment/codeunit/TenantLicenseStateImpl.cpp
 system/system/environment/configuration/codeunit/AdvancedSettings.cpp
 system/system/environment/configuration/codeunit/AdvancedSettingsImpl.cpp
 system/system/environment/configuration/codeunit/AssistedSetupInstallation.cpp
@@ -14229,3 +14231,8 @@ tests/finance/test/codeunit/AmtAutoFormatCurrLCYFCYSymBf.cpp
 tests/finance/test/codeunit/AmtAutoFormatCurrNeverShow.cpp
 peppol/peppol/interface/PEPPOLTaxInfoProvider.cpp
 base/integration/dataverse/interface/DataverseCloudEndpoints.cpp
+system/system/environment/table/EnvironmentInformation.def.cpp
+system/system/azure/identity/query/UsersInPlans.cpp
+base/finance/vat/registration/codeunit/VATLookupQuotaMgt.cpp
+base/finance/vat/registration/table/VATRegNoLookupQuota.cpp
+base/finance/vat/registration/table/VATRegNoLookupQuota.def.cpp

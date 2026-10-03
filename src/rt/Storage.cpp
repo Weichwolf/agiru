@@ -25,11 +25,14 @@
 
 #include "FieldMetadata.h"
 #include "Rows.h"
+#include "Selection.h"
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <optional>
 #include <print>
 #include <set>
@@ -119,7 +122,7 @@ std::string ColumnType(const FieldDef &def) {
   throw Error("ColumnType: no SQL type for this field type yet");
 }
 
-namespace {
+namespace detail {
 
 std::string ColumnZero(const FieldDef &def) {
   switch (def.type) {
@@ -177,7 +180,8 @@ void CreateTable(const Connection &connection, const TableDef &table) {
     if (!Stored(field)) { continue; }
     if (written) { sql += ", "; }
     written = true;
-    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL DEFAULT " + ColumnZero(field);
+    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL DEFAULT " +
+           detail::ColumnZero(field);
   }
   if (!table.keys.empty()) {
     sql += ", PRIMARY KEY (";
@@ -411,25 +415,42 @@ std::string_view Fitted(std::string_view text, std::size_t length) {
 
 namespace {
 
-std::size_t AddMissingColumns(const Connection &into, const TableDef &table) {
+struct SchemaChanges {
+  std::size_t added = 0;
+  std::size_t widened = 0;
+};
+
+SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
   const std::array<std::optional<std::string>, 1> named{std::string(table.name)};
   const Result columns = into.Execute(
-      "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND "
+      "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns "
+      "WHERE table_schema = 'public' AND "
       "table_name = $1",
       named);
-  std::set<std::string> there;
+  std::map<std::string, std::size_t, std::less<>> there;
   for (std::size_t row = 0; row < columns.Rows(); ++row) {
     const std::optional<std::string_view> name = columns.Value(row, 0);
-    if (name.has_value()) { there.emplace(*name); }
+    if (!name.has_value()) { continue; }
+    const auto length = columns.Value(row, 2);
+    const bool bounded = columns.Value(row, 1) == "character varying" && length.has_value();
+    there.emplace(*name, bounded ? std::stoull(std::string(*length)) : 0);
   }
-  std::size_t added = 0;
+  SchemaChanges changes;
   for (const FieldDef &field : table.fields) {
-    if (!Stored(field) || there.contains(std::string(field.name))) { continue; }
-    into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + Quoted(field.name) + " " +
-             ColumnType(field) + " NOT NULL DEFAULT " + ColumnZero(field));
-    ++added;
+    if (!Stored(field)) { continue; }
+    const auto column = there.find(field.name);
+    if (column == there.end()) {
+      into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + Quoted(field.name) + " " +
+               ColumnType(field) + " NOT NULL DEFAULT " + detail::ColumnZero(field));
+      ++changes.added;
+    } else if ((field.type == FieldType::Code || field.type == FieldType::Text) &&
+               column->second != 0 && column->second < field.length) {
+      into.Run("ALTER TABLE " + Quoted(table.name) + " ALTER COLUMN " + Quoted(field.name) +
+               " TYPE " + ColumnType(field));
+      ++changes.widened;
+    }
   }
-  return added;
+  return changes;
 }
 
 }
@@ -445,6 +466,7 @@ void ProvisionSchema(const Connection &into) {
     if (name.has_value()) { there.emplace(*name); }
   }
   std::size_t made = 0;
+  std::size_t added = 0;
   std::size_t widened = 0;
   for (const TableEntry *entry : InstalledTables()) {
     if (!entry->table->providerRefusal.empty()) {
@@ -453,7 +475,9 @@ void ProvisionSchema(const Connection &into) {
       continue;
     }
     if (there.contains(std::string(entry->table->name))) {
-      widened += AddMissingColumns(into, *entry->table);
+      const auto changes = EnsureColumns(into, *entry->table);
+      added += changes.added;
+      widened += changes.widened;
       EnsureSequences(into, *entry->table);
       continue;
     }
@@ -461,8 +485,9 @@ void ProvisionSchema(const Connection &into) {
     ++made;
   }
   if (made != 0) { std::println("{} table(s) created in the runner's database", made); }
+  if (added != 0) { std::println("{} column(s) added to tables the database already had", added); }
   if (widened != 0) {
-    std::println("{} column(s) added to platform tables the database already had", widened);
+    std::println("{} text/code column(s) widened to their declarations", widened);
   }
 }
 
@@ -597,11 +622,13 @@ void ProvisionInstalled(const Connection &into) {
     bare.ObjectType = type;
     bare.ObjectID = id;
     bare.ObjectName = name;
+    bare.Name = name;
     bare.Insert();
     platform::AllObjWithCaption captioned;
     captioned.ObjectType = type;
     captioned.ObjectID = id;
     captioned.ObjectName = name;
+    captioned.Name = name;
     captioned.ObjectCaption = caption.empty() ? name : caption;
     captioned.Insert();
     ++objects;

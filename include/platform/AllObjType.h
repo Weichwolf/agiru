@@ -9,7 +9,7 @@
 /// \brief The `Object Type` option of the platform's object tables, with BC's own ordinals.
 ///
 /// \note Names, captions and positions follow System.app's AllObj/AllObjWithCaption declarations
-///       (28.0.53152.0). Positions 2, 4, 12 and 13 have no AL option name.
+///       (29.0.55365.0). Reserved positions retain empty AL names.
 ///       Legacy C++ enumerators preserve reserved ordinal identities, not invented AL names.
 
 namespace agiru::platform {
@@ -39,14 +39,20 @@ enum class AllObjType : std::int32_t {
   PermissionSet = 20,
   PermissionSetExtension = 21,
   ReportExtension = 22,
+  Blank23 = 23,
+  Blank24 = 24,
+  Blank25 = 25,
+  Blank26 = 26,
+  Blank27 = 27,
+  Interface = 28,
 };
 
 }
 
 /// \brief Source option names and captions, including empty reserved positions.
 template <> struct agiru::OptionTraits<agiru::platform::AllObjType> {
-  /// \brief All 23 System-source positions in their declared order.
-  static constexpr std::array<agiru::EnumValueDef, 23> kValues{{
+  /// \brief All 29 System-source positions in their declared order.
+  static constexpr std::array<agiru::EnumValueDef, 29> kValues{{
       {.ordinal = 0, .name = "TableData", .caption = "TableData"},
       {.ordinal = 1, .name = "Table", .caption = "Table"},
       {.ordinal = 2, .name = "", .caption = ""},
@@ -70,5 +76,11 @@ template <> struct agiru::OptionTraits<agiru::platform::AllObjType> {
       {.ordinal = 20, .name = "PermissionSet", .caption = "PermissionSet"},
       {.ordinal = 21, .name = "PermissionSetExtension", .caption = "PermissionSetExtension"},
       {.ordinal = 22, .name = "ReportExtension", .caption = "ReportExtension"},
+      {.ordinal = 23, .name = "", .caption = ""},
+      {.ordinal = 24, .name = "", .caption = ""},
+      {.ordinal = 25, .name = "", .caption = ""},
+      {.ordinal = 26, .name = "", .caption = ""},
+      {.ordinal = 27, .name = "", .caption = ""},
+      {.ordinal = 28, .name = "Interface", .caption = "Interface"},
   }};
 };

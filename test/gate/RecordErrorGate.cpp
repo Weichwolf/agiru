@@ -179,6 +179,11 @@ void ThePrimaryKeySeparatorsDiffferBetweenTheTwo() {
 }
 
 void StrSubstNoReplacesWhatItIsGiven() {
+  CHECK_TEXT("typed booleans use the same formatter as boxed booleans",
+             StrSubstNo("%1|%2", true, false),
+             StrSubstNo("%1|%2", agiru::Variant{true}, agiru::Variant{false}));
+  CHECK_TEXT("boolean filters keep their stored representation", agiru::FilterText(true), "1");
+  CHECK_TEXT("false filters keep their stored representation", agiru::FilterText(false), "0");
   CHECK_TEXT("two placeholders",
              StrSubstNo("cannot be specified when %1 is %2", "Type", "All"),
              "cannot be specified when Type is All");

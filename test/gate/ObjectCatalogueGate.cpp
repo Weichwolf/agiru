@@ -24,25 +24,27 @@ struct FieldSpec {
   int length = 0;
 };
 
-// System.app 28.0.53152.0: Virtual Tables/AllObj{,WithCaption}.Table.al.
+// System.app 29.0.55365.0: Virtual Tables/AllObj{,WithCaption}.Table.al.
 constexpr int kBareTableId = 2000000038;
 constexpr int kCaptionedTableId = 2000000058;
 constexpr int kBareNamespaceField = 62;
 constexpr int kCaptionedNamespaceField = 63;
 constexpr int kApplicationField = 62;
 
-constexpr std::array<FieldSpec, 6> kBareFields{{
+constexpr std::array<FieldSpec, 7> kBareFields{{
     {.number = 1, .name = "Object Type", .type = agiru::FieldType::Option},
     {.number = 3, .name = "Object ID", .type = agiru::FieldType::Integer},
     {.number = 4, .name = "Object Name", .type = agiru::FieldType::Text, .length = 30},
+    {.number = 5, .name = "Name", .type = agiru::FieldType::Text, .length = 100},
     {.number = 60, .name = "App Package ID", .type = agiru::FieldType::Guid},
     {.number = 61, .name = "App Runtime Package ID", .type = agiru::FieldType::Guid},
     {.number = 62, .name = "AL Namespace", .type = agiru::FieldType::Text, .length = 500},
 }};
-constexpr std::array<FieldSpec, 9> kCaptionedFields{{
+constexpr std::array<FieldSpec, 10> kCaptionedFields{{
     {.number = 1, .name = "Object Type", .type = agiru::FieldType::Option},
     {.number = 3, .name = "Object ID", .type = agiru::FieldType::Integer},
     {.number = 4, .name = "Object Name", .type = agiru::FieldType::Text, .length = 30},
+    {.number = 5, .name = "Name", .type = agiru::FieldType::Text, .length = 100},
     {.number = 20, .name = "Object Caption", .type = agiru::FieldType::Text, .length = 249},
     {.number = 30, .name = "Object Subtype", .type = agiru::FieldType::Text, .length = 30},
     {.number = 60, .name = "App Package ID", .type = agiru::FieldType::Guid},
@@ -50,7 +52,7 @@ constexpr std::array<FieldSpec, 9> kCaptionedFields{{
     {.number = 62, .name = "App ID", .type = agiru::FieldType::Guid},
     {.number = 63, .name = "AL Namespace", .type = agiru::FieldType::Text, .length = 500},
 }};
-constexpr std::array<std::string_view, 23> kObjectTypes{"TableData",
+constexpr std::array<std::string_view, 29> kObjectTypes{"TableData",
                                                         "Table",
                                                         "",
                                                         "Report",
@@ -72,7 +74,13 @@ constexpr std::array<std::string_view, 23> kObjectTypes{"TableData",
                                                         "ProfileExtension",
                                                         "PermissionSet",
                                                         "PermissionSetExtension",
-                                                        "ReportExtension"};
+                                                        "ReportExtension",
+                                                        "",
+                                                        "",
+                                                        "",
+                                                        "",
+                                                        "",
+                                                        "Interface"};
 constexpr std::array<int, 2> kPrimaryKey{1, 3};
 constexpr std::string_view kPackage = "11111111-1111-1111-1111-111111111111";
 constexpr std::string_view kRuntimePackage = "22222222-2222-2222-2222-222222222222";
@@ -195,7 +203,7 @@ void UndeclaredFieldsRemainAbsent() {
     CHECK_TRUE("caption-only and invented AllObj fields stay absent",
                agiru::Field(bare, agiru::FieldNo{number}) == nullptr);
   }
-  for (const int number : {5, 7, 21, 99}) {
+  for (const int number : {7, 21, 99}) {
     CHECK_TRUE("invented AllObjWithCaption fields stay absent",
                agiru::Field(captioned, agiru::FieldNo{number}) == nullptr);
   }
