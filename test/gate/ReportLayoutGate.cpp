@@ -1,6 +1,6 @@
 #include "meta/ReportLayoutDef.h"
 
-#include "../report-layouts/Fixture.h"
+#include "../reporting/report-layouts/Fixture.h"
 #include "Ast.h"
 #include "Check.h"
 #include "Parser.h"

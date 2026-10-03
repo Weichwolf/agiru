@@ -28,8 +28,14 @@ std::string_view DeclaredKind(std::string_view source) {
   const auto tokens = al::Tokenize(source);
   for (std::size_t at = 0; at + 1 < tokens.size(); ++at) {
     if (al::IsPunctuation(tokens[at], "{")) { return {}; }
+    if (al::IsKeyword(tokens[at], "interface") &&
+        (tokens[at + 1].kind == al::TokenKind::Identifier ||
+         tokens[at + 1].kind == al::TokenKind::QuotedIdentifier ||
+         tokens[at + 1].kind == al::TokenKind::Integer)) {
+      return "interface";
+    }
     if (tokens[at + 1].kind != al::TokenKind::Integer) { continue; }
-    for (const auto *const kind : {"table", "report"}) {
+    for (const auto *const kind : {"table", "report", "enum"}) {
       if (al::IsKeyword(tokens[at], kind)) { return kind; }
     }
   }
@@ -75,9 +81,15 @@ void ReadOne(const std::filesystem::path &package,
       CompletePrimaryKey(table);
       into.tables.push_back(std::move(table));
       into.paths.push_back(relative);
-    } else {
+    } else if (kind == "report") {
       into.reports.push_back(al::ParseReport(source));
       into.reportPaths.push_back(relative);
+    } else if (kind == "enum") {
+      into.enums.push_back(al::ParseEnum(source));
+      into.enumPaths.push_back(relative);
+    } else {
+      into.interfaces.push_back(al::ParseInterface(source));
+      into.interfacePaths.push_back(relative);
     }
   } catch (const std::exception &error) {
     into.issues.push_back({.source = relative, .reason = error.what()});
@@ -100,7 +112,32 @@ NativeSources ReadNativeSources(const std::filesystem::path &package) {
       throw std::runtime_error("System source duplicates report identity: " + report.name);
     }
   }
-  if (!into.reports.empty()) { into.app = ReadNativeIdentity(package); }
+  std::set<int> enumIds;
+  std::set<std::string> enumNames;
+  std::set<std::string> enumBareNames;
+  for (const auto &object : into.enums) {
+    if (!enumIds.insert(object.id).second ||
+        !enumNames.insert(LowerKey(object.nameSpace + "." + object.name)).second) {
+      throw std::runtime_error("System source duplicates enum identity: " + object.name);
+    }
+    if (!enumBareNames.insert(LowerKey(object.name)).second) {
+      throw std::runtime_error("System source has ambiguous unqualified enum name: " + object.name);
+    }
+  }
+  std::set<std::string> interfaceNames;
+  std::set<std::string> interfaceBareNames;
+  for (const auto &object : into.interfaces) {
+    if (!interfaceNames.insert(LowerKey(object.nameSpace + "." + object.name)).second) {
+      throw std::runtime_error("System source duplicates interface identity: " + object.name);
+    }
+    if (!interfaceBareNames.insert(LowerKey(object.name)).second) {
+      throw std::runtime_error("System source has ambiguous unqualified interface name: " +
+                               object.name);
+    }
+  }
+  if (!into.reports.empty() || !into.enums.empty() || !into.interfaces.empty()) {
+    into.app = ReadNativeIdentity(package);
+  }
   return into;
 }
 

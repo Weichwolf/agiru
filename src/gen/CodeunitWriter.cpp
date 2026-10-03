@@ -793,15 +793,21 @@ std::string Declaration(const al::ProcedureDecl &procedure,
 }
 
 bool NamesAbsent(const al::CodeunitObject &unit, const Objects &objects) {
-  const auto absent = [&objects](const al::VarDecl &declared) {
+  const auto absent = [&objects](const auto &self, const al::VarDecl &declared) -> bool {
     const std::string type = TypeName(declared.type);
-    if (type == "DotNet") { return true; }
+    if (type == "DotNet" || NamesAbsentType(declared)) { return true; }
+    if (std::ranges::any_of(declared.arguments, [&self](const al::VarDecl &argument) {
+          return self(self, argument);
+        })) {
+      return true;
+    }
     return NamesAnObject(declared) && Reach(declared, objects) == nullptr;
   };
-  if (std::ranges::any_of(unit.variables, absent)) { return true; }
-  return std::ranges::any_of(unit.procedures, [&absent](const al::ProcedureDecl &procedure) {
-    return std::ranges::any_of(procedure.parameters, absent) ||
-           std::ranges::any_of(procedure.variables, absent);
+  const auto named = [&absent](const al::VarDecl &declared) { return absent(absent, declared); };
+  if (std::ranges::any_of(unit.variables, named)) { return true; }
+  return std::ranges::any_of(unit.procedures, [&named](const al::ProcedureDecl &procedure) {
+    return named(procedure.returned) || std::ranges::any_of(procedure.parameters, named) ||
+           std::ranges::any_of(procedure.variables, named);
   });
 }
 
@@ -1081,6 +1087,9 @@ void NoteAbsent(const al::VarDecl &declared,
                 const Objects &objects,
                 DotNetNames &named,
                 DotNetUse &use) {
+  for (const al::VarDecl &argument : declared.arguments) {
+    NoteAbsent(argument, objects, named, use);
+  }
   if (NamesAbsentType(declared)) {
     const std::string bare = Identifier(declared.type);
     named.insert_or_assign(LowerKey(declared.name), bare);
@@ -1107,6 +1116,8 @@ void GatherDotNet(const al::CodeunitObject &unit,
   for (const al::ProcedureDecl &procedure : unit.procedures) {
     DotNetNames inner = named;
     DotNetNames innerMissing = missing;
+    NoteDotNet(procedure.returned, inner, use);
+    NoteAbsent(procedure.returned, objects, innerMissing, absent);
     for (const al::VarDecl &declared : procedure.parameters) {
       NoteDotNet(declared, inner, use);
       NoteAbsent(declared, objects, innerMissing, absent);

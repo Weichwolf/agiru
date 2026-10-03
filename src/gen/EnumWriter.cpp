@@ -3,6 +3,7 @@
 #include "Ast.h"
 #include "CodeunitWriter.h"
 #include "Names.h"
+#include "ObjectKind.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
 
@@ -12,6 +13,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::gen {
@@ -31,6 +33,46 @@ std::vector<const al::EnumValueDecl *> ByOrdinal(const al::EnumObject &object) {
     return a->ordinal < b->ordinal;
   });
   return values;
+}
+
+}
+
+namespace {
+
+std::string DeclarationMetadata(const al::EnumObject &object,
+                                const std::vector<const al::EnumValueDecl *> &sorted) {
+  std::string out = "  static constexpr std::array<std::string_view, " +
+                    std::to_string(object.implements.size()) + "> kInterfaces{";
+  for (std::size_t at = 0; at < object.implements.size(); ++at) {
+    if (at != 0) { out += ", "; }
+    out += Literal(object.implements[at]);
+  }
+  out += "};\n";
+  out += "  static constexpr std::int32_t kObjectID = " + std::to_string(object.id) + ";\n";
+  out += "  static constexpr std::string_view kName{" + Literal(object.name) + "};\n";
+  const auto *caption = al::Find(object.properties, "Caption");
+  out += "  static constexpr std::string_view kCaption{" +
+         Literal(caption == nullptr ? object.name : caption->text) + "};\n";
+  for (const auto &[property, member] :
+       {std::pair{"Scope", "kScope"},
+        std::pair{"DefaultImplementation", "kDefaultImplementation"}}) {
+    const auto *given = al::Find(object.properties, property);
+    out += "  static constexpr std::string_view " + std::string(member) + "{" +
+           Literal(given == nullptr ? "" : given->text) + "};\n";
+  }
+  const auto *extensible = al::Find(object.properties, "Extensible");
+  out += "  static constexpr bool kExtensible = ";
+  out += extensible != nullptr && LowerKey(extensible->text) == "true" ? "true" : "false";
+  out += ";\n";
+  out += "  static constexpr std::array<std::string_view, " + std::to_string(sorted.size()) +
+         "> kValueImplementations{";
+  for (std::size_t at = 0; at < sorted.size(); ++at) {
+    if (at != 0) { out += ", "; }
+    const auto *given = al::Find(sorted[at]->properties, "Implementation");
+    out += Literal(given == nullptr ? "" : given->text);
+  }
+  out += "};\n";
+  return out;
 }
 
 }
@@ -302,7 +344,7 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "#pragma once\n\n";
   out += kRuntimeIncludeMarker;
   out += "\n";
-  out += "#include <array>\n#include <cstdint>\n\n";
+  out += "#include <array>\n#include <cstdint>\n#include <string_view>\n\n";
 
   out += "namespace " + space + " {\n\n";
   out += "enum class " + identifier + " : std::int32_t {\n";
@@ -313,6 +355,7 @@ WriteEnum(const al::EnumObject &object, const std::string &sourcePath, const Obj
   out += "} // namespace " + space + "\n\n";
 
   out += "template <> struct agiru::EnumTraits<" + qualified + "> {\n";
+  out += DeclarationMetadata(object, sorted);
   const al::Property *unknown = al::Find(object.properties, "UnknownValueImplementation");
   out += "  static constexpr std::string_view kUnknownValueImplementation{";
   out += unknown == nullptr ? "\"\"" : Literal(unknown->text);

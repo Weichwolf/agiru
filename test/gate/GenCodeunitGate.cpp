@@ -3,7 +3,9 @@
 #include "EnumWriter.h"
 #include "Format.h"
 #include "Parser.h"
+#include "TableWriter.h"
 
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -104,8 +106,8 @@ std::string Generated(const std::string &source) {
 /// SAME FILE.
 void TheGeneratorReproducesTheTargetImage() {
   const std::string generated = Generated(Read(std::filesystem::path(AGIRU_AL_SOURCE) / kAlPath));
-  const std::string target =
-      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/TransferOldExtTextLines.h");
+  const std::string target = Read(std::filesystem::path(AGIRU_SOURCE_DIR) /
+                                  "test/transpiler/golden/TransferOldExtTextLines.h");
 
   {
     std::ofstream dump("/tmp/agiru-generated-TransferOldExtTextLines.h");
@@ -185,8 +187,8 @@ void TheGeneratorReproducesTheProcedureBodies() {
           Tables()),
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "TransferOldExtTextLines.cpp"});
-  const std::string target =
-      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/TransferOldExtTextLines.cpp");
+  const std::string target = Read(std::filesystem::path(AGIRU_SOURCE_DIR) /
+                                  "test/transpiler/golden/TransferOldExtTextLines.cpp");
 
   {
     std::ofstream dump("/tmp/agiru-generated-TransferOldExtTextLines.cpp");
@@ -493,6 +495,33 @@ void ACodeunitIncludesEveryObjectItNames() {
              generated.find("SalesLineType.h") == generated.rfind("SalesLineType.h"));
 }
 
+void ANativeFieldCannotCaptureARecordMethod() {
+  const std::array tables{agiru::al::ParseTable(R"(table 2000000068 "Record Link" {
+    fields { field(2; "Record ID"; RecordId) {} }
+  })")};
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables(tables);
+  const auto unit = agiru::al::ParseCodeunit(R"(codeunit 50177 Caller {
+    procedure Check()
+    var Native: Record "Record Link"; MethodValue: RecordId; FieldValue: RecordId;
+    begin
+      MethodValue := Native.RecordId;
+      MethodValue := Native.RecordID();
+      FieldValue := Native."Record ID";
+    end;
+  })");
+  const std::string body = agiru::gen::WriteCodeunitSource(unit, "Caller.Codeunit.al", objects);
+  CHECK_TRUE(
+      "property syntax selects the record method rather than a spaced AL field",
+      body.contains(
+          "MethodValue = Native.::agiru::Table<::agiru::platform::RecordLink>::RecordId();"));
+  CHECK_TRUE("case-insensitive explicit calls select the same record method",
+             body.find("RecordId();") != body.rfind("RecordId();"));
+  CHECK_TRUE("quoted field access retains the native ABI field",
+             body.contains("FieldValue = Native.RecordID;"));
+  CHECK_TRUE("native field values are never called", !body.contains("Native.RecordID()"));
+}
+
 } // namespace
 
 int main() {
@@ -511,5 +540,6 @@ int main() {
     ARelationalLeftOperandRetainsItsAlGrouping();
     ARemoteVarParameterLendsTheVariantsStoredType();
     ACodeunitIncludesEveryObjectItNames();
+    ANativeFieldCannotCaptureARecordMethod();
   });
 }

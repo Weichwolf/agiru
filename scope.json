@@ -88,6 +88,8 @@
   ],
   "_product_doc": "Explicit approved source exclusions, reason:path relative to BCApps/src. A trailing slash selects a module directory, otherwise a single exact file. No filename/namespace heuristic. Raw object and method identities always remain inventoried. Current exclusion is a test of BC license/trial warnings and BC SaaS sandbox notifications, not general notifications or ERP workflows.",
   "product_exclude": [
-    "licensing-and-microsoft-cloud:Layers/W1/Tests/SMB/O365RoleCenterNotifications.Codeunit.al"
+    "licensing-and-microsoft-cloud:Layers/W1/Tests/SMB/O365RoleCenterNotifications.Codeunit.al",
+    "licensing-and-microsoft-cloud:System Application/App/Tenant License State/src/TenantLicenseStateImpl.Codeunit.al",
+    "licensing-and-microsoft-cloud:System Application/App/Azure AD Tenant/src/AzureADTenantImpl.Codeunit.al"
   ]
 }

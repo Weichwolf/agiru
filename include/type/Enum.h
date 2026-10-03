@@ -18,6 +18,8 @@
 namespace agiru {
 
 /// \brief The declared values of one AL enum object, as static const data.
+/// Generated specializations also retain the AL object ID, name, caption, scope,
+/// extensibility and interface names. Scope metadata alone does not enforce availability.
 ///
 /// \tparam E The generated enumeration naming the values.
 ///

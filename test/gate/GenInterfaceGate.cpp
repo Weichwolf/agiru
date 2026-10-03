@@ -1,4 +1,4 @@
-#include "../interface-defaults/Fixture.h"
+#include "../transpiler/interface-defaults/Fixture.h"
 #include "Ast.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
@@ -116,6 +116,28 @@ void SourcesNameOnlyTheirBodyDependencies() {
              written.source.find("#include \"Required.h\"") == std::string::npos);
 }
 
+void AbsentSignatureTypesRetainTheirDeclarationsAndGaps() {
+  for (const std::string_view signature : {"procedure Parameter(Value: MissingParameter);",
+                                           "procedure Returned(): MissingReturn;",
+                                           "procedure RecordReturn(): Record MissingRecord;",
+                                           "procedure Nested(Value: List of [MissingElement]);"}) {
+    const auto written =
+        WriteInterface(ParseInterface("interface Missing { " + std::string(signature) + " }"),
+                       "Missing.Interface.al",
+                       Objects());
+    CHECK_TRUE("every absent signature type names its declaration header",
+               written.text.find("#include \"absent/Types.h\"") != std::string::npos);
+    CHECK_TRUE("every absent signature type remains a counted gap", written.absent.size() == 1);
+  }
+  const auto supported =
+      WriteInterface(ParseInterface("interface Supported { procedure Returned(): Integer; }"),
+                     "Supported.Interface.al",
+                     Objects());
+  CHECK_TRUE("supported signatures need no absent declarations",
+             supported.text.find("#include \"absent/Types.h\"") == std::string::npos);
+  CHECK_TRUE("supported signatures add no absent gap", supported.absent.empty());
+}
+
 void Write(const std::filesystem::path &path, std::string_view source) {
   std::ofstream file(path);
   file << source;
@@ -144,5 +166,6 @@ int main(int argc, char **argv) {
     DefinitionsStayOutOfHeaders();
     InvalidBodiesRefuse();
     SourcesNameOnlyTheirBodyDependencies();
+    AbsentSignatureTypesRetainTheirDeclarationsAndGaps();
   });
 }

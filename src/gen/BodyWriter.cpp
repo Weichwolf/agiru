@@ -1161,12 +1161,16 @@ private:
       }
     }
     const bool calledBesideAField =
-        how.callee && reach.spelling == "." && reach.link.kind == al::ExprKind::Name &&
-        reach.base.kind == al::ExprKind::Name && scope_.HasField(member);
+        (how.callee || how.parens) && reach.spelling == "." &&
+        reach.link.kind == al::ExprKind::Name && reach.base.kind == al::ExprKind::Name &&
+        ((how.callee && scope_.HasField(member)) ||
+         (scope_.IsRecord(reach.base.text) && RuntimeCallable(reach.link.text) &&
+          scope_.MemberSpelling(member) != RuntimeSpelling(Identifier(reach.link.text))));
     std::string besideAField;
     if (calledBesideAField) {
       besideAField = scope_.ProcedureOf(member);
-      if (besideAField.empty() && HiddenByABaseMember(reach.link.text)) {
+      if (besideAField.empty() &&
+          HiddenByABaseMember(RuntimeSpelling(Identifier(reach.link.text)))) {
         const std::string table = scope_.TableOf(reach.base.text);
         if (!table.empty()) {
           besideAField =

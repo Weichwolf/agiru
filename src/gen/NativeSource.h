@@ -25,6 +25,10 @@ struct NativeSources {
   std::vector<std::string> paths;
   std::vector<al::PageObject> reports;
   std::vector<std::string> reportPaths;
+  std::vector<al::EnumObject> enums;
+  std::vector<std::string> enumPaths;
+  std::vector<al::InterfaceObject> interfaces;
+  std::vector<std::string> interfacePaths;
   NativeAppIdentity app;
   std::vector<NativeSourceIssue> issues;
   std::vector<std::string> otherSources;

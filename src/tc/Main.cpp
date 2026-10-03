@@ -302,6 +302,9 @@ constexpr std::array kAcknowledgedAttributes{
 };
 
 constexpr std::string_view kTranslatedProperties[] = {
+    std::string_view{"enum.caption"},
+    std::string_view{"enum.extensible"},
+    std::string_view{"enumvalue.caption"},
     std::string_view{"dataitem.calcfields"},
     std::string_view{"dataitem.dataitemlink"},
     std::string_view{"dataitem.dataitemlinkreference"},
@@ -624,6 +627,15 @@ constexpr std::string_view kLayoutObsoletionStatus =
     "pending (board:0063,0033)";
 
 constexpr std::array kPartlyTranslatedProperties{
+    std::pair{std::string_view{"enum.defaultimplementation"},
+              std::string_view{"source mapping retained; native interface/implementor activation "
+                               "pending (board:0034)"}},
+    std::pair{std::string_view{"enumvalue.implementation"},
+              std::string_view{"source mapping retained; native interface/implementor activation "
+                               "pending (board:0034)"}},
+    std::pair{std::string_view{"enum.scope"},
+              std::string_view{"immutable scope retained; target availability enforcement pending "
+                               "(board:0034)"}},
     std::pair{std::string_view{"field.tablerelation"},
               std::string_view{"the bare Table[.Field] form reaches the metadata and the "
                                "conditional grammar does not (board:0043)"}},
@@ -919,34 +931,56 @@ NamesOfProcedures(const std::vector<agiru::al::ProcedureDecl> &procedures) {
   return named;
 }
 
-Interfaces IndexInterfaces(Run &run, Counts &counts, agiru::gen::Objects &objects) {
+void IndexInterface(const agiru::al::InterfaceObject &object, agiru::gen::Objects &objects) {
+  const std::string identifier = agiru::gen::Identifier(object.name);
+  const agiru::gen::TableRef reference{
+      .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
+                    agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Interface),
+      .header = agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) +
+                "/" + identifier + ".h",
+      .fields = {},
+      .procedures = NamesOfProcedures(object.procedures),
+      .parts = {},
+      .name = {},
+      .dataItems = {},
+      .requestFields = {},
+      .columnSources = {},
+      .interfaceReturns = InterfaceReturnsOf(object),
+      .tryFunctions = {},
+      .procedureDeclarations = object.procedures,
+      .interfaceBases = object.extends};
+  objects.interfaces.insert_or_assign(agiru::gen::LowerKey(object.name), reference);
+  if (!object.nameSpace.empty()) {
+    objects.interfaces.insert_or_assign(agiru::gen::LowerKey(object.nameSpace + "." + object.name),
+                                        reference);
+  }
+}
+
+void CheckNativeInterfaceIdentity(const agiru::al::InterfaceObject &object,
+                                  const agiru::gen::NativeSources &native) {
+  for (const auto &original : native.interfaces) {
+    if (agiru::gen::LowerKey(object.name) != agiru::gen::LowerKey(original.name)) { continue; }
+    if (agiru::gen::LowerKey(object.nameSpace) == agiru::gen::LowerKey(original.nameSpace)) {
+      throw std::runtime_error("Application duplicates declared System interface identity: " +
+                               object.name);
+    }
+    throw std::runtime_error("Ambiguous unqualified System interface name: " + object.name);
+  }
+}
+
+Interfaces IndexInterfaces(Run &run,
+                           Counts &counts,
+                           agiru::gen::Objects &objects,
+                           const agiru::gen::NativeSources &native) {
   Interfaces kept;
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Interface.al")) {
     ++counts.files;
     try {
       agiru::al::InterfaceObject object = agiru::al::ParseInterface(Read(path));
+      CheckNativeInterfaceIdentity(object, native);
       ++counts.parsed;
       counts.members += object.procedures.size();
-      const std::string identifier = agiru::gen::Identifier(object.name);
-      objects.interfaces.insert_or_assign(
-          agiru::gen::LowerKey(object.name),
-          agiru::gen::TableRef{
-              .identifier = "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
-                            agiru::gen::ClassName(identifier, agiru::gen::ObjectKind::Interface),
-              .header =
-                  agiru::gen::OutputDirectory(object.nameSpace, agiru::gen::ObjectKind::Interface) +
-                  "/" + identifier + ".h",
-              .fields = {},
-              .procedures = NamesOfProcedures(object.procedures),
-              .parts = {},
-              .name = {},
-              .dataItems = {},
-              .requestFields = {},
-              .columnSources = {},
-              .interfaceReturns = InterfaceReturnsOf(object),
-              .tryFunctions = {},
-              .procedureDeclarations = object.procedures,
-              .interfaceBases = object.extends});
+      IndexInterface(object, objects);
       kept.paths.push_back(std::filesystem::relative(path, run.root).string());
       kept.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
@@ -993,6 +1027,7 @@ struct EnumOwner {
 
 struct Extensions {
   std::map<std::string, std::vector<agiru::al::TableExtensionObject>> tables;
+  std::map<std::string, std::string> tableOwners;
   std::map<std::string, std::vector<agiru::al::EnumExtensionObject>> enums;
   std::map<std::string, EnumOwner> enumOwners;
   std::map<std::string, std::vector<agiru::al::PageExtensionObject>> pages;
@@ -1011,18 +1046,52 @@ std::string Overload(const agiru::al::ProcedureDecl &procedure) {
   return key;
 }
 
-void TakeFields(std::vector<agiru::al::FieldDecl> &into,
-                const std::vector<agiru::al::FieldDecl> &from) {
-  std::set<std::string> names;
-  std::set<int> numbers;
-  for (const agiru::al::FieldDecl &field : into) {
-    names.insert(agiru::gen::LowerKey(field.name));
-    numbers.insert(field.number);
+std::string MoveIdentity(const agiru::al::FieldDecl &field, std::string_view property) {
+  const auto *value = agiru::al::Find(field.properties, property);
+  if (value == nullptr) { return {}; }
+  for (const auto &token : value->value) {
+    if (token.kind == agiru::al::TokenKind::String) { return agiru::gen::LowerKey(token.text); }
   }
+  return agiru::gen::LowerKey(value->text);
+}
+
+void CheckFieldTakeover(const agiru::al::FieldDecl &source,
+                        std::string_view sourceOwner,
+                        const agiru::al::FieldDecl &destination,
+                        std::string_view destinationOwner) {
+  if (sourceOwner.empty() || destinationOwner.empty() ||
+      MoveIdentity(source, "MovedTo") != destinationOwner ||
+      MoveIdentity(destination, "MovedFrom") != sourceOwner ||
+      source.number != destination.number ||
+      agiru::gen::LowerKey(source.name) != agiru::gen::LowerKey(destination.name) ||
+      agiru::gen::LowerKey(source.type) != agiru::gen::LowerKey(destination.type) ||
+      agiru::gen::LowerKey(source.subtype) != agiru::gen::LowerKey(destination.subtype) ||
+      source.length != destination.length) {
+    throw std::runtime_error("invalid moved field takeover: " + source.name);
+  }
+}
+
+void TakeFields(std::vector<agiru::al::FieldDecl> &into,
+                std::map<int, std::string> &owners,
+                const std::vector<agiru::al::FieldDecl> &from,
+                std::string_view owner) {
   for (const agiru::al::FieldDecl &field : from) {
-    if (!names.insert(agiru::gen::LowerKey(field.name)).second) { continue; }
-    if (!numbers.insert(field.number).second) { continue; }
-    into.push_back(field);
+    const auto found = std::ranges::find_if(into, [&](const auto &held) {
+      return held.number == field.number ||
+             agiru::gen::LowerKey(held.name) == agiru::gen::LowerKey(field.name);
+    });
+    if (found == into.end()) {
+      into.push_back(field);
+      owners[field.number] = owner;
+      continue;
+    }
+    if (IsMoved(found->properties) && !IsMoved(field.properties)) {
+      CheckFieldTakeover(*found, owners.at(found->number), field, owner);
+      *found = field;
+      owners[field.number] = owner;
+    } else if (!IsMoved(found->properties) && IsMoved(field.properties)) {
+      CheckFieldTakeover(field, owner, *found, owners.at(found->number));
+    }
   }
 }
 
@@ -1095,6 +1164,7 @@ Extensions ReadExtensions(Run &run,
   for (const agiru::gen::App &app : apps) {
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
+    const auto appOwner = agiru::gen::LowerKey(AppIdentity(run.root).id);
     const auto read = [&](std::string_view suffix, auto parse, auto &into, auto note) {
       for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
@@ -1109,7 +1179,13 @@ Extensions ReadExtensions(Run &run,
       }
     };
     const auto unnoted = [](const auto &, const std::filesystem::path &) {};
-    read(".TableExt.al", agiru::al::ParseTableExtension, store.tables, unnoted);
+    read(".TableExt.al",
+         agiru::al::ParseTableExtension,
+         store.tables,
+         [&](const agiru::al::TableExtensionObject &extension, const std::filesystem::path &) {
+           store.tableOwners[agiru::gen::LowerKey(extension.name) + "|" +
+                             agiru::gen::LowerKey(extension.extends)] = appOwner;
+         });
     read(".EnumExt.al",
          agiru::al::ParseEnumExtension,
          store.enums,
@@ -1449,54 +1525,97 @@ struct Enums {
   std::vector<std::string> paths;
 };
 
-void ScanEnums(
-    Run &run, Counts &counts, const Extensions &store, agiru::gen::EnumIndex &index, Enums &held) {
-  std::vector<agiru::al::EnumObject> objects;
-  std::vector<std::string> paths;
+void CheckEnumValues(const agiru::al::EnumObject &object) {
+  const auto *extensible = agiru::al::Find(object.properties, "Extensible");
+  if (extensible != nullptr && agiru::gen::LowerKey(extensible->text) != "true" &&
+      agiru::gen::LowerKey(extensible->text) != "false") {
+    throw std::runtime_error("Invalid Extensible property on enum: " + object.name);
+  }
+  std::set<int> ordinals;
+  std::set<std::string> names;
+  for (const auto &value : object.values) {
+    if (!ordinals.insert(value.ordinal).second ||
+        !names.insert(agiru::gen::LowerKey(value.name)).second) {
+      throw std::runtime_error("Duplicate enum value in " + object.name + ": " + value.name);
+    }
+  }
+}
+
+void MergeAndIndexEnums(Enums &held,
+                        Counts &counts,
+                        const Extensions &store,
+                        agiru::gen::EnumIndex &index) {
+  for (auto &object : held.objects) {
+    CheckEnumValues(object);
+    const auto found = store.enums.find(agiru::gen::LowerKey(object.name));
+    if (found != store.enums.end()) {
+      const auto *extensible = agiru::al::Find(object.properties, "Extensible");
+      if (extensible == nullptr || agiru::gen::LowerKey(extensible->text) != "true") {
+        throw std::runtime_error("Cannot extend non-extensible enum: " + object.name);
+      }
+      for (const auto &extension : found->second) {
+        object.values.insert(object.values.end(), extension.values.begin(), extension.values.end());
+        ++counts.emitted;
+        ++store.consumed["enum " + found->first];
+      }
+    }
+    CheckEnumValues(object);
+    agiru::gen::EnumRef ref{.identifier =
+                                "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
+                                agiru::gen::ClassName(agiru::gen::Identifier(object.name),
+                                                      agiru::gen::ObjectKind::Enum),
+                            .header = agiru::gen::EnumHeaderPath(object),
+                            .ordinals = {},
+                            .members = {}};
+    for (const auto &value : object.values) {
+      ref.ordinals.emplace(agiru::gen::LowerKey(value.name), value.ordinal);
+      ref.members.emplace(agiru::gen::LowerKey(value.name), agiru::gen::EnumeratorName(value.name));
+    }
+    index.insert_or_assign(agiru::gen::LowerKey(object.name), ref);
+    index.insert_or_assign(std::to_string(object.id), ref);
+    if (!object.nameSpace.empty()) {
+      index.insert_or_assign(agiru::gen::LowerKey(object.nameSpace + "." + object.name), ref);
+    }
+  }
+}
+
+void CheckNativeEnumIdentities(const Enums &held, const agiru::gen::NativeSources &sources) {
+  for (const auto &object : held.objects) {
+    for (const auto &native : sources.enums) {
+      if (object.id == native.id ||
+          agiru::gen::LowerKey(object.nameSpace + "." + object.name) ==
+              agiru::gen::LowerKey(native.nameSpace + "." + native.name)) {
+        throw std::runtime_error("AL enum duplicates declared System enum identity " +
+                                 std::to_string(native.id) + ": " + object.name);
+      }
+      if (agiru::gen::LowerKey(object.name) == agiru::gen::LowerKey(native.name)) {
+        throw std::runtime_error("Ambiguous unqualified System enum name: " + object.name);
+      }
+    }
+  }
+}
+
+void ScanEnums(Run &run,
+               Counts &counts,
+               const Extensions &store,
+               agiru::gen::EnumIndex &index,
+               Enums &held,
+               const agiru::gen::NativeSources &native) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Enum.al")) {
     ++counts.files;
     try {
       agiru::al::EnumObject object = agiru::al::ParseEnum(Read(path));
       ++counts.parsed;
       counts.members += object.values.size();
-      paths.push_back(std::filesystem::relative(path, run.root).string());
-      objects.push_back(std::move(object));
+      held.paths.push_back(std::filesystem::relative(path, run.root).string());
+      held.objects.push_back(std::move(object));
     } catch (const std::exception &e) {
       if (Note(run, path, e)) { --counts.files; }
     }
   }
 
-  for (agiru::al::EnumObject &object : objects) {
-    const auto found = store.enums.find(agiru::gen::LowerKey(object.name));
-    if (found == store.enums.end()) { continue; }
-    for (const agiru::al::EnumExtensionObject &extension : found->second) {
-      object.values.insert(object.values.end(), extension.values.begin(), extension.values.end());
-      ++counts.emitted;
-      ++store.consumed["enum " + found->first];
-    }
-  }
-
-  for (const agiru::al::EnumObject &object : objects) {
-    std::map<std::string, int> ordinals;
-    std::map<std::string, std::string> members;
-    for (const agiru::al::EnumValueDecl &value : object.values) {
-      ordinals.insert_or_assign(agiru::gen::LowerKey(value.name), value.ordinal);
-      members.insert_or_assign(agiru::gen::LowerKey(value.name),
-                               agiru::gen::EnumeratorName(value.name));
-    }
-    index.insert_or_assign(
-        agiru::gen::LowerKey(object.name),
-        agiru::gen::EnumRef{.identifier =
-                                "::agiru::" + agiru::gen::NamespaceSuffix(object.nameSpace) +
-                                agiru::gen::ClassName(agiru::gen::Identifier(object.name),
-                                                      agiru::gen::ObjectKind::Enum),
-                            .header = agiru::gen::EnumHeaderPath(object),
-                            .ordinals = std::move(ordinals),
-                            .members = std::move(members)});
-  }
-  if (run.output.empty()) { return; }
-  held.objects = std::move(objects);
-  held.paths = std::move(paths);
+  CheckNativeEnumIdentities(held, native);
+  MergeAndIndexEnums(held, counts, store, index);
 }
 
 struct ForeignImplementations {
@@ -1688,7 +1807,8 @@ void NoteObjectOptions(const agiru::al::PageObject &object, OptionsInScope &into
 
 void NoteFieldEnums(const agiru::al::TableObject &table,
                     const agiru::gen::EnumIndex &enums,
-                    agiru::gen::FieldEnums &into) {
+                    agiru::gen::FieldEnums &into,
+                    bool bindOptions = true) {
   auto &fields = into[agiru::gen::LowerKey(table.name)];
   for (const agiru::al::FieldDecl &field : table.fields) {
     if (agiru::gen::TypeName(field.type) == "Enum" && !field.subtype.empty()) {
@@ -1699,12 +1819,19 @@ void NoteFieldEnums(const agiru::al::TableObject &table,
       continue;
     }
     if (const agiru::al::Property *members = agiru::al::Find(field.properties, "OptionMembers");
-        members != nullptr) {
+        members != nullptr && bindOptions) {
       const std::string named =
           agiru::gen::OptionEnumName(table.name, field.name, agiru::al::ListValue(*members));
       fields.insert_or_assign(agiru::gen::LowerKey(field.name),
                               named.find("::") == std::string::npos ? "tables::" + named : named);
     }
+  }
+}
+
+void NoteNativeFieldEnums(const agiru::gen::NativeSources &sources, agiru::gen::Objects &objects) {
+  for (const auto &table : sources.tables) {
+    if (!objects.tables.contains(std::to_string(table.id))) { continue; }
+    NoteFieldEnums(table, objects.enums, objects.fieldEnums, false);
   }
 }
 
@@ -1730,31 +1857,49 @@ Tables IndexTables(Run &run, Counts &counts) {
   return kept;
 }
 
-std::size_t MergeExtensions(const Extensions &store, Tables &tables) {
+std::size_t
+MergeExtensions(const Extensions &store, Tables &tables, std::string_view tableOwner = {}) {
   std::size_t merged = 0;
   const auto take = [](auto &into, const auto &from) {
     into.insert(into.end(), from.begin(), from.end());
   };
   for (agiru::al::TableObject &table : tables.objects) {
+    std::map<int, std::string> owners;
+    for (const auto &field : table.fields) { owners[field.number] = tableOwner; }
     const auto found = store.tables.find(agiru::gen::LowerKey(table.name));
-    if (found == store.tables.end()) { continue; }
-    for (const agiru::al::TableExtensionObject &extension : found->second) {
-      for (const agiru::al::FieldDecl &change : extension.modified) {
-        for (agiru::al::FieldDecl &field : table.fields) {
-          if (agiru::gen::LowerKey(field.name) != agiru::gen::LowerKey(change.name)) { continue; }
-          take(field.properties, change.properties);
-          take(field.triggers, change.triggers);
-          break;
+    if (found != store.tables.end()) {
+      for (const agiru::al::TableExtensionObject &extension : found->second) {
+        for (const agiru::al::FieldDecl &change : extension.modified) {
+          const auto field = std::ranges::find_if(table.fields, [&](const auto &held) {
+            return agiru::gen::LowerKey(held.name) == agiru::gen::LowerKey(change.name);
+          });
+          if (field == table.fields.end()) { continue; }
+          take(field->properties, change.properties);
+          take(field->triggers, change.triggers);
         }
+        TakeFields(table.fields,
+                   owners,
+                   extension.fields,
+                   store.tableOwners.at(agiru::gen::LowerKey(extension.name) + "|" + found->first));
+        take(table.keys, extension.keys);
+        take(table.labels, extension.labels);
+        TakeVariables(table.variables, extension.variables);
+        TakeProcedures(table.procedures, extension.procedures);
+        ++merged;
+        ++store.consumed["table " + found->first];
       }
-      TakeFields(table.fields, extension.fields);
-      take(table.keys, extension.keys);
-      take(table.labels, extension.labels);
-      TakeVariables(table.variables, extension.variables);
-      TakeProcedures(table.procedures, extension.procedures);
-      ++merged;
-      ++store.consumed["table " + found->first];
     }
+    std::erase_if(table.fields, [&](const auto &field) {
+      if (!IsMoved(field.properties)) { return false; }
+      std::println("moved-field-unavailable {}.{} ({}) {} -> {}: destination declaration absent; "
+                   "stored data retained",
+                   table.name,
+                   field.name,
+                   field.number,
+                   owners.at(field.number),
+                   MoveIdentity(field, "MovedTo"));
+      return true;
+    });
   }
   return merged;
 }
@@ -2641,9 +2786,10 @@ struct LayoutCounts {
   std::size_t emitted = 0;
 };
 
-struct NativeReportOutput {
+struct NativeObjectOutput {
   std::size_t written = 0;
   std::size_t changed = 0;
+  std::size_t gaps = 0;
 };
 
 std::size_t CountLayouts(const Pages &reports) {
@@ -2660,15 +2806,28 @@ void NoteUnwrittenReports(const Run &run, const Pages &reports, Gathered &gather
   }
 }
 
-NativeReportOutput WriteNativeReports(const Job &job,
+std::size_t NoteNativeEnumInterfaces(const Enums &enums, const agiru::gen::Objects &objects) {
+  std::size_t gaps = 0;
+  for (const auto &object : enums.objects) {
+    for (const auto &face : object.implements) {
+      if (objects.interfaces.contains(agiru::gen::LowerKey(face))) { continue; }
+      ++gaps;
+      std::println("native-enum-interface-unbound {} {}: {}", object.id, object.name, face);
+    }
+  }
+  return gaps;
+}
+
+NativeObjectOutput WriteNativeObjects(const Job &job,
                                       const agiru::gen::NativeSources &native,
+                                      const Enums &enums,
                                       const Pages &reports,
                                       agiru::gen::Objects &objects,
                                       Gathered &gathered,
                                       const TableByName &tables,
                                       std::set<std::filesystem::path> &kept,
                                       LayoutCounts &layouts) {
-  if (reports.objects.empty()) { return {}; }
+  if (reports.objects.empty() && enums.objects.empty() && native.interfaces.empty()) { return {}; }
   Run run{.sourceRoot = job.systemSymbols,
           .root = job.systemSymbols,
           .output = job.output.empty() ? std::filesystem::path{} : job.output / "platform",
@@ -2692,6 +2851,21 @@ NativeReportOutput WriteNativeReports(const Job &job,
   NoteUnwrittenReports(run, reports, gathered);
   for (const auto &report : reports.objects) { NoteObjectOptions(report, gathered.options); }
   WritePages(run, reports, objects, gathered, tables);
+  const auto reportWritten = run.written;
+  WriteEnums(run, enums, objects);
+  const auto enumWritten = run.written - reportWritten;
+  const auto beforeInterfaces = run.written;
+  WriteInterfaces(run,
+                  Interfaces{.objects = native.interfaces, .paths = native.interfacePaths},
+                  gathered,
+                  objects);
+  for (const auto &object : enums.objects) {
+    Absorb(gathered.refused, agiru::gen::Refused(object));
+    NoteProperties(object.properties, "enum", gathered.properties);
+    for (const auto &value : object.values) {
+      NoteProperties(value.properties, "enumvalue", gathered.properties);
+    }
+  }
   kept.merge(run.kept);
   layouts.reports += CountLayouts(Pages{.objects = native.reports, .paths = native.reportPaths});
   layouts.bound += CountLayouts(reports);
@@ -2699,8 +2873,26 @@ NativeReportOutput WriteNativeReports(const Job &job,
   std::println("native {} report sources bound; {} objects written into the platform app; "
                "no asset installation or rendering proof",
                reports.objects.size(),
-               run.written);
-  return {.written = run.written, .changed = run.changed};
+               reportWritten);
+  std::println("native {} enum sources bound; {} enum objects written into the platform app; "
+               "no provider or business execution proof",
+               enums.objects.size(),
+               enumWritten);
+  std::println("native {} interface sources bound; {} interface objects written into the platform "
+               "app; no native implementor or business execution proof",
+               native.interfaces.size(),
+               run.written - beforeInterfaces);
+  std::size_t interfaceGaps = 0;
+  for (const auto &face : native.interfaces) {
+    for (const auto &base : face.extends) {
+      if (objects.interfaces.contains(agiru::gen::LowerKey(base))) { continue; }
+      ++interfaceGaps;
+      std::println("native-interface-base-unbound {}: {}", face.name, base);
+    }
+  }
+  return {.written = run.written,
+          .changed = run.changed,
+          .gaps = NoteNativeEnumInterfaces(enums, objects) + interfaceGaps};
 }
 
 void NoteUnresolvedLayouts(const Extensions &store, Gathered &gathered) {
@@ -2828,7 +3020,7 @@ int Scan(const Job &job) {
   agiru::gen::NativeSources nativeSources = job.systemSymbols.empty()
                                                 ? agiru::gen::NativeSources{}
                                                 : agiru::gen::ReadNativeSources(job.systemSymbols);
-  if (!nativeSources.reports.empty() &&
+  if ((!nativeSources.reports.empty() || !nativeSources.enums.empty()) &&
       std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {
     throw std::runtime_error("apps.json: platform is reserved for the supplied System package");
   }
@@ -2878,6 +3070,16 @@ int Scan(const Job &job) {
 
   const std::size_t nativeGaps = BindNativeSources(
       job.systemSymbols, nativeSources, store, objects, everyTable, allExtensions);
+  Enums nativeEnums{.objects = nativeSources.enums, .paths = nativeSources.enumPaths};
+  Counts nativeEnumCounts;
+  MergeAndIndexEnums(nativeEnums, nativeEnumCounts, store, index);
+  objects.enums = index;
+  for (const auto &face : nativeSources.interfaces) {
+    IndexInterface(face, objects);
+    NoteOptions({}, face.procedures, gathered.options);
+  }
+  NoteNativeFieldEnums(nativeSources, objects);
+  allExtensions.emitted += nativeEnumCounts.emitted;
   const auto nativeReports = BindNativeReports(nativeSources, store, objects);
   for (const auto &report : nativeReports.objects) {
     const auto name = "report " + agiru::gen::LowerKey(report.name);
@@ -2929,16 +3131,17 @@ int Scan(const Job &job) {
     Pages parsedXmlPorts = IndexXmlPorts(run, objects);
     const Queries parsedQueries = IndexQueries(run, objects);
     Enums heldEnums;
-    ScanEnums(run, enums, store, index, heldEnums);
+    ScanEnums(run, enums, store, index, heldEnums, nativeSources);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
     CheckNativeTableIdentities(parsedTables, nativeSources);
-    extensions.emitted += MergeExtensions(store, parsedTables);
+    extensions.emitted +=
+        MergeExtensions(store, parsedTables, agiru::gen::LowerKey(AppIdentity(source).id));
     RefreshTableIndex(parsedTables, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
     }
-    const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects);
+    const Interfaces parsedInterfaces = IndexInterfaces(run, interfaces, objects, nativeSources);
     for (const auto &face : parsedInterfaces.objects) {
       NoteOptions({}, face.procedures, gathered.options);
     }
@@ -3015,8 +3218,8 @@ int Scan(const Job &job) {
     refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
-  const auto nativeOutput = WriteNativeReports(
-      job, nativeSources, nativeReports, objects, gathered, everyTable, kept, layouts);
+  const auto nativeOutput = WriteNativeObjects(
+      job, nativeSources, nativeEnums, nativeReports, objects, gathered, everyTable, kept, layouts);
   written += nativeOutput.written;
   changed += nativeOutput.changed;
   allReports += nativeReports.objects.size();
@@ -3205,7 +3408,7 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return failures.empty() && refusals.empty() && nativeGaps == 0 ? 0 : 1;
+  return failures.empty() && refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 ? 0 : 1;
 }
 
 }

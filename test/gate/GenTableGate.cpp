@@ -51,7 +51,7 @@ void TheGeneratorReproducesTheTargetImage() {
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.h"});
   const std::string target =
-      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.h");
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/transpiler/golden/ResourceCost.h");
 
   // The generated file is left on disk beside the failure, because a line number is not enough to
   // repair an emitter -- the whole output is.
@@ -95,7 +95,7 @@ void TheGeneratorReproducesTheTriggerBodies() {
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.cpp"});
   const std::string target =
-      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.cpp");
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/transpiler/golden/ResourceCost.cpp");
 
   {
     std::ofstream dump("/tmp/agiru-generated-ResourceCost.cpp");
@@ -129,7 +129,7 @@ void TheGeneratorReproducesTheDefinitionsUnit() {
       .stylePath = std::string(AGIRU_SOURCE_DIR) + "/.clang-format",
       .assumedName = "ResourceCost.def.cpp"});
   const std::string target =
-      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/target/ResourceCost.def.cpp");
+      Read(std::filesystem::path(AGIRU_SOURCE_DIR) / "test/transpiler/golden/ResourceCost.def.cpp");
 
   {
     std::ofstream dump("/tmp/agiru-generated-ResourceCost.def.cpp");

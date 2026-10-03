@@ -85,6 +85,20 @@ void ProductBoundariesPreserveCore(const Scope &scope) {
   CHECK_TRUE(
       "O365 names alone never exclude ERP tests",
       !agiru::gen::ProductExclusion(rules, "Layers/W1/Tests/SMB/O365TrialBalance.Codeunit.al"));
+  for (const std::string_view path :
+       {"System Application/App/Tenant License State/src/TenantLicenseStateImpl.Codeunit.al",
+        "System Application/App/Azure AD Tenant/src/AzureADTenantImpl.Codeunit.al"}) {
+    CHECK_TRUE("pure commercial/service implementations are explicitly excluded",
+               agiru::gen::ProductExclusion(rules, path).has_value());
+  }
+  for (const std::string_view path :
+       {"System Application/App/Tenant License State/src/TenantLicenseState.Codeunit.al",
+        "System Application/App/Azure AD Tenant/src/AzureADTenant.Codeunit.al",
+        "System Application/App/User Settings/src/UserSettingsImpl.Codeunit.al",
+        "Layers/W1/BaseApp/System/Notifications/MyPlatformNotifications.Codeunit.al"}) {
+    CHECK_TRUE("mixed callers remain required rather than being silently retired",
+               !agiru::gen::ProductExclusion(rules, path));
+  }
 }
 
 void TheNamespaceDecidesTheDirectory() {
