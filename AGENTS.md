@@ -174,7 +174,20 @@ prove the narrow header's dependency profile with negative controls.
   must not become slice refusal stubs; zero missing procedures emit no helper. The authored
   two-source slice is a linking fixture, not the production slice denominator. Run this
   target before analysing its consumers. This proves declaration loading/fixture linking,
-  not complete native activation, full-tree linking, asset installation, rendering or G1.
+  and byte-preserving packaging of the original named assets, not complete native activation,
+  full-tree linking, asset installation, approval, selection, rendering or G1.
+- Translation emits `layout-assets.json` for named `rendering` layouts, retaining declaring
+  app/version/source ownership and unresolved targets. Use `make layout-assets REQUESTS=<manifest>
+  OUTPUT=<new-directory>` with the matching `AGIRU_BC_SOURCE` and explicit native package when
+  required. `NOTICES=<JSON-array-of-original-notice-files>` preserves notices outside frozen
+  source roots; the qualifiers require the original BC source notice, with an explicit
+  `AGIRU_LAYOUT_SOURCE_NOTICE` override for relocated source copies. Do not omit third-party
+  notices or replace them with agiru's license. It refuses unresolved identities, owner/version drift, missing files, unsafe paths
+  and symlinks; preserves original assets/declarations/notices and records SHA256/size.
+  `scripts/verify_layout_assets.sh` verifies a standalone bundle; `make layout-assets-check`
+  proves loss, ownership, path, byte-integrity and output-failure controls. Bundle completeness
+  applies only to its named-layout population, not legacy layout coverage or ERP/G1. Installation,
+  approval and selected defaults belong to the production catalogue, not this offline packager.
 - `make native-bindings AGIRU_SYSTEM_SYMBOLS=<verified-package>` inventories every
   original native table independently, emits production-generator contracts and compiles
   every bound candidate without PCH. Unbound/refused/crashed/mismatched identities remain
@@ -222,7 +235,8 @@ prove the narrow header's dependency profile with negative controls.
   still builds the full slice in the current tree; use it only for a deliberate
   integration check when that tree will remain unchanged until the build ends.
 - `make transpile` regenerates `apps/`; `make tree` and `make apps` check the
-  complete generated tree. `FULL=1 make lint` checks the whole handwritten surface.
+  complete generated tree. Set `TRANSPILE_OUTPUT=<new-build-directory>` to inspect complete
+  generation without changing root `apps/`. `FULL=1 make lint` checks the whole handwritten surface.
 
 Append new entries to `test/slice` without sorting existing entries. Unity groups are
 content-addressed into 896 stable roots capped at 32 sources; only an overfull root

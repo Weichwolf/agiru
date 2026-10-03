@@ -15,7 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-03
 
-Code `91190e8`; receipts use the matching dirty batch at frozen HEAD `4cbe2a8`, not a new
+- Current code `eb8aa06`: named-layout manifests and content-addressed asset bundles preserve declaring app/version/source, original bytes and third-party notices. Nested source projects own their layouts; portable separators/dot components normalize without allowing traversal or symlinks. No runtime installer/default/approval or renderer is implied.
+- `build/report-assets-full-committed.vhjvEf/`: verified full translation writes 24,397 paths, one new manifest/no lost path. Exactly four report definitions change to correct seven previously ownerless test layouts; all other existing generated files match. All 423 named assets package/verify (306 RDLC, 85 Word, 32 Excel), including sixteen native/extension parts. Original Microsoft license is retained. All 423 immutable declarations from 327 reports compile; ownerless control rejects (`metadata.log`). Legacy asset coverage remains open; this is not an independent full-asset census.
+- `build/native-report-layouts.UTnQxW/result.json`, frozen `eb8aa06`: both original/source-bound variants pass 562 checks; actual app/fixture-slice links and registry/drop controls remain green. Sixteen assets package/verify with original ownership/notices. Installed/approved/selected/rendered: zero; all 368 native objects remain business-unexecuted.
+- `build/report-assets-tests-committed.log`: 117 local cases/188 toolchain tests green, zero skips. Targeted writer/gate analysis is clean; Main retains the original eight diagnostics after the new parameter-name warning is fixed. Changed-only lint after commit checks zero/221 units, then refuses the existing 55 silent places/baseline 13; it is not an analysis pass. Before/after directive lists are identical; no baseline/suppression increase. Receipts: `report-assets-{lint-committed.log,writer-tidy-committed.log,gate-tidy.log,main-tidy-qualified.log,main-diagnostics-{before,qualified}.txt,silent-{before,after}.txt}`.
+- Raw census is canonically unchanged: 113,013 raw/112,998 required methods, zero unmeasured files; three errors/seven conditional variants still refuse. Exact 80/2,314 configured UT identities match and remain unexecuted. Root apps/scope/slice are unchanged. Full translation still exits 1/Make 2 on native gaps; installation/successor proof, complete-tree/link and G1 remain open.
+
+Previous registry code `91190e8`; receipts use the matching dirty batch at frozen HEAD `4cbe2a8`, not a new
 full integration. Native report loading shares the original AST/binder and XML module/layout
 owners. `build/native-report-layouts.RBEaVo/result.json`: original/source-loaded variants each
 pass 562 checks for sixteen layouts. Frozen CMake builds the platform library and actual CLI
