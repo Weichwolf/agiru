@@ -321,7 +321,7 @@ public:
   ///       writes `Field.FieldNo(SystemId)` to filter the system fields OUT of a table's field
   ///       list, and `FieldNo` needs the member to name. So they exist, at the platform's numbers,
   ///       and read as blank.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `TableNo`.
     static constexpr ::agiru::FieldNo TableNo{1};
     /// \brief The AL field number of `No.`.

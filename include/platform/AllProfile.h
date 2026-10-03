@@ -74,7 +74,7 @@ public:
 
   Boolean Promoted{};
 
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo Scope{1};
     static constexpr ::agiru::FieldNo AppID{2};
     static constexpr ::agiru::FieldNo ProfileID{3};

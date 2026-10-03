@@ -60,7 +60,8 @@ constexpr std::array<FieldSpec, 10> kFields{{
 
 void TheDeclarationMatchesTheSystemSource() {
   const auto &table = agiru::TableTraits<agiru::platform::FeatureKey>::kTable;
-  CHECK_TRUE("all ten System fields", table.fields.size() == kFields.size());
+  CHECK_TRUE("all ten declared fields and the common system fields",
+             table.fields.size() == kFields.size() + agiru::kSystemFieldCount);
   CHECK_TRUE("System table number", table.id.Value() == 2000000211);
   CHECK_TEXT("System table name", table.name, "Feature Key");
   CHECK_TEXT("System table caption", table.caption, "Feature Key");

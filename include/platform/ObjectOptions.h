@@ -109,7 +109,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief The field numbers.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ParameterName{1};
     static constexpr ::agiru::FieldNo CompanyName{4};
     static constexpr ::agiru::FieldNo ObjectType{3};

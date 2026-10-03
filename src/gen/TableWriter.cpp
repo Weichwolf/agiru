@@ -858,11 +858,46 @@ void RequireDistinctNativeFields(const al::TableObject &table) {
   std::set<int> numbers;
   std::set<std::string> names;
   for (const auto &field : table.fields) {
+    if (field.number >= kSystemFields.front().no.Value()) {
+      throw std::runtime_error("native source declares a reserved system field number: " +
+                               table.name + "." + field.name);
+    }
     if (!numbers.insert(field.number).second || !names.insert(LowerKey(field.name)).second) {
       throw std::runtime_error("duplicate native field declaration: " + table.name + "." +
                                field.name);
     }
   }
+}
+
+std::string NativeSystemFields(const al::TableObject &table, const TableRef &binding) {
+  const std::string metadata = "::agiru::TableTraits<" + binding.identifier + ">::kTable";
+  std::string out;
+  for (const auto &system : kSystemFields) {
+    const al::FieldDecl field{.number = system.no.Value(),
+                              .name = std::string(system.name),
+                              .type = std::string(system.alType),
+                              .subtype = {},
+                              .length = 0,
+                              .properties = {},
+                              .triggers = {}};
+    out += NativeFieldAssertion(table, field, binding, nullptr);
+    out += std::format(
+        "static_assert({0}::Field_No::{1} == ::agiru::FieldNo{{{2}}}, {3});\n",
+        binding.identifier,
+        system.name,
+        system.no.Value(),
+        Literal("native system field number mismatch: " + table.name + "." + field.name));
+    out += std::format(
+        "static_assert([] {{\n  const auto *field = ::agiru::Field({0}, "
+        "::agiru::FieldNo{{{1}}});\n  return field != nullptr && "
+        "field->offset == offsetof({2}, {3});\n}}(), {4});\n",
+        metadata,
+        system.no.Value(),
+        binding.identifier,
+        system.name,
+        Literal("native system field offset mismatch: " + table.name + "." + field.name));
+  }
+  return out;
 }
 
 }
@@ -887,6 +922,7 @@ std::string NativeTableAssertions(const al::TableObject &table, const TableRef &
   for (const auto &field : table.fields) {
     out += NativeFieldAssertion(table, field, binding, OptionOf(options, field));
   }
+  out += NativeSystemFields(table, binding);
   out += NativeTableProperties(table, metadata);
   out += NativeKeyAssertions(table, metadata);
   return out + "\n";

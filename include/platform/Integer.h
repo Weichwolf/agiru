@@ -62,7 +62,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief The field numbers.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `Number`.
     static constexpr ::agiru::FieldNo Number{1};
   };

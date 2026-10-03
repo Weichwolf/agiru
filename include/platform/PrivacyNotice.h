@@ -50,7 +50,7 @@ public:
   /// \brief AL `PrivacyNotice.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ID{1};
     static constexpr ::agiru::FieldNo IntegrationServiceName{2};
     static constexpr ::agiru::FieldNo Link{3};

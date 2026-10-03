@@ -57,7 +57,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief The field numbers.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo Key{1};
     static constexpr ::agiru::FieldNo Description{2};
     static constexpr ::agiru::FieldNo EdmXml{10};

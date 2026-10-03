@@ -61,7 +61,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief System-source field numbers, not display order.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     /// \brief Object Type field number.
     static constexpr ::agiru::FieldNo ObjectType{1};
     /// \brief Object ID field number.
@@ -84,8 +84,8 @@ public:
 /// \brief The native ABI name for AL AllObj.
 using AllObj = AllObj_Table;
 
-/// \brief All six source fields in field-number order.
-inline constexpr std::array<FieldDef, 6> kAllObjFields{{
+/// \brief All six source fields followed by the common implicit system fields.
+inline constexpr auto kAllObjFields = WithSystemFields<AllObj>(std::array<FieldDef, 6>{{
     Declare<&AllObj::ObjectType>(
         AllObj::Field_No::ObjectType, "Object Type", "Object Type", offsetof(AllObj, ObjectType)),
     Declare<&AllObj::ObjectID>(
@@ -104,7 +104,7 @@ inline constexpr std::array<FieldDef, 6> kAllObjFields{{
                                   "AL Namespace",
                                   "AL Namespace",
                                   offsetof(AllObj, ALNamespace)),
-}};
+}});
 
 /// \brief Only the System-source primary key; no invented name index.
 inline constexpr std::array<KeyDef, 1> kAllObjKeys{{

@@ -72,7 +72,7 @@ public:
   Text<kALNamespaceLength> ALNamespace;
 
   /// \brief System-source field numbers, not display order.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     /// \brief Object Type field number.
     static constexpr ::agiru::FieldNo ObjectType{1};
     /// \brief Object ID field number.
@@ -101,44 +101,47 @@ public:
 /// \brief The native ABI name for AL AllObjWithCaption.
 using AllObjWithCaption = AllObjWithCaption_Table;
 
-/// \brief All nine source fields in field-number order.
-inline constexpr std::array<FieldDef, 9> kAllObjWithCaptionFields{{
-    Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
-                                            "Object Type",
-                                            "Object Type",
-                                            offsetof(AllObjWithCaption, ObjectType)),
-    Declare<&AllObjWithCaption::ObjectID>(AllObjWithCaption::Field_No::ObjectID,
-                                          "Object ID",
-                                          "Object ID",
-                                          offsetof(AllObjWithCaption, ObjectID)),
-    Declare<&AllObjWithCaption::ObjectName>(AllObjWithCaption::Field_No::ObjectName,
-                                            "Object Name",
-                                            "Object Name",
-                                            offsetof(AllObjWithCaption, ObjectName)),
-    Declare<&AllObjWithCaption::ObjectCaption>(AllObjWithCaption::Field_No::ObjectCaption,
-                                               "Object Caption",
-                                               "Object Caption",
-                                               offsetof(AllObjWithCaption, ObjectCaption)),
-    Declare<&AllObjWithCaption::ObjectSubtype>(AllObjWithCaption::Field_No::ObjectSubtype,
-                                               "Object Subtype",
-                                               "Object Subtype",
-                                               offsetof(AllObjWithCaption, ObjectSubtype)),
-    Declare<&AllObjWithCaption::AppPackageID>(AllObjWithCaption::Field_No::AppPackageID,
-                                              "App Package ID",
-                                              "App Package ID",
-                                              offsetof(AllObjWithCaption, AppPackageID)),
-    Declare<&AllObjWithCaption::AppRuntimePackageID>(
-        AllObjWithCaption::Field_No::AppRuntimePackageID,
-        "App Runtime Package ID",
-        "App Runtime Package ID",
-        offsetof(AllObjWithCaption, AppRuntimePackageID)),
-    Declare<&AllObjWithCaption::AppID>(
-        AllObjWithCaption::Field_No::AppID, "App ID", "App ID", offsetof(AllObjWithCaption, AppID)),
-    Declare<&AllObjWithCaption::ALNamespace>(AllObjWithCaption::Field_No::ALNamespace,
-                                             "AL Namespace",
-                                             "AL Namespace",
-                                             offsetof(AllObjWithCaption, ALNamespace)),
-}};
+/// \brief All nine source fields followed by the common implicit system fields.
+inline constexpr auto kAllObjWithCaptionFields =
+    WithSystemFields<AllObjWithCaption>(std::array<FieldDef, 9>{{
+        Declare<&AllObjWithCaption::ObjectType>(AllObjWithCaption::Field_No::ObjectType,
+                                                "Object Type",
+                                                "Object Type",
+                                                offsetof(AllObjWithCaption, ObjectType)),
+        Declare<&AllObjWithCaption::ObjectID>(AllObjWithCaption::Field_No::ObjectID,
+                                              "Object ID",
+                                              "Object ID",
+                                              offsetof(AllObjWithCaption, ObjectID)),
+        Declare<&AllObjWithCaption::ObjectName>(AllObjWithCaption::Field_No::ObjectName,
+                                                "Object Name",
+                                                "Object Name",
+                                                offsetof(AllObjWithCaption, ObjectName)),
+        Declare<&AllObjWithCaption::ObjectCaption>(AllObjWithCaption::Field_No::ObjectCaption,
+                                                   "Object Caption",
+                                                   "Object Caption",
+                                                   offsetof(AllObjWithCaption, ObjectCaption)),
+        Declare<&AllObjWithCaption::ObjectSubtype>(AllObjWithCaption::Field_No::ObjectSubtype,
+                                                   "Object Subtype",
+                                                   "Object Subtype",
+                                                   offsetof(AllObjWithCaption, ObjectSubtype)),
+        Declare<&AllObjWithCaption::AppPackageID>(AllObjWithCaption::Field_No::AppPackageID,
+                                                  "App Package ID",
+                                                  "App Package ID",
+                                                  offsetof(AllObjWithCaption, AppPackageID)),
+        Declare<&AllObjWithCaption::AppRuntimePackageID>(
+            AllObjWithCaption::Field_No::AppRuntimePackageID,
+            "App Runtime Package ID",
+            "App Runtime Package ID",
+            offsetof(AllObjWithCaption, AppRuntimePackageID)),
+        Declare<&AllObjWithCaption::AppID>(AllObjWithCaption::Field_No::AppID,
+                                           "App ID",
+                                           "App ID",
+                                           offsetof(AllObjWithCaption, AppID)),
+        Declare<&AllObjWithCaption::ALNamespace>(AllObjWithCaption::Field_No::ALNamespace,
+                                                 "AL Namespace",
+                                                 "AL Namespace",
+                                                 offsetof(AllObjWithCaption, ALNamespace)),
+    }});
 
 /// \brief Only the System-source primary key; no invented name index.
 inline constexpr std::array<KeyDef, 1> kAllObjWithCaptionKeys{{

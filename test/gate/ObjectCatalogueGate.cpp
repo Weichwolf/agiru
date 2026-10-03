@@ -85,7 +85,8 @@ void DeclarationMatchesSource(int id,
   const auto &table = agiru::TableTraits<Table>::kTable;
   CHECK_TRUE("System table ID", table.id.Value() == id);
   CHECK_TEXT("original AL table name", table.name, name);
-  CHECK_TRUE("complete source field population", table.fields.size() == fields.size());
+  CHECK_TRUE("complete source and implicit field population",
+             table.fields.size() == fields.size() + agiru::kSystemFieldCount);
   CHECK_TRUE("shared company scope", !table.dataPerCompany);
   CHECK_TEXT("source inherent permissions", table.inherentPermissions, "rX");
   CHECK_TRUE("only the source key", table.keys.size() == 1);

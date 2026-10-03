@@ -45,7 +45,7 @@ public:
   /// \brief AL `PrivacyNoticeApproval.SystemModifiedBy`.
   Guid SystemModifiedBy;
 
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ID{1};
     static constexpr ::agiru::FieldNo UserSID{2};
     static constexpr ::agiru::FieldNo ApproverUserSID{3};

@@ -111,7 +111,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief The field numbers, from the system symbols' declaration.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     /// \brief The AL field number of `User Security ID`.
     static constexpr ::agiru::FieldNo UserSecurityID{1};
     /// \brief The AL field number of `User Name`.

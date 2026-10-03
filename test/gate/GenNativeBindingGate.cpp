@@ -61,6 +61,18 @@ void SourceOwnedBindings() {
              ref.declarationAssertions.contains(".fields[1] == ::agiru::FieldNo{3}"));
   CHECK_TRUE("source assertions retain company scope",
              ref.declarationAssertions.contains(".dataPerCompany == false"));
+  for (const auto *name :
+       {"SystemId", "SystemCreatedAt", "SystemCreatedBy", "SystemModifiedAt", "SystemModifiedBy"}) {
+    CHECK_TRUE("implicit native fields carry declaration contracts",
+               ref.declarationAssertions.contains(
+                   "native field declaration mismatch: AllObjWithCaption." + std::string(name)));
+    CHECK_TRUE("implicit native fields check ABI member offsets",
+               ref.declarationAssertions.contains(
+                   "offsetof(::agiru::platform::AllObjWithCaption, " + std::string(name) + ")"));
+    CHECK_TRUE("implicit native fields expose source-independent reserved numbers",
+               ref.declarationAssertions.contains(
+                   "::agiru::platform::AllObjWithCaption::Field_No::" + std::string(name)));
+  }
   const auto page = agiru::al::ParsePage(R"(page 50171 "Source Page" {
     SourceTable = AllObjWithCaption;
     layout { area(Content) { field(Namespace; Rec."AL Namespace") {} } }
@@ -215,7 +227,10 @@ void NativePropertyRefusals() {
             "duplicate native field declaration"},
         std::pair<std::string_view, std::string_view>{
             "fields { field(1; F; Integer) {} field(2; f; Integer) {} }",
-            "duplicate native field declaration"}}) {
+            "duplicate native field declaration"},
+        std::pair<std::string_view, std::string_view>{
+            "fields { field(2000000000; Fake; Guid) {} }",
+            "native source declares a reserved system field number"}}) {
     bool refused = false;
     try {
       const auto table =

@@ -88,7 +88,7 @@ public:
   Guid SystemModifiedBy;
 
   /// \brief The field numbers.
-  struct Field_No {
+  struct Field_No : SystemFieldNumbers {
     static constexpr ::agiru::FieldNo ID{1};
     static constexpr ::agiru::FieldNo Enabled{2};
     static constexpr ::agiru::FieldNo Description{3};
@@ -109,7 +109,7 @@ public:
 using FeatureKey = FeatureKey_Table;
 
 /// \brief The field table.
-inline constexpr std::array<FieldDef, 10> kFeatureKeyFields{{
+inline constexpr auto kFeatureKeyFields = WithSystemFields<FeatureKey>(std::array<FieldDef, 10>{{
     Declare<&FeatureKey::ID>(FeatureKey::Field_No::ID, "ID", "ID", offsetof(FeatureKey, ID)),
     Declare<&FeatureKey::Enabled>(
         FeatureKey::Field_No::Enabled, "Enabled", "Enabled", offsetof(FeatureKey, Enabled)),
@@ -141,7 +141,7 @@ inline constexpr std::array<FieldDef, 10> kFeatureKeyFields{{
                                                "Description In English",
                                                "Description In English",
                                                offsetof(FeatureKey, DescriptionInEnglish)),
-}};
+}});
 
 /// \brief The keys.
 inline constexpr std::array<KeyDef, 1> kFeatureKeyKeys{{

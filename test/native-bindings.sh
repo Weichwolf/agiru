@@ -82,6 +82,30 @@ if "$CXX" "${flags[@]}" -fsyntax-only "$proof/wrong-field-number.cpp" \
   exit 1
 fi
 rg -q 'native field declaration mismatch' "$proof/wrong-field-number.compile.log"
+passed_id=$(jq -r 'first(.[] | select(.status == "contract-pass") | .id)' "$proof/tables.json")
+for control in wrong-system-offset wrong-system-type wrong-system-number; do
+  overlay="$proof/$control/include/meta"
+  mkdir -p "$overlay"
+  awk -v control="$control" '
+    control == "wrong-system-offset" && /offsetof\(T, SystemId\)/ {
+      sub(/offsetof\(T, SystemId\)/, "offsetof(T, SystemCreatedBy)"); changed++
+    }
+    control == "wrong-system-type" && /Declare<&T::SystemId>/ {
+      sub(/Declare<&T::SystemId>/, "Declare<\\&T::SystemCreatedAt>"); changed++
+    }
+    control == "wrong-system-number" && /\.no = FieldNo\{2000000000\}/ {
+      sub(/FieldNo\{2000000000\}/, "FieldNo{2000000099}"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/meta/Declare.h > "$overlay/Declare.h"
+  if "$CXX" "-I$proof/$control/include" "${flags[@]}" -fsyntax-only "$proof/$passed_id.cpp" \
+    > "$proof/$control.compile.log" 2>&1; then
+    printf 'native-bindings: %s escaped the original source contract\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'native (system field offset|field declaration) mismatch' "$proof/$control.compile.log"
+done
 jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile tables "$proof/tables.json" \
   --slurpfile package "$package/provenance.json" --arg head "$(git rev-parse HEAD)" \
   '{head:$head,package:$package[0].identity,package_sha256:$package[0].package_sha256,
@@ -90,7 +114,8 @@ jq -n --slurpfile raw "$proof/raw-inventory.json" --slurpfile tables "$proof/tab
     non_table_objects:($raw[0].summary.objects-($tables[0] | length)),
     unexecuted_native_objects:$raw[0].summary.objects,
     source_field_number_negative_control:"rejected",
-    contract_surface:["identity","field-count","field-type-length-caption","field-subtype-class","option-codes-names-captions","keys","company-scope","replication-declaration","table-caption","inherent-permissions-declaration"],
+    system_field_negative_controls:{offset:"rejected",type:"rejected",number:"rejected"},
+    contract_surface:["identity","field-count","field-type-length-caption","field-subtype-class","base-system-field-number-type-offset","option-codes-names-captions","keys","company-scope","replication-declaration","table-caption","inherent-permissions-declaration"],
     production_native_loader_activated:false,complete_declaration_proof:false,complete_app_proof:false}' \
   > "$proof/result.json"
 base="${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}/Layers/W1/BaseApp"
