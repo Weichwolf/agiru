@@ -15,6 +15,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Unicode integration replay: `20261004T175227Z-2443696`, frozen HEAD `c732229`,
+  source `7a2621f2a5a8eea448751274f9760ac11011a10a485ed498240149c5b2ed7439`;
+  `slice-check all test ut`, six jobs. Runner PID 2446973 is live; slice-check
+  passes and the incremental slice build is active. Source/System/notice dependencies
+  match 164436. Compare every identity/result against that complete 2,314-UT run;
+  no current UT result, causal A/B or G1 claim.
 - Unicode foundation (0035): 48 gate checks and five compiled controls pass;
   all 192,332 Unicode cases match original BC29 text cores, 1,066 outside-profile
   cases remain reported. Previous actual library fails 81,373 reference cases.
