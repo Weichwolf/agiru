@@ -5,6 +5,17 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Native Base64 authority: original System-29 `System.Runtime` codeunit
+  2000000024 declares nine overloads in `src/System Codeunits/Runtime/Base64Convert.Codeunit.al`.
+  `NativeSource.cpp::DeclaredKind` leaves codeunits in `otherSources`; generated
+  `apps/absent/absent/Types.h` misreports this AL capability as a .NET member.
+  Original BC29 NavBase64Converter byte/text cores call CLR Convert and Encoding:
+  text uses GetBytes without a BOM; stream overloads remain separate contracts.
+  Static IL/source hashes: `/tmp/agiru-native-base64-authority.xcQPoo/receipt.json`.
+  BCApps `bb7111877ff7` has thirteen original `Base64 Convert Test` methods;
+  prior milestone 101600 has two OAuth failures at ToBase64, not a gain prediction.
+  No provider or BC execution proved. Predecessor 1511 requires real binary
+  OutStream writes, not returned text or an invented buffer operation.
 - Selected native ASTs now supply `Database::` constants without generating a
   table class/provider. Codeunit/table/page/report execution: 13 checks; primitive
   native-binding/parser gates: 154/139 checks. Source-ID mutation fails eight
@@ -151,6 +162,12 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    implementation finding. Bind real context types; 0039 owns hook/case lifecycle;
    do not turn the current explicit refusal carriers into empty success implementations.
 4. Generate complete native declarations/immutable metadata and bind Native methods to primitives or named refusals. Finish Page Table Field's live projection through 0044 and activate its own binding only with the complete UT recheck; standalone census also exposes API webhook tables and Code Coverage 2000000049. Reuse the System AST/binder and declared field/key/property vocabulary. CodeCoverage Log/Load/Refresh/Include require real instrumentation/provider lifecycle, including the declared MultiSession argument, not empty seeded rows. 0033 owns identity, 0044 providers. Never add Refused arithmetic/default construction to hide absent fields; keep unsupported tables/options visible. Share language/Scope vocabulary without importing whole tables; generic 0019 owns calculation.
+   Native codeunits: admit source ASTs/signatures/ownership through the common
+   codeunit binder; every unimplemented Native body must refuse, never emit empty
+   success. Base64Convert needs all nine source overloads over one byte codec,
+   existing Encoding and bounded stream I/O. Qualify native core/error/line-break
+   contracts, execute the thirteen original tests, retain every other native gap
+   and compare all 2,314 UT after activation. Do not patch OAuth or base64 AL bodies.
    Replay the unchanged 2,314 UT after source-owned constant activation.
    `CodeunitWriter.h::Objects` borrows selected native
    ASTs; `NativeTableNumberOf`/`Names::DeclaredTableNumber` separate IDs from
