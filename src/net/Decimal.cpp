@@ -1,5 +1,7 @@
 #include "type/Decimal.h"
 
+#include "type/AlDecimalArithmetic.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -25,14 +27,23 @@ public:
 namespace {
 __extension__ using U128 = unsigned __int128;
 
-constexpr std::uint8_t kMaxScale = 20;
+constexpr std::uint8_t kMaxScale = 28;
 constexpr unsigned kMantissaBits = 96;
 constexpr U128 kMaxUnits = (static_cast<U128>(1) << kMantissaBits) - 1;
+constexpr U128 kAlSignificantLimit = 999999999999999999ULL;
+
+constexpr U128 AlMaximumUnits() {
+  U128 divisor = 1;
+  while (kMaxUnits / divisor > kAlSignificantLimit) { divisor *= 10; }
+  return (kMaxUnits / divisor) * divisor;
+}
 
 constexpr unsigned kLimbBits = 64;
 constexpr unsigned kTopBit = kLimbBits - 1;
 constexpr std::size_t kLimbs = 3;
 constexpr unsigned kWideBits = kLimbBits * kLimbs;
+constexpr unsigned kClrAlignmentBits = kMantissaBits + 94;
+static_assert(kClrAlignmentBits + 1 <= kWideBits);
 constexpr std::uint64_t kRoundUpAtDigit = 5;
 
 class U192 {
@@ -162,18 +173,39 @@ private:
   std::array<std::uint64_t, kLimbs> w_{{0, 0, 0}};
 };
 
-void ReduceScale(U192 &v, std::uint8_t &scale) {
-  if (v.DivModSmall(10) >= kRoundUpAtDigit) { v.Increment(); }
-  --scale;
+class RoundingTail {
+public:
+  void Prepend(std::uint64_t digit) {
+    sticky_ = sticky_ || digit_ != 0;
+    digit_ = digit;
+  }
+
+  void Append(unsigned digit) { sticky_ = sticky_ || digit != 0; }
+
+  [[nodiscard]] bool Increments(const U192 &value) const {
+    return digit_ > kRoundUpAtDigit || (digit_ == kRoundUpAtDigit && (sticky_ || value.Bit(0)));
+  }
+
+private:
+  std::uint64_t digit_ = 0;
+  bool sticky_ = false;
+};
+
+bool FitsMantissa(const U192 &value) {
+  return value.FitsU128() && value.ToU128() <= kMaxUnits;
 }
 
-U128 FitToUnits(U192 v, std::uint8_t &scale) {
-  while (scale > kMaxScale) { ReduceScale(v, scale); }
-  while (!v.FitsU128() || v.ToU128() > kMaxUnits) {
+U128 FitToUnits(U192 value, std::uint8_t &scale, RoundingTail tail = {}) {
+  for (;;) {
+    if (scale <= kMaxScale && FitsMantissa(value)) {
+      U192 rounded = value;
+      if (tail.Increments(value)) { rounded.Increment(); }
+      if (FitsMantissa(rounded)) { return rounded.ToU128(); }
+    }
     if (scale == 0) { throw DecimalError("Decimal: overflow beyond 2^96 - 1"); }
-    ReduceScale(v, scale);
+    tail.Prepend(value.DivModSmall(10));
+    --scale;
   }
-  return v.ToU128();
 }
 
 void StripTrailingZeros(U128 &units, std::uint8_t &scale) {
@@ -187,18 +219,58 @@ void StripTrailingZeros(U128 &units, std::uint8_t &scale) {
 void Align(U192 &a, std::uint8_t &sa, U192 &b, std::uint8_t &sb) {
   while (sa < sb) {
     U192 t;
-    if (!a.TimesTen(t) || !t.FitsU128()) { break; }
+    if (!a.TimesTen(t)) { throw DecimalError("Decimal: overflow while aligning magnitudes"); }
     a = t;
     ++sa;
   }
   while (sb < sa) {
     U192 t;
-    if (!b.TimesTen(t) || !t.FitsU128()) { break; }
+    if (!b.TimesTen(t)) { throw DecimalError("Decimal: overflow while aligning magnitudes"); }
     b = t;
     ++sb;
   }
-  while (sa > sb) { ReduceScale(a, sa); }
-  while (sb > sa) { ReduceScale(b, sb); }
+}
+
+U128 AppendDecimalDigit(U128 units, unsigned digit) {
+  if (units > (kMaxUnits - digit) / 10) { throw DecimalError("Decimal: overflow while parsing"); }
+  return units * 10 + digit;
+}
+
+class ParsedMagnitude {
+public:
+  void Append(unsigned digit, bool fractional) {
+    if (dropping_) {
+      tail_.Append(digit);
+    } else if (fractional && (scale_ == kMaxScale || units_ > (kMaxUnits - digit) / 10)) {
+      dropping_ = true;
+      tail_.Prepend(digit);
+    } else {
+      units_ = AppendDecimalDigit(units_, digit);
+      if (fractional) { ++scale_; }
+    }
+  }
+
+  [[nodiscard]] Decimal Finish(bool negative) {
+    const U128 units = FitToUnits(U192::From(units_), scale_, tail_);
+    return DecimalAccess::Make(units, scale_, negative && units != 0);
+  }
+
+private:
+  U128 units_ = 0;
+  std::uint8_t scale_ = 0;
+  bool dropping_ = false;
+  RoundingTail tail_;
+};
+
+RoundingTail DivisionTail(U128 remainder, U128 divisor) {
+  RoundingTail tail;
+  const U128 twice = remainder * 2;
+  if (twice >= divisor) {
+    tail.Prepend(kRoundUpAtDigit + (twice > divisor ? 1 : 0));
+  } else {
+    tail.Append(remainder != 0 ? 1 : 0);
+  }
+  return tail;
 }
 
 std::string U128ToString(U128 v) {
@@ -272,11 +344,9 @@ Decimal Decimal::FromInvariantString(std::string_view text) {
     neg = text[i] == '-';
     ++i;
   }
-  U128 units = 0;
-  std::uint8_t scale = 0;
+  ParsedMagnitude magnitude;
   bool seenDigit = false;
   bool seenPoint = false;
-  bool dropped = false;
   for (; i < text.size(); ++i) {
     const char c = text[i];
     if (c == '.') {
@@ -284,21 +354,12 @@ Decimal Decimal::FromInvariantString(std::string_view text) {
       seenPoint = true;
       continue;
     }
-    if (std::isdigit(static_cast<unsigned char>(c)) == 0) {
-      throw DecimalError("Decimal: not a number");
-    }
+    if (c < '0' || c > '9') { throw DecimalError("Decimal: not a number"); }
     seenDigit = true;
-    if (seenPoint && scale == kMaxScale) {
-      if (!dropped && c >= '5') { units += 1; }
-      dropped = true;
-      continue;
-    }
-    if (units > kMaxUnits / 10) { throw DecimalError("Decimal: overflow while parsing"); }
-    units = units * 10 + static_cast<unsigned>(c - '0');
-    if (seenPoint) { ++scale; }
+    magnitude.Append(static_cast<unsigned>(c - '0'), seenPoint);
   }
   if (!seenDigit) { throw DecimalError("Decimal: no digit"); }
-  return DecimalAccess::Make(units, scale, neg && units != 0);
+  return magnitude.Finish(neg);
 }
 
 Decimal &Decimal::operator+=(const Decimal &o) {
@@ -335,6 +396,14 @@ Decimal &Decimal::operator-=(const Decimal &o) {
 Decimal &Decimal::operator*=(const Decimal &o) {
   const U192 p = U192::From(units_).MultipliedBy(o.units_);
   auto scale = static_cast<std::uint8_t>(scale_ + o.scale_);
+  constexpr U128 kSmallMantissaLimit = std::numeric_limits<std::uint32_t>::max();
+  constexpr unsigned kSmallProductScaleLimit =
+      kMaxScale + std::numeric_limits<std::uint64_t>::digits10;
+  const bool small = units_ <= kSmallMantissaLimit && o.units_ <= kSmallMantissaLimit;
+  if ((small && scale > kSmallProductScaleLimit) || (!small && p == U192{})) {
+    *this = Decimal{};
+    return *this;
+  }
   units_ = FitToUnits(p, scale);
   scale_ = scale;
   negative_ = (negative_ != o.negative_) && units_ != 0;
@@ -344,46 +413,48 @@ Decimal &Decimal::operator*=(const Decimal &o) {
 Decimal &Decimal::operator%=(const Decimal &o) {
   if (o.units_ == 0) { throw DecimalError("Decimal: modulo by zero"); }
   if (units_ == 0) { return *this; }
-  const bool negative = IsNegative();
-  const Decimal quotient = Round(Abs() / o.Abs(), Decimal{1}, RoundDirection::Down);
-  Decimal remainder = Abs() - (quotient * o.Abs());
-  if (negative && remainder.units_ != 0) { remainder = Decimal{} - remainder; }
-  *this = remainder;
+  U192 dividend = U192::From(units_);
+  U192 divisor = U192::From(o.units_);
+  std::uint8_t dividendScale = scale_;
+  std::uint8_t divisorScale = o.scale_;
+  Align(dividend, dividendScale, divisor, divisorScale);
+  if (dividend < divisor) { return *this; }
+  U192 remainder;
+  static_cast<void>(dividend.DividedBy(divisor, remainder));
+  if (!remainder.FitsU128() || remainder.ToU128() > kMaxUnits) {
+    throw DecimalError("Decimal: remainder exceeds the 96-bit mantissa");
+  }
+  units_ = remainder.ToU128();
+  scale_ = dividendScale;
+  negative_ = negative_ && units_ != 0;
   return *this;
 }
 
 Decimal &Decimal::operator/=(const Decimal &o) {
   if (o.units_ == 0) { throw DecimalError("Decimal: division by zero"); }
-  if (units_ == 0) { return *this; }
 
-  U192 num = U192::From(units_);
   int scale = static_cast<int>(scale_) - static_cast<int>(o.scale_);
-  const U192 den = U192::From(o.units_);
-  while (scale < kMaxScale) {
-    U192 next;
-    if (!num.TimesTen(next)) { break; }
-    num = next;
-    ++scale;
-  }
-
-  U192 rem;
-  U192 q = num.DividedBy(den, rem);
-
-  U192 twice = rem;
-  twice.ShiftLeft1();
-  if (twice >= den) { q.Increment(); }
-
-  while (scale < 0) {
-    U192 next;
-    if (!q.TimesTen(next)) { throw DecimalError("Decimal: overflow while scaling the quotient"); }
-    q = next;
+  const U128 denominator = o.units_;
+  U128 quotient = units_ / denominator;
+  U128 remainder = units_ % denominator;
+  bool expanded = remainder != 0;
+  while (scale < kMaxScale && (scale < 0 || remainder != 0)) {
+    const U128 numerator = remainder * 10;
+    const U128 next = quotient * 10 + numerator / denominator;
+    if (next > kMaxUnits) {
+      if (scale < 0) { throw DecimalError("Decimal: overflow while scaling the quotient"); }
+      break;
+    }
+    quotient = next;
+    remainder = numerator % denominator;
+    expanded = expanded || remainder != 0;
     ++scale;
   }
   auto s = static_cast<std::uint8_t>(scale);
-  units_ = FitToUnits(q, s);
+  units_ = FitToUnits(U192::From(quotient), s, DivisionTail(remainder, denominator));
   scale_ = s;
   negative_ = (negative_ != o.negative_) && units_ != 0;
-  StripTrailingZeros(units_, scale_);
+  if (expanded) { StripTrailingZeros(units_, scale_); }
   return *this;
 }
 
@@ -408,6 +479,62 @@ Decimal Round(const Decimal &number) {
   return Round(number, Decimal::FromInvariantString("0.01"));
 }
 
+Decimal AlDecimalArithmetic::Normalize(const Decimal &value) {
+  const U128 units = DecimalAccess::Units(value);
+  if (units <= kAlSignificantLimit) { return value; }
+  U128 divisor = 1;
+  std::uint8_t dropped = 0;
+  while (units / divisor > kAlSignificantLimit) {
+    divisor *= 10;
+    ++dropped;
+  }
+  U128 retained = units / divisor;
+  if (units % divisor >= divisor / 2) { ++retained; }
+  if (value.Scale() >= dropped) {
+    const auto scale = static_cast<std::uint8_t>(value.Scale() - dropped);
+    return DecimalAccess::Make(retained, scale, value.IsNegative()).Trimmed();
+  }
+  for (std::uint8_t digit = value.Scale(); digit < dropped; ++digit) { retained *= 10; }
+  if (retained > kMaxUnits) { retained = AlMaximumUnits(); }
+  return DecimalAccess::Make(retained, 0, value.IsNegative());
+}
+
+Decimal AlDecimalArithmetic::Add(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return Normalize(left + right);
+}
+
+Decimal AlDecimalArithmetic::Subtract(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return Normalize(left - right);
+}
+
+Decimal AlDecimalArithmetic::Multiply(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return Normalize(left * right);
+}
+
+Decimal AlDecimalArithmetic::Divide(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return Normalize(left / right);
+}
+
+Decimal AlDecimalArithmetic::Remainder(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return Normalize(left % right);
+}
+
+std::strong_ordering AlDecimalArithmetic::Compare(Decimal left, Decimal right) {
+  left = Normalize(left);
+  right = Normalize(right);
+  return left <=> right;
+}
+
 Decimal Round(const Decimal &number, const Decimal &precision, std::string_view direction) {
   if (direction == "=") { return Round(number, precision, RoundDirection::Nearest); }
   if (direction == ">") { return Round(number, precision, RoundDirection::Up); }
@@ -417,7 +544,8 @@ Decimal Round(const Decimal &number, const Decimal &precision, std::string_view 
 
 Decimal Round(const Decimal &number, const Decimal &precision, RoundDirection direction) {
   if (precision.IsZero()) { throw DecimalError("Round: precision is zero"); }
-  const Decimal p = precision.Abs();
+  if (precision.IsNegative()) { throw DecimalError("Round: precision must be positive"); }
+  const Decimal &p = precision;
   const Decimal quotient = number.Abs() / p;
   Decimal steps = TruncateMagnitude(quotient);
   const Decimal fraction = quotient - steps;

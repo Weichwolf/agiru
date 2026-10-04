@@ -30,21 +30,16 @@ public:
 ///
 /// The value is the mantissa divided by ten to the power of the scale, with a sign.
 ///
-/// \note THE SCALE STOPS AT TWENTY PLACES, NOT AT THE CLR'S TWENTY-EIGHT. The platform stores a
-///       Decimal as `DECIMAL(38,20)` (`fieldtype-option.md`), and a value the runtime holds must
-///       be the value the database gives back, or the same expression evaluates differently on
-///       either side of a `Modify` -- which `SCM Whse. UOM Rnding. UT` requires: `1 / 7` is
-///       written to a base unit's rounding precision, `44 * (1 / 7)` validated into another unit,
-///       and the check is `QtyPerUoM mod Precision = 0` against the precision READ BACK. With
-///       twenty-eight places the product carries digits the column cannot, and the remainder is
-///       a hundred-quintillionth (nine cases, 2026-09-11). So division fills twenty places, a
-///       product's scale is reduced to twenty, and a parsed text with more is rounded to twenty.
+/// \note Calculations retain up to 28 fractional digits and a 96-bit mantissa. Reducing scale
+///       rounds to nearest, ties to even, independently of AL `Round`'s ties-away rule.
+///       SQL column scale and AL literal/input/Format/field limits are separate boundaries;
+///       they must not truncate intermediate arithmetic (`decimal-data-type.md`, board:0066).
 ///
 /// \note THE SCALE IS PART OF THE VALUE. `0.10` and `0.1` compare equal but are not the same
 ///       decimal: CLR arithmetic carries the scale through addition, subtraction and
-///       multiplication, and only division normalises. Ten thousand additions of `0.01` therefore
-///       yield `100.00` rather than `100`, and a gate case states exactly that, because it is the
-///       first thing anyone assumes wrongly.
+///       multiplication; division normalises when extending a nonzero remainder. Ten thousand
+///       additions of `0.01` yield `100.00` rather than `100`. CLR zero-product scale rules also
+///       depend on mantissa width and underflow; zero division uses the natural operand scale.
 class Decimal {
 public:
   /// \return The largest representable magnitude, two to the ninety-sixth less one.
@@ -83,7 +78,8 @@ public:
   /// \param text The text, optionally signed, with at most one full stop.
   /// \return The value, preserving the written scale as CLR parsing does, so `1.2300` keeps four
   ///         decimal places.
-  /// \throws DecimalError when the text is not a number; more than twenty places are rounded.
+  /// \throws DecimalError on invalid text or overflow. Excess fractional precision is rounded
+  ///         to nearest, ties to even, within the CLR scale-28/96-bit representation.
   static Decimal FromInvariantString(std::string_view text);
 
   /// \return True when the value is zero, whatever its scale.
@@ -126,7 +122,8 @@ public:
   /// \throws DecimalError on overflow.
   Decimal &operator*=(const Decimal &o);
 
-  /// \brief Divides, filling up to twenty decimal places and normalising the result.
+  /// \brief Divides with up to 28 fractional digits; normalises an extended remainder, while
+  ///        retaining natural operand scale when the initial division is exact.
   /// \param o The divisor.
   /// \return This object.
   /// \throws DecimalError when the divisor is zero, or on overflow.
@@ -161,6 +158,8 @@ public:
   /// \param o The divisor.
   /// \return This value, now the remainder.
   /// \throws DecimalError on a zero divisor, the way `/` does.
+  /// \note Computes aligned integer magnitudes without rounding a Decimal quotient;
+  /// a quotient outside the calculating range does not prevent an exact remainder.
   /// \warning WITHOUT THIS OPERATOR THE CALL STILL COMPILED, through the `Integer` conversion
   /// below:
   ///          `Qty mod 0.00001` became `int % 0` and the process died of SIGFPE (SCM Whse. UOM
@@ -277,7 +276,7 @@ enum class RoundDirection : std::uint8_t {
 ///                  Both occur in BC.
 /// \param direction Which way to go when the value falls between two multiples.
 /// \return The rounded value.
-/// \throws DecimalError when the precision is zero.
+/// \throws DecimalError when the precision is zero or negative.
 ///
 /// \note The documentation names the default precision as `Amount Rounding Precision` from GLSetup
 ///       via Codeunit 45, falling back to two decimal places. That default is known to the runtime,
@@ -293,7 +292,7 @@ Decimal Round(const Decimal &number,
 /// \param precision The multiple to round to.
 /// \param direction `'='` nearest, `'>'` up, `'<'` down -- one character, as AL spells it.
 /// \return The rounded value.
-/// \throws DecimalError when the precision is zero, or the direction is none of the three.
+/// \throws DecimalError when the precision is zero or negative, or the direction is invalid.
 ///
 /// \note THE DOCUMENTED PARAMETER IS A TEXT. `system-round-method.md` gives
 ///       `Round(Number: Decimal [, Precision: Decimal] [, Direction: Text])`, and the BaseApp

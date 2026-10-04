@@ -5,6 +5,7 @@
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
 #include "type/Code.h"
+#include "type/FieldClass.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 
@@ -13,6 +14,7 @@
 #include "Selection.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -208,11 +210,21 @@ void ALargeAmountIsNotComparedThroughADouble() {
              !Passes("=9007199254740992", "9007199254740993", DecimalField()));
   CHECK_TRUE("a BigInteger the same",
              Passes(">9007199254740992", "9007199254740993", BigIntegerField()));
-  CHECK_TRUE("twenty places still order, and a twenty-first is rounded away as the column would",
+  CHECK_TRUE("twenty-place values retain their numeric ordering",
              Passes("<0.14285714285714285715", "0.14285714285714285714", DecimalField()));
   CHECK_TRUE(
-      "so two texts that differ past the twentieth place compare equal",
-      Passes("=0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
+      "distinct scale-28 buffer values are not equal",
+      !Passes("=0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
+  CHECK_TRUE(
+      "scale-28 buffer values retain their numeric ordering",
+      Passes("<0.1428571428571428571428571429", "0.1428571428571428571428571428", DecimalField()));
+  CHECK_TRUE("negative scale-28 buffer values retain their numeric ordering",
+             Passes(">-0.1428571428571428571428571429",
+                    "-0.1428571428571428571428571428",
+                    DecimalField()));
+  CHECK_TRUE(
+      "a scale-29 halfway operand rounds once to the even scale-28 value",
+      Passes("=0.14285714285714285714285714285", "0.1428571428571428571428571428", DecimalField()));
 }
 
 void NumbersCompareAsNumbers() {
@@ -355,8 +367,6 @@ void ARangeHasTwoEndsAndAnythingElseIsNotARange() {
   CHECK_TRUE("and so does an exclusion", said.find("is not a range") != std::string::npos);
 }
 
-} // namespace
-
 /// A FILTER ON A FLOWFIELD IS A CORRELATED SUBQUERY (board:0678): `SetRange("Template Type", X)`
 /// on a journal batch, whose field is `lookup("Item Journal Template".Type where(Name =
 /// field("Journal Template Name")))`, reached PostgreSQL as a column that does not exist. The
@@ -422,6 +432,14 @@ void AnUpperLimitOfABlankBoundIsTheBlankDate() {
              agiru::detail::Matches(agiru::detail::ParseFilter(".."), "2026-01-01", kFields[2]));
 }
 
+constexpr std::array<agiru::FieldNo, 1> kFlowPrimaryFields{{agiru::FieldNo{1}}};
+constexpr std::array<agiru::KeyDef, 1> kFlowPrimaryKeys{{
+    agiru::KeyDef{.name = "Key1", .fields = kFlowPrimaryFields, .clustered = true},
+}};
+
+void FlowFieldConstantsAndMarks(const agiru::TableDef &outer);
+void ExistenceFiltersAndUnknownTables();
+
 void AFlowFieldFilterBecomesACorrelatedSubquery() {
   static constexpr std::array<agiru::FieldDef, 2> kFields{{
       agiru::FieldDef{.offset = 0,
@@ -433,20 +451,16 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                       .name = "Resource Unit Cost",
                       .caption = "Resource Unit Cost",
                       .calcFormula =
-                          "lookup(\"Resource Cost\".\"Unit Cost\" where(Code = field(Code)))",
+                          R"(lookup("Resource Cost"."Unit Cost" where(Code = field(Code))))",
                       .no = agiru::FieldNo{2},
                       .fieldClass = agiru::FieldClass::FlowField,
                       .type = agiru::FieldType::Decimal},
-  }};
-  static constexpr std::array<agiru::FieldNo, 1> kKey{{agiru::FieldNo{1}}};
-  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
-      agiru::KeyDef{.name = "Key1", .fields = kKey, .clustered = true},
   }};
   static constexpr agiru::TableDef kOuter{.id = agiru::TableId{50000},
                                           .name = "Flow Outer",
                                           .caption = "Flow Outer",
                                           .fields = kFields,
-                                          .keys = kKeys};
+                                          .keys = kFlowPrimaryKeys};
   agiru::detail::RecordState state;
   state.filters.push_back(
       agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "10..20"});
@@ -481,11 +495,16 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
       agiru::detail::Select(&bounded, agiru::platform::kIntegerTable);
   CHECK_TRUE("and a bounded one is exactly its rows",
              five.from.find("generate_series(1, 5)") != std::string::npos);
-  agiru::detail::RecordState unfiltered;
+  const agiru::detail::RecordState unfiltered;
   const agiru::detail::Selection whole =
       agiru::detail::Select(&unfiltered, agiru::platform::kIntegerTable);
   CHECK_TRUE("and no filter at all starts at the platform's own low end",
              whole.from.find("generate_series(-1000000000, -999000001)") != std::string::npos);
+  FlowFieldConstantsAndMarks(kOuter);
+  ExistenceFiltersAndUnknownTables();
+}
+
+void FlowFieldConstantsAndMarks(const agiru::TableDef &outer) {
   // A `const(Database::X)` IN A CALCFORMULA IS THE TABLE'S NUMBER, the way `Query.cpp` reads a
   // DataItemTableFilter: `Price List Line."Asset Type"`-style lookups filter on
   // `"Table ID" = const(Database::"Item Unit of Measure")`, and binding the words put "Database ::
@@ -501,8 +520,7 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
           .offset = 32,
           .name = "Table Rows",
           .caption = "Table Rows",
-          .calcFormula =
-              "count(\"Resource Cost\" where(Type = const(Database::\"Resource Cost\")))",
+          .calcFormula = R"(count("Resource Cost" where(Type = const(Database::"Resource Cost"))))",
           .no = agiru::FieldNo{2},
           .fieldClass = agiru::FieldClass::FlowField,
           .type = agiru::FieldType::Integer},
@@ -511,14 +529,13 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                                             .name = "Flow Numbers",
                                             .caption = "Flow Numbers",
                                             .fields = kNumbered,
-                                            .keys = kKeys};
+                                            .keys = kFlowPrimaryKeys};
   agiru::detail::RecordState numbered;
   numbered.filters.push_back(
       agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "1"});
   const agiru::detail::Selection tableRows = agiru::detail::Select(&numbered, kNumbers);
   CHECK_TRUE("Database::X binds the table's number",
-             tableRows.binds.size() == 2 && tableRows.binds[0].has_value() &&
-                 *tableRows.binds[0] == "202");
+             tableRows.binds.size() == 2 && tableRows.binds[0] == "202");
   // `MarkedOnly` OVER A DATABASE RECORD IS A CLAUSE OVER THE MARKED KEYS
   // (`record-markedonly-method.md`): each mark is one primary key, the clause ORs them, and no
   // mark at all selects nothing rather than everything.
@@ -526,20 +543,22 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
   marked.markedOnly = true;
   marked.marks.insert("A");
   marked.marks.insert("B");
-  const agiru::detail::Selection onlyMarked = agiru::detail::Select(&marked, kOuter);
+  const agiru::detail::Selection onlyMarked = agiru::detail::Select(&marked, outer);
   CHECK_TRUE("two marks are two keys ORed",
              onlyMarked.where.find("\"Code\" = $1") != std::string::npos &&
                  onlyMarked.where.find(" OR ") != std::string::npos &&
                  onlyMarked.where.find("\"Code\" = $2") != std::string::npos);
   CHECK_TRUE("and both keys are bound",
-             onlyMarked.binds.size() == 2 && onlyMarked.binds[0].has_value() &&
-                 onlyMarked.binds[1].has_value() &&
-                 ((*onlyMarked.binds[0] == "A" && *onlyMarked.binds[1] == "B") ||
-                  (*onlyMarked.binds[0] == "B" && *onlyMarked.binds[1] == "A")));
+             onlyMarked.binds.size() == 2 &&
+                 ((onlyMarked.binds[0] == "A" && onlyMarked.binds[1] == "B") ||
+                  (onlyMarked.binds[0] == "B" && onlyMarked.binds[1] == "A")));
   agiru::detail::RecordState unmarked;
   unmarked.markedOnly = true;
-  const agiru::detail::Selection nothing = agiru::detail::Select(&unmarked, kOuter);
+  const agiru::detail::Selection nothing = agiru::detail::Select(&unmarked, outer);
   CHECK_TRUE("no marks select nothing", nothing.where == "FALSE");
+}
+
+void ExistenceFiltersAndUnknownTables() {
   // A LEADING `-` REVERSES `Exist` (`devenv-calcformula-property.md`: `[-]Exist(...)`): `Sales
   // Invoice Header.Closed` is `-exist("Cust. Ledger Entry" where(... Open = filter(true)))`, true
   // when NO open entry is left. Read as a plain EXISTS it said "paid" of every invoice that still
@@ -569,7 +588,7 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                                            .name = "Flow Exists",
                                            .caption = "Flow Exists",
                                            .fields = kExisting,
-                                           .keys = kKeys};
+                                           .keys = kFlowPrimaryKeys};
   agiru::detail::RecordState reversed;
   reversed.filters.push_back(
       agiru::detail::FieldFilter{.field = agiru::FieldNo{2}, .group = 0, .text = "Yes"});
@@ -598,7 +617,7 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
                                          .name = "Flow Lost",
                                          .caption = "Flow Lost",
                                          .fields = kOrphan,
-                                         .keys = kKeys};
+                                         .keys = kFlowPrimaryKeys};
   agiru::detail::RecordState lost;
   lost.filters.push_back(
       agiru::detail::FieldFilter{.field = agiru::FieldNo{1}, .group = 0, .text = "X"});
@@ -617,11 +636,14 @@ void AFlowFieldFilterBecomesACorrelatedSubquery() {
 /// value", and "Key fields are always populated" whatever `PopulateAllFields` says. Without it a
 /// line inserted through the part carries a blank Document No.
 void ANewRowTakesTheKeyItsFiltersFix() {
+  constexpr std::size_t kDocumentNoLength = 20;
+  constexpr std::size_t kDescriptionLength = 50;
+
   struct Row {
     agiru::detail::StateHandle State_Block;
-    agiru::Code<20> DocumentNo;
+    agiru::Code<kDocumentNoLength> DocumentNo;
     agiru::Integer LineNo;
-    agiru::Text<50> Description;
+    agiru::Text<kDescriptionLength> Description;
   };
 
   static constexpr std::array<agiru::FieldDef, 3> kFields{{
@@ -629,7 +651,7 @@ void ANewRowTakesTheKeyItsFiltersFix() {
                       .name = "Document No.",
                       .caption = "Document No.",
                       .no = agiru::FieldNo{1},
-                      .length = 20,
+                      .length = kDocumentNoLength,
                       .type = agiru::FieldType::Code},
       agiru::FieldDef{.offset = offsetof(Row, LineNo),
                       .name = "Line No.",
@@ -640,7 +662,7 @@ void ANewRowTakesTheKeyItsFiltersFix() {
                       .name = "Description",
                       .caption = "Description",
                       .no = agiru::FieldNo{3},
-                      .length = 50,
+                      .length = kDescriptionLength,
                       .type = agiru::FieldType::Text},
   }};
   static constexpr std::array<agiru::FieldNo, 2> kKey{{agiru::FieldNo{1}, agiru::FieldNo{2}}};
@@ -681,6 +703,8 @@ void ANewRowTakesTheKeyItsFiltersFix() {
     CHECK_TRUE("a filter wider than one value seeds nothing",
                std::string_view(wide_row.DocumentNo.Value()).empty());
   }
+}
+
 }
 
 int main() {

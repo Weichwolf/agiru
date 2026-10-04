@@ -219,18 +219,9 @@ public:
 ///          check (board:0043). What it is NOT is a silent pass hidden inside `Validate`.
 void CheckRelation(const void *record, const TableDef &table, FieldNo no);
 
-/// \brief `DecimalPlaces` as an ENTRY rule: a Decimal field declared `0 : 5` takes at most five
-///        places from what a user TYPES, and the property "is evaluated on text boxes and fields
-///        during validation" (`devenv-decimalplaces-property.md`) the way `MinValue` and
-///        `NotBlank` are -- at the client, never on a `Validate` from code.
-///
-/// \note A CODE-DRIVEN `Validate` DOES NOT ROUND, and that is measured against the suite rather
-///       than read: `SCM Whse. UOM Rnding. UT` assigns `1 / 7` to a base unit's `Qty. Rounding
-///       Precision` (twenty places, by assignment) and validates `44 * (1 / 7)` into a `0 : 5`
-///       field, then requires `QtyPerUoM mod Precision = 0` -- which holds exactly when the
-///       validated value keeps its twenty places and fails for every rounding of it. The first
-///       reading here rounded on `Validate` (board:0677, 2026-09-10) and the nine cases stayed red
-///       with different digits.
+/// \brief Rounds a text-entry Decimal to the field's declared maximum `DecimalPlaces`.
+/// \note Numeric assignment/validation and SQL conversion are separate boundaries; this helper
+///       does not establish their precision contract (board:0066/0043).
 /// \param value The value typed. \param table The table. \param no The field.
 /// \return The value rounded to the declared maximum, or unchanged where none is declared.
 Decimal DeclaredPlaces(const Decimal &value, const TableDef &table, FieldNo no);

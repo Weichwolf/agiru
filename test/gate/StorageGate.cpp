@@ -9,6 +9,7 @@
 
 #include "Check.h"
 #include "ResourceCost.h"
+#include "options/Types.h"
 
 #include <array>
 #include <cstddef>
@@ -32,6 +33,7 @@ namespace {
 // total of eleven could be compared with neither.
 constexpr std::size_t kDeclaredFields = 6;
 constexpr std::size_t kFieldCount = kDeclaredFields + agiru::kSystemFieldCount;
+constexpr std::size_t kResourceCodeLength = 20;
 
 ResourceCost Sample() {
   ResourceCost rec;
@@ -74,12 +76,12 @@ void TheDeclarationBecomesAColumnPerField() {
 /// what the `.al` file says and the platform half is somewhere else.
 void ProvisioningPreservesAndWidensBoundedColumns() {
   const agiru::Connection connection(AGIRU_TEST_DSN);
-  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Code\" TYPE varchar(5)");
-  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Work Type Code\" TYPE varchar(25)");
-  connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('KEEP')");
+  connection.Run(R"(ALTER TABLE "Resource Cost" ALTER COLUMN "Code" TYPE varchar(5))");
+  connection.Run(R"(ALTER TABLE "Resource Cost" ALTER COLUMN "Work Type Code" TYPE varchar(25))");
+  connection.Run(R"(INSERT INTO "Resource Cost" ("Code") VALUES ('KEEP'))");
   bool refused = false;
   try {
-    connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('TWENTY-CHARACTER-123')");
+    connection.Run(R"(INSERT INTO "Resource Cost" ("Code") VALUES ('TWENTY-CHARACTER-123'))");
   } catch (const agiru::DatabaseError &) { refused = true; }
   CHECK_TRUE("the old physical width rejects a valid declared value", refused);
   agiru::ProvisionInstalled(connection);
@@ -92,13 +94,13 @@ void ProvisioningPreservesAndWidensBoundedColumns() {
   CHECK_TEXT("existing stored values survive widening",
              Column(connection.Execute("SELECT \"Code\" FROM \"Resource Cost\""), 0, 0),
              "KEEP");
-  connection.Run("INSERT INTO \"Resource Cost\" (\"Code\") VALUES ('TWENTY-CHARACTER-123')");
+  connection.Run(R"(INSERT INTO "Resource Cost" ("Code") VALUES ('TWENTY-CHARACTER-123'))");
   agiru::ProvisionInstalled(connection);
   CHECK_TEXT("repeated provisioning preserves all rows",
              Column(connection.Execute("SELECT count(*) FROM \"Resource Cost\""), 0, 0),
              "2");
   connection.Run("DELETE FROM \"Resource Cost\"");
-  connection.Run("ALTER TABLE \"Resource Cost\" ALTER COLUMN \"Work Type Code\" TYPE varchar(10)");
+  connection.Run(R"(ALTER TABLE "Resource Cost" ALTER COLUMN "Work Type Code" TYPE varchar(10))");
 }
 
 void ARecordSurvivesTheRoundTrip() {
@@ -134,6 +136,40 @@ void AMissingKeyIsAnAnswerRatherThanAnError() {
              !read.Get(agiru::Option<ResourceCostType>{ResourceCostType::All},
                        agiru::Code<20>("NOTHERE"),
                        agiru::Code<10>("")));
+}
+
+void SqlScaleDoesNotTruncateCalculations() {
+  ResourceCost written = Sample();
+  written.Code = "clr28-sql20";
+  written.UnitCost = Decimal{1} / Decimal{3};
+  written.Insert();
+  CHECK_TEXT("writing does not truncate the calculating record buffer",
+             written.UnitCost.ToInvariantString(),
+             "0.3333333333333333333333333333");
+  ResourceCost read;
+  CHECK_TRUE("a scale-28 calculation reaches the ordinary record SQL path",
+             read.Get(written.Type, written.Code, written.WorkTypeCode));
+  CHECK_TEXT("the SQL column quantizes only the persisted value",
+             read.UnitCost.ToInvariantString(),
+             "0.33333333333333333333");
+  written.UnitCost = Decimal::FromInvariantString("0.000000000000000000005");
+  written.Modify();
+  CHECK_TRUE("the positive storage tie is readable",
+             read.Get(written.Type, written.Code, written.WorkTypeCode));
+  CHECK_TEXT("PostgreSQL rounds a positive storage tie away from zero",
+             read.UnitCost.ToInvariantString(),
+             "0.00000000000000000001");
+  CHECK_TEXT("the original value retains its finer calculating scale",
+             written.UnitCost.ToInvariantString(),
+             "0.000000000000000000005");
+  written.UnitCost = -written.UnitCost;
+  written.Modify();
+  CHECK_TRUE("the negative storage tie is readable",
+             read.Get(written.Type, written.Code, written.WorkTypeCode));
+  CHECK_TEXT("PostgreSQL rounds a negative storage tie away from zero",
+             read.UnitCost.ToInvariantString(),
+             "-0.00000000000000000001");
+  written.Delete();
 }
 
 void ModifyOverwritesTheRowItsKeySelects() {
@@ -256,7 +292,7 @@ void ModifyAllAssignsWithoutValidating() {
   rec.Insert();
 
   ResourceCost all;
-  all.SetRange(all.Code, agiru::Code<20>("bulk"));
+  all.SetRange(all.Code, agiru::Code<kResourceCodeLength>("bulk"));
   all.ModifyAll(all.CostType, ResourceCostCostType::PercentExtra, true);
   ResourceCost read;
   CHECK_TRUE("the row is found", read.Get(rec.Type, rec.Code, rec.WorkTypeCode));
@@ -345,8 +381,6 @@ void TransferFieldsLeavesTheSystemFieldsAlone() {
   source.Delete();
 }
 
-} // namespace
-
 /// FILTER GROUP -1 ORS ITS FIELDS. `record-filtergroup-method.md`: "If you have filters on
 /// multiple fields in the same filter group, then only records matching all filters are visible.
 /// The only exception to this is filtergroup -1 where records only need to match at least one of
@@ -370,7 +404,7 @@ void TheCrossColumnGroupOrsItsFields() {
   ResourceCost found;
   found.SetFilter(found.Code, "cross-*");
   found.FilterGroup(-1);
-  found.SetRange(found.Code, agiru::Code<20>("cross-a"));
+  found.SetRange(found.Code, agiru::Code<kResourceCodeLength>("cross-a"));
   found.SetRange(found.WorkTypeCode, agiru::Code<10>("y"));
   found.FilterGroup(0);
   CHECK_TRUE("either field admits a row", found.Count() == 2);
@@ -380,6 +414,8 @@ void TheCrossColumnGroupOrsItsFields() {
   two.Delete();
   three.Delete();
 }
+
+} // namespace
 
 int main() {
   // A GATE THAT CANNOT REACH ITS DATABASE IS RED, NOT SKIPPED. A skipped case reports green and
@@ -391,6 +427,7 @@ int main() {
       TheDeclarationBecomesAColumnPerField();
       ProvisioningPreservesAndWidensBoundedColumns();
       ARecordSurvivesTheRoundTrip();
+      SqlScaleDoesNotTruncateCalculations();
       AMissingKeyIsAnAnswerRatherThanAnError();
       ModifyOverwritesTheRowItsKeySelects();
       TheKeyIsEnforcedByTheDatabase();
