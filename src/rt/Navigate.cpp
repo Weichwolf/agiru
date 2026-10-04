@@ -24,6 +24,7 @@ namespace agiru::detail {
 
 struct OpenCursor {
   Cursor cursor;
+  bool backwards;
 };
 
 void Close(OpenCursor *open) {
@@ -45,6 +46,17 @@ std::string SelectFrom(const Selection &made, const TableDef &table) {
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
   if (!made.order.empty()) { sql += " ORDER BY " + made.order; }
   return sql;
+}
+
+OpenCursor *
+OpenSelection(RecordState &state, const TableDef &table, const Selection &made, bool backwards) {
+  state.open.Forget();
+  const Connection &connection = Session::Current().Database();
+  if (!connection.InTransaction()) { connection.Run("BEGIN"); }
+  auto *open = new OpenCursor{.cursor = Cursor(connection, SelectFrom(made, table), made.binds),
+                              .backwards = backwards};
+  state.open.Hold(open);
+  return open;
 }
 
 bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
@@ -199,16 +211,13 @@ bool RuntimeFindSet(void *record, const TableDef &table) {
   state->open.Forget();
   state->stepped = 0;
   state->positioned = false;
-  const Connection &connection = Session::Current().Database();
-  if (!connection.InTransaction()) { connection.Run("BEGIN"); }
   const Selection made = Select(state, table);
-  auto *open = new OpenCursor{Cursor(connection, SelectFrom(made, table), made.binds)};
+  OpenCursor *open = OpenSelection(*state, table, made, false);
   if (!open->cursor.Step()) {
-    Close(open);
+    state->open.Forget();
     return false;
   }
   ReadInto(record, table, open->cursor);
-  state->open.Hold(open);
   state->positioned = true;
   return true;
 }
@@ -221,29 +230,26 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();
   if (!state->positioned) { return 0; }
-  const std::int32_t wanted = steps;
-  if (wanted < 0 || open == nullptr) {
-    const std::string_view direction = wanted < 0 ? "<" : ">";
-    const std::int64_t count = wanted < 0 ? -std::int64_t{wanted} : wanted;
-    std::int64_t moved = 0;
-    for (std::int64_t taken = 0; taken < count; ++taken) {
-      if (!RuntimeFind(record, table, direction)) {
-        state->positioned = true;
-        break;
-      }
-      ++moved;
-    }
-    return static_cast<std::int32_t>(wanted < 0 ? -moved : moved);
+  if (open != nullptr && !open->cursor.Current()) {
+    state->open.Forget();
+    open = nullptr;
   }
-  for (std::int32_t taken = 0; taken < wanted; ++taken) {
-    if (!open->cursor.Step()) {
-      if (taken != 0) { ReadInto(record, table, open->cursor); }
-      return taken;
-    }
+  const bool backwards = steps < 0;
+  if (open == nullptr || open->backwards != backwards) {
+    Selection made = Select(state, table);
+    const RecordOrder by(table, state->key, state->ascending);
+    Compare(made, by, record, backwards ? "<" : ">");
+    made.order = Reversed(by, backwards);
+    open = OpenSelection(*state, table, made, backwards);
+  }
+  const std::int64_t count = backwards ? -std::int64_t{steps} : steps;
+  std::int64_t moved = 0;
+  while (moved < count && open->cursor.Step()) {
+    ++moved;
     ++state->stepped;
   }
-  ReadInto(record, table, open->cursor);
-  return wanted;
+  if (moved != 0) { ReadInto(record, table, open->cursor); }
+  return static_cast<std::int32_t>(backwards ? -moved : moved);
 }
 
 std::int32_t RuntimeCount(const void *record, const TableDef &table) {

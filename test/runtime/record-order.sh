@@ -8,6 +8,28 @@ gate="$B/gate_MixedOrderGate"
 "$gate" > "$proof/current.log" 2>&1
 selection="$B/gate_SelectionChangeGate"
 "$selection" > "$proof/selection.log" 2>&1
+lifecycle="$B/gate_CursorLifecycleGate"
+"$lifecycle" > "$proof/lifecycle.log" 2>&1
+fetch_block=$(sed -n 's/^inline constexpr std::size_t kFetchBlock = \([0-9]*\);$/\1/p' src/rt/Cursor.h)
+[[ "$fetch_block" =~ ^[1-9][0-9]*$ ]]
+bounded_walks() {
+  awk -v block="$fetch_block" '
+    /^cursor-walk: begin / {
+      if (active) refused = 1;
+      active = 1; calls = 0; steps = $3 < 0 ? -$3 : $3;
+      limit = 5 + int((steps + block - 1) / block); next
+    }
+    /^sql: / && active { calls++ }
+    /^cursor-walk: end / {
+      if (!active || calls > limit) refused = 1;
+      printf "cursor-walk: %d steps, %d SQL statements, bound %d\n", steps, calls, limit;
+      active = 0; phases++
+    }
+    END { if (active || phases != 24 || refused) exit 1 }
+  ' "$1"
+}
+AGIRU_TRACE_SQL=1 "$lifecycle" --trace-walks > "$proof/lifecycle-trace.log" 2>&1
+bounded_walks "$proof/lifecycle-trace.log" > "$proof/lifecycle-statements.log"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 for control in field-direction global-direction primary-ties uniform-predicate; do
@@ -76,9 +98,49 @@ for control in selection-cache temporary-cache excluded-anchor mutation-version 
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
+for control in cursor-generation surviving-portal released-portal one-row-fetch; do
+  source=src/rt/Cursor.cpp
+  if [ "$control" = cursor-generation ]; then source=src/rt/Navigate.cpp; fi
+  awk -v control="$control" '
+    control == "cursor-generation" && /if \(open != nullptr && !open->cursor.Current\(\)\)/ {
+      print "  if (false) {"; changed++; next
+    }
+    control == "surviving-portal" && /if \(Session::Current\(\).Transaction\(\).CursorEpoch\(\) != epoch_\)/ {
+      print "    if (Session::Current().Transaction().CursorEpoch() != epoch_) { return; }";
+      skip = 1; changed++; next
+    }
+    skip { if (/^    }$/) skip = 0; next }
+    control == "released-portal" && /if \(!connection_->InTransaction\(\) \|\| connection_->InFailedTransaction\(\)\)/ {
+      print "  if (Session::Current().Transaction().Depth() == 0) { return; }"; changed++
+    }
+    control == "one-row-fetch" && /std::to_string\(kFetchBlock\)/ {
+      sub(/std::to_string\(kFetchBlock\)/, "std::to_string(std::size_t{1})"); changed++
+    }
+    { print }
+    END { if (changed != 1 || skip) exit 2 }
+  ' "$source" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
+  if [ "$control" = one-row-fetch ]; then
+    AGIRU_TRACE_SQL=1 LD_PRELOAD="$proof/$control.so" "$lifecycle" --trace-walks > "$proof/$control.log" 2>&1
+    if bounded_walks "$proof/$control.log" > "$proof/$control-statements.log"; then
+      printf 'record-order: per-row SQL escaped the bounded-walk control\n' >&2
+      exit 1
+    fi
+  else
+    if LD_PRELOAD="$proof/$control.so" "$lifecycle" > "$proof/$control.log" 2>&1; then
+      printf 'record-order: %s escaped the cursor-lifecycle gate\n' "$control" >&2
+      exit 1
+    fi
+    rg -q 'FAIL ' "$proof/$control.log"
+  fi
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
+  src/rt/Cursor.h src/rt/Cursor.cpp \
   src/rt/Selection.cpp src/rt/Temporary.cpp src/rt/RecordState.cpp \
   include/runtime/RecordState.h include/runtime/Table.h \
-  test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp \
-  "$B/libagiru_rt.so" "$gate" "$selection" > "$proof/inputs.sha256"
-printf 'record-order: mixed order and changing selections pass; nine controls reject; %s\n' "$proof"
+  test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
+  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" > "$proof/inputs.sha256"
+printf 'record-order: order, changing selections and cursor lifecycle pass; thirteen controls reject; %s\n' "$proof"

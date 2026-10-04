@@ -1,12 +1,13 @@
 #include "Cursor.h"
 
 #include "runtime/Database.h"
-#include "runtime/ErrorValue.h"
 #include "runtime/Session.h"
+#include "runtime/Transaction.h"
 
 #include <atomic>
 #include <cstddef>
 #include <cstdio>
+#include <exception>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -29,7 +30,6 @@ Cursor::Cursor(const Connection &connection,
                std::vector<std::optional<std::string>> binds)
     : connection_(&connection),
       name_(NextName()),
-      depth_(Session::HasCurrent() ? Session::Current().Transaction().Depth() : 0),
       epoch_(Session::HasCurrent() ? Session::Current().Transaction().CursorEpoch() : 0),
       block_(nullptr) {
   connection_->Run("DECLARE " + name_ + " NO SCROLL CURSOR FOR " + select, binds);
@@ -37,14 +37,28 @@ Cursor::Cursor(const Connection &connection,
 
 Cursor::~Cursor() {
   if (!Session::HasCurrent() || &Session::Current().Database() != connection_) { return; }
-  if (Session::Current().Transaction().Depth() < depth_) { return; }
-  if (Session::Current().Transaction().CursorEpoch() != epoch_) { return; }
-  if (connection_->InFailedTransaction()) { return; }
+  if (!connection_->InTransaction() || connection_->InFailedTransaction()) { return; }
   try {
+    if (Session::Current().Transaction().CursorEpoch() != epoch_) {
+      const std::vector<std::optional<std::string>> bindings{name_};
+      if (connection_->Execute("SELECT 1 FROM pg_catalog.pg_cursors WHERE name = $1", bindings)
+              .Rows() == 0) {
+        return;
+      }
+    }
     connection_->Run("CLOSE " + name_);
-  } catch (const Error &e) {
-    std::fputs(("agiru: the cursor " + name_ + " stayed open: " + e.what() + "\n").c_str(), stderr);
+  } catch (const std::exception &e) {
+    std::fputs("agiru: the cursor ", stderr);
+    std::fputs(name_.c_str(), stderr);
+    std::fputs(" stayed open: ", stderr);
+    std::fputs(e.what(), stderr);
+    std::fputc('\n', stderr);
   }
+}
+
+bool Cursor::Current() const {
+  return Session::HasCurrent() && &Session::Current().Database() == connection_ &&
+         Session::Current().Transaction().CursorEpoch() == epoch_ && connection_->InTransaction();
 }
 
 bool Cursor::Fetch() {

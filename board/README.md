@@ -15,13 +15,21 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Cursor lifetime (0044): transaction-aware buffers, bounded bidirectional resume
+  and released/surviving/absent portal cleanup. CursorLifecycleGate: 313 checks
+  green; final coherent predecessor fixture reports 14 failures. Ordering/selection
+  remain 5,872/296 green; thirteen compiled controls reject. All 24 traced walks
+  execute: 64 steps use three SQL statements, not 64 per-row reads. No own analysis
+  findings, 33/25/30 inherited gate/Cursor/Navigate findings remain unsuppressed.
+  `/tmp/agiru-cursor-lifecycle.p37EWy`, `/tmp/agiru-record-order-controls.YfDQHq`.
+  Full replay pending; SQL dynamic writes/Query transaction contracts remain open.
 - Selection invalidation (0044): SQL cursors and temporary views follow changed
   filters/keys/directions/active marks; shared temporary Modify is visible.
   SelectionChangeGate: 296 checks green, coherent predecessor 64 red;
   mixed-order matrix remains 5,872 green, nine compiled controls reject.
   `/tmp/agiru-selection-change.li6S1N`, `/tmp/agiru-record-order-controls.sdKg5i`.
   Targeted lint retains existing findings, none in new functions. Outside frozen
-  193025; SQL dynamic writes/transaction cursor recovery and full AL replay remain open.
+  193025; SQL dynamic writes and full AL replay remain open; cursor lifetime is qualified above.
   Complete local replay on HEAD `bae1071` passes: 139 cases/232 tooling tests, exit 0,
   affected source hashes unchanged (`all-local.log`). A read-only Integer probe separately reproduces
   destroyed-cursor FETCH after Commit and savepoint rollback: six checks/two red.

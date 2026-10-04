@@ -5,13 +5,27 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
-- Cursor generation fault is executable, not only a source finding: the read-only
-  `/tmp/agiru-selection-change.li6S1N/CursorEpoch.cpp` uses the production typed
-  Integer table, 128 computed rows and a 64-step Next after production Commit or
-  savepoint rollback. Both paths fetch destroyed portals (`cursor does not exist`):
-  six checks, two red. Compile/run/source/library hashes are in `cursor-epoch-*`.
-  No business tables are created or changed. This remains a red diagnostic, not
-  a repository gate or a fix; move its buffered/block-boundary matrix into a C++ gate.
+- Cursor transactions: `Cursor::Current` checks session/connection/epoch before
+  RuntimeNext uses a buffer. One owned OpenSelection primitive resumes either
+  direction with the shared keyset order and bounded NO SCROLL fetching, not
+  per-row SQL. Cleanup queries `pg_catalog.pg_cursors` after generation changes;
+  surviving portals close, absent portals do not poison transactions. Remove the
+  incorrect depth stamp, which leaked cursors after savepoint release.
+  CursorLifecycleGate: 313 checks green across typed/RecordRef, Commit/rollback,
+  fresh buffered values, block boundaries, partial/exhausted reversal and cleanup.
+  The final identical fixture against coherent original headers/library has 14
+  failures (209 checks; exceptions prevent later checks), not a mixed-ABI replay.
+  `make record-order JOBS=2`: 5,872/296/313 ordering/selection/lifecycle checks
+  green; thirteen compiled controls reject, including a functional-green one-row
+  fetch whose SQL count exceeds the bound. All 24 traced walks retain their cases:
+  64 steps use three statements; 129 requested steps use five. This is a native
+  micro-workload, not BC throughput/resource parity. Final targeted analysis has
+  no own findings; gate/Cursor/Navigate retain 33/25/30 inherited findings, no
+  suppressions. Affected NextZero/Cursor/Find/RecordRef/Query/Temporary/FilterGroup
+  gates pass 112/230/43/89/21/80/137 checks. `/tmp/agiru-cursor-lifecycle.p37EWy`,
+  `/tmp/agiru-record-order-controls.YfDQHq`; the prior read-only red probe stays
+  under `/tmp/agiru-selection-change.li6S1N/cursor-epoch-*`.
+  Full local/AL replay is pending; outside frozen 193025, no UT gain or G1 claim.
 - Selection changes now invalidate SQL cursors and lazily rebuild temporary views
   through `SelectionChanged`: filters/copies, keys/directions/views and active marks.
   Same-cardinality mark replacement is detected; unchanged predicates/directions and
@@ -27,8 +41,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   Find/FilterGroup/Report/TestReport gates pass 112/230/80/43/137/18/15 checks.
   Complete local replay on HEAD `bae1071`: 139 cases/232 tooling tests pass, exit 0;
   affected source hashes match before/after (`all-local.log`, `verified-inputs.sha256`).
-  SQL dynamic writes, transaction
-  cursor recovery and original full AL execution remain unproved. This increment
+  SQL dynamic writes and original full AL execution remain unproved; cursor
+  transaction recovery is qualified above. This selection increment
   is outside frozen 193025; no UT gain or G1 claim.
 - Mixed record ordering: private `src/rt/RecordOrder.{h,cpp}` compiles selected
   directions and complete primary-key tie-breakers once per comparison operation.
@@ -285,14 +299,12 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
    Preserve documented complete-prefix selection; do not restore ignored keys
    just to recover old diagnostics. Compare the full population after any fix.
-1. Prove SQL dynamic result sets after own/shared writes and cursor recovery after
-   Commit/rollback; route table identity through explicit company context. Preserve
-   mixed-order and zero/partial/exhausted/extreme-step gates.
-   `Cursor.cpp` checks CursorEpoch only in destruction, not Step; `Navigate.cpp::RuntimeNext`
-   consumes an existing cursor without epoch validation. Qualify buffered and next-block
-   cases after production Commit and savepoint rollback. Table.cpp writes do not invalidate
-   another variable's cursor. Reject predecessor 0889's unsupported claim that a PostgreSQL
-   snapshot proves BC own-insert blindness; platform documentation requires dynamic sets.
+1. Prove SQL dynamic result sets after own/shared writes; Table.cpp mutations do
+   not invalidate another variable's cursor. Qualify Query.cpp's transaction-boundary
+   contract separately: Query.Read does not use RuntimeNext. Route table identity
+   through explicit company context; preserve lifecycle/mixed-order/step gates.
+   Reject predecessor 0889's unsupported claim that a PostgreSQL snapshot proves
+   BC own-insert blindness; platform documentation requires dynamic sets.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
@@ -377,7 +389,18 @@ User `0ff62b2266fd`, `business-central/ui-enter-criteria-filters.md`.
 Predecessor `openerp/board/1102_persistentes-next-ignoriert-filteraenderungen-im-ergebnissat.md`
 identifies the stale-selection failure; its Python implementation is not transplanted.
 
-Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection-change matrix above; full SQL mutation/transaction recovery remains open.
+Cursor lifetime: same developer/BCApps revisions; Record/RecordRef Next and
+Database Commit methods above. Original `src/Layers/W1/BaseApp/System/RapidStart/ConfigWorksheet.Page.al::GetRelatedTables`
+uses FindSet → Commit → Next directly. User `0ff62b2266fd`,
+`business-central/{ui-batch-posting,ui-how-run-batch-jobs}.md` requires complete batches
+and visible errors, not a cursor implementation. Predecessor 1102/1485 supplies stale
+selection and partial-step counterexamples. PostgreSQL 17 docs, checked 2026-10-04
+(no installed local copy): [pg_cursors](https://www.postgresql.org/docs/17/view-pg-cursors.html),
+[CLOSE](https://www.postgresql.org/docs/17/sql-close.html),
+[DECLARE](https://www.postgresql.org/docs/17/sql-declare.html). Ordinary PostgreSQL
+cursors are insensitive; their snapshots are not BC dynamic-result-set proof.
+
+Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection/lifecycle matrix above; full SQL mutation and Query transaction contracts remain open.
 
 Code: `src/rt/{Record,Navigate,Temporary,Selection,RecordRef,PlatformTables}.cpp`, `include/runtime/Table.h`. Platform: `methods-auto/record/record-next-method.md`, `methods-auto/recordref/recordref-next-method.md`, other Record/RecordRef overloads, devenv-temporary-tables.md, devenv-integer-virtual-table.md. AL: `src/Layers/RU/Tests/Local/ERMVATReinstatement.Codeunit.al::SuggestVATSettlement` explicitly calls temporary Next(0); No. Series temporary filters and platform table users. No dedicated user-facing Next(0) contract; platform method documentation governs. Predecessor board searched for Next(0), with no matching finding; WI-1063/1136/1173/1206/1229 cover adjacent record contracts. Retain source usage as a fixture, never a hardcoded runtime branch.
 

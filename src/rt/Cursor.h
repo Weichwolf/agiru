@@ -1,6 +1,5 @@
 #pragma once
 
-#include "meta/TableDef.h"
 #include "runtime/Database.h"
 
 #include <cstddef>
@@ -24,6 +23,8 @@ public:
 
   ~Cursor();
 
+  [[nodiscard]] bool Current() const;
+
   [[nodiscard]] bool Step();
 
   [[nodiscard]] std::optional<std::string_view> Value(std::size_t column) const;
@@ -35,7 +36,6 @@ private:
 
   const Connection *connection_;
   std::string name_;
-  std::size_t depth_;
   std::size_t epoch_;
   Result block_;
   std::size_t row_ = 0;
