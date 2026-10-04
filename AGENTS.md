@@ -235,5 +235,6 @@ Keep existing IDs when consolidating. Allocate new IDs from all Git history, nev
 open files alone. Delete completed or superseded items; Git preserves their history. Record
 consolidation mappings in the board index. Do not claim ownership through stale `active` text.
 Keep only current build recipes in the working tree; Git preserves superseded instructions.
-Commit and push each verified coherent development increment; split commits by outcome.
+After every verified coherent increment (code, tests or documentation), commit and push
+immediately; split commits by outcome. Do not accumulate unrelated progress.
 Keep pending checks and known failures explicit; a pushed commit is not an ERP milestone.
