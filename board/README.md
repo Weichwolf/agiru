@@ -23,7 +23,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   retention the dependency disappears and 36 checks fail. No native provider proof.
   ID/missing-definition controls fail. Previous actual compiler fails five
   assertions and cannot compile the consumer. Full generation adds 70 files, changes
-  103, removes none; `/tmp/agiru-transpile.NfMuFN`, exit 1. Still 72 unbound Native
+  103, removes none; `/tmp/agiru-transpile.NfMuFN`, exit 1.
+  Root `apps/` regenerated through Make: all 24,534 files match the qualified tree,
+  zero root-only/different files, all 14,225 slice sources present;
+  `/tmp/agiru-transpile.p0ubXY`, exit 1. Still 72 unbound Native
   methods, 90 inactive other sources, 215 unbound tables and 21 unresolved controls.
   Full local replay: 135 cases/232 tooling tests pass; native tooling 58 checks green.
   Runner analysis passes; Main retains four existing Main/BodyWriter findings,

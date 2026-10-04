@@ -18,7 +18,9 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   dependency and fails 36 checks. `platform-execution.log`, `platform-needed.txt` and
   `dropped-platform-*` receipts; not native method/provider execution.
   Full generation adds 70 files, changes 103, removes none; all 24,464 prior files
-  remain. `/tmp/agiru-transpile.NfMuFN`, exit 1: 72 Native methods unbound, 90 other
+  remain. Root `apps/` regenerated through Make and matches all 24,534 qualified
+  files byte-for-byte, no root-only files; all 14,225 slice files remain present.
+  `/tmp/agiru-transpile.p0ubXY`, exit 1: 72 Native methods unbound, 90 other
   sources inactive, 233 tables selected/18 bound/215 unbound, 21 unresolved controls.
   Native is handled as an explicit refusal, including analysis without output;
   it is not silently dropped or a provider success. Local `make test`: 135 cases/
