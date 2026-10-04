@@ -48,11 +48,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   DiscoveryGate passes, including the
   new qualifier's missing-script control. Full local replay passes: 138 cases/
   232 tooling tests, exit 0 (`all-local.log`); source-input hashes match before/
-  after. AL replay `20261004T193025Z-2625193` is running on frozen HEAD `7b7cf45`,
+  after. AL replay `20261004T193025Z-2625193` finishes at 20:42:35 UTC on HEAD `7b7cf45`,
   source `a234a8d7b12a5df02595bc4d9376c8345f454d7566b5652dcc279dc21c499aad`;
-  slice-check/all/test/ut, six jobs, dependencies match completed 184333. Compare
-  every 2,314 identity/result against 184333; null/unsealed seed is diagnostic,
-  not causal A/B. Outside frozen `20261004T184333Z-2543205`. No UT gain, native
+  slice-check/build/test pass; UT is 2,169/2,314, 145 failed, zero incomplete,
+  80 codeunits/1,481 seconds. All identities/statuses/errors match 184333, with no
+  duplicates/missing/added cases; source manifests/files and frozen dependencies match.
+  `artifacts/ut-comparison-184333.json`; null/unsealed seed is diagnostic, not causal A/B.
+  Outside frozen `20261004T184333Z-2543205`. No UT gain, native
   differential oracle, page-presentation or performance claim.
 - Shared compiled predicate: `src/rt/RecordFilter.{h,cpp}` owns parsed expressions
   and borrows immutable field declarations. Temporary Build/Count/DeleteAll/CalcSum
