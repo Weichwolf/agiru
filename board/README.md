@@ -22,8 +22,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-selection-change.li6S1N`, `/tmp/agiru-record-order-controls.sdKg5i`.
   Targeted lint retains existing findings, none in new functions. Outside frozen
   193025; SQL dynamic writes/transaction cursor recovery and full AL replay remain open.
-  Complete local replay is running on HEAD `bae1071` (Make, two jobs, no compiler-input edits);
-  `all-local.log` retains the result. A read-only Integer probe separately reproduces
+  Complete local replay on HEAD `bae1071` passes: 139 cases/232 tooling tests, exit 0,
+  affected source hashes unchanged (`all-local.log`). A read-only Integer probe separately reproduces
   destroyed-cursor FETCH after Commit and savepoint rollback: six checks/two red.
 - Mixed-order integration: `20261004T193025Z-2625193`, frozen HEAD `7b7cf45`,
   source `a234a8d7b12a5df02595bc4d9376c8345f454d7566b5652dcc279dc21c499aad`;

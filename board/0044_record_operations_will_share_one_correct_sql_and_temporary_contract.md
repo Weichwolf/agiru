@@ -25,6 +25,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   gate/RecordState/Temporary/RecordRef/Report have 33/1/31/40/44 existing findings;
   none in the new functions, no suppressions added. Affected NextZero/Cursor/Temporary/
   Find/FilterGroup/Report/TestReport gates pass 112/230/80/43/137/18/15 checks.
+  Complete local replay on HEAD `bae1071`: 139 cases/232 tooling tests pass, exit 0;
+  affected source hashes match before/after (`all-local.log`, `verified-inputs.sha256`).
   SQL dynamic writes, transaction
   cursor recovery and original full AL execution remain unproved. This increment
   is outside frozen 193025; no UT gain or G1 claim.
