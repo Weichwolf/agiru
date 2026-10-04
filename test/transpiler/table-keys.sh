@@ -50,6 +50,30 @@ jq -n --arg directory "$PWD" --arg file "$PWD/test/transpiler/table-keys/Runner.
   > "$proof/compile_commands.json"
 cp "$proof/compile_commands.json" "$B/fixture-commands/table-keys.json"
 
+for control in registry-missing registry-wrong-id; do
+  awk -v control="$control" '
+    /const auto \*entry = FindTable\(id\);/ {
+      if (control == "registry-missing") {
+        print "  static_cast<void>(id); return std::nullopt;"
+      } else {
+        print "  static_cast<void>(id);"
+        sub(/FindTable\(id\)/, "FindTable(::agiru::Fixture::ComposedRow_Table::kId)")
+      }
+      changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/TableMetadata.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" -fPIC -shared "-I$proof/generated/fixture" \
+    -include "$proof/generated/fixture/fixture/table/ComposedRow.h" \
+    "$proof/$control.cpp" "${links[@]}" -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$proof/runner" > "$proof/$control.run.log" 2>&1; then
+    printf 'table-keys: %s escaped installed metadata lookup\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'installed lookup selects|installed lookup projects' "$proof/$control.run.log"
+done
+
 for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
   cp -a "$proof/generated" "$proof/$control"
   source="$proof/$control/fixture/fixture/table/ImplicitRow.def.cpp"

@@ -4,11 +4,13 @@
 #include "meta/ModuleDef.h"
 #include "meta/TableDef.h"
 #include "platform/TableMetadata.h"
+#include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "type/Guid.h"
 
 #include "ReflectionMetadata.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -83,6 +85,12 @@ platform::TableMetadata_Table ProjectTableMetadata(const TableDef &source) {
   result.Access = Verified(MetadataAccess(EffectiveProperty(source, source.access, "Public")));
   result.ALNamespace = source.nameSpace;
   return result;
+}
+
+std::optional<platform::TableMetadata_Table> InstalledTableMetadata(TableId id) {
+  const auto *entry = FindTable(id);
+  if (entry == nullptr) { return std::nullopt; }
+  return ProjectTableMetadata(*entry->table);
 }
 
 }

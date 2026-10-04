@@ -15,6 +15,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Installed metadata lookup (0044): existing catalogue, on-demand projection by
+  original ID; absent rows and unqualified declarations remain distinct. Generated
+  replay passes 61 checks and two new runtime controls; runner lint passes, runtime
+  retains 30 inherited header findings and no own findings. Receipt:
+  `/tmp/agiru-table-keys.rUwABv`. No live-provider/UT claim; outside frozen 120802.
 - Native table constants (0034): selected native AST identities are independent
   of record bindings/providers. Native-binding/parser gates pass 154/139 checks;
   compiled codeunit/table/page/report fixture passes 13 checks and six identity

@@ -5,6 +5,15 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Installed metadata lookup: `TableMetadata.cpp::InstalledTableMetadata` uses
+  the existing sorted catalogue and projects only the requested original ID.
+  Missing IDs return no row; missing owners/native default authority still refuse.
+  Production-generated table-keys replay: 61 checks green; missing-entry and
+  wrong-ID runtime controls reject, with existing key/owner controls retained.
+  `/tmp/agiru-table-keys.rUwABv`, `/tmp/agiru-installed-metadata-focused.log`.
+  Runner analysis passes; runtime retains 30 inherited public-header findings,
+  zero own findings. No second registry, live Record provider or UT gain; outside
+  frozen `20261004T120802Z-2065848`.
 - Frozen SetCurrentKey integration `20261004T023609Z-1410666` finishes at
   04:01:07 UTC: slice/build/local tests pass; UT is 2,161/2,314, 153 failed,
   zero incomplete. All 2,314 unique identities remain, zero gains/losses.

@@ -4,6 +4,7 @@
 #include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"
 #include "platform/TableMetadata.h"
+#include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Table.h"
 #include "runtime/TableDefinition.h"
@@ -17,6 +18,8 @@
 #include "group/fixture/table/OwnedRow.h"
 #include "group/fixture/table/SecondOwnedRow.h"
 #include "orphan/fixture/table/UnownedRow.h"
+
+#include <string_view>
 
 namespace {
 
@@ -140,6 +143,41 @@ void CheckOmittedTableProperties() {
              row.AppID == *agiru::Guid::FromText(source.module->id));
 }
 
+void CheckInstalledLookup() {
+  const auto catalogue = agiru::InstalledTables();
+  const auto row = agiru::detail::InstalledTableMetadata(Row::kId);
+  CHECK_TRUE("installed lookup selects the production declaration by original ID", row.has_value());
+  if (!row) { return; }
+  CHECK_TRUE("installed lookup projects only the requested original identity",
+             row->ID == Row::kId.Value());
+  CHECK_TEXT(
+      "installed lookup retains source names, not captions", row->Name.Value(), "Implicit Row");
+  CHECK_TEXT("installed lookup retains source caption field numbers",
+             row->DataCaptionFields.Value(),
+             "30,10");
+  CHECK_TRUE("installed lookup preserves the original owning app GUID",
+             row->AppID == *agiru::Guid::FromText("118874ab-44bc-4ccb-9daf-59763539ab16"));
+  CHECK_TRUE("missing IDs do not create metadata rows",
+             !agiru::detail::InstalledTableMetadata(agiru::TableId{0}));
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::detail::InstalledTableMetadata(agiru::Fixture::UnownedRow_Table::kId));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("Table Metadata.App ID");
+  }
+  CHECK_TRUE("an installed declaration without an owner stays a named refusal", refused);
+  refused = false;
+  try {
+    static_cast<void>(agiru::detail::InstalledTableMetadata(agiru::platform::TableMetadata::kId));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("Table Metadata.ObsoleteState");
+  }
+  CHECK_TRUE("unqualified native defaults cannot become a fabricated metadata row", refused);
+  const auto after = agiru::InstalledTables();
+  CHECK_TRUE("metadata reads reuse the one frozen catalogue without changing it",
+             catalogue.data() == after.data() && catalogue.size() == after.size());
+}
+
 void CheckNestedIdentity() {
   using Nested = agiru::Fixture::OwnedRow_Table;
   const auto &table = agiru::TableTraits<Nested>::kTable;
@@ -175,5 +213,6 @@ int main() {
     CheckSourceProjection();
     CheckOmittedTableProperties();
     CheckNestedIdentity();
+    CheckInstalledLookup();
   });
 }
