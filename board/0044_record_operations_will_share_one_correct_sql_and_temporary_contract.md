@@ -21,7 +21,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   25/30/38/34 existing findings, no suppression increase. Storage's four existing
   source findings and Selection's declaration mismatch remain included.
   `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
-  Outside frozen 210945; full local/AL replay and own-variable/mixed-reverse write
+  Full local replay on `ccdd9a7`: 141 cases/232 tooling tests green, exit 0;
+  changed inputs match before/after (`all-local.log`, `verified-inputs.sha256`).
+  Outside frozen 210945; full AL replay and own-variable/mixed-reverse write
   qualification remain open. No BC throughput/resource parity or UT gain claimed.
 - Cursor transactions: `Cursor::Current` checks session/connection/epoch before
   RuntimeNext uses a buffer. One owned OpenSelection primitive resumes either

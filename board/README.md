@@ -24,7 +24,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   and rejects twenty-one compiled controls. No new analysis findings; existing
   RecordChanges/Navigate/Storage/gate findings remain 25/30/38/34, unsuppressed.
   `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
-  Outside frozen 210945; full local/AL replay, own-variable/mixed-reverse mutations,
+  Full local replay on `ccdd9a7`: 141 cases/232 tooling tests pass, exit 0;
+  source hashes match before/after (`all-local.log`, `verified-inputs.sha256`).
+  Outside frozen 210945; full AL replay, own-variable/mixed-reverse mutations,
   Query boundaries and company qualification remain open. No UT gain or G1 claim.
 - Cursor lifetime (0044): transaction-aware buffers, bounded bidirectional resume
   and released/surviving/absent portal cleanup. CursorLifecycleGate: 313 checks
