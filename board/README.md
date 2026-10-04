@@ -27,8 +27,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   collisions and wrong namespaces. Generated fixtures pass 25 checks/seven identity
   controls; previous compiler fails the new qualified ordinary constant.
   `/tmp/agiru-native-table-ids.0ENfDa`, `/tmp/agiru-qualified-table-previous.w040rh`.
-  Main analysis retains five existing findings and no new findings. Complete local
-  replay, regenerated-tree activation and recovery of the 69 losses remain pending.
+  Runner analysis passes; Main retains five existing findings and no new findings.
+  Verified-package regeneration changes 22 files; the diagnosed qualified refusals
+  disappear. `/tmp/agiru-transpile.bafUwI`: exit 1, unchanged package identities
+  and native/property/control gaps; all 14,225 slice sources remain. Full Make
+  replay, compiled activation and recovery of the 69 UT losses remain pending.
 - Compiled record filters (0044): one owned predicate for temporary operations
   and computed rows. ReflectionMetadata passes 194 checks/sixteen controls;
   Filter/FilterGroup/Temporary retain 125/137/80 green checks. Same FilterGroup

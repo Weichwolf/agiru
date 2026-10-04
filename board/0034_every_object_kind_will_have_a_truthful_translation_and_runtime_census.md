@@ -16,7 +16,11 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   rejects duplicate qualified identities. Four generated object writers pass 25
   checks/seven controls; prior compiler fails `Microsoft.Fixture.ID Owner`.
   `/tmp/agiru-native-table-ids.0ENfDa`, `/tmp/agiru-qualified-table-previous.w040rh`.
-  Full activation/recovery remains pending. References: developer `ff5939a46e`,
+  Runner analysis passes; Main keeps five existing findings, no new findings.
+  Verified-package regeneration changes 22 files and removes the diagnosed
+  qualified refusals; all 14,225 slice sources remain. Original package hashes
+  and native/property/control gaps match: `/tmp/agiru-transpile.bafUwI`, exit 1.
+  Full compiled activation/recovery remains pending. References: developer `ff5939a46e`,
   `devenv-namespaces-overview.md`; BCApps `bb7111877f`, original
   `Inventory/{Capacity/CapacityLedgerEntry.Table,Posting/ItemJnlPostLine.Codeunit}.al`;
   predecessor 1483 rejects fabricated hash identities. User `0ff62b2266`,
