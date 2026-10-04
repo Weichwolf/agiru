@@ -23,8 +23,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 - Native integration replay: `20261004T164436Z-2355150`, frozen HEAD `ae9c59a`,
   source `1b5af9f74965a935aa39ab0eda282f8bede0ce4c1f101f7695889fa56efc53c0`;
   `slice-check all test ut`, six jobs. Runner PID 2355353 is live; slice-check
-  passes and the production platform library links. Slice compilation remains
-  active; no current UT result. Frozen BCApps revision `bb7111877f`, source and
+  and the complete slice build pass; the production platform library links.
+  Local replay passes 135 cases/232 tooling tests; the full UT run is active,
+  no terminal UT result. Frozen BCApps revision `bb7111877f`, source and
   System hashes match the previous complete replay; original notice is frozen.
   Compare all 2,314 identities/results against 143703 and investigate every loss.
   Null/unsealed seed remains diagnostic only. No G1/primitive activation claim.

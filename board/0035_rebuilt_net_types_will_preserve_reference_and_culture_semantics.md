@@ -26,6 +26,16 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   `methods-auto/textencoding/textencoding-option.md`; BCApps `bb7111877f`, original
   Base64ConvertImpl/Base64ConvertTest; user `0ff62b2266`, data-exchange definitions;
   predecessor 1164. Unicode/RFC 3629 scalar/prefix boundaries supply codec constants.
+- Original Windows-1252 authority: all 65,536 UTF-16 units and 256 byte values
+  measured through BC29 native text cores; all 1,048,576 supplementary scalars
+  produce two question marks. 256 direct/441 non-question-mark best-fit encodes;
+  Latin-1 differs at 495 encode/27 decode identities. Complete byte roundtrip.
+  `CodePageProbe.cs`, `windows-1252{.tsv,-analysis.json,.log}` under the directory above;
+  TSV SHA256 `99e05c67832a638543b851ab05a5538ca3889ecbfe397e86a1e29371de824815`.
+  No C++ codepage repair yet. ICU 76.1 `uconv --fallback` substitutes 65 1A for
+  e+combining acute (native 65 B4), and 1A for U+1F600 (native 3F 3F); no blind adapter.
+  CLR factory probe also proves `GetEncoding(65001)` has a separate three-byte
+  preamble; current factory loses it. `encoding-metadata.tsv`.
 - `Stream.cpp` no longer copies the entire BLOB on each write. One private append
   preserves raw bytes, zero terminators, existing-stream visibility and borrowed
   self-input; storage grows geometrically. StreamGate: 51 checks green, previous
@@ -91,6 +101,12 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
    Feed the resulting exact typed series/dimensions into one shared chart model: C++ vector scenes for PDF/SVG (0063), interactive selection/drilldown through the common CLI/web command contract (0720). Preserve all declared chart kinds and events; neither a static image nor an empty builder closes the chart requirement.
 3. Reproduce or refute XML stream lifetime paths with focused ASan/UBSan cases. Keep shared engines behind AL and .NET-specific public contracts; gate identity/copying, disposal, out parameters, null, encoding and exception differences. Delegate JSON node/number representation to 0722.
 4. Review std::regex compatibility and CultureInfo/TextInfo formatting/casing against the source usages. Add Unicode and culture fixtures that distinguish invariant, session and explicit-provider behaviour.
+   Encoding: use one generic codepage/Unicode converter with immutable sorted
+   source-qualified mappings; preserve best-fit and two-unit supplementary fallback.
+   Qualify every supported page, aliases, factory preambles and unknown-page refusals;
+   1252 is the first measured family, not a complete Native API. Retain original
+   dependency notices if adopting mapping data; do not replace the remaining pages
+   with Latin-1 or infer server locale from the Linux CLR probe.
 5. Rebuild PermissionTestHelper bookkeeping for 0039 and event-capable DotNet variables with explicit subscription lifetimes. Report remaining unsupported signatures by name.
 6. Add settings snapshots and parser-local policy to the shared reader with original error timing; no process-global parser setting. Preserve cursor-consuming DOM Load. Default XmlReader Prohibit rejects DTDs; Ignore skips their processing before entity/attribute expansion. The 2.9.14 SAX callback option above can reject external resources without a version upgrade, but is not an Ignore implementation or forward-only adapter. Reject stopped/denied partial documents even when non-null/wellFormed; collect context-local diagnostics. Limit source/entity output and stream allocations; no unbounded DOM validation pre-pass. Preserve authorized internal Parse and explicit resolver policy; unavailable capabilities refuse. Keep AL/.NET contracts distinct.
 
