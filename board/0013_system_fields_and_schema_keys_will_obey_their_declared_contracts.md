@@ -1,10 +1,23 @@
 # 0013 — System fields and schema keys will obey their declared contracts
 
-Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-03
+Status: open | Priority: P1 | Stage: UT → Clients | Reviewed: 2026-10-04
 Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-population proof.
 
 ## Evidence
 
+- Native virtual-buffer authority: original BC 29.0.54011.55407 Ncl SHA256
+  `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
+  `VirtualDataProvider::.cctor` RVA addf3 sets VirtualTimeStamp to 1, not 0.
+  `AddSystemFieldValues` RVA adcb0 writes it to buffer slot 0; audit fields use
+  NavDateTime/NavGuid defaults only when NCLMetaTable.HasAuditFields is true.
+  SystemId always receives the supplied argument: unkeyed creation passes
+  NavGuid.Default, while the keyed overload passes its SystemId member.
+  IL/hash receipts: `/tmp/agiru-record-order.FQ83WP/native-virtual-system-{fields,population}.il`;
+  original extraction provenance: `/tmp/agiru-table-metadata-authority.gCa1Do`.
+  Static creation-path evidence, not original BC execution, Table Metadata's
+  provider call path, native AL omission defaults or cross-version equivalence
+  with System 29.0.55365.0/Runtime 18. Do not apply SQL insertion/audit defaults
+  or unconditional zero rowversions to computed providers without qualification.
 - Executed UT recovery (2026-10-03): the Integer sequence provider emitted only
   Number while the cursor selected all declared fields, including system fields.
   `Selection::SeriesColumns` now supplies the complete typed projection with the

@@ -261,6 +261,10 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
 4. Extend documented Boolean result versus statement-raises behaviour; preserve database faults. SetCurrentKey's shared selection/consumption fix is implemented above. Classify sortable/unsortable FlowFields from their actual formulas/table domains; implement supported SQL/temporary ordering rather than a blanket refusal. Prove CurrentKeyIndex against disabled/duplicate key identities without guessing filtered index numbering. 0061 owns consumed/discarded lowering.
 5. Complete computed platform tables from system symbols and requested ranges, avoiding fixed-date population as the authoritative implementation.
+   Qualify each provider's creation path against 0013's original virtual-buffer
+   evidence: virtual timestamp 1, conditional audit defaults and supplied versus
+   default SystemId. Do not substitute persisted-row SQL defaults; Table Metadata's
+   actual call path and native omitted-property authority remain unproved.
    Share Page/Table Metadata, Field and AllObj live projections over immutable installed metadata. Populate every represented source property from qualified declarations/app identity, keep Name separate from Caption, and refuse missing authority rather than default values. Reuse `ReflectionMetadata` mappings; CDS is not Query. Prove typed/reflected filtering, count/navigation, permissions, read-only writes and temporary independence before removing the guards. 0013 owns explicit legacy-snapshot/schema activation.
    Native ownership: start at `Main::WriteNativeObjects`, `NativeSources::app` and
    `TableWriter::{NativeTableAssertions,TableReflectionProperties}`. Emit original
