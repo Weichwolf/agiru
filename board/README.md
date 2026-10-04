@@ -45,15 +45,20 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   execute: 64 steps use three SQL statements, not 64 per-row reads. No own analysis
   findings, 33/25/30 inherited gate/Cursor/Navigate findings remain unsuppressed.
   `/tmp/agiru-cursor-lifecycle.p37EWy`, `/tmp/agiru-record-order-controls.YfDQHq`.
-  Full replay is running below; dynamic writes are qualified separately above,
+  Full replay is terminal below; dynamic writes are qualified separately above,
   Query transaction contracts remain open.
 - Cursor/selection integration: `20261004T210945Z-2749818`, frozen HEAD `d1b4873`,
   source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`;
-  `slice-check all test ut`, six jobs. Runner PID 2750430 is live; build/local tests
-  pass (140 cases/232 tooling tests). AL runner PID 2867169 is live, six workers.
-  BCApps/source/System/original-notice identities match completed 193025.
-  Compare all 2,314 identities/statuses/errors against 193025 and investigate losses;
-  null/unsealed seed remains diagnostic, not causal A/B or G1.
+  `slice-check all test ut`, six jobs; terminal at 22:29:37 UTC, runner gone.
+  Slice/build/local tests pass (140 cases/232 tooling tests); UT exits 2:
+  2,170/2,314 passed, 144 failed, zero incomplete, 80 codeunits/1,492 seconds.
+  Against 193025: one gain, zero losses/missing/added/duplicates; source manifests
+  and file hashes match (`artifacts/ut-comparison-193025.json`). The gained original
+  SCM Available to Pick UT multi-item summary scenario previously refused item
+  tracking at document 106058/line 20000. The other changed error only advances
+  generated item/location IDs; tracking quantity remains 0 instead of 10.
+  Frozen source/System/notice pre/post hashes and dependencies match.
+  Null/unsealed seed remains diagnostic, not causal A/B or G1.
 - Selection invalidation (0044): SQL cursors and temporary views follow changed
   filters/keys/directions/active marks; shared temporary Modify is visible.
   SelectionChangeGate: 296 checks green, coherent predecessor 64 red;

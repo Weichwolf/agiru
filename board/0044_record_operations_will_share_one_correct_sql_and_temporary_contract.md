@@ -57,11 +57,18 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   gates pass 112/230/43/89/21/80/137 checks. `/tmp/agiru-cursor-lifecycle.p37EWy`,
   `/tmp/agiru-record-order-controls.YfDQHq`; the prior read-only red probe stays
   under `/tmp/agiru-selection-change.li6S1N/cursor-epoch-*`.
-  Full local/AL replay `20261004T210945Z-2749818` is running: HEAD `d1b4873`,
+  Full local/AL replay `20261004T210945Z-2749818` is terminal: HEAD `d1b4873`,
   source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`,
   six jobs, slice-check/all/test/ut; dependency identities match completed 193025.
-  Compare all 2,314 identities/statuses/errors; null/unsealed seed is diagnostic,
-  not causal A/B. Outside frozen 193025; no UT gain or G1 claim.
+  Slice/build/local tests pass (140 cases/232 tooling); UT exits 2 at 22:29:37 UTC:
+  2,170/2,314 pass, 144 failed, zero incomplete, 80 codeunits/1,492 seconds.
+  All identities remain; one gain, zero losses/duplicates, matching manifests/files.
+  Original SCM Available to Pick UT multi-item summary now passes; its previous
+  item-tracking refusal is gone. The remaining changed diagnostic only advances
+  generated item/location IDs, not the failed tracking quantity.
+  `artifacts/ut-comparison-193025.json`; frozen source/System/notice hashes match.
+  Null/unsealed seed is diagnostic, not causal A/B or G1. Dynamic writes are outside
+  this snapshot and still require full replay.
 - Selection changes now invalidate SQL cursors and lazily rebuild temporary views
   through `SelectionChanged`: filters/copies, keys/directions/views and active marks.
   Same-cardinality mark replacement is detected; unchanged predicates/directions and
