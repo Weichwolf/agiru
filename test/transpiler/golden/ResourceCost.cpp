@@ -10,6 +10,7 @@
 #include "runtime/Record.h"
 #include "runtime/Table.h"
 #include "runtime/test/TestField.h"
+#include "type/BooleanExpression.h"
 #include "type/Option.h"
 
 #include "BuiltinsWritten.h"
@@ -18,8 +19,11 @@
 namespace agiru::Projects::Resources::Pricing {
 
 void ResourceCost_Table::OnValidateCode() {
-  if (Code != "" && Type == ::agiru::Option<::agiru::options::OptionResourceGroupResourceAll>{
-                                ::agiru::options::OptionResourceGroupResourceAll::All}) {
+  if (::agiru::LogicalAnd(
+          {.left = static_cast<bool>(Code != ""),
+           .right = static_cast<bool>(
+               Type == ::agiru::Option<::agiru::options::OptionResourceGroupResourceAll>{
+                           ::agiru::options::OptionResourceGroupResourceAll::All})})) {
     FieldError(Code, StrSubstNo(Text000, FieldCaption(Type), Format(Type)));
   }
 }

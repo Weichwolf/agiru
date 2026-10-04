@@ -15,6 +15,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Boolean lowering (0073): owned eager left-to-right operands; 26 primitive/34
+  generated checks green, old short-circuit compiler 15 red, source-order control
+  four red. Complete local Make replay: 130 cases/223 tooling checks green.
+  `/tmp/agiru-boolean-final-local.log`; new gate/runner analysis passes, generator
+  inherited findings remain. Regeneration retains prior gap counters and all
+  14,225 slice sources. Full AL activation is pending; do not reuse 080905 as
+  post-change execution proof. Native-report qualifier's stale absent-header/
+  two-source assumption blocks specialist receipts/full lint (0034).
 - Latest frozen replay `20261004T080905Z-1761326`: slice-check/all/test exit 0;
   UT exit 2, 2,162/2,314 passed, 152 failed, zero incomplete, 80 codeunits,
   six workers/1,256 seconds. All 2,314 identities compared with 064830: no gains,

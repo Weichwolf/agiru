@@ -3031,7 +3031,8 @@ class DiscoveryGate(unittest.TestCase):
                        'runtime/number-sequences.sh', 'transpiler/table-keys.sh',
                        'runtime/reflection-metadata.sh', 'runtime/catalogue.sh', 'transpiler/native-enums.sh',
                        'runtime/test-contexts.sh', 'runtime/text-positions.sh', 'runtime/xml-reader.sh',
-                       'runtime/codeunit-record.sh', 'runtime/page-navigation.sh')
+                       'runtime/codeunit-record.sh', 'runtime/page-navigation.sh',
+                       'runtime/boolean-expressions.sh')
             for name in scripts:
                 script = root / 'test' / name
                 script.parent.mkdir(parents=True, exist_ok=True)

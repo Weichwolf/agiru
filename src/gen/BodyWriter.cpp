@@ -47,9 +47,6 @@ constexpr int kAdditivePrecedence = 5;
 constexpr int kPrimaryPrecedence = 9;
 
 constexpr std::array kOperators{
-    Operator{.al = "or", .cpp = "||", .precedence = 1},
-    Operator{.al = "and", .cpp = "&&", .precedence = 2},
-    Operator{.al = "xor", .cpp = "!=", .precedence = 3},
     Operator{.al = "=", .cpp = "==", .precedence = 3},
     Operator{.al = "<>", .cpp = "!=", .precedence = 3},
     Operator{.al = "<", .cpp = "<", .precedence = 4},
@@ -1184,8 +1181,6 @@ private:
       out += reach.spelling;
       out += " ";
     }
-    const bool andUnderOr = reach.spelling == "||" && reach.link.kind == al::ExprKind::Binary &&
-                            reach.link.text == "and";
     const OfVariable member{.variable = reach.base.text, .field = reach.link.text};
     if (reach.spelling == "." && reach.through != nullptr &&
         reach.through->kind == al::ExprKind::Name && reach.link.kind == al::ExprKind::Name &&
@@ -1235,8 +1230,7 @@ private:
     out += !besideAField.empty() ? besideAField
            : reach.spelling == "." && reach.link.kind == al::ExprKind::Name
                ? scope_.MemberSpelling(member)
-           : andUnderOr ? "(" + Expression(reach.link, how.precedence + 1) + ")"
-                        : Expression(reach.link, how.precedence + 1);
+               : Expression(reach.link, how.precedence + 1);
     const bool systemFieldOfARecord =
         IsSystemFieldName(reach.link.text) &&
         (reach.base.kind != al::ExprKind::Name || scope_.IsRecord(reach.base.text) ||
@@ -1392,6 +1386,63 @@ private:
            scope_.CallReturnsAHandle(owner.text, procedure.text);
   }
 
+  std::string BooleanExpression(const al::Expr &expression) {
+    std::string_view operation;
+    if (expression.text == "and") {
+      operation = "LogicalAnd";
+    } else if (expression.text == "or") {
+      operation = "LogicalOr";
+    } else if (expression.text == "xor") {
+      operation = "LogicalXor";
+    } else {
+      return {};
+    }
+    const std::string left = Expression(expression.children.front(), 0);
+    const std::string right = Expression(expression.children.back(), 0);
+    return "::agiru::" + std::string(operation) + "({.left = static_cast<bool>(" + left +
+           "), .right = static_cast<bool>(" + right + ")})";
+  }
+
+  bool ReachesAHandle(const al::Expr &root) const {
+    if (root.kind == al::ExprKind::Name) { return scope_.IsHandle(root.text); }
+    if (root.kind != al::ExprKind::Call || root.children.empty()) { return false; }
+    return (root.children.front().kind == al::ExprKind::Name &&
+            scope_.ReturnsAHandle(root.children.front().text)) ||
+           MemberCallReturnsAHandle(root);
+  }
+
+  bool ThroughThis(const al::Expr &root, const std::vector<const al::Expr *> &chain) const {
+    return root.kind == al::ExprKind::Name && SameName(root.text, "this") && chain.size() >= 2 &&
+           chain.back()->kind == al::ExprKind::Name && scope_.IsHandle(chain.back()->text);
+  }
+
+  std::string LinkedChain(const al::Expr &root,
+                          const std::vector<const al::Expr *> &chain,
+                          std::string_view spelling,
+                          int precedence,
+                          bool asCallee,
+                          bool preserveLeftGroup) {
+    const bool handle = spelling == "." && ReachesAHandle(root);
+    const bool throughThis = spelling == "." && ThroughThis(root, chain);
+    const Parens calls = Calls(spelling, root, *chain.front());
+    std::string out = Expression(root, preserveLeftGroup ? precedence + 1 : precedence);
+    for (std::size_t i = chain.size(); i > 0; --i) {
+      const al::Expr &base = i == chain.size() ? root : *chain[i];
+      const bool here = i > 1 && Calls(spelling, base, *chain[i - 1]) == Parens::Last;
+      Link(out,
+           {.spelling = spelling,
+            .base = root,
+            .link = *chain[i - 1],
+            .through = i < chain.size() ? chain[i] : nullptr},
+           {.arrow = (handle && i == chain.size()) || (throughThis && i + 1 == chain.size()),
+            .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
+                      (!asCallee || i != 1),
+            .precedence = precedence,
+            .callee = asCallee && i == 1});
+    }
+    return out;
+  }
+
   std::string Binary(const al::Expr &expression, int outer, bool asCallee) {
     if (expression.text == "in") { return Membership(expression, outer); }
     if (expression.text == "?:") { return Conditional(expression, outer); }
@@ -1399,6 +1450,9 @@ private:
       throw std::runtime_error("a binary operator with " +
                                std::to_string(expression.children.size()) +
                                " operands has no translation");
+    }
+    if (const std::string logical = BooleanExpression(expression); !logical.empty()) {
+      return logical;
     }
 
     if (const std::string assigned = PropertyAssignment(expression); !assigned.empty()) {
@@ -1450,35 +1504,7 @@ private:
       return reached;
     }
 
-    const bool handle =
-        spelling == "." && ((walk->kind == al::ExprKind::Name && scope_.IsHandle(walk->text)) ||
-                            (walk->kind == al::ExprKind::Call && !walk->children.empty() &&
-                             walk->children.front().kind == al::ExprKind::Name &&
-                             scope_.ReturnsAHandle(walk->children.front().text)) ||
-                            MemberCallReturnsAHandle(*walk));
-    const bool throughThis = spelling == "." && walk->kind == al::ExprKind::Name &&
-                             SameName(walk->text, "this") && chain.size() >= 2 &&
-                             chain.back()->kind == al::ExprKind::Name &&
-                             scope_.IsHandle(chain.back()->text);
-    const Parens calls = Calls(spelling, *walk, *chain.front());
-    std::string out = Expression(*walk, preserveLeftGroup ? precedence + 1 : precedence);
-    if (spelling == "||" && walk->kind == al::ExprKind::Binary && walk->text == "and") {
-      out = "(" + out + ")";
-    }
-    for (std::size_t i = chain.size(); i > 0; --i) {
-      const al::Expr &base = i == chain.size() ? *walk : *chain[i];
-      const bool here = i > 1 && Calls(spelling, base, *chain[i - 1]) == Parens::Last;
-      Link(out,
-           {.spelling = spelling,
-            .base = *walk,
-            .link = *chain[i - 1],
-            .through = i < chain.size() ? chain[i] : nullptr},
-           {.arrow = (handle && i == chain.size()) || (throughThis && i + 1 == chain.size()),
-            .parens = (here || (calls != Parens::None && (calls == Parens::First || i == 1))) &&
-                      (!asCallee || i != 1),
-            .precedence = precedence,
-            .callee = asCallee && i == 1});
-    }
+    std::string out = LinkedChain(*walk, chain, spelling, precedence, asCallee, preserveLeftGroup);
     if (precedence < outer) { out = "(" + out + ")"; }
     return out;
   }

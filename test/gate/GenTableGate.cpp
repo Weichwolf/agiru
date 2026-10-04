@@ -211,19 +211,16 @@ void AChangedStatementChangesTheBody() {
              generated.find("Code == \"\"") != std::string::npos);
   CHECK_TRUE("and the old one is gone", generated.find("Code != \"\"") == std::string::npos);
 
-  // AL's `and` is not C++'s, and neither is its `=`. Both mappings are asserted, because an
-  // emitter that passed one through untouched would still compile and mean something else.
   const std::string untouched =
       agiru::gen::WriteSource(agiru::al::ParseTable(original), std::string(kAlPath), {});
-  CHECK_TRUE("`and` becomes `&&`", untouched.find(" && ") != std::string::npos);
+  CHECK_TRUE("AL conjunction owns both ordered Boolean values",
+             untouched.find("::agiru::LogicalAnd({.left = static_cast<bool>(Code != \"\"), "
+                            ".right = static_cast<bool>(Type ==") != std::string::npos);
   CHECK_TRUE("and no AL operator survives",
              untouched.find(" and ") == std::string::npos &&
                  untouched.find(" <> ") == std::string::npos);
-  // The parentheses AL needed are gone, because C++ binds the comparison tighter than the
-  // conjunction. An emitter that parenthesised everything would also be correct and would not
-  // match the target image.
-  CHECK_TRUE("redundant parentheses are not emitted",
-             untouched.find("(Code != \"\") &&") == std::string::npos);
+  CHECK_TRUE("AL conjunction never uses C++ short circuit",
+             untouched.find(" && ") == std::string::npos);
 }
 
 /// A FIELD NAME THAT COLLIDES WITH A RUNTIME TYPE. `Change Log Setup (Field)` really does declare a

@@ -246,7 +246,10 @@ constexpr std::array<std::pair<std::string_view, char>, 18> kFamilies{{
     {"XmlNamespaceManager", 'x'},
 }};
 
-constexpr std::array<std::pair<std::string_view, std::string_view>, 158> kElsewhere{{
+constexpr std::array<std::pair<std::string_view, std::string_view>, 161> kElsewhere{{
+    {"LogicalAnd", "type/BooleanExpression.h"},
+    {"LogicalOr", "type/BooleanExpression.h"},
+    {"LogicalXor", "type/BooleanExpression.h"},
     {"dotnet::String", "dotnet/String.h"},
     {"dotnet::Uri", "dotnet/Uri.h"},
     {"dotnet::UriPartial", "dotnet/Uri.h"},

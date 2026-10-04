@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation
+.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation boolean-expressions
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -121,6 +121,11 @@ text-positions: comments db tc ## execute UTF-16 text positions through generate
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_TextGate
 	@"$(B)/gate_TextGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/text-positions.sh"
+
+boolean-expressions: comments db tc ## execute eager ordered Boolean effects and errors through generated AL
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_BooleanExpressionGate
+	@"$(B)/gate_BooleanExpressionGate"
+	@B="$(B)" bash "$(SELF)/test/runtime/boolean-expressions.sh"
 
 native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt

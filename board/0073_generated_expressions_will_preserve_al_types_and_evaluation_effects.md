@@ -5,6 +5,30 @@ Depends on: 0033 symbol identity.
 
 ## Evidence
 
+- Boolean lowering now emits `LogicalAnd/Or/Xor` with aggregate-initialized owned
+  Boolean operands, left before right; no lambdas, allocations or added standard
+  includes. Nested grouping and consumed TryFunction errors remain intact; ternary
+  branches stay lazy. `make boolean-expressions JOBS=2`: primitive 26/generated AL
+  34 checks green; the old compiler fails 15/34, the source-order mutant fails 4/34.
+  Receipts: `/tmp/agiru-boolean-before-session.log`,
+  `/tmp/agiru-boolean-expressions.VP2FKL`; header frontend 1.0 ms/three no-PCH rounds
+  (`/tmp/agiru-include-cost.36nXSC`). Runtime gate/runner targeted analysis passes.
+  Binary traversal is separated from member-handle selection; its former complexity
+  46 finding is gone, Link decreases 42→38. New helpers have no findings; inherited
+  BodyWriter/RuntimeSurface and BodyWriter.h findings still refuse generator lint.
+  Authored golden/expectations corrected; 78 GenTable checks pass. Final complete
+  `make test JOBS=2`: 130 cases/223 tooling checks green, exit 0
+  (`/tmp/agiru-boolean-final-local.log`). Full regeneration exits 1 with the same
+  native/refusal/missing counters as `cvtGhD`; all 14,225 slice sources remain.
+  `/tmp/agiru-transpile.Hzzsf5`. `make lint` refuses missing specialist receipts;
+  native-report qualification now exposes its stale absent-header/source-count
+  recipe (0034), not a Boolean gate failure. Full AL execution remains pending.
+  Authority: developer `devenv-al-{operators,boolean-operators}.md` (Boolean types),
+  BCApps `bb7111877f` `Inventory/Posting/ItemJnlPostLine.Codeunit.al:3984`
+  (right-side lot splitting), predecessor 1057/1712. Eager evaluation is supported
+  by source usage/prior findings; this is not a new native BC runtime oracle.
+  User intent: `inventory-how-work-item-tracking.md`, user docs `0ff62b2266fd`;
+  developer docs `ff5939a46e05`.
 - Numeric primitive ready, not emitted: `include/type/AlDecimalArithmetic.h`,
   `src/net/Decimal.cpp`, `test/gate/AlDecimalGate.cpp`; 0066 records 34 gate checks,
   37,532 BC29 reference cases and three compiled controls. Normalize is separate
@@ -43,7 +67,9 @@ Depends on: 0033 symbol identity.
 - Latest local suites: 92 cases/26 unchanged connection failures; 119 toolchain tests green under both compilers. CodeunitWriter/TableWriter findings 10/34 unchanged; earlier BodyWriter 25 unchanged. Full source-counted UT/sealed-seed activation remains required; current declaration/build receipts belong to 0034.
 - Record-call prototype retains quoted-field identity and generic `BodyWriter::CallableSpelling`: four spellings, implicit/explicit calls, own-versus-related RecordId; 28 AL checks. Extend binding beyond named receivers, not global spelling rules. Earlier Text prototype retains literal/label anchors in `BodyWriter::{Added,TextJoin}` and Text results in `StringValue.h`; old generator/runtime independently fail. Receipts and historical counts: README, `build/{record-link,text-result}-20261001/`; neither is integrated.
 - The frozen tree also exposes five header failures from undeclared absent interfaces: PowerBIServiceProvider and GraphAuthorization. Their actual AL declarations are excluded by namespace while in-scope callers name them. This remains an identity/dependency-closure gap in 0033/0034, not a working interface implementation or permission to broaden fallback conversions.
-- `BodyWriter::Binary` promotes division to Decimal but Boolean Link emits short-circuit operators. AL eager-operand behavior needs execution proof.
+- `BodyWriter::Binary` still promotes division through the raw CLR Decimal core;
+  declared AL numerical normalization/conversion is not active. Boolean lowering
+  is qualified separately above, not proof of arithmetic sequencing.
 - Decimal lowering currently uses the CLR core directly. Executed original BC29
   Decimal18 arithmetic rounds to eighteen significant digits (0066), independently
   of SQL scale/display limits. Preserve typed AL versus .NET conversions and
@@ -59,7 +85,9 @@ Depends on: 0033 symbol identity.
 1. Reuse declaration-owned callee/receiver and value-consumption lookup before printing. Introduce lowered sequencing only where C++ evaluation differs; share that representation with 0061, not a second type catalogue.
    Resolve a call once to its owning ProcedureDecl using the AL name and full ordered argument types; consume that result for spelling, var/Option/Variant borrowing, Guid literal adaptation, publisher arguments and returned handles. Preserve record/enum identity, nested generic arguments and array shape; length and return type do not invent overload identities. Keep source names/metadata separate from C++ allocation. Unknown/ambiguous best matches must refuse, never select the first/last variant.
    Use existing Objects/TableRef declarations, not another method catalogue or an arity-only dispatcher. Cover own/member Codeunit, Record, Page, Report, Query, XMLport and Interface calls, local shadowing, different/same arity, conversion ranking, var writeback and both declaration orders. Retain the four compiler-accepted failing fixtures, three current positive controls and original SCMProductionOrdersII comparison before promotion. Audit fixture legality with AL compiler controls; source-binding Caller.Codeunit.al's custom Run conflicts with the platform method and needs a separately verified fixture repair.
-2. Add execution fixtures for integer division yielding Decimal, decimal DIV/MOD, eager Boolean operands with var effects, overflow and operand order. Derive expectations from AL documentation and source usage.
+2. Add execution fixtures for integer division yielding Decimal, decimal DIV/MOD,
+   overflow and numeric operand order. Retain the eager Boolean value/effect/error
+   controls above; derive expectations from AL documentation and source usage.
    Retain single-evaluation case controls while implementing declared-type label
    conversion and its Code exception; do not re-expand the selector per comparison.
 3. Activate the option/record-call prototypes only with full sealed-seed UT A/B. Preserve native/ordinary, alias, shadowing, four-spelling/implicit-call and quoted-field controls. Extend the same declaration-owned binding to indexed/chained receivers and implicit Rec; retain user-procedure priority, not a second method catalogue. Runtime record identity/formatting stay separate; never make RecordId fields callable.

@@ -24,6 +24,10 @@ Use `make gate GATE=RecordRefGate JOBS=2` for a focused C++ regression,
 controls. Its shared sorting controls require the compiled `gate_CurrentKeyGate`;
 `make test` builds both the transpiler and all gates before running the script.
 
+`runtime/boolean-expressions.sh` executes eager, ordered Boolean operands, owned
+values, error/TryFunction boundaries and lazy ternary branches; an operand-order
+source mutant must fail. `make boolean-expressions JOBS=2` is the focused entry point.
+
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.

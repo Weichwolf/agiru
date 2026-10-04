@@ -27,7 +27,7 @@ for script in test/transpiler/builtins-reproduce.sh test/tooling/one-definition.
   n=$((n + 1))
   if ! sh "$script"; then red=$((red + 1)); fi
 done
-for script in test/tooling/function-size.sh test/runtime/required-isolation.sh test/tooling/header-dependencies.sh test/tooling/slice-check.sh test/transpiler/interface-defaults.sh test/reporting/report-layouts.sh test/reporting/layout-assets.sh test/runtime/number-sequences.sh test/transpiler/table-keys.sh test/runtime/reflection-metadata.sh test/runtime/catalogue.sh test/transpiler/native-enums.sh test/runtime/test-contexts.sh test/runtime/text-positions.sh test/runtime/xml-reader.sh test/runtime/codeunit-record.sh test/runtime/page-navigation.sh; do
+for script in test/tooling/function-size.sh test/runtime/required-isolation.sh test/tooling/header-dependencies.sh test/tooling/slice-check.sh test/transpiler/interface-defaults.sh test/reporting/report-layouts.sh test/reporting/layout-assets.sh test/runtime/number-sequences.sh test/transpiler/table-keys.sh test/runtime/reflection-metadata.sh test/runtime/catalogue.sh test/transpiler/native-enums.sh test/runtime/test-contexts.sh test/runtime/text-positions.sh test/runtime/xml-reader.sh test/runtime/codeunit-record.sh test/runtime/page-navigation.sh test/runtime/boolean-expressions.sh; do
   n=$((n + 1))
   if ! B="$B" bash "$script"; then red=$((red + 1)); fi
 done
