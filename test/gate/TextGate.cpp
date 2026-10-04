@@ -1,10 +1,17 @@
+#include "runtime/ErrorValue.h"
+#include "type/AlArray.h"
+#include "type/Char.h"
 #include "type/Code.h"
+#include "type/Integer.h"
 #include "type/StringValue.h"
 #include "type/Text.h"
 
 #include "Check.h"
 
+#include <cstddef>
+#include <initializer_list>
 #include <string>
+#include <string_view>
 
 using agiru::Code;
 using agiru::MaxStrLen;
@@ -13,6 +20,9 @@ using agiru::StrLen;
 using agiru::Text;
 
 namespace {
+
+constexpr std::size_t kPositionCapacity = 20;
+constexpr agiru::Integer kEuroPosition = 5;
 
 std::string V(const auto &s) {
   return std::string(s.Value());
@@ -87,6 +97,127 @@ void CodeOrdersNumericallyWhereBothSidesAreDigits() {
   CHECK_TRUE("but they still order", Code<20>("01") < Code<20>("2"));
 }
 
+void GeneratedPositionsReadCharactersNotBytes() {
+  Text<kPositionCapacity> text("AÆØÅ€Z");
+  const Text<kPositionCapacity> frozen(text);
+  CHECK_TRUE("mutable generated positions decode a two-byte character",
+             static_cast<agiru::Char>(agiru::At(text, 2)) == 198);
+  CHECK_TRUE("const generated positions decode a two-byte character", agiru::At(frozen, 2) == 198);
+  CHECK_TRUE("mutable generated positions decode a three-byte character",
+             static_cast<agiru::Char>(agiru::At(text, 5)) == 8364);
+  CHECK_TRUE("const generated positions agree with direct string indexing",
+             agiru::At(frozen, 6) == frozen[6]);
+  CHECK_TRUE("generated positions compare Unicode character literals", agiru::At(text, 3) == "Ø");
+  bool refused = false;
+  try {
+    (void)static_cast<agiru::Char>(agiru::At(text, text.Length() + 1));
+  } catch (const agiru::Error &) { refused = true; }
+  CHECK_TRUE("UTF-8 byte length does not extend the readable character range", refused);
+}
+
+void GeneratedPositionsReplaceWholeCharacters() {
+  Text<kPositionCapacity> text("AÆØÅ€Z");
+  agiru::At(text, 2) = agiru::Char{"A"};
+  CHECK_TEXT("ASCII replacement consumes the complete old UTF-8 character", V(text), "AAØÅ€Z");
+  agiru::At(text, 3) = agiru::Char{"€"};
+  CHECK_TEXT("a wider replacement preserves the following characters", V(text), "AA€Å€Z");
+  agiru::At(text, 4) = agiru::Char{"Æ"}.AsInteger();
+  CHECK_TEXT(
+      "integer assignment encodes its character rather than its low byte", V(text), "AA€Æ€Z");
+  agiru::At(text, kEuroPosition) = "Ø";
+  CHECK_TEXT("one-character literals may occupy multiple UTF-8 bytes", V(text), "AA€ÆØZ");
+  CHECK_TRUE("replacements preserve the UTF-16 length", text.Length() == 6);
+}
+
+void GeneratedPositionAssignmentsCopyValues() {
+  Text<kPositionCapacity> source("ÆØ");
+  Text<kPositionCapacity> target("AB");
+  agiru::At(target, 1) = agiru::At(source, 2);
+  CHECK_TEXT("same-type position assignment copies the character, not the proxy", V(target), "ØB");
+  Text<10> narrow("Å");
+  agiru::At(target, 2) = agiru::At(narrow, 1);
+  CHECK_TEXT("different-type position assignment also copies a decoded character", V(target), "ØÅ");
+  agiru::At(target, 1) = agiru::At(target, 2);
+  CHECK_TEXT("same-string position assignment reads before replacing", V(target), "ÅÅ");
+  agiru::At(target, 1) = agiru::At(target, 1);
+  CHECK_TEXT("same-position assignment leaves the character intact", V(target), "ÅÅ");
+  auto position = agiru::At(target, 1);
+  const auto &samePosition = position;
+  position = samePosition;
+  CHECK_TEXT("proxy self-assignment preserves its character", V(target), "ÅÅ");
+  auto invalid = agiru::At(target, target.Length() + 1);
+  const auto &sameInvalid = invalid;
+  bool refused = false;
+  try {
+    invalid = sameInvalid;
+  } catch (const StringError &) { refused = true; }
+  CHECK_TRUE("proxy self-assignment still validates the readable source position", refused);
+}
+
+void GeneratedPositionsAppendWithinDeclaredBounds() {
+  Text<3> text("ÆØ");
+  agiru::At(text, 3) = agiru::Char{"€"};
+  CHECK_TEXT(
+      "the UTF-16 length plus one appends despite a longer byte representation", V(text), "ÆØ€");
+  bool refused = false;
+  try {
+    agiru::At(text, 4) = "Å";
+  } catch (const StringError &) { refused = true; }
+  CHECK_TRUE("appending respects the declared UTF-16 capacity", refused);
+  CHECK_TEXT("an over-capacity append preserves the previous value", V(text), "ÆØ€");
+  refused = false;
+  try {
+    agiru::At(text, text.Length() + 2) = "A";
+  } catch (const agiru::Error &) { refused = true; }
+  CHECK_TRUE("writes beyond the null-terminator position refuse", refused);
+  refused = false;
+  try {
+    agiru::At(text, 0) = "A";
+  } catch (const agiru::Error &) { refused = true; }
+  CHECK_TRUE("zero is not a writable AL character index", refused);
+  Text<2> empty;
+  agiru::At(empty, 1) = agiru::Char{"Æ"}.AsInteger();
+  agiru::At(empty, 2) = "Ø";
+  CHECK_TEXT("integer and literal assignments build Unicode text from empty", V(empty), "ÆØ");
+}
+
+void GeneratedPositionsDoNotSplitSurrogatePairs() {
+  Text<10> text("A💡Z");
+  CHECK_TRUE("a generated read after a surrogate pair uses its UTF-16 position",
+             static_cast<agiru::Char>(agiru::At(text, 4)) == 90);
+  agiru::At(text, 4) = "Æ";
+  CHECK_TEXT("a generated write after a surrogate pair preserves the pair", V(text), "A💡Æ");
+  agiru::At(text, text.Length() + 1) = "Ø";
+  CHECK_TEXT("append counts the pair as two UTF-16 units", V(text), "A💡ÆØ");
+  for (const agiru::Integer index : {2, 3}) {
+    bool refused = false;
+    try {
+      agiru::At(text, index) = "X";
+    } catch (const StringError &) { refused = true; }
+    CHECK_TRUE("unsupported half-surrogate replacement refuses explicitly", refused);
+    CHECK_TEXT("a refused half-surrogate replacement preserves the text", V(text), "A💡ÆØ");
+  }
+}
+
+void GeneratedPositionWritesRejectInvalidCharacters() {
+  Text<10> text("ÆØ");
+  for (const agiru::Integer code : {-1, 65536, 55296, 57343}) {
+    bool refused = false;
+    try {
+      agiru::At(text, 1) = code;
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("a position cannot encode an out-of-range or isolated surrogate value", refused);
+    CHECK_TEXT("refused character writes preserve the text", V(text), "ÆØ");
+  }
+  for (const std::string_view value : {"", "AB", "💡"}) {
+    bool refused = false;
+    try {
+      agiru::At(text, 1) = value;
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("a position requires exactly one representable UTF-16 unit", refused);
+  }
+}
+
 } // namespace
 
 int main() {
@@ -97,5 +228,11 @@ int main() {
     TextKeepsWhatCodeChanges();
     LengthCountsTheWayDotNetDoes();
     CodeOrdersNumericallyWhereBothSidesAreDigits();
+    GeneratedPositionsReadCharactersNotBytes();
+    GeneratedPositionsReplaceWholeCharacters();
+    GeneratedPositionAssignmentsCopyValues();
+    GeneratedPositionsAppendWithinDeclaredBounds();
+    GeneratedPositionsDoNotSplitSurrogatePairs();
+    GeneratedPositionWritesRejectInvalidCharacters();
   });
 }

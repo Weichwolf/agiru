@@ -63,6 +63,15 @@ std::size_t Utf16Length(std::string_view s);
 /// \throws StringError when the position is outside the text or inside a surrogate pair.
 std::int32_t CodePointAt(std::string_view s, std::size_t unit);
 
+/// \brief Replaces or appends one AL character at a one-based UTF-16 position.
+/// \param text The UTF-8 text.
+/// \param index The position; the length plus one appends.
+/// \param character One UTF-16 unit to encode.
+/// \return The complete updated UTF-8 text, preserving every other character.
+/// \throws StringError for invalid indices, out-of-range characters or unsupported
+/// isolated surrogate units and positions inside surrogate pairs.
+std::string ReplaceTextCharacter(std::string_view text, Integer index, Char character);
+
 /// \brief The byte offset of a ONE-BASED UTF-16 unit position, clamped to the end.
 /// \param s    The text.
 /// \param unit The position, counting from one.

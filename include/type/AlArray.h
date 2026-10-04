@@ -391,6 +391,21 @@ public:
   /// \param value The text. \param index The one-based position.
   CharAt(S &value, Integer index) : value_(&value), index_(index) {}
 
+  /// \brief Copies a proxy referring to the same text position.
+  /// \param other The position to refer to.
+  CharAt(const CharAt &other) = default;
+
+  /// \brief Copies the character from another position of the same text type.
+  /// \param other The source position.
+  /// \return This position, after writing the source character.
+  CharAt &operator=(const CharAt &other) {
+    if (this == &other) {
+      static_cast<void>(Read());
+      return *this;
+    }
+    return *this = static_cast<Char>(other);
+  }
+
   /// \brief AL `Text[Index] := OtherText[OtherIndex]` -- one position copied into another.
   /// \tparam O The other text's type.
   /// \param other The other position.
@@ -403,19 +418,7 @@ public:
   /// \param character The character.
   /// \return This position.
   CharAt &operator=(Char character) {
-    const std::string encoded = Encoded(character);
-    if (encoded.size() == 1) {
-      Write(encoded.front());
-      return *this;
-    }
-    std::string text(value_->Value());
-    if (index_ >= 1 && static_cast<std::size_t>(index_) == text.size() + 1) {
-      text += encoded;
-    } else {
-      Check(text.size());
-      text.replace(static_cast<std::size_t>(index_) - 1, 1, encoded);
-    }
-    *value_ = std::string_view(text);
+    Write(character);
     return *this;
   }
 
@@ -424,11 +427,7 @@ public:
   /// \return This position.
   /// \throws Error when the text is not exactly one character, which is what AL raises.
   CharAt &operator=(std::string_view text) {
-    if (text.size() != 1) {
-      throw Error("A text of length " + std::to_string(text.size()) +
-                  " does not fit one character position");
-    }
-    Write(text.front());
+    Write(Char{text});
     return *this;
   }
 
@@ -444,7 +443,7 @@ public:
   /// \param code The code point.
   /// \return This position.
   CharAt &operator=(std::int32_t code) {
-    Write(static_cast<char>(code));
+    Write(Char{code});
     return *this;
   }
 
@@ -532,12 +531,7 @@ private:
   /// \return The character, encoded.
   [[nodiscard]] std::string ToText() const { return Encoded(Read()); }
 
-  [[nodiscard]] Char Read() const {
-    const std::string_view text = value_->Value();
-    Check(text.size());
-    return static_cast<Char>(
-        static_cast<unsigned char>(text[static_cast<std::size_t>(index_) - 1]));
-  }
+  [[nodiscard]] Char Read() const { return (*value_)[index_]; }
 
   /// \brief AL `Text[Index] := Char`.
   ///
@@ -545,22 +539,9 @@ private:
   ///       `t[i] := c` in a loop that builds a column id are both shipped BaseApp code
   ///       (`DataExchDef.Table.al`, `ExcelBuffer.Table.al`), so an index of `StrLen + 1` extends
   ///       the text by one character; anything further is outside it, as a read would be.
-  void Write(char character) {
-    std::string text(value_->Value());
-    if (index_ >= 1 && static_cast<std::size_t>(index_) == text.size() + 1) {
-      text.push_back(character);
-    } else {
-      Check(text.size());
-      text[static_cast<std::size_t>(index_) - 1] = character;
-    }
+  void Write(Char character) {
+    const std::string text = detail::ReplaceTextCharacter(value_->Value(), index_, character);
     *value_ = std::string_view(text);
-  }
-
-  void Check(std::size_t length) const {
-    if (index_ < 1 || static_cast<std::size_t>(index_) > length) {
-      throw Error("Index " + std::to_string(index_) + " is outside the text of length " +
-                  std::to_string(length));
-    }
   }
 
   S *value_;
@@ -580,12 +561,7 @@ template <typename S>
 template <typename S>
   requires std::derived_from<S, StringValue>
 [[nodiscard]] Char At(const S &value, Integer index) {
-  const std::string_view text = value.Value();
-  if (index < 1 || static_cast<std::size_t>(index) > text.size()) {
-    throw Error("Index " + std::to_string(index) + " is outside the text of length " +
-                std::to_string(text.size()));
-  }
-  return static_cast<Char>(static_cast<unsigned char>(text[static_cast<std::size_t>(index) - 1]));
+  return value[index];
 }
 
 /// \brief AL `ArrayLen(A, Dimension)` -- the length along ONE dimension of a nested array.
