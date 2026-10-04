@@ -12,9 +12,13 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   Qualified namespaces and local Option shadowing execute. Previous compiler
   refuses the first constant. `/tmp/agiru-native-table-ids.gOASon`,
   `/tmp/agiru-native-table-ids-previous.zcfHaD`. Parser/runner analysis passes;
-  existing generator/header findings remain. Original System-29 Permission Set/
-  Permission identities are 2000000004/5; provider and full UT activation remain
-  unproved. References: developer `ff5939a46e`, `devenv-al-operators.md`;
+  existing generator/header findings remain. Full verified-package regeneration
+  changes 40 files; original `ConfigValidateManagement::LookupObject` now emits
+  Permission Set/Permission IDs 2000000004/5. All 14,225 slice sources exist;
+  233 selected/18 bound/215 unbound tables, 125 other inactive sources and 21
+  unresolved controls remain. `/tmp/agiru-transpile.vohqhQ`: exit 1, matching
+  package hashes. Full UT/provider activation remains unproved. References:
+  developer `ff5939a46e`, `devenv-al-operators.md`;
   BCApps `bb7111877f`, `System/RapidStart/ConfigValidateManagement.Codeunit.al:872`;
   original `src/Application Database Tables/Obsoleted/{PermissionSet,Permission}.Table.al`;
   user docs `0ff62b2266`, `ui-how-users-permissions.md`; predecessor 906.
@@ -147,8 +151,8 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    implementation finding. Bind real context types; 0039 owns hook/case lifecycle;
    do not turn the current explicit refusal carriers into empty success implementations.
 4. Generate complete native declarations/immutable metadata and bind Native methods to primitives or named refusals. Finish Page Table Field's live projection through 0044 and activate its own binding only with the complete UT recheck; standalone census also exposes API webhook tables and Code Coverage 2000000049. Reuse the System AST/binder and declared field/key/property vocabulary. CodeCoverage Log/Load/Refresh/Include require real instrumentation/provider lifecycle, including the declared MultiSession argument, not empty seeded rows. 0033 owns identity, 0044 providers. Never add Refused arithmetic/default construction to hide absent fields; keep unsupported tables/options visible. Share language/Scope vocabulary without importing whole tables; generic 0019 owns calculation.
-   Activate the source-owned constant path through verified-package regeneration
-   and the unchanged 2,314 UT. `CodeunitWriter.h::Objects` borrows selected native
+   Replay the unchanged 2,314 UT after source-owned constant activation.
+   `CodeunitWriter.h::Objects` borrows selected native
    ASTs; `NativeTableNumberOf`/`Names::DeclaredTableNumber` separate IDs from
    class/provider capability. Original Permission Set/Permission remain required,
    Scope=Cloud/ObsoleteState=Pending, not licensing exclusions. Constants do not

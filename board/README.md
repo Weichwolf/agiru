@@ -21,8 +21,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   controls. Previous compiler refuses its first constant; ID mutation fails eight
   values. `/tmp/agiru-native-table-ids.{gOASon,2WAIqY}` and
   `/tmp/agiru-native-table-ids-previous.zcfHaD`. Parser/runner analysis passes;
-  existing generator/header findings remain, without suppressions. Complete-tree
-  regeneration and unchanged 2,314-method UT replay are pending; no UT gain claimed.
+  existing generator/header findings remain, without suppressions. Full verified-
+  package regeneration changes 40 files; the original RapidStart filter now emits
+  IDs 2000000004/5. Native 233 selected/18 bound/215 unbound, 125 other inactive
+  sources and 21 unresolved controls remain; all 14,225 slice sources exist.
+  `/tmp/agiru-transpile.vohqhQ`: exit 1, unchanged package hashes. Unchanged
+  2,314-method UT replay remains pending; no provider, full-link or UT gain claimed.
 - Extension controls (0034): one page/report splice implementation; unresolved
   anchors refuse and preserve previous output. Compiled metadata 62 checks green;
   missing/cyclic anchors and wrong-order controls reject. Complete local Make:
