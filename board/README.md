@@ -15,13 +15,19 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Mixed-order integration: `20261004T193025Z-2625193`, frozen HEAD `7b7cf45`,
+  source `a234a8d7b12a5df02595bc4d9376c8345f454d7566b5652dcc279dc21c499aad`;
+  `slice-check all test ut`, six jobs. Runner PID 2625447 is live; no terminal result.
+  BCApps `bb7111877f`; BC source/System/original-notice hashes match completed
+  184333. Compare every one of the 2,314 UT identities/results; retain all losses
+  and changed errors. Null/unsealed seed remains diagnostic, not causal A/B or G1.
 - Record ordering (0044): shared selected-field directions and primary ties;
   SQL mixed-key predicates and temporary views now agree. `make record-order`:
   5,872 checks green, four compiled controls reject; previous actual runtime has
   1,046 failures on the same matrix. `/tmp/agiru-record-order.FQ83WP`.
   Own findings are cleared; inherited header/TempFind findings remain explicit.
   Complete local replay passes: 138 cases/232 tooling tests, exit 0;
-  source-input hashes remain unchanged. Full AL replay is pending. Outside 184333;
+  source-input hashes remain unchanged. Full AL replay is running above. Outside 184333;
   no live Table Metadata activation, UT gain or G1 claim.
 - Codepage integration replay: `20261004T184333Z-2543205`, frozen HEAD `155abe4`,
   source `79960d56653338db08e34dd932ca9d9914ace4454323d51b1578b5ca819d39a1`;
