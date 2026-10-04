@@ -7,6 +7,21 @@ codeunit 50301 "ID Caller"
         exit(Database::"Declared Only");
     end;
 
+    procedure OrdinaryID(): Integer
+    begin
+        exit(Database::"ID Owner");
+    end;
+
+    procedure QualifiedOrdinaryID(): Integer
+    begin
+        exit(Database::Microsoft.Fixture."ID Owner");
+    end;
+
+    procedure WrongOrdinaryNamespace(): Integer
+    begin
+        exit(Database::Other."ID Owner");
+    end;
+
     procedure QualifiedID(): Integer
     begin
         exit(database::System.Fixture."Declared Only");

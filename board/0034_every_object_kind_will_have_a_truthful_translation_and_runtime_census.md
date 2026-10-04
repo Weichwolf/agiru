@@ -5,6 +5,22 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Full native-constant replay 120802 ends at 2,100/2,314: 69 losses, zero gains,
+  unchanged unique population/source hashes versus 101600. Raw identities/errors:
+  run `artifacts/ut-comparison-101600.json`; null/unsealed seed, diagnostic only.
+  Parser qualification exposed ordinary-table index omissions: Capacity Ledger
+  Entry accounts for 61 direct losses; Prod. Order Component and Job Journal Line
+  account for six direct losses plus two expected-error mismatches. Preserve the
+  qualified AST; never restore namespace stripping or fabricate IDs.
+  `Main.cpp::RefreshTableIndex` now admits exact ordinary namespace aliases and
+  rejects duplicate qualified identities. Four generated object writers pass 25
+  checks/seven controls; prior compiler fails `Microsoft.Fixture.ID Owner`.
+  `/tmp/agiru-native-table-ids.0ENfDa`, `/tmp/agiru-qualified-table-previous.w040rh`.
+  Full activation/recovery remains pending. References: developer `ff5939a46e`,
+  `devenv-namespaces-overview.md`; BCApps `bb7111877f`, original
+  `Inventory/{Capacity/CapacityLedgerEntry.Table,Posting/ItemJnlPostLine.Codeunit}.al`;
+  predecessor 1483 rejects fabricated hash identities. User `0ff62b2266`,
+  `admin-manage-appsource-apps.md` adds no namespace-resolution guarantee.
 - Native Base64 authority: original System-29 `System.Runtime` codeunit
   2000000024 declares nine overloads in `src/System Codeunits/Runtime/Base64Convert.Codeunit.al`.
   `NativeSource.cpp::DeclaredKind` leaves codeunits in `otherSources`; generated

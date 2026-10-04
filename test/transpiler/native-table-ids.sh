@@ -81,7 +81,7 @@ for control in source-id missing excluded; do
     rg -q 'Database::Declared Only' "$proof/$control-execution.log"
   fi
 done
-for control in duplicate-id duplicate-name app-collision; do
+for control in duplicate-id duplicate-name app-collision qualified-collision; do
   cp -a "$input" "$proof/$control"
   case "$control" in
     duplicate-id)
@@ -92,13 +92,16 @@ for control in duplicate-id duplicate-name app-collision; do
         > "$proof/$control/package/src/Duplicate.Table.al" ;;
     app-collision)
       sed -i 's/table 50302/table 2000000821/' "$proof/$control/source/IDOwner.Table.al" ;;
+    qualified-collision)
+      sed 's/table 50302/table 50305/' "$input/source/IDOwner.Table.al" \
+        > "$proof/$control/source/DuplicateOwner.Table.al" ;;
   esac
   if "$B/agirutc" "$proof/$control" "$proof/$control/apps.json" \
     --system-symbols "$proof/$control/package" > "$proof/$control.log" 2>&1; then
     printf 'native-table-ids: %s escaped identity validation\n' "$control" >&2
     exit 1
   fi
-  rg -q 'duplicate System table declaration|AL table duplicates declared System table ID' "$proof/$control.log"
+  rg -q 'duplicate System table declaration|AL table duplicates declared System table ID|Duplicate qualified table declaration' "$proof/$control.log"
 done
 rm -f "$proof/runner.o" "$proof/runner" "$proof"/{source-id,missing,excluded}/runner
-printf 'native-table-ids: four object writers execute; six identity controls refuse; native table stays unbound; %s\n' "$proof"
+printf 'native-table-ids: four object writers execute; seven identity controls refuse; native table stays unbound; %s\n' "$proof"

@@ -1779,6 +1779,14 @@ void RefreshTableIndex(const Tables &tables, agiru::gen::Objects &objects) {
                               TableHeaderPath(table));
     objects.tables.insert_or_assign(agiru::gen::LowerKey(table.name), ref);
     objects.tables.insert_or_assign(std::to_string(table.id), ref);
+    if (!table.nameSpace.empty()) {
+      const std::string qualified = agiru::gen::LowerKey(table.nameSpace + "." + table.name);
+      const auto [found, inserted] = objects.tables.try_emplace(qualified, ref);
+      if (!inserted && found->second.id != table.id) {
+        throw std::runtime_error("Duplicate qualified table declaration: " + qualified);
+      }
+      found->second = ref;
+    }
   }
 }
 

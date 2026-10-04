@@ -13,6 +13,7 @@ namespace {
 
 constexpr agiru::Integer kDeclaredID = 2000000821;
 constexpr agiru::Integer kPageID = 50303;
+constexpr agiru::Integer kOrdinaryID = 50302;
 
 template <typename Owner> void DeclaredConstants() {
   Owner owner;
@@ -20,6 +21,17 @@ template <typename Owner> void DeclaredConstants() {
              owner.NativeID() == kDeclaredID);
   CHECK_TRUE("qualified native ID retains its declared namespace",
              owner.QualifiedID() == kDeclaredID);
+  CHECK_TRUE("ordinary table ID follows its selected declaration",
+             owner.OrdinaryID() == kOrdinaryID);
+  CHECK_TRUE("qualified ordinary table ID resolves the same declaration",
+             owner.QualifiedOrdinaryID() == kOrdinaryID);
+  bool refused = false;
+  try {
+    static_cast<void>(owner.WrongOrdinaryNamespace());
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("Other.ID Owner");
+  }
+  CHECK_TRUE("ordinary table lookup never discards a wrong namespace", refused);
 }
 
 template <typename Call> void Refuses(Call call, std::string_view identity) {

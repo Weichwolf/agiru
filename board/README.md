@@ -15,6 +15,20 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Completed native-constant activation `20261004T120802Z-2065848`: frozen HEAD
+  `1c01b11`, source `0039282b99790dd762ea620521f5f34d77fa4398eaa0512414f2fc5c66024c25`;
+  slice-check/all/test exit 0; UT exit 2: 2,100/2,314 passed, 214 failed,
+  zero incomplete, 80 codeunits, six workers/1,258 seconds. Against 101600:
+  zero gains, 69 losses, 28 changed errors, no missing/added/duplicate identities;
+  manifest/source-file hashes match. Receipt: run `artifacts/ut-comparison-101600.json`.
+  Losses reach qualified ordinary table constants, not the later metadata/filter
+  helpers. Null/unsealed seed: diagnostic repeatability, not causal A/B.
+  Repair adds exact namespace aliases to the existing table index, rejecting
+  collisions and wrong namespaces. Generated fixtures pass 25 checks/seven identity
+  controls; previous compiler fails the new qualified ordinary constant.
+  `/tmp/agiru-native-table-ids.0ENfDa`, `/tmp/agiru-qualified-table-previous.w040rh`.
+  Main analysis retains five existing findings and no new findings. Complete local
+  replay, regenerated-tree activation and recovery of the 69 losses remain pending.
 - Compiled record filters (0044): one owned predicate for temporary operations
   and computed rows. ReflectionMetadata passes 194 checks/sixteen controls;
   Filter/FilterGroup/Temporary retain 125/137/80 green checks. Same FilterGroup
@@ -40,10 +54,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   IDs 2000000004/5. Native 233 selected/18 bound/215 unbound, 125 other inactive
   sources and 21 unresolved controls remain; all 14,225 slice sources exist.
   `/tmp/agiru-transpile.vohqhQ`: exit 1, unchanged package hashes. Unchanged
-  2,314-method UT replay is running in `20261004T120802Z-2065848`, frozen HEAD
+  2,314-method UT replay completed in `20261004T120802Z-2065848`, frozen HEAD
   `1c01b11`, source `0039282b99790dd762ea620521f5f34d77fa4398eaa0512414f2fc5c66024c25`,
-  targets `slice-check all test ut`, six jobs. Slice presence passes; other targets
-  are not yet terminal. Independent census retains 113,013 raw/112,998 required
+  targets `slice-check all test ut`, six jobs. Build/local targets pass; UT regresses
+  as recorded above. Independent census retains 113,013 raw/112,998 required
   methods, zero unmeasured files and seven refused variants in three sources
   (exit 2). Receipt: run `artifacts/scope-inventory-development.json` and
   `/tmp/agiru-native-table-ids-census.log`. No provider, full-link or UT gain claimed.
