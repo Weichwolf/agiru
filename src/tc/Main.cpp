@@ -1937,6 +1937,7 @@ std::size_t BindNativeSources(const std::filesystem::path &package,
   Tables nativeTables{.objects = std::move(sources.tables), .paths = sources.paths};
   extensions.emitted += MergeExtensions(store, nativeTables, agiru::gen::LowerKey(sources.app.id));
   sources.tables = std::move(nativeTables.objects);
+  objects.nativeTables = sources.tables;
   objects.tables = agiru::gen::PlatformTables(sources.tables);
   objects.fieldEnums = agiru::gen::PlatformFieldEnums(sources.tables, objects.tables);
   AddNativeSourceTables(sources, objects.tables, tables);

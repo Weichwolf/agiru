@@ -6,6 +6,8 @@
 #include "Names.h"
 
 #include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -57,6 +59,12 @@ public:
   [[nodiscard]] virtual std::string EnumObject(std::string_view name) const {
     static_cast<void>(name);
     return {};
+  }
+
+  [[nodiscard]] virtual std::optional<std::int32_t>
+  DeclaredTableNumber(std::string_view name) const {
+    static_cast<void>(name);
+    return std::nullopt;
   }
 
   [[nodiscard]] virtual std::string ExitValue() const { return {}; }

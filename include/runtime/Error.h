@@ -103,11 +103,11 @@ template <typename T> [[noreturn]] T RefusedTemporal(std::string_view what) {
 ///       says why, and the predecessor paid for the difference.
 void Commit();
 
-/// \brief AL `Database::"X"` for a table this run does not carry -- refused where it is read.
+/// \brief AL `Database::"X"` without a selected table declaration -- refused where it is read.
 /// \param name The AL name of the table.
 /// \return Never.
-/// \throws Error always, naming the table: an object number for a table that is not translated
-///         would be a number nothing can check (board:0034).
+/// \throws Error always, naming the unresolved table. Selected native declarations supply
+///         their source ID independently of executable record/provider support (board:0034).
 [[noreturn]] inline std::int32_t AbsentObjectId(std::string_view name) {
   throw Error("Database::" + std::string(name) +
               " names a table this run does not carry (board:0034)");

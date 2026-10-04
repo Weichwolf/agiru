@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation boolean-expressions control-extensions
+.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation boolean-expressions control-extensions native-table-ids
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -130,6 +130,12 @@ boolean-expressions: comments db tc ## execute eager ordered Boolean effects and
 native-enums: comments db tc ## execute source-loaded native enum fields, parameters and extensions
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-enums.sh"
+
+native-table-ids: comments db tc ## execute source-owned native table IDs without inventing providers
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenNativeBindingGate gate_AlParserGate
+	@"$(B)/gate_GenNativeBindingGate"
+	@"$(B)/gate_AlParserGate"
+	@B="$(B)" bash "$(SELF)/test/transpiler/native-table-ids.sh"
 
 native-consumers: comments db tc ## retranslate and qualify all eight original native-table page units
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-consumers.sh"

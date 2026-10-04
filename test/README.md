@@ -33,6 +33,13 @@ forward anchors and property overrides. Missing/cyclic anchors must refuse in bo
 analysis and generation, retaining previous output. `make control-extensions JOBS=2`
 is the focused entry point; move operations and modified triggers remain separate gaps.
 
+`transpiler/native-table-ids.sh` executes source-owned `Database::` constants through
+codeunit/table/page/report procedures without promoting unbound native declarations to
+record providers. ID mutation, missing/excluded sources and identity collisions must
+fail. Qualified names and local Option shadowing remain distinct. The fixture's one
+unbound table keeps translation nonzero; `make native-table-ids JOBS=2` qualifies the
+constant path, not native provider/business execution or the UT milestone.
+
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.

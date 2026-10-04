@@ -69,12 +69,16 @@ struct Objects {
   TableIndex pages;
   EnumIndex enums;
   FieldEnums fieldEnums;
+  std::span<const al::TableObject> nativeTables;
 
   std::string module;
   std::string moduleHeader;
 };
 
 const TableIndex &PageIndexFor(const Objects &objects, std::string_view type);
+
+[[nodiscard]] std::optional<std::int32_t> NativeTableNumberOf(const Objects &objects,
+                                                              std::string_view name);
 
 [[nodiscard]] bool
 IsTryFunctionOf(const Objects &objects, const al::VarDecl *declared, std::string_view name);

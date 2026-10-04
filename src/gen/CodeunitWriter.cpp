@@ -1523,6 +1523,11 @@ public:
     return found == objects_.enums.end() ? std::string{} : found->second.identifier;
   }
 
+  [[nodiscard]] std::optional<std::int32_t>
+  DeclaredTableNumber(std::string_view name) const override {
+    return NativeTableNumberOf(objects_, name);
+  }
+
   [[nodiscard]] std::string FieldEnumeration(const OfVariable &field) const override {
     if (const std::string column =
             QueryColumnEnumeration(objects_, Declaration(field.variable), field.field);
@@ -2223,6 +2228,25 @@ TableIndex PlatformTables() {
 
 bool NeedsNativeDefinition(const TableRef &binding) {
   return binding.native;
+}
+
+std::optional<std::int32_t> NativeTableNumberOf(const Objects &objects, std::string_view name) {
+  const al::TableObject *matched = nullptr;
+  for (const al::TableObject &table : objects.nativeTables) {
+    const std::string qualified =
+        table.nameSpace.empty() ? table.name : table.nameSpace + "." + table.name;
+    if (!SameName(name, table.name) && !SameName(name, qualified)) { continue; }
+    if (matched != nullptr || table.id <= 0) {
+      throw std::runtime_error("ambiguous or invalid native table identity: " + std::string(name));
+    }
+    matched = &table;
+  }
+  if (matched == nullptr) { return std::nullopt; }
+  const auto binding = objects.tables.find(LowerKey(std::string(name)));
+  if (binding != objects.tables.end() && binding->second.id != matched->id) {
+    throw std::runtime_error("conflicting native table identity: " + std::string(name));
+  }
+  return matched->id;
 }
 
 TableIndex PlatformTables(std::span<const al::TableObject> declarations) {

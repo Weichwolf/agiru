@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -340,6 +341,14 @@ private:
 
   static bool NamesATableNumber(std::string_view base) { return SameName(base, "Database"); }
 
+  std::string DatabaseNumber(std::string_view name) const {
+    const auto number = scope_.DeclaredTableNumber(name);
+    const std::string table = scope_.ObjectNamed("tables", name);
+    if (!table.starts_with("absent::")) { return table + "::kId.Value()"; }
+    if (number) { return std::to_string(*number); }
+    return "::agiru::AbsentObjectId(\"" + std::string(name) + "\")";
+  }
+
   static std::string_view KindNamespace(std::string_view base) {
     if (SameName(base, "Codeunit")) { return "codeunits"; }
     if (SameName(base, "Page")) { return "pages"; }
@@ -450,11 +459,7 @@ private:
         }
       }
       if (scope_.Resolve(base.text).empty() && NamesATableNumber(base.text)) {
-        const std::string table = scope_.ObjectNamed("tables", expression.text);
-        if (table.starts_with("absent::")) {
-          return "::agiru::AbsentObjectId(\"" + expression.text + "\")";
-        }
-        return table + "::kId.Value()";
+        return DatabaseNumber(expression.text);
       }
     }
     const std::string resolved = Expression(base, kPrimaryPrecedence);
@@ -1831,6 +1836,11 @@ public:
     return NamedEnum(objects_, name);
   }
 
+  [[nodiscard]] std::optional<std::int32_t>
+  DeclaredTableNumber(std::string_view name) const override {
+    return NativeTableNumberOf(objects_, name);
+  }
+
   [[nodiscard]] bool IsHandle(std::string_view name) const override {
     if (const al::VarDecl *local = Local(name); local != nullptr) {
       return TypeName(local->type) == "Interface";
@@ -2247,6 +2257,11 @@ public:
 
   [[nodiscard]] std::string EnumObject(std::string_view name) const override {
     return NamedEnum(objects_, name);
+  }
+
+  [[nodiscard]] std::optional<std::int32_t>
+  DeclaredTableNumber(std::string_view name) const override {
+    return NativeTableNumberOf(objects_, name);
   }
 
   [[nodiscard]] bool IsHandle(std::string_view name) const override {

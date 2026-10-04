@@ -602,6 +602,24 @@ void ExclusiveDisjunctionIsAnOperator() {
   CHECK_TRUE("with both sides", e.children[1].children.size() == 2);
 }
 
+void DatabaseScopeRetainsItsNamespace() {
+  for (const auto *const keyword : {"Database", "database", "DATABASE"}) {
+    const auto expression =
+        OnlyExpression("X := " + std::string(keyword) + "::System.Fixture.\"Declared Only\";");
+    CHECK_TEXT("Database scope retains the complete source identity",
+               expression.children[1].text,
+               "System.Fixture.Declared Only");
+    CHECK_TRUE("Database qualification remains one scope expression",
+               expression.children[1].kind == agiru::al::ExprKind::Scope);
+  }
+  const auto bare = OnlyExpression("X := Database::\"Declared Only\";");
+  CHECK_TEXT("bare table names remain unchanged", bare.children[1].text, "Declared Only");
+  const auto enumeration = OnlyExpression("X := Enum::System.Fixture.Choice.Chosen;");
+  CHECK_TEXT("enum value scope retains its separate existing grammar",
+             enumeration.children[1].text,
+             "Chosen");
+}
+
 /// BC 25 gave AL a conditional operator, and the BaseApp uses it.
 void TheConditionalOperatorParses() {
   const agiru::al::Expr e = OnlyExpression("X := Setup.Get() ? A : B;");
@@ -747,6 +765,7 @@ int main() {
     AVarBlockDoesNotSwallowTheNextMembersAttribute();
     TheOperatorHierarchyIsTheOneCalDocuments();
     ExclusiveDisjunctionIsAnOperator();
+    DatabaseScopeRetainsItsNamespace();
     TheConditionalOperatorParses();
     AssertErrorIsAStatement();
     AnElseAfterASemicolonBelongsToTheCase();

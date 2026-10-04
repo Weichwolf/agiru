@@ -15,6 +15,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Native table constants (0034): selected native AST identities are independent
+  of record bindings/providers. Native-binding/parser gates pass 154/139 checks;
+  compiled codeunit/table/page/report fixture passes 13 checks and six identity
+  controls. Previous compiler refuses its first constant; ID mutation fails eight
+  values. `/tmp/agiru-native-table-ids.{gOASon,2WAIqY}` and
+  `/tmp/agiru-native-table-ids-previous.zcfHaD`. Parser/runner analysis passes;
+  existing generator/header findings remain, without suppressions. Complete-tree
+  regeneration and unchanged 2,314-method UT replay are pending; no UT gain claimed.
 - Extension controls (0034): one page/report splice implementation; unresolved
   anchors refuse and preserve previous output. Compiled metadata 62 checks green;
   missing/cyclic anchors and wrong-order controls reject. Complete local Make:

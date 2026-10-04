@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -346,23 +347,46 @@ private:
     return ReadPostfix();
   }
 
+  Expr ReadScope(Expr base, bool qualified) {
+    Advance();
+    Expr scope{.kind = ExprKind::Scope, .text = Peek().text, .children = {}};
+    Advance();
+    while (AtPunctuation(".") && position_ + 2 < tokens_.size() &&
+           tokens_[position_ + 1].kind != TokenKind::Punctuation &&
+           (tokens_[position_ + 2].kind != TokenKind::Punctuation ||
+            tokens_[position_ + 2].text != "(")) {
+      Advance();
+      if (qualified) {
+        scope.text += "." + Peek().text;
+      } else {
+        scope.text = Peek().text;
+      }
+      Advance();
+    }
+    scope.children.push_back(std::move(base));
+    return scope;
+  }
+
+  Expr ReadArguments(Expr base, ExprKind kind, std::string_view closing) {
+    Advance();
+    Expr expression{.kind = kind, .text = {}, .children = {}};
+    expression.children.push_back(std::move(base));
+    while (!AtEnd() && !AtPunctuation(closing)) {
+      expression.children.push_back(ReadTernary());
+      if (AtPunctuation(",")) { Advance(); }
+    }
+    Expect(closing);
+    return expression;
+  }
+
   Expr ReadPostfix() {
+    const bool databaseScope = AtKeyword("Database");
     Expr value = ReadPrimary();
     while (!AtEnd()) {
       if (AtPunctuation("::")) {
-        Advance();
-        Expr scope{.kind = ExprKind::Scope, .text = Peek().text, .children = {}};
-        Advance();
-        while (AtPunctuation(".") && position_ + 2 < tokens_.size() &&
-               tokens_[position_ + 1].kind != TokenKind::Punctuation &&
-               (tokens_[position_ + 2].kind != TokenKind::Punctuation ||
-                tokens_[position_ + 2].text != "(")) {
-          Advance();
-          scope.text = Peek().text;
-          Advance();
-        }
-        scope.children.push_back(std::move(value));
-        value = std::move(scope);
+        const bool qualified =
+            databaseScope && value.kind == ExprKind::Name && value.children.empty();
+        value = ReadScope(std::move(value), qualified);
         continue;
       }
       if (AtPunctuation(".")) {
@@ -376,27 +400,11 @@ private:
         continue;
       }
       if (AtPunctuation("[")) {
-        Advance();
-        Expr index{.kind = ExprKind::Index, .text = {}, .children = {}};
-        index.children.push_back(std::move(value));
-        while (!AtEnd() && !AtPunctuation("]")) {
-          index.children.push_back(ReadTernary());
-          if (AtPunctuation(",")) { Advance(); }
-        }
-        Expect("]");
-        value = std::move(index);
+        value = ReadArguments(std::move(value), ExprKind::Index, "]");
         continue;
       }
       if (AtPunctuation("(")) {
-        Advance();
-        Expr call{.kind = ExprKind::Call, .text = {}, .children = {}};
-        call.children.push_back(std::move(value));
-        while (!AtEnd() && !AtPunctuation(")")) {
-          call.children.push_back(ReadTernary());
-          if (AtPunctuation(",")) { Advance(); }
-        }
-        Expect(")");
-        value = std::move(call);
+        value = ReadArguments(std::move(value), ExprKind::Call, ")");
         continue;
       }
       break;

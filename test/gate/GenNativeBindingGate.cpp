@@ -1,4 +1,5 @@
 #include "Ast.h"
+#include "BodyWriter.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
@@ -7,6 +8,8 @@
 #include "TableWriter.h"
 
 #include <array>
+#include <exception>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -28,6 +31,91 @@ table 2000000058 AllObjWithCaption {
   }
   keys { key(pk; "Object Type", "Object ID") { Clustered = true; } }
 })");
+}
+
+void NativeIdentityConstants() {
+  auto table = SourceTable();
+  table.id = kUnboundId;
+  table.name = "Declared Only";
+  const std::array sources{table};
+  agiru::gen::Objects objects;
+  objects.nativeTables = sources;
+  objects.tables = agiru::gen::PlatformTables(sources);
+  CHECK_TRUE("a declared ID does not manufacture a native class", objects.tables.empty());
+  for (const auto *const name :
+       {"Declared Only", "declared only", "System.Reflection.Declared Only"}) {
+    CHECK_TRUE("native constants retain source identity",
+               agiru::gen::NativeTableNumberOf(objects, name) == kUnboundId);
+  }
+  CHECK_TRUE("wrong namespaces never fall back to a bare source identity",
+             !agiru::gen::NativeTableNumberOf(objects, "Other.Declared Only"));
+  CHECK_TRUE("unknown names remain unresolved",
+             !agiru::gen::NativeTableNumberOf(objects, "Missing"));
+  const std::string procedures = R"(
+    procedure NativeID(): Integer begin exit(Database::"Declared Only"); end;
+    procedure QualifiedID(): Integer begin exit(Database::System.Reflection."Declared Only"); end;
+    procedure MissingID(): Integer begin exit(Database::Other."Declared Only"); end;
+  )";
+  const auto unit = agiru::al::ParseCodeunit("codeunit 50175 Caller {" + procedures + "}");
+  const auto owner = agiru::al::ParseTable(
+      "table 50176 Owner { fields { field(1; ID; Integer) {} }" + procedures + "}");
+  const auto page = agiru::al::ParsePage("page 50177 Caller {" + procedures + "}");
+  const auto report = agiru::al::ParseReport("report 50178 Caller {" + procedures + "}");
+  const std::array bodies{agiru::gen::WriteCodeunitSource(unit, "Caller.al", objects),
+                          agiru::gen::WriteSource(owner, "Owner.al", objects),
+                          agiru::gen::WriteSource(page, "Caller.al", objects, nullptr),
+                          agiru::gen::WriteSource(report, "Caller.al", objects, nullptr)};
+  for (const auto &body : bodies) {
+    CHECK_TRUE("all object procedure writers share the declared native constant",
+               body.contains("return " + std::to_string(kUnboundId) + ";"));
+    CHECK_TRUE("a qualified missing declaration remains a named refusal",
+               body.contains("AbsentObjectId(\"Other.Declared Only\")"));
+    CHECK_TRUE("native constant access needs no absent table class",
+               !body.contains("absent::DeclaredOnly::kId"));
+  }
+  CHECK_TRUE("a source constant creates no executable table binding", objects.tables.empty());
+  objects.nativeTables = {};
+  CHECK_TRUE("unselected sources cannot supply native constants",
+             !agiru::gen::NativeTableNumberOf(objects, table.name));
+  CHECK_TRUE("without a source declaration the writer still refuses",
+             agiru::gen::WriteCodeunitSource(unit, "Caller.al", objects)
+                 .contains("AbsentObjectId(\"Declared Only\")"));
+}
+
+void NativeIdentityRefusals() {
+  auto first = SourceTable();
+  auto second = first;
+  second.nameSpace = "Other";
+  second.id = kUnboundId;
+  const std::array sources{first, second};
+  agiru::gen::Objects objects;
+  objects.nativeTables = sources;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::NativeTableNumberOf(objects, first.name));
+  } catch (const std::runtime_error &) { refused = true; }
+  CHECK_TRUE("ambiguous native names refuse instead of picking a declaration", refused);
+  CHECK_TRUE("fully qualified names preserve their own source identity",
+             agiru::gen::NativeTableNumberOf(objects, "Other.AllObjWithCaption") == second.id);
+  objects.nativeTables = std::span{sources}.first(1);
+  objects.tables = agiru::gen::PlatformTables(objects.nativeTables);
+  CHECK_TRUE("bound native constants keep the same source identity",
+             agiru::gen::NativeTableNumberOf(objects, first.name) == first.id);
+  objects.tables.at("allobjwithcaption").id = kWrongIntrinsicId;
+  refused = false;
+  try {
+    static_cast<void>(agiru::gen::NativeTableNumberOf(objects, first.name));
+  } catch (const std::runtime_error &) { refused = true; }
+  CHECK_TRUE("runtime binding drift cannot change a source constant", refused);
+  objects.tables.clear();
+  first.id = 0;
+  const std::array invalid{first};
+  objects.nativeTables = invalid;
+  refused = false;
+  try {
+    static_cast<void>(agiru::gen::NativeTableNumberOf(objects, first.name));
+  } catch (const std::runtime_error &) { refused = true; }
+  CHECK_TRUE("invalid source IDs never become successful constants", refused);
 }
 
 void SourceOwnedBindings() {
@@ -388,6 +476,8 @@ void NativePropertyRefusals() {
 int main() {
   return gate::Run("GenNativeBinding", [] {
     SourceOwnedBindings();
+    NativeIdentityConstants();
+    NativeIdentityRefusals();
     NativeOwnedDeclarations();
     SharedTableProperties();
     RefusalsAndCodedOrdinals();

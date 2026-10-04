@@ -8,8 +8,9 @@ Depends on: 0006 session identity; 0033 declaring app; 0013 company schema.
 - Table permission checks assume SUPER; Session identity is SYSTEM/blank GUID.
 - Frozen 101600: eleven RapidStart workflows now reach missing `Database::Permission Set`
   identity in `ConfigValidateManagement::LookupObject`; original System-29 Permission
-  Set/Permission declarations are not licensing exclusions. 0034 owns source-only
-  constant binding; that is not a live permission-table/provider or authorization proof.
+  Set/Permission declarations are not licensing exclusions. 0034's source-only
+  constant path now passes authored execution/identity controls; original full-UT
+  activation is pending, not live permission-table/provider or authorization proof.
 - `IsolatedStorage.cpp` lacks extension identity and stores SetEncrypted values as plaintext plus secret=true.
 
 ## Implementation
