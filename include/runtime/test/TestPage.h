@@ -1,6 +1,7 @@
 #pragma once
 
 #include "meta/PageDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/Error.h"
 #include "runtime/Page.h"
 #include "runtime/Record.h"
@@ -352,7 +353,8 @@ public:
   /// \return The action, to `Invoke`.
   TestAction No() { return Bound_("No"); }
 
-  /// \brief AL `TestPage.Edit()` -- switches a view-mode page to editing.
+  /// \brief AL `TestPage.Edit()` -- edits the selected row in a list's declared card,
+  /// or switches a standalone page to editing. Explicit actions take precedence.
   /// \return The action, to `Invoke`.
   TestAction Edit() { return Bound_("Edit"); }
 
@@ -1193,10 +1195,39 @@ private:
                                   before);
   }
 
+  bool EditCard_() {
+    if constexpr (kHasRecord && requires { PageTraits<P>::kPage; }) {
+      const PageDef &list = PageTraits<P>::kPage;
+      if ((list.type != PageType::List && list.type != PageType::ListPart) ||
+          list.cardPageId.Value() == 0) {
+        return false;
+      }
+      const PageEntry *entry = FindPage(list.cardPageId);
+      if (entry == nullptr || entry->run == nullptr) {
+        throw Error("system Edit: the declared CardPageId is not executable");
+      }
+      if (entry->page->source != RecordTraits_().kTable.id) {
+        throw Error("system Edit: CardPageId has a different SourceTable");
+      }
+      if (detail::SaysFalse(entry->page->modifyAllowed)) {
+        throw Error("system Edit: the card's ModifyAllowed property is false");
+      }
+      SaveEditedNewRecord_();
+      const detail::RecordState *state =
+          reinterpret_cast<const detail::StateHandle *>(&Record_())->Peek();
+      if (state == nullptr || !state->positioned) { throw Error("system Edit: no current record"); }
+      static_cast<void>(
+          detail::RunPageByNumber(false, list.cardPageId.Value(), std::as_const(Record_())));
+      return true;
+    }
+    return false;
+  }
+
   bool ModeAction_(std::string_view control) {
     const bool edit = SameWord_(control, "Edit");
     const bool view = SameWord_(control, "View");
     if ((!edit && !view) || ControlNamed_(control) != nullptr || page_ == nullptr) { return false; }
+    if (edit && EditCard_()) { return true; }
     if constexpr (requires(P &page) { page.OpenedAs(edit); }) { page_->OpenedAs(edit); }
     return true;
   }

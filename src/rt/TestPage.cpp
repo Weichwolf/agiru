@@ -55,6 +55,7 @@ void TestField::AssertEqualsText(std::string_view expected) const {
 }
 
 Integer TestField::AsInteger() const {
+  if (core_ == nullptr) { Unbound(); }
   Integer value{};
   const std::string ordinal = core_->ControlOrdinal(name_);
   if (!ordinal.empty() && detail::Evaluated(value, ordinal)) { return value; }

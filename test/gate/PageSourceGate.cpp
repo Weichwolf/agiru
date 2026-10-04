@@ -98,6 +98,16 @@ void ReadsUseTheirOwningInstance() {
 }
 
 void ErrorsAndLegacySourcesRemainExplicit() {
+  const agiru::TestField unbound{"Unopened"};
+  bool unboundRefused = false;
+  try {
+    static_cast<void>(unbound.AsInteger());
+  } catch (const agiru::Error &error) {
+    unboundRefused =
+        std::string_view(error.what()).find("not on a running page") != std::string_view::npos;
+  }
+  CHECK_TRUE("an unbound integer field raises instead of dereferencing a null page",
+             unboundRefused);
   agiru::TestPage<SourcePage> page;
   page.OpenEdit();
   CHECK_TEXT("legacy variable reader stays available", page.ControlText("Legacy"), "before");
