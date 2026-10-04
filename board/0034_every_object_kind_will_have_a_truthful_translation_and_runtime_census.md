@@ -23,7 +23,7 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   refusals, all 14,225 slice files exist. `/tmp/agiru-transpile.vHcXmw`, exit 1,
   `generation-comparison.json`; no new exclusion or silent gap removal.
   Native codeunits are not yet indexed/emitted by production translation; this
-  admission/refusal proof does not implement Base64 or activate a native provider.
+  admission/refusal proof does not bind Base64 or activate a native provider.
   First full local run: 133 cases, only the tooling wrapper red (226/227 tests);
   its Discovery fixture omitted the new script. Registry corrected, Discovery
   negative controls green; final full replay pending. New loader/refusal/runner/
@@ -68,6 +68,28 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   prior milestone 101600 has two OAuth failures at ToBase64, not a gain prediction.
   No provider or BC execution proved. Predecessor 1511 requires real binary
   OutStream writes, not returned text or an invented buffer operation.
+- Shared byte codec: `include/type/Base64.h`, `src/net/Base64.cpp`; generic
+  `OutStream::Borrows` protects views across output growth. One encode/decode core
+  serves owned strings and 4 KiB raw output blocks; preserves prefixes, binary NULs,
+  Convert-profile padding/whitespace, 76-column CRLF and invalid-input output safety.
+  `make base64`: 79 checks pass; wrong line width/padding/whitespace, skipped validation
+  and terminated-write mutants fail 4/18/2/1/24 checks. Stream/Encoding remain 51/5 green.
+  Original BC29 `NavBase64Converter::{ToBase64Core,BytesFromBase64Core}` executes on
+  temporary CLR 10.0.12: 10,051 cases, 4,034 encode/6,017 decode, 2,002 invalid.
+  Both C++ output forms match all cases, 30,214 checks/zero red. Seed 20261004;
+  reference SHA256 `85f6c9f4a6cba8dfcafc23bfe0ccae9871cac943191dd079e558b6a33044d71b`.
+  `/tmp/agiru-base64-core.S1ZV6C/{reference.log,inputs.sha256,controls.sha256}`;
+  oracle source/execution/provenance: `/tmp/agiru-base64-reference.{Oracle.cs,receipt.json}`.
+  Actual CLR transform capability is true; this does not execute native stream branches.
+  Three targeted units add no own findings; each retains 25 unsuppressed Char/StringValue
+  header findings. Discovery fixture includes the new Bash qualifier and passes.
+  Complete local replay pending. No production .NET dependency or hand-edited app.
+  Remaining before Native activation: source-owned index/output/module binding for
+  all nine overloads; exact text encodings, stream cursor/reference/threshold semantics,
+  separate transform-block decoder and native AL diagnostic contracts. Existing Encoding
+  treats single-byte pages as Latin-1 and accepts unknown pages; it is not qualified
+  Windows-1252/UTF-8 replacement behaviour. Run all thirteen original tests and compare
+  the unchanged full 2,314 UT population. No UT gain/performance/WASM claim.
 - Native stream qualification: raw/selected codeunit population is 35/35, none
   excluded; source loading still activates none. Original BC29 output branches use
   raw writes with no BOM/terminator/output transcoding. `ConvertBuffer` retains a

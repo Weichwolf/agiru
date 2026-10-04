@@ -66,6 +66,13 @@ record filters, including group intersections, cross-column OR, FlowFilters and
 owned expression snapshots. Sixteen controls must reject. Temporary operations
 use the same predicate; this does not activate live metadata providers (0044).
 
+`make base64 JOBS=2` qualifies the shared raw byte codec, 76-column CRLF profile,
+CLR Convert decoder rules, bounded stream writes and borrowed-input safety. Five
+compiled mutants must fail. Optional `AGIRU_BASE64_REFERENCE=<TSV>` replays an external
+byte-level reference population through both output forms; the receipt retains its
+hash. It does not bind Native methods or prove text encoding, stream input/cursors,
+CLR transform-block decoding or execution of the original BC Base64 tests (0034).
+
 The ERP milestones are separate: `make ut` executes the source-counted AL UT
 population through `agiru run-tests`; the full AL suite follows. Their original
 source is in BCApps, not in these authored fixtures. A green local regression

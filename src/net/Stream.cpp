@@ -57,13 +57,9 @@ Integer OutStream::Append(std::string_view text, bool terminated) {
     throw Error("OutStream.Write exceeds byte storage capacity");
   }
   std::string owned;
-  if (!text.empty() && !bytes.empty()) {
-    const auto *first = reinterpret_cast<const char *>(bytes.data());
-    const std::less<> before;
-    if (!before(text.data(), first) && before(text.data(), first + bytes.size())) {
-      owned = text;
-      text = owned;
-    }
+  if (Borrows(text)) {
+    owned = text;
+    text = owned;
   }
   const std::size_t oldSize = bytes.size();
   const std::size_t required = oldSize + text.size() + terminator;
@@ -75,6 +71,15 @@ Integer OutStream::Append(std::string_view text, bool terminated) {
   if (!text.empty()) { std::memcpy(bytes.data() + oldSize, text.data(), text.size()); }
   if (terminated) { bytes.back() = 0; }
   return static_cast<Integer>(text.size() + terminator);
+}
+
+bool OutStream::Borrows(std::string_view bytes) const {
+  if (bytes.empty()) { return false; }
+  const auto &storage = Bound().Bytes();
+  if (storage.empty()) { return false; }
+  const auto *first = reinterpret_cast<const char *>(storage.data());
+  const std::less<> before;
+  return !before(bytes.data(), first) && before(bytes.data(), first + storage.size());
 }
 
 Integer OutStream::WriteTerminated(std::string_view text, Integer length) {

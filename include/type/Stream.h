@@ -74,6 +74,12 @@ public:
   /// \return How many were written.
   Integer WriteBytes(std::string_view bytes);
 
+  /// \brief Whether a nonempty view starts inside this stream's BLOB storage.
+  /// \param bytes A valid byte view whose lifetime the caller owns.
+  /// \return True when appending could invalidate the view; false for an empty view.
+  /// \throws Error if a nonempty view is checked against an unbound stream.
+  [[nodiscard]] bool Borrows(std::string_view bytes) const;
+
   /// \brief AL `OutStream.Write(Value)` for a TEXT value.
   ///
   /// \tparam T The value's type, which must read as a `std::string_view`.

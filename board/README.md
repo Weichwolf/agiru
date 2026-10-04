@@ -24,6 +24,19 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   refreezing the source-only snapshot cannot rediscover Git revision, so this
   receipt's revision is null. The matching original receipt records BCApps
   `bb7111877ff786951b86a1a0f80d8b39b8f5dacd`. No new AL result yet.
+- Base64 byte codec (0034): shared string/raw-stream encode/decode, 76-column CRLF,
+  strict Convert-profile whitespace/padding and validation before output. Nonalias
+  stream output uses 4 KiB scratch; aliased input is preserved before growth.
+  `make base64`: 79 checks pass; five compiled mutants fail. Direct original BC29
+  `ToBase64Core`/`BytesFromBase64Core` on temporary CLR 10.0.12 supplies 10,051
+  cases (4,034 encode/6,017 decode, 2,002 invalid); both C++ output forms agree,
+  30,214 checks/zero red. `/tmp/agiru-base64-core.S1ZV6C`; reference SHA256
+  `85f6c9f4a6cba8dfcafc23bfe0ccae9871cac943191dd079e558b6a33044d71b`.
+  Stream/Encoding retain 51/5 checks; Discovery passes. Three targeted units have
+  no own findings, but each retains 25 unsuppressed Char/StringValue header findings.
+  Complete local replay pending. Native production binding, text encodings, stream
+  input/cursors, transform-block decoder, AL diagnostics and all thirteen original
+  BC tests remain open; no UT gain, performance, multi-user or WASM claim.
 - Native codeunit admission (0034): all 35 selected source ASTs retain signatures,
   paths and manifest identity; 72 Native methods remain individually unbound and
   the aggregate 125 inactive-source gap remains. Missing owner/duplicate identities
@@ -44,7 +57,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   thirteen selected units; no suppression/baseline increase.
   `/tmp/agiru-native-codeunits-{all-local,discovery-final,lint}.log`.
   Production indexing/emission and
-  primitive activation remain open; no Base64 implementation or UT gain claimed.
+  primitive activation remain open; no Base64 binding or UT gain claimed.
 - Qualified-table recovery replay: `20261004T132617Z-2130724`, frozen HEAD
   `23d1497`, source `1dee82b25ed072be32d3b5b27f03be68d059c6bdff423b707c0e99f12c947d07`;
   `slice-check all test ut`, six jobs. Terminal: slice-check/all/test exit 0;
