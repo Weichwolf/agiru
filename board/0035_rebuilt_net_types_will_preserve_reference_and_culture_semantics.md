@@ -5,6 +5,22 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- `Stream.cpp` no longer copies the entire BLOB on each write. One private append
+  preserves raw bytes, zero terminators, existing-stream visibility and borrowed
+  self-input; storage grows geometrically. StreamGate: 51 checks green, previous
+  actual library four red; 4,096 one-byte writes require at most thirteen capacity
+  changes. `/tmp/agiru-stream-append-{gate-final,previous-final}.log`,
+  `/tmp/agiru-stream-append-final.sha256`. Runtime/gate have no own lint findings;
+  25/47 inherited header findings remain. Three old gate findings removed, no new
+  suppressions. Full local/AL replay remains pending; outside frozen 132617.
+  Encoding, typed layouts and full BLOB limits remain open, not a streaming/native
+  Base64 activation or BC workload performance claim. References: developer
+  `ff5939a46e`, `methods-auto/outstream/outstream-{write-text-integer,writetext}-method.md`,
+  `methods-auto/blob/blob-data-type.md`; BCApps `bb7111877f`,
+  `System Application/App/Base64 Convert/src/Base64ConvertImpl.Codeunit.al` and
+  `System Application/Test/Base64 Convert/src/Base64ConvertTest.Codeunit.al`;
+  predecessor 1491/1511 require actual stream writes. EncodingGate retains five
+  green checks; `/tmp/agiru-stream-append-encoding-gate.log`.
 - Development reader/DOM repair: one shared cursor/declaration/EOF/Close state;
   Load consumes its current nodes, never reparses raw input. Positioned last-child
   Load stops at the parent end; closed/EOF Load creates an empty non-null document.

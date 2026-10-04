@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 /// \file
@@ -19,11 +20,8 @@ namespace agiru {
 /// variables in that BLOBs have a variable length. The maximum size of a BLOB (binary large object)
 /// is 2 GB."
 ///
-/// \note THE STREAMS ARE NOT HERE YET. `CreateInStream`, `CreateOutStream`, `Import` and `Export`
-///       each take or return an AL type the runtime does not have -- InStream, OutStream and a file
-///       -- so writing them would mean inventing signatures the platform does not document. The AL
-///       surface baseline counts them absent. What a table needs today is a field that holds bytes,
-///       says whether it has any, and reaches storage; that is what this is.
+/// \note Streams borrow this BLOB; writes append to its owned byte storage. Client file
+///       import/export still refuse. Stream text-encoding selection remains unimplemented.
 class Blob {
 public:
   /// \brief An empty BLOB, which is what a field holds until something writes to it.
@@ -59,12 +57,12 @@ public:
 
   /// \brief AL `Blob.CreateOutStream(var OutStream [, TextEncoding])` -- the `var` form.
   /// \param into     The stream to bind to this BLOB.
-  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  /// \param Encoding The encoding, currently ignored; text conversion remains unimplemented.
   void CreateOutStream(class OutStream &into, const TextEncoding &Encoding = {});
 
   /// \brief AL `Blob.CreateInStream(var InStream [, TextEncoding])` -- the `var` form.
   /// \param from     The stream to bind to this BLOB.
-  /// \param Encoding The encoding, which this runtime records and does not yet act on.
+  /// \param Encoding The encoding, currently ignored; text conversion remains unimplemented.
   void CreateInStream(class InStream &from, const TextEncoding &Encoding = {}) const;
 
   /// \brief AL `Blob.Export(Text)`.
@@ -88,6 +86,7 @@ public:
   [[nodiscard]] bool operator==(const Blob &o) const = default;
 
 private:
+  friend class OutStream;
   std::vector<std::uint8_t> bytes_;
 };
 

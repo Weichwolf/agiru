@@ -10,8 +10,12 @@
 
 #include "Check.h"
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 using agiru::Blob;
 using agiru::Error;
@@ -94,7 +98,8 @@ void ReadOfATextTakesTheTextForm() {
   CHECK_TEXT("the text comes back whole", filters.Value(), "WHERE(Field1=1(*))");
   in.ResetPosition();
   agiru::Code<10> code;
-  in.Read(code, 5);
+  constexpr agiru::Integer kPrefixLength = 5;
+  in.Read(code, kPrefixLength);
   CHECK_TEXT("and a Code reads the same way, bounded", code.Value(), "WHERE");
 }
 
@@ -113,7 +118,76 @@ void ATypedReadOrWriteRefuses() {
   CHECK_TRUE("and the BLOB is untouched", !blob.HasValue());
 }
 
-} // namespace
+void WritesRetainStorageAndExactBytes() {
+  std::vector<std::uint8_t> initial{'p'};
+  constexpr std::size_t kReserved = 64;
+  initial.reserve(kReserved);
+  Blob blob;
+  blob.Set(std::move(initial));
+  auto out = blob.CreateOutStream();
+  auto in = blob.CreateInStream();
+  const std::size_t capacity = blob.Bytes().capacity();
+  CHECK_TRUE("empty text preserves reserved storage",
+             out.WriteText("") == 0 && blob.Bytes().capacity() == capacity);
+  CHECK_TRUE("empty raw write preserves reserved storage",
+             out.WriteBytes("") == 0 && blob.Bytes().capacity() == capacity);
+  CHECK_TRUE("raw binary bytes have no terminator",
+             out.WriteBytes(std::string_view("\0\xff", 2)) == 2);
+  CHECK_TRUE("bounded Write adds one zero terminator", out.Write(std::string_view("abcd"), 2) == 3);
+  CHECK_TRUE("an empty Write still writes its terminator", out.Write(std::string_view{}) == 1);
+  CHECK_TRUE("writes within capacity never replace storage", blob.Bytes().capacity() == capacity);
+  CHECK_TEXT("a preexisting input stream sees the exact appended bytes",
+             in.ReadBytes(100),
+             std::string_view("p\0\xff"
+                              "ab\0\0",
+                              7));
+  CHECK_TRUE("no bytes are lost beyond the stream end", in.EOS());
+}
+
+void SmallWritesGrowAmortizedStorage() {
+  constexpr std::size_t kWrites = 4096;
+  constexpr std::size_t kMaximumGrowths = 13;
+  Blob blob;
+  auto out = blob.CreateOutStream();
+  std::size_t capacity = 0;
+  std::size_t growths = 0;
+  bool counts = true;
+  for (std::size_t index = 0; index < kWrites; ++index) {
+    counts = (out.WriteBytes("x") == 1) && counts;
+    if (capacity != blob.Bytes().capacity()) {
+      capacity = blob.Bytes().capacity();
+      ++growths;
+    }
+  }
+  CHECK_TRUE("all small writes return their byte count", counts);
+  CHECK_TRUE("small writes allocate logarithmically, not once per write",
+             growths <= kMaximumGrowths);
+  CHECK_TRUE("storage remains bounded by twice the accumulated bytes", capacity <= kWrites * 2);
+  auto in = blob.CreateInStream();
+  CHECK_TEXT("amortized append retains every byte",
+             in.ReadBytes(static_cast<agiru::Integer>(kWrites)),
+             std::string(kWrites, 'x'));
+}
+
+void WritesPreserveBorrowedSelfInput() {
+  Blob blob;
+  auto out = blob.CreateOutStream();
+  static_cast<void>(out.WriteBytes("abcd"));
+  std::string_view borrowed(reinterpret_cast<const char *>(blob.Bytes().data()), blob.Length());
+  CHECK_TRUE("self input survives storage growth", out.WriteBytes(borrowed) == 4);
+  borrowed = std::string_view(reinterpret_cast<const char *>(blob.Bytes().data()) + 1, 3);
+  CHECK_TRUE("self input also survives terminated writes", out.Write(borrowed, 2) == 3);
+  auto in = blob.CreateInStream();
+  CHECK_TEXT("self input retains its original bytes",
+             in.ReadBytes(100),
+             std::string_view("abcdabcdbc\0", 11));
+  OutStream unbound;
+  bool refused = false;
+  try {
+    static_cast<void>(unbound.WriteBytes(""));
+  } catch (const Error &) { refused = true; }
+  CHECK_TRUE("even empty writes require a bound source", refused);
+}
 
 /// A NOTE ON A RECORD LINK IS A .NET STRING: `BinaryWriter.Write(string)` puts a 7-bit length
 /// prefix before the UTF-8 bytes and `BinaryReader.ReadString` takes it off again, which is how
@@ -136,7 +210,7 @@ void ABinaryWriterAndReaderRoundTripANote() {
   CHECK_TRUE("and Length is the blob's", BinReader.BaseStream().Length() == 7);
   CHECK_TEXT(
       "what was written comes back", std::string(BinReader.ReadString().Value()), "h\xc3\xa4llo");
-  Blob empty;
+  const Blob empty;
   InStream none;
   empty.CreateInStream(none);
   BinReader = BinReader.BinaryReader(none);
@@ -155,6 +229,8 @@ void ABinaryWriterAndReaderRoundTripANote() {
   CHECK_TRUE("a writer never bound refuses", threw);
 }
 
+} // namespace
+
 int main() {
   return gate::Run("Stream", [] {
     WhatIsWrittenLandsInTheBlob();
@@ -162,6 +238,9 @@ int main() {
     ReadingWalksTheStreamAndStopsAtItsEnd();
     ReadOfATextTakesTheTextForm();
     ATypedReadOrWriteRefuses();
+    WritesRetainStorageAndExactBytes();
+    SmallWritesGrowAmortizedStorage();
+    WritesPreserveBorrowedSelfInput();
     ABinaryWriterAndReaderRoundTripANote();
   });
 }

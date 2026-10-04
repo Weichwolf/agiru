@@ -138,6 +138,8 @@ public:
   }
 
 private:
+  Integer Append(std::string_view text, bool terminated);
+
   Integer WriteTerminated(std::string_view text, Integer length);
 
   [[nodiscard]] Blob &Bound() const;

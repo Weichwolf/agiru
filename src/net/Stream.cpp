@@ -9,9 +9,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <functional>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 namespace agiru {
@@ -48,28 +49,45 @@ void InStream::RefuseTyped() {
               "runtime does not have it. Only the text forms are here");
 }
 
+Integer OutStream::Append(std::string_view text, bool terminated) {
+  auto &bytes = Bound().bytes_;
+  const std::size_t maximum = bytes.max_size();
+  const std::size_t terminator = terminated ? 1 : 0;
+  if (terminator > maximum - bytes.size() || text.size() > maximum - bytes.size() - terminator) {
+    throw Error("OutStream.Write exceeds byte storage capacity");
+  }
+  std::string owned;
+  if (!text.empty() && !bytes.empty()) {
+    const auto *first = reinterpret_cast<const char *>(bytes.data());
+    const std::less<> before;
+    if (!before(text.data(), first) && before(text.data(), first + bytes.size())) {
+      owned = text;
+      text = owned;
+    }
+  }
+  const std::size_t oldSize = bytes.size();
+  const std::size_t required = oldSize + text.size() + terminator;
+  if (required > bytes.capacity()) {
+    const std::size_t doubled = bytes.capacity() > maximum / 2 ? maximum : bytes.capacity() * 2;
+    bytes.reserve(required > doubled ? required : doubled);
+  }
+  bytes.resize(required);
+  if (!text.empty()) { std::memcpy(bytes.data() + oldSize, text.data(), text.size()); }
+  if (terminated) { bytes.back() = 0; }
+  return static_cast<Integer>(text.size() + terminator);
+}
+
 Integer OutStream::WriteTerminated(std::string_view text, Integer length) {
   const std::size_t want = length < 0 ? text.size() : static_cast<std::size_t>(length);
-  const std::string_view cut = text.substr(0, want < text.size() ? want : text.size());
-  std::vector<std::uint8_t> bytes = Bound().Bytes();
-  for (const char c : cut) { bytes.push_back(static_cast<std::uint8_t>(c)); }
-  bytes.push_back(0);
-  Bound().Set(std::move(bytes));
-  return static_cast<Integer>(cut.size() + 1);
+  return Append(text.substr(0, want < text.size() ? want : text.size()), true);
 }
 
 Integer OutStream::WriteText(std::string_view text) {
-  std::vector<std::uint8_t> bytes = Bound().Bytes();
-  for (const char c : text) { bytes.push_back(static_cast<std::uint8_t>(c)); }
-  Bound().Set(std::move(bytes));
-  return static_cast<Integer>(text.size());
+  return Append(text, false);
 }
 
 Integer OutStream::WriteBytes(std::string_view bytes) {
-  std::vector<std::uint8_t> held = Bound().Bytes();
-  for (const char c : bytes) { held.push_back(static_cast<std::uint8_t>(c)); }
-  Bound().Set(std::move(held));
-  return static_cast<Integer>(bytes.size());
+  return Append(bytes, false);
 }
 
 std::string InStream::ReadBytes(Integer count) {
