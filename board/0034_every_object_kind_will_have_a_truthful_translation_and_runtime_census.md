@@ -5,34 +5,30 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
-- Native codeunit admission: `NativeSource.{h,cpp}` parses source-declared codeunits
-  and retains paths, typed methods and the original namespaced manifest owner.
-  Duplicate IDs/qualified names and missing owners refuse before output; source
-  parse failures remain counted. Bounded product exclusions retain raw identities.
-  Verified System-29 package: all 35/35 source identities match the independent
-  inventory, zero excluded/missing/unexpected/unmeasured, 72 Native methods named
-  unbound. The aggregate 125 inactive non-table sources remains unchanged.
-  `CodeunitWriter.cpp` refuses Native before AL body/local/event execution;
-  `Refused.cpp` counts each overload with original ID/namespace/types/modes/return.
-  Generator gate 49 checks, authored execution 19, original nine-overload execution
-  eleven checks green. Removing Native fails; the previous actual generator fails
-  all nine original Native calls. `/tmp/agiru-native-codeunits.tTdgkj`,
-  `/tmp/agiru-native-codeunits-previous.f3GfbR`. Missing-owner/duplicate/parse/policy
-  tooling: 54 checks green. Full verified-package generation keeps all 24,464 files
-  byte-identical; native tables remain 233 selected/18 bound/215 unbound, zero source
-  refusals, all 14,225 slice files exist. `/tmp/agiru-transpile.vHcXmw`, exit 1,
-  `generation-comparison.json`; no new exclusion or silent gap removal.
-  Native codeunits are not yet indexed/emitted by production translation; this
-  admission/refusal proof does not bind Base64 or activate a native provider.
-  Discovery's corrected script registry/negative controls pass; the current full
-  local replay is green. Frozen replay retains only a missing-notice layout refusal;
-  same full UT population remains 2,169/2,314 with no gain/loss/error change versus
-  132617 (README). New loader/refusal/runner/
-  emitter/gate analysis passes; three pre-existing gate include findings removed.
-  `make lint` checks thirteen of 244 available units and retains only the existing
-  CodeunitWriter/Main/BodyWriter findings, no new suppressions or baseline increase.
-  `/tmp/agiru-native-codeunits-{all-local,discovery-final,lint}.log`,
-  `lint-units.json` and final targeted `*-tidy.log` receipts under the same prefix.
+- Native codeunit declarations: `src/tc/Main.cpp` indexes original IDs, bare and
+  qualified names and typed procedures; one emitter serves app/native bodies.
+  Duplicate native/app IDs/names and unresolved bare-name ambiguity refuse.
+  Source ASTs establish inline app declarations, not line-based filename guesses.
+  Verified System-29: 35 raw/35 selected/35 emitted, zero excluded/missing/duplicate;
+  all 35 compile without PCH. Linked registry: 108 checks; original nine-overload
+  refusals: eleven checks. `/tmp/agiru-native-codeunit-output.k7vuZx`.
+  Full generation adds 70 files, changes 103, removes none; all 24,464 prior files
+  remain. `/tmp/agiru-transpile.NfMuFN`, exit 1: 72 Native methods unbound, 90 other
+  sources inactive, 233 tables selected/18 bound/215 unbound, 21 unresolved controls.
+  Native is handled as an explicit refusal, including analysis without output;
+  it is not silently dropped or a provider success. Local `make test`: 135 cases/
+  232 tooling tests green; native tooling 58, generator/authored/source-bound checks
+  49/19/8. Source-ID/library-definition controls fail; previous actual compiler
+  fails five assertions and cannot compile the source-bound consumer.
+  `/tmp/agiru-native-codeunits.K1f1tw`, `/tmp/agiru-native-codeunits-previous.UDymKH`,
+  `/tmp/agiru-native-codeunit-output-{all-local-final,native-tooling-final,lint}.log`.
+  New runner analysis passes; Main keeps four existing Main/BodyWriter findings,
+  no added suppression. Full UT replay/primitive binding remain open.
+  References: developer `ff5939a46e`, `devenv-namespaces-overview.md`,
+  `attributes/devenv-native-attribute.md`; BCApps `bb7111877f`,
+  `System Application/App/Base64 Convert/src/Base64ConvertImpl.Codeunit.al`;
+  user `0ff62b2266`, `admin-manage-appsource-apps.md` adds no binding guarantee;
+  predecessor 1483/1511 reject fabricated identities and fake stream writes.
 - Full native-constant replay 120802 ends at 2,100/2,314: 69 losses, zero gains,
   unchanged unique population/source hashes versus 101600. Raw identities/errors:
   run `artifacts/ut-comparison-101600.json`; null/unsealed seed, diagnostic only.
@@ -60,8 +56,8 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   `admin-manage-appsource-apps.md` adds no namespace-resolution guarantee.
 - Native Base64 authority: original System-29 `System.Runtime` codeunit
   2000000024 declares nine overloads in `src/System Codeunits/Runtime/Base64Convert.Codeunit.al`.
-  Source AST admission above retains codeunits but does not yet activate them; generated
-  `apps/absent/absent/Types.h` misreports this AL capability as a .NET member.
+  Source-owned production indexing/output now retains all nine declarations;
+  primitive binding remains open, not a .NET member implementation.
   Original BC29 NavBase64Converter byte/text cores call CLR Convert and Encoding:
   text uses GetBytes without a BOM; stream overloads remain separate contracts.
   Static IL/source hashes: `/tmp/agiru-native-base64-authority.xcQPoo/receipt.json`.
@@ -86,14 +82,14 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   header findings. Discovery fixture includes the new Bash qualifier and passes.
   Full local replay: 135 cases/227 tooling tests pass, exit 0;
   `/tmp/agiru-base64-all-local.log`. No production .NET dependency or hand-edited app.
-  Remaining before Native activation: source-owned index/output/module binding for
-  all nine overloads; exact text encodings, stream cursor/reference/threshold semantics,
+  Remaining before Native activation: primitive binding for all nine overloads;
+  exact text encodings, stream cursor/reference/threshold semantics,
   separate transform-block decoder and native AL diagnostic contracts. Existing Encoding
   treats single-byte pages as Latin-1 and accepts unknown pages; it is not qualified
   Windows-1252/UTF-8 replacement behaviour. Run all thirteen original tests and compare
   the unchanged full 2,314 UT population. No UT gain/performance/WASM claim.
 - Native stream qualification: raw/selected codeunit population is 35/35, none
-  excluded; source loading still activates none. Original BC29 output branches use
+  excluded; all declarations are emitted, but primitives remain unbound. Original BC29 output branches use
   raw writes with no BOM/terminator/output transcoding. `ConvertBuffer` retains a
   76-character line counter across chunks and inserts CRLF before the next block.
   Important counterexample: stream-to-text encoding calls `NavStream.GetBytes(true)`;
@@ -121,8 +117,8 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   AL parameters lack an explicit var modifier. Static source/IL inspection only,
   not original native execution or an implemented provider:
   `/tmp/agiru-native-base64-streams.a3h7rs/{receipt.json,inputs-and-results.sha256}`.
-  Admission/refusal proof above closes source loading and empty-success generation,
-  not production indexing/output/ownership registration or a primitive binding.
+  Declaration/index/output proof above closes source loading and empty-success
+  generation, not a primitive binding or native business execution.
   Next bind all nine overloads and execute the thirteen original tests plus
   cursor/encoding/binary/76-column/error controls. Local Native attribute docs
   `ff5939a46e` describe native codeunit methods, not stream-state guarantees.

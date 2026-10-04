@@ -43,7 +43,11 @@ constant path, not native provider/business execution or the UT milestone.
 `transpiler/native-codeunits.sh` executes void/value/named-return/overloaded/local
 Native refusals before var/stream/event effects. Removing Native must fail the
 compiled runner. `make native-codeunits JOBS=2` is the focused entry point;
-an explicit verified `AGIRU_SYSTEM_SYMBOLS` also compiles and calls all nine original
+the source-bound fixture uses production `--system-symbols` loading, indexes bare,
+qualified and numeric identities, links cross-codeunit AL calls and checks registry
+metadata and original module ownership. Wrong source IDs and missing definitions
+must fail compilation/linking. Unbound Native calls remain named refusals.
+An explicit verified `AGIRU_SYSTEM_SYMBOLS` also compiles and calls all nine original
 Base64 overloads, retaining named refusals. Neither proves implemented native
 behaviour or authenticates authored fixtures as System packages.
 

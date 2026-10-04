@@ -774,6 +774,7 @@ constexpr std::array kActedOnAttributes{
     std::string_view{"internalevent"},
     std::string_view{"messagehandler"},
     std::string_view{"modalpagehandler"},
+    std::string_view{"native"},
     std::string_view{"pagehandler"},
     std::string_view{"recallnotificationhandler"},
     std::string_view{"reporthandler"},
@@ -1467,6 +1468,7 @@ void AddNativeSourceTables(const agiru::gen::NativeSources &sources,
 std::size_t ReportNativeSources(const agiru::gen::NativeSources &sources,
                                 const agiru::gen::TableIndex &bindings) {
   std::size_t unbound = 0;
+  std::size_t unboundMethods = 0;
   for (std::size_t at = 0; at < sources.tables.size(); ++at) {
     if (bindings.contains(std::to_string(sources.tables[at].id))) { continue; }
     ++unbound;
@@ -1480,13 +1482,14 @@ std::size_t ReportNativeSources(const agiru::gen::NativeSources &sources,
   }
   for (std::size_t at = 0; at < sources.codeunits.size(); ++at) {
     const auto &unit = sources.codeunits[at];
-    std::println("native-codeunit-unactivated {} {}.{}: {}",
+    std::println("native-codeunit-declared {} {}.{}: {}",
                  unit.id,
                  unit.nameSpace,
                  unit.name,
                  sources.codeunitPaths[at]);
     for (const auto &procedure : unit.procedures) {
       if (!agiru::al::HasAttribute(procedure, "Native")) { continue; }
+      ++unboundMethods;
       std::println("native-method-unbound {}: {}",
                    agiru::gen::NativeMethodIdentity(unit, procedure),
                    sources.codeunitPaths[at]);
@@ -1498,8 +1501,12 @@ std::size_t ReportNativeSources(const agiru::gen::NativeSources &sources,
                sources.tables.size() - unbound,
                unbound,
                sources.issues.size(),
-               sources.otherSources.size() + sources.codeunits.size());
-  return unbound + sources.issues.size() + sources.otherSources.size() + sources.codeunits.size();
+               sources.otherSources.size());
+  std::println("native {} codeunit declarations selected; {} native methods unbound; "
+               "declaration output is not native execution proof",
+               sources.codeunits.size(),
+               unboundMethods);
+  return unbound + sources.issues.size() + sources.otherSources.size() + unboundMethods;
 }
 
 const agiru::al::TableObject *SourceOf(const agiru::al::PageObject &page,
@@ -2199,21 +2206,77 @@ void BindReportDeclaration(const agiru::al::PageObject &report, agiru::gen::Obje
   objects.reports.insert_or_assign(agiru::gen::LowerKey(report.name), ref);
 }
 
-void IndexCodeunits(const Run &run, agiru::gen::Objects &objects) {
+void CheckNativeCodeunitIdentity(const agiru::gen::ObjectDeclaration &declared,
+                                 const agiru::gen::NativeSources &native) {
+  for (const auto &unit : native.codeunits) {
+    if (declared.id == unit.id) {
+      throw std::runtime_error("AL codeunit duplicates declared System codeunit ID " +
+                               std::to_string(unit.id) + ": " + declared.name);
+    }
+    if (agiru::gen::LowerKey(declared.name) != agiru::gen::LowerKey(unit.name)) { continue; }
+    if (agiru::gen::LowerKey(declared.nameSpace) == agiru::gen::LowerKey(unit.nameSpace)) {
+      throw std::runtime_error("AL codeunit duplicates declared System qualified codeunit name: " +
+                               unit.nameSpace + "." + unit.name);
+    }
+    throw std::runtime_error("ambiguous native/app codeunit name: " + unit.name +
+                             "; namespace-aware resolution required");
+  }
+}
+
+void IndexNativeCodeunits(const agiru::gen::NativeSources &native, agiru::gen::Objects &objects) {
+  for (const auto &unit : native.codeunits) {
+    const auto name = agiru::gen::LowerKey(unit.name);
+    if (objects.codeunits.contains(name)) {
+      throw std::runtime_error("ambiguous native codeunit name: " + unit.name +
+                               "; namespace-aware resolution required");
+    }
+    agiru::gen::TableRef ref;
+    ref.identifier =
+        "::agiru::" + agiru::gen::NamespaceSuffix(unit.nameSpace) +
+        agiru::gen::ClassName(agiru::gen::Identifier(unit.name), agiru::gen::ObjectKind::Codeunit);
+    ref.header = agiru::gen::CodeunitHeaderPath(unit);
+    ref.id = unit.id;
+    ref.name = unit.name;
+    ref.native = true;
+    ref.procedureDeclarations = unit.procedures;
+    for (const auto &procedure : unit.procedures) {
+      const auto key = agiru::gen::LowerKey(procedure.name);
+      ref.procedures.emplace(key, agiru::gen::Identifier(procedure.name));
+      if (agiru::gen::IsTryFunction(procedure)) { ref.tryFunctions.emplace(key); }
+      if (agiru::gen::LowerKey(procedure.returnType) == "interface") {
+        ref.interfaceReturns.emplace(key);
+      }
+    }
+    objects.codeunits.emplace(name, ref);
+    objects.codeunits.emplace(std::to_string(unit.id), ref);
+    if (!unit.nameSpace.empty()) {
+      objects.codeunits.emplace(agiru::gen::LowerKey(unit.nameSpace + "." + unit.name), ref);
+    }
+  }
+}
+
+void IndexCodeunits(const Run &run,
+                    agiru::gen::Objects &objects,
+                    const agiru::gen::NativeSources &native) {
   for (const std::filesystem::path &path : SourcesEndingIn(run, ".Codeunit.al")) {
     const std::string source = Read(path);
-    const agiru::gen::ObjectDeclaration declared =
-        agiru::gen::DeclarationOf(source, agiru::gen::ObjectKind::Codeunit);
+    agiru::gen::ObjectDeclaration declared;
+    std::vector<agiru::al::ProcedureDecl> declarations;
+    try {
+      auto parsed = agiru::al::ParseCodeunit(source);
+      declared = {
+          .found = true, .id = parsed.id, .name = parsed.name, .nameSpace = parsed.nameSpace};
+      declarations = std::move(parsed.procedures);
+    } catch (const std::exception &) {
+      declared = agiru::gen::DeclarationOf(source, agiru::gen::ObjectKind::Codeunit);
+    }
     if (!declared.found) { continue; }
+    CheckNativeCodeunitIdentity(declared, native);
     const std::string &name = declared.name;
     const std::string &nameSpace = declared.nameSpace;
 
     const std::string identifier = agiru::gen::Identifier(name);
     const std::map<std::string, std::string> procedures = DeclaredProcedures(source);
-    std::vector<agiru::al::ProcedureDecl> declarations;
-    try {
-      declarations = agiru::al::ParseCodeunit(source).procedures;
-    } catch (const std::exception &) {}
     objects.codeunits.insert_or_assign(
         agiru::gen::LowerKey(name),
         agiru::gen::TableRef{
@@ -2502,6 +2565,38 @@ void WriteProfiles(Run &run, const agiru::gen::Objects &objects, ProfileCounts &
   }
 }
 
+bool EmitCodeunit(Run &run,
+                  const agiru::al::CodeunitObject &unit,
+                  const std::string &relative,
+                  Gathered &gathered,
+                  const agiru::gen::Objects &objects,
+                  std::map<std::string, std::size_t> &unresolvedTables) {
+  CountAttributes(unit, gathered.attributes, gathered.deprecatedScopes);
+  NotePropertiesOf(unit, gathered.properties);
+  CheckNormal(unit, "codeunit", agiru::gen::IsTestCodeunit(unit), gathered.refused);
+  NoteOptions(unit.variables, unit.procedures, gathered.options);
+  Absorb(gathered.refused, agiru::gen::Refused(unit));
+  if (run.output.empty()) { return false; }
+  try {
+    const auto header = agiru::gen::WriteCodeunit(unit, relative, objects);
+    const auto body = agiru::gen::WriteCodeunitSource(unit, relative, objects);
+    for (const auto &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
+    Absorb(gathered.dotnet, header.dotnet);
+    Absorb(gathered.absent, header.absent);
+    const auto stem = agiru::gen::CodeunitHeaderPath(unit);
+    Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
+    Keep(run,
+         Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
+         body);
+    ++run.written;
+    return true;
+  } catch (const std::exception &e) {
+    run.refusals.push_back(
+        Failure{.reason = Normalised(e.what()), .path = relative, .detail = e.what()});
+    return false;
+  }
+}
+
 void ScanCodeunits(Run &run,
                    Counts &counts,
                    Gathered &gathered,
@@ -2533,30 +2628,13 @@ void ScanCodeunits(Run &run,
     }
     counts.tests += tests;
     if (population.files != 0) { counts.unitParsed += tests; }
-    CountAttributes(*unit, gathered.attributes, gathered.deprecatedScopes);
-    NotePropertiesOf(*unit, gathered.properties);
-    CheckNormal(*unit, "codeunit", agiru::gen::IsTestCodeunit(*unit), gathered.refused);
-    NoteOptions(unit->variables, unit->procedures, gathered.options);
-    if (run.output.empty()) { continue; }
-    try {
-      const std::string relative = std::filesystem::relative(path, run.root).string();
-      const agiru::gen::CodeunitHeader header = agiru::gen::WriteCodeunit(*unit, relative, objects);
-      Absorb(gathered.refused, agiru::gen::Refused(*unit));
-      for (const std::string &missing : header.unresolvedTables) { ++unresolvedTables[missing]; }
-      Absorb(gathered.dotnet, header.dotnet);
-      Absorb(gathered.absent, header.absent);
-      const std::string stem = agiru::gen::CodeunitHeaderPath(*unit);
-      const std::string body = agiru::gen::WriteCodeunitSource(*unit, relative, objects);
-      Keep(run, Output{.directory = run.output, .relative = stem}, header.text);
-      Keep(run,
-           Output{.directory = run.output, .relative = stem.substr(0, stem.size() - 1) + "cpp"},
-           body);
+    if (EmitCodeunit(run,
+                     *unit,
+                     std::filesystem::relative(path, run.root).string(),
+                     gathered,
+                     objects,
+                     unresolvedTables)) {
       ++counts.emitted;
-      ++run.written;
-    } catch (const std::exception &e) {
-      run.refusals.push_back(Failure{.reason = Normalised(e.what()),
-                                     .path = std::filesystem::relative(path, run.root).string(),
-                                     .detail = e.what()});
     }
   }
 }
@@ -2893,6 +2971,11 @@ std::size_t NoteNativeEnumInterfaces(const Enums &enums, const agiru::gen::Objec
   return gaps;
 }
 
+bool HasUnboundNativeMethods(const Gathered &gathered) {
+  return std::ranges::any_of(gathered.refused,
+                             [](const auto &refusal) { return refusal.property == "Native"; });
+}
+
 std::size_t WriteNativeTables(Run &run,
                               const agiru::gen::NativeSources &native,
                               const agiru::gen::Objects &objects) {
@@ -2919,10 +3002,12 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
                                       Gathered &gathered,
                                       const TableByName &tables,
                                       std::set<std::filesystem::path> &kept,
-                                      LayoutCounts &layouts) {
+                                      LayoutCounts &layouts,
+                                      std::map<std::string, std::size_t> &unresolvedTables,
+                                      std::vector<Failure> &refusals) {
   const bool ownedTables = !native.tables.empty() && !native.app.id.empty();
   if (reports.objects.empty() && enums.objects.empty() && native.interfaces.empty() &&
-      !ownedTables) {
+      native.codeunits.empty() && !ownedTables) {
     return {};
   }
   Run run{.sourceRoot = job.systemSymbols,
@@ -2960,6 +3045,13 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
                   Interfaces{.objects = native.interfaces, .paths = native.interfacePaths},
                   gathered,
                   objects);
+  const auto interfacesWritten = run.written - beforeInterfaces;
+  const auto beforeCodeunits = run.written;
+  for (std::size_t at = 0; at < native.codeunits.size(); ++at) {
+    EmitCodeunit(
+        run, native.codeunits[at], native.codeunitPaths[at], gathered, objects, unresolvedTables);
+  }
+  refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   for (const auto &object : enums.objects) {
     Absorb(gathered.refused, agiru::gen::Refused(object));
     NoteProperties(object.properties, "enum", gathered.properties);
@@ -2982,7 +3074,11 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
   std::println("native {} interface sources bound; {} interface objects written into the platform "
                "app; no native implementor or business execution proof",
                native.interfaces.size(),
-               run.written - beforeInterfaces);
+               interfacesWritten);
+  std::println("native {} codeunit sources indexed; {} codeunit objects written into the platform "
+               "app; native methods remain explicit refusals",
+               native.codeunits.size(),
+               run.written - beforeCodeunits);
   std::size_t interfaceGaps = 0;
   for (const auto &face : native.interfaces) {
     for (const auto &base : face.extends) {
@@ -3144,6 +3240,7 @@ int Scan(const Job &job) {
       nativeSources.codeunits.size(),
       rawNativeCodeunits - nativeSources.codeunits.size());
   if ((!nativeSources.reports.empty() || !nativeSources.enums.empty() ||
+       !nativeSources.interfaces.empty() || !nativeSources.codeunits.empty() ||
        (!nativeSources.tables.empty() && !nativeSources.app.id.empty())) &&
       std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {
     throw std::runtime_error("apps.json: platform is reserved for the supplied System package");
@@ -3194,6 +3291,7 @@ int Scan(const Job &job) {
 
   const std::size_t nativeGaps = BindNativeSources(
       job.systemSymbols, nativeSources, store, objects, everyTable, allExtensions);
+  IndexNativeCodeunits(nativeSources, objects);
   Enums nativeEnums{.objects = nativeSources.enums, .paths = nativeSources.enumPaths};
   Counts nativeEnumCounts;
   MergeAndIndexEnums(nativeEnums, nativeEnumCounts, store, index);
@@ -3242,7 +3340,7 @@ int Scan(const Job &job) {
       agiru::gen::NoteDotNetSpellings(Read(path));
     }
     agiru::gen::FixDotNetSpellings();
-    IndexCodeunits(run, objects);
+    IndexCodeunits(run, objects, nativeSources);
     Pages parsedReports = IndexReports(run, objects, nativeSources);
     layouts.reports += CountLayouts(parsedReports);
     extensions.emitted += MergeReportExtensions(store, parsedReports);
@@ -3341,8 +3439,17 @@ int Scan(const Job &job) {
     refusals.insert(refusals.end(), run.refusals.begin(), run.refusals.end());
   }
 
-  const auto nativeOutput = WriteNativeObjects(
-      job, nativeSources, nativeEnums, nativeReports, objects, gathered, everyTable, kept, layouts);
+  const auto nativeOutput = WriteNativeObjects(job,
+                                               nativeSources,
+                                               nativeEnums,
+                                               nativeReports,
+                                               objects,
+                                               gathered,
+                                               everyTable,
+                                               kept,
+                                               layouts,
+                                               unresolvedTables,
+                                               refusals);
   written += nativeOutput.written;
   changed += nativeOutput.changed;
   allReports += nativeReports.objects.size();
@@ -3528,8 +3635,8 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return failures.empty() && refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 &&
-                 store.unplaced == 0
+  return !HasUnboundNativeMethods(gathered) && failures.empty() && refusals.empty() &&
+                 nativeGaps == 0 && nativeOutput.gaps == 0 && store.unplaced == 0
              ? 0
              : 1;
 }

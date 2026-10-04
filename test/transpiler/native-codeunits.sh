@@ -25,7 +25,7 @@ link_generated() {
   local sources=()
   mapfile -t sources < <(rg --files --no-ignore "$output" -g '*.cpp' | LC_ALL=C sort)
   [ "${#sources[@]}" -gt 0 ]
-  "$CXX" "${flags[@]}" "-I$output/fixture" "-I$output/shared" "-I$output/absent" \
+  "$CXX" "${flags[@]}" "-I$output/fixture" "-I$output/platform" "-I$output/shared" "-I$output/absent" \
     "-I$output" "$object" "${sources[@]}" "${links[@]}" -o "$runner"
 }
 
@@ -57,6 +57,46 @@ if "$proof/non-native/runner" > "$proof/non-native-execution.log" 2>&1; then
 fi
 rg -q 'unbound Native refuses with its original typed signature' "$proof/non-native-execution.log"
 
+bound="$input/source-bound"
+status=0
+"$B/agirutc" "$bound" "$bound/apps.json" "$proof/source-bound" \
+  --system-symbols "$bound/native" > "$proof/source-bound.log" 2>&1 || status=$?
+[ "$status" -eq 1 ]
+rg -q '2 codeunit sources indexed; 2 codeunit objects written into the platform app' "$proof/source-bound.log"
+rg -q '2 codeunit declarations selected; 1 native methods unbound' "$proof/source-bound.log"
+"$CXX" "${flags[@]}" "-I$proof/source-bound/fixture" "-I$proof/source-bound/platform" \
+  -c "$input/SourceRunner.cpp" -o "$proof/source-runner.o"
+record_command native-codeunits-source "$input/SourceRunner.cpp" \
+  "$CXX" "${flags[@]}" "-I$proof/source-bound/fixture" "-I$proof/source-bound/platform" \
+  -c "$input/SourceRunner.cpp" -o "$proof/source-runner.o"
+link_generated "$proof/source-bound" "$proof/source-runner.o" "$proof/source-runner"
+"$proof/source-runner" | tee "$proof/source-execution.log"
+
+cp -a "$bound" "$proof/id-mutant"
+sed -i 's/codeunit 50321/codeunit 50320/' "$proof/id-mutant/native/src/odd-source-name.aL"
+status=0
+"$B/agirutc" "$proof/id-mutant" "$proof/id-mutant/apps.json" "$proof/id-generated" \
+  --system-symbols "$proof/id-mutant/native" > "$proof/id-mutant.log" 2>&1 || status=$?
+[ "$status" -eq 1 ]
+if "$CXX" "${flags[@]}" "-I$proof/id-generated/fixture" "-I$proof/id-generated/platform" \
+  "-I$proof/id-generated/absent" "-I$proof/id-generated/shared" \
+  -c "$input/SourceRunner.cpp" -o "$proof/id-runner.o" > "$proof/id-control.log" 2>&1; then
+  printf 'native-codeunits: wrong source ID escaped compilation control\n' >&2
+  exit 1
+fi
+rg -q 'static assertion failed' "$proof/id-control.log"
+
+sources=()
+mapfile -t sources < <(rg --files --no-ignore "$proof/source-bound" -g '*.cpp' | \
+  LC_ALL=C sort | sed '\@/platform/system/fixture/codeunit/SourceNative.cpp$@d')
+if "$CXX" "${flags[@]}" "-I$proof/source-bound/fixture" "-I$proof/source-bound/platform" \
+  "$proof/source-runner.o" "${sources[@]}" "${links[@]}" -o "$proof/missing-definition" \
+  > "$proof/missing-definition-control.log" 2>&1; then
+  printf 'native-codeunits: missing native source definition escaped link control\n' >&2
+  exit 1
+fi
+rg -q 'undefined symbol.*SourceNative_Codeunit' "$proof/missing-definition-control.log"
+
 if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   python3 scripts/fetch_symbols.py --verify "$AGIRU_SYSTEM_SYMBOLS"
   original="$AGIRU_SYSTEM_SYMBOLS/src/System Codeunits/Runtime/Base64Convert.Codeunit.al"
@@ -76,5 +116,6 @@ if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   sha256sum --check --status "$proof/inputs.sha256"
   rm -f "$proof/emitter.o" "$proof/emitter" "$proof/original-runner.o" "$proof/original-runner"
 fi
-rm -f "$proof/runner.o" "$proof/runner" "$proof/non-native/runner"
+rm -f "$proof/runner.o" "$proof/runner" "$proof/non-native/runner" \
+  "$proof/source-runner.o" "$proof/source-runner"
 printf 'native-codeunits: unbound declarations refuse before effects; missing-attribute control fails; %s\n' "$proof"

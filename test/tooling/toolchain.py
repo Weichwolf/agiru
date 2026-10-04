@@ -79,8 +79,10 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.transpiler = (self.repository / os.environ.get('B', 'build') / 'agirutc').resolve()
         self.generated = self.root / 'generated'
 
-    def run_compiler(self, extra=None):
-        arguments = [str(self.transpiler), str(self.root), str(self.apps), str(self.generated)]
+    def run_compiler(self, extra=None, output=True):
+        arguments = [str(self.transpiler), str(self.root), str(self.apps)]
+        if output:
+            arguments.append(str(self.generated))
         arguments += ['--system-symbols', str(self.package)] if extra is None else extra
         return subprocess.run(arguments, text=True, capture_output=True, timeout=30)
 
@@ -349,12 +351,13 @@ class NativeSourceCompilerGate(unittest.TestCase):
     def test_unbound_and_non_table_sources_remain_red_and_counted(self):
         self.native_table_manifest()
         (self.package / 'src/Unknown.al').write_text('table 50199 Unknown { fields { field(1; ID; Integer) {} } }')
-        (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated { }')
+        (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated { [Native] procedure Read() begin end; }')
         result = self.run_compiler()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('native-unbound 50199 Unknown', result.stdout)
         self.assertIn('2 table sources parsed, 1 bound, 1 unbound', result.stdout)
-        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertIn('0 other AL sources not activated', result.stdout)
+        self.assertIn('1 codeunit declarations selected; 1 native methods unbound', result.stdout)
         self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \([^\n]*1 \[Test\] methods\)')
 
     def test_native_codeunit_source_identity_and_policy_are_retained(self):
@@ -365,9 +368,19 @@ class NativeSourceCompilerGate(unittest.TestCase):
         result = self.run_compiler()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('native parsed codeunit declarations: 1 before policy, 1 selected, 0 product-excluded', result.stdout)
-        self.assertIn('native-codeunit-unactivated 50200 System.Fixture.Unactivated: src/not-a-codeunit-name.aL', result.stdout)
+        self.assertIn('native-codeunit-declared 50200 System.Fixture.Unactivated: src/not-a-codeunit-name.aL', result.stdout)
         self.assertIn('native-method-unbound codeunit 50200 System.Fixture.Unactivated.Read(var Value: Integer): Text', result.stdout)
-        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertIn('0 other AL sources not activated', result.stdout)
+        self.assertIn('1 codeunit sources indexed; 1 codeunit objects written into the platform app', result.stdout)
+        self.assertIn('0 declaration(s) of 0 kind(s) are read and dropped', result.stdout)
+        header = self.generated / 'platform/system/fixture/codeunit/Unactivated.h'
+        body = header.with_suffix('.cpp')
+        self.assertIn('CodeunitId kId{50200}', header.read_text())
+        self.assertIn('src/not-a-codeunit-name.aL', body.read_text())
+        self.assertIn('has no native implementation', body.read_text())
+        module = self.generated / 'platform/PlatformModule.h'
+        self.assertIn('85a884cd-20d8-4d18-91bd-e6c1baaa3a32', module.read_text())
+        self.assertIn('1.2.3.4', module.read_text())
         self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \([^\n]*1 \[Test\] methods\)')
         policy = {'include': ['System', 'Microsoft'], 'exclude': [],
             'product_exclude': ['bc-licensing:system-symbols/src/not-a-codeunit-name.aL']}
@@ -377,6 +390,63 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertIn('native parsed codeunit declarations: 1 before policy, 0 selected, 1 product-excluded', excluded.stdout)
         self.assertIn('native product-excluded codeunit 50200 System.Fixture.Unactivated:', excluded.stdout)
         self.assertNotIn('native-method-unbound', excluded.stdout)
+        self.assertFalse(header.exists())
+
+    def test_unbound_native_methods_refuse_in_analysis_with_and_without_a_system_package(self):
+        self.native_table_manifest()
+        declaration = ('namespace System.Fixture; codeunit 50200 NativeUnit { '
+            '[Native] procedure Read(): Integer begin exit(7); end; }')
+        (self.package / 'src/Code.al').write_text(declaration)
+        (self.source / 'Unbound.Codeunit.al').write_text(declaration.replace('50200', '50201')
+            .replace('NativeUnit', 'AppNative'))
+        for extra in (None, []):
+            with self.subTest(extra=extra):
+                result = self.run_compiler(extra=extra, output=False)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('Native in codeunit 50201 System.Fixture.AppNative.Read(): Integer', result.stdout)
+                self.assertIn('0 declaration(s) of 0 kind(s) are read and dropped', result.stdout)
+                self.assertFalse(self.generated.exists())
+
+    def test_an_app_cannot_replace_native_codeunit_identity_or_ambiguously_rebind_its_name(self):
+        self.native_table_manifest()
+        (self.package / 'src/Native.al').write_text('namespace System.Fixture; codeunit 50200 NativeUnit {}')
+        for source, refusal in (
+                ('namespace Microsoft.Fixture; codeunit 50200 Other {}',
+                 'duplicates declared System codeunit ID 50200'),
+                ('namespace System.Fixture; codeunit 50201 NativeUnit {}',
+                 'duplicates declared System qualified codeunit name: System.Fixture.NativeUnit'),
+                ('namespace Microsoft.Fixture; codeunit 50201 NativeUnit {}',
+                 'ambiguous native/app codeunit name: NativeUnit')):
+            with self.subTest(source=source):
+                (self.source / 'Conflict.Codeunit.al').write_text(source)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(refusal, result.stderr)
+                self.assertFalse((self.generated / 'platform/system/fixture/codeunit/NativeUnit.h').exists())
+
+    def test_native_codeunit_bare_name_ambiguity_refuses_instead_of_overwriting(self):
+        self.native_table_manifest()
+        (self.package / 'src/First.al').write_text('namespace System.First; codeunit 50200 NativeUnit {}')
+        (self.package / 'src/Second.al').write_text('namespace System.Second; codeunit 50201 NativeUnit {}')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('ambiguous native codeunit name: NativeUnit', result.stderr)
+        self.assertFalse((self.generated / 'platform').exists())
+
+    def test_codeunit_only_package_reserves_platform_and_emits_ordinary_al_bodies(self):
+        self.native.unlink()
+        self.native_table_manifest()
+        (self.package / 'src/Code.aL').write_text('namespace System.Fixture; codeunit 50200 NativeUnit { '
+            'procedure Read(): Integer begin exit(7); end; }')
+        result = self.run_compiler()
+        self.assertIn('1 codeunit sources indexed; 1 codeunit objects written', result.stdout)
+        self.assertNotIn('native-method-unbound', result.stdout)
+        body = self.generated / 'platform/system/fixture/codeunit/NativeUnit.cpp'
+        self.assertIn('return 7;', body.read_text())
+        self.apps.write_text(json.dumps({'apps': [{'name': 'platform', 'source': 'source'}]}))
+        refused = self.run_compiler()
+        self.assertEqual(refused.returncode, 1, refused.stdout + refused.stderr)
+        self.assertIn('platform is reserved for the supplied System package', refused.stderr)
 
     def test_native_codeunit_duplicate_id_or_qualified_name_refuses_before_output(self):
         self.native_table_manifest()
@@ -592,7 +662,7 @@ class NativeReportSourceCompilerGate(unittest.TestCase):
         self.assertFalse(self.definitions().exists())
 
     def test_unclassified_sources_keep_translation_red_and_population_counted(self):
-        (self.package / 'src/other.al').write_text('codeunit 50233 Unactivated {}')
+        (self.package / 'src/other.al').write_text('page 50233 Unactivated {}')
         result = self.run_compiler()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('1 other AL sources not activated', result.stdout)
@@ -617,7 +687,7 @@ class NativeReportSourceCompilerGate(unittest.TestCase):
 
     def test_comment_text_is_not_a_native_report_declaration(self):
         self.report.write_text('// report 50230 "Native Fixture" { dataset {} }\n'
-            'codeunit 50230 "Not A Report" {}')
+            'page 50230 "Not A Report" {}')
         result = self.run_compiler()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('1 other AL sources not activated', result.stdout)
@@ -658,7 +728,7 @@ class NativeEnumSourceCompilerGate(unittest.TestCase):
         self.assertIn('::agiru::System::Fixture::NativeSparse_Enum', consumer)
 
     def test_unactivated_sources_remain_red_without_losing_the_ut_population(self):
-        (self.package / 'src/Other.al').write_text('codeunit 50245 Unactivated {}')
+        (self.package / 'src/Other.al').write_text('page 50245 Unactivated {}')
         result = self.run_compiler()
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
         self.assertIn('1 other AL sources not activated', result.stdout)

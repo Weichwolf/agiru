@@ -137,7 +137,7 @@ native-table-ids: comments db tc ## execute source-owned native table IDs withou
 	@"$(B)/gate_AlParserGate"
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-table-ids.sh"
 
-native-codeunits: comments db tc ## qualify unbound Native methods; explicit System package also compiles original overloads
+native-codeunits: comments db tc ## qualify source-owned native indexing/output and explicit unbound methods
 	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt gate_GenCodeunitGate
 	@"$(B)/gate_GenCodeunitGate"
 	@B="$(B)" bash "$(SELF)/test/transpiler/native-codeunits.sh"

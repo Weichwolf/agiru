@@ -15,6 +15,18 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Native codeunit indexing/output (0034): 35 raw/selected/emitted original identities,
+  zero missing/excluded/duplicates; 35 compile without PCH. Linked registry 108 and
+  original nine-overload refusal eleven checks green. Bare/qualified/numeric consumers
+  execute; ID/missing-definition controls fail. Previous actual compiler fails five
+  assertions and cannot compile the consumer. Full generation adds 70 files, changes
+  103, removes none; `/tmp/agiru-transpile.NfMuFN`, exit 1. Still 72 unbound Native
+  methods, 90 inactive other sources, 215 unbound tables and 21 unresolved controls.
+  Full local replay: 135 cases/232 tooling tests pass; native tooling 58 checks green.
+  Runner analysis passes; Main retains four existing Main/BodyWriter findings,
+  no added suppression. `/tmp/agiru-native-codeunit-output.k7vuZx`,
+  `/tmp/agiru-native-codeunit-output-{all-local-final,native-tooling-final,lint}.log`.
+  Full AL replay and primitive activation remain pending; no UT gain/G1 claim.
 - Completed integration replay: `20261004T143703Z-2217132`, frozen HEAD `ad7a917`,
   source `8534a91bf87c10d8fc0ffd85f113dca46381fdda1cacbcccfad778357bfbc87e`;
   `slice-check all test ut`, six jobs; terminal receipt, no live runner.
@@ -78,8 +90,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `make lint` retains only existing CodeunitWriter/Main/BodyWriter findings over
   thirteen selected units; no suppression/baseline increase.
   `/tmp/agiru-native-codeunits-{all-local,discovery-final,lint}.log`.
-  Production indexing/emission and
-  primitive activation remain open; no Base64 binding or UT gain claimed.
+  This admission receipt predates production indexing/output above;
+  primitive activation remains open; no Base64 binding or UT gain claimed.
 - Qualified-table recovery replay: `20261004T132617Z-2130724`, frozen HEAD
   `23d1497`, source `1dee82b25ed072be32d3b5b27f03be68d059c6bdff423b707c0e99f12c947d07`;
   `slice-check all test ut`, six jobs. Terminal: slice-check/all/test exit 0;
