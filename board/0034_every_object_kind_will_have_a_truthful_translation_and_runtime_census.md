@@ -286,7 +286,10 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    admitted source ASTs and original module ownership; retain collision controls.
    Keep all unbound methods counted/refusing; Native attribute alone grants no binding.
    Base64Convert needs all nine source overloads over one byte codec,
-   existing Encoding and bounded stream I/O. Qualify native core/error/line-break
+   existing Encoding and bounded stream I/O. First qualify generic shared stream
+   cursor/owner semantics (0035): native ALByValue retains SharedNavStream,
+   while current C++ copies its position scalar. Preserve declared argument modes.
+   Qualify native core/error/line-break
    contracts, execute the thirteen original tests, retain every other native gap
    and compare all 2,314 UT after activation. Do not patch OAuth or base64 AL bodies.
    Replay the unchanged 2,314 UT after source-owned constant activation.

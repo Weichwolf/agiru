@@ -5,6 +5,15 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Stream-copy authority (2026-10-05): original Ncl 29.0.54011.55407
+  `NavInStream.ALByValue` creates a distinct wrapper, then ALAssign/Assign retain
+  the same SharedNavStream target. Position belongs to that target; ALPosition
+  adds one (or returns -1 for nonseekable input). Current `Stream.h` copies its
+  scalar position independently and borrows Blob through a raw pointer. Qualify
+  alias/owner lifetime before activating Native stream overloads; do not change
+  their source by-value signatures to var. Static IL only, no native execution
+  or UT gain; keep System 29.0.55365.0 separate. Receipts/hashes:
+  `/tmp/agiru-stream-alias-authority.eE5zod/{receipt.json,stream-alias.il,inputs.sha256}`.
 - Single-byte foundation: private immutable `src/net/CodePage.{h,cpp}` tables keep
   Windows-1252 and ISO-8859-1 best-fit distinct; ASCII replaces non-ASCII bytes.
   Shared factories preserve declared aliases/preambles and refuse unknown pages.
@@ -131,6 +140,12 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
    Chart: close the original consumer's declared link dependencies under the LLVM stack; execute its twelve retained checks and the original AL numeric conversions. Keep BusinessChartBuilder refusals and all missing checks counted; establish CLR enum Format behaviour separately. Primitive gates alone are not chart workflow proof.
    Feed the resulting exact typed series/dimensions into one shared chart model: C++ vector scenes for PDF/SVG (0063), interactive selection/drilldown through the common CLI/web command contract (0720). Preserve all declared chart kinds and events; neither a static image nor an empty builder closes the chart requirement.
 3. Reproduce or refute XML stream lifetime paths with focused ASan/UBSan cases. Keep shared engines behind AL and .NET-specific public contracts; gate identity/copying, disposal, out parameters, null, encoding and exception differences. Delegate JSON node/number representation to 0722.
+   AL streams: `Stream.h`/`Stream.cpp` need separately owned handles over shared
+   cursor/provider state, not copied scalar positions. Prove assignment/by-value
+   calls, resets, rebinding independence and escaped BLOB/codeunit owner lifetimes
+   through StreamGate and generated AL before Native Base64 activation (0034).
+   Preserve one-based BigInteger Position and nonseekable refusal/results; do not
+   borrow a dead owner or transplant the native session/tree implementation.
 4. Review std::regex compatibility and CultureInfo/TextInfo formatting/casing against the source usages. Add Unicode and culture fixtures that distinguish invariant, session and explicit-provider behaviour.
    Encoding: use one generic codepage/Unicode converter with immutable sorted
    source-qualified mappings; preserve best-fit and two-unit supplementary fallback.
