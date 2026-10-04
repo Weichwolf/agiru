@@ -15,6 +15,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Current integration replay: `20261004T143703Z-2217132`, frozen HEAD `ad7a917`,
+  source `8534a91bf87c10d8fc0ffd85f113dca46381fdda1cacbcccfad778357bfbc87e`;
+  `slice-check all test ut`, six jobs. Runner PID 2217377 confirmed live;
+  slice-check passes, build is running. Includes BLOB amortization, native codeunit
+  admission and corrected Discovery registry. BC input hash matches 132617
+  (`af53219b7fc9e68a58293bad9fd178232d6bef47bbab2166b390620fb38497a2`);
+  refreezing the source-only snapshot cannot rediscover Git revision, so this
+  receipt's revision is null. The matching original receipt records BCApps
+  `bb7111877ff786951b86a1a0f80d8b39b8f5dacd`. No new AL result yet.
 - Native codeunit admission (0034): all 35 selected source ASTs retain signatures,
   paths and manifest identity; 72 Native methods remain individually unbound and
   the aggregate 125 inactive-source gap remains. Missing owner/duplicate identities
