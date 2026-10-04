@@ -1,6 +1,6 @@
 # Delivery board
 
-Review: 2026-10-03. Repository text is English. Open outcomes only; no historical pass count is a current measurement.
+Review: 2026-10-04. Repository text is English. Open outcomes only; no historical pass count is a current measurement.
 
 Build cleanup (2026-10-02): handwritten sources from 79 source copies are preserved in
 `archive/build-20261002/` (relative paths use `--` instead of `/`); standalone probes
@@ -13,9 +13,383 @@ and archived source branches were preserved. The current receipts below are newl
 Preserved native prototype: branch `work/native-field-metadata`, worktree
 `/home/cosmo/Git/agiru-worktrees/native-field-metadata`; not promoted to `main`.
 
-## Current verification — 2026-10-03
+## Current verification — 2026-10-04
 
-- Confirmed UT baseline: BCApps `bb7111877f`, System 29.0.55365.0;
+- Latest frozen replay `20261004T080905Z-1761326`: slice-check/all/test exit 0;
+  UT exit 2, 2,162/2,314 passed, 152 failed, zero incomplete, 80 codeunits,
+  six workers/1,256 seconds. All 2,314 identities compared with 064830: no gains,
+  losses, missing/added identities or changed errors. Receipt:
+  `/tmp/agiru-al-decimal.S7CPdN/ut-final-comparison.json`; source
+  `9243953607b10e22e34c722a13ba0c1b3416f70e1ee1ced0d2397a04c49e9b0c`.
+  Null/unsealed seed: repeatability, not causal A/B or G1/full-app proof.
+- Separate AL arithmetic foundation (0066/0073): 34 gate checks and 37,532 original
+  BC29 Decimal18 reference cases pass exact values/scales/order/error categories.
+  Three compiled controls reject; targeted runtime/gate analysis passes.
+  Complete local replay: 128 cases/223 tooling tests green, exit 0.
+  `/tmp/agiru-al-decimal.S7CPdN/receipt.json`; not active in generated AL or frozen 080905.
+  Qualify every typed conversion/evaluation boundary before full-tree activation;
+  this does not close field/SQL/format/version gaps or make G1 green.
+- Later Decimal batch (0066): CLR scale 28/96-bit arithmetic, nearest-even fitting
+  and exact-division/zero scale contracts; 84 Decimal checks green, three compiled
+  controls reject, 31,536 deterministic .NET 8.0.31 cases match exact text/scale.
+  Ordinary SQL gate proves scale-28 buffers versus scale-20 persisted values and
+  PostgreSQL ties-away rounding (71 checks green). Decimal runtime/gate analysis
+  passes without suppressions. `/tmp/agiru-decimal-clr28-*.log`, reference source
+  and results `/tmp/agiru-decimal-clr-oracle.cIgWYH/`.
+  Complete local gate build and eight affected read-only gates pass; StorageGate
+  own findings decrease by eleven to zero, with 31 existing header findings retained.
+  Outside completed 064830; full AL activation and UOM-loss investigation remain due.
+  Initial local replay: 127 cases/one obsolete FilterGate expectation red;
+  223 tooling tests pass. Correct scale-28 filter contract: 125 green, old-core
+  control three red; local replay passes 127 cases/223 tooling tests. Later Round
+  rejects negative precision: 90 checks green, six red before repair; runtime/gate
+  targeted lint pass. Filter cleanup keeps 125 checks, removes sixteen own findings
+  and its overlong function; thirty inherited header findings remain unsuppressed.
+  Final local replay passes 127 cases/223 tooling tests, exit 0
+  (`/tmp/agiru-round-final-all-local.log`). Frozen `20261004T080905Z-1761326` completed
+  slice-check/all/test/ut with the unchanged 2,162/2,314 result, source
+  `9243953607b10e22e34c722a13ba0c1b3416f70e1ee1ced0d2397a04c49e9b0c`,
+  HEAD `108944f`, BCApps `bb7111877f`; later FilterGate cleanup is outside it.
+  Compare every original method with 064830. Original UOM default runs retain
+  19/19 but only exercise 1/4. Explicit diagnostic seed 4 exposes nine losses
+  (9/19 → 0/19), scale-28 setup versus scale-20 SQL read-back; not regular UT counts.
+  Evidence and boundary work: 0066; native RNG reset coverage: 0039.
+  Executed original BC29 Decimal18 shows an AL-specific eighteen-significant-digit
+  wrapper distinct from the CLR core; native 1/9 × 100 has zero remainder against
+  its basis precision. Version-qualified AL lowering/conversions remain open
+  (0066/0073), not a reason to reduce the CLR core globally.
+- Later page batch (0030): system Edit follows a list's declared CardPageId and
+  selected row through common Page.Run; explicit actions keep precedence.
+  Card opening triggers, standalone modes, false ModifyAllowed and empty selection
+  execute. Unbound TestField.AsInteger now raises rather than dereferencing null.
+  PageSource 15 and generated AL 15 checks green; four compiled controls reject.
+  `make test JOBS=2`: 127 cases/223 tooling tests green
+  (`/tmp/agiru-page-navigation-all-local.log`). Include-only runner cleanup repeats
+  the focused checks/controls and passes targeted analysis; runtime/gate retain
+  44/49 unchanged header findings and zero own findings. Frozen activation
+  `20261004T064830Z-1661382` completed `slice-check all test ut`, six jobs;
+  source `76f14f5fc6f16069f0bb4619fdc4adcf91257edb46341db981d3efafc28bfdd8`,
+  HEAD `108944f`, BCApps `bb7111877f`, original System hash unchanged.
+  Includes ordinary metadata defaults: slice-check/all/test=0, ut=2;
+  2,162/2,314, 152 failed, zero incomplete, 80 codeunits, 1,390 seconds.
+  Compared with 044804: one gain (TestProcessAskUserPermission), zero losses,
+  zero missing/added identities. Three other Incoming Document errors now reach
+  the explicit live Table Metadata provider refusal instead of an unopened page.
+  `/tmp/agiru-page-metadata-ut-comparison.json`; legacy null/unsealed seed,
+  diagnostic repeatability rather than causal A/B. Decimal batch is not included.
+- Completed scoped-Record/XML integration `20261004T044804Z-1552154`:
+  `slice-check/all/test=0`, `ut=2`; 2,161/2,314, 153 failed, zero incomplete,
+  80 codeunits, 1,378 seconds. All 2,314 unique identities and pass statuses match
+  023609; two Incoming Document diagnostics now reach the Table Metadata refusal.
+  `/tmp/agiru-scoped-xml-ut-comparison.json`. Original SQL/debugger replay proves
+  post-rollback error restoration and the first trapped error list; the remaining
+  unopened-page trap is the card's ErrorMessagesPart (0030/0061).
+  Metadata defaults and the later Edit-navigation fix are outside this run.
+  Legacy null/unsealed seed: diagnostic repeatability, not causal A/B proof.
+- Later Table Metadata batch (0044): ordinary AL defaults are resolved without
+  overwriting source omissions; native omissions still refuse. Compiler-18/Runtime-18
+  generated metadata qualifies the defaults, not CLR optional arguments.
+  ReflectionMetadata 181 checks/thirteen controls and generated AL 52 checks pass.
+  Complete `make test JOBS=2` passes 126 cases/223 tooling tests
+  (`/tmp/agiru-metadata-defaults-all-local.log`);
+  `/tmp/agiru-metadata-defaults-receipt.json` retains source/tool/image identities.
+  Runner analysis passes; runtime/gate each retain 30 inherited header findings,
+  zero own findings. Two gate findings are repaired without suppression.
+  This batch is not in frozen integration `20261004T044804Z-1552154`; the live
+  provider guard remains, so no metadata UT gain is claimed.
+- Subsequent var-Record Codeunit.Run batch (0061): scoped, lazy table-global identity;
+  ordinary copies stay independent and callee state restores after success/error.
+  InstanceGate 49 and generated AL 60 checks pass, including post-rollback SQL
+  restoration, nested/typed/static/dynamic/statement/handle/cursor cases; three
+  compiled controls reject. Complete `make test JOBS=2` passes 126 cases and
+  223 tooling tests (`/tmp/agiru-scoped-globals-local-tests.log`, proof
+  `/tmp/agiru-codeunit-record.rr4usJ`). New runner targeted analysis passes;
+  gate analysis still reports 38 header findings and zero own gate findings,
+  including the unchanged no-op Globals assignment; no suppression was added.
+  A Globals handle adds one
+  pointer, preserving standard layout and allocation laziness; no resource/throughput
+  improvement claimed. Completed integration `20261004T044804Z-1552154` has
+  build/local targets green and the UT result above. Its targets are
+  `slice-check all test ut`, six jobs; source
+  `a2852e3b3e7e273f9538ba57cd5b10bd87124ea8ff7fc95eda1859bbbd7ebfbb`,
+  System package `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`,
+  HEAD `108944f`, BCApps `bb7111877f`. It also includes the XML-reader batch;
+  all 2,314 identities/statuses/diagnostics are compared above.
+  `/tmp/agiru-scoped-globals-receipt.json` retains local source/image/proof hashes.
+  Original saved-error SQL restoration now executes; no UT pass gain is claimed.
+- Subsequent XML-reader batch (0035): shared cursor/Close plus consuming DOM Load;
+  positioned/ended readers do not reload old roots. XmlReaderGate 71 checks green;
+  three compiled separate-state/raw-load controls reject
+  (`/tmp/agiru-xml-reader-consuming-load-{gate,controls}.log`). Reader and gate
+  have no own targeted lint findings; inherited findings remain unsuppressed.
+  Initial full local Make run ended with signal status 143, without a completion
+  count (`/tmp/agiru-xml-reader-consuming-load-local-tests.log`); no child remained.
+  Fresh `make test JOBS=2` replay passes all 125 cases and 223 tooling tests, exit 0
+  (`/tmp/agiru-xml-reader-consuming-load-local-replay.log`); source/image hashes
+  and bounded proof scope: `/tmp/agiru-xml-reader-consuming-load-receipt.json`.
+  DTD/resolver enforcement,
+  encoded declarations and bounded input remain open. Outside frozen 023609;
+  no full UT effect claimed.
+- Completed SetCurrentKey integration `20261004T023609Z-1410666`: HEAD `108944f`,
+  source `9484879790ef1e208093a33283f1074fa34c4835038df641983ee3b92919796a`,
+  original System dependency `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`,
+  frozen BCApps `bb7111877f`. Targets `slice-check all test ut`, six jobs;
+  finished 04:01:07 UTC, 5,064 seconds. `slice-check/all/test=0`, `ut=2`;
+  all 14,225 slice inputs, 124 local cases and 223 tooling tests retained/green.
+  UT: 2,161/2,314, 153 failures, zero incomplete, 80 codeunits, 1,603 seconds.
+  Source/package/notice hashes remain unchanged. Versus 011421: all 2,314 unique
+  identities retained, zero gains/losses; four SCM - Planning UT diagnostics change
+  from wrong quantity to missing Inventory Profile 3. Investigate them in 0044;
+  `/tmp/agiru-current-key-ut-comparison.json`. Unsealed seed is repeatability,
+  not sealed causal A/B. Subsequent XML-reader changes are excluded.
+- Development SetCurrentKey batch (0044/0061): shared typed/reflected first-active
+  full-prefix selection, valid unindexed ordering and consumed/statement errors.
+  CurrentKeyGate 54 and FindGate 43 checks green; actual SQL/temporary tied rows and
+  native All Profile execute. Generated AL 48 checks green; six call-context,
+  three key-selection and one source-expression controls reject
+  (`/tmp/agiru-current-key-local-tests.log`, `/tmp/agiru-test-contexts.VFwyFa`).
+  Complete local replay: 124 cases/223 tooling green. Runner analysis passes;
+  new functions/gate have no own findings, inherited findings remain unsuppressed.
+  Regeneration `/tmp/agiru-transpile.cvtGhD`: all 80/2,314 UT identities and
+  14,225 slice inputs retained; eight changed files contain only 44 consumed-call
+  rewrites, zero path losses. Package pre/post identities match; translation still
+  exits 1 for counted native/AL gaps. FlowField sorting remains explicitly refused.
+  In completed 023609, not 011421; terminal effects are above. No UT pass gain.
+- Completed metadata/call-context integration `20261004T011421Z-1315211`: HEAD
+  `108944f`, source
+  `fa6e53d85c1ad8fb8a68af60cf32d63680167875cda9babe5ae3d9ed4ea8bbe8`,
+  BCApps `bb7111877f`, original System dependency
+  `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`.
+  Finished 02:21:23 UTC in 3,987 seconds: `slice-check/all/test=0`, `ut=2`.
+  Local replay passes 123 cases/223 tooling tests; UT passes 2,161/2,314,
+  153 failures, zero incomplete, 80 codeunits, six workers, 1,550 seconds.
+  All identities/statuses are unchanged; one diagnostic changes:
+  Incoming Doc. To Data Exch.UT::TestProcessWithDataExchSucceeds now reaches
+  "The TestPage is not open." (`/tmp/agiru-call-context-ut-comparison.json`).
+  Diagnostic replay remains 12/32 (`/tmp/agiru-incoming-doc-trace-after.{log,jsonl}`).
+  The unsealed seed is repeatability evidence, not a sealed causal A/B. This snapshot
+  includes the projection/shared emitter and TryFunction/single-evaluation case fixes.
+  Production regeneration `/tmp/agiru-transpile.foLQAE`: 18,998 objects emitted,
+  39,974 full-tree test methods, exit 1 for retained gaps (including 215 selected
+  unbound native tables, 625 unsupported object kinds and 5,616 refused properties).
+  Native package pre/post identities match; all 14,225 slice inputs remain present.
+  Versus the prior frozen apps: 2,218 changed files, zero added/missing paths
+  (`/tmp/agiru-call-context-generated-diff.log`).
+- Development call-context batch (0061): shared own-method/Rec/this TryFunction
+  attribute lookup and explicit per-expression ValueUse; nested arguments no longer
+  inherit the outer discarded-call flag. Case selectors are bound once, including
+  ranges/else; generated AL execution passes 40 checks. Four compiled call-context
+  mutants and the existing source-expression mutant fail
+  (`/tmp/agiru-call-context-final-controls.log`). Runner targeted analysis passes;
+  the split call/argument helpers have no own findings, inherited findings remain.
+  Database write policy, overload/chained
+  resolution remain unproved. Frozen incoming-document trace
+  reproduces 12/32; do not attribute conversion assertions to optional-field catches.
+  Complete local replay passes 123 cases/223 tooling
+  (`/tmp/agiru-call-context-local-tests.log`). Independent source census retains
+  all 80/2,314 identities (`/tmp/agiru-call-context-ut-identity-comparison.json`).
+- Development metadata batch (0044): private 23-field Table Metadata projection;
+  one native/app declaration-property emitter, validated Boolean/TableType/page
+  references and static source-number caption arrays. GenNativeBinding 128,
+  GenTable 78, ReflectionMetadata 165 and generated table-keys 46 checks green;
+  previous compiler fails the new declaration gate (25 red). Source replay lint
+  is green; existing public-header/generator findings remain unsuppressed.
+  Original-package audit `/tmp/agiru-native-bindings.IJI5DF`: 234 raw tables,
+  233 selected, 18 qualified/compiled and 221 runtime checks; 215 selected unbound
+  remain red. Receipt precedes the final unused-include-only optimization.
+  Full generation `/tmp/agiru-transpile.uPdL8p` writes 18,998 objects, exit 1 for
+  retained gaps. Output `/tmp/agiru-shared-table-properties-apps.FzGbg1` has no
+  added/missing file paths versus apps; 274 declaration files change and all
+  codeunit files remain identical. Independent UT census: unchanged 80/2,314,
+  zero gained/lost identities (`/tmp/agiru-shared-table-properties-ut-identity-comparison.json`).
+  Complete projection-only replay: 123 cases/223 tooling green
+  (`/tmp/agiru-table-metadata-projection-local-tests.log`). Final shared-emitter
+  replay also passes 123 cases/223 tooling
+  (`/tmp/agiru-shared-table-properties-final-local-tests.log`).
+  Live-provider guards remain; this batch is in the completed snapshot above,
+  not the completed native integration below.
+- Completed native qualification/scope integration `20261003T233302Z-1193251`:
+  HEAD `108944f`, source
+  `8616a740d520103752dd626837f0763ac5be9456d3966c25c1c9a5cf7ce6961c`,
+  original System dependency
+  `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`;
+  frozen BCApps `bb7111877f`. Finished 00:45:38 UTC in 4,321 seconds:
+  `slice-check/all/test=0`, `ut=2`; 123 cases/223 tooling green.
+  UT: 2,161 passed/153 failed, zero incomplete, 80 codeunits, six workers,
+  1,667 seconds. All 2,314 identities/statuses/diagnostics match the preceding run;
+  no gains/losses/missing cases (`/tmp/agiru-native-qualification-ut-comparison.json`).
+  Source/package/notice pre/post hashes agree. Null/unsealed seed: diagnostic
+  repeatability, not sealed A/B proof. Minimum 2,204/G1 remains unmet.
+  Final regeneration `/tmp/agiru-transpile.zsOsIb` remains
+  exit 1 for counted native/app gaps, with 18 qualified tables, 80/2,314 UT and
+  14,225 slice inputs/zero missing. Generated comparison adds only platform/native
+  and changes the absent types/DataClassificationEvalData pair; no old path losses
+  (`/tmp/agiru-native-product-scope-generated-diff-final.log`).
+- Completed catalogue integration `20261003T213424Z-1064496`: frozen HEAD
+  `108944f`, source
+  `0990a42f68e1219c180e9f2d9f34267ed4f21555e4d1412cefd62c0f7a6d3820`,
+  explicit original System package hash `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`.
+  Finished 22:40:57 UTC in 3,957 seconds: `slice-check/all/test=0`, `ut=2`;
+  123 local cases/219 tooling green. UT: 2,161 passed/153 failed, zero incomplete,
+  1,567 seconds/six workers. All 80/2,314 identities, statuses and diagnostics match
+  the preceding run; no gains/losses/missing cases
+  (`/tmp/agiru-catalogue-freeze-ut-comparison.json`). Source/package/notice pre/post
+  hashes agree. Null/unsealed seed: diagnostic repeatability, not causal A/B proof.
+  Minimum 2,204/G1 unmet. The following native qualification batch is not included.
+- Development native qualification: one explicit matching source/ABI pair installs a
+  canonical declaration consumed by typed Record and RecordRef. Duplicate bases,
+  qualifiers and conflicts refuse; nine freeze paths/five controls pass. Catalogue
+  54/GenNativeBinding 85 checks green. `make test JOBS=2`: 123 cases/219 tooling green
+  (`/tmp/agiru-native-source-local-tests.log`); additional concurrent native-cache
+  replay is green (`/tmp/agiru-native-source-final-catalogue.log`). Catalogue targeted
+  analysis and eight-header dependency controls pass; the new narrow header avoids
+  record/session dependencies. Final original-package receipt
+  `/tmp/agiru-native-bindings.WvH4lc`: 234 raw tables retained; 233 selected
+  (18 pass/215 unbound), one original commercial licence table explicitly excluded
+  by root scope.json with a separate system-symbols source domain (0725).
+  The unused licence adapter/registration/generator binding is removed, without DB
+  changes or a success stub. All 18 qualification candidates compile
+  without PCH; their separate DSO passes 221 checks. Dropped-library/wrong-namespace
+  controls reject; the actual SourceRunner targeted analysis is green. No full-app,
+  live-provider or native-qualification UT proof. Production regeneration
+  `/tmp/agiru-transpile.zB9cfB` retains all 80/2,314 UT and 14,225 slice sources,
+  zero missing. GenScope 304 checks, 44 focused tooling tests and final
+  `make test JOBS=2` (123 cases/223 tooling) green
+  (`/tmp/agiru-native-product-scope-local-tests.log`). Targeted Apps/NativeSource
+  analysis passes. Independent source identity comparison retains all 80/2,314,
+  zero added/removed (`/tmp/agiru-native-product-scope-ut-identities.json`). Mixed
+  DataClassificationEvalData still refuses its commercial classification branch;
+  preserve required privacy/user classifications and finish declared separation in
+  0725. Rebuild every changed TableEntry ABI consumer before execution.
+  Next: selected native integration, then complete read-only metadata
+  providers with authoritative absent-property semantics (0033/0044).
+- Completed property/native-owner run `20261003T205744Z-997579`: HEAD `108944f`, source
+  `ae81e3835223a22e250af3de395a1b6fb6164ace0eb20b962f02baad4615fd62`,
+  explicit original System dependency
+  `34c40f0dcc839eb4d244398715e11a801194bfcea69a21257c5de20a9833a955`.
+  Finished 21:31:12 UTC in 1,973 seconds: `slice-check/all/test=0`, `ut=2`;
+  121 cases/219 tooling green. UT: 2,161 passed/153 failed, zero incomplete,
+  1,607 seconds/six disposable clones. Every 80/2,314 source/method identity,
+  status and diagnostic matches the preceding run: no gains/losses/missing cases
+  (`/tmp/agiru-property-native-owner-ut-comparison.json`). Source/package/notice
+  pre/post hashes agree. The following catalogue-freeze batch is not included.
+  Seed identity remains null/unsealed, not causal A/B proof. Minimum 2,204/G1 unmet.
+- Development catalogue batch: one table/page/codeunit/profile registration boundary
+  freezes on first read; duplicate numbered identities, null declarations and late
+  registrations refuse. CatalogueGate 36 checks, nine first-reader paths and three
+  negative controls pass (`/tmp/agiru-catalogue-freeze-controls.log`). Targeted
+  runtime/gate analysis is green. Final `make test JOBS=2`: 123 cases/219 tooling
+  green, including missing-script refusal after updating its independent fixture
+  (`/tmp/agiru-catalogue-freeze-local-tests-final.log`). Native ownership,
+  profile composition and other object-kind registries remain open (0033/0044).
+- New property/native-owner batch: 120 reflection checks and seven negative controls
+  green; 18 native-source tests retain present table-only manifest ownership and
+  reject invalid identities/DTDs/symlinks. The old compiler refuses the legal takeover.
+  `make test JOBS=2`: 121 cases/219 tooling tests, zero red
+  (`/tmp/agiru-metadata-property-native-owner-alias-final-tests.log`). Full regeneration
+  `/tmp/agiru-transpile.6k2ojo` preserves 80/2,314 UT and 14,225 slice inputs/zero missing;
+  generated apps remain byte-identical to the completed snapshot below. Original
+  package provenance is verified; translation still refuses the existing native/app
+  gaps. No live provider or UT gain claimed (0033/0044).
+
+- Completed table-owner integration `20261003T200855Z-894902`: frozen HEAD
+  `108944f` plus source hash
+  `4930e0d8a040849e6b8ba55b9007e352e26e16af01b7bd2151081f4287b19108`.
+  Finished 20:39:59 UTC in 1,828 seconds: `slice-check/all/test=0`, `ut=2`;
+  121 local cases/215 tooling tests green. UT: 2,161 passed/153 failed,
+  zero incomplete, 1,310 seconds/six workers. All 80/2,314 source/method identities,
+  statuses and diagnostics match the preceding run exactly; zero gains/losses
+  (`/tmp/agiru-table-owner-ut-comparison.json`). Frozen source/notice hashes agree.
+  This snapshot has no separate original-System-package dependency receipt;
+  `/tmp/agiru-transpile.uxlEhy` supplies the earlier verified generation provenance,
+  not a package-frozen A/B claim. The null/unsealed seed remains diagnostic only.
+  Subsequent property mappings/table-only native identity changes are not included.
+
+- Subsequent table-owner batch: root compilation-unit manifests take precedence over
+  component manifests; unmanifested groups retain bounded source owners. Private
+  yyjson reads/validates original root identities; native manifests share GUID checks.
+  GenTableGate 78/zero red; generated table-keys 36/zero red; meaningful source and
+  metadata controls reject, including the previous compiler's legal-takeover refusal.
+  `/tmp/agiru-table-owner-composition.log`, `/tmp/agiru-table-keys.4mIYcy`.
+  Full regeneration `/tmp/agiru-transpile.uxlEhy` preserves 80/2,314 UT and
+  14,225 slice inputs/zero missing. Versus the preceding frozen generated tree:
+  six new module headers, 63 table definitions changed, no removals
+  (`/tmp/agiru-table-owner-generated-diff.log`). Regeneration remains exit 1:
+  215 unbound native tables/125 other inactive native sources and existing app gaps.
+  Complete `make test JOBS=2`: 121 local cases/215 tooling tests green
+  (`/tmp/agiru-table-owner-composition-local-tests.log`). Targeted AppManifest,
+  NativeManifest and generated consumer analysis is green; Main/GenTable retain
+  inherited findings, no new suppression/baseline. Native table owners, deployed
+  composition and live Table Metadata projection remain open (0033/0044).
+  Full integration above retains the complete 2,161 baseline without losses.
+
+- Completed text/Decimal integration: `20261003T184820Z-806432`; frozen HEAD
+  `108944f` plus source hash
+  `a5273ffc0fc217bbb636b0d03a0a095b01cfdd315a9ff4096dfc2082728f9d1a`.
+  Finished 19:47:42 UTC in 3,527 seconds: `slice-check/all/test=0`, `ut=2`;
+  121 local cases/215 tooling tests green. UT: 2,161 passed/153 failed,
+  zero incomplete, 1,439 seconds, six disposable database clones. The same
+  80 codeunits/2,314 unique method identities remain: one gain,
+  `Data Exch. Exp. Latin Char UT::TestPreMappingExportDataJnlPreserveFALSE`,
+  zero losses/missing/added cases (`/tmp/agiru-text-decimal-ut-comparison.json`).
+  Source/package/notice pre/post hashes match. The null/unsealed seed still
+  precludes sealed-seed causal A/B claims. Minimum 2,204 and G1 remain unmet.
+  The subsequent table-source-identity batch is not included in this run.
+
+- Decimal batch (0066), not included in `20261003T172807Z-701995`: exact wide-integer
+  modulo no longer requires a representable Decimal quotient; smaller dividends
+  retain their scale. Parsing rejects both signs of 2^96. DecimalGate: 59/zero red;
+  negative controls reproduce quotient overflow, two accepted out-of-range values
+  and two changed-scale results. `/tmp/agiru-decimal-{mod-before,parse-limit-before,
+  mod-scale-before,mod-scale-after}.log`. Scale-28 arithmetic remains open.
+  Final runtime/gate targeted analysis is green, without a baseline increase;
+  combined text/Decimal `make test JOBS=2`: 121 cases/215 tooling tests green
+  (`/tmp/agiru-text-decimal-local-tests.log`). Full replay above retains
+  every UT identity without a loss; scale-28 Decimal conformance remains open.
+
+- Subsequent text-position activation (0066), not included in frozen run
+  `20261003T172807Z-701995`: generated `At`/`CharAt` now reads and replaces UTF-16
+  positions instead of UTF-8 bytes, encodes integer assignments and copies same-type
+  proxy values. `TextGate` 64/zero red; old code reproduces damaged UTF-8 and refuses
+  a Unicode literal. Ten generated AL checks pass; changing the source index fails
+  (`/tmp/agiru-text-position-{before,after,generated}.log`). Half-surrogate operations
+  still refuse explicitly. Targeted analysis has inherited header findings, no new
+  primitive finding. Final `make test JOBS=2`: 121 local cases/215 tooling tests
+  green (`/tmp/agiru-text-position-local-tests-final2.log`); the new fixture remains
+  counted/refused if its script is missing. Full replay above gains one Latin-export
+  case without a loss; half-surrogate parity and other encoding errors remain open.
+
+- JSON/XPath batch on uncommitted HEAD `108944f`: system yyjson replaces the vendored
+  header; `third_party/` and its fixture-copy dependencies are removed. Exact raw
+  number tokens and stable retained nodes are shared by AL/.NET wrappers (0722).
+  JSON 231/.NET JSON 43 checks pass both normally and under ASan/UBSan with leak
+  detection; original-HEAD control reproduces heap-use-after-free and large-number
+  conversion refusal. `/tmp/agiru-yyjson-{local-tests,asan-al-retry,asan-dotnet,
+  negative-old,negative-alias}.log`. `make test JOBS=2`: 120 local cases/215 tooling
+  tests green. Subsequent XPath helper-only split preserves 79/zero red checks;
+  the original engine has 14 red (0035). Private JSON engine targeted analysis is
+  green; existing wrapper/XML/header findings remain red, with no baseline increase.
+  Full lint formats cleanly but refuses five missing specialist compile commands:
+  reporting `{NativeRunner,RegistryRunner}`, native-binding `{Emit,PageRunner}` and
+  native-enums `EmitContracts` (`/tmp/agiru-json-batch-lint.log`).
+  Regeneration `/tmp/agiru-transpile.JCMJlS` retains native refusals (exit 1),
+  14,225 slice inputs/zero missing. Frozen replay `20261003T172807Z-701995`
+  finished 18:30:10 UTC in 3,688 seconds: `slice-check/all/test=0`, `ut=2`;
+  local 120 cases/215 tooling green. UT: 2,160 passed/154 failed, zero
+  incomplete/crashed, 1,380 seconds, six disposable database clones.
+  HEAD `108944f` plus source hash
+  `fd2359d669ae7a2654750a394feb92af59ddc5fe1be0f59babb0f82582b48239`.
+  Independent 80/2,314 manifest identities match the confirmed baseline exactly
+  (`/tmp/agiru-json-xpath-ut-{current,baseline}-identities.json`).
+  Comparison: one gain, `XML DOM Management UT::CheckElementTextWithEmptyNamespace`,
+  zero losses; source/package/notice hashes match before/after
+  (`/tmp/agiru-json-xpath-ut-comparison.json`). The null/unsealed seed still limits
+  causal A/B claims. The preceding 2,159/2,314 result below is historical.
+  JSON parent/insertion/Path and unimplemented
+  AL API contracts, high-scale typed JSON conversion through the scale-20 Decimal
+  core (0066), XML DTD/cursor policy, native resources and WASM remain open.
+
+- Preceding UT baseline: BCApps `bb7111877f`, System 29.0.55365.0;
   80 codeunits/2,314 source-counted methods. Frozen HEAD `49ce9c0` plus source
   `ae8dfcc314d84c62ae046f9f0079b732b4f63ba1e49ba97464ea51afcc72d176`,
   `/tmp/agiru-verify/b3fb41b94d2994ba/20261003T135330Z-494713/result.json`,
@@ -304,7 +678,7 @@ Latest immutable layout/capability code: `c62879f`; receipts below describe this
 | P0 | One canonical policy now excludes one license/SaaS test object explicitly; all raw identities remain. Mixed core/cloud modules and omitted app roots still need product classification, dependency closure and mandatory runner partitioning. | 0725, 0058 |
 | P0 | SingleInstance and Manual bindings now use per-Session ownership; other mutable TLS state still requires isolation. | 0006 |
 | P0 | LockTable arguments/state are not enforced by SQL reads; update/delete predicates omit observed version. | 0012 |
-| P0 | JSON child aliases become dangling after sibling insertion (ASan); Decimal JSON conversion rounds exact values. | 0722 |
+| P0 | JSON parent/replacement/Root/Path contracts remain incomplete; high-scale typed conversion/equality still reaches the scale-20 Decimal core despite exact raw lexemes. | 0722, 0066 |
 | P0 | XmlReader ignores Prohibit and reads a local external entity; demonstrated with a review-owned fixture. | 0035 |
 | P0 | Atomic number-sequence reservations/name binding now pass concurrency and rollback gates; legacy identity migration, populated AL execution and scale qualification remain open. | 0723 |
 | P1 | Descending SQL Next(-1) moves 2 → 1 instead of 3; Next(0) is now fixed through all four typed/RecordRef SQL/temporary paths. | 0044 |
@@ -423,13 +797,13 @@ Diagnostic sources/logs: `build/review-20260928/`: RuntimeProbe, ScopeProbe, Jso
 | [0038](0038_the_complete_generated_tree_will_compile_and_link_without_slice_fallbacks.md) | P1 | The complete generated tree will compile and link without slice fallbacks | 0580, 0591, 0595, 0598, 0599, 0612, 0702 |
 | [0039](0039_the_al_runner_will_control_test_lifecycle_and_isolation_explicitly.md) | P0 | The AL runner will control test lifecycle and isolation explicitly | 0223, 0225, 0268, 0269, 0470, 0472, 0493, 0630, 0715 |
 | [0043](0043_validation_and_relations_will_run_in_the_documented_order.md) | P1 | Validation and relations will run in the documented order | 0029, 0068, 0228, 0229, 0230, 0232, 0234, 0235, 0236, 0237, 0238, 0239, 0240, 0241, 0242, 0243, 0316, 0317, 0318, 0319, 0320, 0321, 0322, 0325, 0328, 0331, 0332, 0530, 0677 |
-| [0044](0044_record_operations_will_share_one_correct_sql_and_temporary_contract.md) | P1 | Record operations will share one correct SQL and temporary contract | 0025, 0032, 0056, 0364, 0398, 0449, 0481, 0505, 0522, 0523, 0607, 0620, 0659, 0697 |
+| [0044](0044_record_operations_will_share_one_correct_sql_and_temporary_contract.md) | P0 | Record operations will share one correct SQL and temporary contract | 0025, 0032, 0056, 0364, 0398, 0449, 0481, 0505, 0522, 0523, 0607, 0620, 0659, 0697 |
 | [0045](0045_reads_will_remain_bounded_and_partial_records_will_be_real.md) | P2 | Reads will remain bounded and partial records will be real | 0017, 0048, 0344, 0345, 0348, 0350, 0351, 0370, 0372, 0520, 0660 |
 | [0055](0055_errors_and_labels_will_keep_bc_text_codes_and_navigation_context.md) | P1 | Errors and labels will keep BC text, codes and navigation context | 0382, 0384, 0506, 0518, 0519, 0528, 0566 |
 | [0057](0057_events_will_preserve_lifetime_permissions_and_isolated_transaction_semantics.md) | P1 | Events will preserve lifetime, permissions and isolated transaction semantics | 0191, 0196, 0197, 0203, 0204, 0244, 0245, 0246, 0247, 0248, 0249, 0251, 0252, 0253, 0254, 0255, 0256, 0257, 0258, 0259, 0260, 0261, 0262, 0263, 0264, 0265, 0266, 0512, 0513, 0514, 0515, 0516, 0706 |
 | [0058](0058_every_ut_run_will_reconcile_results_with_an_independent_source_manifest.md) | P0 | Every UT run will reconcile results with an independent source manifest | — |
 | [0059](0059_surface_coverage_will_distinguish_declarations_refusals_and_tested_behaviour.md) | P1 | Surface coverage will distinguish declarations, refusals and tested behaviour | 0028, 0040, 0071, 0358, 0484, 0525, 0562, 0563, 0564, 0588, 0593, 0594, 0610 |
-| [0061](0061_consumed_and_discarded_calls_will_keep_al_error_semantics.md) | P1 | Consumed and discarded calls will keep AL error semantics | 0226, 0517 |
+| [0061](0061_consumed_and_discarded_calls_will_keep_al_error_semantics.md) | P1 | Consumed and discarded calls will keep AL error semantics | 0073, 0012 |
 | [0062](0062_authorization_will_be_enforced_at_data_and_object_boundaries.md) | P1 | Authorization will be enforced at data and object boundaries | 0202, 0214, 0313, 0314, 0315, 0376, 0377, 0378, 0379, 0380, 0381, 0473, 0483, 0492, 0495, 0499, 0559, 0671 |
 | [0063](0063_reports_will_execute_datasets_and_render_declared_layouts.md) | P0 | Reports will execute datasets and render declared layouts | 0301, 0302, 0303, 0304, 0305, 0306, 0307, 0308, 0309, 0391, 0396, 0397, 0436, 0450, 0451, 0452, 0454, 0455, 0457, 0459, 0486, 0488, 0489, 0546, 0547, 0549, 0557, 0575, 0576, 0577, 0628 |
 | [0064](0064_queries_will_stream_correct_joins_filters_and_typed_aggregates.md) | P2 | Queries will stream correct joins, filters and typed aggregates | 0299, 0352, 0441, 0453, 0461, 0462, 0464, 0550, 0556 |

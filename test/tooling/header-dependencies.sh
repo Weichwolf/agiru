@@ -30,6 +30,16 @@ for header in ObjectKind.h RuntimeSurface.h Names.h; do
 done
 compile_header dotnet/Regex.h "$proof/Regex.h.d"
 reject_dependency "$proof/Regex.h.d" regex
+compile_header type/JsonHandle.h "$proof/JsonHandle.h.d"
+for forbidden in memory yyjson.h json.hpp; do
+  reject_dependency "$proof/JsonHandle.h.d" "$forbidden"
+done
+compile_header type/JsonHandle.h "$proof/forced-yyjson.h.d" -include yyjson.h
+if reject_dependency "$proof/forced-yyjson.h.d" yyjson.h \
+  > "$proof/forced-yyjson.h.log" 2>&1; then
+  printf 'header-dependencies: JSON backend escaped the control\n' >&2
+  exit 1
+fi
 compile_header meta/ModuleDef.h "$proof/ModuleDef.h.d"
 for forbidden in ModuleInfo.h Guid.h List.h Text.h Version.h vector; do
   reject_dependency "$proof/ModuleDef.h.d" "$forbidden"
@@ -50,6 +60,16 @@ if reject_dependency "$proof/forced-Report.h.d" Report.h \
   printf 'header-dependencies: full report header escaped the registry control\n' >&2
   exit 1
 fi
+compile_header runtime/TableDefinition.h "$proof/TableDefinition.h.d"
+for forbidden in Record.h RecordRef.h Variant.h PageDef.h vector mutex filesystem regex; do
+  reject_dependency "$proof/TableDefinition.h.d" "$forbidden"
+done
+compile_header runtime/TableDefinition.h "$proof/forced-Record.h.d" -include runtime/Record.h
+if reject_dependency "$proof/forced-Record.h.d" Record.h \
+  > "$proof/forced-Record.h.log" 2>&1; then
+  printf 'header-dependencies: record state escaped the table declaration control\n' >&2
+  exit 1
+fi
 
 for forbidden in filesystem regex; do
   if [ "$forbidden" = filesystem ]; then header=RuntimeSurface.h; else header=dotnet/Regex.h; fi
@@ -60,4 +80,4 @@ for forbidden in filesystem regex; do
     exit 1
   fi
 done
-printf 'header-dependencies: six standalone headers; filesystem/regex/report/module controls refused\n'
+printf 'header-dependencies: eight standalone headers; filesystem/regex/JSON/report/module/table controls refused\n'

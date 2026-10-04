@@ -1,10 +1,72 @@
 # 0033 — App boundaries and extension merges will be explicit and enforced
 
-Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT symbol identity and app isolation | Reviewed: 2026-10-04
 Depends on: 0034 source identities.
 
 ## Evidence
 
+- Native qualification batch: `Main::WriteNativeTables` emits original module,
+  namespace and supported reflection properties over verified ABI declarations.
+  The frozen catalogue merges only an explicitly matching native ABI/source pair;
+  duplicate bases, duplicate qualifiers and conflicting entries refuse. Typed Record
+  and RecordRef share one cached canonical declaration, without another registry.
+  Generator gate: 85 checks; catalogue proof: 54 checks, nine freeze paths,
+  four native conflict compositions/five rejected mutants. Final local replay:
+  123 cases/219 tooling green (`/tmp/agiru-native-source-local-tests.log`); the
+  subsequent concurrent native-cache refinement passes the full catalogue qualifier.
+  Final original package qualifier `/tmp/agiru-native-bindings.WvH4lc`: 234 raw native
+  tables retained, 233 selected (18 contract-pass/215 unbound), one bounded commercial
+  source excluded by canonical root policy (0725). Its unused adapter/registration/
+  binding is removed; the same relative BCApps path remains required. All 18 production
+  qualification sources compile without PCH. Final local replay: 123 cases/223
+  tooling green (`/tmp/agiru-native-product-scope-local-tests.log`); targeted
+  Apps/NativeSource analysis passes. Their separate Linux DSO
+  passes 221 checks; dropped-library/wrong-namespace controls reject. This is the
+  source declaration/fixture receipt, not full-app/provider/G1 proof. Full regeneration
+  `/tmp/agiru-transpile.zB9cfB` retains 80/2,314 UT and 14,225 slice inputs/zero missing;
+  native qualifications are now generated into production apps. Mixed commercial
+  caller closure remains 0725. The TableEntry ABI changed: rebuild all consumers
+  before execution.
+- `runtime/TableDefinition.h` keeps catalogue resolution free of record/session
+  headers; targeted Catalogue analysis is green. Eight-header dependency checks and
+  a forced Record include negative control pass. Three no-PCH frontend samples:
+  372.6 ms versus Record.h 1,476.5 ms, under concurrent verification; not ERP timings
+  (`/tmp/agiru-native-source-{runtime-lint,header-controls,header-cost}.log`). Actual
+  no-PCH SourceRunner targeted analysis is green (`/tmp/agiru-native-source-runner-lint.log`).
+- `Catalogue.cpp` now freezes table/page/codeunit/profile registration together on
+  the first read. One borrowed immutable pointer catalogue serves ID/name lookup,
+  installed views and page lookup; numbered kinds sort once and duplicate IDs refuse
+  before returning a view. Null entries/declarations and late registrations refuse.
+  `CatalogueGate`: 36 checks/zero red, including eight concurrent first readers;
+  nine first-reader paths and all three numbered duplicate kinds execute in isolated
+  processes. Removed-freeze, accepted-duplicate and reversed-order mutants fail
+  (`/tmp/agiru-catalogue-freeze-controls.log`, `/tmp/agiru-catalogue.wvLKeR`).
+  Targeted runtime/gate analysis is green; intentional record-global non-copying
+  parameters are now named, with unchanged behaviour. This is metadata-only fixture
+  proof, not native-owner installation or complete app/permission composition.
+  Profile identity/ownership and other object-kind registries remain open.
+  Complete local replay: 123 cases/219 tooling green; the discovery fixture still
+  refuses every missing script (`/tmp/agiru-catalogue-freeze-local-tests-final.log`).
+  Full UT integration of catalogue freeze `20261003T213424Z-1064496` retains
+  2,161/2,314 with no identity/status/diagnostic changes; native qualification is
+  not included (`/tmp/agiru-catalogue-freeze-ut-comparison.json`).
+- Present table-only native NavxManifest identities now participate in legal field
+  takeovers; malformed/DTD/symlink manifests refuse. Raw manifest-absent fixtures
+  remain unqualified. NativeSourceCompilerGate: 18 green; old compiler refuses the
+  original-source-bound legal takeover (0044). Native TableDef owners are still open.
+- Table-owner selection now distinguishes a manifest-bearing compilation unit from
+  an unmanifested source group. Root identity wins over component development
+  manifests; grouped tables retain their bounded source identity. The original
+  Return Reason takeover names Business Foundation (`f355...`), not AuditCodes
+  (`88dda...`); unconditional nearest-manifest selection failed full regeneration
+  and is corrected, not bypassed. Complete regeneration retains 80/2,314 UT,
+  14,225 slice sources/zero missing and explicit native gaps (exit 1).
+  Generated root/component/grouped/shared/missing-owner and field-takeover fixture:
+  36/zero red, source/metadata mutations reject; previous compiler rejects the
+  legal grouped takeover. `/tmp/agiru-table-owner-composition.log`,
+  `/tmp/agiru-transpile.uxlEhy`, `/tmp/agiru-table-keys.4mIYcy`.
+  This is table declaration/merge ownership, not complete deployed app composition,
+  native-owner activation, cross-app permissions or G1.
 - UT bootstrap repair (2026-10-03): `Main::TakeFields` no longer keeps a moved source
   ahead of its destination. Match field ID/name/type/length and reciprocal
   MovedTo/MovedFrom against original app IDs, in either extension order. The three
@@ -35,16 +97,28 @@ Depends on: 0034 source identities.
 4. Enforce namespace, Access/local, Extensible, obsolete declarations and preprocessor symbols at generation time. Refuse malformed or unsupported directives rather than silently selecting a branch.
 5. Prove normal app linking with undefined-symbol checks appropriate to declared dependencies. Keep slice fallback stubs explicitly out of the full-app correctness claim.
    Finish declaration/body dependency ownership across writers: merge explicit AST and resolved body-header sets once; remove redundant legacy Door type-list ownership only with all-kind controls. `dependencies.json` names 6,718 files with remaining duplicate directives. Do not move local-only types into public headers or add a master/PCH dependency.
-6. Generate sorted immutable catalogues per deployed app composition; reject duplicate installed kind/ID identities. Freeze registration before first session instead of mutating vectors after call_once sorting. Retain app/schema/composition hashes with each native image; table-layout changes require compatible rebuilt consumers, not unchecked hot-loading.
+6. Complete deployed composition/owner validation around the frozen shared table/page/codeunit catalogue. Qualify native declarations from the original package before installing them; do not insert a second metadata map or silently replace a conflicting ID. Validate profile ownership and freeze the remaining object-kind registries. Retain app/schema/composition hashes with each native image; table-layout changes require compatible rebuilt consumers, not unchecked hot-loading.
    Keep original AL namespace and app/package identities in the same declaration metadata consumed by object reflection (0034), page binding (0030) and typed lowering (0073). Runtime AllObjWithCaption cannot supply ALNamespace from today's caption-only provisioning. No second lookup map or C++-spelling reconstruction; namespace-less source is distinct from missing provenance.
 
 ## Acceptance
 
+- Preserve CatalogueGate's nine freeze paths, cross-kind equal IDs, null/duplicate/late
+  refusal, borrowed-view lifetime and concurrent first-read checks. Retain all three
+  original mutants plus native qualification and triple-registration controls.
+  Original-package qualification retains every failed/unbound identity; verify actual
+  source-owned DSO registration, typed/RecordRef parity and library-drop/namespace
+  controls without PCH. Full UT replay retains every source identity and investigates losses.
 - Cross-app fixtures cover legal dependency, illegal reverse reference, late extension anchor, missing anchor and duplicate names. Compile without the all-app slice include path. Same inputs produce byte-identical merge order.
 - Two distinct AL names that normalize alike retain both IDs, fields and references. Archived emitter is red; conflicting output ownership refuses, never last-writer-wins. Successful repeat keeps bytes and mtimes without declaration loss.
 
 ## References
 
+Catalogue lifetime: `src/rt/Catalogue.cpp`, `include/runtime/{Catalogue,Codeunit}.h`,
+`test/gate/CatalogueGate.cpp`, `test/runtime/catalogue.sh`; board 0006/0044 and
+AGENTS.md shared-read-only metadata invariant. Developer `ff5939a46e`,
+`devenv-{namespaces-overview,profile-object}.md`; a profile has no numbered identity.
+Original predecessor 1080/1417 concern typed reflection and Name/Caption, not an
+authority for mutable registration or fabricated native owners.
 Moved fields: developer `ff5939a46e`, `devenv-move-table-fields-between-extensions.md`
 and `properties/devenv-{movedfrom,movedto,obsoletestate}-property.md`; BCApps
 `bb7111877f`, Business Foundation `AuditCodes/src/Legacy/ObsoleteSourceCode{,Setup}Ext.TableExt.al`,

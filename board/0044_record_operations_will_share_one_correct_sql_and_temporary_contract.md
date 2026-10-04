@@ -1,26 +1,181 @@
 # 0044 — Record operations will share one correct SQL and temporary contract
 
-Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-10-03
+Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-10-04
 Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
-- Full frozen UT `20261003T135330Z-494713`: 43 Table Metadata provider refusals
-  across eleven codeunits; every 80/2,314 identity/status matches the preceding
-  replay (README). Original System-29 TableMetadata declares 23 fields plus
+- Frozen SetCurrentKey integration `20261004T023609Z-1410666` finishes at
+  04:01:07 UTC: slice/build/local tests pass; UT is 2,161/2,314, 153 failed,
+  zero incomplete. All 2,314 unique identities remain, zero gains/losses.
+  Four SCM - Planning UT methods change from wrong quantity to missing Inventory
+  Profile entry 3: ErrorOpenWorksheetOnRequisitionLine, OpenPlanningWorksheetOnRequisitionLine,
+  OpenReqWorksheetOnRequisitionLine and VSTF325404.
+  `/tmp/agiru-current-key-ut-comparison.json`. Trace the changed temporary-key/
+  cursor path before calling this behavioural improvement; no quantity repair proved.
+- Shared `RecordState.cpp::SetCurrentKey` now accepts sortable unindexed fields,
+  selects the first active prefix's complete fields and ignores IncludedFields.
+  Typed Record and RecordRef.SetView use this primitive; successful selection closes
+  the old SQL cursor, while rejected selections preserve the previous key.
+  CurrentKeyGate: 54 checks green, with actual SQL/temporary tied-row ordering,
+  original native All Profile, disabled/included keys and invalid/unsortable fields.
+  FindGate: 43 checks green; its prefix expectation now follows the full source key.
+  Receipts: `/tmp/agiru-current-key-{sql,find}-gate.log`.
+  Generated AL consumption/statement proof: 48 checks, six call-context mutants,
+  three shared key-selection mutants and one source-expression mutant reject
+  (`/tmp/agiru-current-key-local-tests.log`, `/tmp/agiru-test-contexts.VFwyFa`).
+  The AL fixture's field 4 Sort Order is genuinely unindexed; its implicit PK is
+  field 1 Value. Complete local replay: 124 cases/223 tooling tests green.
+  Runner targeted analysis passes; new selection/view/call helpers and gate have
+  no own findings. RecordState retains one inherited header finding, CurrentKeyGate
+  33 inherited findings and BodyWriter 22 existing findings; no suppression increase.
+  Full regeneration `/tmp/agiru-transpile.cvtGhD` retains 80/2,314 UT and
+  14,225 slice inputs, zero missing. Eight generated files change only consumed
+  SetCurrentKey calls; zero added/missing paths. Original package pre/post identities
+  match. Translation remains exit 1 for counted platform/AL gaps, not a G1 pass.
+  Receipts: `/tmp/agiru-current-key-{generated-changes.patch,ut-identity-comparison.json}`
+  and `/tmp/agiru-current-key-{RecordState,Runner}-final-findings.log`.
+  FlowField sorting still explicitly refuses; sortable FlowFields, disabled-key
+  CurrentKeyIndex identity and failed whole-view atomicity remain unproved. This
+  development fix is not in frozen integration `20261004T011421Z-1315211`.
+- Shared declaration emitter: `TableWriter.cpp::TableDeclarationProperties`
+  serves ordinary TableDef initialization and native source qualification.
+  Explicit Boolean, table kind, scalar properties and page IDs share validation;
+  native caption arrays use original field numbers/order/repetitions with static
+  lifetime. Invalid values, missing fields and unresolved page references refuse.
+  GenNativeBinding 128, GenTable 78 and source replay 46 checks green; previous
+  frozen compiler fails 25 new declaration checks. Receipts:
+  `/tmp/agiru-shared-table-properties-{gate,source-replay,old-compiler-control}.log`.
+  Original-package replay `/tmp/agiru-native-bindings.IJI5DF` retains 234 raw/
+  233 selected tables: 18 qualification candidates compile, 221 runtime checks,
+  215 selected unbound remain red. This receipt precedes only the unused-array
+  include optimization. Full generation retains 18,998 objects and identical
+  codeunit files; 274 declarations change, no file paths disappear or appear
+  (`/tmp/agiru-shared-table-properties-generated-diff.log`; empty directory
+  differences are not missing files). Independent source census retains 80/2,314
+  identities. Frozen 011421 build/local replay passes 123 cases/223 tooling tests;
+  terminal UT is 2,161/2,314, 153 failed, zero incomplete. No pass/identity changes;
+  one Incoming Document diagnostic advances to an unopened TestPage (0061/0030).
+  Source replay lint passes; TableWriter retains six existing source and inherited
+  header findings. The new emitter has no reported findings; no suppressions added.
+- Development Table Metadata projection: `src/rt/TableMetadata.{h,cpp}` projects
+  the 23 declared source fields with native option identities and a validated
+  original module GUID. Caption fields retain numeric IDs/order/repetitions; an
+  absent declaration stays empty so the AL caller chooses its primary-key fallback.
+  Missing fields/owners/properties, invalid GUIDs and CDS-as-Query refuse. No copied
+  catalogue/session state. ReflectionMetadata 165 checks, eleven meaningful
+  controls green (`/tmp/agiru-table-metadata-projection-controls.log`). Actual
+  production transpiler/definition/primitive replay: 46 checks, retained key/owner/
+  classification controls reject (`/tmp/agiru-table-keys.AGKBzR`).
+  The live-provider guard remains: absent classification/default authority,
+  implicit-field semantics, deployed/schema qualification and shared read-only
+  filtering/count/navigation/write refusal are not proved. This projection is not
+  a live provider or UT gain, and is not in frozen run `20261003T233302Z-1193251`.
+  Targeted analysis exposes 30 existing public-header findings in RecordState,
+  Char/StringValue, Duration and Variant; the new source's include findings were
+  removed without suppressions. Receipt:
+  `/tmp/agiru-table-metadata-projection-header-findings.log`.
+- Default-authority counterexample: original 29.0.54011.55407 platform Types
+  `MetaTable::.ctor` (RVA 8aa54) defaults `isDataPerCompany` to false, unlike the
+  documented AL default true. Ncl LoadMetadata/AssignFromMetaTable copy compiled
+  properties; CLR constructor ordinals/defaults are not an AL omission oracle.
+  Retain `/tmp/agiru-table-metadata-authority.gCa1Do/provenance.json` and its IL
+  receipts. Ordinary AL omission now has compiler-18/Runtime-18 authority:
+  CustomerContent, Public and Unspecified are emitted for both OnPrem/Cloud targets;
+  documented No and XML creation's Personalization→Cloud complete the projection.
+  Source omissions remain immutable. Native omissions still refuse: this authored
+  extension probe is not native creation authority. ReflectionMetadata 181 checks
+  and thirteen compiled controls pass (`/tmp/agiru-metadata-defaults-local.log`).
+  Production-transpiler replay: 52 checks and existing ownership/key controls pass
+  (`/tmp/agiru-metadata-defaults-generated.log`). Runner analysis passes; runtime
+  and gate retain 30 inherited header findings each and no own findings;
+  the gate's two existing initializer findings are repaired without suppression. Complete
+  `make test JOBS=2`: 126 cases/223 tooling tests pass
+  (`/tmp/agiru-metadata-defaults-all-local.log`); source/tool/image identities:
+  `/tmp/agiru-metadata-defaults-receipt.json`. This batch is not in frozen
+  `20261004T044804Z-1552154`.
+  Oracle `/tmp/agiru-metadata-defaults.Y411KR/compiled-metadata.json` retains the
+  explicit/temporary controls and target-independent properties; compiler 17 refuses
+  original System Runtime 18, and an extension's Scope=OnPrem fails AL0850.
+  Keep demo 28.4, artifact 29.0 and original System 29.0.55365.0 separate.
+- Native source qualification is implemented in the existing frozen catalogue:
+  exact ABI/source pairs yield one canonical declaration; conflicting compositions
+  refuse. `TableDefinition.h` caches immutable metadata once per native type; typed
+  Record and RecordRef use the same definition. Runtime targeted analysis and the
+  narrow-header negative control pass. Final original package proof
+  `/tmp/agiru-native-bindings.WvH4lc`: all 18 emitted qualification
+  candidates compile; 221 DSO/record checks green, dropped-library/wrong-namespace
+  controls red. All 234 raw native tables remain: 233 selected (18 pass/215 unbound),
+  one canonical commercial source exclusion; the unused native licence adapter and
+  generator binding are removed (0725). No licence repair, live-provider activation, complete
+  field/property/default coverage or current full-app/UT claim; 0725 owns mixed
+  commercial caller separation. Production generation retains all 80/2,314 UT;
+  qualifications are emitted into apps/platform. Latest local replay: 123 cases/223
+  tooling green (`/tmp/agiru-native-product-scope-local-tests.log`). Prior local header/pointer replay: 123 cases/219 tooling green
+  (`/tmp/agiru-native-source-local-tests.log`); concurrent native first reads and all
+  five controls pass (`/tmp/agiru-native-source-final-catalogue.log`). Full catalogue
+  freeze UT replay `20261003T213424Z-1064496` remains 2,161/2,314 with no
+  identity/status/diagnostic changes; it does not contain native qualification.
+- Property/native-owner batch: `ReflectionMetadata` resolves all 18 original native
+  property members by their verified names/ordinals, case-insensitively; documented
+  legacy Scope aliases normalize to Cloud/OnPrem. Missing/unknown properties,
+  moved obsolete states and field-only access values refuse, without invented defaults.
+  ReflectionMetadataGate: 120 checks/zero red; seven mapping/guard mutants reject
+  (`/tmp/agiru-reflection-metadata.l6YAW5`). Table-only native packages now validate
+  a present original NavxManifest and retain its owner for field takeovers; malformed,
+  DTD and symlink manifests refuse. Raw manifest-absent fixtures stay unqualified.
+  NativeSourceCompilerGate: 18 tests green; preceding frozen compiler refuses the
+  legal native takeover (`/tmp/agiru-native-table-owner-source-tests-final.log`).
+  Complete local replay: 121 cases/219 tooling tests green
+  (`/tmp/agiru-metadata-property-native-owner-alias-final-tests.log`). Regeneration
+  `/tmp/agiru-transpile.6k2ojo` retains 80/2,314 UT and 14,225 slice inputs/zero missing;
+  generated bytes match the completed table-owner snapshot exactly. Native TableDef
+  owners, absent-property semantics, immutable installed composition and the live
+  provider remain open. Full frozen replay `20261003T205744Z-997579` retains
+  2,161/2,314 passed, zero gains/losses/missing/diagnostic changes, matching
+  source/package/notice hashes (`/tmp/agiru-property-native-owner-ut-comparison.json`).
+  The later catalogue-freeze batch is not included in that UT replay.
+- Table-owner batch: `AppManifest.cpp` uses private system yyjson to read the root
+  identity, not a dependency's first `id`; validates required strings/GUIDs and
+  duplicate identity keys. Native XML manifests share GUID validation. Table/field
+  merging and immutable table declarations use the configured compilation-unit
+  manifest; unmanifested groups use a bounded source manifest. Missing owners stay
+  null; symlink manifests refuse. Original Business Foundation AuditCodes is a
+  counterexample to unconditional nearest-manifest ownership (0033).
+  GenTableGate 78/zero red; generated table-keys 36/zero red. Root/component,
+  nested/shared/missing owners, decoded Unicode and moved-field takeovers execute;
+  wrong owners, duplicate IDs, missing/root-vs-dependency identities, symlinks and
+  wrong takeovers refuse. The previous frozen compiler refuses the legal grouped
+  takeover (`/tmp/agiru-table-owner-composition.log`, `/tmp/agiru-table-keys.4mIYcy`).
+  Full regeneration `/tmp/agiru-transpile.uxlEhy` preserves 80/2,314 UT and
+  14,225 slice inputs/zero missing; six source-module headers and 63 table-definition
+  changes versus the preceding frozen image (`/tmp/agiru-table-owner-generated-diff.log`).
+  Native declaration ownership, installed composition/cross-app collisions and the
+  live-provider guard remain open. Full local replay: 121 cases/215 tooling tests
+  green (`/tmp/agiru-table-owner-composition-local-tests.log`). AppManifest,
+  NativeManifest and generated consumer targeted analysis is green; inherited
+  Main/GenTable findings remain, without a baseline increase. Full replay
+  `20261003T200855Z-894902`: 2,161/2,314 passed, zero gains/losses/missing cases
+  or diagnostic changes (`/tmp/agiru-table-owner-ut-comparison.json`).
+- Latest frozen UT `20261004T064830Z-1661382`: 48 explicit Table Metadata
+  provider refusals across twelve codeunits; 2,162/2,314, 152 failed, zero incomplete.
+  Page navigation gains one case without losses; three more Incoming Document
+  paths now reach this provider boundary. This is a counted blocker population,
+  not a prediction that implementing the provider will pass all 48 methods.
+  Original System-29 TableMetadata declares 23 fields plus
   implicit system fields. The live-provider guard remains; no UT gain claimed.
 - Declaration batch `2458f19`: generated `TableDef` retains available source app identity, original AL
   namespace, Scope, ObsoleteReason, table DataClassification and LinkedObject.
   `meta/ModuleDef.h` shares immutable app declarations without AL state/includes.
   Missing owners/properties are explicit null/empty, not fabricated defaults.
-  Nested app roots and bound native definitions still need per-declaration owners;
+  Bound native definitions still need source-owned declaration metadata;
   deployment target is not Scope and extensions must not replace the base owner.
   Live projection/filtering/read-only execution remain unimplemented.
   GenTableGate 64/zero red; actual generated table-keys fixture 26/zero red,
   four wrong-key/clustering/owner/classification controls reject. LinkedObject
   storage remains refused. Receipts: `/tmp/agiru-table-metadata-commit-controls.log`
-  and `/tmp/agiru-table-metadata-gen-final.log`. No full generated rebuild/UT
-  replay of this declaration batch yet; the confirmed baseline is separate.
+  and `/tmp/agiru-table-metadata-gen-final.log`. The subsequent generated slice
+  rebuild and full UT replay include this declaration batch; no metadata UT gain.
   Complete local replay: 120 cases/215 tooling tests green, zero red/skips
   (`/tmp/agiru-table-metadata-commit-tests.log`).
 - Predecessor findings 1017/1080/1417: direct-ID lookup from the shared registry,
@@ -37,7 +192,6 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 - Consumed setter return remains unproved: current platform examples describe the new group, while BCApps WorkflowResponseFactBox.OnFindRecord saves/restores the returned group. Existing prior-group return is unchanged; neither example nor source usage is a BC runtime oracle. Group -1 FlowField behaviour also needs its own refusal/SQL proof.
 - Main's generic RequireTableProvider boundary now refuses unavailable Page Table Field reads/navigation/SQL writes before session access or record stamping. Schema provisioning reports and skips it rather than creating an empty physical replacement. Explicit temporary storage remains independent. This is declaration/refusal proof, not a live provider; receipts are in README.
 - Page/Table Metadata now use the same named live-provider/schema guard. Partial physical seeding is removed without deleting existing data. `ReflectionMetadataGate` retains 59 projection/refusal/temporary checks; ordinal-cast, CDS→Query, unknown→Normal and removed-guard controls reject. `src/rt/ReflectionMetadata.{h,cpp}` maps verified property identities, not ordinal casts; absent kinds remain refusals. This is not live projection or SQL/provider acceptance.
-- `Table.h::SetCurrentKey` keeps requested ordering but returns `RecordState.cpp::KeyMatches`, incorrectly false without a declared key. Source-backed temporary All Profile probe: Clang/GCC two checks/one red; sorting by Role Center ID succeeds, Boolean result fails. Current BCApps `PopulateProfiles` also sorts Caption/Profile ID without a matching key. Do not invent a native index or teach the declaration gate this false result. `build/all-profile-20261001/artifacts/sort-result.json`; no runtime fix or SQL-sort proof.
 - Integrated unfiltered `GetRangeMin/Max` refusal in the common `Filter.cpp::RangeBoundText`. RangeBoundGate: 32/32 Clang/GCC; old runtime: 20 red. Covers regular/temporary records, borrowed/owned FieldRef, cleared/unrelated filters, exact Decimal scale and explicit blank equality. FilterGate 122/122, RecordRefGate 89/89; 84 local cases green. Direct includes repaired; targeted analysis has only inherited-header findings, with no new gate findings. Frozen full UT retains all 2,310 identities with no status/diagnostic changes; diagnostic legacy-seed evidence, not causal A/B (README). Logs: `/home/cosmo/Git/agiru-worktrees/goal-20260928/build/range-bound-*.log`. Internal empty-bound parsing is unchanged; local docs do not supply exact BC diagnostic wording.
 
 - Integrated Next(0) preserves SQL/temporary typed Record and RecordRef positions and pending field values; omitted Steps remains one. `NextZeroGate`: Clang 19 and GCC 14 each 32 checks green; unchanged runtime negative control: 16 red. Logs: `build/review-20260928/next-zero-{negative,positive}.log`.
@@ -49,13 +203,38 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Implementation
 
+0. Replay the four changed SCM - Planning UT methods from the frozen receipt;
+   pinpoint the first missing Inventory Profile Get and preceding temporary-row
+   key/cursor operations. Original source:
+   `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
+   Preserve documented complete-prefix selection; do not restore ignored keys
+   just to recover old diagnostics. Compare the full population after any fix.
 1. Add reverse/mixed key directions and filter/key-change fixtures. Build lexicographic predicates per key direction plus deterministic primary-key tie-breakers; route table identity through explicit company context. Preserve the completed zero/partial/exhausted/extreme-step gates.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
-4. Implement documented Boolean result versus statement-raises behaviour consistently; only recognized not-found/duplicate conditions may become false. Preserve database faults. `SetCurrentKey`: accept sortable fields without a matching declared key; otherwise select the first active prefix match, include its full ordering and ignore IncludedFields for matching. Refuse unsortable fields; 0061 owns consumed/discarded lowering. One primitive serves typed and reflected ordering, not per-table exceptions.
+4. Extend documented Boolean result versus statement-raises behaviour; preserve database faults. SetCurrentKey's shared selection/consumption fix is implemented above. Classify sortable/unsortable FlowFields from their actual formulas/table domains; implement supported SQL/temporary ordering rather than a blanket refusal. Prove CurrentKeyIndex against disabled/duplicate key identities without guessing filtered index numbering. 0061 owns consumed/discarded lowering.
 5. Complete computed platform tables from system symbols and requested ranges, avoiding fixed-date population as the authoritative implementation.
    Share Page/Table Metadata, Field and AllObj live projections over immutable installed metadata. Populate every represented source property from qualified declarations/app identity, keep Name separate from Caption, and refuse missing authority rather than default values. Reuse `ReflectionMetadata` mappings; CDS is not Query. Prove typed/reflected filtering, count/navigation, permissions, read-only writes and temporary independence before removing the guards. 0013 owns explicit legacy-snapshot/schema activation.
+   Native ownership: start at `Main::WriteNativeObjects`, `NativeSources::app` and
+   `TableWriter::{NativeTableAssertions,TableReflectionProperties}`. Emit original
+   namespace/property/module declarations with verified bound-record ABI contracts
+   into the platform library. Install one canonical TableEntry per identity before
+   catalogue freeze; no competing metadata registry or silent duplicate replacement.
+   Preserve the implemented typed Record/RecordRef canonical binding and qualify
+   the complete selected production image after 0725 retirement; no compiling-only
+   subset or stale ABI consumer is integration proof. Resolve absent
+   classification, native virtual TableType and implicit-field semantics from
+   authority before enabling the live provider; folder names
+   and blank/default enum values are not runtime proof.
+   Validate table Scope eligibility at source admission: the reference compiler
+   rejects an ordinary extension's Scope=OnPrem (AL0850), irrespective of its
+   OnPrem deployment target. Preserve permitted original platform declarations;
+   property-name projection alone does not implement this restriction.
+   Types-29 `MetaTable::AppendSystemFields` (RVA 8be38) inserts field 0
+   SystemRowVersion and uses linked/table-kind-dependent audit fields; retained
+   `/tmp/agiru-metadata-defaults.Y411KR/table-system-fields.il` is creation evidence,
+   not native row-value authority. Preserve 0013/0034's complete version-profile gaps.
    Page Table Field: project the source-declared field/type/length/caption/kind/scope metadata for installed pages and table extensions. Share filter/order/count/navigation with typed Record and RecordRef; preserve pending obsolete fields, exact native codes and permissions. Replace the named refusal only with a tested read-only provider, not seeded placeholders. Temporary writes remain legal; virtual writes refuse. Source classification and generated binding remain 0034/0033.
    Keep the Integer domain intact; bound transfer through cursors, not a truncated relation. Gate filtered Count and navigation across the former million-row cutoff.
    For Field, use `src/rt/FieldMetadata.h` over immutable installed declarations for typed/RecordRef Get, Find and Next. Keep only cursor indices and existing record filters per handle, not a copied catalogue per session. One predicate serves Count/navigation; live virtual writes refuse, temporary writes remain legal. Remove legacy SQL Field copies only on disposable/schema-qualified databases (0004). 0034 owns schema/value contracts, not a second navigation implementation.
@@ -70,7 +249,17 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 Filter groups: include/runtime/{Record,RecordState,Table,RecordRef}.h, src/rt/{RecordRef,Temporary}.cpp, test/gate/FilterGroupGate.cpp and test/transpiler/page-record-binding/. Platform methods-auto/{record,recordref}/*-{filtergroup,hasfilter}-method.md and record/record-getfilter-method.md; current official FilterGroup pages checked 2026-10-02. BCApps main a9ea4d84534cebba852c44bf0f841c2ea149de4e, src/Layers/W1/BaseApp/Foundation/Reporting/CustomLayoutReporting.Codeunit.al::{FindNextEmptyFilterGroup,SetGroupFilter,GetNextGroupFilters}; System/Workflow/WorkflowResponseFactBox.Page.al::OnFindRecord. User business-central/ui-enter-criteria-filters.md. Earlier 1063/1103 expose shared-group storage and five item-tracking regressions; preserve independent filters and investigate every loss, not the predecessor's one-dictionary compromise. Generator property syntax is 0073; runtime remains this WI.
 
-Unindexed sorting: platform `methods-auto/record/record-setcurrentkey-method.md` (2026-02-23); BCApps current main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `System Application/App/User Settings/src/UserSettingsImpl.Codeunit.al::PopulateProfiles`; original System `Virtual Tables/AllProfile.Table.al` has only Scope/App ID/Profile ID PK. User intent `business-central/admin-users-profiles-roles.md`. Predecessor 1464 separates optional Boolean contracts by overload/type, but its claim that SetCurrentKey cannot fail is not adopted; the platform explicitly excludes unsortable fields. No Python call-context maps are transplanted.
+Sorting authority: developer `ff5939a46e05`,
+`methods-auto/record/record-setcurrentkey-method.md`,
+`methods-auto/{record,recordref}/*-setview-method.md`,
+`methods-auto/recordref/recordref-{currentkeyindex,keycount}-method.md` and
+`properties/devenv-includedfields-property.md`. BCApps `bb7111877ff7`,
+`System Application/App/User Settings/src/UserSettingsImpl.Codeunit.al::PopulateProfiles`;
+original System `Virtual Tables/AllProfile.Table.al` has only Scope/App ID/Profile ID PK.
+User intent: `business-central/ui-enter-criteria-filters.md`. Predecessor 1464 separates
+optional Boolean contracts; its claim that SetCurrentKey never fails is rejected.
+RecordRef has no SetCurrentKey method; its SetView shares the primitive. No filtered
+disabled-key index numbering or Python call-context maps are inferred.
 
 Range bounds: platform `methods-auto/{record,fieldref}/*-getrangemin-method.md` and `*-getrangemax-method.md`; BCApps main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `src/System Application/App/Email/src/Email/Sent/SentEmails.Query.al` and `src/System Application/App/Extension Management/src/ExtensionSettings.Page.al` guard calls with GetFilter. User docs contain no separate contract. Predecessor `~/Git/openerp/board/1715_getrangemin-without-filter-must-raise.md` distinguishes public errors from internal blank FlowFilter bounds. Preserve `RangeBoundOf` and the existing FlowFilter gate.
 
@@ -87,7 +276,42 @@ and `methods-auto/moduleinfo/moduleinfo-data-type.md`; BCApps `bb7111877f`,
 Original verified System `29.0.55365.0`: `src/Virtual Tables/TableMetadata.Table.al`.
 User docs `0ff62b2266`, `business-central/admin-classifying-data-sensitivity.md`:
 developer classification is not user-maintained sensitivity. Predecessor 1017/1080/1417
-are findings, not schema authority. No default classification inferred from the
-unavailable local `devenv-classifying-data.md` reference.
+are findings, not schema authority. Local `onprem/classifying-data.md` describes
+2018 NAV field defaults and upgrades, not modern omitted table classification.
+
+Source-owner composition: same developer/BCApps revisions, `devenv-json-files.md`
+and `properties/devenv-{movedfrom,movedto}-property.md`; original
+`Business Foundation/App/{app.json,AuditCodes/app.json,
+AuditCodes/src/Legacy/ObsoleteReturnReasonExt.TableExt.al}` and
+`Layers/W1/BaseApp/Inventory/Location/ReturnReasonExt.TableExt.al`.
+The W1 destination explicitly names Business Foundation, not AuditCodes.
+
+Property mappings: same developer revision, `properties/devenv-{compressiontype,
+datacaptionfields,scope-table,access,obsoletestate,inherentpermissions,
+inherententitlements}-property.md`; original System TableMetadata source above.
+Scope aliases follow the property documentation, not enum-position casts. The
+redirected classification pages supply no absent-table classification default.
+Ordinary AL defaults use Microsoft Development.Tools 18.0.41.62505
+(`https://www.nuget.org/packages/Microsoft.Dynamics.BusinessCentral.Development.Tools/18.0.41.62505`),
+SHA256 `592eb1173af4faee59aca91b4624ccbb70c725ffc78b36719e078b63ffc6697b`,
+original System 29.0.55365.0 and authored default/explicit/temporary tables with
+`/generatecode+`. Runtime-18 compiled XML is identical for OnPrem/Cloud targets.
+Types-29 XML constructor RVA 8ac88 leaves absent Scope at Personalization (0),
+normalized to Cloud by the documented legacy alias; absent ObsoleteState is No.
+The CLR optional-argument constructor is not this XML creation path.
+Retain version/tool/source hashes and the compiler/XML receipts under
+`/tmp/agiru-metadata-defaults.Y411KR/`; proprietary tools stay outside agiru.
+BCApps references: `System Application/App/Data Classification/src/`
+`DataClassificationMgtImpl.Codeunit.al::IsSupportedTable` and
+`DataPrivacyEntities.Table.al`: table classification is distinct from field
+classification; obsolete/type metadata controls supported business tables.
+
+Caption-field serialization: BCApps `bb7111877f`,
+`Apps/W1/DataSearch/App/DataSearchInTable.codeunit.al::{GetKeyText,SplitStringToIntegerList}`
+consumes comma-separated integer field numbers; an empty declaration selects the
+primary-key fallback in AL. The private projection preserves order/repetitions.
+Complete the shared native/app property emission in `TableWriter.cpp`; retain
+source omissions separately from documented effective defaults. Access's field-level
+default and cmdlet compression defaults do not establish every table metadata default.
 
 Property scope: `enableexternalassemblies`, `externalaccess`, `externaltype`, `initvalue`, `iscontroladdin`, `optionordinalvalues`, `provider`, `publickeytoken`, `tabletype`, `usetemporary`, `usetemporary-report`, `usetemporary-xmlport`.

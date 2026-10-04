@@ -153,7 +153,8 @@ prove the narrow header's dependency profile with negative controls.
 - Diagnostics are part of AL behaviour. Do not swallow errors or add uncounted suppressions.
   Constants need a documented origin where their meaning is not self-evident.
 - Dependencies are allowed when the standard library is insufficient; justify their purpose
-  and portability. XML uses libxml2. Reporting must preserve BC layout semantics and produce
+  and portability. XML uses libxml2; JSON uses system yyjson behind a private adapter,
+  preserving exact number tokens and stable node ownership. Reporting must preserve BC layout semantics and produce
   genuine PDF/workbook output through the layout/Cairo architecture above. Verify native
   Linux performance/resources and browser-only WASM compatibility; no Java/desktop-Office engine.
 - Incremental compiler outputs may use `build/`. Temporary fixtures, probes, source
@@ -234,4 +235,5 @@ Keep existing IDs when consolidating. Allocate new IDs from all Git history, nev
 open files alone. Delete completed or superseded items; Git preserves their history. Record
 consolidation mappings in the board index. Do not claim ownership through stale `active` text.
 Keep only current build recipes in the working tree; Git preserves superseded instructions.
-Commit only when requested or otherwise authorized; this review does not require a commit.
+Commit and push each verified coherent development increment; split commits by outcome.
+Keep pending checks and known failures explicit; a pushed commit is not an ERP milestone.

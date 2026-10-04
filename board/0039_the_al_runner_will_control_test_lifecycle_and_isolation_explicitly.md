@@ -8,6 +8,12 @@ Depends on: 0012 boundaries; 0058 comparison; 0718 images; 0006 session state.
 - RequiredTestIsolation preflight now reads the same immutable `CodeunitDef` as the generated catalogue. None/omitted permit every valid policy; Disabled/Codeunit/Function require an exact match. Invalid/mismatched declarations produce one failed result per source method before construction/OnRun. Gate: 430 checks, including two-connection no-effect proof; actual generated AL: nine checks. Removed metadata and bypassed policy controls fail four/130 checks. `test/runtime/required-isolation.sh`, `build/isolation-tests-final.log`: 102 local cases/147 toolchain tests, zero red/skipped. This does not activate the translated TestRunner.
 - BCApps `6261b1c458` generation now exits zero, retaining 80 UT codeunits/2,314 methods and all 24,375 output paths. Exactly 1,315 test-catalogue sources change; normalization of their constructor migrations leaves zero additional byte changes, and all headers are unchanged. `build/isolation-output-comparison.json`. Repeated generation is byte-identical, but six rewrites/two sweeps remain 0589. The new `Create Company Tests` declaration (139326, Disabled) is counted, not excluded or forced into Codeunit isolation. `build/isolation-{generation,generation-final}.log`, `build/isolation-*-generation.sha256`; no executed-UT claim.
 - `TestRunner.cpp` invokes test methods directly; generated TestRunner before/after hooks and PermissionTestHelper reset chain are not driving execution.
+- `TestRunner.cpp::RunOne` resets Randomize(1) for every method. Transparent
+  tracing of all nineteen original SCM UOM methods shows only 1/4, so their green
+  default run does not prove periodic-fraction coverage. Diagnostic seed 4 yields
+  1/9 and exposes existing/new Decimal/field failures (0066); it is not a normal
+  UT count or a reason to choose another seed for green. Retain actual seed/reset
+  policy in receipts and qualify the translated runner's policy from AL hooks.
 - Codeunit/Function/Disabled policies and handler/trap cleanup have focused gates. CLI defaults to Codeunit; platform default is Disabled.
 - `TransactionModel::None` currently avoids success Commit but does not itself refuse direct writes or give page interactions separate transactions.
 - Runtime-18 context primitives retain provider/test-app identities, owned callback
@@ -23,7 +29,7 @@ Depends on: 0012 boundaries; 0058 comparison; 0718 images; 0006 session state.
 1. Generate runner metadata and callback registration; select a translated TestRunner explicitly. Dispatch empty-function codeunit callbacks, skips, OnRun, OnBeforeTestRun and OnAfterTestRun.
 2. Run each before/after hook in its documented own transaction outside test isolation floors. Implement hook-error outcomes and durable reports separately from failed test data.
 3. Complete the TestIsolation × TransactionModel matrix and runner selection; retain the proved RequiredTestIsolation preflight. Codeunit may retain successful cross-method state; Function discards each method; AutoRollback rejects explicit Commit; None rejects direct writes but permits documented page transactions.
-4. Implement PermissionTestHelper and the translated reset chain, then retire native duplicates. Restore handlers/traps/current instance on setup, execution, callback and reporting failures.
+4. Implement PermissionTestHelper and the translated reset chain, then retire native duplicates. Restore handlers/traps/current instance on setup, execution, callback and reporting failures. Derive RNG reset/seed selection from these hooks; report deterministic seed coverage separately without replacing the full method population.
 5. With 0034's Runtime-18 context binding, implement declared TestHandlers and native
    before/after codeunit/procedure/case dispatch. Context belongs to the active test/session;
    before-procedure/case Skip prevents execution and reports its reason; after-hook Skip

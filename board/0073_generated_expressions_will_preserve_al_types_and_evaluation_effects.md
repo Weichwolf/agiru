@@ -1,10 +1,23 @@
 # 0073 — Generated expressions will preserve AL types and evaluation effects
 
-Status: open | Priority: P1 | Stage: UT lowering | Reviewed: 2026-10-02
+Status: open | Priority: P1 | Stage: UT lowering | Reviewed: 2026-10-04
 Depends on: 0033 symbol identity.
 
 ## Evidence
 
+- Numeric primitive ready, not emitted: `include/type/AlDecimalArithmetic.h`,
+  `src/net/Decimal.cpp`, `test/gate/AlDecimalGate.cpp`; 0066 records 34 gate checks,
+  37,532 BC29 reference cases and three compiled controls. Normalize is separate
+  from the CLR core, field range, SQL and display policy. Bind conversions by the
+  declared AL/.NET type at every literal/assignment/parameter/return/field boundary;
+  sequence side-effecting operands left-to-right before passing owned values.
+  Do not activate only division or rely on C++ argument evaluation order.
+- Current case lowering (2026-10-04): CaseChain binds the selector once in a scoped
+  value. Generated Boolean TryFunction and ordinary Integer side-effect selectors
+  execute across multiple/range/else branches; the repeated-selector mutant fails.
+  The 40-check call-context fixture and controls are recorded in 0061. Call's former
+  154-line argument loop is split without new targeted helper findings. Case-label
+  conversion/overflow and Code's special comparison rule remain unproved.
 - Current generic record-call repair in `src/gen/BodyWriter.cpp::Link`: callable
   members whose C++ spelling aliases a native field retain the runtime method in
   explicit and property-access syntax. Quoted Record ID stays a value. Actual
@@ -31,6 +44,11 @@ Depends on: 0033 symbol identity.
 - Record-call prototype retains quoted-field identity and generic `BodyWriter::CallableSpelling`: four spellings, implicit/explicit calls, own-versus-related RecordId; 28 AL checks. Extend binding beyond named receivers, not global spelling rules. Earlier Text prototype retains literal/label anchors in `BodyWriter::{Added,TextJoin}` and Text results in `StringValue.h`; old generator/runtime independently fail. Receipts and historical counts: README, `build/{record-link,text-result}-20261001/`; neither is integrated.
 - The frozen tree also exposes five header failures from undeclared absent interfaces: PowerBIServiceProvider and GraphAuthorization. Their actual AL declarations are excluded by namespace while in-scope callers name them. This remains an identity/dependency-closure gap in 0033/0034, not a working interface implementation or permission to broaden fallback conversions.
 - `BodyWriter::Binary` promotes division to Decimal but Boolean Link emits short-circuit operators. AL eager-operand behavior needs execution proof.
+- Decimal lowering currently uses the CLR core directly. Executed original BC29
+  Decimal18 arithmetic rounds to eighteen significant digits (0066), independently
+  of SQL scale/display limits. Preserve typed AL versus .NET conversions and
+  operator results; do not globally reduce the shared CLR primitive's precision.
+  Actual target-version parity and full unchanged-population activation remain due.
 - `TableWriter` caches names by AST address/partial identity; shared option generation writes sanitized C++ spelling as AL names.
 - Actual ReportResGovernSettings compiles without PCH; whole predecessor fails its reconstructed type under both compilers. Actual FeatureManagement executes all four one-way/reversible × None/All Users editability cases under both compilers. Its preceding own image already executed them with an ordinary option wrapper; do not claim a formerly failing runtime control. Current regeneration uses the native vocabulary. `artifacts/real-consumers.json`; validation/actions, provider and actual-client workflows remain unproved.
 - `BodyWriter::ControlTrigger` checks only the base method name against AL procedures, then returns one unchecked `_Control` suffix. Reserve the complete generated member namespace: both that suffix and another control's synthesized method can collide. Cover multiple occupied suffixes and two controls with intersecting trigger/getter spellings; do not rename either AL declaration.
@@ -42,6 +60,8 @@ Depends on: 0033 symbol identity.
    Resolve a call once to its owning ProcedureDecl using the AL name and full ordered argument types; consume that result for spelling, var/Option/Variant borrowing, Guid literal adaptation, publisher arguments and returned handles. Preserve record/enum identity, nested generic arguments and array shape; length and return type do not invent overload identities. Keep source names/metadata separate from C++ allocation. Unknown/ambiguous best matches must refuse, never select the first/last variant.
    Use existing Objects/TableRef declarations, not another method catalogue or an arity-only dispatcher. Cover own/member Codeunit, Record, Page, Report, Query, XMLport and Interface calls, local shadowing, different/same arity, conversion ranking, var writeback and both declaration orders. Retain the four compiler-accepted failing fixtures, three current positive controls and original SCMProductionOrdersII comparison before promotion. Audit fixture legality with AL compiler controls; source-binding Caller.Codeunit.al's custom Run conflicts with the platform method and needs a separately verified fixture repair.
 2. Add execution fixtures for integer division yielding Decimal, decimal DIV/MOD, eager Boolean operands with var effects, overflow and operand order. Derive expectations from AL documentation and source usage.
+   Retain single-evaluation case controls while implementing declared-type label
+   conversion and its Code exception; do not re-expand the selector per comparison.
 3. Activate the option/record-call prototypes only with full sealed-seed UT A/B. Preserve native/ordinary, alias, shadowing, four-spelling/implicit-call and quoted-field controls. Extend the same declaration-owned binding to indexed/chained receivers and implicit Rec; retain user-procedure priority, not a second method catalogue. Runtime record identity/formatting stay separate; never make RecordId fields callable.
    Declared controls/columns/fields must precede primitive or CLR getter fallback; extend the integrated receiver-priority rule to every lowering path and preserve the actual .NET getter.
    Retain custom procedure signatures and argument modes for every receiver kind; use the same declaration binding for member spelling and `LentParametersOf`. Compile and execute an XMLport method updating a caller's bounded Text, with same-app/dependent-app and archived-emitter controls.
@@ -57,6 +77,10 @@ Depends on: 0033 symbol identity.
 - Oracle-proven Text/Guid, Code+Code and literal joins retain Text and select declared overloads; SecretText selects SecretText without unwrapping. Keep independent old generator/runtime controls, destination diagnostics, Unicode/case/spaces, native storage joins and owned-buffer transfer. Activation retains the full source-counted UT population and sealed-seed per-method comparison.
 
 ## References
+
+Case selectors: `devenv-al-control-statements.md#case-statements`, developer revision
+`ff5939a46e05`; predecessor 810 K6. Implementation: BodyWriter::CaseChain;
+`test/runtime/test-contexts/{TryScopes.Table.al,Fixture.Codeunit.al,Runner.cpp}`.
 
 Overload binding: methods/devenv-overload-method.md (current official page checked 2026-10-02), devenv-al-type-conversion-expressions.md; BCApps main a9ea4d84534cebba852c44bf0f841c2ea149de4e, W1 Tests/SCM-Manufacturing/SCMProductionOrdersII.Codeunit.al::{CreatePutAwayFromPutAwayWorksheet,CreatePutawayFromPutawayWorksheet}. No distinct end-user procedure-overload contract. Earlier 1090 requires static type identity for same-arity List overloads; 1318 requires preserving all declarations; 943's unconditional last-variant fallback is rejected. Probe AL compiler assembly SHA256 1eabc562b732bd0b2819a9d4ac152c5ab442d236ea228f8fb65461606c37faed/System.app 5b72ba127cb2221722f02544bfb3f3bd5a50402bf92bfab6d7e584e049b9681d; source/hash pairs remain in probe.json. Acceptance by this compiler is not a BC runtime oracle.
 

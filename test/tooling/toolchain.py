@@ -84,10 +84,138 @@ class NativeSourceCompilerGate(unittest.TestCase):
         arguments += ['--system-symbols', str(self.package)] if extra is None else extra
         return subprocess.run(arguments, text=True, capture_output=True, timeout=30)
 
+    def native_table_manifest(self):
+        manifest = self.package / 'NavxManifest.xml'
+        manifest.write_text('<Package xmlns="http://schemas.microsoft.com/navx/2015/manifest">'
+            '<App Id="85a884cd-20d8-4d18-91bd-e6c1baaa3a32" Name="Table Only" '
+            'Publisher="agiru tests" Version="1.2.3.4"/></Package>')
+        return manifest
+
+    def test_table_only_native_owner_validates_a_legal_field_takeover(self):
+        self.native_table_manifest()
+        source = self.native.read_text()
+        original = 'field(1; "Page ID"; Integer)\n        {\n        }'
+        self.assertEqual(source.count(original), 1)
+        self.native.write_text(source.replace(original,
+            'field(1; "Page ID"; Integer) { ObsoleteState = Moved; '
+            "MovedTo = '118874ab-44bc-4ccb-9daf-59763539ab16'; }"))
+        (self.source / 'app.json').write_text(json.dumps({
+            'id': '118874ab-44bc-4ccb-9daf-59763539ab16', 'name': 'Table Destination',
+            'publisher': 'agiru tests', 'version': '1.0.0.0'}))
+        (self.source / 'Takeover.TableExt.al').write_text('namespace Microsoft.Fixture; '
+            'tableextension 50183 Destination extends "Page Table Field" { fields { '
+            'field(1; "Page ID"; Integer) { '
+            "MovedFrom = '85a884cd-20d8-4d18-91bd-e6c1baaa3a32'; } } }")
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('1 table sources parsed, 1 bound, 0 unbound', result.stdout)
+        compiled = self.compile_page()
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        previous = os.environ.get('AGIRU_NATIVE_OWNER_PREVIOUS')
+        if previous:
+            original_compiler = self.transpiler
+            self.transpiler = Path(previous)
+            try:
+                old = self.run_compiler()
+            finally:
+                self.transpiler = original_compiler
+            self.assertEqual(old.returncode, 1, old.stdout + old.stderr)
+            self.assertIn('invalid moved field takeover: Page ID', old.stderr)
+
+    def test_table_only_manifest_malformed_identity_and_dtd_refuse(self):
+        manifest = self.native_table_manifest()
+        original = manifest.read_text()
+        for mutant in ('<Package>',
+                       original.replace('85a884cd-20d8-4d18-91bd-e6c1baaa3a32', 'invalid'),
+                       '<!DOCTYPE Package [<!ENTITY name "Unsafe">]>' + original):
+            with self.subTest(mutant=mutant):
+                manifest.write_text(mutant)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('System', result.stderr)
+                self.assertFalse(self.generated.exists())
+
+    def test_table_only_manifest_symlinks_refuse_before_output(self):
+        manifest = self.native_table_manifest()
+        held = self.package / 'held.xml'
+        manifest.rename(held)
+        for target in (held, self.package / 'missing.xml'):
+            with self.subTest(target=target):
+                manifest.symlink_to(target)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('System manifest is a symlink', result.stderr)
+                self.assertFalse(self.generated.exists())
+                manifest.unlink()
+
+    def test_table_only_raw_fixture_without_manifest_stays_unqualified(self):
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse((self.generated / 'platform/PlatformModule.h').exists())
+        self.assertIn('no provider or business execution proof', result.stdout)
+
+    def test_native_product_scope_retains_raw_identity_and_required_page(self):
+        commercial = self.package / 'src/Commercial.Table.al'
+        commercial.write_text('namespace System.Security.AccessControl; '
+            'table 2000000998 "Authored Commercial" { fields { field(1; ID; Integer) {} } }')
+        rule = 'bc-licensing:system-symbols/src/Commercial.Table.al'
+        policy = {'include': ['System', 'Microsoft'], 'exclude': [], 'product_exclude': [rule]}
+        (self.root / 'scope.json').write_text(json.dumps(policy))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('native product-excluded table 2000000998', result.stdout)
+        self.assertIn('1 table sources parsed, 1 bound, 0 unbound', result.stdout)
+        report = scope_inventory.inventory(self.package,
+            {'apps': [{'name': 'native', 'source': 'src'}]}, policy, 'system-symbols')
+        self.assertFalse(report['errors'], report['errors'])
+        self.assertEqual(report['summary']['objects_by_kind']['table'], 2)
+        excluded = [row for row in report['objects'] if row['product_exclusion_reason']]
+        self.assertEqual([(row['id'], row['product_exclusion_reason']) for row in excluded],
+                         [(2000000998, 'bc-licensing')])
+        compiled = self.compile_page()
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        self.assertEqual(sum(len(row['methods']) for row in milestone.scan(self.source)), 1)
+        policy['product_exclude'] = []
+        (self.root / 'scope.json').write_text(json.dumps(policy))
+        reintroduced = self.run_compiler()
+        self.assertEqual(reintroduced.returncode, 1, reintroduced.stdout + reintroduced.stderr)
+        self.assertIn('native-unbound 2000000998', reintroduced.stdout)
+
+    def test_native_rule_cannot_exclude_the_same_relative_bcapps_path(self):
+        renamed = self.package / 'src/unusual-name.Codeunit.al'
+        self.native.rename(renamed)
+        self.native = renamed
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['System', 'Microsoft'],
+            'exclude': [], 'product_exclude': ['bc-licensing:system-symbols/src/unusual-name.Codeunit.al']}))
+        (self.root / 'src').mkdir()
+        (self.root / 'src/unusual-name.Codeunit.al').write_text('namespace Microsoft.Fixture; '
+            'codeunit 50186 Retained { procedure Execute() begin end; }')
+        apps = json.loads(self.apps.read_text())
+        apps['apps'].append({'name': 'other', 'source': 'src'})
+        self.apps.write_text(json.dumps(apps))
+        result = self.run_compiler()
+        self.assertTrue(list(self.generated.rglob('Retained.h')),
+            result.stdout + result.stderr + '\n' +
+            '\n'.join(str(path.relative_to(self.generated)) for path in self.generated.rglob('*')))
+        self.assertIn('native product-excluded table 2000000171', result.stdout)
+        report = scope_inventory.inventory(self.root, apps, json.loads((self.root / 'scope.json').read_text()))
+        retained = next(row for row in report['objects'] if row['id'] == 50186)
+        self.assertIsNone(retained['product_exclusion_reason'])
+
+    def test_native_exclusion_requires_its_original_source_package(self):
+        (self.root / 'scope.json').write_text(json.dumps({'include': ['System', 'Microsoft'],
+            'exclude': [], 'product_exclude': ['bc-licensing:system-symbols/src/unusual-name.aL']}))
+        result = self.run_compiler([])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('System product exclusion requires --system-symbols', result.stderr)
+        self.assertFalse(self.generated.exists())
+
     def moved_field_sources(self, reverse=False, destination=True):
         source_id = '118874ab-44bc-4ccb-9daf-59763539ab16'
         destination_id = '85a884cd-20d8-4d18-91bd-e6c1baaa3a32'
-        (self.source / 'app.json').write_text(json.dumps({'id': source_id}))
+        (self.source / 'app.json').write_text(json.dumps({
+            'id': source_id, 'name': 'Moved Field Source',
+            'publisher': 'agiru tests', 'version': '1.0.0.0'}))
         (self.source / 'Moved.Table.al').write_text('namespace Microsoft.Fixture; '
             'table 50180 "Moved Row" { fields { field(1; ID; Integer) {} } }')
         (self.source / 'Old.TableExt.al').write_text('namespace Microsoft.Fixture; '
@@ -96,7 +224,9 @@ class NativeSourceCompilerGate(unittest.TestCase):
             f"MovedTo = '{destination_id}';" + ' } } }')
         successor = self.root / 'successor'
         successor.mkdir()
-        (successor / 'app.json').write_text(json.dumps({'id': destination_id}))
+        (successor / 'app.json').write_text(json.dumps({
+            'id': destination_id, 'name': 'Moved Field Destination',
+            'publisher': 'agiru tests', 'version': '1.0.0.0'}))
         declaration = successor / 'New.TableExt.al'
         if destination:
             declaration.write_text('namespace Microsoft.Fixture; '
@@ -2228,6 +2358,30 @@ class SourceInventoryGate(unittest.TestCase):
         self.assertEqual(scope_inventory.product_reason('Module/Check.al', rules), 'bc-licensing')
         self.assertIsNone(scope_inventory.product_reason('ModuleExtra/Check.al', rules))
         self.assertIsNone(scope_inventory.product_reason('module/Check.al', rules))
+
+    def test_source_domains_are_separate_without_shrinking_raw_populations(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'src').mkdir()
+            (root / 'src/Commercial.al').write_text('table 1 Commercial {}')
+            (root / 'src/User.al').write_text('table 2 User {}')
+            configuration = {'apps': [{'name': 'native', 'source': 'src'}]}
+            policy = {'include': ['System', 'Microsoft'], 'exclude': [],
+                      'product_exclude': ['bc-licensing:system-symbols/src/Commercial.al']}
+            native = scope_inventory.inventory(root, configuration, policy, 'system-symbols')
+            regular = scope_inventory.inventory(root, configuration, policy)
+            self.assertEqual(native['summary']['objects'], 2)
+            self.assertEqual(regular['summary']['objects'], 2)
+            self.assertEqual(native['summary']['product_excluded_objects'], 1)
+            self.assertEqual(regular['summary']['product_excluded_objects'], 0)
+            self.assertEqual(native['source_sha256'], regular['source_sha256'])
+            self.assertFalse(native['errors'])
+            self.assertFalse(regular['errors'])
+            self.assertEqual(len(regular['other_domain_rules']), 1)
+            with self.assertRaises(ValueError):
+                scope_inventory.inventory(root, configuration, policy, 'unknown')
+            with self.assertRaises(ValueError):
+                scope_inventory.product_rules({'product_exclude': ['bc-licensing:system-symbols/']})
         for value in ('bc-licensing:/root', 'bc-licensing:../root', 'bc-licensing:Module/./Check.al',
                       'bc-licensing:Module//Check.al', 'bc-licensing:Module//',
                       'unknown:Module/', 'missing-reason',
@@ -2869,38 +3023,38 @@ class DiscoveryGate(unittest.TestCase):
             (root / 'build').mkdir()
             shutil.copyfile(SCRIPT.parents[2] / 'test/run.sh', root / 'test/run.sh')
             (root / 'test/gate/Fixture.cpp').touch()
-            for name in ('transpiler/builtins-reproduce.sh', 'tooling/one-definition.sh',
-                         'tooling/function-size.sh',
-                         'runtime/required-isolation.sh', 'tooling/header-dependencies.sh',
-                         'tooling/slice-check.sh', 'transpiler/interface-defaults.sh',
-                         'reporting/report-layouts.sh', 'reporting/layout-assets.sh',
-                         'runtime/number-sequences.sh', 'transpiler/table-keys.sh',
-                         'runtime/reflection-metadata.sh', 'transpiler/native-enums.sh',
-                         'runtime/test-contexts.sh'):
+            scripts = ('transpiler/builtins-reproduce.sh', 'tooling/one-definition.sh',
+                       'tooling/function-size.sh',
+                       'runtime/required-isolation.sh', 'tooling/header-dependencies.sh',
+                       'tooling/slice-check.sh', 'transpiler/interface-defaults.sh',
+                       'reporting/report-layouts.sh', 'reporting/layout-assets.sh',
+                       'runtime/number-sequences.sh', 'transpiler/table-keys.sh',
+                       'runtime/reflection-metadata.sh', 'runtime/catalogue.sh', 'transpiler/native-enums.sh',
+                       'runtime/test-contexts.sh', 'runtime/text-positions.sh', 'runtime/xml-reader.sh',
+                       'runtime/codeunit-record.sh', 'runtime/page-navigation.sh')
+            for name in scripts:
                 script = root / 'test' / name
                 script.parent.mkdir(parents=True, exist_ok=True)
                 script.write_text('exit 0\n')
             (root / 'test/tooling/toolchain.py').write_text('raise SystemExit(0)\n')
             command = ['sh', str(root / 'test/run.sh')]
             env = dict(os.environ, B=str(root / 'build'))
+            case_count = len(scripts) + 2
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn('16 case(s), 1 red', result.stdout)
+            self.assertIn(f'{case_count} case(s), 1 red', result.stdout)
             binary = root / 'build/gate_Fixture'
             binary.write_text('#!/bin/sh\nexit 0\n')
             binary.chmod(0o755)
             result = subprocess.run(command, env=env, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn('16 case(s), 0 red', result.stdout)
-            for name in ('reporting/report-layouts.sh', 'reporting/layout-assets.sh',
-                         'runtime/number-sequences.sh', 'transpiler/table-keys.sh',
-                         'runtime/reflection-metadata.sh', 'transpiler/native-enums.sh',
-                         'runtime/test-contexts.sh'):
+            self.assertIn(f'{case_count} case(s), 0 red', result.stdout)
+            for name in scripts:
                 script = root / 'test' / name
                 script.rename(script.with_suffix('.saved'))
                 result = subprocess.run(command, env=env, capture_output=True, text=True)
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                self.assertIn('16 case(s), 1 red', result.stdout)
+                self.assertIn(f'{case_count} case(s), 1 red', result.stdout)
                 script.with_suffix('.saved').rename(script)
 
 
