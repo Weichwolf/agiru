@@ -19,7 +19,10 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   findings and each retains 33 existing unsuppressed header findings. Local replay:
   136 cases, one wrong-notice-path refusal, 232 tooling tests pass (`all-local.log`).
   Corrected layout qualifier passes all controls (`layout-corrected.log`); this
-  does not rewrite the original red result. Frozen full-UT verification is pending.
+  does not rewrite the original red result. Frozen replay `20261004T184333Z-2543205`
+  is active on HEAD `155abe4`: slice-check/all/test/ut, six jobs, correct frozen
+  original notice. Compare all 2,314 identities against completed 175227;
+  null/unsealed seed remains diagnostic, not causal A/B. No terminal result yet.
   Other pages, locale defaults, array bounds/types and Native bindings remain gaps.
   References: pinned developer/BCApps/user revisions below; original
   `EncodingImpl.Codeunit.al`, `DotNetWrappers/DotNetEncoding.Codeunit.al`,

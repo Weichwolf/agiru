@@ -15,6 +15,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Codepage integration replay: `20261004T184333Z-2543205`, frozen HEAD `155abe4`,
+  source `79960d56653338db08e34dd932ca9d9914ace4454323d51b1578b5ca819d39a1`;
+  `slice-check all test ut`, six jobs. Runner PID 2543935 is live; no terminal result.
+  BC source/System/notice dependencies match completed 175227; original notice
+  is explicit and frozen. Compare every one of its 2,314 identities/results;
+  null/unsealed seed remains diagnostic, not causal A/B or G1 evidence.
 - Codepage foundation (0035): Windows-1252/ASCII/ISO-8859-1, distinct best-fit,
   factory aliases/preambles and explicit unknown-page refusals. `make encoding`
   passes 87 checks and twelve compiled controls; all 192,678 selected native text
