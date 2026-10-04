@@ -16,7 +16,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   controls reject and input hashes match (`/tmp/agiru-record-order-controls.TqaC8V`).
   Final cleanup reuses one writer and adds direct includes; 4,886 checks stay green.
   Analysis has no own findings, 30/35 inherited runtime/gate header findings remain
-  unsuppressed. Final controls and original-codeunit diagnostic replay are pending;
+  unsuppressed. Final controls pass: 5,872/296/313/7,493/4,886 checks green,
+  twenty-three compiled controls reject; hashes match (`/tmp/agiru-record-order-controls.aUoxgz`).
+  Original Invoice Aggregate UT (134396) completes with 55/57 passed, two unchanged
+  Table Metadata failures: one Rename gain, no losses/changed errors/missing/added/
+  duplicates, matching source denominator (`134396-comparison.json`). Its owned
+  diagnostic database is removed; the source template remains unchanged.
+  Two remaining codeunits and complete local/AL replay are pending;
   that image retains all seven non-runtime hashes from 223110, replaces libagiru_rt
   only and does not qualify rebuilt ModifyAll callers or the full UT population.
   Frozen 232014 includes the ModifyAll caller fix, not

@@ -24,13 +24,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   (`/tmp/agiru-record-order-controls.TqaC8V`), input hashes match. Final cleanup
   reuses one writer per cascade and includes only named headers; RenameGate stays
   4,886 green. Analysis has no own findings; 30/35 inherited runtime/gate header
-  findings remain unsuppressed. Final control replay and three original codeunits
-  on a disposable diagnostic image are running; no original AL recovery or complete
-  local replay claimed yet. The image retains all seven non-runtime hashes from
+  findings remain unsuppressed. Final control replay passes: 5,872/296/313/7,493/
+  4,886 checks green, twenty-three controls reject, all input hashes match
+  (`/tmp/agiru-record-order-controls.aUoxgz`). The image retains all seven non-runtime hashes from
   completed 223110 and replaces only libagiru_rt; it does not qualify rebuilt
   generated callers of the new ModifyAll template or the full UT population.
-  Original `TestRenamePostedInvoice` (134396) now passes in the diagnostic replay;
-  its complete codeunit and the other two affected codeunits are not yet terminal.
+  Original Invoice Aggregate UT (134396) is terminal: 55/57 passed, two unchanged
+  Table Metadata failures; its Rename test is recovered. Source count stays 57;
+  one gain, no losses/changed errors/missing/added/duplicates (`134396-comparison.json`).
+  Completed diagnostic DB is removed; the source template is unchanged. The other
+  two codeunits and complete local/AL replay remain pending.
 - Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
   source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
   `slice-check all test ut`, six jobs, runner PID 3102678 confirmed live.
