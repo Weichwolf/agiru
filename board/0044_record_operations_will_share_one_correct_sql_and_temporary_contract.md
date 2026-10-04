@@ -5,6 +5,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Cursor generation fault is executable, not only a source finding: the read-only
+  `/tmp/agiru-selection-change.li6S1N/CursorEpoch.cpp` uses the production typed
+  Integer table, 128 computed rows and a 64-step Next after production Commit or
+  savepoint rollback. Both paths fetch destroyed portals (`cursor does not exist`):
+  six checks, two red. Compile/run/source/library hashes are in `cursor-epoch-*`.
+  No business tables are created or changed. This remains a red diagnostic, not
+  a repository gate or a fix; move its buffered/block-boundary matrix into a C++ gate.
 - Selection changes now invalidate SQL cursors and lazily rebuild temporary views
   through `SelectionChanged`: filters/copies, keys/directions/views and active marks.
   Same-cardinality mark replacement is detected; unchanged predicates/directions and
@@ -356,6 +363,7 @@ Range bounds: platform `methods-auto/{record,fieldref}/*-getrangemin-method.md` 
 
 Selection-change authority: developer `ff5939a46e05`,
 `methods-auto/record/record-{next,setfilter,copyfilter,copyfilters,mark,markedonly,clearmarks}-method.md`
+and `methods-auto/database/database-commit-method.md`,
 and `dev-itpro/administration/optimize-sql-al-Database-methods-and-performance-on-server.md`
 in the same documentation repository.
 BCApps `bb7111877ff7`: `Inventory/Tracking/InventoryProfileOffsetting.Codeunit.al::ForecastConsumption`
