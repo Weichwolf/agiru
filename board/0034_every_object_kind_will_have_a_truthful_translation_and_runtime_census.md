@@ -30,7 +30,9 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   `/tmp/agiru-native-codeunits.K1f1tw`, `/tmp/agiru-native-codeunits-previous.UDymKH`,
   `/tmp/agiru-native-codeunit-output-{all-local-final,native-tooling-final,lint}.log`.
   New runner analysis passes; Main keeps four existing Main/BodyWriter findings,
-  no added suppression. Full UT replay/primitive binding remain open.
+  no added suppression. Full replay `20261004T164436Z-2355150` is active on frozen
+  HEAD `ae9c59a`; platform linking/slice-check pass, slice/UT remain unfinished.
+  Compare the unchanged full 2,314 population before primitive binding (README).
   References: developer `ff5939a46e`, `devenv-namespaces-overview.md`,
   `attributes/devenv-native-attribute.md`; BCApps `bb7111877f`,
   `System Application/App/Base64 Convert/src/Base64ConvertImpl.Codeunit.al`;
