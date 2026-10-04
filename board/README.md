@@ -17,15 +17,19 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 - Unicode integration replay: `20261004T175227Z-2443696`, frozen HEAD `c732229`,
   source `7a2621f2a5a8eea448751274f9760ac11011a10a485ed498240149c5b2ed7439`;
-  `slice-check all test ut`, six jobs. Runner PID 2446973 is live; slice-check
-  passes and the incremental slice build is active. Source/System/notice dependencies
-  match 164436. Compare every identity/result against that complete 2,314-UT run;
-  no current UT result, causal A/B or G1 claim.
+  `slice-check all test ut`, six jobs; terminal receipt, runner exited.
+  Slice-check/all/test exit 0: 136 local cases/232 tooling tests pass.
+  UT exit 2: 2,169/2,314 pass, 145 fail, zero incomplete; 80 codeunits/1,353 seconds.
+  Against 164436: zero gains/losses/changed errors/missing/added/duplicate identities;
+  source manifest/file hashes match. `artifacts/ut-comparison-164436.json`.
+  Frozen source/System/notice hashes match before/after; BC source/System/notice
+  dependencies match 164436. Null/unsealed seed remains diagnostic, not causal A/B.
+  Codepage changes are outside this snapshot; no G1 claim.
 - Unicode foundation (0035): 48 gate checks and five compiled controls pass;
   all 192,332 Unicode cases match original BC29 text cores, 1,066 outside-profile
   cases remain reported. Previous actual library fails 81,373 reference cases.
   `/tmp/agiru-base64-text-reference.pGQWvN`; complete local replay passes 136 cases/
-  232 tooling tests, exit 0. Full AL replay pending, outside frozen 164436.
+  232 tooling tests, exit 0. Complete AL replay is recorded above, without losses.
   Native binding, codepages/best-fit and locale defaults remain open.
 - Native integration replay: `20261004T164436Z-2355150`, frozen HEAD `ae9c59a`,
   source `1b5af9f74965a935aa39ab0eda282f8bede0ce4c1f101f7695889fa56efc53c0`;

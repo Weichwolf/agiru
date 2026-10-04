@@ -21,9 +21,11 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Encoding/runtime gate analysis has no own findings; existing header findings
   remain unsuppressed. Complete local replay passes 136 cases/232 tooling tests,
   exit 0; `all-local.log`, final source/image hashes in `final-inputs.sha256`.
-  Full replay `20261004T175227Z-2443696` is active on frozen HEAD `c732229`;
-  slice-check passes, no terminal build/AL result. Compare all 2,314 identities
-  against completed 164436; null/unsealed seed remains diagnostic, not causal A/B.
+  Full replay `20261004T175227Z-2443696` completed on frozen HEAD `c732229`:
+  slice-check/all/test exit 0; UT exit 2, 2,169/2,314 pass, 145 fail, zero incomplete.
+  Against 164436, all identities/source hashes match, no gains/losses/changed errors;
+  `artifacts/ut-comparison-164436.json`. Null/unsealed seed remains diagnostic,
+  not causal A/B. Codepage changes are outside this snapshot.
   Remaining: codepage tables/best-fit/default selection, array bounds/types and
   all nine Native Base64 bindings/streams (0034); no BC workflow/WASM/performance claim.
   References: developer `ff5939a46e`, `devenv-file-handling-and-text-encoding.md`,
