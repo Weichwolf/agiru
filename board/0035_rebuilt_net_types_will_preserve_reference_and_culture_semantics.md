@@ -1,10 +1,31 @@
 # 0035 — Rebuilt .NET types will preserve reference and culture semantics
 
-Status: open | Priority: P0 | Stage: UT XML safety first; All bridge closure | Reviewed: 2026-10-03
+Status: open | Priority: P0 | Stage: UT XML safety first; All bridge closure | Reviewed: 2026-10-04
 Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Unicode foundation: `src/net/Encoding.cpp` validates UTF-8 maximal subparts,
+  UTF-16 pairs/tails and UTF-32 scalars/tails; encoders replace isolated surrogate
+  units and char arrays preserve UTF-16 units. No byte-conversion BOM or point vector.
+  `make encoding`: 48 checks; five compiled controls reject passthrough, unchecked
+  pairs, lost tails, wrong scalar range and scalar-valued char arrays. Original
+  BC29 native text cores on temporary CLR 10.0.12: 193,398 raw cases, 192,332 within
+  the Unicode profile (30,598 encode/161,734 decode), 1,066 outside that profile.
+  All selected cases agree; previous actual library fails 81,373 reference cases.
+  Reference SHA256 `1ad63a57512ecd536baf9b623b7db811d1c4f6d2bbcbde498a3dfa6adbbf33a9`;
+  `/tmp/agiru-base64-text-reference.pGQWvN`, `/tmp/agiru-encoding.t0a7W7`.
+  Codepage provider is registered; codepage zero on this Linux CLR is UTF-8, not
+  proof of Windows ANSI/OEM locale behaviour. Measured 1252 best-fit maps combining
+  acute to B4 and a supplementary character to two question marks; Latin-1 is wrong.
+  Encoding/runtime gate analysis has no own findings; existing header findings
+  remain unsuppressed. Full local/AL replay is pending; outside frozen 164436.
+  Remaining: codepage tables/best-fit/default selection, array bounds/types and
+  all nine Native Base64 bindings/streams (0034); no BC workflow/WASM/performance claim.
+  References: developer `ff5939a46e`, `devenv-file-handling-and-text-encoding.md`,
+  `methods-auto/textencoding/textencoding-option.md`; BCApps `bb7111877f`, original
+  Base64ConvertImpl/Base64ConvertTest; user `0ff62b2266`, data-exchange definitions;
+  predecessor 1164. Unicode/RFC 3629 scalar/prefix boundaries supply codec constants.
 - `Stream.cpp` no longer copies the entire BLOB on each write. One private append
   preserves raw bytes, zero terminators, existing-stream visibility and borrowed
   self-input; storage grows geometrically. StreamGate: 51 checks green, previous

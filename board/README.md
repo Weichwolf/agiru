@@ -15,6 +15,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Unicode foundation (0035): 48 gate checks and five compiled controls pass;
+  all 192,332 Unicode cases match original BC29 text cores, 1,066 outside-profile
+  cases remain reported. Previous actual library fails 81,373 reference cases.
+  `/tmp/agiru-base64-text-reference.pGQWvN`; full local/AL replay pending, outside
+  frozen 164436. Native binding, codepages/best-fit and locale defaults remain open.
 - Native integration replay: `20261004T164436Z-2355150`, frozen HEAD `ae9c59a`,
   source `1b5af9f74965a935aa39ab0eda282f8bede0ce4c1f101f7695889fa56efc53c0`;
   `slice-check all test ut`, six jobs. Runner PID 2355353 is live; slice-check

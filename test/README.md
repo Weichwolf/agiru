@@ -77,6 +77,13 @@ byte-level reference population through both output forms; the receipt retains i
 hash. It does not bind Native methods or prove text encoding, stream input/cursors,
 CLR transform-block decoding or execution of the original BC Base64 tests (0034).
 
+`make encoding JOBS=2` qualifies UTF-8/UTF-16LE/UTF-32LE Unicode replacement and
+UTF-16 char-array units. Five compiled mutants must fail. Optional
+`AGIRU_ENCODING_REFERENCE=<TSV>` compares the declared Unicode profile against
+original native text-core results; reports total, selected and outside-profile rows
+and retains the reference hash. Codepage tables/best-fit fallback, locale defaults,
+array bounds, Native binding and original AL execution remain separate gaps (0034).
+
 The ERP milestones are separate: `make ut` executes the source-counted AL UT
 population through `agiru run-tests`; the full AL suite follows. Their original
 source is in BCApps, not in these authored fixtures. A green local regression

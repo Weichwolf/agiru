@@ -2,10 +2,13 @@
 
 #include "dotnet/Regex.h"
 #include "runtime/ErrorValue.h"
+#include "type/Boolean.h"
 #include "type/Integer.h"
-#include "type/Text.h"
+#include "type/StringValue.h"
 #include "type/Variant.h"
 
+#include <cctype>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -32,11 +35,20 @@ constexpr std::int32_t kBits12 = 12;
 constexpr std::int32_t kBits18 = 18;
 constexpr std::int32_t kBits8 = 8;
 constexpr char kReplacement = '?';
+constexpr std::int32_t kUnicodeReplacement = 0xFFFD;
+constexpr std::uint32_t kLastScalar = 0x10FFFF;
+constexpr std::int32_t kUtf8TwoByteLimit = 0x800;
+constexpr unsigned char kFirstTwoByteLead = 0xC2;
+constexpr unsigned char kLastFourByteLead = 0xF4;
+constexpr unsigned char kSurrogateThreeByteLead = 0xED;
+constexpr unsigned char kThreeByteSecondMinimum = 0xA0;
+constexpr unsigned char kFourByteSecondBoundary = 0x90;
+constexpr std::int32_t kAsciiMask = 0x7F;
 
 void AppendUtf8(std::string &out, std::int32_t code) {
   if (code < kAsciiLimit) {
     out += static_cast<char>(code);
-  } else if (code < (1 << (kBits6 + 5))) {
+  } else if (code < kUtf8TwoByteLimit) {
     out += static_cast<char>(kTwoByteLead | (code >> kBits6));
     out += static_cast<char>(kContinuation | (code & kSixBits));
   } else if (code < kSurrogateBase) {
@@ -51,29 +63,113 @@ void AppendUtf8(std::string &out, std::int32_t code) {
   }
 }
 
-std::vector<std::int32_t> CodePointsOf(std::string_view utf8) {
-  std::vector<std::int32_t> points;
-  for (std::size_t i = 0; i < utf8.size();) {
-    const auto lead = static_cast<unsigned char>(utf8[i]);
-    std::int32_t code = lead;
-    std::size_t more = 0;
-    if (lead >= kFourByteLead) {
-      code = lead & 0x07;
-      more = 3;
-    } else if (lead >= kThreeByteLead) {
-      code = lead & 0x0F;
-      more = 2;
-    } else if (lead >= kTwoByteLead) {
-      code = lead & 0x1F;
-      more = 1;
+bool IsHighSurrogate(std::int32_t code) {
+  return code >= kHighSurrogate && code < kLowSurrogate;
+}
+
+bool IsLowSurrogate(std::int32_t code) {
+  return code >= kLowSurrogate && code <= (kLowSurrogate | kSurrogateMask);
+}
+
+std::int32_t JoinSurrogates(std::int32_t high, std::int32_t low) {
+  return kSurrogateBase + ((high - kHighSurrogate) << kTenBits) + low - kLowSurrogate;
+}
+
+std::int32_t NextUtf8(std::string_view input, std::size_t &position, bool allowSurrogates) {
+  const auto lead = static_cast<unsigned char>(input[position++]);
+  if (lead < kAsciiLimit) { return lead; }
+  if (lead < kFirstTwoByteLead || lead > kLastFourByteLead) { return kUnicodeReplacement; }
+  const std::size_t length = lead < kThreeByteLead ? 2 : (lead < kFourByteLead ? 3 : 4);
+  std::int32_t code = lead & (kAsciiMask >> length);
+  for (std::size_t index = 1; index < length; ++index) {
+    if (position == input.size()) { return kUnicodeReplacement; }
+    const auto byte = static_cast<unsigned char>(input[position]);
+    if (byte < kContinuation || byte > (kContinuation | kSixBits)) { return kUnicodeReplacement; }
+    if (index == 1 &&
+        ((lead == kThreeByteLead && byte < kThreeByteSecondMinimum) ||
+         (lead == kSurrogateThreeByteLead && byte >= kThreeByteSecondMinimum && !allowSurrogates) ||
+         (lead == kFourByteLead && byte < kFourByteSecondBoundary) ||
+         (lead == kLastFourByteLead && byte >= kFourByteSecondBoundary))) {
+      return kUnicodeReplacement;
     }
-    ++i;
-    for (std::size_t k = 0; k < more && i < utf8.size(); ++k, ++i) {
-      code = (code << kBits6) | (static_cast<unsigned char>(utf8[i]) & kSixBits);
-    }
-    points.push_back(code);
+    ++position;
+    code = (code << kBits6) | (byte & kSixBits);
   }
-  return points;
+  return code;
+}
+
+std::int32_t NextTextScalar(std::string_view input, std::size_t &position) {
+  const std::int32_t code = NextUtf8(input, position, true);
+  if (IsHighSurrogate(code) && position < input.size()) {
+    std::size_t next = position;
+    const std::int32_t low = NextUtf8(input, next, true);
+    if (IsLowSurrogate(low)) {
+      position = next;
+      return JoinSurrogates(code, low);
+    }
+  }
+  return IsHighSurrogate(code) || IsLowSurrogate(code) ? kUnicodeReplacement : code;
+}
+
+void AppendUtf16Unit(std::string &out, std::int32_t code) {
+  out += static_cast<char>(code & kByteMask);
+  out += static_cast<char>((code >> kBits8) & kByteMask);
+}
+
+void AppendUtf16(std::string &out, std::int32_t code) {
+  if (code >= kSurrogateBase) {
+    const std::int32_t offset = code - kSurrogateBase;
+    AppendUtf16Unit(out, kHighSurrogate | (offset >> kTenBits));
+    AppendUtf16Unit(out, kLowSurrogate | (offset & kSurrogateMask));
+    return;
+  }
+  AppendUtf16Unit(out, code);
+}
+
+std::int32_t Utf16Unit(std::string_view bytes, std::size_t position) {
+  return static_cast<unsigned char>(bytes[position]) |
+         (static_cast<unsigned char>(bytes[position + 1]) << kBits8);
+}
+
+std::string DecodeUtf16(std::string_view bytes) {
+  std::string out;
+  out.reserve(bytes.size());
+  std::size_t position = 0;
+  while (position + 1 < bytes.size()) {
+    std::int32_t code = Utf16Unit(bytes, position);
+    position += 2;
+    if (IsHighSurrogate(code) && position + 1 < bytes.size() &&
+        IsLowSurrogate(Utf16Unit(bytes, position))) {
+      code = JoinSurrogates(code, Utf16Unit(bytes, position));
+      position += 2;
+    } else if (IsHighSurrogate(code) || IsLowSurrogate(code)) {
+      code = kUnicodeReplacement;
+    }
+    AppendUtf8(out, code);
+  }
+  if (position < bytes.size()) { AppendUtf8(out, kUnicodeReplacement); }
+  return out;
+}
+
+std::string DecodeUtf32(std::string_view bytes) {
+  std::string out;
+  out.reserve(bytes.size());
+  std::size_t position = 0;
+  while (position + 3 < bytes.size()) {
+    std::uint32_t code = 0;
+    for (std::size_t index = 0; index < 4; ++index) {
+      code |= static_cast<std::uint32_t>(static_cast<unsigned char>(bytes[position + index]))
+              << (index * kBits8);
+    }
+    position += 4;
+    if (code > kLastScalar ||
+        (code >= kHighSurrogate && code <= (kLowSurrogate | kSurrogateMask))) {
+      code = kUnicodeReplacement;
+    }
+    AppendUtf8(out, static_cast<std::int32_t>(code));
+  }
+  if (position < bytes.size()) { AppendUtf8(out, kUnicodeReplacement); }
+  return out;
 }
 
 Array BytesToArray(std::string_view bytes) {
@@ -157,11 +253,14 @@ Array Encoding::Convert(const class Encoding &from, const class Encoding &to, co
 }
 
 std::string Encoding::Encode(std::string_view text) const {
-  if (codePage_ == kUtf8 || codePage_ == kUnset || codePage_ == kDefault) {
-    return std::string(text);
-  }
   std::string out;
-  for (const std::int32_t code : CodePointsOf(text)) {
+  out.reserve(text.size());
+  for (std::size_t position = 0; position < text.size();) {
+    const std::int32_t code = NextTextScalar(text, position);
+    if (codePage_ == kUtf8 || codePage_ == kUnset || codePage_ == kDefault) {
+      AppendUtf8(out, code);
+      continue;
+    }
     if (codePage_ == kUtf32) {
       for (int shift = 0; shift < kBits8 * 4; shift += kBits8) {
         out += static_cast<char>((code >> shift) & kByteMask);
@@ -169,18 +268,7 @@ std::string Encoding::Encode(std::string_view text) const {
       continue;
     }
     if (codePage_ == kUtf16) {
-      if (code >= kSurrogateBase) {
-        const std::int32_t offset = code - kSurrogateBase;
-        const std::int32_t high = kHighSurrogate | (offset >> kTenBits);
-        const std::int32_t low = kLowSurrogate | (offset & kSurrogateMask);
-        for (const std::int32_t unit : {high, low}) {
-          out += static_cast<char>(unit & kByteMask);
-          out += static_cast<char>((unit >> kBits8) & kByteMask);
-        }
-      } else {
-        out += static_cast<char>(code & kByteMask);
-        out += static_cast<char>((code >> kBits8) & kByteMask);
-      }
+      AppendUtf16(out, code);
       continue;
     }
     const std::int32_t limit = codePage_ == kAscii ? kAsciiLimit : kLatinLimit;
@@ -191,34 +279,16 @@ std::string Encoding::Encode(std::string_view text) const {
 
 std::string Encoding::Decode(std::string_view bytes) const {
   if (codePage_ == kUtf8 || codePage_ == kUnset || codePage_ == kDefault) {
-    return std::string(bytes);
+    std::string out;
+    out.reserve(bytes.size());
+    for (std::size_t position = 0; position < bytes.size();) {
+      AppendUtf8(out, NextUtf8(bytes, position, false));
+    }
+    return out;
   }
   std::string out;
-  if (codePage_ == kUtf32) {
-    for (std::size_t i = 0; i + 3 < bytes.size(); i += 4) {
-      std::int32_t code = 0;
-      for (int k = 3; k >= 0; --k) {
-        code =
-            (code << kBits8) | static_cast<unsigned char>(bytes[i + static_cast<std::size_t>(k)]);
-      }
-      AppendUtf8(out, code);
-    }
-    return out;
-  }
-  if (codePage_ == kUtf16) {
-    for (std::size_t i = 0; i + 1 < bytes.size(); i += 2) {
-      std::int32_t unit = static_cast<unsigned char>(bytes[i]) |
-                          (static_cast<unsigned char>(bytes[i + 1]) << kBits8);
-      if (unit >= kHighSurrogate && unit < kLowSurrogate && i + 3 < bytes.size()) {
-        const std::int32_t low = static_cast<unsigned char>(bytes[i + 2]) |
-                                 (static_cast<unsigned char>(bytes[i + 3]) << kBits8);
-        unit = kSurrogateBase + (((unit & kSurrogateMask) << kTenBits) | (low & kSurrogateMask));
-        i += 2;
-      }
-      AppendUtf8(out, unit);
-    }
-    return out;
-  }
+  if (codePage_ == kUtf32) { return DecodeUtf32(bytes); }
+  if (codePage_ == kUtf16) { return DecodeUtf16(bytes); }
   for (const char c : bytes) { AppendUtf8(out, static_cast<unsigned char>(c)); }
   return out;
 }
@@ -240,17 +310,21 @@ Integer Encoding::GetByteCount(std::string_view text) const {
 }
 
 Array Encoding::GetChars(const Array &bytes) const {
-  Array out;
-  for (const std::int32_t code : CodePointsOf(Decode(ArrayToBytes(bytes, 0, bytes.Length())))) {
-    out.Add(Variant{Integer{code}});
-  }
-  return out;
+  return GetChars(bytes, 0, bytes.Length());
 }
 
 Array Encoding::GetChars(const Array &bytes, Integer index, Integer count) const {
   Array out;
-  for (const std::int32_t code : CodePointsOf(Decode(ArrayToBytes(bytes, index, count)))) {
-    out.Add(Variant{Integer{code}});
+  const std::string text = Decode(ArrayToBytes(bytes, index, count));
+  for (std::size_t position = 0; position < text.size();) {
+    const std::int32_t code = NextUtf8(text, position, false);
+    if (code >= kSurrogateBase) {
+      const std::int32_t offset = code - kSurrogateBase;
+      out.Add(Variant{Integer{kHighSurrogate | (offset >> kTenBits)}});
+      out.Add(Variant{Integer{kLowSurrogate | (offset & kSurrogateMask)}});
+    } else {
+      out.Add(Variant{Integer{code}});
+    }
   }
   return out;
 }

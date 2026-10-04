@@ -12,19 +12,15 @@
 
 namespace agiru::dotnet {
 
-/// \brief .NET `System.Text.Encoding`, rebuilt for the four encodings the BaseApp names: UTF-8
-///        (code page 65001), UTF-16 little-endian (`Unicode`, 1200), ASCII (20127) and the
-///        single-byte pages, which are read and written as Latin-1 -- one byte per code point
-///        below 256 and `?` above it.
+/// \brief .NET `System.Text.Encoding` with UTF-8, UTF-16LE and UTF-32LE replacement decoding.
+///        Unicode encoders replace unpaired UTF-16 surrogates; byte conversion emits no BOM.
+/// \warning Single-byte pages still use an unqualified Latin-1 approximation, including
+///          Windows-1252 best-fit encoding; unknown numeric pages are not yet rejected.
 ///
 /// \note A BYTE ARRAY IS A `dotnet::Array` OF INTEGERS 0..255, the way AL reads a `byte[]` back
 ///       (`Array.GetValue(i)` is an Integer there too).
-/// \note `GetEncoding(0)` IS THE SERVER'S ANSI CODE PAGE, 1252, NOT UTF-8. BC's service tier runs
-///       on Windows with the code-page provider registered, and there code page 0 is the
-///       system's ANSI page; the BaseApp writes the pair `TextEncoding = WINDOWS` on an xmlport
-///       and `StreamReader(InStream, Encoding.GetEncoding(0))` on the reader (Payment Export
-///       XMLPort UT, whose `æøå` came back as three question marks under UTF-8, 2026-09-12).
-///       `Encoding.Default` stays UTF-8, which is what .NET Core defines it as.
+/// \note `GetEncoding(0)` currently selects 1252 for the Windows-compatible server default;
+///       locale-dependent ANSI/OEM selection remains unqualified. `Encoding.Default` is UTF-8.
 class Encoding {
 public:
   /// \brief The binder behind `E := E.Encoding()`, which AL never calls with arguments.
@@ -77,22 +73,22 @@ public:
   /// \param count How many. \return The text.
   [[nodiscard]] ::agiru::Text<0> GetString(const Array &bytes, Integer index, Integer count) const;
 
-  /// \brief `Encoding.GetChars(bytes)`. \param bytes The bytes. \return The code points, one
-  ///        Integer each, as `Array.GetValue` reads a `char[]`.
+  /// \brief `Encoding.GetChars(bytes)`. \param bytes The bytes. \return UTF-16 code units,
+  ///        one Integer each, including two units for a supplementary character.
   [[nodiscard]] Array GetChars(const Array &bytes) const;
 
   /// \brief `Encoding.GetChars(bytes, index, count)`. \param bytes The bytes. \param index From.
-  /// \param count How many bytes. \return The code points.
+  /// \param count How many bytes. \return UTF-16 code units.
   [[nodiscard]] Array GetChars(const Array &bytes, Integer index, Integer count) const;
 
-  /// \brief `Encoding.GetBytes(chars, index, count)`: the bytes of `count` code points from
-  ///        `index`. \param chars The code points. \param index From. \param count How many.
+  /// \brief `Encoding.GetBytes(chars, index, count)`: the bytes of `count` UTF-16 code units from
+  ///        `index`. \param chars The code units. \param index From. \param count How many.
   /// \return The bytes.
   [[nodiscard]] Array GetBytes(const Array &chars, Integer index, Integer count) const;
 
   /// \brief `Encoding.GetBytes(chars, index, count, bytes, byteIndex)`: the bytes of `count`
-  ///        code points from `index`, written into `bytes` from `byteIndex`. \param chars The
-  ///        code points. \param index From. \param count How many. \param bytes The array
+  ///        code units from `index`, written into `bytes` from `byteIndex`. \param chars The
+  ///        code units. \param index From. \param count How many. \param bytes The array
   ///        written into. \param byteIndex Where in it. \return How many bytes were written.
   Integer
   GetBytes(const Array &chars, Integer index, Integer count, Array &bytes, Integer byteIndex) const;
@@ -115,10 +111,11 @@ public:
   [[nodiscard]] Boolean IsNull() const { return codePage_ == kUnset; }
 
   /// \brief The bytes of a text, as a string of bytes rather than an `Array`.
-  /// \param text The text. \return The bytes.
+  /// \param text UTF-8 text; isolated UTF-16 units may use WTF-8. \return The bytes without BOM.
   [[nodiscard]] std::string Encode(std::string_view text) const;
 
-  /// \brief The text of some bytes. \param bytes The bytes. \return The text, UTF-8.
+  /// \brief The text of some bytes. \param bytes The bytes. \return The text, UTF-8;
+  ///        malformed Unicode uses U+FFFD and a leading BOM remains a character.
   [[nodiscard]] std::string Decode(std::string_view bytes) const;
 
   static constexpr std::int32_t kUtf8 = 65001;       ///< The UTF-8 code page.

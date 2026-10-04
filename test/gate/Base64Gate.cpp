@@ -4,6 +4,7 @@
 #include "type/Stream.h"
 
 #include "Check.h"
+#include "Reference.h"
 
 #include <array>
 #include <cstddef>
@@ -156,43 +157,14 @@ void BoundedOutputAndAliasing() {
   CHECK_TRUE("nonempty output requires a bound destination", refused);
 }
 
-unsigned HexDigit(char value) {
-  if (value >= '0' && value <= '9') { return static_cast<unsigned>(value - '0'); }
-  if (value >= 'A' && value <= 'F') { return static_cast<unsigned>(value - 'A') + 10U; }
-  throw agiru::Error("invalid hexadecimal reference fixture");
-}
-
-std::string Unhex(std::string_view hex) {
-  if (hex.size() % 2 != 0) { throw agiru::Error("incomplete hexadecimal reference fixture"); }
-  std::string result;
-  result.reserve(hex.size() / 2);
-  for (std::size_t index = 0; index < hex.size(); index += 2) {
-    result.push_back(static_cast<char>((HexDigit(hex[index]) << 4U) | HexDigit(hex[index + 1])));
-  }
-  return result;
-}
-
 void ReferenceRow(const std::string &line) {
-  std::array<std::string_view, 4> fields{};
-  std::size_t start = 0;
-  for (std::size_t index = 0; index < fields.size(); ++index) {
-    const std::size_t end = line.find('\t', start);
-    if (index != fields.size() - 1 && end == std::string::npos) {
-      throw agiru::Error("missing Base64 reference field");
-    }
-    if (index == fields.size() - 1 && end != std::string::npos) {
-      throw agiru::Error("extra Base64 reference field");
-    }
-    fields[index] =
-        std::string_view(line).substr(start, end == std::string::npos ? end : end - start);
-    start = end + 1;
-  }
-  const std::string input = Unhex(fields[1]);
+  const auto fields = gate::ReferenceFields<4>(line);
+  const std::string input = gate::Unhex(fields[1]);
   agiru::Blob blob;
   auto out = blob.CreateOutStream();
   if (fields[0] == "E" && (fields[2] == "0" || fields[2] == "1")) {
     const bool lines = fields[2] == "1";
-    const std::string expected = Unhex(fields[3]);
+    const std::string expected = gate::Unhex(fields[3]);
     CHECK_TEXT("original native byte encoder matches string output",
                agiru::EncodeBase64(input, lines),
                expected);
@@ -220,7 +192,7 @@ void ReferenceRow(const std::string &line) {
     CHECK_TRUE("invalid reference input writes no bytes", !blob.HasValue());
     return;
   }
-  const std::string expected = Unhex(fields[3]);
+  const std::string expected = gate::Unhex(fields[3]);
   CHECK_TEXT("CLR decoder matches binary string output", decoded, expected);
   CHECK_TEXT("CLR decoder matches raw stream output", Bytes(blob), expected);
 }
