@@ -21,8 +21,8 @@ Depends on: 0033 symbol identity.
   (`/tmp/agiru-boolean-final-local.log`). Full regeneration exits 1 with the same
   native/refusal/missing counters as `cvtGhD`; all 14,225 slice sources remain.
   `/tmp/agiru-transpile.Hzzsf5`. `make lint` refuses missing specialist receipts;
-  native-report qualification now exposes its stale absent-header/source-count
-  recipe (0034), not a Boolean gate failure. Full AL execution remains pending.
+  native-report qualification exposed its stale absent-header/source-count
+  recipe, repaired in 0034. Full AL execution remains pending in snapshot 101600.
   Authority: developer `devenv-al-{operators,boolean-operators}.md` (Boolean types),
   BCApps `bb7111877f` `Inventory/Posting/ItemJnlPostLine.Codeunit.al:3984`
   (right-side lot splitting), predecessor 1057/1712. Eager evaluation is supported

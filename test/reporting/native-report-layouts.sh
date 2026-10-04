@@ -53,7 +53,12 @@ rg --files --no-ignore "$package/layout" "$base/Foundation/Reporting/ReportParts
   | LC_ALL=C sort | xargs -d '\n' sha256sum >> "$proof/originals.sha256"
 "$B/agirutc" "$input" "$input/apps.json" "$proof/generated" > "$proof/generation.log" 2>&1
 rg -q 'layouts +2 report / 14 extension declarations; 16 bound layouts, 16 immutable declarations emitted, 0 retained on unresolved targets' "$proof/generation.log"
-"$B/agirutc" "$input" "$input/apps.json" > "$proof/source-only.log" 2>&1
+mkdir "$proof/source-only-work"
+(cd "$proof/source-only-work"; "$B/agirutc" "$input" "$input/apps.json") > "$proof/source-only.log" 2>&1
+if [ -n "$(rg --files --no-ignore "$proof/source-only-work")" ]; then
+  printf 'native-report-layouts: analysis without an output target wrote files\n' >&2
+  exit 1
+fi
 rg -q '16 bound layouts, 0 immutable declarations emitted, 0 retained on unresolved targets' "$proof/source-only.log"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -Iinclude -Itest/gate -Isrc/al)
@@ -65,7 +70,8 @@ compile() {
   rg --files --no-ignore "$generated" -g '*.cpp' | LC_ALL=C sort > "$output.sources"
   mapfile -t sources < "$output.sources"
   [ "${#sources[@]}" -gt 0 ]
-  local includes=("-I$generated/native" "-I$generated/platform" "-I$generated/base" "-I$generated/shared")
+  local includes=("-I$generated/native" "-I$generated/platform" "-I$generated/base"
+    "-I$generated/absent" "-I$generated/shared")
   "$CXX" "${flags[@]}" "${includes[@]}" -c test/reporting/report-layouts/NativeRunner.cpp -o "$output.runner.o"
   "$CXX" "${flags[@]}" "${includes[@]}" "$output.runner.o" "${sources[@]}" "${links[@]}" -o "$output"
 }
@@ -165,8 +171,13 @@ compile "$proof/source-bound" "$proof/source-bound-runner"
 cat "$proof/source-bound-runner.log"
 rg -F -q "$native_id" "$proof/source-bound/platform/PlatformModule.h"
 loader_source_status=0
-"$B/agirutc" "$source_input" "$source_input/apps.json" --system-symbols "$package" \
-  > "$proof/source-bound-source-only.log" 2>&1 || loader_source_status=$?
+mkdir "$proof/source-bound-source-only-work"
+(cd "$proof/source-bound-source-only-work"; "$B/agirutc" "$source_input" "$source_input/apps.json" \
+  --system-symbols "$package") > "$proof/source-bound-source-only.log" 2>&1 || loader_source_status=$?
+if [ -n "$(rg --files --no-ignore "$proof/source-bound-source-only-work")" ]; then
+  printf 'native-report-layouts: native analysis without an output target wrote files\n' >&2
+  exit 1
+fi
 [ "$loader_source_status" = 1 ]
 rg -q '16 bound layouts, 0 immutable declarations emitted, 0 retained on unresolved targets' \
   "$proof/source-bound-source-only.log"
@@ -217,8 +228,24 @@ cmake -S "$cmake_input" -B "$proof/cmake-build" -G Ninja \
   > "$proof/cmake-configure.log" 2>&1
 cmake --build "$proof/cmake-build" --target help > "$proof/cmake-targets.log"
 rg -q 'agiru_app_platform' "$proof/cmake-targets.log"
-jq -e '[.[] | select(.file | contains("/apps/platform/"))] | length == 2' \
-  "$proof/cmake-build/compile_commands.json" > /dev/null
+rg --files --no-ignore "$cmake_input/apps/platform" -g '*.cpp' \
+  | sed "s|^$cmake_input/apps/platform/||" | LC_ALL=C sort > "$proof/platform-sources.expected"
+[ "$(wc -l < "$proof/platform-sources.expected")" -ge 2 ]
+verify_platform_sources() {
+  jq -r '.[] | select(.file | contains("/apps/platform/")) | .file | split("/apps/platform/")[1]' \
+    "$1" | LC_ALL=C sort > "$2"
+  cmp "$proof/platform-sources.expected" "$2"
+}
+verify_platform_sources "$proof/cmake-build/compile_commands.json" "$proof/platform-sources.actual"
+omitted=$(jq -er 'first(.[] | select(.file | contains("/apps/platform/")) | .file)' \
+  "$proof/cmake-build/compile_commands.json")
+jq --arg omitted "$omitted" '[.[] | select(.file != $omitted)]' \
+  "$proof/cmake-build/compile_commands.json" > "$proof/platform-commands.missing.json"
+if verify_platform_sources "$proof/platform-commands.missing.json" "$proof/platform-sources.missing" \
+  > "$proof/platform-source-population-control.log" 2>&1; then
+  printf 'native-report-layouts: a missing native compilation escaped the source-population control\n' >&2
+  exit 1
+fi
 cmake --build "$proof/cmake-build" -j "${JOBS:-2}" --target native_report_registry agiru \
   > "$proof/cmake-build.log" 2>&1
 "$proof/cmake-build/native_report_registry" 2000000001 'Tenant Report Defaults' \

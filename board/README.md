@@ -21,9 +21,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-boolean-final-local.log`; new gate/runner analysis passes, generator
   inherited findings remain. Regeneration retains prior gap counters and all
   14,225 slice sources. Full AL activation is pending; do not reuse 080905 as
-  post-change execution proof. Native-report qualifier's stale absent-header/
-  two-source assumption blocks specialist receipts/full lint (0034).
-- Latest frozen replay `20261004T080905Z-1761326`: slice-check/all/test exit 0;
+  post-change execution proof. Activation snapshot `20261004T101600Z-1902967`
+  freezes HEAD `5b7072c`, source `8af4d25d73e72d881a5df4ed1289e7fe928240c10d8f419cd0d5e1c0a9da86b3`;
+  its all build reached completion; test/UT results remain pending.
+- Native qualifier/output repair (0034): all 29 platform sources compile in app/
+  slice modes; dropped compilation refuses. Original/loader report checks pass
+  562 each; native enum declarations pass 28/28. Analysis-only writes no files
+  (old compiler: 18); explicit generation is byte-identical to the compiled proof.
+  Specialist receipts now exist; six inherited Main/header findings keep lint red.
+  `/tmp/agiru-native-no-output-final.4hBhBG`, `/tmp/agiru-native-report-layouts.XcbXKD`.
+  This source-only guard/recipe batch is outside snapshot 101600.
+- Latest completed frozen replay `20261004T080905Z-1761326`: slice-check/all/test exit 0;
   UT exit 2, 2,162/2,314 passed, 152 failed, zero incomplete, 80 codeunits,
   six workers/1,256 seconds. All 2,314 identities compared with 064830: no gains,
   losses, missing/added identities or changed errors. Receipt:

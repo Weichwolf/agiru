@@ -1,10 +1,23 @@
 # 0034 — Every object kind will have a truthful translation and runtime census
 
-Status: open | Priority: P0 | Stage: UT census; All object coverage | Reviewed: 2026-10-03
+Status: open | Priority: P0 | Stage: UT census; All object coverage | Reviewed: 2026-10-04
 Depends on: none. Activation requires 0033 identities, 0044 native providers and 0058 unchanged-population proof.
 
 ## Evidence
 
+- Native report qualifier repaired: standalone compilation uses CMake's universal
+  absent-header path and compares every emitted platform source with actual
+  compile commands, not the obsolete two-source assumption. All 29 sources compile
+  in app/slice modes; removing one actual command fails the shared checker.
+  Original/production-loader variants pass 562 checks each; owner/property/asset,
+  library-drop and missing-module controls remain (`/tmp/agiru-native-report-layouts.XcbXKD`).
+  `Main.cpp::WriteNativeTables` now respects analysis-only output: old compiler
+  writes 18 files (`/tmp/agiru-native-no-output.v76NgP`), current compiler writes
+  none in either isolated working directory. Explicit output is byte-identical
+  to the compiled qualifier (`/tmp/agiru-native-no-output-final.4hBhBG`). Range
+  iteration removes the writer's tidy finding; six inherited Main/header findings
+  remain, without suppression. Native enum package: 28/28 declarations compile
+  (`/tmp/agiru-native-enum-package.tLmpgn`). No provider/business/G1 claim.
 - UT recovery: original System 29.0.55365.0 object catalogues add field 5 Name
   (Text[100]) independently of legacy Object Name (Text[30]), and option ordinal 28
   Interface with five reserved predecessors. `include/platform/{AllObj,AllObjWithCaption,

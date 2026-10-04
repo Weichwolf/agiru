@@ -2885,10 +2885,9 @@ std::size_t NoteNativeEnumInterfaces(const Enums &enums, const agiru::gen::Objec
 std::size_t WriteNativeTables(Run &run,
                               const agiru::gen::NativeSources &native,
                               const agiru::gen::Objects &objects) {
-  if (native.app.id.empty()) { return 0; }
+  if (run.output.empty() || native.app.id.empty()) { return 0; }
   std::size_t count = 0;
-  for (std::size_t i = 0; i < native.tables.size(); ++i) {
-    const auto &table = native.tables[i];
+  for (const auto &table : native.tables) {
     const auto binding = objects.tables.find(std::to_string(table.id));
     if (binding == objects.tables.end()) { continue; }
     const auto relative = "native/table/" + std::to_string(table.id) + ".cpp";
