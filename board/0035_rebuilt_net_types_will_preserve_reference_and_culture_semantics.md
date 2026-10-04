@@ -19,7 +19,9 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   proof of Windows ANSI/OEM locale behaviour. Measured 1252 best-fit maps combining
   acute to B4 and a supplementary character to two question marks; Latin-1 is wrong.
   Encoding/runtime gate analysis has no own findings; existing header findings
-  remain unsuppressed. Full local/AL replay is pending; outside frozen 164436.
+  remain unsuppressed. Complete local replay passes 136 cases/232 tooling tests,
+  exit 0; `all-local.log`, final source/image hashes in `final-inputs.sha256`.
+  Full AL replay remains pending; outside frozen 164436.
   Remaining: codepage tables/best-fit/default selection, array bounds/types and
   all nine Native Base64 bindings/streams (0034); no BC workflow/WASM/performance claim.
   References: developer `ff5939a46e`, `devenv-file-handling-and-text-encoding.md`,
