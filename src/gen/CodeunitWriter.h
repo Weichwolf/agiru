@@ -172,6 +172,8 @@ bool DeclaresAnOption(const std::vector<al::VarDecl> &variables,
 
 bool IsTryFunction(const al::ProcedureDecl &procedure);
 
+bool IsTryFunction(std::span<const al::ProcedureDecl> procedures, std::string_view name);
+
 bool DefaultsToTrue(const al::ProcedureDecl &procedure);
 
 std::set<std::string> Shadowing(std::span<const al::VarDecl> variables,

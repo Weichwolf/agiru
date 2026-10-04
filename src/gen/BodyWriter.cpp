@@ -31,6 +31,8 @@ namespace {
 
 constexpr int kMaxDepth = 4096;
 
+enum class ValueUse { Consumed, Discarded };
+
 struct Operator {
   const char *al;
   const char *cpp;
@@ -184,7 +186,10 @@ private:
   }
 
   std::string CaseChain(const al::Stmt &statement, int indent) {
-    const std::string subject = Expression(statement.expression, kPrimaryPrecedence);
+    const std::string value = Expression(statement.expression, kPrimaryPrecedence);
+    const std::string subject = "CaseValue_Block_" + std::to_string(++caseSequence_);
+    const int outer = indent;
+    indent += 2;
     std::string out;
     for (const al::Stmt &branch : statement.body) {
       std::string condition;
@@ -214,7 +219,8 @@ private:
       out += out.empty() ? Pad(indent) + "{\n" : " else {\n";
       out += Statements(statement.otherwise, indent + 2) + Pad(indent) + "}\n";
     }
-    return out;
+    return Pad(outer) + "{\n" + Pad(indent) + "[[maybe_unused]] const auto " + subject + " = " +
+           value + ";\n" + out + Pad(outer) + "}\n";
   }
 
   std::string Statement(const al::Stmt &statement, int indent) {
@@ -315,10 +321,7 @@ private:
       case al::StmtKind::Break: out = Pad(indent) + "break;\n"; break;
       case al::StmtKind::Continue: out = Pad(indent) + "continue;\n"; break;
       case al::StmtKind::Expression: {
-        const bool was = discarded_;
-        discarded_ = true;
-        out = Pad(indent) + Expression(statement.expression, 0) + ";\n";
-        discarded_ = was;
+        out = Pad(indent) + Expression(statement.expression, 0, ValueUse::Discarded) + ";\n";
         break;
       }
     }
@@ -533,10 +536,11 @@ private:
     return {};
   }
 
-  std::string RunObject(const al::Expr &expression, const al::Expr &callee) {
+  std::string RunObject(const al::Expr &expression, const al::Expr &callee, ValueUse use) {
     const al::Expr &named = expression.children[1];
     std::string member = Identifier(callee.children[1].text);
-    if (!discarded_ && member == "Run" && SameName(callee.children[0].text, "Codeunit")) {
+    if (use == ValueUse::Consumed && member == "Run" &&
+        SameName(callee.children[0].text, "Codeunit")) {
       member = "Ok_Run";
     }
     std::string subject = Expression(named, kPrimaryPrecedence);
@@ -678,24 +682,21 @@ private:
            scope_.IsTryFunctionOf(callee.children[0].text, callee.children[1].text);
   }
 
-  std::string Tried(const al::Expr &expression) {
+  std::string Tried(const al::Expr &expression, ValueUse use) {
     const al::Expr &callee = expression.children.front();
-    if (discarded_ || !IsTriedCall(callee)) { return {}; }
-    const bool was = discarded_;
-    discarded_ = true;
-    const std::string inner = Call(expression);
-    discarded_ = was;
+    if (use == ValueUse::Discarded || !IsTriedCall(callee)) { return {}; }
+    const std::string inner = Call(expression, ValueUse::Discarded);
     return "::agiru::Tried([&] { return " + inner + "; })";
   }
 
-  [[nodiscard]] bool IsRecordInsert(const al::Expr &callee) const {
+  [[nodiscard]] bool IsRecordOperation(const al::Expr &callee, std::string_view member) const {
     if (callee.kind == al::ExprKind::Name) {
-      return SameName(callee.text, "Insert") && scope_.Resolve(callee.text).empty() &&
+      return SameName(callee.text, member) && scope_.Resolve(callee.text).empty() &&
              scope_.IsRecord("Rec");
     }
     return callee.kind == al::ExprKind::Binary && callee.text == "." &&
            callee.children.size() == 2 && callee.children[1].kind == al::ExprKind::Name &&
-           SameName(callee.children[1].text, "Insert") &&
+           SameName(callee.children[1].text, member) &&
            callee.children[0].kind == al::ExprKind::Name &&
            scope_.IsRecord(callee.children[0].text);
   }
@@ -760,12 +761,158 @@ private:
                                [type](std::string_view kind) { return SameName(kind, type); });
   }
 
-  std::string Call(const al::Expr &expression) {
+  struct CallArguments {
+    std::string receiver;
+    std::string reach = ".";
+    std::size_t fields = 0;
+    const al::Expr *holder = nullptr;
+    std::vector<bool> publisherVars;
+    std::vector<std::string> lent;
+    std::vector<std::string> declared;
+  };
+
+  CallArguments ArgumentsOf(const al::Expr &callee) {
+    CallArguments out;
+    if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
+        callee.children[1].kind == al::ExprKind::Name) {
+      out.fields = FieldArguments(callee.children[1].text);
+      if (out.fields != 0 && callee.children.front().kind == al::ExprKind::Name &&
+          TakesValues(scope_.DeclaredType(callee.children.front().text))) {
+        out.fields = 0;
+      }
+      if (out.fields != 0) {
+        const al::Expr *owner = &callee.children.front();
+        if (owner->kind == al::ExprKind::Binary && owner->text == "." &&
+            owner->children.size() == 2 && owner->children[1].kind == al::ExprKind::Name &&
+            RuntimeDeclares(owner->children[1].text) && !RuntimeCallable(owner->children[1].text)) {
+          owner = &owner->children.front();
+        }
+        out.receiver = Expression(*owner, kPrimaryPrecedence);
+        out.reach = owner->kind == al::ExprKind::Name && scope_.IsHandle(owner->text) ? "->" : ".";
+        out.holder = owner;
+      }
+    }
+    out.publisherVars = callee.kind == al::ExprKind::Name
+                            ? scope_.VarParametersOfPublisher(callee.text)
+                            : std::vector<bool>{};
+    out.lent =
+        callee.kind == al::ExprKind::Name ? scope_.LentParameters(callee.text)
+        : callee.kind == al::ExprKind::Binary && callee.text == "." &&
+                callee.children.size() == 2 && callee.children.front().kind == al::ExprKind::Name &&
+                callee.children.back().kind == al::ExprKind::Name
+            ? scope_.MemberLentParameters(OfVariable{.variable = callee.children.front().text,
+                                                     .field = callee.children.back().text})
+            : std::vector<std::string>{};
+    out.declared = callee.kind == al::ExprKind::Name ? scope_.ParameterTypes(callee.text)
+                                                     : std::vector<std::string>{};
+    return out;
+  }
+
+  std::string
+  TypedArgument(const al::Expr &argument, std::size_t index, const CallArguments &context) {
+    const bool named =
+        argument.kind == al::ExprKind::Name &&
+        (!scope_.Resolve(argument.text).empty() || IsSystemFieldName(argument.text) ||
+         SameName(argument.text, "Rec") || SameName(argument.text, "xRec"));
+    const bool lvalue = named || argument.kind == al::ExprKind::Index ||
+                        (argument.kind == al::ExprKind::Binary && argument.text == ".");
+    if (index < context.declared.size() && argument.kind == al::ExprKind::StringLiteral &&
+        SameName(context.declared[index], "Guid")) {
+      return "::agiru::Guid(" + Expression(argument, 0) + ")";
+    }
+    if (index < context.lent.size() && !context.lent[index].empty() &&
+        argument.kind == al::ExprKind::Name &&
+        SameName(scope_.DeclaredType(argument.text), "Variant")) {
+      return Expression(argument, kPrimaryPrecedence) + ".Lend<" + context.lent[index] + ">()";
+    }
+    if (index < context.lent.size() && context.lent[index].find("Option<") != std::string::npos &&
+        !context.lent[index].ends_with("Option<>") && argument.kind == al::ExprKind::Name &&
+        SameName(scope_.DeclaredType(argument.text), "Option")) {
+      return Expression(argument, kPrimaryPrecedence) + ".Lend<" + context.lent[index] + ">()";
+    }
+    if (index < context.publisherVars.size() && context.publisherVars[index] && !lvalue) {
+      return "::agiru::Materialised(" + Expression(argument, 0) + ")";
+    }
+    return {};
+  }
+
+  std::string FilterArgument(const al::Expr &callee, const al::Expr &argument, std::size_t i) {
+    if (i == 1 && argument.kind == al::ExprKind::Name && !scope_.IsVariable(argument.text) &&
+        (IsMemberCall(callee, "SetFilter") || IsMemberCall(callee, "GetFilter")) &&
+        callee.kind == al::ExprKind::Binary && callee.children.size() == 2 &&
+        IsMemberCall(callee.children[0], "Filter")) {
+      return Literal(argument.text);
+    }
+    if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Name &&
+        !scope_.IsVariable(argument.text) && !scope_.Resolve("Rec").empty() &&
+        scope_.HasField(OfVariable{.variable = "Rec", .field = argument.text})) {
+      const std::string rec = scope_.Resolve("Rec");
+      return rec + ", " + rec + "." +
+             scope_.MemberSpelling(OfVariable{.variable = "Rec", .field = argument.text});
+    }
+    if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Binary &&
+        argument.text == "." && argument.children.size() == 2 &&
+        argument.children[0].kind == al::ExprKind::Name &&
+        (scope_.IsRecord(argument.children[0].text) ||
+         SameName(scope_.DeclaredType(argument.children[0].text), "Record") ||
+         !scope_.TableOf(argument.children[0].text).empty())) {
+      return (scope_.IsHandle(argument.children[0].text) ? "*" : "") +
+             Expression(argument.children[0], kPrimaryPrecedence) + ", " + Expression(argument, 0);
+    }
+    return {};
+  }
+
+  std::string FieldArgument(const al::Expr &argument, std::size_t i, const CallArguments &context) {
+    const al::Expr *holder = context.holder;
+    const bool isField = !context.receiver.empty() &&
+                         (context.fields == static_cast<std::size_t>(-1) || i <= context.fields);
+    if (isField && holder != nullptr && holder->kind == al::ExprKind::Index &&
+        !holder->children.empty() && holder->children.front().kind == al::ExprKind::Name &&
+        argument.kind == al::ExprKind::Name &&
+        scope_.HasField(
+            OfVariable{.variable = holder->children.front().text, .field = argument.text})) {
+      return context.receiver + context.reach +
+             scope_.MemberSpelling(
+                 OfVariable{.variable = holder->children.front().text, .field = argument.text});
+    }
+    if (isField && argument.kind == al::ExprKind::Name &&
+        (scope_.Resolve(argument.text).empty() ||
+         (holder != nullptr && holder->kind == al::ExprKind::Name &&
+          scope_.HasField(OfVariable{.variable = holder->text, .field = argument.text})))) {
+      return context.receiver + context.reach +
+             (holder != nullptr && holder->kind == al::ExprKind::Name
+                  ? scope_.MemberSpelling(
+                        OfVariable{.variable = holder->text, .field = argument.text})
+                  : Identifier(argument.text));
+    }
+    return {};
+  }
+
+  std::string Arguments(const al::Expr &expression, const al::Expr &callee) {
+    const CallArguments context = ArgumentsOf(callee);
+    std::string out;
+    for (std::size_t i = 1; i < expression.children.size(); ++i) {
+      if (i != 1) { out += ", "; }
+      const al::Expr &argument = expression.children[i];
+      if (const std::string typed = TypedArgument(argument, i - 1, context); !typed.empty()) {
+        out += typed;
+      } else if (const std::string filter = FilterArgument(callee, argument, i); !filter.empty()) {
+        out += filter;
+      } else if (const std::string field = FieldArgument(argument, i, context); !field.empty()) {
+        out += field;
+      } else {
+        out += Expression(argument, 0);
+      }
+    }
+    return out;
+  }
+
+  std::string Call(const al::Expr &expression, ValueUse use) {
     const al::Expr &callee = expression.children.front();
     if (const std::string refused = RefusedControlCall(callee); !refused.empty()) {
       return refused;
     }
-    if (const std::string tried = Tried(expression); !tried.empty()) { return tried; }
+    if (const std::string tried = Tried(expression, use); !tried.empty()) { return tried; }
     if (callee.kind == al::ExprKind::Name && SameName(callee.text, "Error") &&
         scope_.Resolve(callee.text).empty()) {
       return Raise(expression);
@@ -779,135 +926,25 @@ private:
         callee.children[0].kind == al::ExprKind::Name &&
         !KindNamespace(callee.children[0].text).empty() && expression.children.size() > 1 &&
         !scope_.IsVariable(callee.children[0].text)) {
-      return RunObject(expression, callee);
+      return RunObject(expression, callee, use);
     }
-    std::string spelled =
-        Callee(callee, expression.children.empty() ? 0 : expression.children.size() - 1);
-    if (!discarded_ && IsRecordInsert(callee) && spelled.ends_with("Insert")) {
-      spelled.replace(spelled.size() - 6, 6, "Ok_Insert");
+    std::string spelled = Callee(callee, expression.children.size() - 1);
+    if (use == ValueUse::Consumed && IsRecordOperation(callee, "Insert") &&
+        spelled.ends_with("Insert")) {
+      constexpr std::string_view kInsert = "Insert";
+      spelled.replace(spelled.size() - kInsert.size(), kInsert.size(), "Ok_Insert");
     }
-    if (!discarded_ && IsCodeunitRun(callee) && spelled.ends_with("Run")) {
-      spelled.replace(spelled.size() - 3, 3, "Ok_Run");
+    if (use == ValueUse::Consumed && IsRecordOperation(callee, "SetCurrentKey") &&
+        spelled.ends_with("SetCurrentKey")) {
+      constexpr std::string_view kSetCurrentKey = "SetCurrentKey";
+      spelled.replace(
+          spelled.size() - kSetCurrentKey.size(), kSetCurrentKey.size(), "Ok_SetCurrentKey");
     }
-    std::string out = spelled + "(";
-    std::string receiver;
-    std::string reach = ".";
-    std::size_t fields = 0;
-    const al::Expr *holder = nullptr;
-    if (callee.kind == al::ExprKind::Binary && callee.text == "." && callee.children.size() == 2 &&
-        callee.children[1].kind == al::ExprKind::Name) {
-      fields = FieldArguments(callee.children[1].text);
-      if (fields != 0 && callee.children.front().kind == al::ExprKind::Name &&
-          TakesValues(scope_.DeclaredType(callee.children.front().text))) {
-        fields = 0;
-      }
-      if (fields != 0) {
-        const al::Expr *owner = &callee.children.front();
-        if (owner->kind == al::ExprKind::Binary && owner->text == "." &&
-            owner->children.size() == 2 && owner->children[1].kind == al::ExprKind::Name &&
-            RuntimeDeclares(owner->children[1].text) && !RuntimeCallable(owner->children[1].text)) {
-          owner = &owner->children.front();
-        }
-        receiver = Expression(*owner, kPrimaryPrecedence);
-        reach = owner->kind == al::ExprKind::Name && scope_.IsHandle(owner->text) ? "->" : ".";
-        holder = owner;
-      }
+    if (use == ValueUse::Consumed && IsCodeunitRun(callee) && spelled.ends_with("Run")) {
+      constexpr std::string_view kRun = "Run";
+      spelled.replace(spelled.size() - kRun.size(), kRun.size(), "Ok_Run");
     }
-    const std::vector<bool> publisherVars = callee.kind == al::ExprKind::Name
-                                                ? scope_.VarParametersOfPublisher(callee.text)
-                                                : std::vector<bool>{};
-    const std::vector<std::string> lent =
-        callee.kind == al::ExprKind::Name ? scope_.LentParameters(callee.text)
-        : callee.kind == al::ExprKind::Binary && callee.text == "." &&
-                callee.children.size() == 2 && callee.children.front().kind == al::ExprKind::Name &&
-                callee.children.back().kind == al::ExprKind::Name
-            ? scope_.MemberLentParameters(OfVariable{.variable = callee.children.front().text,
-                                                     .field = callee.children.back().text})
-            : std::vector<std::string>{};
-    const std::vector<std::string> declared = callee.kind == al::ExprKind::Name
-                                                  ? scope_.ParameterTypes(callee.text)
-                                                  : std::vector<std::string>{};
-    for (std::size_t i = 1; i < expression.children.size(); ++i) {
-      if (i != 1) { out += ", "; }
-      const al::Expr &argument = expression.children[i];
-      const bool named =
-          argument.kind == al::ExprKind::Name &&
-          (!scope_.Resolve(argument.text).empty() || IsSystemFieldName(argument.text) ||
-           SameName(argument.text, "Rec") || SameName(argument.text, "xRec"));
-      const bool lvalue = named || argument.kind == al::ExprKind::Index ||
-                          (argument.kind == al::ExprKind::Binary && argument.text == ".");
-      if (i - 1 < declared.size() && argument.kind == al::ExprKind::StringLiteral &&
-          SameName(declared[i - 1], "Guid")) {
-        out += "::agiru::Guid(" + Expression(argument, 0) + ")";
-        continue;
-      }
-      if (i - 1 < lent.size() && !lent[i - 1].empty() && argument.kind == al::ExprKind::Name &&
-          SameName(scope_.DeclaredType(argument.text), "Variant")) {
-        out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
-        continue;
-      }
-      if (i - 1 < lent.size() && lent[i - 1].find("Option<") != std::string::npos &&
-          !lent[i - 1].ends_with("Option<>") && argument.kind == al::ExprKind::Name &&
-          SameName(scope_.DeclaredType(argument.text), "Option")) {
-        out += Expression(argument, kPrimaryPrecedence) + ".Lend<" + lent[i - 1] + ">()";
-        continue;
-      }
-      if (i - 1 < publisherVars.size() && publisherVars[i - 1] && !lvalue) {
-        out += "::agiru::Materialised(" + Expression(argument, 0) + ")";
-        continue;
-      }
-      if (i == 1 && argument.kind == al::ExprKind::Name && !scope_.IsVariable(argument.text) &&
-          (IsMemberCall(callee, "SetFilter") || IsMemberCall(callee, "GetFilter")) &&
-          callee.kind == al::ExprKind::Binary && callee.children.size() == 2 &&
-          IsMemberCall(callee.children[0], "Filter")) {
-        out += Literal(argument.text);
-        continue;
-      }
-      if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Name &&
-          !scope_.IsVariable(argument.text) && !scope_.Resolve("Rec").empty() &&
-          scope_.HasField(OfVariable{.variable = "Rec", .field = argument.text})) {
-        const std::string rec = scope_.Resolve("Rec");
-        out += rec + ", " + rec + "." +
-               scope_.MemberSpelling(OfVariable{.variable = "Rec", .field = argument.text});
-        continue;
-      }
-      if (i == 2 && IsMemberCall(callee, "CopyFilter") && argument.kind == al::ExprKind::Binary &&
-          argument.text == "." && argument.children.size() == 2 &&
-          argument.children[0].kind == al::ExprKind::Name &&
-          (scope_.IsRecord(argument.children[0].text) ||
-           SameName(scope_.DeclaredType(argument.children[0].text), "Record") ||
-           !scope_.TableOf(argument.children[0].text).empty())) {
-        out += (scope_.IsHandle(argument.children[0].text) ? "*" : "") +
-               Expression(argument.children[0], kPrimaryPrecedence) + ", " +
-               Expression(argument, 0);
-        continue;
-      }
-      const bool isField =
-          !receiver.empty() && (fields == static_cast<std::size_t>(-1) || i <= fields);
-      if (isField && holder != nullptr && holder->kind == al::ExprKind::Index &&
-          !holder->children.empty() && holder->children.front().kind == al::ExprKind::Name &&
-          expression.children[i].kind == al::ExprKind::Name &&
-          scope_.HasField(OfVariable{.variable = holder->children.front().text,
-                                     .field = expression.children[i].text})) {
-        out += receiver + reach +
-               scope_.MemberSpelling(OfVariable{.variable = holder->children.front().text,
-                                                .field = expression.children[i].text});
-        continue;
-      }
-      if (isField && expression.children[i].kind == al::ExprKind::Name &&
-          (scope_.Resolve(expression.children[i].text).empty() ||
-           (holder != nullptr && holder->kind == al::ExprKind::Name &&
-            scope_.HasField(
-                OfVariable{.variable = holder->text, .field = expression.children[i].text})))) {
-        out += receiver + reach;
-        out += holder != nullptr && holder->kind == al::ExprKind::Name
-                   ? scope_.MemberSpelling(
-                         OfVariable{.variable = holder->text, .field = expression.children[i].text})
-                   : Identifier(expression.children[i].text);
-        continue;
-      }
-      out += Expression(expression.children[i], 0);
-    }
+    std::string out = spelled + "(" + Arguments(expression, callee);
     if ((spelled.ends_with("::NavApp::GetCallerModuleInfo") ||
          spelled.ends_with("::NavApp::GetCurrentModuleInfo")) &&
         !scope_.Module().empty()) {
@@ -1494,7 +1531,7 @@ private:
            (SameName(expression.text, "is") ? ".Is<" : ".As<") + interface + ">()";
   }
 
-  std::string Expression(const al::Expr &expression, int outer) {
+  std::string Expression(const al::Expr &expression, int outer, ValueUse use = ValueUse::Consumed) {
     if (const std::string asked = InterfaceTest(expression); !asked.empty()) { return asked; }
     if (expression.kind == al::ExprKind::Binary || expression.kind == al::ExprKind::Call) {
       if (const std::string folded = RefusedFold(expression); !folded.empty()) { return folded; }
@@ -1507,7 +1544,7 @@ private:
       case al::ExprKind::TemporalLiteral: out = Temporal(expression.text); break;
       case al::ExprKind::Name: out = Name(expression); break;
       case al::ExprKind::Scope: out = Scope(expression); break;
-      case al::ExprKind::Call: out = Call(expression); break;
+      case al::ExprKind::Call: out = Call(expression, use); break;
       case al::ExprKind::Unary:
         out = std::string(UnaryOperator(expression.text)) +
               Expression(expression.children.front(), kUnaryPrecedence);
@@ -1530,7 +1567,7 @@ private:
 
   const Names &scope_;
   int depth_ = 0;
-  bool discarded_ = false;
+  std::size_t caseSequence_ = 0;
 };
 
 }
@@ -1828,9 +1865,17 @@ public:
     return nullptr;
   }
 
+  [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
+    return ::agiru::gen::IsTryFunction(table_.procedures, name);
+  }
+
   [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
                                      std::string_view name) const override {
     const al::VarDecl *local = Local(variable);
+    if (local == nullptr && Global(variable) == nullptr &&
+        (SameName(variable, "Rec") || SameName(variable, "xRec"))) {
+      return IsTryFunction(name);
+    }
     return ::agiru::gen::IsTryFunctionOf(
         objects_, local != nullptr ? local : Global(variable), name);
   }
@@ -2394,8 +2439,15 @@ public:
                             : TypeName(where->type);
   }
 
+  [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
+    return ::agiru::gen::IsTryFunction(page_.procedures, name);
+  }
+
   [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
                                      std::string_view name) const override {
+    if (const TableRef *table = RecordOf(variable); table != nullptr) {
+      return table->tryFunctions.contains(LowerKey(std::string(name)));
+    }
     return ::agiru::gen::IsTryFunctionOf(objects_, DeclarationOf(variable), name);
   }
 

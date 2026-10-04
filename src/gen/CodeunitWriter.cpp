@@ -205,6 +205,12 @@ bool IsTryFunction(const al::ProcedureDecl &procedure) {
   });
 }
 
+bool IsTryFunction(std::span<const al::ProcedureDecl> procedures, std::string_view name) {
+  return std::ranges::any_of(procedures, [name](const al::ProcedureDecl &procedure) {
+    return SameName(procedure.name, name) && IsTryFunction(procedure);
+  });
+}
+
 bool IsTryFunctionOf(const Objects &objects, const al::VarDecl *declared, std::string_view name) {
   if (declared == nullptr) { return false; }
   const std::string type = TypeName(declared->type);
@@ -1254,10 +1260,7 @@ public:
   }
 
   [[nodiscard]] bool IsTryFunction(std::string_view name) const override {
-    const std::string key = LowerKey(std::string(name));
-    return std::ranges::any_of(unit_.procedures, [&key](const al::ProcedureDecl &declared) {
-      return LowerKey(declared.name) == key && ::agiru::gen::IsTryFunction(declared);
-    });
+    return ::agiru::gen::IsTryFunction(unit_.procedures, name);
   }
 
   [[nodiscard]] bool IsLabel(std::string_view name) const override {
@@ -1314,6 +1317,7 @@ public:
 
   [[nodiscard]] bool IsTryFunctionOf(std::string_view variable,
                                      std::string_view name) const override {
+    if (SameName(variable, "this")) { return IsTryFunction(name); }
     return ::agiru::gen::IsTryFunctionOf(objects_, Declaration(variable), name);
   }
 
@@ -2174,7 +2178,7 @@ TableIndex PlatformTables() {
     std::int32_t number;
   };
 
-  constexpr std::array<Identity, 19> identities{{
+  constexpr std::array<Identity, 18> identities{{
       {.name = "AllObj", .number = 2000000038},
       {.name = "AllObjWithCaption", .number = 2000000058},
       {.name = "All Profile", .number = 2000000178},
@@ -2190,7 +2194,6 @@ TableIndex PlatformTables() {
       {.name = "OData Edm Type", .number = 2000000179},
       {.name = "Page Metadata", .number = 2000000138},
       {.name = "Page Table Field", .number = 2000000171},
-      {.name = "Tenant License State", .number = 2000000189},
       {.name = "Date", .number = 2000000007},
       {.name = "User", .number = 2000000120},
       {.name = "User Personalization", .number = 2000000073},
@@ -2319,8 +2322,6 @@ FieldEnums PlatformFieldEnums() {
   enums["table metadata"]["access"] = "::agiru::platform::TableMetadataAccess";
   enums["2000000136"] = enums["table metadata"];
   enums["2000000068"] = enums["record link"];
-  enums["tenant license state"]["state"] = "::agiru::platform::TenantLicenseStateState";
-  enums["2000000189"] = enums["tenant license state"];
   enums["allobj"]["object type"] = "::agiru::platform::AllObjType";
   enums["2000000038"] = enums["allobj"];
   enums["allobjwithcaption"]["object type"] = "::agiru::platform::AllObjType";

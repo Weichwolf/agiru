@@ -65,11 +65,14 @@ struct CodeunitEntry {
 
 /// \brief Puts a codeunit in the catalogue, once per generated codeunit, at load time.
 /// \param entry The entry, which lives for the program.
+/// \throws std::invalid_argument for a null entry; std::logic_error after any
+/// catalogue read has frozen the installed composition.
 void RegisterCodeunitEntry(const CodeunitEntry *entry);
 
 /// \brief Finds a codeunit by its number.
 /// \param id The number.
 /// \return The entry, or `nullptr` when this build carries no codeunit of that number.
+/// \throws std::logic_error if any installed table/page/codeunit kind has duplicate IDs.
 [[nodiscard]] const CodeunitEntry *FindCodeunit(CodeunitId id);
 
 namespace detail {
@@ -313,7 +316,8 @@ private:
 };
 
 /// \brief A record variable's own AL globals -- the `Var_Block` a generated table carries for the
-///        variables its `.al` declares -- made on the variable's first use and never anyone else's.
+///        variables its `.al` declares -- made on first use. Ordinary copies keep their own;
+///        a scoped var-Record call borrows its caller's identity without copying or allocating it.
 ///
 /// \tparam T The generated `Variables` block.
 ///
@@ -326,26 +330,90 @@ private:
 ///          copy starts with its own, unmade -- which is what the `Instance` doc already promised
 ///          of a record's object variables, and what the temporary store's `load` had to arrange by
 ///          hand.
-template <typename T> class Globals : public Instance<T> {
+template <typename T> class Globals {
 public:
   /// \brief Nothing made yet.
   Globals() = default;
 
   /// \brief A copy starts with its own, unmade.
-  Globals(const Globals &) : Instance<T>() {}
+  /// \param other The source; its record-variable globals are deliberately not copied.
+  Globals([[maybe_unused]] const Globals &other) {}
 
   /// \brief Takes the other's.
-  Globals(Globals &&other) noexcept = default;
+  Globals(Globals &&other) noexcept : owned_(std::move(other.owned_)) {}
 
   /// \brief AL `Rec := Other`: the globals stay this variable's own.
+  /// \param other The source; its record-variable globals are deliberately not assigned.
   /// \return This handle, unchanged.
-  Globals &operator=(const Globals &) { return *this; }
+  Globals &operator=([[maybe_unused]] const Globals &other) { return *this; }
 
   /// \brief Takes the other's, letting go of these.
   /// \return This handle.
-  Globals &operator=(Globals &&other) noexcept = default;
+  Globals &operator=(Globals &&other) noexcept {
+    if (this != &other) { Owner()->owned_ = std::move(other.Owner()->owned_); }
+    return *this;
+  }
 
   ~Globals() = default;
+
+  /// \brief Reads or creates the active record variable's block, including a scoped var borrow.
+  /// \return The block; borrowing an unmade block remains lazy until this call.
+  T *operator->() { return Owner()->owned_.operator->(); }
+
+  /// \brief Reads the active block, lazily creating it when necessary.
+  /// \return The active block.
+  const T *operator->() const { return const_cast<Globals *>(this)->operator->(); }
+
+  /// \brief Reaches the active block by reference. \return The block.
+  T &operator*() { return *operator->(); }
+
+  /// \brief Reaches the active block by const reference. \return The block.
+  const T &operator*() const { return *operator->(); }
+
+  /// \brief AL uses the held block itself. \return The active block.
+  operator T &() { return *operator->(); }
+
+  /// \brief Clears the active block without changing its scoped variable identity.
+  void Forget() { Owner()->owned_.Forget(); }
+
+  /// \brief Keeps a caller's globals visible only during a var-Record operation.
+  class BorrowScope {
+  public:
+    /// \brief Borrows the source identity without allocating either block.
+    /// \param borrower The callee's variable. \param source The caller's variable.
+    BorrowScope(Globals &borrower, Globals &source)
+        : borrower_(borrower), previous_(borrower.borrowed_) {
+      Globals *const owner = source.Owner();
+      if (owner != &borrower) { borrower.borrowed_ = owner; }
+    }
+
+    BorrowScope(const BorrowScope &) = delete;
+    BorrowScope(BorrowScope &&) = delete;
+    BorrowScope &operator=(const BorrowScope &) = delete;
+    BorrowScope &operator=(BorrowScope &&) = delete;
+
+    /// \brief Restores the callee's previous identity on success or unwinding.
+    ~BorrowScope() { borrower_.borrowed_ = previous_; }
+
+  private:
+    Globals &borrower_;
+    Globals *previous_;
+  };
+
+  /// \brief Borrows table globals for a scoped var-Record call, never ordinary assignment.
+  /// \param source The live caller, which must outlive the returned scope.
+  /// \return A noncopyable guard restoring the previous identity.
+  [[nodiscard]] BorrowScope BorrowFrom(Globals &source) { return BorrowScope(*this, source); }
+
+private:
+  Globals *Owner() {
+    Globals *owner = this;
+    while (owner->borrowed_ != nullptr) { owner = owner->borrowed_; }
+    return owner;
+  }
+
+  Instance<T> owned_;
+  Globals *borrowed_ = nullptr;
 };
 
 /// \brief What every AL codeunit can do, without the generated class saying any of it.
@@ -478,9 +546,13 @@ public:
   /// \tparam Record The caller's record type, or a handle to one.
   /// \param rec The record.
   /// \return True, once `OnRun` returned.
+  /// \note Table-variable globals borrow the caller's identity only during this run. Saved
+  ///       temporary buffers survive an error/SQL rollback; ordinary record copies stay separate.
+  ///       The callee's previous globals are restored on both success and exception unwinding.
   template <typename Record> bool Run(Record &rec) {
     detail::Scope scope;
     TakeIn_(rec);
+    [[maybe_unused]] const auto globals = BorrowGlobals_(rec);
     static_cast<Derived *>(this)->OnRun();
     GiveBack_(rec);
     scope.Keep();
@@ -495,6 +567,7 @@ public:
     detail::Scope scope;
     try {
       TakeIn_(rec);
+      [[maybe_unused]] const auto globals = BorrowGlobals_(rec);
       static_cast<Derived *>(this)->OnRun();
       GiveBack_(rec);
     } catch (const Error &e) {
@@ -507,6 +580,20 @@ public:
 
 private:
   friend Derived;
+
+  struct NoGlobals {};
+
+  template <typename Record> auto BorrowGlobals_(Record &rec) {
+    if constexpr (requires { *rec.operator->(); }) {
+      return BorrowGlobals_(*rec.operator->());
+    } else if constexpr (requires(Derived &unit) {
+                           unit.Rec.Var_Block.BorrowFrom(rec.Var_Block);
+                         }) {
+      return static_cast<Derived *>(this)->Rec.Var_Block.BorrowFrom(rec.Var_Block);
+    } else {
+      return NoGlobals{};
+    }
+  }
 
   /// THE HANDLE IS REACHED THROUGH BEFORE THE STATE IS READ. A caller's record global arrives as
   /// an `Instance<T>`, and its address is the address of a POINTER and not of a record: read as a

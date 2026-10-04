@@ -5,6 +5,9 @@
 #include "BuiltinsWritten.h"
 #include "Check.h"
 
+#include <stdexcept>
+#include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace {
@@ -198,15 +201,15 @@ int Copyable::made = 0;
 void ACopyHoldsACopyOfWhatTheOtherMade() {
   Copyable::made = 0;
   agiru::Instance<Copyable> first;
-  first->value = 7;
+  first->value = kInitial;
   CHECK_TRUE("the first handle made one", Copyable::made == 1);
   agiru::Instance<Copyable> second(first);
-  CHECK_TRUE("the copy holds a copy", Copyable::made == 2 && second->value == 7);
-  second->value = 8;
-  CHECK_TRUE("which is its own", first->value == 7);
+  CHECK_TRUE("the copy holds a copy", Copyable::made == 2 && second->value == kInitial);
+  second->value = kInitial + 1;
+  CHECK_TRUE("which is its own", first->value == kInitial);
   agiru::Instance<Copyable> third;
   third = first;
-  CHECK_TRUE("and assignment copies too", third->value == 7 && Copyable::made == 3);
+  CHECK_TRUE("and assignment copies too", third->value == kInitial && Copyable::made == 3);
 }
 
 void ACopyOfWhatCannotBeCopiedHoldsNothing() {
@@ -244,6 +247,64 @@ void AssigningKeepsTheVariablesOwnGlobals() {
   }
   CHECK_TRUE("each is freed exactly once", Counted::gone == 3);
 }
+
+void ScopedGlobalsKeepTheCallersIdentity() {
+  static_assert(std::is_standard_layout_v<agiru::Globals<Counted>>);
+  static_assert(sizeof(agiru::Globals<Counted>) ==
+                sizeof(agiru::Instance<Counted>) + sizeof(void *));
+  Reset();
+  {
+    agiru::Globals<Counted> caller;
+    agiru::Globals<Counted> callee;
+    {
+      const auto borrow = callee.BorrowFrom(caller);
+      CHECK_TRUE("borrowing unmade globals allocates nothing", Counted::made == 0);
+      callee->Value(kWritten);
+      CHECK_TRUE("the caller sees a block first made through its callee",
+                 caller->Value() == kWritten && Counted::made == 1);
+      agiru::Globals<Counted> copy(callee);
+      CHECK_TRUE("copying a borrowed record does not copy its identity",
+                 copy->Value() == kInitial && Counted::made == 2);
+      const agiru::Globals<Counted> &view = callee;
+      CHECK_TRUE("const reads reach the same borrowed block", view->Value() == kWritten);
+    }
+    CHECK_TRUE("leaving a borrow restores the callee's own lazy block",
+               callee->Value() == kInitial && Counted::made == 3);
+    callee->Value(kWritten + 1);
+    agiru::Globals<Counted> other;
+    other->Value(kWritten + 2);
+    try {
+      [[maybe_unused]] const auto outer = callee.BorrowFrom(caller);
+      {
+        const auto inner = callee.BorrowFrom(other);
+        callee->Value(kWritten + 3);
+        CHECK_TRUE("a nested call targets its own caller", other->Value() == kWritten + 3);
+      }
+      CHECK_TRUE("the nested return restores the outer caller", callee->Value() == kWritten);
+      {
+        const auto same = caller.BorrowFrom(callee);
+        CHECK_TRUE("borrowing an identity from itself cannot create a cycle",
+                   caller->Value() == kWritten);
+      }
+      throw std::runtime_error("scoped unwind");
+    } catch (const std::runtime_error &error) {
+      CHECK_TEXT("the scoped test caught its own exception",
+                 std::string_view(error.what()),
+                 "scoped unwind");
+    }
+    CHECK_TRUE("exception unwinding restores the callee's preexisting block",
+               callee->Value() == kWritten + 1);
+    CHECK_TRUE("the failed scope does not discard its caller's block", caller->Value() == kWritten);
+    {
+      const auto borrow = callee.BorrowFrom(caller);
+      callee.Forget();
+      CHECK_TRUE("clearing through a borrow clears the active caller", caller->Value() == kInitial);
+    }
+    CHECK_TRUE("clearing borrowed globals leaves the callee's own block intact",
+               callee->Value() == kWritten + 1);
+  }
+  CHECK_TRUE("scoped borrows never take ownership or double free", Counted::gone == Counted::made);
+}
 }
 
 int main() {
@@ -256,5 +317,6 @@ int main() {
     AHandleConvertsToTheObject();
     MovingTakesTheInstance();
     AssigningKeepsTheVariablesOwnGlobals();
+    ScopedGlobalsKeepTheCallersIdentity();
   });
 }
