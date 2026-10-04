@@ -1386,6 +1386,15 @@ void SpliceOperations(std::vector<agiru::al::PageControl> &section, const Extens
   section.insert(section.end(), waiting.begin(), waiting.end());
 }
 
+void ReportUnplacedControls(const Extensions &store) {
+  if (store.unplaced == 0) { return; }
+  std::println("unplaced   {} extension control operation(s) name a control the target does not "
+               "declare, and stay where they were written (board:0033)",
+               store.unplaced);
+  std::println("ABORT     {} extension control operation(s) have unresolved anchors (board:0034)",
+               store.unplaced);
+}
+
 std::size_t MergeReportExtensions(const Extensions &store, Pages &reports) {
   std::size_t merged = 0;
   const auto take = [](auto &into, auto &from) {
@@ -1433,28 +1442,7 @@ std::size_t MergePageExtensions(const Extensions &store, Pages &pages) {
       ++store.consumed["page " + found->first];
     }
     for (std::vector<agiru::al::PageControl> *section : {&page.layout, &page.actions}) {
-      std::vector<agiru::al::PageControl> waiting;
-      for (const agiru::al::PageControl &control : *section) {
-        if (IsAnOperation(control.kind)) { waiting.push_back(control); }
-      }
-      if (waiting.empty()) { continue; }
-      std::erase_if(*section, [](const agiru::al::PageControl &control) {
-        return IsAnOperation(control.kind);
-      });
-      for (bool moved = true; moved && !waiting.empty();) {
-        moved = false;
-        std::vector<agiru::al::PageControl> again;
-        for (const agiru::al::PageControl &operation : waiting) {
-          if (Splice(*section, operation)) {
-            moved = true;
-          } else {
-            again.push_back(operation);
-          }
-        }
-        waiting = std::move(again);
-      }
-      store.unplaced += waiting.size();
-      section->insert(section->end(), waiting.begin(), waiting.end());
+      SpliceOperations(*section, store);
     }
   }
   return merged;
@@ -3334,7 +3322,8 @@ int Scan(const Job &job) {
   WriteReportAssets(job, gathered.reportAssets, kept);
 
   if (!job.output.empty()) {
-    const std::size_t swept = failures.empty() && refusals.empty() ? Sweep(job.output, kept) : 0;
+    const std::size_t swept =
+        failures.empty() && refusals.empty() && store.unplaced == 0 ? Sweep(job.output, kept) : 0;
     std::println("written   {} objects into {}; {} changed, {} swept",
                  written,
                  job.output.string(),
@@ -3353,11 +3342,7 @@ int Scan(const Job &job) {
                  foreignImplementations.registered,
                  foreignImplementations.pending.size());
   }
-  if (store.unplaced != 0) {
-    std::println("unplaced   {} page-extension operation(s) name a control the base page does not "
-                 "declare, and stay where they were written (board:0033)",
-                 store.unplaced);
-  }
+  ReportUnplacedControls(store);
   std::map<std::string, std::size_t> orphans;
   for (const auto &[name, total] : store.held) {
     const auto taken = store.consumed.find(name);
@@ -3514,7 +3499,10 @@ int Scan(const Job &job) {
     std::println("          reaches the metadata and what does not.");
     return 1;
   }
-  return failures.empty() && refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 ? 0 : 1;
+  return failures.empty() && refusals.empty() && nativeGaps == 0 && nativeOutput.gaps == 0 &&
+                 store.unplaced == 0
+             ? 0
+             : 1;
 }
 
 }

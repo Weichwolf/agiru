@@ -1,10 +1,18 @@
 # 0058 — Every UT run will reconcile results with an independent source manifest
 
-Status: open | Priority: P0 | Stage: UT; All population expansion | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT; All population expansion | Reviewed: 2026-10-04
 Depends on: 0589 trustworthy execution; 0004 sealed seed for acceptance.
 
 ## Evidence
 
+- Latest executed configured UT replay 101600: all 80/2,314 original identities,
+  2,169 passed/145 failed, zero incomplete; seven gains/zero losses/missing/added
+  against 080905. Manifest and original source-file hashes are identical. Snapshot
+  HEAD `5b7072c`, content `8af4d25d73e72d881a5df4ed1289e7fe928240c10d8f419cd0d5e1c0a9da86b3`.
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261004T101600Z-1902967/artifacts/ut-comparison-080905.json`.
+  Null/unsealed seed: diagnostic repeatability, not causal A/B or the independently
+  larger full AL suite. Later native/control-extension compiler changes are outside
+  this snapshot; no full-app/G1 claim.
 - Latest clean reference refresh `6261b1c458`→`bb7111877f`: 36,874 files/36,783 objects/4,171 test codeunits; 113,013 raw methods, fifteen approved exclusions, 112,998 required, zero unmeasured and the same seven conditional refusals (census exit 2). Exact identity comparison retains all 113,005 previous methods and adds eight: PowerBICoreTest.AssistedSetupShowsDeploymentChoiceForNonEvaluationCompany; SubcWIPTransCreateTest.{MultipleWIPReturnsFromOneProductionOrderOpenExactList,ReusedWIPReturnFromAnotherPurchaseOrderAppearsInList,SingleWIPReturnOpensRealTransferOrderCard}; PowerBISynchronizerTests.{TestDeploymentBufferCountsAndRemovesOutcomes,TestDeploymentBufferLoadsSelection}; HttpWebReqMgtTests.TestSetUseDefaultCredentials; TestJobQueueSNAP.RunCleanUpTaskWhenJobQueueRetriedByPlatformTwice. Product classification of mixed cloud/core cases remains 0725, not an implicit exclusion. Configured UT identities remain byte-identical at 80/2,314, no AL execution. `build/number-sequence-{census-before.log,raw-methods-{old,current,added,lost}.tsv,ut-{before,after}.json}`; generated-image refresh/link remains 0038.
 
 - Conditional boundary inventory now tracks source offsets and complete symbol assignments, including implicit `#else`, nested boolean conditions and file-local define/undef. Same frozen source/apps/scope hashes: 36,873 files, 36,781→36,782 objects; only report 208 gains measurement, no object or Test identity loss. All 113,005 raw methods survive; fifteen approved exclusions leave 112,990 required raw methods. Zero unmeasured files does not imply a runnable population: seven refused CLEANSCHEMA assignments in three files remain explicit errors. Eight-symbol fallback work budget refuses rather than truncating. Proof: build/census-final/comparison.json; inventories: build/census-{before,final}/scope-inventory.json.

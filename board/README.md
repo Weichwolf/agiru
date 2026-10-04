@@ -15,6 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Extension controls (0034): one page/report splice implementation; unresolved
+  anchors refuse and preserve previous output. Compiled metadata 62 checks green;
+  missing/cyclic anchors and wrong-order controls reject. Complete local Make:
+  131 cases/223 tooling tests green, exit 0. Runner analysis passes; Main/header
+  findings decrease six→five, Scan complexity 99→98; no suppression increase.
+  Full regeneration exits 1 with unchanged native/missing/property counters and
+  21 unresolved controls now explicitly refusing. All 14,225 slice sources remain;
+  all emitted files match current root files (321 root-only stale tree entries
+  are separate). `/tmp/agiru-transpile.i5mrtz`,
+  `/tmp/agiru-control-extensions-all-local.log`. Outside frozen 101600; not full
+  extension semantics, app linking or G1 proof.
 - Boolean lowering (0073): owned eager left-to-right operands; 26 primitive/34
   generated checks green, old short-circuit compiler 15 red, source-order control
   four red. Complete local Make replay: 130 cases/223 tooling checks green.

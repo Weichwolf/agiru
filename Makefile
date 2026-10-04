@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation boolean-expressions
+.PHONY: test-contexts text-positions catalogue codeunit-record page-navigation boolean-expressions control-extensions
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -157,6 +157,10 @@ catalogue: comments db ## prove immutable shared registration, sorted lookup and
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)
 	@python3 $(SELF)/test/tooling/lint-analysis.py --tidy clang-tidy-19 --jobs 1 --require-unit
+
+control-extensions: comments db tc
+	@cmake --build "$(B)" -j "$(JOBS)" --target agiru_rt
+	@B="$(B)" bash "$(SELF)/test/transpiler/control-extensions.sh"
 
 test: gates tc     ## the fast gate
 	@B="$(B)" sh $(SELF)/test/run.sh

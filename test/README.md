@@ -28,6 +28,11 @@ controls. Its shared sorting controls require the compiled `gate_CurrentKeyGate`
 values, error/TryFunction boundaries and lazy ternary branches; an operand-order
 source mutant must fail. `make boolean-expressions JOBS=2` is the focused entry point.
 
+`transpiler/control-extensions.sh` executes page/report-request-page control order,
+forward anchors and property overrides. Missing/cyclic anchors must refuse in both
+analysis and generation, retaining previous output. `make control-extensions JOBS=2`
+is the focused entry point; move operations and modified triggers remain separate gaps.
+
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.

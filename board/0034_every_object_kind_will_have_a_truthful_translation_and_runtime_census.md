@@ -5,6 +5,25 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Extension controls now share `SpliceOperations` for pages and report request
+  pages. Unresolved anchors return failure in analysis/generation and prevent
+  sweeping previous output. `make control-extensions`: 62 compiled metadata checks,
+  eight missing/cyclic-anchor controls and a wrong-order execution control pass;
+  the previous compiler accepts the first missing anchor and deletes prior output.
+  `/tmp/agiru-control-extensions.{dDh8Fa,BEZRHd,IibVej}`. Complete local Make replay:
+  131 cases/223 tooling tests green (`/tmp/agiru-control-extensions-all-local.log`).
+  Full verified-package regeneration retains all 14,225 slice sources and prior
+  gap counts, including 21 unresolved controls; those now have an explicit ABORT.
+  Every emitted file matches the current root tree; 321 root-only stale tree
+  entries remain separate, not a complete-tree/linking claim.
+  `/tmp/agiru-transpile.i5mrtz/{translation.log,tree-comparison.txt}`. New runner
+  analysis passes; Main/header findings decrease six→five without suppression,
+  Scan complexity 99→98. Move operations, modified triggers and full extension
+  execution remain open. References: developer `ff5939a46e`,
+  `devenv-{page,report}-ext-object.md`; BCApps `bb7111877f`,
+  `Manufacturing/Inventory/Costing/MfgResetCostIsAdjusted.ReportExt.al` and
+  `OtherCapabilities/Email/EmailAddressLookup.PageExt.al`; user docs `0ff62b2266`,
+  `ui-extensions.md`. Predecessor keyword search supplies no direct merge guarantee.
 - Native report qualifier repaired: standalone compilation uses CMake's universal
   absent-header path and compares every emitted platform source with actual
   compile commands, not the obsolete two-source assumption. All 29 sources compile
@@ -115,6 +134,17 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    implementation finding. Bind real context types; 0039 owns hook/case lifecycle;
    do not turn the current explicit refusal carriers into empty success implementations.
 4. Generate complete native declarations/immutable metadata and bind Native methods to primitives or named refusals. Finish Page Table Field's live projection through 0044 and activate its own binding only with the complete UT recheck; standalone census also exposes API webhook tables and Code Coverage 2000000049. Reuse the System AST/binder and declared field/key/property vocabulary. CodeCoverage Log/Load/Refresh/Include require real instrumentation/provider lifecycle, including the declared MultiSession argument, not empty seeded rows. 0033 owns identity, 0044 providers. Never add Refused arithmetic/default construction to hide absent fields; keep unsupported tables/options visible. Share language/Scope vocabulary without importing whole tables; generic 0019 owns calculation.
+   Next identity boundary: `BodyWriter.cpp::Kinded` currently requires a usable
+   class even for `Database::<table>` constants. Separate source-declared identity
+   from runtime binding/provider capability through the common `Objects`/Names
+   contract; retain kind/app/namespace/ID collisions and absent-record refusals.
+   Frozen 101600 reaches this gap in eleven RapidStart workflows through original
+   `System/RapidStart/ConfigValidateManagement.Codeunit.al::LookupObject` (line 872).
+   Original System-29 `src/Application Database Tables/Obsoleted/{PermissionSet,
+   Permission}.Table.al` declares IDs 2000000004/5, Scope=Cloud/ObsoleteState=Pending;
+   neither is a licensing exclusion. Execute an authored constant consumer and
+   source-ID/namespace/collision controls, then replay the same 2,314 UT. Constants
+   alone do not implement permission records, live metadata or authorization (0062).
    A verified-package declaration profile must own version-dependent fields/options/permissions. The common five base system fields do not implement Runtime-18's four user-name/full-name FlowFields for Normal/Temporary tables; retain that gap and the pinned Runtime-17 contract separately (0013), rather than extending all profiles with a guessed union.
 5. One read-only live provider projects installed declaration metadata for AllObj/Field/Table Metadata/Page Metadata; 0033 owns app/package/namespace identity, 0044 access/navigation, 0004 independent seed/schema provenance. Replace ProvisionInstalled's partial mutable snapshot/family-wide early exits. Keep Name distinct from Caption; populate represented properties from their declarations and explicitly refuse unavailable metadata. Table Metadata CDS→option mapping needs authoritative platform proof; never reinterpret Query or report a guessed Normal/default value.
 6. Field: finish the FieldRef.Type boundary and effective metadata/provenance; reuse the main declaration/compact Type map, not another catalogue. Carry field/table/extension property ownership and defaults; refuse unknown metadata instead of reporting guessed zero/blank values. Preserve ordinary dense options and foreign OptionOrdinalValues; unsupported native code ordering remains explicit. Rebuild all consumers and prove full UT population before activating native source binding. Feature Key catalogue/provider/activation belong to 0004/0044; no guessed disabled defaults or empty-catalogue success.
