@@ -80,9 +80,12 @@ and reversed walks. DynamicRecordGate adds same-session Modify/Insert/Delete/Ren
 ModifyAll/DeleteAll and filter admission/exclusion through typed Record/RecordRef,
 inside/across fetch blocks, with uniform/mixed keys, global reversal and already-open
 backward cursors. Own-variable Modify/Delete/Rename preserve the frame/system identity
-and resume from its current key. Revision storage follows active readers, not historical
+and resume from its current key. Own ModifyAll retains the caller's buffer, system identity
+and position on SQL/shared temporary rows in all eight orders, including block boundaries.
+Revision storage follows active readers, not historical
 table visits; session/table/connection isolation and failed/temporary writes are checked.
-Twenty-one compiled controls must reject; traced SQL counts reject a functional-green
+Twenty-two compiled controls must reject, including caller-traversing ModifyAll;
+traced SQL counts reject a functional-green
 one-row fetch. Full AL dynamic-write replay and Query transaction contracts remain open;
 this is not client-page presentation or live metadata-provider activation (0044).
 

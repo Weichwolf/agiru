@@ -179,6 +179,39 @@ for control in write-revision insert-notify update-notify delete-notify bulk-del
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
+control=modifyall-frame
+mkdir -p "$proof/$control/runtime"
+awk '
+  /void ModifyAll\(Field &member, const Value &value, Boolean RunTrigger = false\)/ {
+    print;
+    print "    if (!FindSet()) { return; }";
+    print "    do { member = value; Modify(RunTrigger); } while (Next() != 0);";
+    skip = 1; changed++; next
+  }
+  skip { if (/^  }$/) { print; skip = 0; } next }
+  { print }
+  END { if (changed != 1 || skip) exit 2 }
+' include/runtime/Table.h > "$proof/$control/runtime/Table.h"
+dsn=$(sed -n 's/^AGIRU_TEST_DSN:STRING=//p' "$B/CMakeCache.txt")
+[[ -n "$dsn" ]]
+image="$B/CMakeFiles/gate_image.dir/test/transpiler/golden"
+"$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-DAGIRU_TEST_DSN=\"$dsn\"" -I"$proof/$control" -Iinclude -Isrc/rt \
+  -Itest/transpiler/golden test/gate/DynamicRecordGate.cpp \
+  "$image/LineNumberBuffer.cpp.o" "$image/ResourceCost.cpp.o" \
+  "$image/ResourceCost.def.cpp.o" "$image/TransferOldExtTextLines.cpp.o" \
+  "$image/WorkType.cpp.o" "$image/WorkType.def.cpp.o" \
+  -L"$B" -Wl,-rpath,"$B" -lagiru_gen -lagiru_rt -lagiru_al -lagiru_net -lagiru_db \
+  -o "$proof/$control-gate"
+if "$proof/$control-gate" > "$proof/$control.log" 2>&1; then
+  printf 'record-order: caller traversal escaped the ModifyAll frame gate\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*ModifyAll retains the caller.s field buffer' "$proof/$control.log"
+sha256sum "$proof/$control/runtime/Table.h" "$proof/$control-gate" >> "$proof/controls.sha256"
+rm -- "$proof/$control/runtime/Table.h" "$proof/$control-gate"
+rmdir "$proof/$control/runtime" "$proof/$control"
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   src/rt/Cursor.h src/rt/Cursor.cpp \
   src/rt/RecordChanges.h src/rt/RecordChanges.cpp src/rt/SessionState.h src/rt/Storage.cpp \
@@ -187,4 +220,4 @@ sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
   test/gate/DynamicRecordGate.cpp \
   "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle and dynamic writes pass; twenty-one controls reject; %s\n' "$proof"
+printf 'record-order: order, selections, cursor lifecycle and dynamic writes pass; twenty-two controls reject; %s\n' "$proof"

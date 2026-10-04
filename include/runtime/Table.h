@@ -1806,34 +1806,33 @@ public:
     return value;
   }
 
-  /// \brief AL `Record.ModifyAll(...)`. Modifies a field in all records within a range that you
-  /// specify.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
   /// \brief AL `Record.ModifyAll(Field, NewValue [, RunTrigger])` -- sets one field on every
-  ///        record the filters select (`record-modifyall-method.md`).
+  ///        selected row without changing this variable's buffer or traversal position.
   /// \tparam Field The field's type.
   /// \tparam Value The value's type.
   /// \param member     The field itself, the way AL names it: `Rec.ModifyAll(Status, X)`.
   /// \param value      The new value.
   /// \param RunTrigger Whether `OnModify` runs per record.
-  /// \note A WALK AND NOT ONE `UPDATE`, so the triggers and the rowversion are the ordinary
-  ///       ones; the single statement is the measured optimisation this can take later.
-  /// \warning THE FIELD IS ASSIGNED AND NEVER VALIDATED. `record-modifyall-method.md`: "The
-  ///          OnValidate field trigger is never run when ModifyAll is used", and `RunTrigger`
-  ///          is the `OnModify` trigger alone. `Price List Line.RenameNo` runs
-  ///          `ModifyAll("Product No.", NewNo, true)` from `Resource.OnRename`, before the
-  ///          resource's row carries the new number; a validation there could not find the
-  ///          resource and blanked the line (Price List Line UT, T130/T131, 2026-09-12).
+  /// \note Uses an independent filtered worker with default object globals and shared
+  ///       temporary rows. Row writes retain the ordinary modify events and rowversion.
+  ///       Set-based SQL optimization and sort-field mutation remain board:0044 gaps.
+  /// \warning Never invokes OnValidate; RunTrigger controls OnModify only
+  ///          (`record-modifyall-method.md`).
   template <typename Field, typename Value>
   void ModifyAll(Field &member, const Value &value, Boolean RunTrigger = false) {
-    if (!FindSet()) { return; }
+    const FieldDef *field = ::agiru::Field(TableDefinition<Derived>(), NumberOf(&member));
+    Field replacement{};
+    replacement = value;
+    Derived worker;
+    worker.Copy(static_cast<const Derived &>(*this));
+    detail::RuntimeBorrowTemporary(&worker, Self());
+    auto &target =
+        *reinterpret_cast<Field *>(reinterpret_cast<std::byte *>(&worker) + field->offset);
+    if (!worker.FindSet()) { return; }
     do {
-      member = value;
-      Modify(RunTrigger);
-    } while (Next() != 0);
+      target = replacement;
+      worker.Modify(RunTrigger);
+    } while (worker.Next() != 0);
   }
 
   /// \brief AL `Record.ReadConsistency(...)`. Determines if the table supports read consistency.

@@ -314,6 +314,56 @@ void ReadOutlivesSession() {
   read.reset();
 }
 
+void OwnModifyAll(bool temporary, Order order, std::size_t steps) {
+  const agiru::Session session(AGIRU_TEST_DSN);
+  Fill(false, 0);
+  Cost row;
+  agiru::Temporary<Cost> rows;
+  if (temporary) {
+    for (std::size_t index = 0; index < kRows; ++index) {
+      CHECK_TRUE("each SQL fixture row exists", row.Get(row.Type, Code(index), "hours"));
+      rows = row;
+      rows.Insert();
+    }
+    row.Copy(rows);
+    agiru::detail::RuntimeBorrowTemporary(&row, &rows);
+  }
+  CHECK_TRUE("the bulk caller selects its declared order",
+             order.mixed ? row.SetCurrentKey(row.UnitCost, row.Code) : row.SetCurrentKey(row.Code));
+  if (order.mixed) { row.SetAscending(row.Code, false); }
+  row.Ascending(order.ascending);
+  CHECK_TRUE("the bulk caller opens its cursor", order.backwards ? row.FindLast() : row.FindSet());
+  if (order.backwards) {
+    CHECK_TRUE("the bulk caller has an already-open reverse buffer", row.Next(-1) == -1);
+  }
+  const auto sequence = Sequence(order);
+  const auto signedSteps =
+      order.backwards ? -static_cast<std::int32_t>(steps) : static_cast<std::int32_t>(steps);
+  CHECK_TRUE("the bulk caller reaches its selected anchor", row.Next(signedSteps) == signedSteps);
+  const std::string anchor = std::string(row.Code);
+  const auto systemId = row.SystemId;
+  row.ModifyAll(row.DirectUnitCost, agiru::Decimal{kChangedCost});
+  CHECK_TEXT("ModifyAll retains the caller's field buffer", row.Code, anchor);
+  CHECK_TRUE("ModifyAll retains the caller's SystemId", row.SystemId == systemId);
+  CHECK_TRUE("ModifyAll does not overwrite the caller's field value",
+             row.DirectUnitCost == agiru::Decimal{kOriginalCost});
+  CHECK_TRUE("zero Next retains the bulk caller's position", row.Next(0) == 0);
+  const auto direction = order.backwards ? -1 : 1;
+  CHECK_TRUE("Next resumes after the preserved bulk anchor", row.Next(direction) == direction);
+  CHECK_TEXT("bulk continuation has the independently ordered successor",
+             row.Code,
+             Code(sequence[steps + 1]));
+  CHECK_TRUE("bulk continuation reads the changed stored value",
+             row.DirectUnitCost == agiru::Decimal{kChangedCost});
+  CHECK_TRUE("bulk writes preserve the selected population", row.Count() == kRows);
+  if (temporary) {
+    Cost sql;
+    CHECK_TRUE("the SQL fixture remains present", sql.Get(sql.Type, row.Code, "hours"));
+    CHECK_TRUE("temporary ModifyAll does not change SQL rows",
+               sql.DirectUnitCost == agiru::Decimal{kOriginalCost});
+  }
+}
+
 }
 
 int main() {
@@ -349,6 +399,12 @@ int main() {
     for (const auto change : {Change::Modify, Change::Delete, Change::Rename}) {
       OwnCursorWrite(false, change);
       OwnCursorWrite(true, change);
+    }
+    for (const auto order : orders) {
+      for (const auto count : steps) {
+        OwnModifyAll(false, order, count);
+        OwnModifyAll(true, order, count);
+      }
     }
   });
 }

@@ -15,6 +15,24 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- ModifyAll caller preservation (0044): an independent filtered worker shares temporary
+  rows, not caller buffers/cursors/globals. DynamicRecordGate: 7,493 checks green;
+  the same fixture against the preceding implementation has 144 failures. SQL and
+  temporary walks retain the caller's frame/SystemId/position in all eight orders,
+  with live changed successors. New code has no analysis findings; 35 existing
+  header findings remain unsuppressed. `/tmp/agiru-modifyall.tQeH01`.
+  `make record-order`: 5,872/296/313/7,493 green, twenty-two compiled controls reject;
+  input hashes match (`/tmp/agiru-record-order-controls.ZF440l`). Outside frozen 223110; full AL replay,
+  sort-field mutation, native trigger/global proof and set-based optimization remain open.
+  StorageGate retains 71 green checks, including no-OnValidate. Disposable DB
+  `agiru_modifyall_20261005_01` is removed; original gate configuration is restored.
+  Default-configuration rebuild and complete local replay remain pending.
+- Dynamic-write integration: `20261004T223110Z-2943281`, frozen HEAD `382ecce`,
+  source `d6b5367a085aae5be3e0d154ba6caf8660df15047a41945ca6294ab6efa53a0e`;
+  `slice-check all test ut`, six jobs. Runner PID 2944742 is live; slice/build pass,
+  local tests are executing. Source/System/original-notice dependencies match 210945.
+  Compare all 2,314 identities/statuses/errors against 210945. Null/unsealed seed
+  remains diagnostic, not causal A/B or G1. ModifyAll's caller fix is outside this run.
 - Dynamic SQL reads (0044): successful row/bulk writes change a session/table revision;
   Next discards obsolete buffers before bounded keyset resumption. Tracking retires
   with the final reader; ordinary Next adds no SQL or map lookup. DynamicRecordGate:

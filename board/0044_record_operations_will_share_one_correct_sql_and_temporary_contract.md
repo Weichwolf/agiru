@@ -5,6 +5,20 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- ModifyAll caller preservation: `Table.h` uses an independent filtered worker,
+  copies NewValue before writes and borrows shared temporary rows. The caller's
+  field buffer/SystemId/position survive; Next observes changed stored successors.
+  DynamicRecordGate retains every prior case and adds SQL/temporary own bulk walks
+  in all eight orders at steps 1/64: 7,493 checks green, preceding implementation
+  144 red on the same fixture. New source has no analysis findings; 35 existing
+  header findings remain unsuppressed. `/tmp/agiru-modifyall.tQeH01`.
+  `make record-order`: 5,872/296/313/7,493 green, twenty-two compiled controls reject;
+  the restored caller-traversing header fails the same 144 checks. Input hashes match
+  (`/tmp/agiru-record-order-controls.ZF440l`). Outside frozen 223110; original full
+  AL execution, sort-field mutation, native global/trigger proof and set-based SQL
+  remain open. StorageGate retains 71 green checks, including no-OnValidate.
+  Disposable DB `agiru_modifyall_20261005_01` is removed; original gate configuration
+  is restored. Default rebuild and complete local replay remain pending.
 - Expanded dynamic writes: 5,013 checks green retain every original case and add
   uniform/mixed/global-reversed orders, already-open backward cursors and own
   Modify/Delete/Rename through typed/RecordRef. Own writes preserve the frame and
@@ -345,6 +359,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 1. Replay the expanded dynamic-write matrix above through the full AL population.
    Keep bounded reads
    and measure write-loop overhead, including ModifyAll's current per-row traversal.
+   Qualify sort-field changes, trigger globals and subscribed events before introducing
+   a set-based fast path; caller-preserving traversal alone is not that contract.
    Qualify Query.cpp's transaction-boundary
    contract separately: Query.Read does not use RuntimeNext. Route table identity
    through explicit company context; preserve lifecycle/mixed-order/step gates.
@@ -449,8 +465,11 @@ Dynamic writes: developer `ff5939a46e05`, the administration dynamic-result-set
 guarantee above and `methods-auto/record/record-{modifyall,deleteall}-method.md`.
 BCApps `bb7111877ff7`, `src/Layers/W1/BaseApp/Sales/Document/ItemChargeAssgntSales.Codeunit.al::AssignItemCharges`
 does four ModifyAll calls before traversal. User `0ff62b2266fd`,
-`business-central/ui-how-run-batch-jobs.md`. Predecessor 1573 identifies ModifyAll's
-buffer/position corruption, still separate from this shared-read invalidation;
+`business-central/{ui-how-run-batch-jobs,ui-enter-criteria-filters}.md`.
+Predecessor 1573 identifies ModifyAll's buffer/position corruption; 1589 records
+the documented default-global requirement. Independent workers preserve the caller
+and start with default globals; native per-row/subscriber/global-reset proof remains open.
+`ItemChargeAssgntSales::AssignEqually` immediately traverses from the retained first row;
 0889's own-insert-blindness claim contradicts the platform dynamic-set guarantee.
 Own Rename: `methods-auto/{record,recordref}/*-rename-method.md` and
 BCApps `bb7111877ff7`, `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al::T066_CopyResourceCostInconsistentData`
