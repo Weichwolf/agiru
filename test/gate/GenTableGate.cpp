@@ -1,6 +1,8 @@
 #include "BodyWriter.h"
 #include "Check.h"
+#include "CodeunitWriter.h"
 #include "Format.h"
+#include "NativeSource.h"
 #include "Parser.h"
 #include "Refused.h"
 #include "TableWriter.h"
@@ -8,6 +10,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -313,7 +316,7 @@ void ATableDeclaredTemporaryConstructsItsStore() {
                      "&::agiru::kTempOps<") != std::string::npos);
   CHECK_TRUE("and the traits say so",
              agiru::gen::WriteDefinitions(agiru::al::ParseTable(declared), std::string(kAlPath), {})
-                     .find(".tableType = TableType::Temporary,") != std::string::npos);
+                     .find(".tableType = ::agiru::TableType::Temporary,") != std::string::npos);
 }
 
 /// A FIELD'S `OnLookup` TRIGGER IS IN THE MAP BESIDE ITS TABLE, like `OnValidate`: the method was
@@ -463,6 +466,48 @@ table 60003 "Reflection Source"
   CHECK_TRUE("an invalid linked-object property refuses instead of becoming false", refused);
 }
 
+void AppIdentityComesFromTheRootManifest() {
+  constexpr std::string_view valid = R"({
+    "dependencies": [{"id":"85a884cd-20d8-4d18-91bd-e6c1baaa3a32","name":"Not the owner"}],
+    "id":"834a40c9-7a26-46f2-9348-3f6cc8c71719",
+    "name":"Nested \"Caf\u00e9\" Fixture",
+    "publisher":"agiru tests\nwith tabs\tand slashes\\",
+    "version":"2.3.4.5"
+  })";
+  const auto app = agiru::gen::ParseAppIdentity(valid);
+  CHECK_TEXT(
+      "a dependency ID does not become the owner", app.id, "834a40c9-7a26-46f2-9348-3f6cc8c71719");
+  CHECK_TEXT("JSON strings are decoded without losing Unicode or quotes",
+             app.name,
+             "Nested \"Café\" Fixture");
+  CHECK_TEXT("escaped control characters retain their original source value",
+             app.publisher,
+             "agiru tests\nwith tabs\tand slashes\\");
+  CHECK_TEXT("the manifest version remains exact", app.version, "2.3.4.5");
+  for (
+      const std::string_view invalid :
+      {"[]",
+       "{}",
+       "{",
+       "{\"id\":42}",
+       R"({"id":"834a40c9-7a26-46f2-9348-3f6cc8c71719","id":"834a40c9-7a26-46f2-9348-3f6cc8c71719","name":"x","publisher":"y","version":"1.0.0.0"})",
+       R"({"id":"invalid-guid","name":"x","publisher":"y","version":"1.0.0.0"})",
+       R"({"id":"834a40c9-7a26-46f2-9348-3f6cc8c71719","name":"","publisher":"y","version":"1.0.0.0"})",
+       R"({"id":"834a40c9-7a26-46f2-9348-3f6cc8c71719","name":"x","publisher":"y"})"}) {
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::gen::ParseAppIdentity(invalid));
+    } catch (const std::runtime_error &error) {
+      refused = std::string_view(error.what()).contains("app.json");
+    }
+    CHECK_TRUE("invalid or ambiguous identity refuses instead of supplying defaults", refused);
+  }
+  CHECK_TRUE("a valid uppercase GUID is accepted",
+             agiru::gen::IsAppGuid("834A40C9-7A26-46F2-9348-3F6CC8C71719"));
+  CHECK_TRUE("the native and AL manifests share GUID validation",
+             !agiru::gen::IsAppGuid("834a40c9-7a26-46f2-9348-3f6cc8c7171z"));
+}
+
 } // namespace
 
 int main() {
@@ -479,5 +524,6 @@ int main() {
     AFieldWithAnOnLookupTriggerIsInTheLookupMap();
     ACollidingNameCarriesASeam();
     ReflectionDeclarationsRetainSourceAuthority();
+    AppIdentityComesFromTheRootManifest();
   });
 }

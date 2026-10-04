@@ -1131,26 +1131,38 @@ void NoteTargets(const Extensions &store) {
   for (const auto &[name, list] : store.reports) { store.held["report " + name] += list.size(); }
 }
 
-std::string JsonValue(std::string_view text, std::string_view key);
-
 agiru::gen::NativeAppIdentity AppIdentity(const std::filesystem::path &root) {
   const auto manifest = root / "app.json";
+  if (std::filesystem::is_symlink(manifest)) {
+    throw std::runtime_error("app.json is a symlink: " + manifest.string());
+  }
   if (!std::filesystem::is_regular_file(manifest)) { return {}; }
-  const auto text = Read(manifest);
-  return {.id = JsonValue(text, "id"),
-          .name = JsonValue(text, "name"),
-          .publisher = JsonValue(text, "publisher"),
-          .version = JsonValue(text, "version")};
+  return agiru::gen::ParseAppIdentity(Read(manifest));
 }
 
-agiru::gen::ReportAssetApp LayoutApp(const std::filesystem::path &root,
-                                     const std::filesystem::path &declaration) {
-  for (auto directory = declaration.parent_path(); !directory.empty();) {
-    if (std::filesystem::is_regular_file(directory / "app.json")) {
+enum class SourceOwnerPolicy { NearestManifest, CompilationUnit };
+
+agiru::gen::ReportAssetApp
+SourceApp(const std::filesystem::path &root,
+          const std::filesystem::path &declaration,
+          SourceOwnerPolicy policy = SourceOwnerPolicy::NearestManifest) {
+  const auto base = std::filesystem::absolute(root).lexically_normal();
+  const auto source = std::filesystem::absolute(declaration).lexically_normal();
+  const auto relative = source.lexically_relative(base);
+  if (relative.empty() || *relative.begin() == "..") {
+    throw std::runtime_error("source declaration is outside its app root: " + source.string());
+  }
+  if (policy == SourceOwnerPolicy::CompilationUnit) {
+    auto identity = AppIdentity(base);
+    if (!identity.id.empty()) { return {.identity = std::move(identity), .source = "."}; }
+  }
+  for (auto directory = source.parent_path(); !directory.empty();) {
+    const auto manifest = directory / "app.json";
+    if (std::filesystem::is_symlink(manifest) || std::filesystem::is_regular_file(manifest)) {
       return {.identity = AppIdentity(directory),
-              .source = std::filesystem::relative(directory, root).generic_string()};
+              .source = directory.lexically_relative(base).generic_string()};
     }
-    if (directory == root || directory == directory.parent_path()) { break; }
+    if (directory == base || directory == directory.parent_path()) { break; }
     directory = directory.parent_path();
   }
   return {};
@@ -1173,7 +1185,6 @@ Extensions ReadExtensions(Run &run,
   for (const agiru::gen::App &app : apps) {
     run.root = source / app.source;
     if (!std::filesystem::is_directory(run.root)) { continue; }
-    const auto appOwner = agiru::gen::LowerKey(AppIdentity(run.root).id);
     const auto read = [&](std::string_view suffix, auto parse, auto &into, auto note) {
       for (const std::filesystem::path &path : SourcesEndingIn(run, suffix)) {
         ++counts.files;
@@ -1191,9 +1202,11 @@ Extensions ReadExtensions(Run &run,
     read(".TableExt.al",
          agiru::al::ParseTableExtension,
          store.tables,
-         [&](const agiru::al::TableExtensionObject &extension, const std::filesystem::path &) {
+         [&](const agiru::al::TableExtensionObject &extension, const std::filesystem::path &path) {
            store.tableOwners[agiru::gen::LowerKey(extension.name) + "|" +
-                             agiru::gen::LowerKey(extension.extends)] = appOwner;
+                             agiru::gen::LowerKey(extension.extends)] =
+               agiru::gen::LowerKey(
+                   SourceApp(run.root, path, SourceOwnerPolicy::CompilationUnit).identity.id);
          });
     read(".EnumExt.al",
          agiru::al::ParseEnumExtension,
@@ -1210,7 +1223,7 @@ Extensions ReadExtensions(Run &run,
          store.reports,
          [&](agiru::al::PageExtensionObject &extension, const std::filesystem::path &path) {
            NoteLayoutOwners(extension.rendering,
-                            LayoutApp(source, path).identity.id,
+                            SourceApp(source, path).identity.id,
                             std::filesystem::relative(path, source));
          });
   }
@@ -1866,15 +1879,24 @@ Tables IndexTables(Run &run, Counts &counts) {
   return kept;
 }
 
-std::size_t
-MergeExtensions(const Extensions &store, Tables &tables, std::string_view tableOwner = {}) {
+std::size_t MergeExtensions(const Extensions &store,
+                            Tables &tables,
+                            std::string_view tableOwner = {},
+                            const std::filesystem::path &sourceRoot = {}) {
   std::size_t merged = 0;
   const auto take = [](auto &into, const auto &from) {
     into.insert(into.end(), from.begin(), from.end());
   };
-  for (agiru::al::TableObject &table : tables.objects) {
+  for (std::size_t i = 0; i < tables.objects.size(); ++i) {
+    agiru::al::TableObject &table = tables.objects[i];
+    const std::string owner =
+        sourceRoot.empty() ? std::string(tableOwner)
+                           : agiru::gen::LowerKey(SourceApp(sourceRoot,
+                                                            sourceRoot / tables.paths[i],
+                                                            SourceOwnerPolicy::CompilationUnit)
+                                                      .identity.id);
     std::map<int, std::string> owners;
-    for (const auto &field : table.fields) { owners[field.number] = tableOwner; }
+    for (const auto &field : table.fields) { owners[field.number] = owner; }
     const auto found = store.tables.find(agiru::gen::LowerKey(table.name));
     if (found != store.tables.end()) {
       for (const agiru::al::TableExtensionObject &extension : found->second) {
@@ -1925,24 +1947,12 @@ std::size_t BindNativeSources(const std::filesystem::path &package,
     return 0;
   }
   Tables nativeTables{.objects = std::move(sources.tables), .paths = sources.paths};
-  extensions.emitted += MergeExtensions(store, nativeTables);
+  extensions.emitted += MergeExtensions(store, nativeTables, agiru::gen::LowerKey(sources.app.id));
   sources.tables = std::move(nativeTables.objects);
   objects.tables = agiru::gen::PlatformTables(sources.tables);
   objects.fieldEnums = agiru::gen::PlatformFieldEnums(sources.tables, objects.tables);
   AddNativeSourceTables(sources, objects.tables, tables);
   return ReportNativeSources(sources, objects.tables);
-}
-
-void WriteTables(Run &run,
-                 const Tables &kept,
-                 const agiru::gen::EnumIndex &index,
-                 const agiru::gen::Objects &objects,
-                 Gathered &gathered,
-                 std::map<std::string, std::size_t> &unresolvedEnums) {
-  if (run.output.empty()) { return; }
-  for (std::size_t i = 0; i < kept.objects.size(); ++i) {
-    WriteTable(run, kept.objects[i], kept.paths[i], index, objects, gathered, unresolvedEnums);
-  }
 }
 
 struct UnitTestPopulation {
@@ -2055,16 +2065,6 @@ std::set<std::string> InterfaceReturns(std::string_view source) {
   return returning;
 }
 
-std::string JsonValue(std::string_view text, std::string_view key) {
-  const std::size_t at = text.find("\"" + std::string(key) + "\"");
-  if (at == std::string_view::npos) { return {}; }
-  const std::size_t open = text.find('"', text.find(':', at) + 1);
-  if (open == std::string_view::npos) { return {}; }
-  const std::size_t close = text.find('"', open + 1);
-  return close == std::string_view::npos ? std::string{}
-                                         : std::string(text.substr(open + 1, close - open - 1));
-}
-
 void EmitModule(Run &run,
                 const agiru::gen::App &app,
                 const agiru::gen::NativeAppIdentity &identity,
@@ -2073,22 +2073,14 @@ void EmitModule(Run &run,
   objects.module.clear();
   objects.moduleHeader.clear();
   const std::string identifier = agiru::gen::Identifier(app.name);
-  const auto literal = [](std::string value) {
-    std::string out = "\"";
-    for (const char c : value) {
-      if (c == '"' || c == '\\') { out += '\\'; }
-      out += c;
-    }
-    return out + "\"";
-  };
   std::string header;
   header += "// Generated from " + std::string(source) + ". Do not edit.\n\n#pragma once\n\n";
   header += "#include \"meta/ModuleDef.h\"\n\nnamespace agiru::app::" + identifier + " {\n\n";
   header += "inline constexpr ::agiru::ModuleDef kModule{\n";
-  header += "    .id = " + literal(identity.id) + ",\n";
-  header += "    .name = " + literal(identity.name) + ",\n";
-  header += "    .publisher = " + literal(identity.publisher) + ",\n";
-  header += "    .version = " + literal(identity.version) + ",\n};\n\n}\n";
+  header += "    .id = " + agiru::gen::Literal(identity.id) + ",\n";
+  header += "    .name = " + agiru::gen::Literal(identity.name) + ",\n";
+  header += "    .publisher = " + agiru::gen::Literal(identity.publisher) + ",\n";
+  header += "    .version = " + agiru::gen::Literal(identity.version) + ",\n};\n\n}\n";
   if (!run.output.empty()) {
     Keep(run, Output{.directory = run.output, .relative = identifier + "Module.h"}, header);
   }
@@ -2102,11 +2094,69 @@ agiru::gen::NativeAppIdentity WriteModule(Run &run,
                                           agiru::gen::Objects &objects) {
   objects.module.clear();
   objects.moduleHeader.clear();
-  const auto manifest = source / "app.json";
-  if (!std::filesystem::is_regular_file(manifest)) { return {}; }
-  const auto identity = AppIdentity(source);
+  auto identity = AppIdentity(source);
+  if (identity.id.empty()) { return {}; }
   EmitModule(run, app, identity, app.source + "/app.json", objects);
   return identity;
+}
+
+class ModuleContext {
+  agiru::gen::Objects &objects_;
+  std::string module_;
+  std::string header_;
+
+public:
+  explicit ModuleContext(agiru::gen::Objects &objects)
+      : objects_(objects), module_(objects.module), header_(objects.moduleHeader) {}
+
+  ~ModuleContext() {
+    objects_.module.swap(module_);
+    objects_.moduleHeader.swap(header_);
+  }
+};
+
+void WriteTables(Run &run,
+                 const agiru::gen::App &app,
+                 const Tables &kept,
+                 const agiru::gen::EnumIndex &index,
+                 agiru::gen::Objects &objects,
+                 Gathered &gathered,
+                 std::map<std::string, std::size_t> &unresolvedEnums) {
+  if (run.output.empty()) { return; }
+  const ModuleContext context{objects};
+  std::map<std::string, std::pair<std::string, std::string>> modules;
+  modules.emplace(".", std::pair{objects.module, objects.moduleHeader});
+  std::map<std::string, std::string> identities;
+  const auto root = AppIdentity(run.root);
+  if (!root.id.empty()) { identities.emplace(agiru::gen::LowerKey(root.id), "."); }
+  for (std::size_t i = 0; i < kept.objects.size(); ++i) {
+    const auto owner =
+        SourceApp(run.root, run.root / kept.paths[i], SourceOwnerPolicy::CompilationUnit);
+    if (owner.identity.id.empty()) {
+      objects.module.clear();
+      objects.moduleHeader.clear();
+    } else {
+      const std::string id = agiru::gen::LowerKey(owner.identity.id);
+      const auto [found, inserted] = identities.emplace(id, owner.source);
+      if (!inserted && found->second != owner.source) {
+        throw std::runtime_error("duplicate table-owner app id " + id + ": " + found->second +
+                                 " and " + owner.source);
+      }
+      const auto held = modules.find(owner.source);
+      if (held == modules.end()) {
+        const agiru::gen::App nested{.name = "SourceApp" + agiru::gen::Identifier(id),
+                                     .source = owner.source,
+                                     .depends = {}};
+        EmitModule(
+            run, nested, owner.identity, app.source + "/" + owner.source + "/app.json", objects);
+        modules.emplace(owner.source, std::pair{objects.module, objects.moduleHeader});
+      } else {
+        objects.module = held->second.first;
+        objects.moduleHeader = held->second.second;
+      }
+    }
+    WriteTable(run, kept.objects[i], kept.paths[i], index, objects, gathered, unresolvedEnums);
+  }
 }
 
 void BindReportDeclaration(const agiru::al::PageObject &report, agiru::gen::Objects &objects) {
@@ -2200,7 +2250,7 @@ Pages IndexReports(Run &run,
     BindReportDeclaration(parsed.has_value() ? *parsed : declaration, objects);
     if (parsed.has_value()) {
       NoteLayoutOwners(parsed->rendering,
-                       LayoutApp(run.sourceRoot, path).identity.id,
+                       SourceApp(run.sourceRoot, path).identity.id,
                        std::filesystem::relative(path, run.sourceRoot));
       reports.paths.push_back(std::filesystem::relative(path, run.root).string());
       reports.objects.push_back(std::move(*parsed));
@@ -2779,13 +2829,18 @@ void Add(Counts &into, const Counts &one) {
 
 void NoteProductExclusions(const Job &job, const agiru::gen::TranspileScope &scope) {
   for (const agiru::gen::SourceExclusion &rule : scope.productExclude) {
-    const std::filesystem::path excluded = job.source / rule.source;
+    const bool native = rule.domain == agiru::gen::SourceDomain::SystemSymbols;
+    const std::filesystem::path excluded = (native ? job.systemSymbols : job.source) / rule.source;
+    if (native && job.systemSymbols.empty()) {
+      throw std::runtime_error("scope.json: System product exclusion requires --system-symbols: " +
+                               rule.source);
+    }
     if (!std::filesystem::exists(excluded)) {
       throw std::runtime_error("scope.json: product exclusion target is missing: " + rule.source);
     }
     std::println("product exclusion {}: {} (raw inventory retained by make census)",
                  rule.reason,
-                 rule.source);
+                 (native ? "system-symbols/" : "") + rule.source);
   }
 }
 
@@ -2827,6 +2882,25 @@ std::size_t NoteNativeEnumInterfaces(const Enums &enums, const agiru::gen::Objec
   return gaps;
 }
 
+std::size_t WriteNativeTables(Run &run,
+                              const agiru::gen::NativeSources &native,
+                              const agiru::gen::Objects &objects) {
+  if (native.app.id.empty()) { return 0; }
+  std::size_t count = 0;
+  for (std::size_t i = 0; i < native.tables.size(); ++i) {
+    const auto &table = native.tables[i];
+    const auto binding = objects.tables.find(std::to_string(table.id));
+    if (binding == objects.tables.end()) { continue; }
+    const auto relative = "native/table/" + std::to_string(table.id) + ".cpp";
+    Keep(run,
+         Output{.directory = run.output, .relative = relative},
+         agiru::gen::NativeTableDefinition(table, binding->second, objects));
+    ++count;
+    ++run.written;
+  }
+  return count;
+}
+
 NativeObjectOutput WriteNativeObjects(const Job &job,
                                       const agiru::gen::NativeSources &native,
                                       const Enums &enums,
@@ -2836,7 +2910,11 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
                                       const TableByName &tables,
                                       std::set<std::filesystem::path> &kept,
                                       LayoutCounts &layouts) {
-  if (reports.objects.empty() && enums.objects.empty() && native.interfaces.empty()) { return {}; }
+  const bool ownedTables = !native.tables.empty() && !native.app.id.empty();
+  if (reports.objects.empty() && enums.objects.empty() && native.interfaces.empty() &&
+      !ownedTables) {
+    return {};
+  }
   Run run{.sourceRoot = job.systemSymbols,
           .root = job.systemSymbols,
           .output = job.output.empty() ? std::filesystem::path{} : job.output / "platform",
@@ -2851,6 +2929,10 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
              native.app,
              "platform/NavxManifest.xml",
              objects);
+  const auto tablesWritten = WriteNativeTables(run, native, objects);
+  std::println("native {} table declarations emitted with original module/namespace ownership; "
+               "no live metadata provider proof",
+               tablesWritten);
   gathered.reportAssets.apps.push_back(
       {.identity = native.app, .source = "platform", .platform = true});
   for (const auto &report : reports.objects) {
@@ -2860,9 +2942,9 @@ NativeObjectOutput WriteNativeObjects(const Job &job,
   NoteUnwrittenReports(run, reports, gathered);
   for (const auto &report : reports.objects) { NoteObjectOptions(report, gathered.options); }
   WritePages(run, reports, objects, gathered, tables);
-  const auto reportWritten = run.written;
+  const auto reportWritten = run.written - tablesWritten;
   WriteEnums(run, enums, objects);
-  const auto enumWritten = run.written - reportWritten;
+  const auto enumWritten = run.written - reportWritten - tablesWritten;
   const auto beforeInterfaces = run.written;
   WriteInterfaces(run,
                   Interfaces{.objects = native.interfaces, .paths = native.interfacePaths},
@@ -2929,7 +3011,7 @@ void WriteReportAssets(const Job &job,
         })) {
       continue;
     }
-    const auto app = LayoutApp(job.source, job.source / request.layout.owner.source);
+    const auto app = SourceApp(job.source, job.source / request.layout.owner.source);
     if (app.identity.id.empty()) { continue; }
     if (std::ranges::none_of(requests.apps, [&](const auto &known) {
           return known.identity.id == app.identity.id && known.source == app.source;
@@ -3029,7 +3111,24 @@ int Scan(const Job &job) {
   agiru::gen::NativeSources nativeSources = job.systemSymbols.empty()
                                                 ? agiru::gen::NativeSources{}
                                                 : agiru::gen::ReadNativeSources(job.systemSymbols);
-  if ((!nativeSources.reports.empty() || !nativeSources.enums.empty()) &&
+  const auto rawNativeTables = nativeSources.tables.size();
+  agiru::gen::SelectNativeSources(nativeSources, scope);
+  for (const auto &excluded : nativeSources.excluded) {
+    std::println("native product-excluded {} {} {}.{}: {} ({})",
+                 excluded.kind,
+                 excluded.id,
+                 excluded.nameSpace,
+                 excluded.name,
+                 excluded.source,
+                 excluded.reason);
+  }
+  std::println(
+      "native parsed table declarations: {} before policy, {} selected, {} product-excluded",
+      rawNativeTables,
+      nativeSources.tables.size(),
+      rawNativeTables - nativeSources.tables.size());
+  if ((!nativeSources.reports.empty() || !nativeSources.enums.empty() ||
+       (!nativeSources.tables.empty() && !nativeSources.app.id.empty())) &&
       std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {
     throw std::runtime_error("apps.json: platform is reserved for the supplied System package");
   }
@@ -3137,15 +3236,14 @@ int Scan(const Job &job) {
       agiru::gen::AddReportAssets(gathered.reportAssets, report);
     }
     NoteUnwrittenReports(run, parsedReports, gathered);
-    Pages parsedXmlPorts = IndexXmlPorts(run, objects);
+    const Pages parsedXmlPorts = IndexXmlPorts(run, objects);
     const Queries parsedQueries = IndexQueries(run, objects);
     Enums heldEnums;
     ScanEnums(run, enums, store, index, heldEnums, nativeSources);
     objects.enums = index;
     Tables &parsedTables = held.emplace_back(IndexTables(run, tables));
     CheckNativeTableIdentities(parsedTables, nativeSources);
-    extensions.emitted +=
-        MergeExtensions(store, parsedTables, agiru::gen::LowerKey(AppIdentity(source).id));
+    extensions.emitted += MergeExtensions(store, parsedTables, {}, source);
     RefreshTableIndex(parsedTables, objects);
     for (const agiru::al::TableObject &table : parsedTables.objects) {
       NoteFieldEnums(table, objects.enums, objects.fieldEnums);
@@ -3191,7 +3289,7 @@ int Scan(const Job &job) {
     NoteUnresolvedImplementations(run, heldEnums, objects, foreignImplementations);
     WriteEnumExtensions(run, app.name, store, objects, foreignImplementations);
     WriteInterfaces(run, parsedInterfaces, gathered, objects);
-    WriteTables(run, parsedTables, index, objects, gathered, unresolvedEnums);
+    WriteTables(run, app, parsedTables, index, objects, gathered, unresolvedEnums);
     for (agiru::al::PageObject &page : parsed.objects) {
       agiru::gen::SynthesizeRunObjectActions(page, objects);
       agiru::gen::SynthesizeDataCaption(page);

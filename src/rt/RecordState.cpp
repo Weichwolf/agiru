@@ -3,11 +3,16 @@
 #include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/ErrorValue.h"
+#include "type/FieldClass.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace agiru::detail {
@@ -116,6 +121,20 @@ std::vector<Clause> ClausesOf(std::string_view view) {
   return clauses;
 }
 
+void ViewSorting(RecordState &state, const TableDef &table, std::string_view sorting) {
+  std::vector<FieldNo> fields;
+  for (const std::string_view field : SplitOutsideParentheses(sorting, ',')) {
+    if (!Trimmed(field).empty()) { fields.push_back(FieldOfView(table, field).no); }
+  }
+  if (fields.empty()) {
+    throw Error("The view clause SORTING() names no field of " + std::string(table.name));
+  }
+  if (!SetCurrentKey(state, table, fields)) {
+    throw Error("SetView: the requested fields of " + std::string(table.name) +
+                " are not sortable");
+  }
+}
+
 }
 
 std::string ViewOf(const RecordState *state, const TableDef &table, bool useNames) {
@@ -157,15 +176,7 @@ void ApplyView(RecordState &state, const TableDef &table, std::string_view view)
   for (const Clause &clause : ClausesOf(view)) {
     if (SameText(clause.keyword, "VERSION")) { continue; }
     if (SameText(clause.keyword, "SORTING")) {
-      std::size_t named = 0;
-      for (const std::string_view field : SplitOutsideParentheses(clause.inside, ',')) {
-        if (Trimmed(field).empty()) { continue; }
-        state.key.push_back(SortField{.field = FieldOfView(table, field).no, .ascending = true});
-        ++named;
-      }
-      if (named == 0) {
-        throw Error("The view clause SORTING() names no field of " + std::string(table.name));
-      }
+      ViewSorting(state, table, clause.inside);
       continue;
     }
     if (SameText(clause.keyword, "ORDER")) {
@@ -228,20 +239,33 @@ std::string Literally(std::string_view value) {
   return out;
 }
 
-bool KeyMatches(const TableDef &table, const std::vector<SortField> &key) {
-  if (key.empty()) { return true; }
-  for (const KeyDef &declared : table.keys) {
-    if (declared.fields.size() < key.size()) { continue; }
-    bool prefix = true;
-    for (std::size_t i = 0; i < key.size(); ++i) {
-      if (declared.fields[i] != key[i].field) {
-        prefix = false;
-        break;
-      }
+bool SetCurrentKey(RecordState &state, const TableDef &table, std::span<const FieldNo> fields) {
+  if (fields.empty()) { throw Error("SetCurrentKey requires at least one field"); }
+  for (const FieldNo no : fields) {
+    const FieldDef *field = Field(table, no);
+    if (field == nullptr) {
+      throw Error("SetCurrentKey: the table has no field " + std::to_string(no.Value()));
     }
-    if (prefix) { return true; }
+    if (field->type == FieldType::Blob || field->fieldClass == FieldClass::FlowFilter) {
+      return false;
+    }
+    if (field->fieldClass == FieldClass::FlowField) {
+      throw Error("SetCurrentKey: FlowField sorting is not implemented for " +
+                  std::string(table.name) + "." + std::string(field->name));
+    }
   }
-  return false;
+  for (const KeyDef &declared : table.keys) {
+    if (!declared.enabled || declared.fields.size() < fields.size()) { continue; }
+    if (!std::equal(fields.begin(), fields.end(), declared.fields.begin())) { continue; }
+    fields = declared.fields;
+    break;
+  }
+  std::vector<SortField> selected;
+  selected.reserve(fields.size());
+  for (const FieldNo no : fields) { selected.push_back(SortField{.field = no, .ascending = true}); }
+  state.open.Forget();
+  state.key = std::move(selected);
+  return true;
 }
 
 }

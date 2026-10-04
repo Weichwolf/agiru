@@ -7,6 +7,14 @@ table 60001 "Implicit Row"
     ObsoleteState = Pending;
     ObsoleteReason = 'Source-owned reflection fixture';
     DataClassification = AccountData;
+    CompressionType = Row;
+    Access = Internal;
+    DataCaptionFields = Later, "Primary ID";
+    DataPerCompany = false;
+    ReplicateData = false;
+    PasteIsValid = false;
+    LookupPageId = 50176;
+    DrillDownPageId = 50177;
 
     fields
     {

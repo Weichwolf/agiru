@@ -750,7 +750,9 @@ public:
   ///       lookup trigger -- `OnAfterLookup(Selected: RecordRef)` is 30-odd call sites -- and what
   ///       AL copies is the ROW, which is this record's fields.
   template <typename T> [[nodiscard]] const T *As() const {
-    if (State().record == nullptr || State().table != &TableTraits<T>::kTable) { return nullptr; }
+    if (State().record == nullptr || State().table != &::agiru::TableDefinition<T>()) {
+      return nullptr;
+    }
     return static_cast<const T *>(State().record);
   }
 

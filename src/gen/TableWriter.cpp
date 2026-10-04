@@ -1235,17 +1235,114 @@ std::string TableKeyDeclarations(const al::TableObject &table,
   return out;
 }
 
-std::string TableReflectionProperties(const al::TableObject &table, const Objects &objects) {
+std::string TableDeclarationProperties(const al::TableObject &table,
+                                       const Objects &objects,
+                                       std::string_view captionFields,
+                                       std::string_view prefix = "    .",
+                                       std::string_view suffix = ",\n") {
   std::string out;
-  if (!objects.module.empty()) { out += "    .module = &" + objects.module + ",\n"; }
-  if (!table.nameSpace.empty()) { out += "    .nameSpace = " + Literal(table.nameSpace) + ",\n"; }
+  const auto emit = [&](std::string_view member, const std::string &value) {
+    out += std::string(prefix) + std::string(member) + " = " + value + std::string(suffix);
+  };
+  const auto text = [&](std::string_view name, std::string_view member) {
+    if (const auto *found = Find(table.properties, name); found != nullptr) {
+      emit(member, Literal(found->text));
+    }
+  };
+  const auto boolean = [&](std::string_view name, std::string_view member) {
+    if (const auto *found = Find(table.properties, name); found != nullptr) {
+      const std::string value = LowerKey(found->text);
+      if (value != "true" && value != "false") {
+        throw std::invalid_argument(std::string(name) + " must be true or false: " + found->text);
+      }
+      emit(member, value);
+    }
+  };
+  text("ExternalName", "externalName");
+  text("ExternalSchema", "externalSchema");
+  if (const auto *found = Find(table.properties, "TableType"); found != nullptr) {
+    static constexpr std::array types{
+        "Normal", "CRM", "CDS", "ExternalSQL", "Exchange", "MicrosoftGraph", "Temporary"};
+    const auto *const spelled = std::ranges::find_if(
+        types, [&](const char *name) { return LowerKey(name) == LowerKey(found->text); });
+    if (spelled == types.end()) {
+      throw std::invalid_argument("unknown TableType: " + found->text);
+    }
+    emit("tableType", "::agiru::TableType::" + std::string(*spelled));
+  }
+  boolean("DataPerCompany", "dataPerCompany");
+  boolean("ReplicateData", "replicateData");
+  text("DataAccessIntent", "dataAccessIntent");
+  text("CompressionType", "compressionType");
+  if (Find(table.properties, "DataCaptionFields") != nullptr) {
+    emit("dataCaptionFields", std::string(captionFields));
+  }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"Permissions", "permissions"},
+        std::pair<std::string_view, std::string_view>{"InherentPermissions", "inherentPermissions"},
+        std::pair<std::string_view, std::string_view>{"InherentEntitlements",
+                                                      "inherentEntitlements"},
+        std::pair<std::string_view, std::string_view>{"Extensible", "extensible"},
+        std::pair<std::string_view, std::string_view>{"Access", "access"},
+        std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
+        std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"}}) {
+    text(name, member);
+  }
+  for (const auto &[name, member] :
+       {std::pair<std::string_view, std::string_view>{"LookupPageId", "lookupPageId"},
+        std::pair<std::string_view, std::string_view>{"DrillDownPageId", "drillDownPageId"}}) {
+    if (const auto *found = Find(table.properties, name); found != nullptr) {
+      const std::string number = PageNumber(objects.pages, found->text);
+      if (number.empty()) {
+        throw std::invalid_argument("unresolved " + std::string(name) + ": " + found->text);
+      }
+      emit(member, "::agiru::PageId{" + number + "}");
+    }
+  }
+  boolean("PasteIsValid", "pasteIsValid");
+  text("Description", "description");
+  text("AllowInCustomizations", "allowInCustomizations");
+  text("ObsoleteState", "obsoleteState");
+  return out;
+}
+
+std::string NativeCaptionFields(const al::TableObject &table) {
+  const auto *property = Find(table.properties, "DataCaptionFields");
+  if (property == nullptr) { return {}; }
+  const auto names = CommaSeparatedNames(property->text);
+  std::string out = "constexpr std::array<::agiru::FieldNo, " + std::to_string(names.size()) +
+                    "> kSourceCaptionFields{{";
+  for (const auto &name : names) {
+    const auto found = std::ranges::find_if(table.fields, [&](const al::FieldDecl &field) {
+      return LowerKey(field.name) == LowerKey(name);
+    });
+    if (found == table.fields.end()) {
+      throw std::invalid_argument("DataCaptionFields names an absent field: " + name);
+    }
+    out += "::agiru::FieldNo{" + std::to_string(found->number) + "},";
+  }
+  return out + "}};\n\n";
+}
+
+std::string TableReflectionProperties(const al::TableObject &table,
+                                      const Objects &objects,
+                                      std::string_view prefix = "    .",
+                                      std::string_view suffix = ",\n") {
+  std::string out;
+  if (!objects.module.empty()) {
+    out += std::string(prefix) + "module = &" + objects.module + std::string(suffix);
+  }
+  if (!table.nameSpace.empty()) {
+    out += std::string(prefix) + "nameSpace = " + Literal(table.nameSpace) + std::string(suffix);
+  }
   for (const auto &[name, member] :
        {std::pair<std::string_view, std::string_view>{"Scope", "scope"},
         std::pair<std::string_view, std::string_view>{"ObsoleteReason", "obsoleteReason"},
         std::pair<std::string_view, std::string_view>{"DataClassification",
                                                       "dataClassification"}}) {
     if (const auto *found = Find(table.properties, name); found != nullptr) {
-      out += "    ." + std::string(member) + " = " + Literal(found->text) + ",\n";
+      out += std::string(prefix) + std::string(member) + " = " + Literal(found->text) +
+             std::string(suffix);
     }
   }
   if (const auto *found = Find(table.properties, "LinkedObject"); found != nullptr) {
@@ -1253,11 +1350,32 @@ std::string TableReflectionProperties(const al::TableObject &table, const Object
     if (value != "true" && value != "false") {
       throw std::invalid_argument("LinkedObject must be true or false: " + found->text);
     }
-    out += "    .linkedObject = " + value + ",\n";
+    out += std::string(prefix) + "linkedObject = " + value + std::string(suffix);
   }
   return out;
 }
 
+}
+
+std::string NativeTableDefinition(const al::TableObject &table,
+                                  const TableRef &binding,
+                                  const Objects &objects) {
+  if (objects.module.empty() || objects.moduleHeader.empty()) {
+    throw std::runtime_error("native table declaration has no original module: " + table.name);
+  }
+  std::string out = NativeTableAssertions(table, binding);
+  out += "#include \"runtime/Catalogue.h\"\n#include \"" + objects.moduleHeader + "\"\n";
+  const std::string captionFields = NativeCaptionFields(table);
+  if (!captionFields.empty()) { out += "#include <array>\n"; }
+  out += "\nnamespace {\n\n" + captionFields;
+  out += "constexpr ::agiru::TableDef kSourceTable = [] {\n";
+  out += "  auto table = ::agiru::TableTraits<" + binding.identifier + ">::kTable;\n";
+  out += TableDeclarationProperties(table, objects, "kSourceCaptionFields", "  table.", ";\n");
+  out += TableReflectionProperties(table, objects, "  table.", ";\n");
+  out += "  return table;\n}();\n\n";
+  out += "const ::agiru::RegisterTableSource<" + binding.identifier +
+         ", kSourceTable> kSourceRegistration;\n\n}\n";
+  return out;
 }
 
 std::string TableDefinitions(const al::TableObject &declared, const Objects &objects) {
@@ -1283,67 +1401,7 @@ std::string TableDefinitions(const al::TableObject &declared, const Objects &obj
   out += ",\n";
   out += "    .fields = k" + tableIdentifier + "Fields,\n";
   out += "    .keys = k" + tableIdentifier + "Keys,\n";
-  const auto property = [&table](std::string_view name) {
-    const al::Property *found = Find(table.properties, name);
-    return found == nullptr ? std::string{} : found->text;
-  };
-  for (const auto &[name, member] :
-       {std::pair<std::string_view, std::string_view>{"ExternalName", "externalName"},
-        std::pair<std::string_view, std::string_view>{"ExternalSchema", "externalSchema"}}) {
-    const std::string said = property(name);
-    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
-  }
-  const std::string kind = property("TableType");
-  if (!kind.empty()) {
-    static constexpr std::array kTableTypes{
-        "Normal", "CRM", "CDS", "ExternalSQL", "Exchange", "MicrosoftGraph", "Temporary"};
-    const auto *const spelled = std::ranges::find_if(
-        kTableTypes, [&](const char *name) { return LowerKey(name) == LowerKey(kind); });
-    out += "    .tableType = TableType::" +
-           (spelled == kTableTypes.end() ? kind : std::string(*spelled)) + ",\n";
-  }
-  const std::string perCompany = property("DataPerCompany");
-  if (LowerKey(perCompany) == "false") { out += "    .dataPerCompany = false,\n"; }
-  const std::string replicate = property("ReplicateData");
-  if (LowerKey(replicate) == "false") { out += "    .replicateData = false,\n"; }
-  for (const auto &[name, member] :
-       {std::pair<std::string_view, std::string_view>{"DataAccessIntent", "dataAccessIntent"},
-        std::pair<std::string_view, std::string_view>{"CompressionType", "compressionType"}}) {
-    const std::string said = property(name);
-    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
-  }
-  if (!property("DataCaptionFields").empty()) {
-    out += "    .dataCaptionFields = " + tableClass + "::kDataCaptionFields,\n";
-  }
-  for (const auto &[name, member] :
-       {std::pair<std::string_view, std::string_view>{"Permissions", "permissions"},
-        std::pair<std::string_view, std::string_view>{"InherentPermissions", "inherentPermissions"},
-        std::pair<std::string_view, std::string_view>{"InherentEntitlements",
-                                                      "inherentEntitlements"},
-        std::pair<std::string_view, std::string_view>{"Extensible", "extensible"},
-        std::pair<std::string_view, std::string_view>{"Access", "access"},
-        std::pair<std::string_view, std::string_view>{"MovedFrom", "movedFrom"},
-        std::pair<std::string_view, std::string_view>{"MovedTo", "movedTo"}}) {
-    const std::string said = property(name);
-    if (!said.empty()) { out += "    ." + std::string(member) + " = " + Literal(said) + ",\n"; }
-  }
-  for (const auto &[name, member] :
-       {std::pair<std::string_view, std::string_view>{"LookupPageId", "lookupPageId"},
-        std::pair<std::string_view, std::string_view>{"DrillDownPageId", "drillDownPageId"}}) {
-    const std::string said = PageNumber(objects.pages, property(name));
-    if (!said.empty()) {
-      out += "    ." + std::string(member) + " = ::agiru::PageId{" + said + "},\n";
-    }
-  }
-  {
-    if (LowerKey(property("PasteIsValid")) == "false") { out += "    .pasteIsValid = false,\n"; }
-    const std::string describe = property("Description");
-    if (!describe.empty()) { out += "    .description = " + Literal(describe) + ",\n"; }
-    const std::string said = property("AllowInCustomizations");
-    if (!said.empty()) { out += "    .allowInCustomizations = " + Literal(said) + ",\n"; }
-  }
-  const std::string obsolete = property("ObsoleteState");
-  if (!obsolete.empty()) { out += "    .obsoleteState = " + Literal(obsolete) + ",\n"; }
+  out += TableDeclarationProperties(table, objects, tableClass + "::kDataCaptionFields");
   out += TableReflectionProperties(table, objects);
   out += "};\n\n";
 

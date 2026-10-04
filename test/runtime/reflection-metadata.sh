@@ -9,7 +9,7 @@ gate="$B/gate_ReflectionMetadataGate"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 
-for control in ordinal-cast cds-query default-fallback; do
+for control in ordinal-cast cds-query default-fallback property-fallback property-ordinal scope-aliases; do
   awk -v control="$control" '
     control == "ordinal-cast" && /case PageType::HeadlinePart: return Native::HeadlinePart;/ {
       sub(/return Native::HeadlinePart;/, "return static_cast<Native>(type);"); changed++
@@ -21,12 +21,53 @@ for control in ordinal-cast cds-query default-fallback; do
     control == "default-fallback" && /return std::unexpected\("unknown TableType/ {
       $0 = "  return Native::Normal;"; changed++
     }
+    control == "property-fallback" && /return std::unexpected\("Table Metadata\."/ {
+      print "  static_cast<void>(property); return static_cast<Native>(0);"; changed++; skipping=1; next
+    }
+    control == "property-ordinal" && /static_cast<Native>\(value.ordinal\)/ {
+      sub(/static_cast<Native>\(value.ordinal\)/, "static_cast<Native>(value.ordinal + 1)"); changed++
+    }
+    control == "scope-aliases" && /SameProperty\(name, alias\)/ {
+      $0 = "    static_cast<void>(alias); static_cast<void>(value);"; changed++
+    }
     { print }
     END { if (changed != 1 || skipping) exit 2 }
   ' src/rt/ReflectionMetadata.cpp > "$proof/$control.cpp"
   "$CXX" "${flags[@]}" "$proof/$control.cpp" -o "$proof/$control.so"
   if LD_PRELOAD="$proof/$control.so" "$gate" > "$proof/$control.log" 2>&1; then
     printf 'reflection-metadata: %s escaped the identity/refusal gate\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL ' "$proof/$control.log"
+done
+
+for control in caption-names absent-caption-field null-owner wrong-access wrong-default-classification native-defaults; do
+  awk -v control="$control" '
+    control == "caption-names" && /result \+= std::to_string\(no.Value\(\)\);/ {
+      $0 = "    result += Field(source, no)->name;"; changed++
+    }
+    control == "absent-caption-field" && /if \(Field\(source, no\) == nullptr\)/ {
+      $0 = "    if (false) {"; changed++
+    }
+    control == "null-owner" && /return \*owner;/ {
+      $0 = "  return Guid{};"; changed++
+    }
+    control == "wrong-access" && /result.Access = Verified\(MetadataAccess\(EffectiveProperty/ {
+      $0 = "  result.Access = platform::TableMetadataAccess::Public;"; changed++
+    }
+    control == "wrong-default-classification" && /EffectiveProperty\(source, source.dataClassification, "CustomerContent"\)/ {
+      sub(/"CustomerContent"/, "\"ToBeClassified\""); changed++
+    }
+    control == "native-defaults" && /return value.empty\(\) && !IsPlatformTable\(source.id\)/ {
+      sub(/!IsPlatformTable\(source.id\)/, "source.id.Value() != 0"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/TableMetadata.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the source projection gate\n' "$control" >&2
     exit 1
   fi
   rg -q 'FAIL ' "$proof/$control.log"
@@ -47,4 +88,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: typed projection and temporary rows pass; four controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, AL defaults, kind/property mappings and temporary rows pass; thirteen controls refuse; %s\n' "$proof"

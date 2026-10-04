@@ -5,7 +5,7 @@ B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-table-keys.XXXXXX)
 input="$PWD/test/transpiler/table-keys"
-flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate)
+flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -Iinclude -Itest/gate -Isrc/rt)
 links=(-stdlib=libc++ --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_net -lagiru_db)
 
@@ -20,10 +20,22 @@ compile() {
   rg --files --no-ignore "$generated" -g '*.cpp' | LC_ALL=C sort > "$output.sources"
   mapfile -t sources < "$output.sources"
   [ "${#sources[@]}" -gt 0 ] || { printf 'table-keys: no generated sources\n' >&2; return 2; }
-  "$CXX" "${flags[@]}" "-I$generated" "-I$generated/fixture" "-I$generated/shared" \
+  "$CXX" "${flags[@]}" "-I$generated" "-I$generated/fixture" "-I$generated/group" "-I$generated/orphan" "-I$generated/shared" \
     -c test/transpiler/table-keys/Runner.cpp -o "$output.runner.o"
-  "$CXX" "${flags[@]}" "-I$generated" "-I$generated/fixture" "-I$generated/shared" \
+  "$CXX" "${flags[@]}" "-I$generated" "-I$generated/fixture" "-I$generated/group" "-I$generated/orphan" "-I$generated/shared" \
     "$output.runner.o" "${sources[@]}" "${links[@]}" -o "$output"
+}
+
+repoint_takeover() {
+  local changed=$1
+  awk '
+    /MovedFrom =/ {
+      sub(/834a40c9-7a26-46f2-9348-3f6cc8c71719/, "118874ab-44bc-4ccb-9daf-59763539ab16"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "$changed" > "$changed.changed"
+  mv "$changed.changed" "$changed"
 }
 
 generate "$B/agirutc" "$proof/generated"
@@ -33,7 +45,8 @@ mkdir -p "$B/fixture-commands"
 jq -n --arg directory "$PWD" --arg file "$PWD/test/transpiler/table-keys/Runner.cpp" \
   --args '[{directory:$directory,file:$file,arguments:$ARGS.positional}]' -- \
   "$CXX" "${flags[@]}" "-I$proof/generated" "-I$proof/generated/fixture" \
-  "-I$proof/generated/shared" -c test/transpiler/table-keys/Runner.cpp -o "$proof/runner.runner.o" \
+  "-I$proof/generated/group" "-I$proof/generated/orphan" "-I$proof/generated/shared" \
+  -c test/transpiler/table-keys/Runner.cpp -o "$proof/runner.runner.o" \
   > "$proof/compile_commands.json"
 cp "$proof/compile_commands.json" "$B/fixture-commands/table-keys.json"
 
@@ -77,8 +90,75 @@ for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
     printf 'table-keys: %s escaped the generated execution gate\n' "$control" >&2
     exit 1
   fi
-  rg -q '1 red' "$proof/$control.run.log"
+  case "$control" in
+    wrong-name) claim='the primary key retains the original AL field name';;
+    wrong-clustering) claim='the primary key is clustered by default';;
+    wrong-owner) claim='table owner comes from the source manifest';;
+    wrong-classification) claim='table classification is retained';;
+  esac
+  rg -q "FAIL .*${claim}" "$proof/$control.run.log"
 done
+
+cp -a "$proof/generated" "$proof/parent-owner"
+source="$proof/parent-owner/group/fixture/table/OwnedRow.def.cpp"
+awk '
+  /^#include "SourceApp.*Module.h"/ { print "#include \"FixtureModule.h\"" }
+  /\.module = &::agiru::app::SourceApp/ {
+    sub(/::agiru::app::SourceApp[^:]+::kModule/, "::agiru::app::Fixture::kModule"); changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' "$source" > "$proof/parent-owner.cpp"
+mv "$proof/parent-owner.cpp" "$source"
+compile "$proof/parent-owner" "$proof/parent-owner-runner" > "$proof/parent-owner.compile.log" 2>&1
+if "$proof/parent-owner-runner" > "$proof/parent-owner.run.log" 2>&1; then
+  printf 'table-keys: parent owner escaped nested identity checks\n' >&2; exit 1
+fi
+rg -q 'nearest source manifest' "$proof/parent-owner.run.log"
+
+for control in duplicate-app missing-identity dependency-owner symlink-manifest wrong-takeover; do
+  cp -a "$input/al" "$proof/$control-input"
+  manifest="$proof/$control-input/group/nested/app.json"
+  if [ "$control" = symlink-manifest ]; then
+    mv "$manifest" "$manifest.saved"
+    ln -s missing-app.json "$manifest"
+    expected='app.json is a symlink'
+  else
+    if [ "$control" = duplicate-app ]; then
+      mkdir "$proof/$control-input/group/duplicate"
+      cp "$manifest" "$proof/$control-input/group/duplicate/app.json"
+      mv "$proof/$control-input/group/nested/SecondOwnedRow.Table.al" \
+        "$proof/$control-input/group/duplicate/SecondOwnedRow.Table.al"
+      cp "$manifest" "$manifest.changed"
+      expected='duplicate table-owner app id'
+    elif [ "$control" = missing-identity ]; then
+      jq 'del(.publisher)' "$manifest" > "$manifest.changed"
+      expected='app.json lacks nonempty string identity field publisher'
+    elif [ "$control" = dependency-owner ]; then
+      jq 'del(.id)' "$manifest" > "$manifest.changed"
+      expected='app.json lacks nonempty string identity field id'
+    else
+      repoint_takeover "$proof/$control-input/fixture/OwnedRowExtension.TableExt.al"
+      cp "$manifest" "$manifest.changed"
+      expected='invalid moved field takeover'
+    fi
+    mv "$manifest.changed" "$manifest"
+  fi
+  if "$B/agirutc" "$proof/$control-input" "$input/apps.json" "$proof/$control-output" \
+    > "$proof/$control-generation.log" 2>&1; then
+    printf 'table-keys: %s escaped source identity validation\n' "$control" >&2; exit 1
+  fi
+  rg -q "$expected" "$proof/$control-generation.log"
+done
+
+if [ -n "${AGIRU_OWNER_PREVIOUS:-}" ]; then
+  if "$AGIRU_OWNER_PREVIOUS" "$input/al" "$input/apps.json" "$proof/previous-owner" \
+    > "$proof/previous-owner.generation.log" 2>&1; then
+    printf 'table-keys: previous compiler accepted a nested source takeover\n' >&2; exit 1
+  fi
+  rg -q 'invalid moved field takeover' "$proof/previous-owner.generation.log"
+  sha256sum "$AGIRU_OWNER_PREVIOUS" > "$proof/previous-owner.sha256"
+fi
 
 if [ -n "${AGIRU_KEYS_PREVIOUS:-}" ]; then
   LD_LIBRARY_PATH="$(dirname "$AGIRU_KEYS_PREVIOUS")" generate "$AGIRU_KEYS_PREVIOUS" "$proof/previous"
@@ -90,4 +170,4 @@ if [ -n "${AGIRU_KEYS_PREVIOUS:-}" ]; then
   rg -q 'extension keys never replace the implicit primary key' "$proof/previous.run.log"
   rg -q 'the primary key belongs to the base table' "$proof/previous.run.log"
 fi
-printf 'table-keys: source owner/properties, original keys and temporary operations pass; controls reject; %s\n' "$proof"
+printf 'table-keys: root/nested/shared/missing owners, original keys and temporary operations pass; identity/ownership controls reject; %s\n' "$proof"

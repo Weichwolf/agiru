@@ -1,0 +1,7 @@
+{
+  "dependencies": [{"id": "85a884cd-20d8-4d18-91bd-e6c1baaa3a32", "name": "Not the owner"}],
+  "id": "834a40c9-7a26-46f2-9348-3f6cc8c71719",
+  "name": "Nested \"Caf\u00e9\" Fixture",
+  "publisher": "agiru tests",
+  "version": "2.3.4.5"
+}

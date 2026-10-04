@@ -186,7 +186,9 @@ void CurrentKeyNamesTheKeysFields() {
   ResourceCost rec;
   CHECK_TEXT("the primary key by default", rec.CurrentKey(), "Type,Code,Work Type Code");
   rec.SetCurrentKey(rec.CostType, rec.Code);
-  CHECK_TEXT("and SetCurrentKey's fields after one", rec.CurrentKey(), "Cost Type,Code");
+  CHECK_TEXT("and a prefix selects the complete declared key",
+             rec.CurrentKey(),
+             "Cost Type,Code,Work Type Code");
 }
 
 void TheCurrentKeyDecidesWhichRowIsFirst() {

@@ -7,6 +7,7 @@
 #include "runtime/Events.h"
 #include "runtime/Record.h"
 #include "runtime/RecordState.h"
+#include "runtime/TableDefinition.h"
 #include "type/Boolean.h"
 #include "type/ErrorInfo.h"
 #include "type/Guid.h"
@@ -653,7 +654,7 @@ template <typename T> bool SameKey(const T &a, const T &b) {
 /// This base is that platform half, so the generated class stays a transcription of the `.al` file.
 ///
 /// \tparam Derived The generated table class, whose fields this reaches through
-///         `TableTraits<Derived>::kTable`.
+///         `TableDefinition<Derived>()`.
 ///
 /// \note The base holds NO data. That is what leaves a generated record standard-layout, which is
 ///       what lets the field table address a field by `offsetof`.
@@ -674,7 +675,7 @@ private:
     const std::string text = detail::RangeBoundText(Filtered(), no, upper);
     if (text.empty()) { return Field{}; }
     Derived bound{};
-    detail::EvaluateInto(&bound, TableTraits<Derived>::kTable, no, text);
+    detail::EvaluateInto(&bound, TableDefinition<Derived>(), no, text);
     const std::ptrdiff_t offset =
         reinterpret_cast<const char *>(&member) - reinterpret_cast<const char *>(Self());
     return *reinterpret_cast<const Field *>(reinterpret_cast<const char *>(&bound) + offset);
@@ -761,7 +762,7 @@ public:
   ///       filenames are for: the predecessor paid three reverts for reading the wrong file.
   Boolean Insert(Boolean RunTrigger, Boolean InsertWithSystemId) {
     if (!Insert_(RunTrigger, InsertWithSystemId)) {
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.caption) +
+      throw Error("The " + std::string(TableDefinition<Derived>().caption) +
                       " already exists. Identification fields and values: " + PrimaryKeyText(),
                   "DB:RecordExists");
     }
@@ -781,7 +782,7 @@ private:
       }
     }
     if (!detail::RuntimeInsert(
-            Self(), TableTraits<Derived>::kTable, static_cast<bool>(InsertWithSystemId))) {
+            Self(), TableDefinition<Derived>(), static_cast<bool>(InsertWithSystemId))) {
       return false;
     }
     CaptureImage();
@@ -818,8 +819,8 @@ public:
         static_cast<Derived *>(this)->OnModify();
       }
     }
-    if (!detail::RuntimeModify(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+    if (!detail::RuntimeModify(Self(), TableDefinition<Derived>())) {
+      throw Error("The " + std::string(TableDefinition<Derived>().name) +
                       " does not exist. Identification fields and values: " + PrimaryKeyText(),
                   "DB:RecordNotFound");
     }
@@ -846,8 +847,8 @@ public:
         static_cast<Derived *>(this)->OnDelete();
       }
     }
-    if (!detail::RuntimeDelete(Self(), TableTraits<Derived>::kTable)) {
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+    if (!detail::RuntimeDelete(Self(), TableDefinition<Derived>())) {
+      throw Error("The " + std::string(TableDefinition<Derived>().name) +
                       " does not exist. Identification fields and values: " + PrimaryKeyText(),
                   "DB:RecordNotFound");
     }
@@ -869,9 +870,9 @@ public:
   /// \throws Error when the argument count does not match the primary key.
   template <typename... Keys> detail::Found Get(const Keys &...keys) {
     AssignPrimaryKey(keys...);
-    const bool found = Read(detail::RuntimeGet(Self(), TableTraits<Derived>::kTable));
+    const bool found = Read(detail::RuntimeGet(Self(), TableDefinition<Derived>()));
     return detail::Found{
-        found, TableTraits<Derived>::kTable.name, found ? std::string{} : PrimaryKeyText()};
+        found, TableDefinition<Derived>().name, found ? std::string{} : PrimaryKeyText()};
   }
 
   /// \brief AL `Record.Get(RecordId)` -- the row that id names.
@@ -893,7 +894,7 @@ public:
   ///          `AssignKey` now refuses a value whose type is not the field's, so the same mistake
   ///          elsewhere is an error rather than a corrupted record.
   detail::Found Get(const ::agiru::RecordId &id) {
-    const TableDef &table = TableTraits<Derived>::kTable;
+    const TableDef &table = TableDefinition<Derived>();
     if (id.IsEmpty()) { throw Error("Get: the RecordId names no record"); }
     if (id.TableNo() != table.id.Value()) {
       throw Error("Get: the RecordId names table " + std::to_string(id.TableNo()) +
@@ -933,13 +934,13 @@ public:
     requires(!std::is_same_v<Field, ::agiru::FieldNo>)
   [[noreturn]] void FieldError(const Field &member, const ::agiru::ErrorInfo &info) const {
     ::agiru::ErrorInfo raised = info;
-    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), raised.Message());
+    ::agiru::FieldError(Self(), TableDefinition<Derived>(), NumberOf(&member), raised.Message());
   }
 
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[noreturn]] void FieldError(const FieldType &member, std::string_view text = {}) const {
-    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, NumberOf(&member), text);
+    ::agiru::FieldError(Self(), TableDefinition<Derived>(), NumberOf(&member), text);
   }
 
   /// \brief AL `Record.TestField(Field)`, naming the field itself.
@@ -949,7 +950,7 @@ public:
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   void TestField(const FieldType &member) const {
-    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, NumberOf(&member));
+    ::agiru::detail::TestField(Self(), TableDefinition<Derived>(), NumberOf(&member));
   }
 
   /// \brief AL `Record.TestField(Field, Value)`, naming the field itself.
@@ -988,13 +989,13 @@ public:
   void TestField(const FieldType &member, const Value &expected) const {
     const ::agiru::FieldNo no = NumberOf(&member);
     if constexpr (std::is_enum_v<Value> && std::constructible_from<FieldType, Value>) {
-      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
+      ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, FieldType{expected});
     } else if constexpr (std::is_enum_v<Value>) {
-      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<Value>{expected});
+      ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, Option<Value>{expected});
     } else if constexpr (std::constructible_from<FieldType, const Value &>) {
-      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, FieldType{expected});
+      ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, FieldType{expected});
     } else {
-      ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
+      ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, expected);
     }
   }
 
@@ -1024,7 +1025,7 @@ public:
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[nodiscard]] std::string_view FieldCaption(const FieldType &member) const {
-    return ::agiru::FieldCaption(TableTraits<Derived>::kTable, NumberOf(&member));
+    return ::agiru::FieldCaption(TableDefinition<Derived>(), NumberOf(&member));
   }
 
   /// \brief AL `Record.FieldError(Field [, Text])`.
@@ -1034,14 +1035,14 @@ public:
   /// \throws Error always.
   /// \see agiru::FieldError
   [[noreturn]] void FieldError(::agiru::FieldNo no, std::string_view text = {}) const {
-    ::agiru::FieldError(Self(), TableTraits<Derived>::kTable, no, text);
+    ::agiru::FieldError(Self(), TableDefinition<Derived>(), no, text);
   }
 
   /// \brief AL `Record.TestField(Field)`.
   /// \param no The field to test.
   /// \throws Error when the field holds its type's blank.
   void TestField(::agiru::FieldNo no) const {
-    ::agiru::detail::TestField(Self(), TableTraits<Derived>::kTable, no);
+    ::agiru::detail::TestField(Self(), TableDefinition<Derived>(), no);
   }
 
   /// \brief Whether a field declares `NotBlank`, which the UI enforces and a `Validate` does not
@@ -1050,7 +1051,7 @@ public:
   /// \param no The field.
   /// \return True when the declaration says `NotBlank = true`.
   [[nodiscard]] static bool FieldNotBlank(::agiru::FieldNo no) {
-    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    const FieldDef *def = Field(TableDefinition<Derived>(), no);
     return def != nullptr && def->notBlank;
   }
 
@@ -1076,7 +1077,7 @@ public:
   /// \param text What the user entered.
   /// \throws Error when the entry lies outside the declared range.
   static void CheckEntryRange(::agiru::FieldNo no, std::string_view text) {
-    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    const FieldDef *def = Field(TableDefinition<Derived>(), no);
     if (def != nullptr) { detail::CheckEntryRange(text, def->minValue, def->maxValue); }
   }
 
@@ -1088,7 +1089,7 @@ public:
   template <typename Value>
     requires(!std::is_enum_v<Value>)
   void TestField(::agiru::FieldNo no, const Value &expected) const {
-    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, expected);
+    ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, expected);
   }
 
   /// \brief AL `Record.TestField(Field, Value)` against a named option member.
@@ -1104,7 +1105,7 @@ public:
   template <typename E>
     requires std::is_enum_v<E>
   void TestField(::agiru::FieldNo no, E expected) const {
-    ::agiru::TestFieldValue(Self(), TableTraits<Derived>::kTable, no, Option<E>{expected});
+    ::agiru::TestFieldValue(Self(), TableDefinition<Derived>(), no, Option<E>{expected});
   }
 
   /// \brief AL `Record.FieldNo(Field)` -- the AL number of a field, named the way AL names it.
@@ -1126,7 +1127,7 @@ public:
   /// \param no The field.
   /// \return The field's `Caption` property.
   [[nodiscard]] std::string_view FieldCaption(::agiru::FieldNo no) const {
-    return ::agiru::FieldCaption(TableTraits<Derived>::kTable, no);
+    return ::agiru::FieldCaption(TableDefinition<Derived>(), no);
   }
 
   /// \brief AL `Record.AddLink(...)`. Adds a link to a record.
@@ -1200,7 +1201,7 @@ public:
   ///       leave it so, and only this, `SetAutoCalcFields`, or a page control whose source is the
   ///       field itself, fills it. A stored field passed here is left alone.
   template <typename... Fields> Boolean CalcFields(Fields &...members) {
-    (detail::CalcField(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    (detail::CalcField(Self(), TableDefinition<Derived>(), Filtered(), NumberOf(&members)), ...);
     return true;
   }
 
@@ -1222,7 +1223,7 @@ public:
   ///       handle (SCM Available to Pick UT, 2026-09-12). The rows summed are the ones the
   ///       record's filters and marks select, the same set `Count` counts (TemporaryGate).
   template <typename... Fields> Boolean CalcSums(Fields &...members) {
-    (detail::CalcSum(Self(), TableTraits<Derived>::kTable, Filtered(), NumberOf(&members)), ...);
+    (detail::CalcSum(Self(), TableDefinition<Derived>(), Filtered(), NumberOf(&members)), ...);
     return true;
   }
 
@@ -1249,7 +1250,7 @@ public:
   /// \return Never.
   /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
   void Consistent(Boolean consistent) const {
-    detail::MarkConsistent(TableTraits<Derived>::kTable, static_cast<bool>(consistent));
+    detail::MarkConsistent(TableDefinition<Derived>(), static_cast<bool>(consistent));
   }
 
   /// \brief AL `Record.Copy(...)`. Makes this record refer to another's rows, or copies its
@@ -1349,7 +1350,7 @@ public:
   ///        `SortRecordRef`, which reads it back as a `SORTING(...)` view.
   /// \return The key's text.
   [[nodiscard]] std::string CurrentKey() const {
-    return detail::RuntimeCurrentKey(Self(), TableTraits<Derived>::kTable);
+    return detail::RuntimeCurrentKey(Self(), TableDefinition<Derived>());
   }
 
   /// \brief AL `Record.DeleteLink(...)`. Deletes a specified link from a record in a table.
@@ -1384,7 +1385,7 @@ public:
   /// \param no The field number.
   /// \return Whether the table declares it and marks it enabled.
   [[nodiscard]] Boolean FieldActive(::agiru::FieldNo no) const {
-    const FieldDef *def = Field(TableTraits<Derived>::kTable, no);
+    const FieldDef *def = Field(TableDefinition<Derived>(), no);
     return def != nullptr && def->enabled;
   }
 
@@ -1400,14 +1401,14 @@ public:
   template <typename FieldType>
     requires(!std::is_same_v<FieldType, ::agiru::FieldNo>)
   [[nodiscard]] std::string_view FieldName(const FieldType &member) const {
-    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, NumberOf(&member));
+    return ::agiru::detail::FieldNameOf(TableDefinition<Derived>(), NumberOf(&member));
   }
 
   /// \brief AL `Record.FieldName(FieldNo)`.
   /// \param no The field number.
   /// \return The name.
   [[nodiscard]] std::string_view FieldName(::agiru::FieldNo no) const {
-    return ::agiru::detail::FieldNameOf(TableTraits<Derived>::kTable, no);
+    return ::agiru::detail::FieldNameOf(TableDefinition<Derived>(), no);
   }
 
   /// \brief AL `Record.FilterGroup()` -- which group `SetRange` and `SetFilter` write into.
@@ -1430,8 +1431,8 @@ public:
   /// \return True when a row matched.
   /// \see `record-find-method.md`, which tabulates the five characters.
   detail::Found Find(std::string_view which = "=") {
-    return detail::Found{Read(detail::RuntimeFind(Self(), TableTraits<Derived>::kTable, which)),
-                         TableTraits<Derived>::kTable.name};
+    return detail::Found{Read(detail::RuntimeFind(Self(), TableDefinition<Derived>(), which)),
+                         TableDefinition<Derived>().name};
   }
 
   /// \brief AL `Record.FindFirst()` -- the first row of the set.
@@ -1465,8 +1466,8 @@ public:
   }
 
   detail::Found FindSet() {
-    return detail::Found{Read(detail::RuntimeFindSet(Self(), TableTraits<Derived>::kTable)),
-                         TableTraits<Derived>::kTable.name};
+    return detail::Found{Read(detail::RuntimeFindSet(Self(), TableDefinition<Derived>())),
+                         TableDefinition<Derived>().name};
   }
 
   /// \brief AL `Record.FindSet(ForUpdate)`.
@@ -1482,7 +1483,7 @@ public:
 
   /// \brief AL `Record.Next()`. Steps to the next row of the open set.
   /// \return 1 when it moved, 0 at the end -- which is what `repeat ... until Next() = 0` reads.
-  Integer Next() { return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, 1)); }
+  Integer Next() { return Stepped(detail::RuntimeNext(Self(), TableDefinition<Derived>(), 1)); }
 
   /// \brief AL `Record.Next(Steps)`.
   /// \param Steps How far to step: forward when positive, back when negative.
@@ -1496,7 +1497,7 @@ public:
   ///       that `Get` reached -- `Item.Get(No); Item.Next` -- moves the same way, since there is
   ///       no set open to step.
   Integer Next(Integer Steps) {
-    return Stepped(detail::RuntimeNext(Self(), TableTraits<Derived>::kTable, Steps));
+    return Stepped(detail::RuntimeNext(Self(), TableDefinition<Derived>(), Steps));
   }
 
   /// \brief AL `Record.Count()`. How many rows the filters select.
@@ -1504,20 +1505,20 @@ public:
   /// \warning IT COSTS A `count(*)`. `IsEmpty` is the one to reach for when the question is only
   ///          whether any row matched.
   [[nodiscard]] Integer Count() const {
-    return detail::RuntimeCount(Self(), TableTraits<Derived>::kTable);
+    return detail::RuntimeCount(Self(), TableDefinition<Derived>());
   }
 
   /// \brief AL `Record.IsEmpty()`. Whether the filters select nothing.
   /// \return True when no row matched.
   [[nodiscard]] Boolean IsEmpty() const {
-    return detail::RuntimeIsEmpty(Self(), TableTraits<Derived>::kTable);
+    return detail::RuntimeIsEmpty(Self(), TableDefinition<Derived>());
   }
 
   /// \brief AL `Record.DeleteAll()`. Removes every row the filters select.
   /// \note THE TRIGGER DOES NOT RUN. That is AL's own rule for the no-argument form, and
   ///       `DeleteAll(true)` is the one that runs `OnDelete` per row.
   void DeleteAll() {
-    static_cast<void>(detail::RuntimeDeleteAll(Self(), TableTraits<Derived>::kTable));
+    static_cast<void>(detail::RuntimeDeleteAll(Self(), TableDefinition<Derived>()));
   }
 
   /// \brief AL `Record.DeleteAll(RunTrigger)`.
@@ -1560,7 +1561,7 @@ public:
   /// \param SystemId The id.
   /// \return True when a row carries it; `record-getbysystemid-method.md`: filters do not apply.
   Boolean GetBySystemId(const Guid &SystemId) {
-    return Read(detail::RuntimeGetBySystemId(Self(), TableTraits<Derived>::kTable, SystemId));
+    return Read(detail::RuntimeGetBySystemId(Self(), TableDefinition<Derived>(), SystemId));
   }
 
   /// \brief AL `Record.GetFilter(Field)`. The filter standing on one field.
@@ -1579,7 +1580,7 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     for (const detail::FieldFilter &one : state->filters) {
       if (one.field == no && one.group == state->group) {
-        const FieldDef *def = ::agiru::Field(TableTraits<Derived>::kTable, no);
+        const FieldDef *def = ::agiru::Field(TableDefinition<Derived>(), no);
         return def == nullptr ? std::string(one.text) : detail::ShownFilter(*def, one.text);
       }
     }
@@ -1591,7 +1592,7 @@ public:
   /// state of the MARKEDONLY method (Record).
   /// \return `Caption: filter, Caption: filter` over the current group; empty when unfiltered.
   [[nodiscard]] ::agiru::Text<0> GetFilters() const {
-    return ::agiru::Text<0>(detail::FiltersText(Filtered(), TableTraits<Derived>::kTable));
+    return ::agiru::Text<0>(detail::FiltersText(Filtered(), TableDefinition<Derived>()));
   }
 
   /// \brief AL `Record.GetPosition([UseNames])`. The current record's primary key, as text.
@@ -1603,7 +1604,7 @@ public:
   ///       quote is doubled -- a key whose text carries a comma or an equals sign would otherwise
   ///       come back as two parts.
   [[nodiscard]] std::string GetPosition(Boolean UseNames = false) const {
-    return detail::PositionText(Self(), TableTraits<Derived>::kTable, UseNames);
+    return detail::PositionText(Self(), TableDefinition<Derived>(), UseNames);
   }
 
   /// \brief AL `Record.GetRangeMax(Field)`. The upper bound of the range standing on a field.
@@ -1631,7 +1632,7 @@ public:
   /// \param UseNames Captions when true (AL's default), `Field<no>` when false.
   /// \return `VERSION(1) SORTING(...) ORDER(...) WHERE(...)`, what `SetView` reads back.
   [[nodiscard]] std::string GetView(Boolean UseNames = true) const {
-    return detail::ViewOf(Filtered(), TableTraits<Derived>::kTable, static_cast<bool>(UseNames));
+    return detail::ViewOf(Filtered(), TableDefinition<Derived>(), static_cast<bool>(UseNames));
   }
 
   /// \brief AL `Record.HasFilter()`: whether the current filter group contains a field filter.
@@ -1649,7 +1650,7 @@ public:
   ///       handed in as a parameter.
   /// \see `record-init-method.md`, `properties/devenv-initvalue-property.md`
   void Init() {
-    detail::RuntimeInit(Self(), TableTraits<Derived>::kTable);
+    detail::RuntimeInit(Self(), TableDefinition<Derived>());
     BlankImage();
   }
 
@@ -1704,7 +1705,7 @@ public:
     const Derived *row = from.template As<Derived>();
     if (row == nullptr) {
       throw Error("A RecordRef of another table cannot be assigned to " +
-                  std::string(TableTraits<Derived>::kTable.name));
+                  std::string(TableDefinition<Derived>().name));
     }
     if (row != static_cast<const Derived *>(Self())) { *static_cast<Derived *>(Self()) = *row; }
     return *static_cast<Derived *>(Self());
@@ -1751,7 +1752,7 @@ public:
   [[nodiscard]] Boolean Mark() const {
     const detail::RecordState *state = Filtered();
     if (state == nullptr) { return false; }
-    return state->marks.contains(detail::MarkKey(Self(), TableTraits<Derived>::kTable));
+    return state->marks.contains(detail::MarkKey(Self(), TableDefinition<Derived>()));
   }
 
   /// \brief AL `Record.Mark(Boolean)` -- marks or unmarks the record the variable stands on.
@@ -1764,7 +1765,7 @@ public:
   ///       key that is remembered, because that is what identifies the row again after a `Find`.
   void Mark(Boolean mark) {
     detail::RecordState &state = State();
-    const std::string key = detail::MarkKey(Self(), TableTraits<Derived>::kTable);
+    const std::string key = detail::MarkKey(Self(), TableDefinition<Derived>());
     if (mark) {
       state.marks.insert(key);
     } else {
@@ -1884,7 +1885,7 @@ public:
   ///       in front of it rather than read from anywhere.
   template <typename... Arguments>::agiru::RecordId RecordId(Arguments &&...arguments) const {
     (static_cast<void>(arguments), ...);
-    const TableDef &table = TableTraits<Derived>::kTable;
+    const TableDef &table = TableDefinition<Derived>();
     std::vector<std::string> key;
     if (!table.keys.empty()) {
       for (const ::agiru::FieldNo no : table.keys.front().fields) {
@@ -1937,7 +1938,7 @@ public:
     static_assert(sizeof...(Keys) > 0, "Rename takes the new primary key");
     Derived before = static_cast<const Derived &>(*this);
     std::size_t position = 0;
-    (AssignKey(TableTraits<Derived>::kTable, position++, keys), ...);
+    (AssignKey(TableDefinition<Derived>(), position++, keys), ...);
     return RenameFrom(before);
   }
 
@@ -1958,9 +1959,9 @@ public:
         static_cast<Derived *>(this)->OnRename();
       }
     }
-    if (!detail::RuntimeRename(Self(), &was, TableTraits<Derived>::kTable)) {
+    if (!detail::RuntimeRename(Self(), &was, TableDefinition<Derived>())) {
       static_cast<Derived &>(*this) = was;
-      throw Error("The " + std::string(TableTraits<Derived>::kTable.name) +
+      throw Error("The " + std::string(TableDefinition<Derived>().name) +
                       " does not exist. Identification fields and values: " + PrimaryKeyText(),
                   "DB:RecordNotFound");
     }
@@ -2012,7 +2013,7 @@ public:
   template <typename Member> void SetAscending(const Member &member, Boolean ascending) {
     detail::RecordState &state = State();
     if (state.key.empty()) {
-      const TableDef &table = TableTraits<Derived>::kTable;
+      const TableDef &table = TableDefinition<Derived>();
       if (!table.keys.empty()) {
         for (const ::agiru::FieldNo no : table.keys[0].fields) {
           state.key.push_back(detail::SortField{.field = no, .ascending = true});
@@ -2054,15 +2055,27 @@ public:
   }
 
   /// \brief AL `Record.SetCurrentKey(...)`. Selects a key for a table.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \tparam Fields The declared field member types.
+  /// \param members Fields defining the requested sort prefix.
+  /// \return True after selecting an active matching key or an unindexed sort order.
+  /// \throws Error when fields are not sortable or their sort semantics are unsupported.
+  /// \note Consumed AL calls use Ok_SetCurrentKey; discarded calls raise on failure.
   template <typename... Fields> Boolean SetCurrentKey(const Fields &...members) {
-    detail::RecordState &state = State();
-    state.key.clear();
-    (state.key.push_back(detail::SortField{.field = NumberOf(&members), .ascending = true}), ...);
-    return detail::KeyMatches(TableTraits<Derived>::kTable, state.key);
+    if (!Ok_SetCurrentKey(members...)) {
+      throw Error("SetCurrentKey: the requested fields of " +
+                  std::string(TableDefinition<Derived>().name) + " are not sortable");
+    }
+    return true;
+  }
+
+  /// \brief The consumed Boolean SetCurrentKey overload; known unsortable fields return false.
+  /// \tparam Fields The declared field member types.
+  /// \param members Fields defining the requested sort prefix.
+  /// \return True for a supported ordering, false for Blob/FlowFilter fields.
+  /// \throws Error for invalid fields or unsupported FlowField semantics.
+  template <typename... Fields> Boolean Ok_SetCurrentKey(const Fields &...members) {
+    const std::array<::agiru::FieldNo, sizeof...(members)> fields{NumberOf(&members)...};
+    return detail::SetCurrentKey(State(), TableDefinition<Derived>(), fields);
   }
 
   /// \brief AL `Record.SetFilter(...)`. Assigns a filter to a field that you specify.
@@ -2122,7 +2135,7 @@ public:
   /// \param Position The text `GetPosition` returned.
   /// \throws Error when a part names a field the table does not carry.
   void SetPosition(std::string_view Position) {
-    detail::TakePosition(Self(), TableTraits<Derived>::kTable, Position);
+    detail::TakePosition(Self(), TableDefinition<Derived>(), Position);
   }
 
   /// \brief AL `Record.SetRange(...)`. Sets a simple filter, such as a single range or a single
@@ -2161,26 +2174,26 @@ public:
   /// as a record filter.
   /// \note `record-setrecfilter-method.md`: a filter on each primary key field at the record's
   ///       current value, so a later `Find` selects this one row and `Count` answers one.
-  void SetRecFilter() { detail::RuntimeSetRecFilter(Self(), TableTraits<Derived>::kTable); }
+  void SetRecFilter() { detail::RuntimeSetRecFilter(Self(), TableDefinition<Derived>()); }
 
   /// \brief AL `Record.SetView(...)`. Sets the current sort order, key, and filters on a table.
   /// \param String The view, in the `SourceTableView` form; empty clears the filters and
   ///               returns to the primary key.
   /// \throws Error when the view names a field the table does not have.
   void SetView(std::string_view String) {
-    detail::ApplyView(State(), TableTraits<Derived>::kTable, String);
+    detail::ApplyView(State(), TableDefinition<Derived>(), String);
   }
 
   /// \brief AL `Record.TableCaption()`. Gets the current caption of a table as a string.
   /// \return The `Caption` the table declares, which is its name when it declares none.
   [[nodiscard]] ::agiru::Text<0> TableCaption() const {
-    return ::agiru::Text<0>(TableTraits<Derived>::kTable.caption);
+    return ::agiru::Text<0>(TableDefinition<Derived>().caption);
   }
 
   /// \brief AL `Record.TableName()`. Gets the name of a table.
   /// \return The AL name, spaces and all.
   [[nodiscard]] std::string TableName() const {
-    return std::string(TableTraits<Derived>::kTable.name);
+    return std::string(TableDefinition<Derived>().name);
   }
 
   /// \brief AL `Record.TransferFields(FromRecord [, InitPrimaryKeyFields [, Skip]])`.
@@ -2208,7 +2221,7 @@ public:
                       Boolean InitPrimaryKeyFields = true,
                       Boolean SkipFieldsNotMatchingType = false) {
     detail::RuntimeTransferFields(Self(),
-                                  TableTraits<Derived>::kTable,
+                                  TableDefinition<Derived>(),
                                   detail::RecordAddress(From),
                                   TableTraits<Source>::kTable,
                                   InitPrimaryKeyFields,
@@ -2285,8 +2298,8 @@ public:
     Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before, Self());
     try {
-      detail::EvaluateInto(Self(), TableTraits<Derived>::kTable, no, text);
-      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      detail::EvaluateInto(Self(), TableDefinition<Derived>(), no, text);
+      detail::CheckRelation(Self(), TableDefinition<Derived>(), no);
       ValidateEvent("OnBeforeValidateEvent", no, before);
       RunOnValidate(no);
       ValidateEvent("OnAfterValidateEvent", no, before);
@@ -2300,7 +2313,7 @@ public:
   /// \param no The field.
   /// \return The formatted text.
   [[nodiscard]] std::string FieldFormat(::agiru::FieldNo no) const {
-    return detail::FieldFormat(Self(), TableTraits<Derived>::kTable, no);
+    return detail::FieldFormat(Self(), TableDefinition<Derived>(), no);
   }
 
   /// \brief AL `Record.SetFilter(Field, Text)` by number, which a page's filter pane sets.
@@ -2324,7 +2337,7 @@ public:
       member = static_cast<Field>(value);
     }
     try {
-      detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+      detail::CheckRelation(Self(), TableDefinition<Derived>(), no);
       ValidateEvent("OnBeforeValidateEvent", no, before);
       RunOnValidate(no);
       ValidateEvent("OnAfterValidateEvent", no, before);
@@ -2345,7 +2358,7 @@ public:
     const ::agiru::FieldNo no = NumberOf(&member);
     Derived before = static_cast<Derived &>(*this);
     detail::BeforeImage image(&before, Self());
-    detail::CheckRelation(Self(), TableTraits<Derived>::kTable, no);
+    detail::CheckRelation(Self(), TableDefinition<Derived>(), no);
     RunOnValidate(no);
   }
 
@@ -2388,9 +2401,9 @@ private:
   [[nodiscard]] ::agiru::FieldNo NumberOf(const void *member) const {
     const auto offset = static_cast<std::size_t>(static_cast<const std::byte *>(member) -
                                                  static_cast<const std::byte *>(Self()));
-    const FieldDef *def = FieldAtOffset(TableTraits<Derived>::kTable, offset);
+    const FieldDef *def = FieldAtOffset(TableDefinition<Derived>(), offset);
     if (def == nullptr) {
-      throw Error("this record, a " + std::string(TableTraits<Derived>::kTable.name) +
+      throw Error("this record, a " + std::string(TableDefinition<Derived>().name) +
                   ", declares no field at byte " + std::to_string(offset) +
                   ": the member belongs to another record");
     }
@@ -2433,7 +2446,7 @@ protected:
   /// \note Shared with the temporary store, which assigns the key the same way and then searches
   ///       its own rows rather than the database. Doing it twice was the alternative.
   [[nodiscard]] std::string PrimaryKeyText() const {
-    const TableDef &table = TableTraits<Derived>::kTable;
+    const TableDef &table = TableDefinition<Derived>();
     if (table.keys.empty()) { return {}; }
     std::string out;
     for (const ::agiru::FieldNo no : table.keys[0].fields) {
@@ -2447,7 +2460,7 @@ protected:
   }
 
   template <typename... Keys> void AssignPrimaryKey(const Keys &...keys) {
-    const TableDef &table = TableTraits<Derived>::kTable;
+    const TableDef &table = TableDefinition<Derived>();
     if (table.keys.empty() || table.keys[0].fields.size() < sizeof...(Keys)) {
       throw Error("Get: more values than the primary key has fields");
     }
@@ -2483,15 +2496,15 @@ private:
   void ValidateEvent(std::string_view event, ::agiru::FieldNo no, const Derived &before) {
     static constexpr std::array<std::string_view, 3> kNames{"Rec", "xRec", "CurrFieldNo"};
     std::string_view element;
-    for (const FieldDef &def : TableTraits<Derived>::kTable.fields) {
+    for (const FieldDef &def : TableDefinition<Derived>().fields) {
       if (def.no == no) { element = def.name; }
     }
     auto &rec = static_cast<Derived &>(*this);
     Derived xRec = before;
     ::agiru::Integer currFieldNo = detail::Validating();
     detail::RaiseEventOn(EventObject::Table,
-                         TableTraits<Derived>::kTable.id.Value(),
-                         TableTraits<Derived>::kTable.name,
+                         TableDefinition<Derived>().id.Value(),
+                         TableDefinition<Derived>().name,
                          event,
                          element,
                          kNames,
@@ -2514,8 +2527,8 @@ private:
     auto &rec = static_cast<Derived &>(*this);
     detail::RaiseEventFrom(static_cast<void *>(&rec),
                            EventObject::Table,
-                           TableTraits<Derived>::kTable.id.Value(),
-                           TableTraits<Derived>::kTable.name,
+                           TableDefinition<Derived>().id.Value(),
+                           TableDefinition<Derived>().name,
                            event,
                            {},
                            kNames,
@@ -2541,7 +2554,7 @@ private:
     const detail::RecordState *state = Filtered();
     if (state == nullptr || state->autoCalc.empty()) { return; }
     for (const ::agiru::FieldNo no : state->autoCalc) {
-      detail::CalcField(Self(), TableTraits<Derived>::kTable, state, no);
+      detail::CalcField(Self(), TableDefinition<Derived>(), state, no);
     }
   }
 

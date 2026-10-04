@@ -2,12 +2,74 @@
 
 #include "meta/PageDef.h"
 #include "meta/TableDef.h"
+#include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"
+#include "type/Option.h"
 
+#include <array>
+#include <cctype>
+#include <cstddef>
 #include <expected>
+#include <string>
 #include <string_view>
+#include <utility>
 
 namespace agiru::detail {
+
+namespace {
+
+bool SameProperty(std::string_view left, std::string_view right) {
+  if (left.size() != right.size()) { return false; }
+  for (std::size_t i = 0; i < left.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(left[i])) !=
+        std::tolower(static_cast<unsigned char>(right[i]))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+template <typename Native>
+std::expected<Native, std::string> MetadataProperty(std::string_view name,
+                                                    std::string_view property) {
+  for (const auto &value : OptionTraits<Native>::kValues) {
+    if (SameProperty(name, value.name)) { return static_cast<Native>(value.ordinal); }
+  }
+  return std::unexpected("Table Metadata." + std::string(property) + " has no verified member '" +
+                         std::string(name) + "'");
+}
+
+}
+
+std::expected<platform::TableMetadataObsoleteState, std::string>
+MetadataObsoleteState(std::string_view name) {
+  return MetadataProperty<platform::TableMetadataObsoleteState>(name, "ObsoleteState");
+}
+
+std::expected<platform::TableMetadataCompressionType, std::string>
+MetadataCompressionType(std::string_view name) {
+  return MetadataProperty<platform::TableMetadataCompressionType>(name, "CompressionType");
+}
+
+std::expected<platform::TableMetadataScope, std::string> MetadataScope(std::string_view name) {
+  using Native = platform::TableMetadataScope;
+  constexpr std::array aliases{std::pair{std::string_view{"Extension"}, Native::Cloud},
+                               std::pair{std::string_view{"Personalization"}, Native::Cloud},
+                               std::pair{std::string_view{"Internal"}, Native::OnPrem}};
+  for (const auto &[alias, value] : aliases) {
+    if (SameProperty(name, alias)) { return value; }
+  }
+  return MetadataProperty<platform::TableMetadataScope>(name, "Scope");
+}
+
+std::expected<platform::TableMetadataAccess, std::string> MetadataAccess(std::string_view name) {
+  return MetadataProperty<platform::TableMetadataAccess>(name, "Access");
+}
+
+std::expected<platform::FieldDataClassification, std::string>
+MetadataDataClassification(std::string_view name) {
+  return MetadataProperty<platform::FieldDataClassification>(name, "DataClassification");
+}
 
 std::expected<platform::PageMetadataPageType, std::string_view> MetadataPageType(PageType type) {
   using Native = platform::PageMetadataPageType;

@@ -1,12 +1,22 @@
 #include "meta/Ids.h"
 #include "meta/ModuleDef.h"
 #include "meta/TableDef.h"
+#include "platform/ReflectionOptions.h"
+#include "platform/ReflectionTypes.h"
+#include "platform/TableMetadata.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/Table.h"
+#include "runtime/TableDefinition.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 
 #include "Check.h"
+#include "TableMetadata.h"
+#include "fixture/table/ComposedRow.h"
 #include "fixture/table/ImplicitRow.h"
+#include "group/fixture/table/OwnedRow.h"
+#include "group/fixture/table/SecondOwnedRow.h"
+#include "orphan/fixture/table/UnownedRow.h"
 
 namespace {
 
@@ -77,6 +87,83 @@ void CheckSourceIdentity() {
   CHECK_TEXT("table classification is retained", table.dataClassification, "AccountData");
   CHECK_TRUE("an absent linked-object declaration keeps the documented default",
              !table.linkedObject);
+  CHECK_TRUE("a compilation unit owns components despite their development manifests",
+             table.module == agiru::TableTraits<agiru::Fixture::ComposedRow_Table>::kTable.module);
+}
+
+void CheckSourceProjection() {
+  using namespace agiru::platform;
+  const auto row = agiru::detail::ProjectTableMetadata(agiru::TableDefinition<Row>());
+  CHECK_TRUE("production source ID reaches the typed projection", row.ID == Row::kId.Value());
+  CHECK_TEXT(
+      "production AL name survives the runtime projection", row.Name.Value(), "Implicit Row");
+  CHECK_TEXT(
+      "production caption stays independent", row.Caption.Value(), "Different table caption");
+  CHECK_TEXT("production caption fields are original numeric IDs in declared order",
+             row.DataCaptionFields.Value(),
+             "30,10");
+  CHECK_TRUE("production scope and access reach their original native options",
+             row.Scope == TableMetadataScope::Cloud && row.Access == TableMetadataAccess::Internal);
+  CHECK_TRUE("production classification reaches its original native option",
+             row.DataClassification == FieldDataClassification::AccountData);
+  CHECK_TRUE("production obsolete and compression properties remain typed",
+             row.ObsoleteState == TableMetadataObsoleteState::Pending &&
+                 row.CompressionType == TableMetadataCompressionType::Row);
+  CHECK_TRUE("production false flags do not revert to runtime defaults",
+             !row.DataPerCompany && !row.ReplicateData && !row.PasteIsValid);
+  CHECK_TRUE("production lookup and drilldown IDs survive",
+             row.LookupPageID == 50176 && row.DrillDownPageID == 50177);
+  CHECK_TRUE("production declaring app GUID reaches the runtime projection",
+             row.AppID == *agiru::Guid::FromText("118874ab-44bc-4ccb-9daf-59763539ab16"));
+}
+
+void CheckOmittedTableProperties() {
+  using namespace agiru::platform;
+  using Defaults = agiru::Fixture::ComposedRow_Table;
+  const auto &source = agiru::TableDefinition<Defaults>();
+  CHECK_TRUE("the production transpiler preserves omitted table properties",
+             source.dataClassification.empty() && source.access.empty() &&
+                 source.compressionType.empty() && source.obsoleteState.empty() &&
+                 source.scope.empty());
+  const auto row = agiru::detail::ProjectTableMetadata(source);
+  CHECK_TRUE("generated ordinary tables use the compiled AL classification default",
+             row.DataClassification == FieldDataClassification::CustomerContent);
+  CHECK_TRUE("generated ordinary tables use Public access and Unspecified compression",
+             row.Access == TableMetadataAccess::Public &&
+                 row.CompressionType == TableMetadataCompressionType::Unspecified);
+  CHECK_TRUE("generated ordinary tables use Cloud scope and No obsoletion",
+             row.Scope == TableMetadataScope::Cloud &&
+                 row.ObsoleteState == TableMetadataObsoleteState::No);
+  CHECK_TRUE("generated Boolean defaults agree with compiled AL metadata",
+             row.DataPerCompany && row.ReplicateData && row.PasteIsValid && !row.LinkedObject);
+  CHECK_TRUE("effective defaults preserve the original app owner",
+             row.AppID == *agiru::Guid::FromText(source.module->id));
+}
+
+void CheckNestedIdentity() {
+  using Nested = agiru::Fixture::OwnedRow_Table;
+  const auto &table = agiru::TableTraits<Nested>::kTable;
+  CHECK_TRUE("a nested manifest supplies an immutable table owner", table.module != nullptr);
+  if (table.module == nullptr) { return; }
+  CHECK_TEXT("nested tables belong to the nearest source manifest, not its parent or dependency",
+             table.module->id,
+             "834a40c9-7a26-46f2-9348-3f6cc8c71719");
+  CHECK_TEXT("source identity strings are decoded before C++ emission",
+             table.module->name,
+             "Nested \"Café\" Fixture");
+  CHECK_TEXT("nested source version is not the parent version", table.module->version, "2.3.4.5");
+  CHECK_TRUE("an extension from the parent app does not replace the base owner",
+             agiru::Field(table, agiru::FieldNo{2}) != nullptr);
+  const auto *moved = agiru::Field(table, agiru::FieldNo{3});
+  CHECK_TRUE("a takeover validates the nested source app rather than the output bucket",
+             moved != nullptr && moved->obsoleteState.empty());
+  CHECK_TRUE("distinct source apps never share the parent module pointer",
+             table.module != agiru::TableTraits<Row>::kTable.module);
+  CHECK_TRUE("tables of one nested app share one immutable module definition",
+             table.module ==
+                 agiru::TableTraits<agiru::Fixture::SecondOwnedRow_Table>::kTable.module);
+  CHECK_TRUE("an app without a manifest never inherits an owner from outside its configured root",
+             agiru::TableTraits<agiru::Fixture::UnownedRow_Table>::kTable.module == nullptr);
 }
 
 }
@@ -85,5 +172,8 @@ int main() {
   return gate::Run("GeneratedTableKeys", [] {
     CheckKeys();
     CheckSourceIdentity();
+    CheckSourceProjection();
+    CheckOmittedTableProperties();
+    CheckNestedIdentity();
   });
 }

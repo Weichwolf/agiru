@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -559,14 +560,15 @@ void RuntimeCopyFilter(const RecordState *from, FieldNo source, void *target, Fi
 /// \throws Error when a field is not the table's, or a clause is not one of the four.
 void ApplyView(RecordState &state, const TableDef &table, std::string_view view);
 
-/// \brief Whether the table declares a key those fields select.
-///
-/// \param table The table.
-/// \param key   The fields, in order.
-/// \return True when a declared key matches exactly or by PREFIX.
-///
-/// \note A KEY THAT MATCHES NOTHING STILL SORTS. `record-setcurrentkey-method.md` is explicit: the
-///       order is applied either way, and what a match buys is an index.
-[[nodiscard]] bool KeyMatches(const TableDef &table, const std::vector<SortField> &key);
+/// \brief Selects the first active prefix-matching key, or the requested unindexed order.
+/// \param state The record-variable state to update after successful validation.
+/// \param table The original declaration containing fields and ordered key definitions.
+/// \param fields The requested source field numbers, in order; at least one is required.
+/// \return False for Blob or FlowFilter fields, true for a supported sort order.
+/// \throws Error for absent fields or unimplemented FlowField sort semantics.
+/// \note IncludedFields do not participate. A matching key contributes all its fields.
+///       Failure leaves the previous key/cursor intact; success closes the old SQL cursor.
+[[nodiscard]] bool
+SetCurrentKey(RecordState &state, const TableDef &table, std::span<const FieldNo> fields);
 
 }

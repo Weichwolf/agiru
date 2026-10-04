@@ -23,6 +23,10 @@ BindTable(const al::TableObject &table, std::string identifier, std::string head
 [[nodiscard]] std::string NativeTableAssertions(const al::TableObject &table,
                                                 const TableRef &binding);
 
+[[nodiscard]] std::string NativeTableDefinition(const al::TableObject &table,
+                                                const TableRef &binding,
+                                                const Objects &objects);
+
 std::string VariableIdentifier(const al::TableObject &table, const std::string &name);
 
 std::string FieldIdentifier(const al::TableObject &table, const std::string &name);

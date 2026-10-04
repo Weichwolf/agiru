@@ -1,1 +1,1 @@
-{"apps":[{"name":"fixture","source":"fixture","depends":[]}]}
+{"apps":[{"name":"group","source":"group","depends":[]},{"name":"fixture","source":"fixture","depends":["group"]},{"name":"orphan","source":"orphan","depends":[]}]}
