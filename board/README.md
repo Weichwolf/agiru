@@ -15,22 +15,29 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
-- Current integration replay: `20261004T143703Z-2217132`, frozen HEAD `ad7a917`,
+- Completed integration replay: `20261004T143703Z-2217132`, frozen HEAD `ad7a917`,
   source `8534a91bf87c10d8fc0ffd85f113dca46381fdda1cacbcccfad778357bfbc87e`;
-  `slice-check all test ut`, six jobs. Runner PID 2217377 confirmed live;
+  `slice-check all test ut`, six jobs; terminal receipt, no live runner.
   slice-check/all pass; test exits 2 (133 cases, one refused layout qualifier,
-  227 tooling tests pass), UT is running in six disposable database clones.
+  227 tooling tests pass). UT exits 2: 2,169/2,314 passed, 145 failed, zero
+  incomplete, 80 codeunits/six workers/1,278 seconds. Against 132617: zero gains,
+  losses or changed errors. Against 101600: zero gains/losses, eleven changed
+  errors. All identities and source hashes match, zero missing/added/duplicates;
+  `artifacts/ut-comparison-{132617,101600}.json`. Null/unsealed seed remains
+  diagnostic repeatability, not causal A/B. Frozen source/package hashes match
+  before/after. Later byte-codec/notice-preflight changes are outside this snapshot.
   The source-only BC input lacks its original notice; matching notice SHA256
   `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383`
   from 132617 makes the separate frozen layout replay pass, without changing the
   original red target or frozen inputs. `/tmp/agiru-layout-assets-check.z72Dwo`.
   The current freezer rejects this missing-notice input before dependency copying;
-  relocated sources require explicit `AGIRU_LAYOUT_SOURCE_NOTICE`. Includes BLOB amortization, native codeunit
+  relocated sources require explicit `AGIRU_LAYOUT_SOURCE_NOTICE`. Includes BLOB
+  amortization, native codeunit
   admission and corrected Discovery registry. BC input hash matches 132617
   (`af53219b7fc9e68a58293bad9fd178232d6bef47bbab2166b390620fb38497a2`);
   refreezing the source-only snapshot cannot rediscover Git revision, so this
   receipt's revision is null. The matching original receipt records BCApps
-  `bb7111877ff786951b86a1a0f80d8b39b8f5dacd`. No new AL result yet.
+  `bb7111877ff786951b86a1a0f80d8b39b8f5dacd`.
 - Base64 byte codec (0034): shared string/raw-stream encode/decode, 76-column CRLF,
   strict Convert-profile whitespace/padding and validation before output. Nonalias
   stream output uses 4 KiB scratch; aliased input is preserved before growth.
@@ -64,9 +71,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   retains all 24,464 files byte-identical and unchanged native/property/control
   gaps; all 14,225 slice files exist. `/tmp/agiru-transpile.vHcXmw`, exit 1;
   `generation-comparison.json` matches all 35 independent raw codeunit identities.
-  First full local run: 133 cases, only the tooling wrapper red (226/227 tests):
-  Discovery's authored script registry omitted the new fixture. Corrected registry
-  passes its negative controls; final replay pending. New loader/refusal/gate/
+  Discovery's corrected script registry passes its negative controls; current
+  full local replay is green above. Frozen replay has only the missing-notice
+  refusal above. New loader/refusal/gate/
   runners/emitter analysis passes; three old gate include findings removed.
   `make lint` retains only existing CodeunitWriter/Main/BodyWriter findings over
   thirteen selected units; no suppression/baseline increase.

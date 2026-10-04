@@ -24,9 +24,10 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   `generation-comparison.json`; no new exclusion or silent gap removal.
   Native codeunits are not yet indexed/emitted by production translation; this
   admission/refusal proof does not bind Base64 or activate a native provider.
-  First full local run: 133 cases, only the tooling wrapper red (226/227 tests);
-  its Discovery fixture omitted the new script. Registry corrected, Discovery
-  negative controls green; final full replay pending. New loader/refusal/runner/
+  Discovery's corrected script registry/negative controls pass; the current full
+  local replay is green. Frozen replay retains only a missing-notice layout refusal;
+  same full UT population remains 2,169/2,314 with no gain/loss/error change versus
+  132617 (README). New loader/refusal/runner/
   emitter/gate analysis passes; three pre-existing gate include findings removed.
   `make lint` checks thirteen of 244 available units and retains only the existing
   CodeunitWriter/Main/BodyWriter findings, no new suppressions or baseline increase.
