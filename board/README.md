@@ -18,7 +18,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 - Native codeunit indexing/output (0034): 35 raw/selected/emitted original identities,
   zero missing/excluded/duplicates; 35 compile without PCH. Linked registry 108 and
   original nine-overload refusal eleven checks green. Bare/qualified/numeric consumers
-  execute; ID/missing-definition controls fail. Previous actual compiler fails five
+  execute. All 64 platform units compile/link as one shared library; registry-only
+  lookup retains 35 codeunits under `--as-needed`, 108 checks green. Without library
+  retention the dependency disappears and 36 checks fail. No native provider proof.
+  ID/missing-definition controls fail. Previous actual compiler fails five
   assertions and cannot compile the consumer. Full generation adds 70 files, changes
   103, removes none; `/tmp/agiru-transpile.NfMuFN`, exit 1. Still 72 unbound Native
   methods, 90 inactive other sources, 215 unbound tables and 21 unresolved controls.

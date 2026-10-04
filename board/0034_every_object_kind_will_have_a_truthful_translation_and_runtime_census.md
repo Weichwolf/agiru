@@ -12,6 +12,11 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   Verified System-29: 35 raw/35 selected/35 emitted, zero excluded/missing/duplicate;
   all 35 compile without PCH. Linked registry: 108 checks; original nine-overload
   refusals: eleven checks. `/tmp/agiru-native-codeunit-output.k7vuZx`.
+  Complete generated platform: 64 strict/PIC units compile and link as one shared
+  library; registry-only consumer retains all 35 under Linux `--as-needed` with
+  explicit library retention, 108 checks green. Dropping retention removes the
+  dependency and fails 36 checks. `platform-execution.log`, `platform-needed.txt` and
+  `dropped-platform-*` receipts; not native method/provider execution.
   Full generation adds 70 files, changes 103, removes none; all 24,464 prior files
   remain. `/tmp/agiru-transpile.NfMuFN`, exit 1: 72 Native methods unbound, 90 other
   sources inactive, 233 tables selected/18 bound/215 unbound, 21 unresolved controls.
