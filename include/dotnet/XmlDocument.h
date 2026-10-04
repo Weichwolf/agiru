@@ -265,8 +265,9 @@ public:
   /// \param filename The file path or URL. \throws Error when it cannot be loaded or parsed.
   void Load(std::string_view filename);
 
-  /// \brief `XmlDocument.Load(reader)`: the document the reader reads, taken whole.
-  /// \param reader The reader. \throws Error on bad XML.
+  /// \brief `XmlDocument.Load(reader)`: replaces the tree from the reader's current position,
+  /// consuming its shared cursor. Closed/EOF readers produce an empty document.
+  /// \param reader The reader. \throws Error on bad XML or invalid document children.
   void Load(const class XmlReader &reader);
 
   /// \brief `XmlDocument.Load(reader)`, over a reader this runtime has not rebuilt.

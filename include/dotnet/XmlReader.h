@@ -12,6 +12,10 @@
 #include <string_view>
 #include <utility>
 
+namespace agiru::detail {
+struct XmlHandle;
+}
+
 namespace agiru::dotnet {
 
 /// \brief .NET `XmlNodeType`, held by number -- the numbers libxml2's reader answers are .NET's
@@ -65,8 +69,7 @@ private:
   std::int32_t number_ = 0;
 };
 
-/// \brief .NET `DtdProcessing`: what a reader does with a DTD. Only `Ignore` and `Prohibit` are
-///        named by the BaseApp, and this reader never resolves one.
+/// \brief .NET `DtdProcessing`: the declared Prohibit/Ignore/Parse policy values.
 class DtdProcessing {
 public:
   /// \brief `Prohibit`, the .NET default.
@@ -104,7 +107,7 @@ public:
   }
 };
 
-/// \brief .NET `XmlUrlResolver`, carried and never asked: no external entity is fetched here.
+/// \brief .NET `XmlUrlResolver`; explicit resolution policy remains unsupported (0035).
 class XmlUrlResolver {
 public:
   /// \brief The binder behind `R := R.XmlUrlResolver()`.
@@ -143,8 +146,7 @@ private:
   std::string text_;
 };
 
-/// \brief .NET `XmlReaderSettings`: the BaseApp sets `DtdProcessing` and `XmlResolver`, and this
-///        reader ignores DTDs and resolves nothing whatever they say.
+/// \brief .NET `XmlReaderSettings`; reader DTD/resolver enforcement remains incomplete (0035).
 class XmlReaderSettings {
 public:
   /// \brief The binder behind `S := S.XmlReaderSettings()`.
@@ -182,6 +184,8 @@ private:
 ///       `MoveToFirstAttribute`, `MoveToNextAttribute`. Whitespace between elements is reported
 ///       as .NET reports it with `IgnoreWhitespace = false` -- the default, which the BaseApp
 ///       does not change -- so a walk sees the same node sequence.
+/// \note Copies alias one cursor, including declaration position, EOF and Close. Assigning
+///       a newly created reader replaces only that reference, not its previous aliases.
 class XmlReader {
 public:
   /// \brief `XmlReader.Create(path, settings)`. \param path A file path. \param settings The
@@ -223,7 +227,7 @@ public:
   /// \brief `XmlReader.Read()`: moves to the next node. \return Whether there was one.
   [[nodiscard]] Boolean Read();
 
-  /// \brief `XmlReader.Close()`: ends the walk.
+  /// \brief `XmlReader.Close()`: ends the shared walk for this reader and its aliases.
   void Close();
 
   /// \brief `XmlReader.Depth`. \return The current node's depth, the root element at 0.
@@ -256,20 +260,12 @@ public:
   /// \return Whether the walk is over.
   [[nodiscard]] Boolean Eof() const;
 
-  /// \brief The whole document the reader reads, for a consumer that takes it at once.
-  /// \return The text, empty before `Create`.
-  [[nodiscard]] std::string_view Source() const {
-    return text_ == nullptr ? std::string_view{} : std::string_view(*text_);
-  }
-
 private:
+  friend class XmlDocument;
+  struct State;
   static XmlReader Over(std::string text);
-  std::shared_ptr<void> reader_;
-  std::shared_ptr<std::string> text_;
-  bool over_ = false;
-  bool declarationPending_ = false;
-  bool atDeclaration_ = false;
-  std::string declaration_;
+  void LoadDocument(::agiru::detail::XmlHandle &into, bool preserveWhitespace) const;
+  std::shared_ptr<State> state_;
 };
 
 /// \brief .NET `XmlTextReader`: the same reader under the name `XML DOM Management` uses.

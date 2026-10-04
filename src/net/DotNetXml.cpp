@@ -441,7 +441,7 @@ void XmlDocument::Load(std::string_view filename) {
 }
 
 void XmlDocument::Load(const XmlReader &reader) {
-  LoadXml(reader.Source());
+  reader.LoadDocument(handle_, preserveWhitespace_);
 }
 
 void XmlDocument::LoadXml(std::string_view text) {

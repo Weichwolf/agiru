@@ -153,6 +153,81 @@ bool ParseLocation(std::string_view location, bool preserveWhitespace, XmlHandle
   return true;
 }
 
+namespace {
+
+bool XPathNameByte(char value) {
+  constexpr unsigned char kNonAscii = 0x80;
+  return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') ||
+         (value >= '0' && value <= '9') || value == '_' || value == '-' || value == '.' ||
+         static_cast<unsigned char>(value) >= kNonAscii;
+}
+
+bool EmptyNamespacePrefix(std::string_view name,
+                          const std::vector<std::pair<std::string, std::string>> &namespaces) {
+  const auto found = std::ranges::find_if(namespaces, [&](const auto &binding) {
+    return binding.first == name && binding.second.empty();
+  });
+  return found != namespaces.end() && xmlValidateNCName(Bytes(found->first), 0) == 0;
+}
+
+void AppendXPathNameTest(std::string_view expression,
+                         std::size_t &at,
+                         const std::vector<std::pair<std::string, std::string>> &namespaces,
+                         std::string &out) {
+  const std::size_t start = at;
+  while (at < expression.size() && XPathNameByte(expression[at])) { ++at; }
+  const std::size_t colon = at;
+  if (at + 1 >= expression.size() || expression[at] != ':' || expression[at + 1] == ':') {
+    out.append(expression.substr(start, at - start));
+    return;
+  }
+  ++at;
+  const std::size_t local = at;
+  if (expression[at] == '*') {
+    ++at;
+  } else {
+    while (at < expression.size() && XPathNameByte(expression[at])) { ++at; }
+  }
+  const std::size_t before = expression.find_last_not_of(" \t\r\n", start == 0 ? 0 : start - 1);
+  const std::size_t after = expression.find_first_not_of(" \t\r\n", at);
+  const bool variable = start != 0 && before != std::string_view::npos && expression[before] == '$';
+  const bool function = after != std::string_view::npos && expression[after] == '(';
+  const bool malformed = local == at || (at < expression.size() && expression[at] == ':');
+  if (variable || function || malformed ||
+      !EmptyNamespacePrefix(expression.substr(start, colon - start), namespaces)) {
+    out.append(expression.substr(start, at - start));
+  } else if (expression[local] == '*') {
+    out += "*[namespace-uri()='']";
+  } else {
+    out.append(expression.substr(local, at - local));
+  }
+}
+
+std::string
+ResolveEmptyNamespaces(std::string_view expression,
+                       const std::vector<std::pair<std::string, std::string>> &namespaces) {
+  std::string out;
+  out.reserve(expression.size());
+  for (std::size_t at = 0; at < expression.size();) {
+    if (expression[at] == '\'' || expression[at] == '"') {
+      const std::size_t end = expression.find(expression[at], at + 1);
+      const std::size_t size =
+          end == std::string_view::npos ? expression.size() - at : end - at + 1;
+      out.append(expression.substr(at, size));
+      at += size;
+      continue;
+    }
+    if (!XPathNameByte(expression[at])) {
+      out += expression[at++];
+      continue;
+    }
+    AppendXPathNameTest(expression, at, namespaces, out);
+  }
+  return out;
+}
+
+}
+
 std::vector<XmlHandle> XPath(const XmlHandle &from,
                              std::string_view expression,
                              const std::vector<std::pair<std::string, std::string>> &namespaces) {
@@ -165,9 +240,9 @@ std::vector<XmlHandle> XPath(const XmlHandle &from,
   if (context == nullptr) { return found; }
   context->node = node->type == XML_DOCUMENT_NODE ? reinterpret_cast<xmlNodePtr>(doc) : node;
   for (const auto &[prefix, uri] : namespaces) {
-    if (!prefix.empty()) { xmlXPathRegisterNs(context, Bytes(prefix), Bytes(uri)); }
+    if (!prefix.empty() && !uri.empty()) { xmlXPathRegisterNs(context, Bytes(prefix), Bytes(uri)); }
   }
-  const std::string held(expression);
+  const std::string held = ResolveEmptyNamespaces(expression, namespaces);
   xmlXPathObjectPtr result = xmlXPathEvalExpression(Bytes(held), context);
   if (result != nullptr) {
     if (result->type == XPATH_NODESET && result->nodesetval != nullptr) {

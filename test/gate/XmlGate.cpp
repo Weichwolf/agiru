@@ -100,6 +100,80 @@ void XPathSelectsWithNamespaces() {
   CHECK_TEXT("that was added", std::string(uri.Value()), "urn:p");
 }
 
+void EmptyNamespaceAliasesPreserveXPathTokens() {
+  XmlDocument document;
+  CHECK_TRUE(
+      "empty-namespace fixture parses",
+      XmlDocument::ReadFrom(
+          R"(<root xmlns:p="urn:p"><item value="e:literal" code="one">plain</item><p:item code="two">qualified</p:item><élément>Unicode</élément></root>)",
+          document));
+  XmlNamespaceManager manager;
+  manager.AddNamespace("e", "");
+  manager.AddNamespace("p", "urn:p");
+  manager.AddNamespace("child", "");
+  manager.AddNamespace("leer_ä", "");
+  XmlNode found;
+  CHECK_TRUE("a prefix mapped to no namespace selects unqualified elements",
+             document.SelectSingleNode("/root/e:item", manager, found));
+  CHECK_TEXT("the empty alias does not select the same local name in another namespace",
+             found.IsXmlElement() ? found.AsXmlElement().InnerText() : "",
+             "plain");
+  CHECK_TRUE("quoted prefix text is not rewritten",
+             document.SelectSingleNode("/root/e:item[@value='e:literal']", manager, found));
+  CHECK_TRUE("double-quoted prefix text is not rewritten",
+             document.SelectSingleNode("/root/e:item[@value=\"e:literal\"]", manager, found));
+  CHECK_TRUE("empty aliases apply to unqualified attribute names",
+             document.SelectSingleNode("/root/e:item[@e:code='one']", manager, found));
+  CHECK_TRUE("axis separators remain distinct from prefix separators",
+             document.SelectSingleNode("/root/child::e:item", manager, found));
+  CHECK_TRUE("prefix and local names keep their Unicode bytes",
+             document.SelectSingleNode("/root/leer_ä:élément", manager, found));
+  XmlNodeList all;
+  CHECK_TRUE("empty namespace wildcard evaluates", document.SelectNodes("/root/e:*", manager, all));
+  CHECK_TRUE("empty namespace wildcard excludes namespaced siblings", all.Count() == 2);
+  CHECK_TRUE("mixed empty and ordinary aliases evaluate",
+             document.SelectNodes("/root/e:item | /root/p:item", manager, all));
+  CHECK_TRUE("mixed aliases retain both distinct namespaces", all.Count() == 2);
+  CHECK_TRUE("an undeclared longer prefix is not partially rewritten",
+             !document.SelectSingleNode("/root/ee:item", manager, found));
+  manager.AddNamespace("e", "urn:p");
+  CHECK_TRUE("rebinding the alias takes effect on the next operation",
+             document.SelectSingleNode("/root/e:item", manager, found));
+  CHECK_TEXT("rebinding preserves the qualified namespace",
+             found.IsXmlElement() ? found.AsXmlElement().InnerText() : "",
+             "qualified");
+  manager.AddNamespace("e", "");
+  CHECK_TRUE("rebinding back to no namespace takes effect",
+             document.SelectSingleNode("/root/e:item", manager, found));
+  CHECK_TEXT("the next lookup returns the unqualified node again",
+             found.IsXmlElement() ? found.AsXmlElement().InnerText() : "",
+             "plain");
+}
+
+void DotNetEmptyNamespaceUsesTheSharedXPathEngine() {
+  agiru::dotnet::XmlDocument document;
+  document = document.XmlDocument();
+  document.LoadXml("<root/>");
+  auto root = document.DocumentElement();
+  auto child = document.CreateElement("empty", "item", "");
+  child.InnerText("source-owned value");
+  static_cast<void>(root.AppendChild(child));
+  agiru::dotnet::XmlNamespaceManager manager;
+  manager = manager.XmlNamespaceManager(document.NameTable());
+  manager.AddNamespace("empty", "");
+  const auto found = root.SelectSingleNode("/root/empty:item", manager);
+  CHECK_TRUE("the original XML DOM pattern finds its empty-namespace element",
+             !agiru::IsNull(found));
+  CHECK_TEXT(
+      "the original XML DOM pattern retains its text", found.InnerText(), "source-owned value");
+  const auto list = root.SelectNodes("/root/empty:*", manager);
+  CHECK_TRUE("the .NET node-list path uses the same empty-alias semantics", list.Count() == 1);
+  CHECK_TRUE("a missing empty-namespace element remains null",
+             agiru::IsNull(root.SelectSingleNode("/root/empty:absent", manager)));
+  CHECK_TRUE("an undeclared prefix remains unresolved",
+             agiru::IsNull(root.SelectSingleNode("/root/unknown:item", manager)));
+}
+
 /// A DOCUMENT IS BUILT: `Create`, `Add` of an element, a text and a Variant carrying either, and a
 /// node added to a tree is seen through every handle on it, because the types are references
 /// (`xmlelement-data-type.md`).
@@ -227,6 +301,8 @@ int main() {
     ReadFromAndWriteToRoundTrip();
     ElementsAreWalkedAndRead();
     XPathSelectsWithNamespaces();
+    EmptyNamespaceAliasesPreserveXPathTokens();
+    DotNetEmptyNamespaceUsesTheSharedXPathEngine();
     ElementsAreBuiltAndShared();
     DotNetClassesWalkTheSameTree();
     DotNetLocationLoadAndDeclaration();

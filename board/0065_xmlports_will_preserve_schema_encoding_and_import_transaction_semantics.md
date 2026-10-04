@@ -1,12 +1,17 @@
 # 0065 — XMLports will preserve schema, encoding and import transaction semantics
 
-Status: open | Priority: P1 | Stage: UT data exchange; All streaming | Reviewed: 2026-09-28
+Status: open | Priority: P1 | Stage: UT data exchange; All streaming | Reviewed: 2026-10-03
 Depends on: 0043 validation; 0035 XML; 0074 streams.
 
 ## Evidence
 
 - `XmlPortInput` materializes parsed input and ReadWhole accumulates all stream blocks.
-- UT data exchange includes raw 0x85 in a UTF-8 SQL parameter and hidden PEPPOL conversion errors; the responsible layer must be traced.
+- The preceding baseline has raw 0x85 in a payment-export SQL parameter and hidden
+  PEPPOL conversion errors. The UTF-16 text-position repair belongs to 0066.
+  Full replay `20261003T184820Z-806432` passes 2,161/2,314: one gain,
+  `Data Exch. Exp. Latin Char UT::TestPreMappingExportDataJnlPreserveFALSE`,
+  zero losses/missing/added identities (`/tmp/agiru-text-decimal-ut-comparison.json`).
+  Other conversion failures remain gaps; do not attribute every error to XMLports.
 
 ## Implementation
 

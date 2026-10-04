@@ -1,11 +1,30 @@
 # 0035 — Rebuilt .NET types will preserve reference and culture semantics
 
-Status: open | Priority: P0 | Stage: UT XML safety first; All bridge closure | Reviewed: 2026-10-02
+Status: open | Priority: P0 | Stage: UT XML safety first; All bridge closure | Reviewed: 2026-10-03
 Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
-- XML/JSON/regex/streams have implementations. Confirmed JSON use-after-free and Decimal loss are isolated in 0722; XML stream analyzer findings still need focused reproduction.
+- Development reader/DOM repair: one shared cursor/declaration/EOF/Close state;
+  Load consumes its current nodes, never reparses raw input. Positioned last-child
+  Load stops at the parent end; closed/EOF Load creates an empty non-null document.
+  Namespaces, attributes, DTD, text/CDATA and xml:space are retained; read errors
+  refuse and file ownership is exception-safe. Xml-prefixed PIs are not declarations.
+  XmlReaderGate passes 71 checks; independently compiled cursor-local, close-local
+  and raw-load mutants fail (`/tmp/agiru-xml-reader-consuming-load-{gate,controls}.log`,
+  `/tmp/agiru-xml-reader.keVpCb`). `test/runtime/xml-reader.sh` retains the controls.
+  Reader/gate targeted lint have no own findings; 36/62 inherited findings remain,
+  unsuppressed. The two earlier file-read analyzer findings are repaired.
+  Initial full local Make run ended with signal status 143, no completion count;
+  `/tmp/agiru-xml-reader-consuming-load-local-tests.log`. No child remained;
+  fresh `make test JOBS=2` replay passes 125 cases and all 223 tooling tests, exit 0
+  (`/tmp/agiru-xml-reader-consuming-load-local-replay.log`).
+  Completed shared activation 044804 keeps 2,161/2,314 and all identities/pass
+  statuses; no XML pass gain/loss. `/tmp/agiru-scoped-xml-ut-comparison.json`.
+  DTD/resolver enforcement,
+  encoded declarations and streaming bounds remain open; no security claim.
+- XML/JSON/regex/streams have implementations. JSON ownership/number migration and remaining contract gaps belong to 0722; XML stream analyzer findings still need focused reproduction.
+- Shared XPath handles empty namespace aliases without rewriting literals, axes or longer prefixes; wildcards retain their namespace predicate. XmlGate: 79/zero red, old engine 14 red (`/tmp/agiru-xml-empty-alias-{before,after}.log`). Full UT replay `20261003T172807Z-701995`: 2,160/2,314 passed, one gain (`XMLDOMManagementUT::CheckElementTextWithEmptyNamespace`), zero losses/missing/crashes. `/tmp/agiru-json-xpath-ut-comparison.json`. No DTD/resolver/cursor policy changes.
 - WorkbookReader/Writer refusals are real .NET bridge work. Base64Convert, EntityText and WebService errors also use '.NET member' wording but refer to absent AL/platform objects: route those to 0034/0038/0044.
 - Original Ncl inspection proves two complete ten-getter Int32 families, not string keys: Caption=4, Description=2, Editable=68. Both families and the tested dictionary primitive are now in main; 45/70 checks green. Main-origin comparison retains all eight consumers: AddPageFields body/definition compile without PCH, DictionaryWrapper.Keys remains one error, no compile loss. All twenty value mutants and both iterator-policy controls remain source-identical to the proved prototype. Contract: build/page-source-binding-20261001/artifacts/designer-contract.json; promotion and frozen verification receipts in README. No live designer or SQL workflow proof.
 - Own GenericDictionary2 preserves six boxed scalar key types, duplicate Add errors, shared reference identity, null/out boundaries and owned KeyValuePair snapshots. Its immutable AL constructor binder refuses unsupported CLR boxing. Modern Remove/Clear preserve enumeration without dangling map iterators; Add invalidates. Seventy checks green, old shared-API control six red and both wrong iterator policies fail. Integer-key request-page consumers remain compiled, not executed.
@@ -13,7 +32,10 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 - XmlDeclaration accessors reject an element handle; FirstChild still does not represent the declaration node.
 - `XmlReader::Create` ignores DtdProcessing/XmlResolver; `Over` always enables NOENT. BoundaryProbe confirms Prohibit accepts the DTD and reads its local review-owned entity file. NONET does not prevent this disclosure.
 - Installed libxml2 is 2.9.14. `XML_PARSE_NO_XXE` requires 2.13; context-local resource loaders require 2.14. Do not propose those APIs without a portable dependency/version plan or use a process-global loader as a session policy. Current BCApps `XMLDOMManagement.Codeunit.al::CreateXMLReaderFromInStream` explicitly requests Ignore; its DTD must not be reported or expanded.
-- `DotNetXml.cpp::XmlDocument::Load(XmlReader)` reparses raw `reader.Source()` without Read: a policy bypass even after repairing Read alone. Ignore must skip DTD processing before entity/attribute expansion; merely hiding the doctype event or clearing NOENT is insufficient.
+- `XmlDocument.Load(XmlReader)` now consumes the production cursor; unused Source()
+  is removed. Its former raw-input policy bypass is covered by the compiled mutant.
+  Read/Create still ignore DTD/resolver settings. Ignore must skip DTD processing
+  before entity/attribute expansion; hiding the doctype or clearing NOENT is insufficient.
 - Fresh LLVM production probe: 32 UTF-8/UTF-16LE stream cases reproduce four Prohibit/Ignore external-file leaks, eight reported ignored DTDs and two positioned-reader reloads of consumed siblings. Six closed readers reload their original root; the source contract instead leaves an empty document, not a presumed exception. build/xml-policy-20261002/runtime-probe.json; reader/Load must share one cursor/policy state.
 - libxml2 2.9.14 context experiment: 24 observations retain internal entity/default-attribute parsing while blocking external general/parameter/subset resources. Owned FIFO control is opened by the unsafe parser, never by guarded/Prohibit parsers; no global loader changed. Critical: xmlStopParser returns a non-null document with wellFormed=true and error 111; check policy/error state, not pointer/form alone. Ignore grammar, expansion bounds, HTTP trap and production reader integration remain unproved. build/xml-policy-20261002/{context-probe,resource-trap,next-policy}.json; this is a measured backend option, not a security fix.
 - Full-app blocker `TryGetStringTenantSetting` is a native Boolean(Text, out Text), not an AL object. Pinned IL clears out first; empty name returns false. GetStringTenantSetting reads current session/tenant, uppercases with invariant culture, and exposes only DISPLAYNAME/AADTENANTID/TENANTID. Try catches ArgumentException only; missing session/provider must not become false or blank success. Current TenantSettings contains none of these identities. IsWSKeyAllowed also reads tenant policy, not a constant.
@@ -31,7 +53,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 3. Reproduce or refute XML stream lifetime paths with focused ASan/UBSan cases. Keep shared engines behind AL and .NET-specific public contracts; gate identity/copying, disposal, out parameters, null, encoding and exception differences. Delegate JSON node/number representation to 0722.
 4. Review std::regex compatibility and CultureInfo/TextInfo formatting/casing against the source usages. Add Unicode and culture fixtures that distinguish invariant, session and explicit-provider behaviour.
 5. Rebuild PermissionTestHelper bookkeeping for 0039 and event-capable DotNet variables with explicit subscription lifetimes. Report remaining unsupported signatures by name.
-6. Implement one reader-owned shared cursor/policy state with settings snapshots and original error timing; no process-global parser setting. XmlDocument.Load consumes that cursor, never raw Source(). Default XmlReader Prohibit rejects DTDs; Ignore skips their processing before entity/attribute expansion. The 2.9.14 SAX callback option above can reject external resources without a version upgrade, but is not an Ignore implementation or forward-only adapter. Reject stopped/denied partial documents even when non-null/wellFormed; collect context-local diagnostics. Limit source/entity output and stream allocations; no unbounded DOM validation pre-pass. Preserve authorized internal Parse and explicit resolver policy; unavailable capabilities refuse. Keep AL/.NET contracts distinct.
+6. Add settings snapshots and parser-local policy to the shared reader with original error timing; no process-global parser setting. Preserve cursor-consuming DOM Load. Default XmlReader Prohibit rejects DTDs; Ignore skips their processing before entity/attribute expansion. The 2.9.14 SAX callback option above can reject external resources without a version upgrade, but is not an Ignore implementation or forward-only adapter. Reject stopped/denied partial documents even when non-null/wellFormed; collect context-local diagnostics. Limit source/entity output and stream allocations; no unbounded DOM validation pre-pass. Preserve authorized internal Parse and explicit resolver policy; unavailable capabilities refuse. Keep AL/.NET contracts distinct.
 
 ## Acceptance
 
@@ -51,3 +73,22 @@ Collection continuation: same main, System Application/App/Performance Profiler/
 Tenant: platform `devenv-get-started-call-dotnet-from-al.md`; current BCApps main `System Application/App/{Azure AD Tenant/src/AzureADTenantImpl,Environment Information/src/TenantInformationImpl}.Codeunit.al`; user `business-central/admin-troubleshoot-connectivity.md`; predecessor board search has no method guarantee. Official 28.4.53241.0 `ServiceTier/PFiles64/Microsoft Dynamics NAV/280/Service/Microsoft.Dynamics.Nav.NavUserAccount.dll`, 33,080 bytes, SHA256 `464ed2d63f40bacc7dc405c28f95e1aa8ca2df96df4213aef7b161bc538bffbd`: Try RVA 217c, Get 249c, IsWSKeyAllowed 22ac. Own `build/field-native-proof/{fetch_runtime.py,inspect_runtime.py,tenant-settings-contract.txt}`; catch token 01000015 is System.ArgumentException. Static inspection, no BC workload claim.
 
 Code: `src/net/{XmlReader,DotNetXml,Regex}.cpp`, `include/dotnet/XmlReader.h`, `src/gen/Names.cpp`; gates: `XmlReaderGate`, `XmlGate`. Platform: `methods-auto/xmldocument/xmldocument-readfrom-string-xmldocument-method.md` does not specify .NET DTD/resolver settings. AL: `Layers/W1/BaseApp/Modules/System/Xml/XMLDOMManagement.Codeunit.al`, `Layers/W1/Tests/Misc/XMLDOMManagementUT.Codeunit.al`, DotNet declarations, current BCApps revision in README. Contracts: [DtdProcessing](https://learn.microsoft.com/en-us/dotnet/api/system.xml.xmlreadersettings.dtdprocessing), [XmlResolver](https://learn.microsoft.com/en-us/dotnet/api/system.xml.xmlreadersettings.xmlresolver), [libxml2 parser options and per-context loader versions](https://gnome.pages.gitlab.gnome.org/libxml2/html/parser_8h.html). User/predecessor searches add no resolver-policy guarantee; do not copy Python bridge semantics.
+
+Reader alias state: local `methods-auto/dotnet/dotnet-data-type.md` and
+`devenv-get-started-call-dotnet-from-al.md` describe the bridge, not cursor/Close
+guarantees; missing detail checked against [XmlReader.Close](https://learn.microsoft.com/en-us/dotnet/api/system.xml.xmlreader.close?view=netframework-4.8.1)
+and [ReadState](https://learn.microsoft.com/en-us/dotnet/api/system.xml.xmlreader.readstate?view=net-5.0).
+Original `XMLDOMManagement::LoadXmlDocFromText` loads then closes a reader;
+user `business-central/across-income-documents.md` supplies workflow intent, not
+reader-state authority. Earlier 1185 concerns Load error propagation, not alias state.
+
+DOM cursor: original BCApps `XMLDOMManagement::LoadXmlDocFromText` and
+`XMLDOMManagementUT::CheckDoctypeElementWithEmptyInternalSubset`; .NET-specific
+positioned/end semantics are absent from the local AL method docs and predecessor.
+Primary [Framework XmlLoader](https://raw.githubusercontent.com/microsoft/referencesource/main/System.Xml/System/Xml/Dom/XmlLoader.cs)
+confirms current-position sequencing, empty ended readers and parent-end boundaries.
+Own adapter copies current nodes through Read, not a transplanted implementation.
+Whitespace inheritance uses the original
+[libxml2 2.9.14 tree contract](https://raw.githubusercontent.com/GNOME/libxml2/v2.9.14/tree.c).
+
+Empty-namespace XPath: developer docs `ff5939a46e`, `methods-auto/{xmlnamespacemanager/xmlnamespacemanager-addnamespace,xmlnode/xmlnode-selectsinglenode-string-xmlnamespacemanager-xmlnode}-method.md`; BCApps `bb7111877f`, original XMLDOMManagementUT and XMLDOMManagement overloads. Earlier 1214 reproduces the same prefix failure; [XPath 1.0](https://www.w3.org/TR/1999/REC-xpath-19991116/) defines QName, wildcard and quoted-token boundaries. User import documentation supplies no XPath token grammar.
