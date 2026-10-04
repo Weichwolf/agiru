@@ -14,65 +14,23 @@
 #include "type/JsonToken.h"
 #include "type/JsonValue.h"
 #include "type/List.h"
-#include "type/SecretText.h"
-#include "type/Stream.h"
 #include "type/Text.h"
 #include "type/Time.h"
 
 #include "JsonEngine.h"
 
+#include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <string_view>
-#include <vector>
-
-#include <nlohmann/json.hpp>
-
-namespace agiru::detail {
-
-void JsonRetain(JsonTree *tree) noexcept {
-  if (tree != nullptr) { ++tree->uses; }
-}
-
-void JsonRelease(JsonTree *tree) noexcept {
-  if (tree != nullptr && --tree->uses == 0) { delete tree; }
-}
-
-JsonHandle JsonHandleMade(nlohmann::ordered_json value) {
-  auto *tree = new JsonTree{.root = std::move(value), .uses = 0};
-  return JsonHandle{tree, &tree->root};
-}
-
-nlohmann::ordered_json &JsonNodeOf(const JsonHandle &handle) {
-  if (handle.node == nullptr) {
-    throw Error("this JSON value refers to nothing -- nothing has been read into it");
-  }
-  return *static_cast<nlohmann::ordered_json *>(handle.node);
-}
-
-JsonHandle JsonHandleAt(const JsonHandle &tree, nlohmann::ordered_json &node) {
-  return JsonHandle{tree.tree, &node};
-}
-
-JsonHandle NewJsonObject() {
-  return JsonHandleMade(nlohmann::ordered_json::object());
-}
-
-JsonHandle NewJsonArray() {
-  return JsonHandleMade(nlohmann::ordered_json::array());
-}
-
-JsonHandle NewJsonValue() {
-  return JsonHandleMade(nlohmann::ordered_json());
-}
-
-}
+#include <utility>
 
 namespace agiru {
 
 namespace {
 
-using Json = nlohmann::ordered_json;
+using Json = detail::JsonNode;
 
 Json &Node(const detail::JsonHandle &handle) {
   return detail::JsonNodeOf(handle);
@@ -80,7 +38,7 @@ Json &Node(const detail::JsonHandle &handle) {
 
 Json FromDecimal(const Decimal &value) {
   const std::string text = value.ToInvariantString();
-  return Json::parse(text, nullptr, false, false);
+  return Json::Number(text);
 }
 
 template <typename T> Json Valued(const T &value);
@@ -130,7 +88,7 @@ Json Textual(std::string_view value) {
 }
 
 std::string TextOf(const Json &node) {
-  if (node.is_string()) { return node.get<std::string>(); }
+  if (node.is_string()) { return node.Text(); }
   if (node.is_null()) { return {}; }
   return node.dump();
 }
@@ -179,7 +137,7 @@ Boolean InsertInto(const detail::JsonHandle &handle, Integer index, Json value) 
   if (!node.is_array() || index < 0 || static_cast<std::size_t>(index) > node.size()) {
     return false;
   }
-  node.insert(node.begin() + index, std::move(value));
+  node.insert(static_cast<std::size_t>(index), std::move(value));
   return true;
 }
 
@@ -570,47 +528,47 @@ void JsonArray::Add(::agiru::Time Value) {
 }
 
 void JsonValue::SetValue(::agiru::BigInteger Value) {
-  Node(Handle_) = Valued<BigInteger>(Value);
+  Handle_ = detail::JsonHandleMade(Textual(std::to_string(Value)));
 }
 
 void JsonValue::SetValue(::agiru::Boolean Value) {
-  Node(Handle_) = Valued<Boolean>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Boolean>(Value));
 }
 
 void JsonValue::SetValue(::agiru::Byte Value) {
-  Node(Handle_) = Valued<Byte>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Byte>(Value));
 }
 
 void JsonValue::SetValue(::agiru::Char Value) {
-  Node(Handle_) = Valued<Char>(Value);
+  Handle_ = detail::JsonHandleMade(Json(static_cast<std::int32_t>(Value)));
 }
 
 void JsonValue::SetValue(::agiru::Date Value) {
-  Node(Handle_) = Valued<Date>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Date>(Value));
 }
 
 void JsonValue::SetValue(::agiru::DateTime Value) {
-  Node(Handle_) = Valued<DateTime>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<DateTime>(Value));
 }
 
 void JsonValue::SetValue(::agiru::Decimal Value) {
-  Node(Handle_) = Valued<Decimal>(Value);
+  Handle_ = detail::JsonHandleMade(Textual(Value.ToInvariantString()));
 }
 
 void JsonValue::SetValue(::agiru::Duration Value) {
-  Node(Handle_) = Valued<Duration>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Duration>(Value));
 }
 
 void JsonValue::SetValue(::agiru::Integer Value) {
-  Node(Handle_) = Valued<Integer>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Integer>(Value));
 }
 
 void JsonValue::SetValue(std::string_view Value) {
-  Node(Handle_) = Textual(Value);
+  Handle_ = detail::JsonHandleMade(Textual(Value));
 }
 
 void JsonValue::SetValue(::agiru::Time Value) {
-  Node(Handle_) = Valued<Time>(Value);
+  Handle_ = detail::JsonHandleMade(Valued<Time>(Value));
 }
 
 }
@@ -642,7 +600,7 @@ Boolean JsonObject::Remove(std::string_view Key) {
   ::agiru::List<std::string> keys;
   const Json &node = Node(Handle_);
   if (node.is_object()) {
-    for (const auto &one : node.items()) { keys.Add(one.key()); }
+    for (const auto &[key, value] : node.Members()) { keys.Add(key); }
   }
   return keys;
 }
@@ -651,9 +609,9 @@ Boolean JsonObject::Remove(std::string_view Key) {
   ::agiru::List<::agiru::JsonToken> values;
   Json &node = Node(Handle_);
   if (node.is_object()) {
-    for (auto &one : node.items()) {
+    for (const auto &[key, value] : node.Members()) {
       JsonToken token;
-      token.Handle_ = detail::JsonHandle{Handle_.tree, &one.value()};
+      token.Handle_ = detail::JsonHandle{Handle_.tree, &value.Node()};
       values.Add(token);
     }
   }
@@ -661,7 +619,7 @@ Boolean JsonObject::Remove(std::string_view Key) {
 }
 
 Boolean JsonObject::ReadFrom(std::string_view String) {
-  Json parsed = Json::parse(String, nullptr, false);
+  Json parsed = Json::parse(String);
   if (parsed.is_discarded() || !parsed.is_object()) { return false; }
   Handle_ = detail::NewJsonObject();
   Node(Handle_) = std::move(parsed);
@@ -688,12 +646,12 @@ Boolean JsonArray::Get(Integer Index, JsonToken &Result) {
 Boolean JsonArray::RemoveAt(Integer Index) {
   Json &node = Node(Handle_);
   if (!WithinArray(node, Index)) { return false; }
-  node.erase(node.begin() + Index);
+  node.erase(static_cast<std::size_t>(Index));
   return true;
 }
 
 Boolean JsonArray::ReadFrom(std::string_view String) {
-  Json parsed = Json::parse(String, nullptr, false);
+  Json parsed = Json::parse(String);
   if (parsed.is_discarded() || !parsed.is_array()) { return false; }
   Handle_ = detail::NewJsonArray();
   Node(Handle_) = std::move(parsed);
@@ -755,64 +713,42 @@ std::string JsonValue::AsCode() {
 
 Integer JsonValue::AsInteger() {
   const Json &node = Node(Handle_);
-  if (node.is_number()) { return static_cast<Integer>(node.get<std::int64_t>()); }
-  if (node.is_boolean()) { return node.get<bool>() ? 1 : 0; }
-  return static_cast<Integer>(::agiru::Round(Decimal::FromInvariantString(TextOf(node)), 1));
+  if (!node.is_number()) { throw Error("JsonValue.AsInteger requires a number"); }
+  const std::int64_t value = detail::JsonInteger(node.Text());
+  if (value < std::numeric_limits<Integer>::min() || value > std::numeric_limits<Integer>::max()) {
+    throw Error("JSON number does not fit an Integer");
+  }
+  return static_cast<Integer>(value);
 }
 
 BigInteger JsonValue::AsBigInteger() {
   const Json &node = Node(Handle_);
-  return node.is_number() ? static_cast<BigInteger>(node.get<std::int64_t>())
-                          : static_cast<BigInteger>(AsInteger());
+  if (!node.is_number() && !node.is_string()) {
+    throw Error("JsonValue.AsBigInteger requires a number or string");
+  }
+  return detail::JsonInteger(node.Text());
 }
 
 Decimal JsonValue::AsDecimal() {
   const Json &node = Node(Handle_);
-  if (node.is_string()) { return Decimal::FromInvariantString(node.get<std::string>()); }
-  return Decimal::FromInvariantString(node.dump());
+  if (!node.is_number() && !node.is_string()) {
+    throw Error("JsonValue.AsDecimal requires a number or string");
+  }
+  return Decimal::FromInvariantString(detail::ExactJsonDecimal(node.Text()));
 }
 
 Boolean JsonValue::AsBoolean() {
   const Json &node = Node(Handle_);
-  if (node.is_boolean()) { return node.get<bool>(); }
-  if (node.is_number()) { return node.get<std::int64_t>() != 0; }
-  const std::string text = TextOf(node);
-  return text == "true" || text == "True";
+  if (!node.is_boolean()) { throw Error("JsonValue.AsBoolean requires a Boolean"); }
+  return node.Boolean();
 }
 
 namespace {
 
 Boolean SelectIn(const detail::JsonHandle &handle, std::string_view path, JsonToken &into) {
-  Json *node = &Node(handle);
-  std::string_view rest = path;
-  if (rest.starts_with("$")) { rest.remove_prefix(1); }
-  while (!rest.empty()) {
-    if (rest.front() == '.') {
-      rest.remove_prefix(1);
-      continue;
-    }
-    if (rest.front() == '[') {
-      const std::size_t close = rest.find(']');
-      if (close == std::string_view::npos || !node->is_array()) { return false; }
-      const std::string digits(rest.substr(1, close - 1));
-      std::size_t at = 0;
-      for (const char c : digits) {
-        if (c < '0' || c > '9') { return false; }
-        at = (at * 10) + static_cast<std::size_t>(c - '0');
-      }
-      if (at >= node->size()) { return false; }
-      node = &(*node)[at];
-      rest.remove_prefix(close + 1);
-      continue;
-    }
-    const std::size_t next = rest.find_first_of(".[");
-    const std::string name(rest.substr(0, next));
-    if (!node->is_object() || !node->contains(name)) { return false; }
-    node = &(*node)[name];
-    if (next == std::string_view::npos) { break; }
-    rest.remove_prefix(next);
-  }
-  into.Handle_ = detail::JsonHandle{handle.tree, node};
+  Json *node = detail::FindJsonPath(Node(handle), path);
+  if (node == nullptr) { return false; }
+  into.Handle_ = detail::JsonHandleAt(handle, *node);
   return true;
 }
 

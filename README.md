@@ -23,3 +23,6 @@ make help        # the list
 
 Prerequisites: see `scripts/install.sh`. The BC version is pinned in `BC_VERSION` and must match the
 checked-out BCApps source -- `make provision` refuses otherwise.
+
+XML uses system libxml2 (MIT); JSON uses system yyjson (MIT, Debian `libyyjson-dev`).
+The libraries remain private implementation dependencies; packaging must retain their notices.

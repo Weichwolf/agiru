@@ -197,13 +197,14 @@ endif()
 # PRIVATE to the value layer: the door sees a handle and never a libxml2 header.
 if(TARGET agiru_net)
   find_package(LibXml2 REQUIRED)
-  target_link_libraries(agiru_net PRIVATE LibXml2::LibXml2)
-  target_include_directories(agiru_net PRIVATE "${CMAKE_SOURCE_DIR}/third_party")
+  find_package(yyjson CONFIG REQUIRED)
+  target_link_libraries(agiru_net PRIVATE LibXml2::LibXml2 yyjson::yyjson)
 endif()
 
 if(TARGET agiru_gen)
   find_package(LibXml2 REQUIRED)
-  target_link_libraries(agiru_gen PRIVATE LibXml2::LibXml2)
+  find_package(yyjson CONFIG REQUIRED)
+  target_link_libraries(agiru_gen PRIVATE LibXml2::LibXml2 yyjson::yyjson)
 endif()
 
 

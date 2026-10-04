@@ -20,6 +20,14 @@ void JsonRetain(JsonTree *tree) noexcept;
 /// \param tree The document, or nothing.
 void JsonRelease(JsonTree *tree) noexcept;
 
+/// \brief Retains a stable node independently of container membership.
+/// \param node The opaque node, or nothing.
+void JsonNodeRetain(void *node) noexcept;
+
+/// \brief Releases a node; detached nodes survive while handles retain them.
+/// \param node The opaque node, or nothing.
+void JsonNodeRelease(void *node) noexcept;
+
 /// \brief What an AL JSON value refers to: a node inside a document.
 ///
 /// \note IT IS A REFERENCE, AS THE AL TYPES ARE. `jsonobject-data-type.md`: "JsonObject is a
@@ -35,10 +43,16 @@ struct JsonHandle {
 
   /// \brief A handle on a node, taking a count.
   /// \param inTree The document. \param at The node.
-  JsonHandle(JsonTree *inTree, void *at) noexcept : tree(inTree), node(at) { JsonRetain(tree); }
+  JsonHandle(JsonTree *inTree, void *at) noexcept : tree(inTree), node(at) {
+    JsonRetain(tree);
+    JsonNodeRetain(node);
+  }
 
   /// \brief A second handle on the same node. \param o The other.
-  JsonHandle(const JsonHandle &o) noexcept : tree(o.tree), node(o.node) { JsonRetain(tree); }
+  JsonHandle(const JsonHandle &o) noexcept : tree(o.tree), node(o.node) {
+    JsonRetain(tree);
+    JsonNodeRetain(node);
+  }
 
   /// \brief Takes the other's handle. \param o The other.
   JsonHandle(JsonHandle &&o) noexcept : tree(o.tree), node(o.node) {
@@ -50,6 +64,8 @@ struct JsonHandle {
   JsonHandle &operator=(const JsonHandle &o) noexcept {
     if (this != &o) {
       JsonRetain(o.tree);
+      JsonNodeRetain(o.node);
+      JsonNodeRelease(node);
       JsonRelease(tree);
       tree = o.tree;
       node = o.node;
@@ -60,6 +76,7 @@ struct JsonHandle {
   /// \brief Takes the other's handle. \param o The other. \return This.
   JsonHandle &operator=(JsonHandle &&o) noexcept {
     if (this != &o) {
+      JsonNodeRelease(node);
       JsonRelease(tree);
       tree = o.tree;
       node = o.node;
@@ -69,7 +86,10 @@ struct JsonHandle {
     return *this;
   }
 
-  ~JsonHandle() { JsonRelease(tree); }
+  ~JsonHandle() {
+    JsonNodeRelease(node);
+    JsonRelease(tree);
+  }
 
   /// \brief Whether the value refers to anything. \return Whether it is empty.
   [[nodiscard]] bool Empty() const noexcept { return node == nullptr; }

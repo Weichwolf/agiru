@@ -1,4 +1,5 @@
 #include "runtime/ErrorValue.h"
+#include "type/BigInteger.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/JsonArray.h"
@@ -10,6 +11,7 @@
 
 #include "Check.h"
 
+#include <limits>
 #include <string>
 #include <string_view>
 
@@ -141,12 +143,132 @@ void SelectTokenWalksThePath() {
   // and a key that is not there refuses unless the caller asked for a default.
   CHECK_TRUE("a path that is not there", !static_cast<bool>(object.SelectToken("$.a.b[9]", token)));
   CHECK_TRUE("nor a name that is not", !static_cast<bool>(object.SelectToken("$.nope", token)));
+  CHECK_TRUE("an overflowing index cannot wrap to a real element",
+             !object.SelectToken("$.a.b[18446744073709551617]", token));
+  CHECK_TRUE("an empty index cannot become zero", !object.SelectToken("$.a.b[]", token));
   std::string said;
   try {
     static_cast<void>(object.GetText("nope"));
   } catch (const agiru::Error &e) { said = e.what(); }
   CHECK_TRUE("GetText without a default refuses", !said.empty());
   CHECK_TRUE("and with one answers blank", object.GetText("nope", true).Length() == 0);
+}
+
+void ExactNumbersRemainNumbers() {
+  agiru::JsonObject object;
+  const std::string source =
+      R"({"large":999999999999999.99,"scale":0.1234567890123456789012345678,"exponent":-1.25e+2,"max":9223372036854775807,"min":-9223372036854775808})";
+  CHECK_TRUE("exact numbers parse", object.ReadFrom(source));
+  CHECK_TRUE("large decimal retains every digit",
+             object.GetDecimal("large") ==
+                 agiru::Decimal::FromInvariantString("999999999999999.99"));
+  CHECK_TRUE("scale 28 retains every digit",
+             object.GetDecimal("scale") ==
+                 agiru::Decimal::FromInvariantString("0.1234567890123456789012345678"));
+  CHECK_TRUE("exponent is exact", object.GetDecimal("exponent") == agiru::Decimal{-125});
+  agiru::JsonToken token;
+  CHECK_TRUE("max Int64 found", object.Get("max", token));
+  CHECK_TRUE("max Int64 is exact",
+             token.AsValue().AsBigInteger() == std::numeric_limits<agiru::BigInteger>::max());
+  CHECK_TRUE("min Int64 found", object.Get("min", token));
+  CHECK_TRUE("min Int64 is exact",
+             token.AsValue().AsBigInteger() == std::numeric_limits<agiru::BigInteger>::min());
+  agiru::Text<0> written;
+  CHECK_TRUE("numbers serialize", object.WriteTo(written));
+  CHECK_TEXT("raw number lexemes survive without quoting", written, source);
+  agiru::JsonObject added;
+  CHECK_TRUE("Decimal Add succeeds",
+             added.Add("amount", agiru::Decimal::FromInvariantString("999999999999999.99")));
+  CHECK_TRUE("added Decimal serializes", added.WriteTo(written));
+  CHECK_TEXT("Decimal Add emits an exact number", written, R"({"amount":999999999999999.99})");
+}
+
+template <typename Operation> bool Refuses(Operation operation) {
+  try {
+    operation();
+  } catch (const agiru::Error &) { return true; }
+  return false;
+}
+
+void InexactAndOverflowConversionsRefuse() {
+  agiru::JsonObject object;
+  CHECK_TRUE(
+      "conversion controls parse",
+      object.ReadFrom(
+          R"({"fraction":1.25,"narrow":2147483648,"wide":9223372036854775808,"scale":0.12345678901234567890123456789,"range":1e100,"integer":12e2,"bad":"1..2","text":"7","zero":-0e200})"));
+  CHECK_TRUE("Integer does not truncate a fraction",
+             Refuses([&] { static_cast<void>(object.GetInteger("fraction")); }));
+  CHECK_TRUE("Integer does not wrap overflow",
+             Refuses([&] { static_cast<void>(object.GetInteger("narrow")); }));
+  agiru::JsonToken token;
+  CHECK_TRUE("Int64 overflow found", object.Get("wide", token));
+  CHECK_TRUE("Int64 overflow refuses",
+             Refuses([&] { static_cast<void>(token.AsValue().AsBigInteger()); }));
+  CHECK_TRUE("Decimal does not round excess precision",
+             Refuses([&] { static_cast<void>(object.GetDecimal("scale")); }));
+  CHECK_TRUE("Decimal exponent overflow refuses",
+             Refuses([&] { static_cast<void>(object.GetDecimal("range")); }));
+  CHECK_TRUE("exact integral exponent converts", object.GetInteger("integer") == 1200);
+  CHECK_TRUE("a malformed numeric string refuses",
+             Refuses([&] { static_cast<void>(object.GetDecimal("bad")); }));
+  CHECK_TRUE("Integer requires a number",
+             Refuses([&] { static_cast<void>(object.GetInteger("text")); }));
+  CHECK_TRUE("Boolean does not silently accept a number",
+             Refuses([&] { static_cast<void>(object.GetBoolean("integer")); }));
+  CHECK_TRUE("Boolean does not silently accept unrelated text",
+             Refuses([&] { static_cast<void>(object.GetBoolean("text")); }));
+  CHECK_TRUE("signed exponent zero remains exact", object.GetDecimal("zero") == agiru::Decimal{});
+  CHECK_TRUE("NaN is invalid JSON", !object.ReadFrom(R"({"n":NaN})"));
+  CHECK_TRUE("Infinity is invalid JSON", !object.ReadFrom(R"({"n":Infinity})"));
+  CHECK_TRUE("trailing data is invalid JSON", !object.ReadFrom("{} trailing"));
+}
+
+void RetainedNodesSurviveGrowthAndRemoval() {
+  agiru::JsonToken held;
+  {
+    agiru::JsonObject object;
+    CHECK_TRUE("alias source parses", object.ReadFrom(R"({"inner":{"n":1}})"));
+    CHECK_TRUE("child retained", object.Get("inner", held));
+    for (agiru::Integer index = 0; index < 128; ++index) {
+      CHECK_TRUE("sibling appended", object.Add(std::to_string(index), index));
+    }
+    CHECK_TRUE("alias survives container growth", held.AsObject().GetInteger("n") == 1);
+    CHECK_TRUE("alias write remains shared", held.AsObject().Replace("n", agiru::Integer{7}));
+    CHECK_TRUE("parent observes alias write", object.GetObject("inner").GetInteger("n") == 7);
+    CHECK_TRUE("child removed", object.Remove("inner"));
+    CHECK_TRUE("removed child remains valid", held.AsObject().GetInteger("n") == 7);
+    CHECK_TRUE("removed child is absent", !object.Contains("inner"));
+  }
+  CHECK_TRUE("retained child outlives parent variable", held.AsObject().GetInteger("n") == 7);
+  agiru::JsonArray array;
+  CHECK_TRUE("array source parses", array.ReadFrom("[10,20,30]"));
+  CHECK_TRUE("array child retained", array.Get(1, held));
+  CHECK_TRUE("earlier child removed", array.RemoveAt(0));
+  CHECK_TRUE("alias tracks identity rather than former index", held.AsValue().AsInteger() == 20);
+  CHECK_TRUE("retained child removed", array.RemoveAt(0));
+  CHECK_TRUE("detached array child remains valid", held.AsValue().AsInteger() == 20);
+}
+
+void SetValueDisconnectsAndUsesItsDeclaredRepresentation() {
+  agiru::JsonObject object;
+  CHECK_TRUE("setter source parses", object.ReadFrom(R"({"n":1})"));
+  agiru::JsonToken token;
+  CHECK_TRUE("setter child found", object.Get("n", token));
+  agiru::JsonValue value = token.AsValue();
+  value.SetValue(agiru::Integer{9});
+  CHECK_TRUE("SetValue disconnects from its containing tree", object.GetInteger("n") == 1);
+  CHECK_TRUE("other aliases retain the previous node", token.AsValue().AsInteger() == 1);
+  CHECK_TRUE("setter variable contains the new value", value.AsInteger() == 9);
+  value.SetValue(agiru::Decimal::FromInvariantString("999999999999999.99"));
+  agiru::JsonObject wrapped;
+  CHECK_TRUE("explicit JsonValue can be added", wrapped.Add("decimal", value));
+  value.SetValue(std::numeric_limits<agiru::BigInteger>::max());
+  CHECK_TRUE("explicit BigInteger JsonValue can be added", wrapped.Add("integer", value));
+  agiru::Text<0> written;
+  CHECK_TRUE("setter representations serialize", wrapped.WriteTo(written));
+  CHECK_TEXT("SetValue Decimal/BigInteger stores strings, unlike Add Decimal",
+             written,
+             R"({"decimal":"999999999999999.99","integer":"9223372036854775807"})");
 }
 
 } // namespace
@@ -159,5 +281,9 @@ int main() {
     AnArrayIsIndexedFromZero();
     ATokenLooksIntoTheDocument();
     SelectTokenWalksThePath();
+    ExactNumbersRemainNumbers();
+    InexactAndOverflowConversionsRefuse();
+    RetainedNodesSurviveGrowthAndRemoval();
+    SetValueDisconnectsAndUsesItsDeclaredRepresentation();
   });
 }

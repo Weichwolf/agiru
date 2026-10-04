@@ -12,7 +12,6 @@
 #include "JsonEngine.h"
 
 #include <cstddef>
-#include <cstdint>
 #include <limits>
 #include <string>
 #include <string_view>
@@ -23,7 +22,7 @@ namespace agiru::dotnet {
 
 namespace {
 
-using Json = nlohmann::ordered_json;
+using Json = ::agiru::detail::JsonNode;
 
 constexpr int kIndent = 2;
 
@@ -39,13 +38,14 @@ std::string Indented(const Json &node) {
 }
 
 std::string LeafText(const Json &node) {
-  if (node.is_string()) { return node.get<std::string>(); }
-  if (node.is_boolean()) { return node.get<bool>() ? "True" : "False"; }
+  if (node.is_string()) { return node.Text(); }
+  if (node.is_boolean()) { return node.Boolean() ? "True" : "False"; }
   if (node.is_null()) { return {}; }
-  if (node.is_number_integer()) { return std::to_string(node.get<std::int64_t>()); }
-  if (node.is_number_unsigned()) { return std::to_string(node.get<std::uint64_t>()); }
+  if (node.is_number_integer()) { return node.Text(); }
   if (node.is_number_float()) {
-    return Decimal::FromInvariantString(node.dump()).Trimmed().ToInvariantString();
+    return Decimal::FromInvariantString(::agiru::detail::ExactJsonDecimal(node.Text()))
+        .Trimmed()
+        .ToInvariantString();
   }
   return Indented(node);
 }
@@ -60,7 +60,7 @@ Json FromVariant(const ::agiru::Variant &value) {
   if (value.Is<Integer>()) { return Json(value.Get<Integer>()); }
   if (value.Is<BigInteger>()) { return Json(value.Get<BigInteger>()); }
   if (value.Is<Decimal>()) {
-    return Json::parse(value.Get<Decimal>().Trimmed().ToInvariantString());
+    return Json::Number(value.Get<Decimal>().Trimmed().ToInvariantString());
   }
   if (value.IsText()) { return Json(std::string(std::string_view(value.Get<Text<0>>()))); }
   throw Error(std::string("a JSON value cannot be made of a Variant holding ") +
@@ -102,7 +102,8 @@ std::vector<::agiru::Variant> Selected(const ::agiru::detail::JsonHandle &handle
     if (wanted.size() >= 2 && wanted.front() == '\'' && wanted.back() == '\'') {
       wanted = wanted.substr(1, wanted.size() - 2);
     }
-    for (Json &item : node) {
+    for (const auto &held : node.Children()) {
+      Json &item = held.Node();
       if (FilterMatches(item, name, wanted)) { found.push_back(Carried(TokenAt(handle, item))); }
     }
     return found;
@@ -127,7 +128,7 @@ JToken::JToken(const ::agiru::Variant &value) : handle_(HandleOf(value)) {}
 }
 
 JToken JToken::Parse(std::string_view json) const {
-  Json parsed = Json::parse(json, nullptr, false);
+  Json parsed = Json::parse(json);
   if (parsed.is_discarded()) { throw Error("JToken.Parse: the text is not JSON"); }
   return JToken{::agiru::detail::JsonHandleMade(std::move(parsed))};
 }
@@ -145,7 +146,7 @@ JToken JToken::DeepClone() const {
 
 JToken JToken::Root() const {
   if (handle_.Empty()) { return {}; }
-  return JToken{::agiru::detail::JsonHandle{handle_.tree, &handle_.tree->root}};
+  return JToken{::agiru::detail::JsonHandle{handle_.tree, &handle_.tree->root.Node()}};
 }
 
 ::agiru::Text<0> JToken::Path() const {
@@ -160,35 +161,8 @@ JToken JToken::Root() const {
 
 JToken JToken::SelectToken(std::string_view path) const {
   if (handle_.Empty()) { return {}; }
-  Json *node = &::agiru::detail::JsonNodeOf(handle_);
-  std::string_view rest = path;
-  if (rest.starts_with("$")) { rest.remove_prefix(1); }
-  while (!rest.empty()) {
-    if (rest.front() == '.') {
-      rest.remove_prefix(1);
-      continue;
-    }
-    if (rest.front() == '[') {
-      const std::size_t close = rest.find(']');
-      if (close == std::string_view::npos || !node->is_array()) { return {}; }
-      std::size_t at = 0;
-      for (const char c : rest.substr(1, close - 1)) {
-        if (c < '0' || c > '9') { return {}; }
-        at = (at * 10) + static_cast<std::size_t>(c - '0');
-      }
-      if (at >= node->size()) { return {}; }
-      node = &(*node)[at];
-      rest.remove_prefix(close + 1);
-      continue;
-    }
-    const std::size_t next = rest.find_first_of(".[");
-    const std::string name(rest.substr(0, next));
-    if (!node->is_object() || !node->contains(name)) { return {}; }
-    node = &(*node)[name];
-    if (next == std::string_view::npos) { break; }
-    rest.remove_prefix(next);
-  }
-  return TokenAt(handle_, *node);
+  Json *node = ::agiru::detail::FindJsonPath(::agiru::detail::JsonNodeOf(handle_), path);
+  return node == nullptr ? JToken{} : TokenAt(handle_, *node);
 }
 
 GenericIEnumerable1 JToken::SelectTokens(std::string_view path,
@@ -203,10 +177,10 @@ GenericIEnumerable1 JToken::SelectTokens(std::string_view path,
 ::agiru::Variant JToken::Value() const {
   if (handle_.Empty()) { return {}; }
   const Json &node = ::agiru::detail::JsonNodeOf(handle_);
-  if (node.is_string()) { return ::agiru::Variant(node.get<std::string>()); }
-  if (node.is_boolean()) { return ::agiru::Variant(Boolean{node.get<bool>()}); }
-  if (node.is_number_integer() || node.is_number_unsigned()) {
-    const auto whole = node.get<std::int64_t>();
+  if (node.is_string()) { return ::agiru::Variant(node.Text()); }
+  if (node.is_boolean()) { return ::agiru::Variant(Boolean{node.Boolean()}); }
+  if (node.is_number_integer()) {
+    const auto whole = ::agiru::detail::JsonInteger(node.Text());
     if (whole >= std::numeric_limits<Integer>::min() &&
         whole <= std::numeric_limits<Integer>::max()) {
       return ::agiru::Variant(static_cast<Integer>(whole));
@@ -214,7 +188,8 @@ GenericIEnumerable1 JToken::SelectTokens(std::string_view path,
     return ::agiru::Variant(static_cast<BigInteger>(whole));
   }
   if (node.is_number_float()) {
-    return ::agiru::Variant(Decimal::FromInvariantString(node.dump()));
+    return ::agiru::Variant(
+        Decimal::FromInvariantString(::agiru::detail::ExactJsonDecimal(node.Text())));
   }
   if (node.is_null()) { return {}; }
   return Carried(*this);
@@ -259,9 +234,12 @@ GenericIEnumerator1 JToken::GetEnumerator() const {
   if (!handle_.Empty()) {
     Json &node = ::agiru::detail::JsonNodeOf(handle_);
     if (node.is_array()) {
-      for (Json &item : node) { items.push_back(Carried(TokenAt(handle_, item))); }
+      for (const auto &held : node.Children()) {
+        Json &item = held.Node();
+        items.push_back(Carried(TokenAt(handle_, item)));
+      }
     } else if (node.is_object()) {
-      for (auto &[name, value] : node.items()) {
+      for (const auto &[name, value] : node.Members()) {
         items.push_back(::agiru::Variant(JProperty::Of(handle_, name)));
       }
     }
@@ -306,7 +284,8 @@ JsonChildIterator JToken::end() const {
 JObject &JsonChildIterator::operator*() {
   Json &node = ::agiru::detail::JsonNodeOf(handle_);
   std::size_t seen = 0;
-  for (Json &child : node) {
+  for (std::size_t index = 0; index < node.size(); ++index) {
+    Json &child = node.is_array() ? node[index] : node.Members()[index].second.Node();
     if (seen == at_) {
       current_ = JObject::Over(::agiru::detail::JsonHandleAt(handle_, child));
       return current_;
@@ -408,15 +387,7 @@ void JProperty::Replace(const class JProperty &property) {
   if (newName == name_) {
     object[name_] = std::move(value);
   } else {
-    Json rebuilt = Json::object();
-    for (auto &[key, held] : object.items()) {
-      if (key == name_) {
-        rebuilt[newName] = std::move(value);
-      } else {
-        rebuilt[key] = held;
-      }
-    }
-    object = std::move(rebuilt);
+    object.RenameMember(name_, newName, std::move(value));
     name_ = newName;
   }
   handle_ = ::agiru::detail::JsonHandleAt(owner_, object[name_]);
@@ -443,7 +414,7 @@ class JObject &JObject::operator=(const ::agiru::Variant &value) {
 }
 
 JObject JObject::Parse(std::string_view json) const {
-  Json parsed = Json::parse(json, nullptr, false);
+  Json parsed = Json::parse(json);
   if (parsed.is_discarded() || !parsed.is_object()) {
     throw Error("JObject.Parse: the text is not a JSON object");
   }
@@ -489,7 +460,7 @@ GenericIEnumerable1 JObject::Properties() const {
   if (!handle_.Empty()) {
     Json &object = ::agiru::detail::JsonNodeOf(handle_);
     if (object.is_object()) {
-      for (auto &[name, value] : object.items()) {
+      for (const auto &[name, value] : object.Members()) {
         items.push_back(::agiru::Variant(JProperty::Of(handle_, name)));
       }
     }
@@ -525,7 +496,7 @@ class JArray &JArray::operator=(const ::agiru::Variant &value) {
 }
 
 JArray JArray::Parse(std::string_view json) const {
-  Json parsed = Json::parse(json, nullptr, false);
+  Json parsed = Json::parse(json);
   if (parsed.is_discarded() || !parsed.is_array()) {
     throw Error("JArray.Parse: the text is not a JSON array");
   }
@@ -544,7 +515,8 @@ void JArray::Merge(const JToken &other) {
   Json &array = ::agiru::detail::JsonNodeOf(handle_);
   const Json &more = ::agiru::detail::JsonNodeOf(other.Handle());
   if (!array.is_array() || !more.is_array()) { return; }
-  for (const Json &item : more) { array.push_back(item); }
+  const Json copy(more);
+  for (const auto &item : copy.Children()) { array.push_back(item.Node()); }
 }
 
 void JArray::Insert(::agiru::Integer index, const ::agiru::Variant &value) {
@@ -553,7 +525,7 @@ void JArray::Insert(::agiru::Integer index, const ::agiru::Variant &value) {
   if (!array.is_array() || index < 0 || static_cast<std::size_t>(index) > array.size()) {
     throw Error("JArray.Insert: the index is outside the array");
   }
-  array.insert(array.begin() + index, FromVariant(value));
+  array.insert(static_cast<std::size_t>(index), FromVariant(value));
 }
 
 void JArray::RemoveAt(::agiru::Integer index) {
@@ -562,7 +534,7 @@ void JArray::RemoveAt(::agiru::Integer index) {
   if (!array.is_array() || index < 0 || static_cast<std::size_t>(index) >= array.size()) {
     throw Error("JArray.RemoveAt: the index is outside the array");
   }
-  array.erase(array.begin() + index);
+  array.erase(static_cast<std::size_t>(index));
 }
 
 }

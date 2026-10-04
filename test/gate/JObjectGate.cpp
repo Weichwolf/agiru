@@ -1,6 +1,7 @@
 #include "dotnet/Generic.h"
 #include "dotnet/JObject.h"
 #include "runtime/ErrorValue.h"
+#include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/Text.h"
 #include "type/Variant.h"
@@ -135,13 +136,65 @@ void PropertiesEnumerateAndReplace() {
   }
   CHECK_TEXT("the names in document order", names, "first;second;");
   JProperty renamed;
+  JToken first = object.SelectToken("first");
   renamed = renamed.JProperty("third", Variant(agiru::Integer{3}));
   object.Property("second").Replace(renamed);
   CHECK_TEXT("Replace swaps name and value in place",
              T(object.ToString()),
              "{\r\n  \"first\": 1,\r\n  \"third\": 3\r\n}");
+  first.Replace(JValue{}.JValue(Variant(agiru::Integer{8})));
+  CHECK_TEXT("renaming another property keeps existing aliases attached",
+             T(object.SelectToken("first").ToString()),
+             "8");
   CHECK_TRUE("Remove takes a member out", object.Remove("first"));
   CHECK_TRUE("and reports a missing one", !object.Remove("first"));
+}
+
+void ExactNumbersAndStableAliasesShareTheEngine() {
+  JObject object;
+  object = object.Parse(
+      R"({"amount":999999999999999.99,"scale":0.1234567890123456789012345678,"whole":9223372036854775807,"nested":{"n":1}})");
+  CHECK_TEXT("large decimal leaf is exact",
+             T(object.SelectToken("amount").ToString()),
+             "999999999999999.99");
+  CHECK_TRUE("Decimal Variant retains scale 28",
+             object.SelectToken("scale").Value().Get<agiru::Decimal>() ==
+                 agiru::Decimal::FromInvariantString("0.1234567890123456789012345678"));
+  CHECK_TRUE("Int64 Variant retains all bits",
+             object.SelectToken("whole").Value().Get<agiru::BigInteger>() == 9223372036854775807LL);
+  const JToken held = object.SelectToken("nested");
+  for (agiru::Integer index = 0; index < 128; ++index) {
+    object.Add(std::to_string(index), Variant(index));
+  }
+  CHECK_TEXT("retained token survives sibling growth", T(held.SelectToken("n").ToString()), "1");
+  JValue seven;
+  seven = seven.JValue(Variant(agiru::Integer{7}));
+  held.SelectToken("n").Replace(seven);
+  CHECK_TEXT(
+      "retained token writes through to parent", T(object.SelectToken("nested.n").ToString()), "7");
+  JToken clone = object.DeepClone();
+  object.SelectToken("nested.n").Replace(JValue{}.JValue(Variant(agiru::Integer{9})));
+  CHECK_TEXT("DeepClone is independent", T(clone.SelectToken("nested.n").ToString()), "7");
+  CHECK_TRUE("retained node can be detached", object.Remove("nested"));
+  CHECK_TEXT("detached node remains readable", T(held.SelectToken("n").ToString()), "9");
+  CHECK_TRUE("removed member is absent", object.SelectToken("nested").IsNullObject());
+  JArray array;
+  array = array.Parse("[10,20]");
+  CHECK_TRUE("an overflowing index cannot wrap in the .NET adapter",
+             array.SelectToken("$[18446744073709551617]").IsNullObject());
+  CHECK_TRUE("an empty index is not zero in the .NET adapter",
+             array.SelectToken("$[]").IsNullObject());
+  const JToken item = array.Item(Variant(agiru::Integer{1}));
+  array.Insert(0, Variant(agiru::Integer{5}));
+  CHECK_TEXT("array alias survives index shifts", T(item.ToString()), "20");
+  array.RemoveAt(2);
+  CHECK_TEXT("removed array alias remains readable", T(item.ToString()), "20");
+  JObject out;
+  out = out.JObject();
+  out.Add("amount", Variant(agiru::Decimal::FromInvariantString("999999999999999.99")));
+  CHECK_TEXT(".NET Decimal serialization is an exact number",
+             T(out.ToString()),
+             "{\r\n  \"amount\": 999999999999999.99\r\n}");
 }
 
 }
@@ -152,5 +205,6 @@ int main() {
     AVariantCarriesATokenAndFormatRendersIt();
     AnArrayEnumeratesAndFiltersItsObjects();
     PropertiesEnumerateAndReplace();
+    ExactNumbersAndStableAliasesShareTheEngine();
   });
 }
