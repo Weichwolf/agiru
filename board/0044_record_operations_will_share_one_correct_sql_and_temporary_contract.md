@@ -25,7 +25,11 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   gates pass 112/230/43/89/21/80/137 checks. `/tmp/agiru-cursor-lifecycle.p37EWy`,
   `/tmp/agiru-record-order-controls.YfDQHq`; the prior read-only red probe stays
   under `/tmp/agiru-selection-change.li6S1N/cursor-epoch-*`.
-  Full local/AL replay is pending; outside frozen 193025, no UT gain or G1 claim.
+  Full local/AL replay `20261004T210945Z-2749818` is running: HEAD `d1b4873`,
+  source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`,
+  six jobs, slice-check/all/test/ut; dependency identities match completed 193025.
+  Compare all 2,314 identities/statuses/errors; null/unsealed seed is diagnostic,
+  not causal A/B. Outside frozen 193025; no UT gain or G1 claim.
 - Selection changes now invalidate SQL cursors and lazily rebuild temporary views
   through `SelectionChanged`: filters/copies, keys/directions/views and active marks.
   Same-cardinality mark replacement is detected; unchanged predicates/directions and

@@ -22,7 +22,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   execute: 64 steps use three SQL statements, not 64 per-row reads. No own analysis
   findings, 33/25/30 inherited gate/Cursor/Navigate findings remain unsuppressed.
   `/tmp/agiru-cursor-lifecycle.p37EWy`, `/tmp/agiru-record-order-controls.YfDQHq`.
-  Full replay pending; SQL dynamic writes/Query transaction contracts remain open.
+  Full replay is running below; SQL dynamic writes/Query transaction contracts remain open.
+- Cursor/selection integration: `20261004T210945Z-2749818`, frozen HEAD `d1b4873`,
+  source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`;
+  `slice-check all test ut`, six jobs. Runner PID 2750430 is live; build is running.
+  BCApps/source/System/original-notice identities match completed 193025.
+  Compare all 2,314 identities/statuses/errors against 193025 and investigate losses;
+  null/unsealed seed remains diagnostic, not causal A/B or G1.
 - Selection invalidation (0044): SQL cursors and temporary views follow changed
   filters/keys/directions/active marks; shared temporary Modify is visible.
   SelectionChangeGate: 296 checks green, coherent predecessor 64 red;
