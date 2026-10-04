@@ -8,6 +8,7 @@
 #include "RelationBranches.h"
 #include "RenameCascade.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstddef>
 #include <map>
@@ -125,15 +126,14 @@ void Rewrite(const Reference &reference,
   const bool inKey =
       !referring.keys.empty() &&
       std::ranges::find(referring.keys[0].fields, field.no) != referring.keys[0].fields.end();
+  const Made written(reference.entry);
   do {
+    reference.entry->copy(written.record, row.record);
+    SetFieldText(written.record, field, newText);
     if (inKey) {
-      const Made was(reference.entry);
-      reference.entry->copy(was.record, row.record);
-      SetFieldText(row.record, field, newText);
-      static_cast<void>(RuntimeRename(row.record, was.record, referring));
+      static_cast<void>(RuntimeRename(written.record, row.record, referring));
     } else {
-      SetFieldText(row.record, field, newText);
-      static_cast<void>(RuntimeModify(row.record, referring));
+      static_cast<void>(RuntimeModify(written.record, referring));
     }
   } while (RuntimeNext(row.record, referring, 1) != 0);
 }

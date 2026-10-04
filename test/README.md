@@ -84,7 +84,11 @@ and resume from its current key. Own ModifyAll retains the caller's buffer, syst
 and position on SQL/shared temporary rows in all eight orders, including block boundaries.
 Revision storage follows active readers, not historical
 table visits; session/table/connection isolation and failed/temporary writes are checked.
-Twenty-two compiled controls must reject, including caller-traversing ModifyAll;
+RenameGate retains the cascade reader's old key while a separate record writes the
+new key. Typed/reflected parent renames in both directions retain every keyed/non-key
+child and its exact aggregate at 1/64/130 rows, including unrelated-parent controls.
+Twenty-three compiled controls must reject, including caller-traversing ModifyAll
+and a cascade that overwrites its read anchor;
 traced SQL counts reject a functional-green
 one-row fetch. Full AL dynamic-write replay and Query transaction contracts remain open;
 this is not client-page presentation or live metadata-provider activation (0044).

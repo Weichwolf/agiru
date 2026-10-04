@@ -12,6 +12,8 @@ lifecycle="$B/gate_CursorLifecycleGate"
 "$lifecycle" > "$proof/lifecycle.log" 2>&1
 dynamic="$B/gate_DynamicRecordGate"
 "$dynamic" > "$proof/dynamic.log" 2>&1
+rename="$B/gate_RenameGate"
+"$rename" > "$proof/rename.log" 2>&1
 fetch_block=$(sed -n 's/^inline constexpr std::size_t kFetchBlock = \([0-9]*\);$/\1/p' src/rt/Cursor.h)
 [[ "$fetch_block" =~ ^[1-9][0-9]*$ ]]
 bounded_walks() {
@@ -212,12 +214,29 @@ rg -q 'FAIL .*ModifyAll retains the caller.s field buffer' "$proof/$control.log"
 sha256sum "$proof/$control/runtime/Table.h" "$proof/$control-gate" >> "$proof/controls.sha256"
 rm -- "$proof/$control/runtime/Table.h" "$proof/$control-gate"
 rmdir "$proof/$control/runtime" "$proof/$control"
+control=cascade-anchor
+awk '
+  /} while \(RuntimeNext\(row.record, referring, 1\) != 0\);/ {
+    print "    reference.entry->copy(row.record, written.record);"; changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/rt/Rename.cpp > "$proof/$control.cpp"
+"$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
+if LD_PRELOAD="$proof/$control.so" "$rename" > "$proof/$control.log" 2>&1; then
+  printf 'record-order: changed cascade anchor escaped the rename gate\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*every referring row follows the renamed key' "$proof/$control.log"
+sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+rm -- "$proof/$control.cpp" "$proof/$control.so"
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   src/rt/Cursor.h src/rt/Cursor.cpp \
   src/rt/RecordChanges.h src/rt/RecordChanges.cpp src/rt/SessionState.h src/rt/Storage.cpp \
   src/rt/Selection.cpp src/rt/Temporary.cpp src/rt/RecordState.cpp \
   include/runtime/RecordState.h include/runtime/Table.h \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
-  test/gate/DynamicRecordGate.cpp \
-  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle and dynamic writes pass; twenty-two controls reject; %s\n' "$proof"
+  test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
+  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" > "$proof/inputs.sha256"
+printf 'record-order: order, selections, cursor lifecycle, dynamic writes and rename cascades pass; twenty-three controls reject; %s\n' "$proof"

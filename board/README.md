@@ -15,6 +15,27 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Rename cascade regression (0044): the reader must retain the old key while an
+  independent record writes the related row. RenameGate retains its original cases
+  and adds typed/reflected parent renames in both directions over keyed/non-key
+  children at 1/64/130 rows, exact aggregates and unrelated parents: 4,886 checks
+  green, preceding actual runtime 780 red on the same fixture.
+  `/tmp/agiru-rename-anchor.7GvVDQ`. Initial twenty-three compiled controls reject
+  (`/tmp/agiru-record-order-controls.TqaC8V`), input hashes match. Final cleanup
+  reuses one writer per cascade and includes only named headers; RenameGate stays
+  4,886 green. Analysis has no own findings; 30/35 inherited runtime/gate header
+  findings remain unsuppressed. Final control replay and three original codeunits
+  on a disposable diagnostic image are running; no original AL recovery or complete
+  local replay claimed yet. The image retains all seven non-runtime hashes from
+  completed 223110 and replaces only libagiru_rt; it does not qualify rebuilt
+  generated callers of the new ModifyAll template or the full UT population.
+- Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
+  source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
+  `slice-check all test ut`, six jobs, runner PID 3102678 confirmed live.
+  Slice check passes; build is running. Dependencies match completed 223110.
+  Includes ModifyAll caller preservation, excludes the later Rename cascade fix.
+  Compare all 2,314 identities/statuses/errors against 223110 and retain all losses.
+  Null/unsealed seed remains diagnostic, not causal A/B or G1.
 - ModifyAll caller preservation (0044): an independent filtered worker shares temporary
   rows, not caller buffers/cursors/globals. DynamicRecordGate: 7,493 checks green;
   the same fixture against the preceding implementation has 144 failures. SQL and

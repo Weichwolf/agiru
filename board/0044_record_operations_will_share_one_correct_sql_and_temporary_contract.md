@@ -5,6 +5,22 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Rename cascade read anchor: `src/rt/Rename.cpp::Rewrite` now writes through an
+  independent record, leaving its reader on the old key for dynamic Next resumption.
+  The preceding implementation skipped remaining old-parent children when their
+  leading primary-key component moved forward. RenameGate retains every original
+  case and adds both parent-rename directions, typed/reflected parents, keyed/non-key
+  children at 1/64/130 rows, exact aggregates and unrelated-parent controls: 4,886
+  checks green, preceding actual runtime 780 red on the identical fixture.
+  `/tmp/agiru-rename-anchor.7GvVDQ/{before,after}.log`. Initial twenty-three compiled
+  controls reject and input hashes match (`/tmp/agiru-record-order-controls.TqaC8V`).
+  Final cleanup reuses one writer and adds direct includes; 4,886 checks stay green.
+  Analysis has no own findings, 30/35 inherited runtime/gate header findings remain
+  unsuppressed. Final controls and original-codeunit diagnostic replay are pending;
+  that image retains all seven non-runtime hashes from 223110, replaces libagiru_rt
+  only and does not qualify rebuilt ModifyAll callers or the full UT population.
+  Frozen 232014 includes the ModifyAll caller fix, not
+  this cascade fix; replay all original UT and investigate all remaining losses.
 - ModifyAll caller preservation: `Table.h` uses an independent filtered worker,
   copies NewValue before writes and borrows shared temporary rows. The caller's
   field buffer/SystemId/position survive; Next observes changed stored successors.
@@ -487,6 +503,17 @@ BCApps `bb7111877ff7`, `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al::T
 renames ResourceCost.Code while retaining Type/Work Type Code. The docs' prohibited
 table examples do not establish a blanket refusal of every option-containing key;
 retain this original source counterexample without a business-specific runtime branch.
+
+Rename cascade: developer `ff5939a46e05`, `methods-auto/record/record-rename-method.md`
+and `devenv-set-relationships-between-tables.md` explicitly require automatic updates
+of related key values. BCApps `bb7111877ff7`, original
+`src/Layers/W1/Tests/{ERM-Sales/ERMSalesInvoiceAggregateUT,ERM-Sales/ERMSalesCrMemoAggrUT,ERM-Purchase/ERMPurchCrMemoAggrUT}.Codeunit.al`
+Rename methods and `BaseApp/Utilities/DocumentTotals.Codeunit.al` compare stored
+entity totals with posted-header FlowFields over the related lines. Predecessor
+1162 supplies the same three original cases; 0934's rejected interpretation that
+only explicit AL triggers cascade contradicts the platform documentation.
+Keep generic declared-relation propagation; repair traversal, not business code
+or dynamic-read visibility. User batch/filter intent and revisions are cited above.
 
 Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection/lifecycle matrix above; full SQL mutation and Query transaction contracts remain open.
 

@@ -174,7 +174,7 @@ encoding: comments db ## prove declared encodings, factories and compiled negati
 	@B="$(B)" bash "$(SELF)/test/runtime/encoding.sh"
 
 record-order: comments db ## prove record ordering, changing selections and negative controls
-	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate
+	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate gate_SelectionChangeGate gate_CursorLifecycleGate gate_DynamicRecordGate gate_RenameGate
 	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)

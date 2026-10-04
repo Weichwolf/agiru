@@ -1,15 +1,28 @@
+#include "meta/Declare.h"
+#include "meta/Ids.h"
+#include "meta/TableDef.h"
+#include "runtime/Catalogue.h"
 #include "runtime/RecordRef.h"
+#include "runtime/RecordState.h"
 #include "runtime/Session.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
+#include "runtime/TableDefinition.h"
 #include "type/Code.h"
 #include "type/Decimal.h"
+#include "type/Integer.h"
+#include "type/Variant.h"
 
 #include "Check.h"
 #include "ResourceCost.h"
 #include "WorkType.h"
+#include "options/Types.h"
 
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 using agiru::CreateTable;
 using agiru::Decimal;
@@ -22,11 +35,62 @@ using agiru::app::tables::WorkType;
 
 namespace {
 
+template <bool Keyed> struct CascadeLine : agiru::Table<CascadeLine<Keyed>> {
+  agiru::detail::StateHandle State_Block;
+  agiru::Code<10> Parent;
+  agiru::Integer LineNo;
+  agiru::Decimal Amount;
+  static constexpr agiru::TableId kId{Keyed ? 50101 : 50102};
+  static constexpr std::string_view kName = Keyed ? "Keyed Cascade Line" : "Cascade Line";
+};
+
+}
+
+template <bool Keyed> struct agiru::TableTraits<CascadeLine<Keyed>> {
+  using Line = CascadeLine<Keyed>;
+  static constexpr std::array<agiru::FieldDef, 3> kFields{{
+      agiru::Declare<&Line::Parent>(
+          agiru::FieldNo{1},
+          "Parent",
+          "Parent",
+          offsetof(Line, Parent),
+          agiru::Declared{.relationTable = "Work Type", .relation = "Work Type"}),
+      agiru::Declare<&Line::LineNo>(
+          agiru::FieldNo{2}, "Line No.", "Line No.", offsetof(Line, LineNo)),
+      agiru::Declare<&Line::Amount>(agiru::FieldNo{3}, "Amount", "Amount", offsetof(Line, Amount)),
+  }};
+  static constexpr std::array<agiru::FieldNo, Keyed ? 2 : 1> kKey = [] {
+    if constexpr (Keyed) {
+      return std::array{agiru::FieldNo{1}, agiru::FieldNo{2}};
+    } else {
+      return std::array{agiru::FieldNo{2}};
+    }
+  }();
+  static constexpr std::array<agiru::KeyDef, 1> kKeys{{
+      agiru::KeyDef{.name = "Primary", .fields = kKey},
+  }};
+  static constexpr agiru::TableDef kTable{.id = Line::kId,
+                                          .name = Line::kName,
+                                          .caption = Line::kName,
+                                          .fields = kFields,
+                                          .keys = kKeys};
+};
+
+namespace {
+
+const agiru::RegisterTable<CascadeLine<true>> kKeyedLines;
+const agiru::RegisterTable<CascadeLine<false>> kPlainLines;
+
 void Fresh() {
   DropTable(Session::Current().Database(), agiru::TableTraits<ResourceCost>::kTable);
   CreateTable(Session::Current().Database(), agiru::TableTraits<ResourceCost>::kTable);
   DropTable(Session::Current().Database(), agiru::TableTraits<WorkType>::kTable);
   CreateTable(Session::Current().Database(), agiru::TableTraits<WorkType>::kTable);
+  for (const auto *table : {&agiru::TableDefinition<CascadeLine<true>>(),
+                            &agiru::TableDefinition<CascadeLine<false>>()}) {
+    DropTable(Session::Current().Database(), *table);
+    CreateTable(Session::Current().Database(), *table);
+  }
 }
 
 void WorkTypeNamed(const char *code) {
@@ -50,7 +114,7 @@ void CostFor(const char *code, const char *workType) {
 // the key field it carries is what the cascade rewrote -- through `Rename`, not `Modify`.
 std::string WorkTypeOf(const char *code) {
   ResourceCost cost;
-  cost.SetRange(cost.Code, agiru::Code<20>(code));
+  cost.SetRange(cost.Code, decltype(cost.Code){code});
   if (!cost.FindFirst()) { return "<missing>"; }
   return std::string(cost.WorkTypeCode.Value());
 }
@@ -95,7 +159,7 @@ void AFilteredRecordRenamesTheSame() {
   CostFor("R1", "A");
 
   WorkType type;
-  type.SetRange(type.Description, agiru::Text<100>("Work type A"));
+  type.SetRange(type.Description, decltype(type.Description){"Work type A"});
   CHECK_TRUE("the filtered record finds its row", type.FindFirst());
   type.Rename(agiru::Code<10>("B"));
   CHECK_TEXT("the referring row follows", WorkTypeOf("R1"), "B");
@@ -118,6 +182,57 @@ void ARecordRefRenamesTheSameRowAndRelatedRows() {
   CHECK_TRUE("RecordRef.Rename removes the old key", !old.Get(agiru::Code<10>("HOURS")));
 }
 
+template <bool Keyed>
+void CascadeRetainsItsReadAnchor(bool reflected, bool forward, std::int32_t count) {
+  Fresh();
+  using Line = CascadeLine<Keyed>;
+  const char *oldKey = forward ? "A" : "Z";
+  const char *newKey = forward ? "Z" : "A";
+  WorkTypeNamed(oldKey);
+  WorkTypeNamed("OTHER");
+  Line row;
+  for (std::int32_t index = 1; index <= count + 1; ++index) {
+    row.Init();
+    row.Parent = index <= count ? oldKey : "OTHER";
+    row.LineNo = index;
+    row.Amount = Decimal{index};
+    row.Insert();
+  }
+  WorkType parent;
+  CHECK_TRUE("cascade source exists", parent.Get(agiru::Code<10>{oldKey}));
+  if (reflected) {
+    agiru::RecordRef reference;
+    reference.GetTable(parent);
+    CHECK_TRUE("reflected cascade succeeds", reference.Rename(agiru::Code<10>{newKey}));
+  } else {
+    CHECK_TRUE("typed cascade succeeds", parent.Rename(agiru::Code<10>{newKey}));
+  }
+  row.SetRange(row.Parent, agiru::Code<10>{newKey});
+  CHECK_TRUE("every referring row follows the renamed key", row.Count() == count);
+  row.CalcSums(row.Amount);
+  CHECK_TRUE("the cascade retains the complete exact aggregate",
+             row.Amount == Decimal{count * (count + 1) / 2});
+  row.Reset();
+  for (std::int32_t index = 1; index <= count; ++index) {
+    const bool found = [&] {
+      if constexpr (Keyed) {
+        return row.Get(agiru::Code<10>{newKey}, index);
+      } else {
+        return row.Get(index);
+      }
+    }();
+    CHECK_TRUE("every original line identity survives the cascade", found);
+    CHECK_TEXT("every original line has the new parent", std::string(row.Parent.Value()), newKey);
+    CHECK_TRUE("every original line retains its exact amount", row.Amount == Decimal{index});
+  }
+  row.SetRange(row.Parent, agiru::Code<10>{oldKey});
+  CHECK_TRUE("no referring line retains the old parent", row.Count() == 0);
+  row.SetRange(row.Parent, agiru::Code<10>{"OTHER"});
+  CHECK_TRUE("an unrelated parent retains its line", row.FindFirst());
+  CHECK_TRUE("the unrelated line retains its exact amount", row.Amount == Decimal{count + 1});
+  CHECK_TRUE("the cascade does not duplicate or delete lines", row.Count() == 1);
+}
+
 } // namespace
 
 int main() {
@@ -126,5 +241,13 @@ int main() {
     ARenameCarriesTheRowsThatReferToTheKey();
     AFilteredRecordRenamesTheSame();
     ARecordRefRenamesTheSameRowAndRelatedRows();
+    for (const bool reflected : {false, true}) {
+      for (const bool forward : {false, true}) {
+        for (const std::int32_t count : {1, 64, 130}) {
+          CascadeRetainsItsReadAnchor<true>(reflected, forward, count);
+          CascadeRetainsItsReadAnchor<false>(reflected, forward, count);
+        }
+      }
+    }
   });
 }
