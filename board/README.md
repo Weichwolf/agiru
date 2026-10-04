@@ -33,8 +33,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   no shared-DB overlap. Full AL with this caller fix remains pending.
 - Dynamic-write integration: `20261004T223110Z-2943281`, frozen HEAD `382ecce`,
   source `d6b5367a085aae5be3e0d154ba6caf8660df15047a41945ca6294ab6efa53a0e`;
-  `slice-check all test ut`, six jobs. Runner PID 2944742 is live; slice/build/local
-  tests pass (141 cases/232 tooling tests); the full AL target has started.
+  `slice-check all test ut`, six jobs; terminal at 23:14:22 UTC, runner gone.
+  Slice/build/local tests pass (141 cases/232 tooling tests); UT exits 2:
+  2,167/2,314 passed, 147 failed, zero incomplete, 80 codeunits/1,510 seconds.
+  Against 210945: zero gains, three losses, no changed errors/missing/added/duplicates;
+  source manifests/file hashes match. Original posted invoice/sales credit memo/
+  purchase credit memo Rename tests now report roughly tripled total tax amounts.
+  Investigate their iteration/write paths; do not waive the regressions.
+  Frozen source/System/notice pre/post hashes match.
   Source/System/original-notice dependencies match 210945.
   Compare all 2,314 identities/statuses/errors against 210945. Null/unsealed seed
   remains diagnostic, not causal A/B or G1. ModifyAll's caller fix is outside this run.

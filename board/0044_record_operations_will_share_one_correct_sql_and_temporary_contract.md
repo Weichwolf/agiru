@@ -23,7 +23,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   replay passes: 141 cases/232 tooling tests, exit 0; source/control hashes match
   before/after (`all-local.log`, `/tmp/agiru-record-order-controls.QWFUBk`). It starts
   after frozen 223110's local run passes, without shared database overlap.
-  Full AL on frozen 223110 is live and excludes this caller fix.
+  Full AL on frozen 223110 is terminal and excludes this caller fix: 2,167/2,314
+  passed, 147 failed, zero incomplete; slice/build/local tests pass. Against 210945:
+  three losses, zero gains/changed errors/missing/added/duplicates; source manifests
+  and file hashes match. Original TestRenamePostedInvoice (134396) and
+  TestRenamePostedCrMemo (134397/134416) report roughly tripled total tax amounts.
+  Investigate original iteration/write paths and replay the caller fix without
+  waiving these regressions. Frozen source/System/notice pre/post hashes match.
 - Expanded dynamic writes: 5,013 checks green retain every original case and add
   uniform/mixed/global-reversed orders, already-open backward cursors and own
   Modify/Delete/Rename through typed/RecordRef. Own writes preserve the frame and
