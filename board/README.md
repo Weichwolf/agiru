@@ -26,14 +26,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
   Full local replay on `ccdd9a7`: 141 cases/232 tooling tests pass, exit 0;
   source hashes match before/after (`all-local.log`, `verified-inputs.sha256`).
-  Outside frozen 210945; full AL replay, own-variable/mixed-reverse mutations,
+  Outside frozen 210945; full AL replay,
   Query boundaries and company qualification remain open. No UT gain or G1 claim.
 - Dynamic-write continuation (0044): 5,013 checks green over all eight write kinds,
   typed/RecordRef, uniform/mixed/global-reversed orders and pre-existing backward
   cursors; original cases remain. Own Modify/Delete/Rename retain frame/system ID
   and resume at the current key. Twenty-one compiled controls reject; no own analysis
   findings, 35 existing header findings remain unsuppressed. Disposable gate DB
-  `agiru_dynamic_order_20261004_01` isolates this run from frozen AL verification.
+  `agiru_dynamic_order_20261004_01` isolated the run from frozen AL verification;
+  it is removed. Original gate configuration is restored; the default-DB replay
+  passes the same 5,013 checks (`default-gate.log`, `default-inputs.sha256`).
   `/tmp/agiru-dynamic-order.1x5qFL`, `/tmp/agiru-record-order-controls.rNkiaB`.
   Expanded matrix is outside the 141-case local replay and frozen 210945; no UT/G1 claim.
 - Cursor lifetime (0044): transaction-aware buffers, bounded bidirectional resume

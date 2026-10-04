@@ -13,6 +13,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   Twenty-one compiled controls reject; final analysis has no own findings and 35
   existing header findings, no suppressions. Disposable DB
   `agiru_dynamic_order_20261004_01` prevents overlap with frozen gate/AL databases.
+  The disposable DB is removed and the original gate configuration restored;
+  replay on the default database retains 5,013 green checks (`default-gate.log`).
   `/tmp/agiru-dynamic-order.1x5qFL`, `/tmp/agiru-record-order-controls.rNkiaB`.
   Outside the 141-case local replay and frozen 210945; full AL replay remains pending.
 - Dynamic SQL reads: private `RecordChanges.{h,cpp}` tracks only active readers,
@@ -33,8 +35,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
   Full local replay on `ccdd9a7`: 141 cases/232 tooling tests green, exit 0;
   changed inputs match before/after (`all-local.log`, `verified-inputs.sha256`).
-  Outside frozen 210945; full AL replay and own-variable/mixed-reverse write
-  qualification remain open. No BC throughput/resource parity or UT gain claimed.
+  Outside frozen 210945; full AL replay remains open. Order/own-frame continuation
+  is qualified above. No BC throughput/resource parity or UT gain claimed.
 - Cursor transactions: `Cursor::Current` checks session/connection/epoch before
   RuntimeNext uses a buffer. One owned OpenSelection primitive resumes either
   direction with the shared keyset order and bounded NO SCROLL fetching, not
