@@ -23,7 +23,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   14,225 slice sources. Full AL activation is pending; do not reuse 080905 as
   post-change execution proof. Activation snapshot `20261004T101600Z-1902967`
   freezes HEAD `5b7072c`, source `8af4d25d73e72d881a5df4ed1289e7fe928240c10d8f419cd0d5e1c0a9da86b3`;
-  its all build reached completion; test/UT results remain pending.
+  its `all` build and 130-case/223-tooling replay pass. UT execution has started
+  with six workers on disposable clones; its final result remains pending.
+  Manifest/source-file hashes match 080905; no denominator change.
 - Native qualifier/output repair (0034): all 29 platform sources compile in app/
   slice modes; dropped compilation refuses. Original/loader report checks pass
   562 each; native enum declarations pass 28/28. Analysis-only writes no files
