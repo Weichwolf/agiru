@@ -19,9 +19,11 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   remain open. StorageGate retains 71 green checks, including no-OnValidate.
   Disposable DB `agiru_modifyall_20261005_01` is removed; original gate configuration
   is restored. Default `make gates JOBS=2` passes on `bc433db`; source hashes match
-  (`default-gates-build.log`, `local-source-inputs.sha256`). Complete local replay
-  starts after frozen 223110's 141-case/232-tooling local run passes, without shared
-  database overlap. Full AL on frozen 223110 is live and excludes this caller fix.
+  (`default-gates-build.log`, `local-source-inputs.sha256`). Complete default-DB
+  replay passes: 141 cases/232 tooling tests, exit 0; source/control hashes match
+  before/after (`all-local.log`, `/tmp/agiru-record-order-controls.QWFUBk`). It starts
+  after frozen 223110's local run passes, without shared database overlap.
+  Full AL on frozen 223110 is live and excludes this caller fix.
 - Expanded dynamic writes: 5,013 checks green retain every original case and add
   uniform/mixed/global-reversed orders, already-open backward cursors and own
   Modify/Delete/Rename through typed/RecordRef. Own writes preserve the frame and

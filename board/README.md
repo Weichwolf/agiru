@@ -27,8 +27,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   StorageGate retains 71 green checks, including no-OnValidate. Disposable DB
   `agiru_modifyall_20261005_01` is removed; original gate configuration is restored.
   Default-configuration `make gates JOBS=2` passes on `bc433db`, source hashes match
-  (`default-gates-build.log`, `local-source-inputs.sha256`). Complete local replay
-  is running only after frozen 223110's gate tests finish; no shared-DB overlap.
+  (`default-gates-build.log`, `local-source-inputs.sha256`). Complete default-DB
+  replay passes: 141 cases/232 tooling tests, exit 0; inputs unchanged before/after
+  (`all-local.log`). It starts only after frozen 223110's local tests finish;
+  no shared-DB overlap. Full AL with this caller fix remains pending.
 - Dynamic-write integration: `20261004T223110Z-2943281`, frozen HEAD `382ecce`,
   source `d6b5367a085aae5be3e0d154ba6caf8660df15047a41945ca6294ab6efa53a0e`;
   `slice-check all test ut`, six jobs. Runner PID 2944742 is live; slice/build/local
