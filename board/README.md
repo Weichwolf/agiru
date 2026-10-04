@@ -20,7 +20,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   5,872 checks green, four compiled controls reject; previous actual runtime has
   1,046 failures on the same matrix. `/tmp/agiru-record-order.FQ83WP`.
   Own findings are cleared; inherited header/TempFind findings remain explicit.
-  Complete local replay is running; full AL replay is pending. Outside 184333;
+  Complete local replay passes: 138 cases/232 tooling tests, exit 0;
+  source-input hashes remain unchanged. Full AL replay is pending. Outside 184333;
   no live Table Metadata activation, UT gain or G1 claim.
 - Codepage integration replay: `20261004T184333Z-2543205`, frozen HEAD `155abe4`,
   source `79960d56653338db08e34dd932ca9d9914ace4454323d51b1578b5ca819d39a1`;

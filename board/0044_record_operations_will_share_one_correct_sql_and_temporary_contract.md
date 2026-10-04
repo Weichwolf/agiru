@@ -21,8 +21,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   existing TempFind complexity, reduced from 39 to 31. Selection's marked-row
   clause composition is split without changing bind/filter semantics.
   DiscoveryGate passes, including the
-  new qualifier's missing-script control. Full local/AL replay remains pending;
-  this change is outside frozen `20261004T184333Z-2543205`. No UT gain, native
+  new qualifier's missing-script control. Full local replay passes: 138 cases/
+  232 tooling tests, exit 0 (`all-local.log`); source-input hashes match before/
+  after. AL replay is pending; outside frozen `20261004T184333Z-2543205`. No UT gain, native
   differential oracle, page-presentation or performance claim.
 - Shared compiled predicate: `src/rt/RecordFilter.{h,cpp}` owns parsed expressions
   and borrows immutable field declarations. Temporary Build/Count/DeleteAll/CalcSum
