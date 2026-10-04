@@ -26,7 +26,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   IDs 2000000004/5. Native 233 selected/18 bound/215 unbound, 125 other inactive
   sources and 21 unresolved controls remain; all 14,225 slice sources exist.
   `/tmp/agiru-transpile.vohqhQ`: exit 1, unchanged package hashes. Unchanged
-  2,314-method UT replay remains pending; no provider, full-link or UT gain claimed.
+  2,314-method UT replay is running in `20261004T120802Z-2065848`, frozen HEAD
+  `1c01b11`, source `0039282b99790dd762ea620521f5f34d77fa4398eaa0512414f2fc5c66024c25`,
+  targets `slice-check all test ut`, six jobs. Slice presence passes; other targets
+  are not yet terminal. Independent census retains 113,013 raw/112,998 required
+  methods, zero unmeasured files and seven refused variants in three sources
+  (exit 2). Receipt: run `artifacts/scope-inventory-development.json` and
+  `/tmp/agiru-native-table-ids-census.log`. No provider, full-link or UT gain claimed.
 - Extension controls (0034): one page/report splice implementation; unresolved
   anchors refuse and preserve previous output. Compiled metadata 62 checks green;
   missing/cyclic anchors and wrong-order controls reject. Complete local Make:
