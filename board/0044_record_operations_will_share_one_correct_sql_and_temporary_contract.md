@@ -5,6 +5,24 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Dynamic SQL reads: private `RecordChanges.{h,cpp}` tracks only active readers,
+  with session-owned table revisions and O(1) read checks. Successful Storage row
+  writes and RuntimeDeleteAll advance the matching revision; failed, temporary,
+  unrelated-table and foreign-connection writes do not. RuntimeNext reuses the
+  bounded keyset primitive, never stale buffers. Shared ownership permits token
+  teardown after its session; the final reader retires the table counter.
+  DynamicRecordGate: 2,335 green across typed/RecordRef Modify/Insert/Delete/Rename,
+  ModifyAll/DeleteAll, filter admission/exclusion, fetch boundaries, isolation and
+  1,000 retired table visits. Initial business matrix before implementation:
+  320 checks/48 red; not an identical replay of the expanded final population.
+  `make record-order`: 5,872/296/313/2,335 green; twenty-one controls reject,
+  including each write hook, revision checks, table/connection scope and retirement.
+  Final analysis has no new findings; RecordChanges/Navigate/Storage/gate retain
+  25/30/38/34 existing findings, no suppression increase. Storage's four existing
+  source findings and Selection's declaration mismatch remain included.
+  `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
+  Outside frozen 210945; full local/AL replay and own-variable/mixed-reverse write
+  qualification remain open. No BC throughput/resource parity or UT gain claimed.
 - Cursor transactions: `Cursor::Current` checks session/connection/epoch before
   RuntimeNext uses a buffer. One owned OpenSelection primitive resumes either
   direction with the shared keyset order and bounded NO SCROLL fetching, not
@@ -303,8 +321,10 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
    Preserve documented complete-prefix selection; do not restore ignored keys
    just to recover old diagnostics. Compare the full population after any fix.
-1. Prove SQL dynamic result sets after own/shared writes; Table.cpp mutations do
-   not invalidate another variable's cursor. Qualify Query.cpp's transaction-boundary
+1. Replay the dynamic-write matrix above through the full AL population; qualify
+   own-variable mutation and already-open mixed/reverse cursors. Keep bounded reads
+   and measure write-loop overhead, including ModifyAll's current per-row traversal.
+   Qualify Query.cpp's transaction-boundary
    contract separately: Query.Read does not use RuntimeNext. Route table identity
    through explicit company context; preserve lifecycle/mixed-order/step gates.
    Reject predecessor 0889's unsupported claim that a PostgreSQL snapshot proves
@@ -403,6 +423,14 @@ selection and partial-step counterexamples. PostgreSQL 17 docs, checked 2026-10-
 [CLOSE](https://www.postgresql.org/docs/17/sql-close.html),
 [DECLARE](https://www.postgresql.org/docs/17/sql-declare.html). Ordinary PostgreSQL
 cursors are insensitive; their snapshots are not BC dynamic-result-set proof.
+
+Dynamic writes: developer `ff5939a46e05`, the administration dynamic-result-set
+guarantee above and `methods-auto/record/record-{modifyall,deleteall}-method.md`.
+BCApps `bb7111877ff7`, `src/Layers/W1/BaseApp/Sales/Document/ItemChargeAssgntSales.Codeunit.al::AssignItemCharges`
+does four ModifyAll calls before traversal. User `0ff62b2266fd`,
+`business-central/ui-how-run-batch-jobs.md`. Predecessor 1573 identifies ModifyAll's
+buffer/position corruption, still separate from this shared-read invalidation;
+0889's own-insert-blindness claim contradicts the platform dynamic-set guarantee.
 
 Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection/lifecycle matrix above; full SQL mutation and Query transaction contracts remain open.
 

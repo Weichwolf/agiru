@@ -15,6 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Dynamic SQL reads (0044): successful row/bulk writes change a session/table revision;
+  Next discards obsolete buffers before bounded keyset resumption. Tracking retires
+  with the final reader; ordinary Next adds no SQL or map lookup. DynamicRecordGate:
+  2,335 checks green, including typed/RecordRef mutations, filters, isolation,
+  failed/temporary writes and 1,000 retired table visits. Initial business matrix:
+  320 checks/48 red before the fix. `make record-order` retains 5,872/296/313 green
+  and rejects twenty-one compiled controls. No new analysis findings; existing
+  RecordChanges/Navigate/Storage/gate findings remain 25/30/38/34, unsuppressed.
+  `/tmp/agiru-dynamic-record.AeNaPT`, `/tmp/agiru-record-order-controls.fEDCql`.
+  Outside frozen 210945; full local/AL replay, own-variable/mixed-reverse mutations,
+  Query boundaries and company qualification remain open. No UT gain or G1 claim.
 - Cursor lifetime (0044): transaction-aware buffers, bounded bidirectional resume
   and released/surviving/absent portal cleanup. CursorLifecycleGate: 313 checks
   green; final coherent predecessor fixture reports 14 failures. Ordering/selection
@@ -22,7 +33,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   execute: 64 steps use three SQL statements, not 64 per-row reads. No own analysis
   findings, 33/25/30 inherited gate/Cursor/Navigate findings remain unsuppressed.
   `/tmp/agiru-cursor-lifecycle.p37EWy`, `/tmp/agiru-record-order-controls.YfDQHq`.
-  Full replay is running below; SQL dynamic writes/Query transaction contracts remain open.
+  Full replay is running below; dynamic writes are qualified separately above,
+  Query transaction contracts remain open.
 - Cursor/selection integration: `20261004T210945Z-2749818`, frozen HEAD `d1b4873`,
   source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`;
   `slice-check all test ut`, six jobs. Runner PID 2750430 is live; build is running.

@@ -76,8 +76,12 @@ The same exact-value matrix runs through typed Record and RecordRef on SQL and
 temporary rows. SelectionChangeGate adds changed filters/copies, keys/directions/views,
 active marks, unchanged setters and shared temporary Modify visibility. CursorLifecycleGate
 adds Commit/rollback buffer recovery, released/surviving/absent portal cleanup, partial
-and reversed walks. Thirteen compiled controls must reject; traced SQL counts reject
-a functional-green one-row fetch. SQL dynamic writes and Query transaction contracts remain open;
+and reversed walks. DynamicRecordGate adds same-session Modify/Insert/Delete/Rename,
+ModifyAll/DeleteAll and filter admission/exclusion through typed Record/RecordRef,
+inside/across fetch blocks. Revision storage follows active readers, not historical
+table visits; session/table/connection isolation and failed/temporary writes are checked.
+Twenty-one compiled controls must reject; traced SQL counts reject a functional-green
+one-row fetch. Full AL dynamic-write replay and Query transaction contracts remain open;
 this is not client-page presentation or live metadata-provider activation (0044).
 
 `make base64 JOBS=2` qualifies the shared raw byte codec, 76-column CRLF profile,

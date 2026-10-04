@@ -10,6 +10,8 @@ selection="$B/gate_SelectionChangeGate"
 "$selection" > "$proof/selection.log" 2>&1
 lifecycle="$B/gate_CursorLifecycleGate"
 "$lifecycle" > "$proof/lifecycle.log" 2>&1
+dynamic="$B/gate_DynamicRecordGate"
+"$dynamic" > "$proof/dynamic.log" 2>&1
 fetch_block=$(sed -n 's/^inline constexpr std::size_t kFetchBlock = \([0-9]*\);$/\1/p' src/rt/Cursor.h)
 [[ "$fetch_block" =~ ^[1-9][0-9]*$ ]]
 bounded_walks() {
@@ -102,8 +104,8 @@ for control in cursor-generation surviving-portal released-portal one-row-fetch;
   source=src/rt/Cursor.cpp
   if [ "$control" = cursor-generation ]; then source=src/rt/Navigate.cpp; fi
   awk -v control="$control" '
-    control == "cursor-generation" && /if \(open != nullptr && !open->cursor.Current\(\)\)/ {
-      print "  if (false) {"; changed++; next
+    control == "cursor-generation" && /if \(open != nullptr && .*open->cursor.Current\(\)/ {
+      sub(/!open->cursor.Current\(\)/, "false"); changed++
     }
     control == "surviving-portal" && /if \(Session::Current\(\).Transaction\(\).CursorEpoch\(\) != epoch_\)/ {
       print "    if (Session::Current().Transaction().CursorEpoch() != epoch_) { return; }";
@@ -137,10 +139,52 @@ for control in cursor-generation surviving-portal released-portal one-row-fetch;
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
   rm -- "$proof/$control.cpp" "$proof/$control.so"
 done
+for control in write-revision insert-notify update-notify delete-notify bulk-delete-notify table-scope connection-scope reader-retirement; do
+  source=src/rt/RecordChanges.cpp
+  case "$control" in
+    insert-notify|update-notify|delete-notify) source=src/rt/Storage.cpp;;
+    bulk-delete-notify) source=src/rt/Navigate.cpp;;
+  esac
+  awk -v control="$control" '
+    control == "write-revision" && /return observed_ == revision_->second.value;/ {
+      sub(/observed_ == revision_->second.value/, "true"); changed++
+    }
+    control == "insert-notify" && /if \(inserted\) \{ detail::RecordWritten/ { changed++; next }
+    control == "update-notify" && /^  detail::RecordWritten/ { changed++; next }
+    control == "delete-notify" && /if \(deleted\) \{ detail::RecordWritten/ { changed++; next }
+    control == "bulk-delete-notify" && /if \(written.Affected\(\) != 0\) \{ RecordWritten/ { changed++; next }
+    control == "table-scope" && /if \(found != state->recordChanges->tables_.end\(\)\)/ {
+      print "  for (auto &[id, revision] : state->recordChanges->tables_) { ++revision.value; }";
+      print "  static_cast<void>(found);"; changed++; next
+    }
+    control == "connection-scope" && /&Session::Current\(\).Database\(\) != &connection/ {
+      sub(/&Session::Current\(\).Database\(\) != &connection/, "false"); changed++
+    }
+    control == "connection-scope" && /^void RecordWritten/ {
+      print; print "  static_cast<void>(connection);"; next
+    }
+    control == "reader-retirement" && /owner_->tables_.erase\(revision_\)/ {
+      sub(/owner_->tables_.erase\(revision_\)/, "static_cast<void>(revision_)"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' "$source" > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_db -lagiru_net -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$dynamic" > "$proof/$control.log" 2>&1; then
+    printf 'record-order: %s escaped the dynamic-record gate\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL ' "$proof/$control.log"
+  sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
+  rm -- "$proof/$control.cpp" "$proof/$control.so"
+done
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   src/rt/Cursor.h src/rt/Cursor.cpp \
+  src/rt/RecordChanges.h src/rt/RecordChanges.cpp src/rt/SessionState.h src/rt/Storage.cpp \
   src/rt/Selection.cpp src/rt/Temporary.cpp src/rt/RecordState.cpp \
   include/runtime/RecordState.h include/runtime/Table.h \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
-  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" > "$proof/inputs.sha256"
-printf 'record-order: order, changing selections and cursor lifecycle pass; thirteen controls reject; %s\n' "$proof"
+  test/gate/DynamicRecordGate.cpp \
+  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" > "$proof/inputs.sha256"
+printf 'record-order: order, selections, cursor lifecycle and dynamic writes pass; twenty-one controls reject; %s\n' "$proof"

@@ -8,6 +8,7 @@
 #include "runtime/Table.h"
 
 #include "Cursor.h"
+#include "RecordChanges.h"
 #include "RecordOrder.h"
 #include "Selection.h"
 #include "Temporary.h"
@@ -24,6 +25,7 @@ namespace agiru::detail {
 
 struct OpenCursor {
   Cursor cursor;
+  RecordRead read;
   bool backwards;
 };
 
@@ -54,6 +56,7 @@ OpenSelection(RecordState &state, const TableDef &table, const Selection &made, 
   const Connection &connection = Session::Current().Database();
   if (!connection.InTransaction()) { connection.Run("BEGIN"); }
   auto *open = new OpenCursor{.cursor = Cursor(connection, SelectFrom(made, table), made.binds),
+                              .read = RecordRead(table.id),
                               .backwards = backwards};
   state.open.Hold(open);
   return open;
@@ -230,7 +233,7 @@ std::int32_t RuntimeNext(void *record, const TableDef &table, std::int32_t steps
   RecordState *state = StateOf(record);
   OpenCursor *open = state->open.Held();
   if (!state->positioned) { return 0; }
-  if (open != nullptr && !open->cursor.Current()) {
+  if (open != nullptr && (!open->cursor.Current() || !open->read.Current())) {
     state->open.Forget();
     open = nullptr;
   }
@@ -280,7 +283,9 @@ std::int32_t RuntimeDeleteAll(const void *record, const TableDef &table) {
   const Selection made = Select(PeekOf(record), table);
   std::string sql = "DELETE FROM " + Name(table);
   if (!made.where.empty()) { sql += " WHERE " + made.where; }
-  Session::Current().Database().Run(sql, made.binds);
+  const Connection &connection = Session::Current().Database();
+  const Result written = connection.Execute(sql, made.binds);
+  if (written.Affected() != 0) { RecordWritten(connection, table.id); }
   return 0;
 }
 

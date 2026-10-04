@@ -13,6 +13,8 @@ class SubscriptionCatalogue;
 
 namespace agiru::detail {
 
+class RecordChanges;
+
 struct SessionState {
   struct Binding {
     CodeunitId id;
@@ -25,6 +27,7 @@ struct SessionState {
   std::map<CodeunitId, OwnedInstance> singles;
   std::vector<Binding> bindings;
   std::uint64_t lastBinding = 0;
+  std::shared_ptr<RecordChanges> recordChanges;
 
   static SessionState &Current();
   static SessionState *Peek();

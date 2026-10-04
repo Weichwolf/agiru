@@ -24,6 +24,7 @@
 #include "type/Integer.h"
 
 #include "FieldMetadata.h"
+#include "RecordChanges.h"
 #include "Rows.h"
 #include "Selection.h"
 
@@ -273,7 +274,9 @@ bool InsertRow(const Connection &connection,
       connection.Execute("INSERT INTO " + Quoted(table.name) + " (" + columns + ") VALUES (" +
                              placeholders + ") ON CONFLICT DO NOTHING",
                          values);
-  return written.Affected() == 1;
+  const bool inserted = written.Affected() == 1;
+  if (inserted) { detail::RecordWritten(connection, table.id); }
+  return inserted;
 }
 
 std::optional<FieldValues> GetRow(const Connection &connection,
@@ -347,6 +350,7 @@ std::optional<FieldValues> Updated(const Connection &connection,
                              KeyPredicate(table, keyAt) + " RETURNING " + OwnedColumns(table),
                          bound);
   if (result.Rows() == 0) { return std::nullopt; }
+  detail::RecordWritten(connection, table.id);
   return RowOf(result, 0);
 }
 
@@ -392,7 +396,9 @@ bool DeleteRow(const Connection &connection,
   const Result result = connection.Execute("DELETE FROM " + Quoted(table.name) + " WHERE " +
                                                KeyPredicate(table, 1) + " RETURNING 1",
                                            key);
-  return result.Rows() != 0;
+  const bool deleted = result.Rows() != 0;
+  if (deleted) { detail::RecordWritten(connection, table.id); }
+  return deleted;
 }
 
 std::string_view Required(const std::optional<std::string> &value, const FieldDef &def) {
