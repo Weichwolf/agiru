@@ -98,9 +98,9 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   Remaining before Native activation: primitive binding for all nine overloads;
   exact text encodings, stream cursor/reference/threshold semantics,
   separate transform-block decoder and native AL diagnostic contracts. Unicode
-  replacement/UTF-16 char units are now independently qualified in 0035; single-byte
-  pages still use Latin-1 and accept unknown pages. Windows-1252 best-fit and locale
-  defaults remain gaps. Run all thirteen original tests and compare
+  replacement/UTF-16 char units and distinct Windows-1252/ASCII/ISO-8859-1 pages
+  are independently qualified in 0035; unknown pages now refuse. Other codepages
+  and locale defaults remain gaps. Run all thirteen original tests and compare
   the unchanged full 2,314 UT population. No UT gain/performance/WASM claim.
 - Native stream qualification: raw/selected codeunit population is 35/35, none
   excluded; all declarations are emitted, but primitives remain unbound. Original BC29 output branches use

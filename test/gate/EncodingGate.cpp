@@ -18,6 +18,20 @@ using agiru::dotnet::Encoding;
 
 namespace {
 
+constexpr unsigned kAsciiBoundary = 128;
+constexpr unsigned kTwoByteBoundary = 2048;
+constexpr unsigned kUnitPopulation = 65536;
+constexpr unsigned kBytePopulation = 256;
+constexpr unsigned kContinuation = 0x80U;
+constexpr unsigned kTwoByteLead = 0xC0U;
+constexpr unsigned kThreeByteLead = 0xE0U;
+constexpr unsigned kFourByteLead = 0xF0U;
+constexpr unsigned kPayloadMask = 0x3FU;
+constexpr unsigned kSixBits = 6U;
+constexpr unsigned kTwelveBits = 12U;
+constexpr unsigned kEighteenBits = 18U;
+constexpr unsigned kByteBits = 8U;
+
 void CodePageZeroIsTheAnsiPage() {
   const Encoding ansi = Encoding::GetEncoding(agiru::Integer{0});
   CHECK_TEXT("bytes E6 F8 E5 read as Latin letters",
@@ -135,6 +149,170 @@ void CharacterArrays() {
              Encoding::Unicode().GetPreamble().Length() == 2);
 }
 
+void SingleBytePages() {
+  const Encoding windows = Encoding::GetEncoding(agiru::Integer{1252});
+  const Encoding latin = Encoding::GetEncoding(agiru::Integer{28591});
+  CHECK_TEXT("Windows euro differs from the Latin-1 control",
+             windows.Decode(gate::Unhex("80")),
+             gate::Unhex("E282AC"));
+  CHECK_TEXT(
+      "Latin-1 retains its C1 control", latin.Decode(gate::Unhex("80")), gate::Unhex("C280"));
+  CHECK_TEXT("Windows smart punctuation is not Latin-1",
+             windows.Decode(gate::Unhex("919293949697")),
+             gate::Unhex("E28098E28099E2809CE2809DE28093E28094"));
+  CHECK_TEXT("undefined Windows byte identities roundtrip as controls",
+             windows.Decode(gate::Unhex("818D8F909D")),
+             gate::Unhex("C281C28DC28FC290C29D"));
+  CHECK_TEXT("Windows reverse mapping preserves the euro",
+             windows.Encode(gate::Unhex("E282AC")),
+             gate::Unhex("80"));
+  CHECK_TEXT("best-fit is a byte mapping, not Unicode normalization",
+             windows.Encode(gate::Unhex("65CC81")),
+             gate::Unhex("65B4"));
+  CHECK_TEXT("best-fit folds fullwidth and accented characters",
+             windows.Encode(gate::Unhex("C480EFBCA1")),
+             "AA");
+  CHECK_TEXT("Latin-1 never borrows Windows best-fit", latin.Encode(gate::Unhex("65CC81")), "e?");
+  CHECK_TEXT("Latin-1 retains its own punctuation best-fit",
+             latin.Encode(gate::Unhex("E282ACE28098E28099E2809CE2809DE28093E28094")),
+             "?''\"\"--");
+  CHECK_TEXT(
+      "ASCII replaces each non-ASCII byte", Encoding::ASCII().Decode(gate::Unhex("80FF")), "??");
+  for (const Encoding &encoding : {windows, latin, Encoding::ASCII()}) {
+    CHECK_TEXT("single-byte encoders replace both supplementary UTF-16 units",
+               encoding.Encode(gate::Unhex("F09F9880")),
+               "??");
+    CHECK_TEXT("single-byte encoders replace an isolated surrogate once",
+               encoding.Encode(gate::Unhex("EDA080")),
+               "?");
+  }
+  CHECK_TEXT("Latin-1 reports its actual codepage name", latin.WebName(), "iso-8859-1");
+}
+
+void EncodingFactories() {
+  CHECK_TRUE("numeric UTF-8 retains its separately requested preamble",
+             Encoding::GetEncoding(agiru::Integer{65001}).GetPreamble().Length() == 3);
+  CHECK_TRUE("named UTF-8 selects the same preamble",
+             Encoding::GetEncoding("UTF-8").GetPreamble().Length() == 3);
+  CHECK_TRUE("Default does not acquire the UTF8 singleton preamble",
+             Encoding::Default().GetPreamble().Length() == 0);
+  CHECK_TRUE("Latin-1 aliases do not select Windows-1252",
+             Encoding::GetEncoding("latin1").CodePage() == 28591);
+  CHECK_TRUE("cp819 selects Latin-1", Encoding::GetEncoding("cp819").CodePage() == 28591);
+  CHECK_TRUE("cp1252 selects Windows", Encoding::GetEncoding("cp1252").CodePage() == 1252);
+  CHECK_TRUE("x-ansi selects Windows", Encoding::GetEncoding("x-ansi").CodePage() == 1252);
+  CHECK_TRUE("UTF-16LE is the little-endian alias",
+             Encoding::GetEncoding("utf-16le").CodePage() == 1200);
+  CHECK_TRUE("UTF-32LE is the little-endian alias",
+             Encoding::GetEncoding("utf-32le").CodePage() == 12000);
+  for (const char *name : {"utf8", "utf32", "latin-1", "x-cp1252", "windows-1251", "iso-8859-2"}) {
+    bool refused = false;
+    try {
+      static_cast<void>(Encoding::GetEncoding(name));
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("unknown aliases and unimplemented pages never select an unrelated encoding",
+               refused);
+  }
+  for (const int page : {-1, 437, 1251, 28592, 65536}) {
+    bool refused = false;
+    try {
+      static_cast<void>(Encoding::GetEncoding(agiru::Integer{page}));
+    } catch (const agiru::Error &) { refused = true; }
+    CHECK_TRUE("unimplemented numeric pages never fall through to Latin-1", refused);
+  }
+  const Encoding unimplemented = Encoding::Made(437, false);
+  bool encodeRefused = false;
+  bool decodeRefused = false;
+  try {
+    static_cast<void>(unimplemented.Encode(""));
+  } catch (const agiru::Error &) { encodeRefused = true; }
+  try {
+    static_cast<void>(unimplemented.Decode(""));
+  } catch (const agiru::Error &) { decodeRefused = true; }
+  CHECK_TRUE("raw unimplemented encoders refuse even empty input", encodeRefused);
+  CHECK_TRUE("raw unimplemented decoders refuse even empty input", decodeRefused);
+}
+
+std::string ScalarInput(unsigned code) {
+  std::string text;
+  if (code < kAsciiBoundary) {
+    text += static_cast<char>(code);
+  } else if (code < kTwoByteBoundary) {
+    text += static_cast<char>(kTwoByteLead | (code >> kSixBits));
+    text += static_cast<char>(kContinuation | (code & kPayloadMask));
+  } else if (code < kUnitPopulation) {
+    text += static_cast<char>(kThreeByteLead | (code >> kTwelveBits));
+    text += static_cast<char>(kContinuation | ((code >> kSixBits) & kPayloadMask));
+    text += static_cast<char>(kContinuation | (code & kPayloadMask));
+  } else {
+    text += static_cast<char>(kFourByteLead | (code >> kEighteenBits));
+    text += static_cast<char>(kContinuation | ((code >> kTwelveBits) & kPayloadMask));
+    text += static_cast<char>(kContinuation | ((code >> kSixBits) & kPayloadMask));
+    text += static_cast<char>(kContinuation | (code & kPayloadMask));
+  }
+  return text;
+}
+
+unsigned HexUnit(std::string_view hex) {
+  const std::string bytes = gate::Unhex(hex);
+  if (bytes.size() != 2) { throw agiru::Error("codepage reference requires one UTF-16 unit"); }
+  return (static_cast<unsigned>(static_cast<unsigned char>(bytes[0])) << kByteBits) |
+         static_cast<unsigned char>(bytes[1]);
+}
+
+void CodePageReference(const char *path, int page) {
+  std::array<bool, kUnitPopulation> encoded{};
+  std::array<bool, kBytePopulation> decoded{};
+  std::size_t encodeRows = 0;
+  std::size_t decodeRows = 0;
+  std::ifstream input(path);
+  if (!input) { throw agiru::Error("cannot open codepage reference fixture"); }
+  const Encoding encoding = Encoding::GetEncoding(agiru::Integer{page});
+  std::string line;
+  while (std::getline(input, line)) {
+    const auto fields = gate::ReferenceFields<3>(line);
+    if (fields[0] == "E") {
+      const unsigned unit = HexUnit(fields[1]);
+      if (encoded[unit]) { throw agiru::Error("duplicate codepage encode identity"); }
+      encoded[unit] = true;
+      ++encodeRows;
+      const std::string expected = gate::Unhex(fields[2]);
+      if (expected.size() != 1) {
+        throw agiru::Error("codepage reference requires one output byte");
+      }
+      CHECK_TEXT("every UTF-16 unit matches original native codepage bytes",
+                 encoding.Encode(ScalarInput(unit)),
+                 expected);
+    } else if (fields[0] == "D") {
+      const std::string bytes = gate::Unhex(fields[1]);
+      if (bytes.size() != 1) { throw agiru::Error("codepage reference requires one input byte"); }
+      const auto byte = static_cast<unsigned char>(bytes[0]);
+      if (decoded[byte]) { throw agiru::Error("duplicate codepage decode identity"); }
+      decoded[byte] = true;
+      ++decodeRows;
+      CHECK_TEXT("every byte matches original native codepage UTF-16 units",
+                 encoding.Decode(bytes),
+                 ScalarInput(HexUnit(fields[2])));
+    } else {
+      throw agiru::Error("unknown codepage reference operation");
+    }
+  }
+  if (!input.eof()) { throw agiru::Error("cannot read codepage reference fixture"); }
+  CHECK_TRUE("the complete BMP encode population remains counted", encodeRows == kUnitPopulation);
+  CHECK_TRUE("the complete byte decode population remains counted", decodeRows == kBytePopulation);
+  constexpr unsigned kLastScalar = 0x10FFFF;
+  for (unsigned point = kUnitPopulation; point <= kLastScalar; ++point) {
+    CHECK_TEXT("every supplementary scalar matches the original two-unit fallback",
+               encoding.Encode(ScalarInput(point)),
+               "??");
+  }
+  std::println("Codepage {} reference: {} encodes, {} decodes, {} supplementary scalars",
+               page,
+               encodeRows,
+               decodeRows,
+               kLastScalar - kUnitPopulation + 1);
+}
+
 bool ReferenceRow(const std::string &line) {
   const auto fields = gate::ReferenceFields<5>(line);
   if (fields[0] != "E" && fields[0] != "D") {
@@ -152,6 +330,12 @@ bool ReferenceRow(const std::string &line) {
       encoding = Encoding::Unicode();
     } else if (fields[2] == "12000") {
       encoding = Encoding::UTF32();
+    } else if (fields[2] == "1252") {
+      encoding = Encoding::GetEncoding(agiru::Integer{Encoding::kWindows1252});
+    } else if (fields[2] == "20127") {
+      encoding = Encoding::ASCII();
+    } else if (fields[2] == "28591") {
+      encoding = Encoding::GetEncoding(agiru::Integer{Encoding::kLatin1});
     } else {
       return false;
     }
@@ -162,7 +346,7 @@ bool ReferenceRow(const std::string &line) {
   }
   const std::string input = gate::Unhex(fields[3]);
   const std::string expected = gate::Unhex(fields[4]);
-  CHECK_TEXT("shared Unicode codec matches the original BC29 text core",
+  CHECK_TEXT("shared declared encoding profile matches the original BC29 text core",
              fields[0] == "E" ? encoding.Encode(input) : encoding.Decode(input),
              expected);
   return true;
@@ -182,8 +366,8 @@ void Reference(const char *path) {
     }
   }
   if (!input.eof()) { throw agiru::Error("cannot read encoding reference fixture"); }
-  CHECK_TRUE("the original Unicode reference population is nonempty", selected != 0);
-  std::println("Encoding reference: {} total, {} Unicode, {} outside Unicode profile",
+  CHECK_TRUE("the original encoding reference population is nonempty", selected != 0);
+  std::println("Encoding reference: {} total, {} selected, {} outside the declared profile",
                selected + outside,
                selected,
                outside);
@@ -193,7 +377,19 @@ void Reference(const char *path) {
 
 int main(int argc, char **argv) {
   return gate::Run("Encoding", [&] {
-    if (argc > 2) { throw agiru::Error("EncodingGate accepts at most one reference fixture"); }
+    if (argc == 3 && std::string_view(argv[1]) == "--codepage-reference") {
+      CodePageReference(argv[2], Encoding::kWindows1252);
+      return;
+    }
+    if (argc == 3 && std::string_view(argv[1]) == "--ascii-reference") {
+      CodePageReference(argv[2], Encoding::kAscii);
+      return;
+    }
+    if (argc == 3 && std::string_view(argv[1]) == "--latin1-reference") {
+      CodePageReference(argv[2], Encoding::kLatin1);
+      return;
+    }
+    if (argc > 2) { throw agiru::Error("EncodingGate requires a declared reference mode"); }
     if (argc == 2) {
       Reference(argv[1]);
       return;
@@ -203,5 +399,7 @@ int main(int argc, char **argv) {
     Utf16Replacement();
     Utf32Replacement();
     CharacterArrays();
+    SingleBytePages();
+    EncodingFactories();
   });
 }

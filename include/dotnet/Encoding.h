@@ -14,8 +14,10 @@ namespace agiru::dotnet {
 
 /// \brief .NET `System.Text.Encoding` with UTF-8, UTF-16LE and UTF-32LE replacement decoding.
 ///        Unicode encoders replace unpaired UTF-16 surrogates; byte conversion emits no BOM.
-/// \warning Single-byte pages still use an unqualified Latin-1 approximation, including
-///          Windows-1252 best-fit encoding; unknown numeric pages are not yet rejected.
+///        ASCII, ISO-8859-1 and Windows-1252 are distinct; single-byte encoders replace
+///        supplementary characters with two question marks. Windows-1252 and Latin-1 retain
+///        their distinct best-fit mappings.
+/// \warning Other codepages remain explicit refusals; this is not the complete .NET catalogue.
 ///
 /// \note A BYTE ARRAY IS A `dotnet::Array` OF INTEGERS 0..255, the way AL reads a `byte[]` back
 ///       (`Array.GetValue(i)` is an Integer there too).
@@ -47,12 +49,13 @@ public:
   /// \brief `Encoding.UTF32`. \return UTF-32 little-endian.
   [[nodiscard]] static class Encoding UTF32();
 
-  /// \brief `Encoding.GetEncoding(codePage)`. \param codePage 65001, 1200, 20127, 0, or a
-  ///        single-byte page. \return The encoding.
+  /// \brief `Encoding.GetEncoding(codePage)`. \param codePage The declared numeric codepage.
+  /// \return The supported encoding. \throws Error for an unimplemented codepage.
   [[nodiscard]] static class Encoding GetEncoding(Integer codePage);
 
   /// \brief `Encoding.GetEncoding(name)`. \param name `utf-8`, `utf-16`, `us-ascii`,
-  ///        `windows-1252` and the like. \return The encoding. \throws Error for a name unknown.
+  ///        `windows-1252`, `iso-8859-1` or a supported alias. \return The encoding.
+  /// \throws Error for an unknown name or unsupported page; never guesses from a prefix.
   [[nodiscard]] static class Encoding GetEncoding(std::string_view name);
 
   /// \brief `Encoding.Convert(from, to, bytes)`. \param from The bytes' encoding. \param to The
@@ -100,7 +103,7 @@ public:
   /// \brief `Encoding.CodePage`. \return The code page.
   [[nodiscard]] Integer CodePage() const { return codePage_; }
 
-  /// \brief `Encoding.WebName`. \return `utf-8`, `utf-16`, `us-ascii` or `windows-<page>`.
+  /// \brief `Encoding.WebName`. \return The encoding name, including `iso-8859-1` for Latin-1.
   [[nodiscard]] ::agiru::Text<0> WebName() const;
 
   /// \brief `Encoding.EncodingName`. \return The same name as `WebName`.
@@ -121,6 +124,7 @@ public:
   static constexpr std::int32_t kUtf8 = 65001;       ///< The UTF-8 code page.
   static constexpr std::int32_t kUtf16 = 1200;       ///< The UTF-16 little-endian code page.
   static constexpr std::int32_t kAscii = 20127;      ///< The ASCII code page.
+  static constexpr std::int32_t kLatin1 = 28591;     ///< ISO-8859-1, distinct from Windows-1252.
   static constexpr std::int32_t kDefault = 0;        ///< `GetEncoding(0)`, the default.
   static constexpr std::int32_t kWindows1252 = 1252; ///< The Western European single-byte page.
   static constexpr std::int32_t kUtf32 = 12000;      ///< The UTF-32 little-endian code page.

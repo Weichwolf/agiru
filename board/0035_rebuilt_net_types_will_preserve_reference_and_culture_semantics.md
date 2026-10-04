@@ -5,6 +5,25 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Single-byte foundation: private immutable `src/net/CodePage.{h,cpp}` tables keep
+  Windows-1252 and ISO-8859-1 best-fit distinct; ASCII replaces non-ASCII bytes.
+  Shared factories preserve declared aliases/preambles and refuse unknown pages.
+  `make encoding`: 87 checks, twelve compiled controls reject; original BC29 text
+  cores agree for 192,678/193,398 cases, 720 outside-profile cases remain counted.
+  Each of three native codepage corpora measures all 65,536 BMP units, 256 bytes
+  and 1,048,576 supplementary scalars; C++ agrees throughout. Receipts:
+  `/tmp/agiru-codepages.g4fWUJ/receipt.json`, `/tmp/agiru-encoding.SaM7UU`.
+  Previous actual library fails thirteen checks then refuses the Latin-1 alias.
+  The same full text-reference population has 49 prior-library failures, zero now.
+  Data notices: `licenses/`. CodePage analysis passes; runtime/gate add no own
+  findings and each retains 33 existing unsuppressed header findings. Local replay:
+  136 cases, one wrong-notice-path refusal, 232 tooling tests pass (`all-local.log`).
+  Corrected layout qualifier passes all controls (`layout-corrected.log`); this
+  does not rewrite the original red result. Frozen full-UT verification is pending.
+  Other pages, locale defaults, array bounds/types and Native bindings remain gaps.
+  References: pinned developer/BCApps/user revisions below; original
+  `EncodingImpl.Codeunit.al`, `DotNetWrappers/DotNetEncoding.Codeunit.al`,
+  predecessor 1164/1511. Latin-1 best-fit is measured, not borrowed from Windows.
 - Unicode foundation: `src/net/Encoding.cpp` validates UTF-8 maximal subparts,
   UTF-16 pairs/tails and UTF-32 scalars/tails; encoders replace isolated surrogate
   units and char arrays preserve UTF-16 units. No byte-conversion BOM or point vector.
@@ -26,7 +45,7 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Against 164436, all identities/source hashes match, no gains/losses/changed errors;
   `artifacts/ut-comparison-164436.json`. Null/unsealed seed remains diagnostic,
   not causal A/B. Codepage changes are outside this snapshot.
-  Remaining: codepage tables/best-fit/default selection, array bounds/types and
+  Remaining: other codepage tables/default selection, array bounds/types and
   all nine Native Base64 bindings/streams (0034); no BC workflow/WASM/performance claim.
   References: developer `ff5939a46e`, `devenv-file-handling-and-text-encoding.md`,
   `methods-auto/textencoding/textencoding-option.md`; BCApps `bb7111877f`, original
@@ -38,10 +57,10 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Latin-1 differs at 495 encode/27 decode identities. Complete byte roundtrip.
   `CodePageProbe.cs`, `windows-1252{.tsv,-analysis.json,.log}` under the directory above;
   TSV SHA256 `99e05c67832a638543b851ab05a5538ca3889ecbfe397e86a1e29371de824815`.
-  No C++ codepage repair yet. ICU 76.1 `uconv --fallback` substitutes 65 1A for
+  C++ codepage qualification is above. ICU 76.1 `uconv --fallback` substitutes 65 1A for
   e+combining acute (native 65 B4), and 1A for U+1F600 (native 3F 3F); no blind adapter.
   CLR factory probe also proves `GetEncoding(65001)` has a separate three-byte
-  preamble; current factory loses it. `encoding-metadata.tsv`.
+  preamble; the corrected factory preserves it. `encoding-metadata.tsv`.
 - `Stream.cpp` no longer copies the entire BLOB on each write. One private append
   preserves raw bytes, zero terminators, existing-stream visibility and borrowed
   self-input; storage grows geometrically. StreamGate: 51 checks green, previous

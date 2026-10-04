@@ -7,6 +7,8 @@
 #include "type/StringValue.h"
 #include "type/Variant.h"
 
+#include "CodePage.h"
+
 #include <cctype>
 #include <cstddef>
 #include <cstdint>
@@ -24,7 +26,6 @@ constexpr std::int32_t kFourByteLead = 0xF0;
 constexpr std::int32_t kContinuation = 0x80;
 constexpr std::int32_t kSixBits = 0x3F;
 constexpr std::int32_t kAsciiLimit = 0x80;
-constexpr std::int32_t kLatinLimit = 0x100;
 constexpr std::int32_t kSurrogateBase = 0x10000;
 constexpr std::int32_t kHighSurrogate = 0xD800;
 constexpr std::int32_t kLowSurrogate = 0xDC00;
@@ -228,10 +229,12 @@ Encoding::GetEncoding(Integer codePage) {
 
   const std::int32_t page = codePage;
   if (page == kDefault) { return Made(kWindows1252, false); }
-  if (page == kUtf8) { return Made(kUtf8, false); }
+  if (page == kUtf8) { return UTF8(); }
   if (page == kUtf16) { return Made(kUtf16, true); }
   if (page == kUtf32) { return Made(kUtf32, true); }
-  return Made(page, false);
+  if (FindSingleByteCodePage(page) != nullptr) { return Made(page, false); }
+  throw Error("Encoding.GetEncoding: code page " + std::to_string(page) +
+              " has no implementation (board:0035)");
 }
 
 class Encoding Encoding::GetEncoding(std::string_view name) {
@@ -239,11 +242,15 @@ class Encoding Encoding::GetEncoding(std::string_view name) {
   for (const char c : name) {
     lowered += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
   }
-  if (lowered == "utf-8" || lowered == "utf8") { return Made(kUtf8, false); }
-  if (lowered == "utf-16" || lowered == "unicode") { return Made(kUtf16, true); }
-  if (lowered == "us-ascii" || lowered == "ascii") { return Made(kAscii, false); }
-  if (lowered.starts_with("windows-") || lowered.starts_with("iso-8859-")) {
-    return Made(kWindows1252, false);
+  if (lowered == "utf-8") { return UTF8(); }
+  if (lowered == "utf-16" || lowered == "unicode" || lowered == "utf-16le") { return Unicode(); }
+  if (lowered == "utf-32" || lowered == "utf-32le") { return UTF32(); }
+  if (lowered == "us-ascii" || lowered == "ascii") { return ASCII(); }
+  if (lowered == "windows-1252" || lowered == "cp1252" || lowered == "x-ansi") {
+    return GetEncoding(Integer{kWindows1252});
+  }
+  if (lowered == "iso-8859-1" || lowered == "latin1" || lowered == "cp819") {
+    return GetEncoding(Integer{kLatin1});
   }
   throw Error("Encoding.GetEncoding: the encoding " + std::string(name) + " is not one known here");
 }
@@ -253,6 +260,13 @@ Array Encoding::Convert(const class Encoding &from, const class Encoding &to, co
 }
 
 std::string Encoding::Encode(std::string_view text) const {
+  const SingleByteCodePage *single = FindSingleByteCodePage(codePage_);
+  const bool unicode = codePage_ == kUtf8 || codePage_ == kUnset || codePage_ == kDefault ||
+                       codePage_ == kUtf16 || codePage_ == kUtf32;
+  if (!unicode && single == nullptr) {
+    throw Error("Encoding.Encode: code page " + std::to_string(codePage_) +
+                " has no implementation (board:0035)");
+  }
   std::string out;
   out.reserve(text.size());
   for (std::size_t position = 0; position < text.size();) {
@@ -271,8 +285,11 @@ std::string Encoding::Encode(std::string_view text) const {
       AppendUtf16(out, code);
       continue;
     }
-    const std::int32_t limit = codePage_ == kAscii ? kAsciiLimit : kLatinLimit;
-    out += code < limit ? static_cast<char>(code) : kReplacement;
+    if (code >= kSurrogateBase) {
+      out.append(2, kReplacement);
+    } else {
+      out += static_cast<char>(EncodeSingleByteUnit(*single, code));
+    }
   }
   return out;
 }
@@ -289,7 +306,16 @@ std::string Encoding::Decode(std::string_view bytes) const {
   std::string out;
   if (codePage_ == kUtf32) { return DecodeUtf32(bytes); }
   if (codePage_ == kUtf16) { return DecodeUtf16(bytes); }
-  for (const char c : bytes) { AppendUtf8(out, static_cast<unsigned char>(c)); }
+  const SingleByteCodePage *single = FindSingleByteCodePage(codePage_);
+  if (single == nullptr) {
+    throw Error("Encoding.Decode: code page " + std::to_string(codePage_) +
+                " has no implementation (board:0035)");
+  }
+  out.reserve(bytes.size());
+  for (const char c : bytes) {
+    const auto byte = static_cast<unsigned char>(c);
+    AppendUtf8(out, single->decode[byte]);
+  }
   return out;
 }
 
@@ -363,6 +389,7 @@ Array Encoding::GetPreamble() const {
   if (codePage_ == kUtf16) { return ::agiru::Text<0>{"utf-16"}; }
   if (codePage_ == kUtf32) { return ::agiru::Text<0>{"utf-32"}; }
   if (codePage_ == kAscii) { return ::agiru::Text<0>{"us-ascii"}; }
+  if (codePage_ == kLatin1) { return ::agiru::Text<0>{"iso-8859-1"}; }
   if (codePage_ == kUtf8 || codePage_ == kUnset || codePage_ == kDefault) {
     return ::agiru::Text<0>{"utf-8"};
   }

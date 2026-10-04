@@ -169,7 +169,7 @@ base64: comments db ## prove byte codec, bounded output, aliases and compiled ne
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_Base64Gate
 	@B="$(B)" bash "$(SELF)/test/runtime/base64.sh"
 
-encoding: comments db ## prove Unicode replacement, UTF-16 units and compiled negative controls
+encoding: comments db ## prove declared encodings, factories and compiled negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_EncodingGate
 	@B="$(B)" bash "$(SELF)/test/runtime/encoding.sh"
 
