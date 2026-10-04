@@ -20,8 +20,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Filter/FilterGroup/Temporary retain 125/137/80 green checks. Same FilterGroup
   bodies: parser calls decrease 97→25, not a workload performance claim.
   `/tmp/agiru-record-filter-parsing.EklR47`, `/tmp/agiru-reflection-metadata.hiyxPP`.
-  No new lint findings; inherited headers/TempFind remain red. Full local replay
-  pending; outside frozen 120802, not live-provider activation or a UT gain.
+  No new lint findings; inherited headers/TempFind remain red. Complete local Make
+  passes 132 cases/223 tooling tests, exit 0; parsing receipt `local-verification.json`
+  and `/tmp/agiru-compiled-record-filter-all-local.log`. Outside frozen 120802;
+  not live-provider activation or a UT gain.
 - Installed metadata lookup (0044): existing catalogue, on-demand projection by
   original ID; absent rows and unqualified declarations remain distinct. Generated
   replay passes 61 checks and two new runtime controls; runner lint passes, runtime

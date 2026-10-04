@@ -18,7 +18,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   `/tmp/agiru-record-filter-parsing.EklR47/`; not a throughput/resource benchmark.
   Targeted analysis: no new source findings; 30 inherited header findings remain,
   plus Temporary's existing TempFind complexity 39. No suppressions added.
-  Full local replay pending; outside frozen 120802, with live providers still guarded.
+  Complete `make test JOBS=2`: 132 cases/223 tooling tests green, exit 0;
+  `/tmp/agiru-compiled-record-filter-all-local.log` and parsing receipt
+  `local-verification.json`. Outside frozen 120802; live providers remain guarded.
 - Installed metadata lookup: `TableMetadata.cpp::InstalledTableMetadata` uses
   the existing sorted catalogue and projects only the requested original ID.
   Missing IDs return no row; missing owners/native default authority still refuse.
