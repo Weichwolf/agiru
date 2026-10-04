@@ -36,7 +36,7 @@ std::string_view DeclaredKind(std::string_view source) {
       return "interface";
     }
     if (tokens[at + 1].kind != al::TokenKind::Integer) { continue; }
-    for (const auto *const kind : {"table", "report", "enum"}) {
+    for (const auto *const kind : {"table", "report", "enum", "codeunit"}) {
       if (al::IsKeyword(tokens[at], kind)) { return kind; }
     }
   }
@@ -88,6 +88,9 @@ void ReadOne(const std::filesystem::path &package,
     } else if (kind == "enum") {
       into.enums.push_back(al::ParseEnum(source));
       into.enumPaths.push_back(relative);
+    } else if (kind == "codeunit") {
+      into.codeunits.push_back(al::ParseCodeunit(source));
+      into.codeunitPaths.push_back(relative);
     } else {
       into.interfaces.push_back(al::ParseInterface(source));
       into.interfacePaths.push_back(relative);
@@ -98,7 +101,8 @@ void ReadOne(const std::filesystem::path &package,
 }
 
 bool NeedsNativeIdentity(const NativeSources &sources, const std::filesystem::path &package) {
-  if (!sources.reports.empty() || !sources.enums.empty() || !sources.interfaces.empty()) {
+  if (!sources.reports.empty() || !sources.enums.empty() || !sources.interfaces.empty() ||
+      !sources.codeunits.empty()) {
     return true;
   }
   if (sources.tables.empty()) { return false; }
@@ -179,6 +183,15 @@ NativeSources ReadNativeSources(const std::filesystem::path &package) {
                                object.name);
     }
   }
+  std::set<int> codeunitIds;
+  std::set<std::string> codeunitNames;
+  for (const auto &object : into.codeunits) {
+    if (object.id <= 0 || !codeunitIds.insert(object.id).second ||
+        !codeunitNames.insert(LowerKey(object.nameSpace + "." + object.name)).second) {
+      throw std::runtime_error("System source has invalid or duplicate codeunit identity: " +
+                               object.name);
+    }
+  }
   if (NeedsNativeIdentity(into, package)) { into.app = ReadNativeIdentity(package); }
   return into;
 }
@@ -188,6 +201,7 @@ void SelectNativeSources(NativeSources &sources, const TranspileScope &scope) {
   SelectFamily(sources.reports, sources.reportPaths, "report", sources, scope);
   SelectFamily(sources.enums, sources.enumPaths, "enum", sources, scope);
   SelectFamily(sources.interfaces, sources.interfacePaths, "interface", sources, scope);
+  SelectFamily(sources.codeunits, sources.codeunitPaths, "codeunit", sources, scope);
 }
 
 }

@@ -45,6 +45,8 @@ struct NativeSources {
   std::vector<std::string> enumPaths;
   std::vector<al::InterfaceObject> interfaces;
   std::vector<std::string> interfacePaths;
+  std::vector<al::CodeunitObject> codeunits;
+  std::vector<std::string> codeunitPaths;
   NativeAppIdentity app;
   std::vector<NativeSourceIssue> issues;
   std::vector<std::string> otherSources;

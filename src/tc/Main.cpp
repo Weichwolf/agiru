@@ -1478,14 +1478,28 @@ std::size_t ReportNativeSources(const agiru::gen::NativeSources &sources,
   for (const auto &issue : sources.issues) {
     std::println("native-refused {}: {}", issue.source, issue.reason);
   }
+  for (std::size_t at = 0; at < sources.codeunits.size(); ++at) {
+    const auto &unit = sources.codeunits[at];
+    std::println("native-codeunit-unactivated {} {}.{}: {}",
+                 unit.id,
+                 unit.nameSpace,
+                 unit.name,
+                 sources.codeunitPaths[at]);
+    for (const auto &procedure : unit.procedures) {
+      if (!agiru::al::HasAttribute(procedure, "Native")) { continue; }
+      std::println("native-method-unbound {}: {}",
+                   agiru::gen::NativeMethodIdentity(unit, procedure),
+                   sources.codeunitPaths[at]);
+    }
+  }
   std::println("native {} table sources parsed, {} bound, {} unbound, {} source refusals; "
                "{} other AL sources not activated; no provider or business execution proof",
                sources.tables.size(),
                sources.tables.size() - unbound,
                unbound,
                sources.issues.size(),
-               sources.otherSources.size());
-  return unbound + sources.issues.size() + sources.otherSources.size();
+               sources.otherSources.size() + sources.codeunits.size());
+  return unbound + sources.issues.size() + sources.otherSources.size() + sources.codeunits.size();
 }
 
 const agiru::al::TableObject *SourceOf(const agiru::al::PageObject &page,
@@ -3108,6 +3122,7 @@ int Scan(const Job &job) {
                                                 ? agiru::gen::NativeSources{}
                                                 : agiru::gen::ReadNativeSources(job.systemSymbols);
   const auto rawNativeTables = nativeSources.tables.size();
+  const auto rawNativeCodeunits = nativeSources.codeunits.size();
   agiru::gen::SelectNativeSources(nativeSources, scope);
   for (const auto &excluded : nativeSources.excluded) {
     std::println("native product-excluded {} {} {}.{}: {} ({})",
@@ -3123,6 +3138,11 @@ int Scan(const Job &job) {
       rawNativeTables,
       nativeSources.tables.size(),
       rawNativeTables - nativeSources.tables.size());
+  std::println(
+      "native parsed codeunit declarations: {} before policy, {} selected, {} product-excluded",
+      rawNativeCodeunits,
+      nativeSources.codeunits.size(),
+      rawNativeCodeunits - nativeSources.codeunits.size());
   if ((!nativeSources.reports.empty() || !nativeSources.enums.empty() ||
        (!nativeSources.tables.empty() && !nativeSources.app.id.empty())) &&
       std::ranges::any_of(apps, [](const auto &app) { return app.name == "platform"; })) {

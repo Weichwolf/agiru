@@ -12,6 +12,32 @@
 namespace agiru::gen {
 namespace {
 
+std::string DeclaredType(const al::VarDecl &declared) {
+  std::string out;
+  if (!declared.dimensions.empty()) {
+    out = "array[";
+    for (const int dimension : declared.dimensions) {
+      if (out.back() != '[') { out += ','; }
+      out += std::to_string(dimension);
+    }
+    out += "] of ";
+  }
+  out += declared.type;
+  if (!declared.subtype.empty()) { out += " " + declared.subtype; }
+  if (declared.length != 0) { out += "[" + std::to_string(declared.length) + "]"; }
+  if (!declared.arguments.empty()) {
+    out += " of [";
+    for (const auto &argument : declared.arguments) {
+      if (out.back() != '[') { out += ", "; }
+      out += DeclaredType(argument);
+    }
+    out += ']';
+  }
+  for (const auto &member : declared.members) { out += " \"" + member + "\""; }
+  if (declared.temporary) { out += " temporary"; }
+  return out;
+}
+
 constexpr std::array kRefused{
     std::string_view{"abouttextml"},
     std::string_view{"abouttitleml"},
@@ -63,6 +89,24 @@ constexpr std::array kRefusedValue{
 
 bool RefusedByName(std::string_view name) {
   return std::ranges::find(kRefused, name) != kRefused.end();
+}
+
+std::string NativeMethodIdentity(const al::CodeunitObject &codeunit,
+                                 const al::ProcedureDecl &procedure) {
+  std::string out = "codeunit " + std::to_string(codeunit.id) + " ";
+  if (!codeunit.nameSpace.empty()) { out += codeunit.nameSpace + '.'; }
+  out += codeunit.name + '.' + procedure.name + '(';
+  for (const auto &parameter : procedure.parameters) {
+    if (out.back() != '(') { out += "; "; }
+    if (parameter.byReference) { out += "var "; }
+    out += parameter.name + ": " + DeclaredType(parameter);
+  }
+  out += ')';
+  if (!procedure.returnType.empty()) {
+    if (!procedure.returnName.empty()) { out += ' ' + procedure.returnName; }
+    out += ": " + DeclaredType(procedure.returned);
+  }
+  return out;
 }
 
 void CollectRefused(const std::vector<al::Property> &properties,
@@ -126,6 +170,10 @@ std::vector<RefusedProperty> Refused(const al::PageObject &page) {
 std::vector<RefusedProperty> Refused(const al::CodeunitObject &codeunit) {
   std::vector<RefusedProperty> found;
   CollectRefused(codeunit.properties, "codeunit " + codeunit.name, found);
+  for (const auto &procedure : codeunit.procedures) {
+    if (!al::HasAttribute(procedure, "Native")) { continue; }
+    found.push_back({.property = "Native", .where = NativeMethodIdentity(codeunit, procedure)});
+  }
   return found;
 }
 

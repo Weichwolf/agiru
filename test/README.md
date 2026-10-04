@@ -40,6 +40,13 @@ fail. Qualified names and local Option shadowing remain distinct. The fixture's 
 unbound table keeps translation nonzero; `make native-table-ids JOBS=2` qualifies the
 constant path, not native provider/business execution or the UT milestone.
 
+`transpiler/native-codeunits.sh` executes void/value/named-return/overloaded/local
+Native refusals before var/stream/event effects. Removing Native must fail the
+compiled runner. `make native-codeunits JOBS=2` is the focused entry point;
+an explicit verified `AGIRU_SYSTEM_SYMBOLS` also compiles and calls all nine original
+Base64 overloads, retaining named refusals. Neither proves implemented native
+behaviour or authenticates authored fixtures as System packages.
+
 `runtime/xml-reader.sh` proves shared cursor/close and consuming DOM-load contracts
 in `XmlReaderGate`; separate-state and raw-input reload mutants must fail. It covers
 positioned/ended readers, node ownership, namespaces, DTD retention and whitespace.

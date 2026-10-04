@@ -18,6 +18,7 @@
 namespace {
 
 constexpr int kPageArgumentCount = 5;
+constexpr int kCodeunitArgumentCount = 4;
 
 std::string Read(const char *path) {
   std::ifstream stream(path);
@@ -46,6 +47,16 @@ void Write(const std::filesystem::path &path, std::string_view text) {
   stream << text;
 }
 
+int EmitCodeunit(const char *source, const char *output) {
+  const auto unit = agiru::al::ParseCodeunit(Read(source));
+  const agiru::gen::Objects objects;
+  auto path = std::filesystem::path(output) / agiru::gen::CodeunitHeaderPath(unit);
+  Write(path, agiru::gen::WriteCodeunit(unit, source, objects).text);
+  path.replace_extension(".cpp");
+  Write(path, agiru::gen::WriteCodeunitSource(unit, source, objects));
+  return 0;
+}
+
 int EmitPage(const char *tableSource, const char *pageSource, const char *output) {
   const auto table = agiru::al::ParseTable(Read(tableSource));
   const std::array declarations{table};
@@ -72,10 +83,14 @@ int EmitPage(const char *tableSource, const char *pageSource, const char *output
 int main(int argc, char **argv) {
   try {
     if (argc == 2) { return Emit(argv[1]); }
+    if (argc == kCodeunitArgumentCount && std::string_view(argv[1]) == "--codeunit") {
+      return EmitCodeunit(argv[2], argv[3]);
+    }
     if (argc == kPageArgumentCount && std::string_view(argv[1]) == "--page") {
       return EmitPage(argv[2], argv[3], argv[4]);
     }
     std::cerr << "usage: native-binding-emit <original-table-source>\n"
+                 "       native-binding-emit --codeunit <codeunit-source> <output>\n"
                  "       native-binding-emit --page <table-source> <page-source> <output>\n";
     return 2;
   } catch (const agiru::al::ParseError &error) {

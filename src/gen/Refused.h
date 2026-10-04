@@ -15,6 +15,9 @@ struct RefusedProperty {
 
 bool RefusedByName(std::string_view name);
 
+std::string NativeMethodIdentity(const al::CodeunitObject &codeunit,
+                                 const al::ProcedureDecl &procedure);
+
 void CollectRefused(const std::vector<al::Property> &properties,
                     std::string_view where,
                     std::vector<RefusedProperty> &into);

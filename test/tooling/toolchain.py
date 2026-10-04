@@ -347,6 +347,7 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertIn('native field declaration mismatch: Page Table Field.Caption', compiled.stderr)
 
     def test_unbound_and_non_table_sources_remain_red_and_counted(self):
+        self.native_table_manifest()
         (self.package / 'src/Unknown.al').write_text('table 50199 Unknown { fields { field(1; ID; Integer) {} } }')
         (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated { }')
         result = self.run_compiler()
@@ -354,6 +355,54 @@ class NativeSourceCompilerGate(unittest.TestCase):
         self.assertIn('native-unbound 50199 Unknown', result.stdout)
         self.assertIn('2 table sources parsed, 1 bound, 1 unbound', result.stdout)
         self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \([^\n]*1 \[Test\] methods\)')
+
+    def test_native_codeunit_source_identity_and_policy_are_retained(self):
+        self.native_table_manifest()
+        declared = self.package / 'src/not-a-codeunit-name.aL'
+        declared.write_text('namespace System.Fixture; codeunit 50200 Unactivated { '
+            '[Native] procedure Read(var Value: Integer): Text begin end; }')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('native parsed codeunit declarations: 1 before policy, 1 selected, 0 product-excluded', result.stdout)
+        self.assertIn('native-codeunit-unactivated 50200 System.Fixture.Unactivated: src/not-a-codeunit-name.aL', result.stdout)
+        self.assertIn('native-method-unbound codeunit 50200 System.Fixture.Unactivated.Read(var Value: Integer): Text', result.stdout)
+        self.assertIn('1 other AL sources not activated', result.stdout)
+        self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \([^\n]*1 \[Test\] methods\)')
+        policy = {'include': ['System', 'Microsoft'], 'exclude': [],
+            'product_exclude': ['bc-licensing:system-symbols/src/not-a-codeunit-name.aL']}
+        (self.root / 'scope.json').write_text(json.dumps(policy))
+        excluded = self.run_compiler()
+        self.assertEqual(excluded.returncode, 0, excluded.stdout + excluded.stderr)
+        self.assertIn('native parsed codeunit declarations: 1 before policy, 0 selected, 1 product-excluded', excluded.stdout)
+        self.assertIn('native product-excluded codeunit 50200 System.Fixture.Unactivated:', excluded.stdout)
+        self.assertNotIn('native-method-unbound', excluded.stdout)
+
+    def test_native_codeunit_duplicate_id_or_qualified_name_refuses_before_output(self):
+        self.native_table_manifest()
+        original = 'namespace System.Fixture; codeunit 50200 Unactivated {}'
+        (self.package / 'src/First.al').write_text(original)
+        for mutant in (original.replace('Unactivated', 'Other'), original.replace('50200', '50201')):
+            with self.subTest(mutant=mutant):
+                (self.package / 'src/Duplicate.al').write_text(mutant)
+                result = self.run_compiler()
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn('invalid or duplicate codeunit identity', result.stderr)
+                self.assertFalse(self.generated.exists())
+
+    def test_native_codeunit_missing_manifest_is_not_an_invented_owner(self):
+        (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated {}')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('cannot read System NavxManifest.xml', result.stderr)
+        self.assertFalse(self.generated.exists())
+
+    def test_native_codeunit_parse_refusal_retains_source_and_ut_population(self):
+        (self.package / 'src/Code.al').write_text('codeunit 50200 Unactivated { [Native] procedure Read(')
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn('native-refused src/Code.al', result.stdout)
+        self.assertIn('1 source refusals', result.stdout)
         self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \([^\n]*1 \[Test\] methods\)')
 
     def test_comments_cannot_manufacture_a_native_declaration(self):
@@ -3033,7 +3082,7 @@ class DiscoveryGate(unittest.TestCase):
                        'runtime/test-contexts.sh', 'runtime/text-positions.sh', 'runtime/xml-reader.sh',
                        'runtime/codeunit-record.sh', 'runtime/page-navigation.sh',
                        'runtime/boolean-expressions.sh', 'transpiler/control-extensions.sh',
-                       'transpiler/native-table-ids.sh')
+                       'transpiler/native-table-ids.sh', 'transpiler/native-codeunits.sh')
             for name in scripts:
                 script = root / 'test' / name
                 script.parent.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,7 @@
 #include "Expr.h"
 #include "Names.h"
 #include "ObjectKind.h"
+#include "Refused.h"
 #include "RuntimeSurface.h"
 #include "Scope.h"
 #include "TableWriter.h"
@@ -1846,7 +1847,7 @@ std::string MethodSource(const al::ProcedureDecl &procedure,
       Returns(procedure, objects) + " " + className + "::" + Identifier(procedure.name) + "(" +
       Parameters(procedure, objects, true, owner.name, shadowed, owner.procedures, body) + ") {";
   const std::string locals =
-      IsPublisher(procedure)
+      IsPublisher(procedure) || al::HasAttribute(procedure, "Native")
           ? std::string{}
           : Locals(procedure, objects, owner.name, owner.procedures, body, shadowed);
   if (locals.empty() && body.empty()) { return out + "}\n\n"; }
@@ -1881,11 +1882,16 @@ std::string WriteCodeunitSource(const al::CodeunitObject &unit,
     const bool publisher = IsPublisher(procedure);
     const ProcedureNames names(unit, procedure, objects);
     const std::string body =
-        publisher ? RaisingBody(procedure,
-                                "EventObject::Codeunit",
-                                TraitsOf("CodeunitTraits", space, unitClass) + "::kId.Value()",
-                                TraitsOf("CodeunitTraits", space, unitClass) + "::kName")
-                  : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
+        al::HasAttribute(procedure, "Native")
+            ? "  throw ::agiru::Error(" +
+                  Literal(NativeMethodIdentity(unit, procedure) +
+                          " has no native implementation (board:0034)") +
+                  ");\n"
+        : publisher ? RaisingBody(procedure,
+                                  "EventObject::Codeunit",
+                                  TraitsOf("CodeunitTraits", space, unitClass) + "::kId.Value()",
+                                  TraitsOf("CodeunitTraits", space, unitClass) + "::kName")
+                    : WriteStatements(names, procedure.body, 2) + FallsOff(procedure, names);
     out += MethodSource(procedure, names.Context(), unitClass, objects, body);
   }
 

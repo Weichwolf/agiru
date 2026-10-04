@@ -1,9 +1,10 @@
+#include "Ast.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
 #include "Format.h"
 #include "Parser.h"
-#include "TableWriter.h"
+#include "Refused.h"
 
 #include <array>
 #include <cstddef>
@@ -522,6 +523,34 @@ void ANativeFieldCannotCaptureARecordMethod() {
   CHECK_TRUE("native field values are never called", !body.contains("Native.RecordID()"));
 }
 
+void NativeDeclarationsNeverBecomeSuccessfulEmptyMethods() {
+  const auto unit = agiru::al::ParseCodeunit(R"(namespace System.Fixture;
+    codeunit 50311 NativeFixture {
+      [Native] procedure Empty() begin end;
+      [nAtIvE] procedure Read(var Value: Integer) Result: Text
+      var UnexpectedLocal: Integer;
+      begin Value := 99; exit('success'); end;
+      [Native] [IntegrationEvent(false, false)]
+      procedure Publish(var Value: Integer) begin end;
+      procedure Ordinary(): Integer begin exit(7); end;
+    })");
+  const auto refused = agiru::gen::Refused(unit);
+  CHECK_TRUE("every Native overload remains counted", refused.size() == 3);
+  CHECK_TEXT("refusal retains source namespace, ID, modes and named return",
+             refused.at(1).where,
+             "codeunit 50311 System.Fixture.NativeFixture.Read(var Value: Integer) Result: Text");
+  CHECK_TEXT("Native capability is not a guessed property", refused.at(1).property, "Native");
+  const auto source = agiru::gen::WriteCodeunitSource(unit, "NativeFixture.Codeunit.al", Tables());
+  CHECK_TRUE("native void declarations refuse instead of falling off",
+             source.contains("NativeFixture.Empty() has no native implementation"));
+  CHECK_TRUE(
+      "native publisher declarations refuse before raising events",
+      source.contains("NativeFixture.Publish(var Value: Integer) has no native implementation"));
+  CHECK_TRUE("Native ignores authored fallback bodies", !source.contains("Value = 99"));
+  CHECK_TRUE("unbound Native never initializes AL locals", !source.contains("UnexpectedLocal{}"));
+  CHECK_TRUE("ordinary AL procedures retain their implementation", source.contains("return 7;"));
+}
+
 } // namespace
 
 int main() {
@@ -541,5 +570,6 @@ int main() {
     ARemoteVarParameterLendsTheVariantsStoredType();
     ACodeunitIncludesEveryObjectItNames();
     ANativeFieldCannotCaptureARecordMethod();
+    NativeDeclarationsNeverBecomeSuccessfulEmptyMethods();
   });
 }
