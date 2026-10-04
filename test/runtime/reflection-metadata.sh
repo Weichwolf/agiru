@@ -9,6 +9,29 @@ gate="$B/gate_ReflectionMetadataGate"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror
   -fPIC -shared -Iinclude -Isrc/rt --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19)
 
+for control in filter-union filter-flowfilter filter-empty; do
+  awk -v control="$control" '
+    control == "filter-union" && /crossColumnHit = crossColumnHit \|\| passes;/ {
+      $0 = "      crossColumnHit = crossColumnHit && passes;"; changed++
+    }
+    control == "filter-flowfilter" && /field->fieldClass == FieldClass::FlowFilter/ {
+      sub(/field->fieldClass == FieldClass::FlowFilter/, "false"); changed++
+    }
+    control == "filter-empty" && /\.expression = ParseFilter\(filter.text\)/ {
+      sub(/ParseFilter\(filter.text\)/, "ParseFilter(\"\")"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' src/rt/RecordFilter.cpp > "$proof/$control.cpp"
+  "$CXX" "${flags[@]}" "$proof/$control.cpp" -L"$B" -Wl,-rpath,"$B" \
+    -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control.so"
+  if LD_PRELOAD="$proof/$control.so" "$gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the shared compiled filter gate\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL ' "$proof/$control.log"
+done
+
 for control in ordinal-cast cds-query default-fallback property-fallback property-ordinal scope-aliases; do
   awk -v control="$control" '
     control == "ordinal-cast" && /case PageType::HeadlinePart: return Native::HeadlinePart;/ {
@@ -88,4 +111,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, AL defaults, kind/property mappings and temporary rows pass; thirteen controls refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, compiled filters, AL defaults and temporary rows pass; sixteen controls refuse; %s\n' "$proof"

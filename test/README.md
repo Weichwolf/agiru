@@ -54,6 +54,11 @@ temporary cursors and compiled no-borrow/no-restore/assignment-alias controls ar
 selected-record identity, opening triggers, explicit-action precedence and card
 ModifyAllowed policy. View navigation and general command permissions remain open (0030).
 
+`runtime/reflection-metadata.sh` verifies declaration projection and shared compiled
+record filters, including group intersections, cross-column OR, FlowFilters and
+owned expression snapshots. Sixteen controls must reject. Temporary operations
+use the same predicate; this does not activate live metadata providers (0044).
+
 The ERP milestones are separate: `make ut` executes the source-counted AL UT
 population through `agiru run-tests`; the full AL suite follows. Their original
 source is in BCApps, not in these authored fixtures. A green local regression

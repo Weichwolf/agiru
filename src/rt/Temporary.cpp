@@ -9,10 +9,9 @@
 #include "type/BigInteger.h"
 #include "type/Decimal.h"
 #include "type/Duration.h"
-#include "type/FieldClass.h"
 #include "type/Integer.h"
 
-#include "Filter.h"
+#include "RecordFilter.h"
 
 #include <algorithm>
 #include <compare>
@@ -97,34 +96,15 @@ bool SameKeyAt(const TempTable &temp, const TableDef &table, std::size_t at, con
          Ordered(temp.ops->at(temp.rows, at), record, table, PrimaryKey(table)) == 0;
 }
 
-bool Passes(const void *row, const std::vector<FieldFilter> &filters, const TableDef &table) {
-  bool crossColumn = false;
-  bool crossColumnHit = false;
-  for (const FieldFilter &filter : filters) {
-    const FieldDef &def = FieldOf(table, filter.field);
-    if (def.fieldClass == FieldClass::FlowFilter) { continue; }
-    const std::string value = def.type == FieldType::RecordId || def.type == FieldType::DateFormula
-                                  ? StorageText(row, def)
-                                  : FieldText(row, def);
-    const bool passes = Matches(ParseFilter(filter.text), value, def);
-    if (filter.group == kCrossColumnGroup) {
-      crossColumn = true;
-      crossColumnHit = crossColumnHit || passes;
-      continue;
-    }
-    if (!passes) { return false; }
-  }
-  return !crossColumn || crossColumnHit;
-}
-
 void Build(Held held, const TableDef &table) {
   RecordState &state = *held.state;
   state.view.clear();
+  const RecordFilter filter(state.viewFilters, table);
   const std::size_t count = held.temp->ops->count(held.temp->rows);
   for (std::size_t index = 0; index < count; ++index) {
     const void *row = held.temp->ops->at(held.temp->rows, index);
     if (state.markedOnly && !state.marks.contains(MarkKey(row, table))) { continue; }
-    if (Passes(row, state.viewFilters, table)) { state.view.push_back(index); }
+    if (filter.Matches(row)) { state.view.push_back(index); }
   }
   const std::vector<FieldNo> by = OrderOf(state.viewKey, table);
   std::ranges::stable_sort(state.view, [&](std::size_t a, std::size_t b) {
@@ -293,10 +273,11 @@ bool TempDelete(void *record, const TableDef &table) {
 
 std::int32_t TempDeleteAll(void *record, const TableDef &table) {
   const Held held = Reach(record);
+  const RecordFilter filter(held.state->filters, table);
   std::int32_t removed = 0;
   std::size_t index = 0;
   while (index < held.temp->ops->count(held.temp->rows)) {
-    if (Passes(held.temp->ops->at(held.temp->rows, index), held.state->filters, table)) {
+    if (filter.Matches(held.temp->ops->at(held.temp->rows, index))) {
       held.temp->ops->erase(held.temp->rows, index);
       ++removed;
     } else {
@@ -309,12 +290,13 @@ std::int32_t TempDeleteAll(void *record, const TableDef &table) {
 
 std::int32_t TempCount(void *record, const TableDef &table) {
   const Held held = Reach(record);
+  const RecordFilter filter(held.state->filters, table);
   std::int32_t count = 0;
   const std::size_t rows = held.temp->ops->count(held.temp->rows);
   for (std::size_t index = 0; index < rows; ++index) {
     const void *row = held.temp->ops->at(held.temp->rows, index);
     if (held.state->markedOnly && !held.state->marks.contains(MarkKey(row, table))) { continue; }
-    if (Passes(row, held.state->filters, table)) { ++count; }
+    if (filter.Matches(row)) { ++count; }
   }
   return count;
 }
@@ -325,6 +307,7 @@ bool TempIsEmpty(void *record, const TableDef &table) {
 
 void TempCalcSum(void *record, const TableDef &table, const FieldDef &def) {
   const Held held = Reach(record);
+  const RecordFilter filter(held.state->filters, table);
   const auto at = [&def](const void *row) {
     return static_cast<const std::byte *>(row) + def.offset;
   };
@@ -334,7 +317,7 @@ void TempCalcSum(void *record, const TableDef &table, const FieldDef &def) {
   for (std::size_t index = 0; index < rows; ++index) {
     const void *row = held.temp->ops->at(held.temp->rows, index);
     if (held.state->markedOnly && !held.state->marks.contains(MarkKey(row, table))) { continue; }
-    if (!Passes(row, held.state->filters, table)) { continue; }
+    if (!filter.Matches(row)) { continue; }
     switch (def.type) {
       case FieldType::Decimal:
         decimal = decimal + *reinterpret_cast<const Decimal *>(at(row));

@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Compiled record filters (0044): one owned predicate for temporary operations
+  and computed rows. ReflectionMetadata passes 194 checks/sixteen controls;
+  Filter/FilterGroup/Temporary retain 125/137/80 green checks. Same FilterGroup
+  bodies: parser calls decrease 97→25, not a workload performance claim.
+  `/tmp/agiru-record-filter-parsing.EklR47`, `/tmp/agiru-reflection-metadata.hiyxPP`.
+  No new lint findings; inherited headers/TempFind remain red. Full local replay
+  pending; outside frozen 120802, not live-provider activation or a UT gain.
 - Installed metadata lookup (0044): existing catalogue, on-demand projection by
   original ID; absent rows and unqualified declarations remain distinct. Generated
   replay passes 61 checks and two new runtime controls; runner lint passes, runtime

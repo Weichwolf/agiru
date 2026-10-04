@@ -1,3 +1,4 @@
+#include "meta/Ids.h"
 #include "meta/ModuleDef.h"
 #include "meta/PageDef.h"
 #include "meta/TableDef.h"
@@ -6,13 +7,16 @@
 #include "platform/ReflectionTypes.h"
 #include "platform/TableMetadata.h"
 #include "runtime/ErrorValue.h"
+#include "runtime/RecordState.h"
 #include "runtime/Storage.h"
 #include "runtime/Table.h"
+#include "type/FieldClass.h"
 #include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 
 #include "Check.h"
+#include "RecordFilter.h"
 #include "ReflectionMetadata.h"
 #include "TableMetadata.h"
 
@@ -25,6 +29,7 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -61,6 +66,62 @@ constexpr agiru::TableDef kSourceTable{.id = agiru::TableId{60074},
                                        .obsoleteReason = "Original reason",
                                        .dataClassification = "AccountData",
                                        .linkedObject = true};
+
+void CompiledRecordFilters() {
+  using Row = agiru::platform::TableMetadata;
+  using Filter = agiru::detail::FieldFilter;
+  using agiru::detail::RecordFilter;
+  const auto &table = agiru::TableTraits<Row>::kTable;
+  auto row = agiru::detail::ProjectTableMetadata(kSourceTable);
+  CHECK_TRUE("an empty compiled filter accepts a computed row",
+             RecordFilter({}, table).Matches(&row));
+  std::vector filters{
+      Filter{.field = Row::Field_No::ID, .group = 0, .text = "60070..60080"},
+      Filter{.field = Row::Field_No::Name, .group = -1, .text = "'Source name'"},
+      Filter{.field = Row::Field_No::Caption, .group = -1, .text = "'Other caption'"}};
+  const RecordFilter original(filters, table);
+  CHECK_TRUE("compiled cross-column filters OR together", original.Matches(&row));
+  row.Name = "Other name";
+  CHECK_TRUE("a cross-column miss excludes the computed row", !original.Matches(&row));
+  row.Caption = "Other caption";
+  CHECK_TRUE("either cross-column field may accept the row", original.Matches(&row));
+  row.ID = kTemporaryId;
+  CHECK_TRUE("ordinary groups intersect the cross-column union", !original.Matches(&row));
+  row.ID = kSourceTable.id.Value();
+  filters.front().text = "1..2";
+  const RecordFilter changed(filters, table);
+  CHECK_TRUE("a compiled filter owns its expression snapshot", original.Matches(&row));
+  CHECK_TRUE("a new operation observes the changed filters", !changed.Matches(&row));
+  filters.clear();
+  CHECK_TRUE("compiled filters outlive the source filter container", original.Matches(&row));
+  CHECK_TRUE("projection filtering does not allocate record/session state",
+             row.State_Block.Peek() == nullptr);
+  const std::array intersection{
+      Filter{.field = Row::Field_No::ID, .group = 0, .text = "60070..60080"},
+      Filter{.field = Row::Field_No::ID, .group = 2, .text = "60075..60085"}};
+  const RecordFilter groups(intersection, table);
+  CHECK_TRUE("same-field constraints from separate groups remain distinct", !groups.Matches(&row));
+  row.ID = kSourceTable.id.Value() + 1;
+  CHECK_TRUE("the same-field group intersection accepts only shared values", groups.Matches(&row));
+  auto fields = agiru::platform::kTableMetadataFields;
+  for (auto &field : fields) {
+    if (field.no == Row::Field_No::Name) { field.fieldClass = agiru::FieldClass::FlowFilter; }
+  }
+  auto flowTable = table;
+  flowTable.fields = fields;
+  const std::array flow{
+      Filter{.field = Row::Field_No::Name, .group = -1, .text = "'Absent value'"}};
+  CHECK_TRUE("FlowFilters constrain calculations, not computed row membership",
+             RecordFilter(flow, flowTable).Matches(&row));
+  bool refused = false;
+  try {
+    const std::array missing{Filter{.field = agiru::FieldNo{0}, .group = 0, .text = "1"}};
+    static_cast<void>(RecordFilter(missing, table));
+  } catch (const agiru::Error &error) {
+    refused = std::string_view(error.what()).contains("no field 0");
+  }
+  CHECK_TRUE("an undeclared filter field refuses before a computed scan", refused);
+}
 
 void TableProjection() {
   using namespace agiru::platform;
@@ -415,6 +476,7 @@ int main() {
     TableProjectionVariants();
     TableProjectionDefaults();
     TableProjectionRefusals();
+    CompiledRecordFilters();
     MissingProviderIsNotAnEmptySnapshot<agiru::platform::PageMetadata>();
     MissingProviderIsNotAnEmptySnapshot<agiru::platform::TableMetadata>();
   });

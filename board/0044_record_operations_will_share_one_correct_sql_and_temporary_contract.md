@@ -5,6 +5,20 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Shared compiled predicate: `src/rt/RecordFilter.{h,cpp}` owns parsed expressions
+  and borrows immutable field declarations. Temporary Build/Count/DeleteAll/CalcSum
+  parse once per operation, not once per row; computed metadata uses the same API.
+  Group intersections, cross-column OR, skipped FlowFilters and changed/destroyed
+  source filter containers execute in ReflectionMetadata: 194 checks green, sixteen
+  controls reject. Filter/FilterGroup/Temporary retain 125/137/80 green checks.
+  `/tmp/agiru-reflection-metadata.hiyxPP`; focused Make logs
+  `/tmp/agiru-compiled-record-filter-{scalar,groups,temporary,final-replay}.log`.
+  Identical FilterGroup bodies against current/preceding frozen runtime: 25 versus
+  97 ParseFilter calls, both 137/137 green. Instrumentation/source/image receipts:
+  `/tmp/agiru-record-filter-parsing.EklR47/`; not a throughput/resource benchmark.
+  Targeted analysis: no new source findings; 30 inherited header findings remain,
+  plus Temporary's existing TempFind complexity 39. No suppressions added.
+  Full local replay pending; outside frozen 120802, with live providers still guarded.
 - Installed metadata lookup: `TableMetadata.cpp::InstalledTableMetadata` uses
   the existing sorted catalogue and projects only the requested original ID.
   Missing IDs return no row; missing owners/native default authority still refuse.
@@ -255,6 +269,13 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 - Unindexed sortable fields return true and sort correctly; active prefix selection uses the first full key. Disabled keys, IncludedFields and unsortable fields have separate controls. Genuine failure returns false in value context and raises in statement context; keep both checks in the retained unindexed probe.
 
 ## References
+
+Compiled predicates: developer `ff5939a46e05`, `methods-auto/record/record-{filtergroup,count}-method.md`
+and `devenv-flowfilter-overview.md`; BCApps `bb7111877ff7`,
+`Foundation/Reporting/CustomLayoutReporting.Codeunit.al::{SetGroupFilter,FindNextEmptyFilterGroup}`;
+user `0ff62b2266fd`, `business-central/ui-enter-criteria-filters.md`.
+Predecessor 1063/1103 require every reader to retain group intersections; do not
+replace grouped source filters with a field-keyed dictionary or parallel state.
 
 Filter groups: include/runtime/{Record,RecordState,Table,RecordRef}.h, src/rt/{RecordRef,Temporary}.cpp, test/gate/FilterGroupGate.cpp and test/transpiler/page-record-binding/. Platform methods-auto/{record,recordref}/*-{filtergroup,hasfilter}-method.md and record/record-getfilter-method.md; current official FilterGroup pages checked 2026-10-02. BCApps main a9ea4d84534cebba852c44bf0f841c2ea149de4e, src/Layers/W1/BaseApp/Foundation/Reporting/CustomLayoutReporting.Codeunit.al::{FindNextEmptyFilterGroup,SetGroupFilter,GetNextGroupFilters}; System/Workflow/WorkflowResponseFactBox.Page.al::OnFindRecord. User business-central/ui-enter-criteria-filters.md. Earlier 1063/1103 expose shared-group storage and five item-tracking regressions; preserve independent filters and investigate every loss, not the predecessor's one-dictionary compromise. Generator property syntax is 0073; runtime remains this WI.
 
