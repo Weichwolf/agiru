@@ -26,11 +26,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   sort-field mutation, native trigger/global proof and set-based optimization remain open.
   StorageGate retains 71 green checks, including no-OnValidate. Disposable DB
   `agiru_modifyall_20261005_01` is removed; original gate configuration is restored.
-  Default-configuration rebuild and complete local replay remain pending.
+  Default-configuration `make gates JOBS=2` passes on `bc433db`, source hashes match
+  (`default-gates-build.log`, `local-source-inputs.sha256`). Complete local replay
+  is running only after frozen 223110's gate tests finish; no shared-DB overlap.
 - Dynamic-write integration: `20261004T223110Z-2943281`, frozen HEAD `382ecce`,
   source `d6b5367a085aae5be3e0d154ba6caf8660df15047a41945ca6294ab6efa53a0e`;
-  `slice-check all test ut`, six jobs. Runner PID 2944742 is live; slice/build pass,
-  local tests are executing. Source/System/original-notice dependencies match 210945.
+  `slice-check all test ut`, six jobs. Runner PID 2944742 is live; slice/build/local
+  tests pass (141 cases/232 tooling tests); the full AL target has started.
+  Source/System/original-notice dependencies match 210945.
   Compare all 2,314 identities/statuses/errors against 210945. Null/unsealed seed
   remains diagnostic, not causal A/B or G1. ModifyAll's caller fix is outside this run.
 - Dynamic SQL reads (0044): successful row/bulk writes change a session/table revision;
