@@ -277,6 +277,11 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 1. Prove SQL dynamic result sets after own/shared writes and cursor recovery after
    Commit/rollback; route table identity through explicit company context. Preserve
    mixed-order and zero/partial/exhausted/extreme-step gates.
+   `Cursor.cpp` checks CursorEpoch only in destruction, not Step; `Navigate.cpp::RuntimeNext`
+   consumes an existing cursor without epoch validation. Qualify buffered and next-block
+   cases after production Commit and savepoint rollback. Table.cpp writes do not invalidate
+   another variable's cursor. Reject predecessor 0889's unsupported claim that a PostgreSQL
+   snapshot proves BC own-insert blindness; platform documentation requires dynamic sets.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
@@ -351,7 +356,8 @@ Range bounds: platform `methods-auto/{record,fieldref}/*-getrangemin-method.md` 
 
 Selection-change authority: developer `ff5939a46e05`,
 `methods-auto/record/record-{next,setfilter,copyfilter,copyfilters,mark,markedonly,clearmarks}-method.md`
-and `administration/optimize-sql-al-Database-methods-and-performance-on-server.md`.
+and `dev-itpro/administration/optimize-sql-al-Database-methods-and-performance-on-server.md`
+in the same documentation repository.
 BCApps `bb7111877ff7`: `Inventory/Tracking/InventoryProfileOffsetting.Codeunit.al::ForecastConsumption`
 narrows, Find('+'), widens and Next; `Inventory/Counting/Document/PhysInvtShowDuplicates.Codeunit.al`
 marks during an ordinary walk before activating MarkedOnly. Both under `src/Layers/W1/BaseApp/`.
