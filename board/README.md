@@ -24,10 +24,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   no live Table Metadata activation, UT gain or G1 claim.
 - Codepage integration replay: `20261004T184333Z-2543205`, frozen HEAD `155abe4`,
   source `79960d56653338db08e34dd932ca9d9914ace4454323d51b1578b5ca819d39a1`;
-  `slice-check all test ut`, six jobs. Runner PID 2543935 is live; no terminal result.
-  BC source/System/notice dependencies match completed 175227; original notice
-  is explicit and frozen. Compare every one of its 2,314 identities/results;
-  null/unsealed seed remains diagnostic, not causal A/B or G1 evidence.
+  `slice-check all test ut`, six jobs; terminal at 19:20:49 UTC, runner gone.
+  Slice/build/test pass (136 cases/232 tooling tests); UT exits 2:
+  2,169/2,314 passed, 145 failed, zero incomplete, 80 codeunits/1,422 seconds.
+  Against 175227: zero gains/losses/changed errors/missing/added/duplicates;
+  all source manifest/file hashes match. `artifacts/ut-comparison-175227.json`.
+  Frozen source/System/notice pre/post hashes match, BCApps `bb7111877f`.
+  Null/unsealed seed remains diagnostic repeatability, not causal A/B or G1.
 - Codepage foundation (0035): Windows-1252/ASCII/ISO-8859-1, distinct best-fit,
   factory aliases/preambles and explicit unknown-page refusals. `make encoding`
   passes 87 checks and twelve compiled controls; all 192,678 selected native text
@@ -38,7 +41,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   CodePage analysis passes; runtime/gate have no own findings, 33 inherited header
   findings each remain unsuppressed. Local replay: 136 cases, one wrong-notice-path
   refusal; 232 tooling tests pass. Corrected layout qualifier passes, without
-  rewriting the red receipt. Frozen full replay is pending. Other codepages,
+  rewriting the red receipt. Frozen full replay above is terminal. Other codepages,
   locale defaults/native bindings remain open. Notices: `licenses/`.
 - Unicode integration replay: `20261004T175227Z-2443696`, frozen HEAD `c732229`,
   source `7a2621f2a5a8eea448751274f9760ac11011a10a485ed498240149c5b2ed7439`;
