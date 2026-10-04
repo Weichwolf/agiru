@@ -1,6 +1,7 @@
 #include "Ast.h"
 #include "Check.h"
 #include "CodeunitWriter.h"
+#include "EnumWriter.h"
 #include "PageWriter.h"
 #include "Parser.h"
 #include "TableWriter.h"
@@ -114,6 +115,119 @@ void SourceOwnedBindings() {
   CHECK_TRUE("ordinary bindings carry no native contract",
              agiru::gen::BindTable(table, "::fixture::Row", "fixture/Row.h")
                  .declarationAssertions.empty());
+}
+
+void NativeOwnedDeclarations() {
+  auto table = SourceTable();
+  table.properties.push_back(
+      agiru::al::ParseTable("table 1 T { Scope = Cloud; }").properties.front());
+  const std::array sources{table};
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables(sources);
+  objects.module = "::agiru::app::platform::kModule";
+  objects.moduleHeader = "platformModule.h";
+  const auto &binding = objects.tables.at(std::to_string(table.id));
+  const auto text = agiru::gen::NativeTableDefinition(table, binding, objects);
+  CHECK_TRUE("original native ABI contracts precede qualification",
+             text.contains("native field count mismatch: AllObjWithCaption"));
+  CHECK_TRUE(
+      "qualified native source uses the bound record ABI",
+      text.contains(
+          "auto table = ::agiru::TableTraits<::agiru::platform::AllObjWithCaption>::kTable;"));
+  CHECK_TRUE("original module header is included", text.contains("#include \"platformModule.h\""));
+  CHECK_TRUE("original module owner is qualified",
+             text.contains("table.module = &::agiru::app::platform::kModule;"));
+  CHECK_TRUE("original AL namespace is retained",
+             text.contains("table.nameSpace = \"System.Reflection\";"));
+  CHECK_TRUE("original availability scope is retained", text.contains("table.scope = \"Cloud\";"));
+  CHECK_TRUE("unused native caption arrays do not widen includes",
+             !text.contains("#include <array>"));
+  CHECK_TRUE(
+      "same catalogue receives explicit qualification",
+      text.contains("RegisterTableSource<::agiru::platform::AllObjWithCaption, kSourceTable>"));
+  objects.module.clear();
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::NativeTableDefinition(table, binding, objects));
+  } catch (const std::runtime_error &error) {
+    refused = std::string_view(error.what()).contains("no original module");
+  }
+  CHECK_TRUE("unowned native source cannot be qualified", refused);
+}
+
+void SharedTableProperties() {
+  auto table = SourceTable();
+  table.properties = agiru::al::ParseTable(R"(table 1 T {
+    ExternalName = 'original'; ExternalSchema = 'schema'; TableType = Temporary;
+    DataPerCompany = false; ReplicateData = true; DataAccessIntent = ReadOnly;
+    CompressionType = Row; DataCaptionFields = "Object ID", "Object Type", "Object ID";
+    InherentPermissions = rX; InherentEntitlements = r; Access = Internal;
+    LookupPageID = 50176; DrillDownPageID = 50177; PasteIsValid = true;
+    ObsoleteState = Pending; Scope = Cloud; DataClassification = AccountData;
+  })")
+                         .properties;
+  const std::array sources{table};
+  agiru::gen::Objects objects;
+  objects.tables = agiru::gen::PlatformTables(sources);
+  objects.module = "::agiru::app::platform::kModule";
+  objects.moduleHeader = "platformModule.h";
+  const auto &binding = objects.tables.at(std::to_string(table.id));
+  const auto native = agiru::gen::NativeTableDefinition(table, binding, objects);
+  const auto ordinary = agiru::gen::TableDefinitions(table, objects);
+  for (const std::string_view assignment : {"externalName = \"original\"",
+                                            "externalSchema = \"schema\"",
+                                            "tableType = ::agiru::TableType::Temporary",
+                                            "dataPerCompany = false",
+                                            "replicateData = true",
+                                            "dataAccessIntent = \"ReadOnly\"",
+                                            "compressionType = \"Row\"",
+                                            "inherentPermissions = \"rX\"",
+                                            "inherentEntitlements = \"r\"",
+                                            "access = \"Internal\"",
+                                            "lookupPageId = ::agiru::PageId{50176}",
+                                            "drillDownPageId = ::agiru::PageId{50177}",
+                                            "pasteIsValid = true",
+                                            "obsoleteState = \"Pending\"",
+                                            "scope = \"Cloud\"",
+                                            "dataClassification = \"AccountData\""}) {
+    CHECK_TRUE("native declaration retains source property: " + std::string(assignment),
+               native.contains("table." + std::string(assignment) + ";"));
+    CHECK_TRUE("ordinary declaration uses the same source property: " + std::string(assignment),
+               ordinary.contains("." + std::string(assignment) + ","));
+  }
+  CHECK_TRUE("native caption fields retain source IDs, order and repetitions",
+             native.contains("::agiru::FieldNo{3},::agiru::FieldNo{1},::agiru::FieldNo{3},"));
+  CHECK_TRUE("native caption fields have static lifetime",
+             native.contains("table.dataCaptionFields = kSourceCaptionFields;"));
+  CHECK_TRUE("native caption arrays name their direct include",
+             native.contains("#include <array>"));
+  for (const std::string_view invalid :
+       {"DataPerCompany = Unknown;", "TableType = Unknown;", "LookupPageID = MissingPage;"}) {
+    auto broken = table;
+    broken.properties =
+        agiru::al::ParseTable("table 1 T { " + std::string(invalid) + " }").properties;
+    for (const bool isNative : {false, true}) {
+      bool refused = false;
+      try {
+        static_cast<void>(isNative ? agiru::gen::NativeTableDefinition(broken, binding, objects)
+                                   : agiru::gen::TableDefinitions(broken, objects));
+      } catch (const std::exception &error) {
+        refused =
+            agiru::gen::LowerKey(error.what())
+                .contains(agiru::gen::LowerKey(std::string(invalid.substr(0, invalid.find(' ')))));
+      }
+      CHECK_TRUE("both declaration paths refuse invalid source properties", refused);
+    }
+  }
+  table.properties =
+      agiru::al::ParseTable("table 1 T { DataCaptionFields = MissingField; }").properties;
+  bool refused = false;
+  try {
+    static_cast<void>(agiru::gen::NativeTableDefinition(table, binding, objects));
+  } catch (const std::invalid_argument &error) {
+    refused = std::string_view(error.what()).contains("absent field: MissingField");
+  }
+  CHECK_TRUE("native caption declarations cannot invent fields", refused);
 }
 
 void RefusalsAndCodedOrdinals() {
@@ -274,6 +388,8 @@ void NativePropertyRefusals() {
 int main() {
   return gate::Run("GenNativeBinding", [] {
     SourceOwnedBindings();
+    NativeOwnedDeclarations();
+    SharedTableProperties();
     RefusalsAndCodedOrdinals();
     NativePropertyRefusals();
   });

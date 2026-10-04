@@ -16,9 +16,9 @@ if [ -n "${AGIRU_SYSTEM_SYMBOLS:-}" ]; then
   python3 scripts/fetch_symbols.py --verify "$package" > "$proof/package-before.json"
   cp "$package/provenance.json" "$proof/package-provenance.json"
   printf '%s\n' '{"apps":[{"name":"native","source":"src"}]}' > "$proof/native-apps.json"
-  printf '%s\n' '{"include":["System","Microsoft"],"exclude":[],"product_exclude":[]}' > "$proof/native-scope.json"
   python3 scripts/scope_inventory.py "$package" --apps "$proof/native-apps.json" \
-    --scope "$proof/native-scope.json" --output "$proof/native-inventory.json" > "$proof/native-inventory.log"
+    --scope "$(dirname "$2")/scope.json" --source-domain system-symbols \
+    --output "$proof/native-inventory.json" > "$proof/native-inventory.log"
   arguments+=(--system-symbols "$package")
 fi
 jq -n --args '$ARGS.positional' -- "$B/agirutc" "${arguments[@]}" > "$proof/command.json"

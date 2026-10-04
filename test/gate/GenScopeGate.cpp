@@ -99,6 +99,17 @@ void ProductBoundariesPreserveCore(const Scope &scope) {
     CHECK_TRUE("mixed callers remain required rather than being silently retired",
                !agiru::gen::ProductExclusion(rules, path));
   }
+  constexpr std::string_view native = "src/Tenant Database Tables/TenantLicenseState.Table.al";
+  CHECK_TRUE("native commercial state has a bounded domain-specific exclusion",
+             agiru::gen::ProductExclusion(rules, native, agiru::gen::SourceDomain::SystemSymbols)
+                 .has_value());
+  CHECK_TRUE("native rules never retire similarly located BCApps objects",
+             !agiru::gen::ProductExclusion(rules, native));
+  for (const std::string_view path :
+       {"src/Tenant Database Tables/User.Table.al", "src/Virtual Tables/TableMetadata.Table.al"}) {
+    CHECK_TRUE("native security and core reflection remain required",
+               !agiru::gen::ProductExclusion(rules, path, agiru::gen::SourceDomain::SystemSymbols));
+  }
 }
 
 void TheNamespaceDecidesTheDirectory() {

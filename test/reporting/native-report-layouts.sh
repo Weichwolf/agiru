@@ -207,7 +207,7 @@ done
 cmake_input="$proof/cmake-source"
 mkdir -p "$cmake_input"
 cp CMakeLists.txt "$cmake_input/"
-cp -a src include cmake third_party test scripts "$cmake_input/"
+cp -a src include cmake test scripts "$cmake_input/"
 cp -a "$proof/source-bound" "$cmake_input/apps"
 cp "$source_input/apps.json" "$cmake_input/apps.json"
 cp test/reporting/report-layouts/link-slice "$cmake_input/test/slice"

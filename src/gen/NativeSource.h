@@ -4,13 +4,25 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace agiru::gen {
 
+struct TranspileScope;
+
 struct NativeSourceIssue {
   std::string source;
   std::string reason;
+};
+
+struct NativeSourceExclusion {
+  std::string source;
+  std::string reason;
+  std::string kind;
+  int id = 0;
+  std::string name;
+  std::string nameSpace;
 };
 
 struct NativeAppIdentity {
@@ -19,6 +31,10 @@ struct NativeAppIdentity {
   std::string publisher;
   std::string version;
 };
+
+bool IsAppGuid(std::string_view value);
+
+NativeAppIdentity ParseAppIdentity(std::string_view text);
 
 struct NativeSources {
   std::vector<al::TableObject> tables;
@@ -32,10 +48,13 @@ struct NativeSources {
   NativeAppIdentity app;
   std::vector<NativeSourceIssue> issues;
   std::vector<std::string> otherSources;
+  std::vector<NativeSourceExclusion> excluded;
 };
 
 NativeAppIdentity ReadNativeIdentity(const std::filesystem::path &package);
 
 NativeSources ReadNativeSources(const std::filesystem::path &package);
+
+void SelectNativeSources(NativeSources &sources, const TranspileScope &scope);
 
 }

@@ -366,6 +366,8 @@ def product_rules(policy):
         if not source or path.is_absolute() or '\\' in source or '//' in source or any(
                 part in ('', '.', '..') for part in parts):
             raise ValueError('product exclusion needs a bounded relative source path')
+        if source == 'system-symbols/':
+            raise ValueError('System exclusions require a bounded source inside the package')
         if source in seen:
             raise ValueError('duplicate product exclusion source')
         seen.add(source)
@@ -378,12 +380,18 @@ def product_reason(source, rules):
                  (selected.endswith('/') and source.startswith(selected))), None)
 
 
-def inventory(root, configuration, policy):
+def inventory(root, configuration, policy, source_domain='bcapps'):
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError('AL source root must be a directory')
     apps = configured_apps(configuration)
-    rules = product_rules(policy)
+    all_rules = product_rules(policy)
+    if source_domain not in ('bcapps', 'system-symbols'):
+        raise ValueError('unknown source domain')
+    prefix = 'system-symbols/'
+    rules = [(reason, source[len(prefix):] if source_domain == 'system-symbols' else source)
+             for reason, source in all_rules
+             if source.startswith(prefix) == (source_domain == 'system-symbols')]
     declared_roots = {path.parent.relative_to(root).as_posix()
                       for path in root.rglob('app.json') if path.is_file()}
     files, objects, errors = [], [], []
@@ -441,7 +449,11 @@ def inventory(root, configuration, policy):
                   for _, source in rules if not (root / source).exists())
     test_units = [item for item in objects if item['kind'] == 'codeunit' and item['test_subtype']]
     return {'format': 1, 'scope': 'raw source; conditional variants retained, not an executable manifest',
-            'source_root': str(root), 'source_sha256': source_digest.hexdigest(),
+            'source_root': str(root), 'source_domain': source_domain,
+            'other_domain_rules': [{'reason': reason, 'source': source}
+                                  for reason, source in all_rules
+                                  if source.startswith(prefix) != (source_domain == 'system-symbols')],
+            'source_sha256': source_digest.hexdigest(),
             'summary': {'files': len(files), 'objects': len(objects),
                         'test_codeunits': len(test_units),
                         'test_methods': sum(len(item['methods']) for item in test_units),
@@ -468,9 +480,10 @@ def main():
     parser.add_argument('--apps', type=Path, default=repository / 'apps.json')
     parser.add_argument('--scope', type=Path, default=repository / 'scope.json')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--source-domain', choices=('bcapps', 'system-symbols'), default='bcapps')
     args = parser.parse_args()
     apps_bytes, scope_bytes = args.apps.read_bytes(), args.scope.read_bytes()
-    report = inventory(args.root, json.loads(apps_bytes), json.loads(scope_bytes))
+    report = inventory(args.root, json.loads(apps_bytes), json.loads(scope_bytes), args.source_domain)
     report['source_revision'] = bc_revision(args.root, repository)
     report['apps_sha256'] = hashlib.sha256(apps_bytes).hexdigest()
     report['scope_sha256'] = hashlib.sha256(scope_bytes).hexdigest()

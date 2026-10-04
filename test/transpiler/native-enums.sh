@@ -77,7 +77,7 @@ rg -q 'abstract|pure virtual' "$proof/wrong-interface-signature/compile.log"
 cmake_source="$proof/cmake-source"
 mkdir -p "$cmake_source"
 cp CMakeLists.txt "$cmake_source/"
-cp -a src include cmake third_party test scripts "$cmake_source/"
+cp -a src include cmake test scripts "$cmake_source/"
 cp -a "$proof/generated" "$cmake_source/apps"
 cp "$input/apps.json" "$cmake_source/apps.json"
 printf '%s\n' 'fixture/fixture/codeunit/NativeConsumerUT.cpp' \

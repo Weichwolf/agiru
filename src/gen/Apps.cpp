@@ -170,10 +170,12 @@ void RequireRelativeSource(std::string_view name) {
 }
 
 std::optional<std::string_view> ProductExclusion(const TranspileScope &scope,
-                                                 const std::filesystem::path &relativeSource) {
+                                                 const std::filesystem::path &relativeSource,
+                                                 SourceDomain domain) {
   const std::string source = relativeSource.generic_string();
   RequireRelativeSource(source);
   for (const SourceExclusion &rule : scope.productExclude) {
+    if (rule.domain != domain) { continue; }
     if (source == rule.source || (rule.source.ends_with('/') && source.starts_with(rule.source))) {
       return rule.reason;
     }
@@ -199,7 +201,7 @@ TranspileScope ReadScope(const std::filesystem::path &path) {
       throw std::runtime_error("scope.json: product exclusions need a reason and source");
     }
     const std::string reason = entry.substr(0, colon);
-    const std::string source = entry.substr(colon + 1);
+    std::string source = entry.substr(colon + 1);
     if (reason != "bc-licensing" && reason != "microsoft-cloud" &&
         reason != "licensing-and-microsoft-cloud") {
       throw std::runtime_error("scope.json: product exclusion reason is not approved");
@@ -208,7 +210,15 @@ TranspileScope ReadScope(const std::filesystem::path &path) {
     if (!selected.insert(source).second) {
       throw std::runtime_error("scope.json: duplicate product exclusion source");
     }
-    scope.productExclude.push_back(SourceExclusion{.reason = reason, .source = source});
+    constexpr std::string_view kNativePrefix = "system-symbols/";
+    const auto domain =
+        source.starts_with(kNativePrefix) ? SourceDomain::SystemSymbols : SourceDomain::BCApps;
+    if (domain == SourceDomain::SystemSymbols) {
+      source.erase(0, kNativePrefix.size());
+      RequireRelativeSource(source);
+    }
+    scope.productExclude.push_back(
+        SourceExclusion{.reason = reason, .source = source, .domain = domain});
   }
   if (scope.include.empty()) {
     throw std::runtime_error("scope.json: the include list is empty, so nothing is in scope");

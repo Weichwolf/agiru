@@ -1,5 +1,6 @@
 #include "NativeSource.h"
 
+#include "Apps.h"
 #include "EnumWriter.h"
 #include "Lexer.h"
 #include "Parser.h"
@@ -96,6 +97,49 @@ void ReadOne(const std::filesystem::path &package,
   }
 }
 
+bool NeedsNativeIdentity(const NativeSources &sources, const std::filesystem::path &package) {
+  if (!sources.reports.empty() || !sources.enums.empty() || !sources.interfaces.empty()) {
+    return true;
+  }
+  if (sources.tables.empty()) { return false; }
+  const auto manifest = package / "NavxManifest.xml";
+  return std::filesystem::exists(manifest) || std::filesystem::is_symlink(manifest);
+}
+
+template <typename Object>
+void SelectFamily(std::vector<Object> &objects,
+                  std::vector<std::string> &paths,
+                  std::string_view kind,
+                  NativeSources &sources,
+                  const TranspileScope &scope) {
+  if (objects.size() != paths.size()) {
+    throw std::logic_error("Native source identities and paths do not match");
+  }
+  std::size_t kept = 0;
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    const auto reason = ProductExclusion(scope, paths[i], SourceDomain::SystemSymbols);
+    if (reason) {
+      const auto &object = objects[i];
+      int id = 0;
+      if constexpr (requires { object.id; }) { id = object.id; }
+      sources.excluded.push_back({.source = paths[i],
+                                  .reason = std::string(*reason),
+                                  .kind = std::string(kind),
+                                  .id = id,
+                                  .name = object.name,
+                                  .nameSpace = object.nameSpace});
+    } else {
+      if (kept != i) {
+        objects[kept] = std::move(objects[i]);
+        paths[kept] = std::move(paths[i]);
+      }
+      ++kept;
+    }
+  }
+  objects.resize(kept);
+  paths.resize(kept);
+}
+
 }
 
 NativeSources ReadNativeSources(const std::filesystem::path &package) {
@@ -135,10 +179,15 @@ NativeSources ReadNativeSources(const std::filesystem::path &package) {
                                object.name);
     }
   }
-  if (!into.reports.empty() || !into.enums.empty() || !into.interfaces.empty()) {
-    into.app = ReadNativeIdentity(package);
-  }
+  if (NeedsNativeIdentity(into, package)) { into.app = ReadNativeIdentity(package); }
   return into;
+}
+
+void SelectNativeSources(NativeSources &sources, const TranspileScope &scope) {
+  SelectFamily(sources.tables, sources.paths, "table", sources, scope);
+  SelectFamily(sources.reports, sources.reportPaths, "report", sources, scope);
+  SelectFamily(sources.enums, sources.enumPaths, "enum", sources, scope);
+  SelectFamily(sources.interfaces, sources.interfacePaths, "interface", sources, scope);
 }
 
 }

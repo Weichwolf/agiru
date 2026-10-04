@@ -16,9 +16,12 @@ struct App {
 
 std::vector<App> ReadApps(const std::filesystem::path &path);
 
+enum class SourceDomain { BCApps, SystemSymbols };
+
 struct SourceExclusion {
   std::string reason;
   std::string source;
+  SourceDomain domain = SourceDomain::BCApps;
 };
 
 struct TranspileScope {
@@ -36,6 +39,8 @@ struct TranspileScope {
 TranspileScope ReadScope(const std::filesystem::path &path);
 
 [[nodiscard]] std::optional<std::string_view>
-ProductExclusion(const TranspileScope &scope, const std::filesystem::path &relativeSource);
+ProductExclusion(const TranspileScope &scope,
+                 const std::filesystem::path &relativeSource,
+                 SourceDomain domain = SourceDomain::BCApps);
 
 }

@@ -1,7 +1,5 @@
 #include "NativeSource.h"
 
-#include <cctype>
-#include <cstddef>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
@@ -32,20 +30,6 @@ std::string Attribute(const xmlNode &node, const char *name) {
     throw std::runtime_error("System manifest lacks App attribute " + std::string(name));
   }
   return reinterpret_cast<const char *>(value.get());
-}
-
-void RequireGuid(std::string_view value) {
-  static constexpr std::size_t kGuidLength = 36;
-  if (value.size() != kGuidLength) {
-    throw std::runtime_error("System manifest has invalid App Id");
-  }
-  for (std::size_t at = 0; at < value.size(); ++at) {
-    const bool dash = at == 8 || at == 13 || at == 18 || at == 23;
-    if ((dash && value[at] != '-') ||
-        (!dash && std::isxdigit(static_cast<unsigned char>(value[at])) == 0)) {
-      throw std::runtime_error("System manifest has invalid App Id");
-    }
-  }
 }
 
 const xmlNode &AppNode(const xmlDoc &document) {
@@ -85,7 +69,7 @@ NativeAppIdentity ReadNativeIdentity(const std::filesystem::path &package) {
                              .name = Attribute(app, "Name"),
                              .publisher = Attribute(app, "Publisher"),
                              .version = Attribute(app, "Version")};
-  RequireGuid(identity.id);
+  if (!IsAppGuid(identity.id)) { throw std::runtime_error("System manifest has invalid App Id"); }
   return identity;
 }
 
