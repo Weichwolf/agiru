@@ -70,6 +70,12 @@ record filters, including group intersections, cross-column OR, FlowFilters and
 owned expression snapshots. Sixteen controls must reject. Temporary operations
 use the same predicate; this does not activate live metadata providers (0044).
 
+`make record-order JOBS=2` verifies mixed field directions, global reversal,
+primary-key ties, filters, relative searches and cursor/keyset direction changes.
+The same exact-value matrix runs through typed Record and RecordRef on SQL and
+temporary rows. Four compiled controls must reject. This is record-search proof,
+not client-page presentation or live metadata-provider activation (0044).
+
 `make base64 JOBS=2` qualifies the shared raw byte codec, 76-column CRLF profile,
 CLR Convert decoder rules, bounded stream writes and borrowed-input safety. Five
 compiled mutants must fail. Optional `AGIRU_BASE64_REFERENCE=<TSV>` replays an external

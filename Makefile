@@ -19,7 +19,7 @@ export CCACHE_SLOPPINESS
 .PHONY: all apps builtins census comments cronus db gap gate lint lint-one schema tc test transpile tree provision doc clean spotless help demo symbols gates ut verify verify-start verify-status
 .PHONY: lint-config include-cost slice-check interface-defaults report-layouts report-layout-metadata layout-assets layout-assets-check native-report-layouts native-bindings native-enums native-enum-package native-interface-package native-consumers number-sequences table-keys reflection-metadata
 .PHONY: verify-check
-.PHONY: test-contexts text-positions catalogue base64 encoding codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits
+.PHONY: test-contexts text-positions catalogue base64 encoding record-order codeunit-record page-navigation boolean-expressions control-extensions native-table-ids native-codeunits
 
 # `make` DELETES THE COMMENTS IN `src/` BEFORE IT BUILDS. AGENTS.md states the rule -- `include/` is
 # documented and `src/` is not -- and a rule that only nags is one somebody is always about to get
@@ -172,6 +172,10 @@ base64: comments db ## prove byte codec, bounded output, aliases and compiled ne
 encoding: comments db ## prove declared encodings, factories and compiled negative controls
 	@cmake --build "$(B)" -j "$(JOBS)" --target gate_EncodingGate
 	@B="$(B)" bash "$(SELF)/test/runtime/encoding.sh"
+
+record-order: comments db ## prove mixed record ordering and keyset navigation with negative controls
+	@cmake --build $(B) -j $(JOBS) --target gate_MixedOrderGate
+	@B="$(B)" bash "$(SELF)/test/runtime/record-order.sh"
 
 lint-one: export AGIRU_LINT_UNIT = $(UNIT)
 lint-one: comments db ## analyse one configured unit without a build (UNIT=src/rt/Transaction.cpp)

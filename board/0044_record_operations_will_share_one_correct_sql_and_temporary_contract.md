@@ -5,6 +5,25 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Mixed record ordering: private `src/rt/RecordOrder.{h,cpp}` compiles selected
+  directions and complete primary-key tie-breakers once per comparison operation.
+  SQL ORDER BY, reverse/keyset search and temporary views share the same order.
+  Mixed predicates use direction-aware lexicographic prefixes and single binds;
+  uniform directions retain the direct tuple predicate. No live-provider guard
+  is removed. `make record-order JOBS=2`: 5,872 checks green across SQL/temporary,
+  typed/RecordRef, mixed/uniform and global reverse orders, ties, filters,
+  relative/combined searches and partial/exhausted/zero steps. Four compiled
+  controls reject; the previous actual runtime fails 1,046 of the same checks.
+  `/tmp/agiru-record-order.FQ83WP`, `/tmp/agiru-record-order-controls.mkHPht`.
+  New order/gate units have no own analysis findings; 30/33 inherited header
+  findings remain, no suppressions added. Navigate/Selection also have no own
+  findings (30/27 inherited); Temporary retains 30 inherited findings and its
+  existing TempFind complexity, reduced from 39 to 31. Selection's marked-row
+  clause composition is split without changing bind/filter semantics.
+  DiscoveryGate passes, including the
+  new qualifier's missing-script control. Full local/AL replay remains pending;
+  this change is outside frozen `20261004T184333Z-2543205`. No UT gain, native
+  differential oracle, page-presentation or performance claim.
 - Shared compiled predicate: `src/rt/RecordFilter.{h,cpp}` owns parsed expressions
   and borrows immutable field declarations. Temporary Build/Count/DeleteAll/CalcSum
   parse once per operation, not once per row; computed metadata uses the same API.
@@ -234,7 +253,9 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
    Preserve documented complete-prefix selection; do not restore ignored keys
    just to recover old diagnostics. Compare the full population after any fix.
-1. Add reverse/mixed key directions and filter/key-change fixtures. Build lexicographic predicates per key direction plus deterministic primary-key tie-breakers; route table identity through explicit company context. Preserve the completed zero/partial/exhausted/extreme-step gates.
+1. Prove filter/key/direction changes against live cursors and shared temporary
+   mutations; route table identity through explicit company context. Preserve
+   mixed-order and zero/partial/exhausted/extreme-step gates.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
 3. Centralize primitives below the typed wrappers while retaining typed field access. Preserve table variables and temporary ownership according to operation, not a general C++ copy rule.
@@ -271,6 +292,14 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 - Unindexed sortable fields return true and sort correctly; active prefix selection uses the first full key. Disabled keys, IncludedFields and unsortable fields have separate controls. Genuine failure returns false in value context and raises in statement context; keep both checks in the retained unindexed probe.
 
 ## References
+
+Mixed record order: developer `ff5939a46e05`,
+`methods-auto/record/record-{setascending,ascending,find}-method.md`;
+BCApps `bb7111877ff7`, `System Application/App/Table Information/src/TableInformationCacheImpl.Codeunit.al::SetBiggestTablesFilter`;
+user `0ff62b2266fd`, `archive/WorkingWithDynamics/sorting.md`.
+Predecessor board search found no SetAscending/mixed-direction finding; 1102
+separately covers cursor invalidation. Record-search order follows the documented
+current-key path with primary ties; SetAscending is not a client-page sort policy.
 
 Compiled predicates: developer `ff5939a46e05`, `methods-auto/record/record-{filtergroup,count}-method.md`
 and `devenv-flowfilter-overview.md`; BCApps `bb7111877ff7`,

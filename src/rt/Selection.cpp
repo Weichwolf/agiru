@@ -6,8 +6,10 @@
 #include "runtime/ErrorValue.h"
 #include "runtime/RecordState.h"
 #include "runtime/Storage.h"
+#include "type/FieldClass.h"
 
 #include "Filter.h"
+#include "RecordOrder.h"
 #include "Where.h"
 
 #include <algorithm>
@@ -43,19 +45,6 @@ const FieldDef &FieldOf(const TableDef &table, FieldNo no) {
   throw Error("the table carries no field " + std::to_string(no.Value()));
 }
 
-std::vector<FieldNo> OrderedBy(const RecordState *state, const TableDef &table) {
-  std::vector<FieldNo> named;
-  if (state != nullptr && !state->key.empty()) {
-    named.reserve(state->key.size());
-    for (const SortField &one : state->key) { named.push_back(one.field); }
-  }
-  if (table.keys.empty()) { return named; }
-  for (const FieldNo no : table.keys[0].fields) {
-    if (std::ranges::find(named, no) == named.end()) { named.push_back(no); }
-  }
-  return named;
-}
-
 constexpr Interval kSeriesDomain{.low = -1000000000, .high = 1000000000};
 
 constexpr std::int64_t kSeriesLimit = 1000000;
@@ -76,7 +65,7 @@ std::string SeriesColumns(const TableDef &table, const FieldDef &number) {
   std::string columns = "g::int AS " + Quoted(number.name);
   for (const auto &field : table.fields) {
     if (!Stored(field) || field.no == number.no) { continue; }
-    const auto system = std::ranges::find_if(kSystemFields, [&](const auto &declared) {
+    const auto *const system = std::ranges::find_if(kSystemFields, [&](const auto &declared) {
       return declared.no == field.no &&
              ((declared.alType == "Guid" && field.type == FieldType::Guid) ||
               (declared.alType == "DateTime" && field.type == FieldType::DateTime));
@@ -151,6 +140,47 @@ void Narrow(Selection &made, const RecordState *state, const TableDef &table) {
   made.where += "(" + crossColumn + ")";
 }
 
+std::string MarkClause(Selection &made,
+                       const TableDef &table,
+                       std::span<const FieldNo> key,
+                       const std::string &mark) {
+  std::vector<std::string> values;
+  std::size_t start = 0;
+  for (std::size_t at = mark.find('\x1f'); at != std::string::npos; at = mark.find('\x1f', start)) {
+    values.push_back(mark.substr(start, at - start));
+    start = at + 1;
+  }
+  values.push_back(mark.substr(start));
+  if (values.size() != key.size()) { return {}; }
+  std::string one;
+  for (std::size_t i = 0; i < key.size(); ++i) {
+    Atom atom;
+    atom.value = values[i];
+    const Clause clause =
+        Where(FieldOf(table, key[i]), Expression{All{atom}}, made.binds.size() + 1);
+    if (clause.sql.empty()) { continue; }
+    if (!one.empty()) { one += " AND "; }
+    one += clause.sql;
+    made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
+  }
+  return one;
+}
+
+void NarrowMarks(Selection &made, const RecordState *state, const TableDef &table) {
+  if (state == nullptr || !state->markedOnly) { return; }
+  std::string marked;
+  const std::span<const FieldNo> key =
+      table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
+  for (const std::string &mark : state->marks) {
+    const std::string one = MarkClause(made, table, key, mark);
+    if (one.empty()) { continue; }
+    if (!marked.empty()) { marked += " OR "; }
+    marked += "(" + one + ")";
+  }
+  if (!made.where.empty()) { made.where += " AND "; }
+  made.where += marked.empty() ? std::string("FALSE") : "(" + marked + ")";
+}
+
 }
 
 std::string Name(const TableDef &table) {
@@ -168,15 +198,6 @@ std::string Columns(const TableDef &table) {
   return columns;
 }
 
-bool Ascends(const RecordState *state, FieldNo no) {
-  if (state == nullptr) { return true; }
-  bool field = true;
-  for (const SortField &one : state->key) {
-    if (one.field == no) { field = one.ascending; }
-  }
-  return state->ascending == field;
-}
-
 Selection Select(const RecordState *state, const TableDef &table) {
   Selection made;
   made.from = Name(table);
@@ -185,43 +206,15 @@ Selection Select(const RecordState *state, const TableDef &table) {
     if (!series.empty()) { made.from = series; }
   }
   Narrow(made, state, table);
-  if (state != nullptr && state->markedOnly) {
-    std::string marked;
-    const std::span<const FieldNo> key =
-        table.keys.empty() ? std::span<const FieldNo>{} : table.keys[0].fields;
-    for (const std::string &mark : state->marks) {
-      std::vector<std::string> values;
-      std::size_t start = 0;
-      for (std::size_t at = mark.find('\x1f'); at != std::string::npos;
-           at = mark.find('\x1f', start)) {
-        values.push_back(mark.substr(start, at - start));
-        start = at + 1;
-      }
-      values.push_back(mark.substr(start));
-      if (values.size() != key.size()) { continue; }
-      std::string one;
-      for (std::size_t i = 0; i < key.size(); ++i) {
-        Atom atom;
-        atom.value = values[i];
-        const Clause clause =
-            Where(FieldOf(table, key[i]), Expression{All{atom}}, made.binds.size() + 1);
-        if (clause.sql.empty()) { continue; }
-        if (!one.empty()) { one += " AND "; }
-        one += clause.sql;
-        made.binds.insert(made.binds.end(), clause.binds.begin(), clause.binds.end());
-      }
-      if (one.empty()) { continue; }
-      if (!marked.empty()) { marked += " OR "; }
-      marked += "(" + one + ")";
-    }
-    if (!made.where.empty()) { made.where += " AND "; }
-    made.where += marked.empty() ? std::string("FALSE") : "(" + marked + ")";
-  }
-  made.sorted = OrderedBy(state, table);
-  for (const FieldNo no : made.sorted) {
+  NarrowMarks(made, state, table);
+  const RecordOrder order(table,
+                          state == nullptr ? std::span<const SortField>{} : state->key,
+                          state == nullptr || state->ascending);
+  for (const RecordOrder::Column &column : order.Columns()) {
+    made.sorted.push_back(column.field->no);
     if (!made.order.empty()) { made.order += ", "; }
-    made.order += Quoted(FieldOf(table, no).name);
-    if (!Ascends(state, no)) { made.order += " DESC"; }
+    made.order += Quoted(column.field->name);
+    if (!column.ascending) { made.order += " DESC"; }
   }
   return made;
 }

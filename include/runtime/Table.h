@@ -1141,10 +1141,10 @@ public:
   /// \brief AL `Record.AddLoadFields(...)`. Specifies fields to be initially loaded when the record
   /// is retrieved from its data source. Subsequent calls to AddLoadFields will not overwrite fields
   /// already selected for the initial load.
-  /// \tparam Arguments Whatever AL's overload set takes.
-  /// \param arguments The arguments, read only to be discarded.
-  /// \return Never.
-  /// \throws Error always -- the name is declared, the behaviour is not (board:0035).
+  /// \tparam Member The selected field's type.
+  /// \param member A field in the current key.
+  /// \param ascending True for ascending, false for descending.
+  /// \note This record-search setting is not a client-page presentation policy.
   /// \brief AL `Record.AddLoadFields(...)` -- partial records (`record-addloadfields-method.md`)
   /// are a
   ///        LOAD optimisation: a record that loads every field satisfies every read the partial

@@ -1,4 +1,3 @@
-#include "meta/Ids.h"
 #include "meta/TableDef.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
@@ -9,12 +8,15 @@
 #include "runtime/Table.h"
 
 #include "Cursor.h"
+#include "RecordOrder.h"
 #include "Selection.h"
 #include "Temporary.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -64,40 +66,72 @@ bool ReadInto(void *record, const TableDef &table, const Cursor &cursor) {
 
 namespace {
 
-const FieldDef &Sorted(const TableDef &table, FieldNo no) {
-  for (const FieldDef &def : table.fields) {
-    if (def.no == no) { return def; }
-  }
-  throw Error("the sort path names a field the table lacks");
-}
-
-std::string
-Reversed(const Selection &made, const RecordState *state, const TableDef &table, bool descending) {
+std::string Reversed(const RecordOrder &by, bool descending) {
   std::string order;
-  for (const FieldNo no : made.sorted) {
+  for (const RecordOrder::Column &column : by.Columns()) {
     if (!order.empty()) { order += ", "; }
-    order += Quoted(Sorted(table, no).name);
-    if (descending == Ascends(state, no)) { order += " DESC"; }
+    order += Quoted(column.field->name);
+    if (descending == column.ascending) { order += " DESC"; }
   }
   return order;
 }
 
-void Compare(Selection &made, const TableDef &table, const void *record, std::string_view op) {
+std::string TuplePredicate(Selection &made,
+                           std::span<const RecordOrder::Column> order,
+                           const void *record,
+                           std::string_view op) {
   std::string columns;
   std::string values;
-  for (const FieldNo no : made.sorted) {
+  for (const RecordOrder::Column &column : order) {
     if (!columns.empty()) {
       columns += ", ";
       values += ", ";
     }
-    const FieldDef &def = Sorted(table, no);
-    columns += Quoted(def.name);
-    made.binds.emplace_back(StorageText(record, def));
+    columns += Quoted(column.field->name);
+    made.binds.emplace_back(StorageText(record, *column.field));
     values += "$" + std::to_string(made.binds.size());
   }
-  if (columns.empty()) { return; }
+  const std::string_view comparison =
+      op == "=" || order.front().ascending ? op : (op == ">" ? "<" : ">");
+  return "(" + columns + ") " + std::string(comparison) + " (" + values + ")";
+}
+
+std::string MixedPredicate(Selection &made,
+                           std::span<const RecordOrder::Column> order,
+                           const void *record,
+                           std::string_view op) {
+  std::string prefix;
+  std::string predicate;
+  for (const RecordOrder::Column &column : order) {
+    const FieldDef &def = *column.field;
+    const std::string name = Quoted(def.name);
+    made.binds.emplace_back(StorageText(record, def));
+    const std::string value = "$" + std::to_string(made.binds.size());
+    if (!predicate.empty()) { predicate += " OR "; }
+    const std::string_view comparison = column.ascending ? op : (op == ">" ? "<" : ">");
+    predicate.append("(")
+        .append(prefix)
+        .append(name)
+        .append(" ")
+        .append(comparison)
+        .append(" ")
+        .append(value)
+        .append(")");
+    prefix.append(name).append(" = ").append(value).append(" AND ");
+  }
+  return predicate;
+}
+
+void Compare(Selection &made, const RecordOrder &by, const void *record, std::string_view op) {
+  const auto order = by.Columns();
+  if (order.empty()) { return; }
+  const bool uniform = std::ranges::all_of(order, [&](const RecordOrder::Column &column) {
+    return column.ascending == order.front().ascending;
+  });
+  const std::string predicate = op == "=" || uniform ? TuplePredicate(made, order, record, op)
+                                                     : MixedPredicate(made, order, record, op);
   if (!made.where.empty()) { made.where += " AND "; }
-  made.where += "(" + columns + ") " + std::string(op) + " (" + values + ")";
+  made.where += "(" + predicate + ")";
 }
 
 bool ReadOne(void *record, const TableDef &table, const Selection &made, const std::string &order) {
@@ -138,17 +172,18 @@ bool RuntimeFind(void *record, const TableDef &table, std::string_view which) {
     state->open.Forget();
     state->positioned = false;
     Selection made = Select(state, table);
+    const RecordOrder by(table, state->key, state->ascending);
     switch (step) {
       case '+': break;
-      case '=': Compare(made, table, record, "="); break;
-      case '>': Compare(made, table, record, ">"); break;
-      case '<': Compare(made, table, record, "<"); break;
+      case '=': Compare(made, by, record, "="); break;
+      case '>': Compare(made, by, record, ">"); break;
+      case '<': Compare(made, by, record, "<"); break;
       default:
         throw Error("Record.Find: '" + std::string(1, step) +
                     "' is not one of the characters record-find-method.md declares");
     }
     const bool backwards = step == '+' || step == '<';
-    if (ReadOne(record, table, made, Reversed(made, state, table, backwards))) {
+    if (ReadOne(record, table, made, Reversed(by, backwards))) {
       state->positioned = true;
       return true;
     }

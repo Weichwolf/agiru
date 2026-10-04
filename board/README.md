@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Record ordering (0044): shared selected-field directions and primary ties;
+  SQL mixed-key predicates and temporary views now agree. `make record-order`:
+  5,872 checks green, four compiled controls reject; previous actual runtime has
+  1,046 failures on the same matrix. `/tmp/agiru-record-order.FQ83WP`.
+  Own findings are cleared; inherited header/TempFind findings remain explicit.
+  Complete local replay is running; full AL replay is pending. Outside 184333;
+  no live Table Metadata activation, UT gain or G1 claim.
 - Codepage integration replay: `20261004T184333Z-2543205`, frozen HEAD `155abe4`,
   source `79960d56653338db08e34dd932ca9d9914ace4454323d51b1578b5ca819d39a1`;
   `slice-check all test ut`, six jobs. Runner PID 2543935 is live; no terminal result.

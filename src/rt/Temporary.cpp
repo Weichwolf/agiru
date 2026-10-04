@@ -12,6 +12,7 @@
 #include "type/Integer.h"
 
 #include "RecordFilter.h"
+#include "RecordOrder.h"
 
 #include <algorithm>
 #include <compare>
@@ -40,17 +41,6 @@ const FieldDef &FieldOf(const TableDef &table, FieldNo no) {
     if (def.no == no) { return def; }
   }
   throw Error("the table carries no field " + std::to_string(no.Value()));
-}
-
-std::vector<FieldNo> OrderOf(const std::vector<SortField> &key, const TableDef &table) {
-  std::vector<FieldNo> named;
-  named.reserve(key.size());
-  for (const SortField &one : key) { named.push_back(one.field); }
-  if (table.keys.empty()) { return named; }
-  for (const FieldNo no : table.keys[0].fields) {
-    if (std::ranges::find(named, no) == named.end()) { named.push_back(no); }
-  }
-  return named;
 }
 
 std::span<const FieldNo> PrimaryKey(const TableDef &table) {
@@ -106,11 +96,10 @@ void Build(Held held, const TableDef &table) {
     if (state.markedOnly && !state.marks.contains(MarkKey(row, table))) { continue; }
     if (filter.Matches(row)) { state.view.push_back(index); }
   }
-  const std::vector<FieldNo> by = OrderOf(state.viewKey, table);
+  const RecordOrder by(table, state.viewKey, state.viewAscending);
   std::ranges::stable_sort(state.view, [&](std::size_t a, std::size_t b) {
-    const std::strong_ordering order = Ordered(
-        held.temp->ops->at(held.temp->rows, a), held.temp->ops->at(held.temp->rows, b), table, by);
-    return state.viewAscending ? order < 0 : order > 0;
+    return by.Compare(held.temp->ops->at(held.temp->rows, a),
+                      held.temp->ops->at(held.temp->rows, b)) < 0;
   });
   state.viewVersion = held.temp->version;
 }
@@ -137,12 +126,12 @@ void Refresh(Held held, const TableDef &table, const void *record) {
   }
   held.state->viewMarks = held.state->marks.size();
   Build(held, table);
-  const std::vector<FieldNo> by = OrderOf(held.state->viewKey, table);
+  const RecordOrder by(table, held.state->viewKey, held.state->viewAscending);
   std::size_t at = 0;
   while (at < held.state->view.size()) {
-    const std::strong_ordering order =
-        Ordered(held.temp->ops->at(held.temp->rows, held.state->view[at]), record, table, by);
-    if (held.state->viewAscending ? order >= 0 : order <= 0) { break; }
+    if (by.Compare(held.temp->ops->at(held.temp->rows, held.state->view[at]), record) >= 0) {
+      break;
+    }
     ++at;
   }
   held.state->at = at;
@@ -354,7 +343,7 @@ bool TempFindSet(void *record, const TableDef &table) {
 bool TempFind(void *record, const TableDef &table, std::string_view which) {
   const Held held = Reach(record);
   if (which.empty()) { which = "="; }
-  const std::vector<FieldNo> by = OrderOf(held.state->key, table);
+  const RecordOrder by(table, held.state->key, held.state->ascending);
   for (const char step : which) {
     if ((step == '-' || step == '+') && which.size() != 1) {
       throw Error("Record.Find: '-' and '+' can only be used alone, and this one reads \"" +
@@ -372,7 +361,7 @@ bool TempFind(void *record, const TableDef &table, std::string_view which) {
       case '+': Land(held, record, view.size() - 1); return true;
       case '=':
         for (std::size_t at = 0; at < view.size(); ++at) {
-          if (Ordered(rowOf(at), record, table, by) == 0) {
+          if (by.Compare(rowOf(at), record) == 0) {
             Land(held, record, at);
             return true;
           }
@@ -380,8 +369,7 @@ bool TempFind(void *record, const TableDef &table, std::string_view which) {
         break;
       case '>':
         for (std::size_t at = 0; at < view.size(); ++at) {
-          const std::strong_ordering order = Ordered(rowOf(at), record, table, by);
-          if (held.state->viewAscending ? order > 0 : order < 0) {
+          if (by.Compare(rowOf(at), record) > 0) {
             Land(held, record, at);
             return true;
           }
@@ -389,8 +377,7 @@ bool TempFind(void *record, const TableDef &table, std::string_view which) {
         break;
       case '<':
         for (std::size_t at = view.size(); at > 0; --at) {
-          const std::strong_ordering order = Ordered(rowOf(at - 1), record, table, by);
-          if (held.state->viewAscending ? order < 0 : order > 0) {
+          if (by.Compare(rowOf(at - 1), record) < 0) {
             Land(held, record, at - 1);
             return true;
           }
