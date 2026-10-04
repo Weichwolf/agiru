@@ -175,7 +175,11 @@ std::string RecordRef::GetView(::agiru::Boolean UseNames) const {
 
 ::agiru::Boolean RecordRef::Ascending(::agiru::Boolean SetAscending) {
   if (State().record == nullptr) { throw Error("RecordRef.Ascending: the RecordRef is not open"); }
-  reinterpret_cast<detail::StateHandle *>(State().record)->Ensure().ascending = SetAscending;
+  detail::RecordState &state = reinterpret_cast<detail::StateHandle *>(State().record)->Ensure();
+  if (state.ascending != static_cast<bool>(SetAscending)) {
+    state.ascending = SetAscending;
+    detail::SelectionChanged(state);
+  }
   return SetAscending;
 }
 
@@ -693,6 +697,7 @@ Integer RecordRef::CurrentKeyIndex(Integer NewKeyIndex) {
       throw Error("the key index " + std::to_string(NewKeyIndex) + " is outside 1.." +
                   std::to_string(table.keys.size()));
     }
+    detail::SelectionChanged(state);
     state.key.clear();
     for (const FieldNo no : table.keys[static_cast<std::size_t>(NewKeyIndex) - 1].fields) {
       state.key.push_back(detail::SortField{.field = no, .ascending = true});

@@ -169,6 +169,7 @@ std::string ViewOf(const RecordState *state, const TableDef &table, bool useName
 }
 
 void ApplyView(RecordState &state, const TableDef &table, std::string_view view) {
+  SelectionChanged(state);
   state.filters.clear();
   state.key.clear();
   state.ascending = true;
@@ -216,12 +217,21 @@ void RuntimeCopyFilter(const RecordState *from, FieldNo source, void *target, Fi
   }
   std::erase_if(into.filters, [&](const FieldFilter &one) { return one.field == destination; });
   into.filters.insert(into.filters.end(), copied.begin(), copied.end());
+  SelectionChanged(into);
+}
+
+void SelectionChanged(RecordState &state) {
+  state.open.Forget();
+  state.viewDirty = true;
 }
 
 void Narrow(RecordState &state, ::agiru::FieldNo field, const std::string &text) {
   const auto same = [field, &state](const FieldFilter &one) {
     return one.field == field && one.group == state.group;
   };
+  const auto previous = std::ranges::find_if(state.filters, same);
+  if (previous == state.filters.end() ? text.empty() : previous->text == text) { return; }
+  SelectionChanged(state);
   std::erase_if(state.filters, same);
   if (text.empty()) { return; }
   state.filters.push_back(FieldFilter{.field = field, .group = state.group, .text = text});
@@ -263,7 +273,7 @@ bool SetCurrentKey(RecordState &state, const TableDef &table, std::span<const Fi
   std::vector<SortField> selected;
   selected.reserve(fields.size());
   for (const FieldNo no : fields) { selected.push_back(SortField{.field = no, .ascending = true}); }
-  state.open.Forget();
+  SelectionChanged(state);
   state.key = std::move(selected);
   return true;
 }

@@ -106,11 +106,11 @@ void Build(Held held, const TableDef &table) {
 
 void Snapshot(Held held, const TableDef &table) {
   RecordState &state = *held.state;
-  state.viewMarks = state.marks.size();
   state.viewFilters = state.filters;
   state.viewKey = state.key;
   state.viewAscending = state.ascending;
   Build(held, table);
+  state.viewDirty = false;
 }
 
 void Land(Held held, void *record, std::size_t at) {
@@ -119,28 +119,40 @@ void Land(Held held, void *record, std::size_t at) {
   held.temp->ops->load(record, held.temp->ops->at(held.temp->rows, held.state->view[at]));
 }
 
-void Refresh(Held held, const TableDef &table, const void *record) {
-  if (held.state->viewVersion == held.temp->version &&
-      held.state->viewMarks == held.state->marks.size()) {
-    return;
+struct Anchor {
+  std::size_t at;
+  bool found;
+};
+
+Anchor Refresh(Held held, const TableDef &table, const void *record) {
+  const bool selectionChanged = held.state->viewDirty;
+  const bool rowsChanged = held.state->viewVersion != held.temp->version;
+  if (selectionChanged) {
+    Snapshot(held, table);
+  } else if (rowsChanged) {
+    Build(held, table);
   }
-  held.state->viewMarks = held.state->marks.size();
-  Build(held, table);
+  if (!selectionChanged && !rowsChanged && held.state->at < held.state->view.size()) {
+    return Anchor{.at = held.state->at, .found = true};
+  }
   const RecordOrder by(table, held.state->viewKey, held.state->viewAscending);
   std::size_t at = 0;
-  while (at < held.state->view.size()) {
-    if (by.Compare(held.temp->ops->at(held.temp->rows, held.state->view[at]), record) >= 0) {
-      break;
+  std::size_t end = held.state->view.size();
+  while (at < end) {
+    const std::size_t middle = at + (end - at) / 2;
+    if (by.Compare(held.temp->ops->at(held.temp->rows, held.state->view[middle]), record) < 0) {
+      at = middle + 1;
+    } else {
+      end = middle;
     }
-    ++at;
   }
-  held.state->at = at;
   const bool same = at < held.state->view.size() &&
                     Ordered(held.temp->ops->at(held.temp->rows, held.state->view[at]),
                             record,
                             table,
                             PrimaryKey(table)) == 0;
-  if (!same) { held.state->at = at == 0 ? 0 : at - 1; }
+  held.state->at = same ? at : held.state->view.size();
+  return Anchor{.at = at, .found = same};
 }
 
 }
@@ -159,6 +171,7 @@ void RuntimeMakeTemporary(void *record, const TempOps *ops) {
   RecordState *state = StateOf(record);
   state->temporary = TempHandle(new TempTable(ops, ops->make()));
   state->view.clear();
+  state->viewDirty = true;
   state->positioned = false;
 }
 
@@ -248,6 +261,7 @@ bool TempModify(void *record, const TableDef &table) {
   const std::size_t at = LowerBound(*held.temp, table, record);
   if (!SameKeyAt(*held.temp, table, at, record)) { return false; }
   held.temp->ops->replace(held.temp->rows, at, record);
+  ++held.temp->version;
   return true;
 }
 
@@ -395,22 +409,26 @@ std::int32_t TempNext(void *record, const TableDef &table, std::int32_t steps) {
   if (steps == 0) { return 0; }
   const Held held = Reach(record);
   if (!held.state->positioned) { return 0; }
-  Refresh(held, table, record);
+  const Anchor anchor = Refresh(held, table, record);
   const std::int32_t wanted = steps;
-  const std::int32_t way = wanted > 0 ? 1 : -1;
   const std::int64_t count = wanted < 0 ? -std::int64_t{wanted} : wanted;
   std::int64_t taken = 0;
-  std::size_t at = held.state->at;
-  for (std::int64_t step = 0; step < count; ++step) {
-    if (way > 0 ? at + 1 >= held.state->view.size() : at == 0) {
-      if (taken != 0) { Land(held, record, at); }
-      return static_cast<std::int32_t>(taken);
-    }
-    at = way > 0 ? at + 1 : at - 1;
-    taken += way;
+  std::size_t at = anchor.at;
+  if (wanted > 0 && anchor.found) { ++at; }
+  if (wanted < 0) {
+    if (at == 0) { return 0; }
+    --at;
   }
-  Land(held, record, at);
-  return static_cast<std::int32_t>(taken);
+  std::size_t last = at;
+  for (std::int64_t step = 0; step < count; ++step) {
+    if (at >= held.state->view.size()) { break; }
+    last = at;
+    ++taken;
+    if (wanted < 0 && at == 0) { break; }
+    at = wanted > 0 ? at + 1 : at - 1;
+  }
+  if (taken != 0) { Land(held, record, last); }
+  return static_cast<std::int32_t>(wanted < 0 ? -taken : taken);
 }
 
 }

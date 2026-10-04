@@ -73,8 +73,10 @@ use the same predicate; this does not activate live metadata providers (0044).
 `make record-order JOBS=2` verifies mixed field directions, global reversal,
 primary-key ties, filters, relative searches and cursor/keyset direction changes.
 The same exact-value matrix runs through typed Record and RecordRef on SQL and
-temporary rows. Four compiled controls must reject. This is record-search proof,
-not client-page presentation or live metadata-provider activation (0044).
+temporary rows. SelectionChangeGate adds changed filters/copies, keys/directions/views,
+active marks, unchanged setters and shared temporary Modify visibility. Nine compiled
+controls must reject. SQL dynamic writes/transaction cursor recovery remain open;
+this is not client-page presentation or live metadata-provider activation (0044).
 
 `make base64 JOBS=2` qualifies the shared raw byte codec, 76-column CRLF profile,
 CLR Convert decoder rules, bounded stream writes and borrowed-input safety. Five

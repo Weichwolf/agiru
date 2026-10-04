@@ -160,6 +160,7 @@ void AdoptTableView(void *to, const void *from) {
   RecordState &into = reinterpret_cast<StateHandle *>(to)->Ensure();
   const RecordState *source = reinterpret_cast<const StateHandle *>(from)->Peek();
   if (source == nullptr) { return; }
+  SelectionChanged(into);
   for (const FieldFilter &one : source->filters) {
     into.filters.push_back(FieldFilter{.field = one.field,
                                        .group = one.group == kFixedViewGroup ? 0 : one.group,
@@ -171,11 +172,13 @@ void GiveRequestFilters(void *to, const void *from) {
   RecordState &into = reinterpret_cast<StateHandle *>(to)->Ensure();
   const RecordState *source = reinterpret_cast<const StateHandle *>(from)->Peek();
   into.filters = source == nullptr ? std::vector<FieldFilter>{} : source->filters;
+  SelectionChanged(into);
 }
 
 void TakeRequestFilters(void *to, const void *from) {
   RecordState &into = reinterpret_cast<StateHandle *>(to)->Ensure();
   const RecordState *source = reinterpret_cast<const StateHandle *>(from)->Peek();
+  SelectionChanged(into);
   std::erase_if(into.filters, [](const FieldFilter &one) { return one.group == 0; });
   if (source == nullptr) { return; }
   for (const FieldFilter &one : source->filters) {

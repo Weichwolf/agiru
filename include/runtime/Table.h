@@ -1186,7 +1186,11 @@ public:
   /// \param value True for upwards.
   /// \return The direction it now runs.
   Boolean Ascending(Boolean value) {
-    State().ascending = value;
+    detail::RecordState &state = State();
+    if (state.ascending != static_cast<bool>(value)) {
+      state.ascending = value;
+      detail::SelectionChanged(state);
+    }
     return value;
   }
 
@@ -1241,7 +1245,10 @@ public:
   /// \brief AL `Record.ClearMarks()` -- takes every mark off this variable.
   void ClearMarks() {
     auto *state = const_cast<detail::RecordState *>(Filtered());
-    if (state != nullptr) { state->marks.clear(); }
+    if (state != nullptr && !state->marks.empty()) {
+      state->marks.clear();
+      if (state->markedOnly) { detail::SelectionChanged(*state); }
+    }
   }
 
   /// \brief AL `Record.Consistent(...)`. Marks a table as being consistent or inconsistent.
@@ -1306,7 +1313,9 @@ public:
   void CopyFilters(const Derived &from) {
     const detail::RecordState *source =
         reinterpret_cast<const detail::StateHandle *>(&from)->Peek();
-    State().filters = source == nullptr ? std::vector<detail::FieldFilter>{} : source->filters;
+    detail::RecordState &state = State();
+    state.filters = source == nullptr ? std::vector<detail::FieldFilter>{} : source->filters;
+    detail::SelectionChanged(state);
   }
 
   /// \brief AL `Record.CopyLinks(FromRecord)`: the links of another record, or of the record a
@@ -1766,11 +1775,8 @@ public:
   void Mark(Boolean mark) {
     detail::RecordState &state = State();
     const std::string key = detail::MarkKey(Self(), TableDefinition<Derived>());
-    if (mark) {
-      state.marks.insert(key);
-    } else {
-      state.marks.erase(key);
-    }
+    const bool changed = mark ? state.marks.insert(key).second : state.marks.erase(key) != 0;
+    if (changed && state.markedOnly) { detail::SelectionChanged(state); }
   }
 
   /// \note NO `<algorithm>` IN THE DOOR. A linear walk over a handful of marks is written out
@@ -1792,7 +1798,11 @@ public:
   /// \param value True to restrict.
   /// \return What it was set to.
   Boolean MarkedOnly(Boolean value) {
-    State().markedOnly = value;
+    detail::RecordState &state = State();
+    if (state.markedOnly != static_cast<bool>(value)) {
+      state.markedOnly = value;
+      detail::SelectionChanged(state);
+    }
     return value;
   }
 
@@ -2022,7 +2032,10 @@ public:
     }
     const ::agiru::FieldNo no = NumberOf(&member);
     for (detail::SortField &one : state.key) {
-      if (one.field == no) { one.ascending = static_cast<bool>(ascending); }
+      if (one.field == no && one.ascending != static_cast<bool>(ascending)) {
+        one.ascending = static_cast<bool>(ascending);
+        detail::SelectionChanged(state);
+      }
     }
   }
 

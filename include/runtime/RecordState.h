@@ -262,7 +262,7 @@ struct TempOps {
 struct TempTable {
   const TempOps *ops;       ///< How to reach the rows.
   void *rows;               ///< The rows, owned here.
-  std::uint64_t version{0}; ///< Rises on every structural change, so a walk can notice.
+  std::uint64_t version{0}; ///< Rises on every row change, so a walk can notice.
   std::size_t held{0};      ///< How many records share it; the last one frees it.
 
   TempTable(const TempOps *ops_, void *rows_) : ops(ops_), rows(rows_) {}
@@ -342,6 +342,7 @@ struct RecordState {
   std::vector<FieldFilter> viewFilters; ///< The filters that built it -- a walk keeps its own.
   std::vector<SortField> viewKey;       ///< And the key.
   bool viewAscending = true;            ///< And the direction.
+  bool viewDirty = true;                ///< Selection setters invalidate the cached temporary view.
 
   std::vector<FieldFilter> filters;       ///< AND across fields and groups.
   std::vector<::agiru::FieldNo> autoCalc; ///< `SetAutoCalcFields`: calculated after every read.
@@ -357,8 +358,7 @@ struct RecordState {
   ///       answered that with a linear walk written out by hand, because `<algorithm>` may not
   ///       enter the door.
   std::set<std::string> marks;
-  bool markedOnly = false;   ///< `MarkedOnly(true)`.
-  std::size_t viewMarks = 0; ///< How many marks the temporary view was built over (\see view).
+  bool markedOnly = false; ///< `MarkedOnly(true)`.
 
   /// \brief AL `xRec` -- the record as it was last READ, INSERTED or MODIFIED.
   ///
@@ -472,6 +472,7 @@ public:
       const bool positioned = mine.positioned && mine.temporary == nullptr && keep == nullptr;
       mine.temporary = std::move(keep);
       mine.view.clear();
+      mine.viewDirty = true;
       mine.positioned = positioned;
     }
   }
@@ -512,6 +513,11 @@ private:
 
   RecordState *state_ = nullptr;
 };
+
+/// \brief Invalidates cached navigation after a record's selection changes.
+/// \param state The record-variable state; its current field values/position remain intact.
+/// \note Drops the SQL cursor and defers temporary-view rebuilding until navigation.
+void SelectionChanged(RecordState &state);
 
 /// \brief Puts a filter on one field, replacing whatever that field carried.
 ///

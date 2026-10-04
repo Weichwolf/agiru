@@ -5,6 +5,22 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Selection changes now invalidate SQL cursors and lazily rebuild temporary views
+  through `SelectionChanged`: filters/copies, keys/directions/views and active marks.
+  Same-cardinality mark replacement is detected; unchanged predicates/directions and
+  inactive marks retain the cursor. Temporary Modify advances the shared row version;
+  excluded origins use a binary insertion anchor without skipping the first successor.
+  SelectionChangeGate: 296 checks green; the coherent original runtime/headers fail
+  64 of the same checks. `make record-order JOBS=2` retains 5,872 ordering checks
+  and now rejects nine compiled controls. Receipts: `/tmp/agiru-selection-change.li6S1N`,
+  `/tmp/agiru-record-order-controls.sdKg5i`. Clang/Linux x86_64 RecordState sizeof
+  is 272 → 264 bytes, not a session/throughput benchmark. Targeted lint remains red:
+  gate/RecordState/Temporary/RecordRef/Report have 33/1/31/40/44 existing findings;
+  none in the new functions, no suppressions added. Affected NextZero/Cursor/Temporary/
+  Find/FilterGroup/Report/TestReport gates pass 112/230/80/43/137/18/15 checks.
+  SQL dynamic writes, transaction
+  cursor recovery and original full AL execution remain unproved. This increment
+  is outside frozen 193025; no UT gain or G1 claim.
 - Mixed record ordering: private `src/rt/RecordOrder.{h,cpp}` compiles selected
   directions and complete primary-key tie-breakers once per comparison operation.
   SQL ORDER BY, reverse/keyset search and temporary views share the same order.
@@ -258,8 +274,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
    Preserve documented complete-prefix selection; do not restore ignored keys
    just to recover old diagnostics. Compare the full population after any fix.
-1. Prove filter/key/direction changes against live cursors and shared temporary
-   mutations; route table identity through explicit company context. Preserve
+1. Prove SQL dynamic result sets after own/shared writes and cursor recovery after
+   Commit/rollback; route table identity through explicit company context. Preserve
    mixed-order and zero/partial/exhausted/extreme-step gates.
 2. Write a small operation matrix over typed Record, RecordRef and temporary records: Init versus Clear, assignment versus Copy, Copy(ShareTable), Get versus filters, Find directions, marks and ModifyAll/DeleteAll triggers.
    Extend the retained FilterGroupGate matrix to SQL and full sealed-seed UT A/B. Verify consumed setter return against the platform rather than assuming the example proves it; prove group -1 FlowField refusal. Keep independent per-group filters, same-field intersection, cross-column OR and every former item-tracking identity.
@@ -333,7 +349,17 @@ disabled-key index numbering or Python call-context maps are inferred.
 
 Range bounds: platform `methods-auto/{record,fieldref}/*-getrangemin-method.md` and `*-getrangemax-method.md`; BCApps main `a9ea4d84534cebba852c44bf0f841c2ea149de4e`, `src/System Application/App/Email/src/Email/Sent/SentEmails.Query.al` and `src/System Application/App/Extension Management/src/ExtensionSettings.Page.al` guard calls with GetFilter. User docs contain no separate contract. Predecessor `~/Git/openerp/board/1715_getrangemin-without-filter-must-raise.md` distinguishes public errors from internal blank FlowFilter bounds. Preserve `RangeBoundOf` and the existing FlowFilter gate.
 
-Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Predecessor `openerp/board/1102_persistentes-next-ignoriert-filteraenderungen-im-ergebnissat.md` identifies filter/key invalidation; that separate gap remains open here.
+Selection-change authority: developer `ff5939a46e05`,
+`methods-auto/record/record-{next,setfilter,copyfilter,copyfilters,mark,markedonly,clearmarks}-method.md`
+and `administration/optimize-sql-al-Database-methods-and-performance-on-server.md`.
+BCApps `bb7111877ff7`: `Inventory/Tracking/InventoryProfileOffsetting.Codeunit.al::ForecastConsumption`
+narrows, Find('+'), widens and Next; `Inventory/Counting/Document/PhysInvtShowDuplicates.Codeunit.al`
+marks during an ordinary walk before activating MarkedOnly. Both under `src/Layers/W1/BaseApp/`.
+User `0ff62b2266fd`, `business-central/ui-enter-criteria-filters.md`.
+Predecessor `openerp/board/1102_persistentes-next-ignoriert-filteraenderungen-im-ergebnissat.md`
+identifies the stale-selection failure; its Python implementation is not transplanted.
+
+Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection-change matrix above; full SQL mutation/transaction recovery remains open.
 
 Code: `src/rt/{Record,Navigate,Temporary,Selection,RecordRef,PlatformTables}.cpp`, `include/runtime/Table.h`. Platform: `methods-auto/record/record-next-method.md`, `methods-auto/recordref/recordref-next-method.md`, other Record/RecordRef overloads, devenv-temporary-tables.md, devenv-integer-virtual-table.md. AL: `src/Layers/RU/Tests/Local/ERMVATReinstatement.Codeunit.al::SuggestVATSettlement` explicitly calls temporary Next(0); No. Series temporary filters and platform table users. No dedicated user-facing Next(0) contract; platform method documentation governs. Predecessor board searched for Next(0), with no matching finding; WI-1063/1136/1173/1206/1229 cover adjacent record contracts. Retain source usage as a fixture, never a hardcoded runtime branch.
 

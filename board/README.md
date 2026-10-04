@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Selection invalidation (0044): SQL cursors and temporary views follow changed
+  filters/keys/directions/active marks; shared temporary Modify is visible.
+  SelectionChangeGate: 296 checks green, coherent predecessor 64 red;
+  mixed-order matrix remains 5,872 green, nine compiled controls reject.
+  `/tmp/agiru-selection-change.li6S1N`, `/tmp/agiru-record-order-controls.sdKg5i`.
+  Targeted lint retains existing findings, none in new functions. Outside frozen
+  193025; SQL dynamic writes/transaction cursor recovery and full AL replay remain open.
 - Mixed-order integration: `20261004T193025Z-2625193`, frozen HEAD `7b7cf45`,
   source `a234a8d7b12a5df02595bc4d9376c8345f454d7566b5652dcc279dc21c499aad`;
   `slice-check all test ut`, six jobs. Runner PID 2625447 is live; no terminal result.
