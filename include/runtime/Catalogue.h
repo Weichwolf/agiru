@@ -43,6 +43,9 @@ struct TableEntry {
   ///        beside it (`Table::RenameFrom`), so that `RecordRef.Rename` runs the trigger, the
   ///        events and the cascade.
   bool (*rename)(void *record, const void *before);
+  /// \brief Explicit ABI binding qualified by an original native source declaration.
+  /// Null for ordinary entries; qualification never permits arbitrary duplicate IDs.
+  const TableEntry *sourceBinding = nullptr;
 };
 
 /// \brief Makes an empty record.
@@ -96,7 +99,37 @@ inline constexpr TableEntry kTableEntry{
 
 /// \brief Adds one table to the catalogue.
 /// \param entry The entry, which must outlive the process.
+/// \throws std::invalid_argument for a null entry/declaration; std::logic_error after
+/// any catalogue read has frozen the installed composition.
 void RegisterTableEntry(const TableEntry *entry);
+
+/// \brief Binds source-owned native metadata to the existing record ABI and factories.
+/// \tparam T The native record class.
+/// \tparam Source The immutable original-source declaration, checked by the generator.
+/// \return An immutable entry for registration before the catalogue freezes.
+template <typename T, const TableDef &Source>
+inline constexpr TableEntry kSourceTableEntry = [] {
+  static_assert(Source.id == TableTraits<T>::kTable.id);
+  static_assert(IsPlatformTable(Source.id));
+  static_assert(Source.module != nullptr);
+  auto entry = kTableEntry<T>;
+  entry.table = &Source;
+  entry.sourceBinding = &kTableEntry<T>;
+  return entry;
+}();
+
+/// \brief Installs one original-source native table declaration at library initialization.
+/// \tparam T The existing native record class.
+/// \tparam Source The generator's source-owned immutable declaration.
+template <typename T, const TableDef &Source> struct RegisterTableSource {
+  /// \brief Registers the declaration before any catalogue read.
+  RegisterTableSource() { RegisterTableEntry(&kSourceTableEntry<T, Source>); }
+
+  /// \brief Registration is a library-lifetime action, not a copyable value.
+  RegisterTableSource(const RegisterTableSource &) = delete;
+  /// \brief An installed registration cannot be reassigned.
+  RegisterTableSource &operator=(const RegisterTableSource &) = delete;
+};
 
 /// \brief What the runtime knows about a generated page: its declaration and how to run it.
 struct PageEntry {
@@ -113,11 +146,14 @@ struct PageEntry {
 
 /// \brief Puts a page in the catalogue, once per generated page, at load time.
 /// \param entry The entry, which lives for the program.
+/// \throws std::invalid_argument for a null entry/declaration; std::logic_error after
+/// any catalogue read has frozen the installed composition.
 void RegisterPageEntry(const PageEntry *entry);
 
 /// \brief Finds a page by its number.
 /// \param id The number.
 /// \return The entry, or `nullptr` when this build carries no such page.
+/// \throws std::logic_error if any installed table/page/codeunit kind has duplicate IDs.
 [[nodiscard]] const PageEntry *FindPage(PageId id);
 
 /// \brief The page a lookup on a table opens: its `LookupPageId`, else the first `List` page whose
@@ -147,6 +183,7 @@ template <typename T> struct RegisterTable {
 ///
 /// \param id The table number.
 /// \return The entry, or `nullptr` when this binary carries no such table.
+/// \throws std::logic_error if any installed table/page/codeunit kind has duplicate IDs.
 [[nodiscard]] const TableEntry *FindTable(TableId id);
 
 /// \brief The installed table of an AL NAME, which is how a `TableRelation` names its target.
@@ -155,11 +192,16 @@ template <typename T> struct RegisterTable {
 [[nodiscard]] const TableEntry *FindTable(std::string_view name);
 
 /// \brief Every installed table, by number.
-/// \return The entries, sorted by table number.
+/// \return A stable borrowed view, sorted by table number. The first catalogue read
+/// freezes registration for tables, pages, codeunits and profiles together.
+/// \throws std::logic_error if any installed table/page/codeunit kind has duplicate IDs.
 [[nodiscard]] std::span<const TableEntry *const> InstalledTables();
 
 /// \brief Registers a translated `profile` object; the generated source does this once, at load.
 /// \param profile The declaration, `constexpr` data in `.rodata`.
+/// \throws std::invalid_argument for a null declaration; std::logic_error after any
+/// catalogue read has frozen the installed composition. Profile ownership validation
+/// remains separate from the numbered object kinds.
 void RegisterProfileEntry(const ProfileDef *profile);
 
 /// \brief The static registration a generated profile source makes.
@@ -176,17 +218,17 @@ struct RegisterProfile {
 };
 
 /// \brief Every installed profile, in the order the sources registered them.
-/// \return The declarations.
+/// \return A stable borrowed view; freezes the same installed composition as table lookup.
 [[nodiscard]] std::span<const ProfileDef *const> InstalledProfiles();
 
 struct CodeunitEntry;
 
-/// \brief Every installed codeunit, in the order the sources registered them.
-/// \return The entries.
+/// \brief Every installed codeunit, sorted by number.
+/// \return A stable borrowed view; freezes the same installed composition as table lookup.
 [[nodiscard]] std::span<const CodeunitEntry *const> InstalledCodeunits();
 
-/// \brief Every installed page, in the order the sources registered them.
-/// \return The entries.
+/// \brief Every installed page, sorted by number.
+/// \return A stable borrowed view; freezes the same installed composition as table lookup.
 [[nodiscard]] std::span<const PageEntry *const> InstalledPages();
 
 }
