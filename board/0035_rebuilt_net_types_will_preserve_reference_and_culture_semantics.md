@@ -12,7 +12,9 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   changes. `/tmp/agiru-stream-append-{gate-final,previous-final}.log`,
   `/tmp/agiru-stream-append-final.sha256`. Runtime/gate have no own lint findings;
   25/47 inherited header findings remain. Three old gate findings removed, no new
-  suppressions. Full local/AL replay remains pending; outside frozen 132617.
+  suppressions. Full local replay passes 132 cases/223 tooling tests, exit 0;
+  `/tmp/agiru-stream-append-all-local.log`, unchanged final source/image hashes.
+  AL replay remains pending; outside frozen 132617.
   Encoding, typed layouts and full BLOB limits remain open, not a streaming/native
   Base64 activation or BC workload performance claim. References: developer
   `ff5939a46e`, `methods-auto/outstream/outstream-{write-text-integer,writetext}-method.md`,

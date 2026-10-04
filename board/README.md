@@ -17,8 +17,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 - Qualified-table recovery replay: `20261004T132617Z-2130724`, frozen HEAD
   `23d1497`, source `1dee82b25ed072be32d3b5b27f03be68d059c6bdff423b707c0e99f12c947d07`;
-  `slice-check all test ut`, six jobs. Runner PID 2130942 is confirmed live;
-  slice-check/build pass, local fixtures are running. Includes installed metadata
+  `slice-check all test ut`, six jobs. Terminal: slice-check/all/test exit 0;
+  UT exit 2, 2,169/2,314 passed, 145 failed, zero incomplete, 80 codeunits,
+  six workers/1,330 seconds. Against 120802: 69 gains, zero losses, 28 changed
+  errors. Against 101600: zero gains/losses, eleven changed errors. All 2,314
+  identities and source hashes match, with no missing/added/duplicate cases.
+  Receipts: run `artifacts/ut-comparison-{120802,101600}.json`. Null/unsealed
+  seed: diagnostic repeatability, not causal A/B. Includes installed metadata
   lookup and prepared filters; later BLOB append changes are outside this snapshot.
 - BLOB stream append (0035): raw/text/terminated writes reuse owned storage with
   geometric growth; borrowed self-input remains safe across reallocation. Stream
@@ -26,7 +31,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `/tmp/agiru-stream-append-{gate-final,previous-final}.log`, final image/source hashes
   `/tmp/agiru-stream-append-final.sha256`. Targeted runtime/gate analysis has no own
   findings; 25/47 inherited header findings remain, unsuppressed. Three old gate
-  findings are repaired. Full local/AL replay for this later batch remains pending;
+  findings are repaired. Full local replay passes 132 cases/223 tooling tests,
+  exit 0 (`/tmp/agiru-stream-append-all-local.log`); final source/image hashes
+  still match. AL replay for this later batch remains pending;
   encoding, typed binary layouts and the complete BLOB size policy remain gaps.
 - Completed native-constant activation `20261004T120802Z-2065848`: frozen HEAD
   `1c01b11`, source `0039282b99790dd762ea620521f5f34d77fa4398eaa0512414f2fc5c66024c25`;
@@ -44,7 +51,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Verified-package regeneration changes 22 files; the diagnosed qualified refusals
   disappear. `/tmp/agiru-transpile.bafUwI`: exit 1, unchanged package identities
   and native/property/control gaps; all 14,225 slice sources remain. Full Make
-  replay, compiled activation and recovery of the 69 UT losses remain pending.
+  replay and compiled activation recover all 69 UT losses in 132617 above.
 - Compiled record filters (0044): one owned predicate for temporary operations
   and computed rows. ReflectionMetadata passes 194 checks/sixteen controls;
   Filter/FilterGroup/Temporary retain 125/137/80 green checks. Same FilterGroup

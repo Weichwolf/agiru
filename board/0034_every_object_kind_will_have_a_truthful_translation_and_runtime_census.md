@@ -20,7 +20,12 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   Verified-package regeneration changes 22 files and removes the diagnosed
   qualified refusals; all 14,225 slice sources remain. Original package hashes
   and native/property/control gaps match: `/tmp/agiru-transpile.bafUwI`, exit 1.
-  Full compiled activation/recovery remains pending. References: developer `ff5939a46e`,
+  Full replay 132617 recovers all 69 losses: 2,169/2,314, 145 failed, zero
+  incomplete; slice-check/all/test exit 0, UT exit 2. Against 101600: no
+  gains/losses, eleven changed errors; against 120802: 69 gains/no losses,
+  28 changed errors. No missing/added/duplicate identities; source hashes match.
+  Run `artifacts/ut-comparison-{120802,101600}.json`; null/unsealed seed,
+  diagnostic repeatability, not causal A/B or G1. References: developer `ff5939a46e`,
   `devenv-namespaces-overview.md`; BCApps `bb7111877f`, original
   `Inventory/{Capacity/CapacityLedgerEntry.Table,Posting/ItemJnlPostLine.Codeunit}.al`;
   predecessor 1483 rejects fabricated hash identities. User `0ff62b2266`,
