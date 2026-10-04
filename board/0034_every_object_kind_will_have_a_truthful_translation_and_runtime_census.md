@@ -30,10 +30,13 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   `/tmp/agiru-native-codeunits.K1f1tw`, `/tmp/agiru-native-codeunits-previous.UDymKH`,
   `/tmp/agiru-native-codeunit-output-{all-local-final,native-tooling-final,lint}.log`.
   New runner analysis passes; Main keeps four existing Main/BodyWriter findings,
-  no added suppression. Full replay `20261004T164436Z-2355150` is active on frozen
-  HEAD `ae9c59a`; platform/slice build and 135 local cases/232 tooling tests pass;
-  UT remains active without a terminal result.
-  Compare the unchanged full 2,314 population before primitive binding (README).
+  no added suppression. Full replay `20261004T164436Z-2355150`, frozen HEAD
+  `ae9c59a`, is terminal: platform/slice build and 135 local cases/232 tooling tests
+  pass; UT 2,169/2,314, 145 failed/zero incomplete, 80 codeunits/1,464 seconds.
+  Against 143703: zero gains/losses/missing/added/duplicates; source hashes match.
+  Only two OAuth errors change to the source-owned Native Base64 refusal.
+  `artifacts/ut-comparison-143703.json`; null/unsealed seed, diagnostic only.
+  Frozen source/package/notice hashes remain unchanged. No provider/G1 proof.
   References: developer `ff5939a46e`, `devenv-namespaces-overview.md`,
   `attributes/devenv-native-attribute.md`; BCApps `bb7111877f`,
   `System Application/App/Base64 Convert/src/Base64ConvertImpl.Codeunit.al`;
@@ -279,9 +282,9 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    implementation finding. Bind real context types; 0039 owns hook/case lifecycle;
    do not turn the current explicit refusal carriers into empty success implementations.
 4. Generate complete native declarations/immutable metadata and bind Native methods to primitives or named refusals. Finish Page Table Field's live projection through 0044 and activate its own binding only with the complete UT recheck; standalone census also exposes API webhook tables and Code Coverage 2000000049. Reuse the System AST/binder and declared field/key/property vocabulary. CodeCoverage Log/Load/Refresh/Include require real instrumentation/provider lifecycle, including the declared MultiSession argument, not empty seeded rows. 0033 owns identity, 0044 providers. Never add Refused arithmetic/default construction to hide absent fields; keep unsupported tables/options visible. Share language/Scope vocabulary without importing whole tables; generic 0019 owns calculation.
-   Native codeunits: extend the common production codeunit index/output with the
-   admitted source ASTs, original module ownership and collision controls. Keep
-   all unbound methods counted/refusing; Native attribute alone grants no binding.
+   Native methods: bind through the common production codeunit index/output,
+   admitted source ASTs and original module ownership; retain collision controls.
+   Keep all unbound methods counted/refusing; Native attribute alone grants no binding.
    Base64Convert needs all nine source overloads over one byte codec,
    existing Encoding and bounded stream I/O. Qualify native core/error/line-break
    contracts, execute the thirteen original tests, retain every other native gap

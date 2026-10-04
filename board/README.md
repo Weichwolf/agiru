@@ -23,13 +23,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Native binding, codepages/best-fit and locale defaults remain open.
 - Native integration replay: `20261004T164436Z-2355150`, frozen HEAD `ae9c59a`,
   source `1b5af9f74965a935aa39ab0eda282f8bede0ce4c1f101f7695889fa56efc53c0`;
-  `slice-check all test ut`, six jobs. Runner PID 2355353 is live; slice-check
-  and the complete slice build pass; the production platform library links.
-  Local replay passes 135 cases/232 tooling tests; the full UT run is active,
-  no terminal UT result. Frozen BCApps revision `bb7111877f`, source and
-  System hashes match the previous complete replay; original notice is frozen.
-  Compare all 2,314 identities/results against 143703 and investigate every loss.
-  Null/unsealed seed remains diagnostic only. No G1/primitive activation claim.
+  `slice-check all test ut`, six jobs; terminal receipt, no live runner.
+  Slice-check/all/test exit 0: platform/slice link, 135 local cases/232 tooling tests.
+  UT exit 2: 2,169/2,314 pass, 145 fail, zero incomplete; 80 codeunits/1,464 seconds.
+  Against 143703: zero gains/losses/missing/added/duplicate identities, matching
+  source manifest/file hashes. Two OAuth errors now identify the original native
+  Base64 method instead of an absent .NET member; no business pass gain.
+  `artifacts/ut-comparison-143703.json`. Frozen source/System/notice hashes remain
+  unchanged; BCApps `bb7111877f`. Null/unsealed seed is diagnostic repeatability,
+  not causal A/B. Unicode repair is outside this snapshot; no G1/provider claim.
 - Native codeunit indexing/output (0034): 35 raw/selected/emitted original identities,
   zero missing/excluded/duplicates; 35 compile without PCH. Linked registry 108 and
   original nine-overload refusal eleven checks green. Bare/qualified/numeric consumers
