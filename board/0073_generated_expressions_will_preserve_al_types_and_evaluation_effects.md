@@ -22,7 +22,16 @@ Depends on: 0033 symbol identity.
   native/refusal/missing counters as `cvtGhD`; all 14,225 slice sources remain.
   `/tmp/agiru-transpile.Hzzsf5`. `make lint` refuses missing specialist receipts;
   native-report qualification exposed its stale absent-header/source-count
-  recipe, repaired in 0034. Full AL execution remains pending in snapshot 101600.
+  recipe, repaired in 0034. Frozen 101600 completes slice-check/all/test (exit 0)
+  and all 2,314 UT identities (exit 2): 2,169 pass, 145 fail, zero incomplete.
+  Compared with 080905: seven gains, zero losses/missing/added, thirteen changed
+  errors. Six serial-tracking pick/shipment cases and the no-breakbulk summary
+  scenario gain; eleven RapidStart errors now reach missing Permission Set
+  identity. Original source/manifest hashes match; the seed remains null/unsealed,
+  so this is diagnostic repeatability, not causal A/B or G1/full-app proof.
+  `/tmp/agiru-verify/b3fb41b94d2994ba/20261004T101600Z-1902967/artifacts/ut-comparison-080905.json`.
+  Native/source-only guard repairs and later control-extension work are outside
+  this snapshot. The separate numeric helper is compiled but remains inactive.
   Authority: developer `devenv-al-{operators,boolean-operators}.md` (Boolean types),
   BCApps `bb7111877f` `Inventory/Posting/ItemJnlPostLine.Codeunit.al:3984`
   (right-side lot splitting), predecessor 1057/1712. Eager evaluation is supported

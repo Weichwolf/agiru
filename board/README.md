@@ -20,12 +20,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   four red. Complete local Make replay: 130 cases/223 tooling checks green.
   `/tmp/agiru-boolean-final-local.log`; new gate/runner analysis passes, generator
   inherited findings remain. Regeneration retains prior gap counters and all
-  14,225 slice sources. Full AL activation is pending; do not reuse 080905 as
-  post-change execution proof. Activation snapshot `20261004T101600Z-1902967`
+  14,225 slice sources. Activation snapshot `20261004T101600Z-1902967`
   freezes HEAD `5b7072c`, source `8af4d25d73e72d881a5df4ed1289e7fe928240c10d8f419cd0d5e1c0a9da86b3`;
-  its `all` build and 130-case/223-tooling replay pass. UT execution has started
-  with six workers on disposable clones; its final result remains pending.
-  Manifest/source-file hashes match 080905; no denominator change.
+  slice-check/all/test exit 0; UT exits 2: 2,169/2,314 passed, 145 failed,
+  zero incomplete, 80 codeunits, six workers/1,430 seconds. All identities and
+  manifest/source-file hashes match 080905: seven gains, zero losses/missing/added
+  cases, thirteen changed errors. Gains: six serial-tracking pick/shipment cases
+  and the no-breakbulk summary scenario. Eleven RapidStart cases now reach the
+  missing Permission Set identity; 37 live Table Metadata refusals remain.
+  Comparison: snapshot `artifacts/ut-comparison-080905.json`. The separate AL
+  numeric helper is compiled but not emitted. Null/unsealed seed: diagnostic
+  repeatability, not causal A/B, complete-app linking or G1 proof.
 - Native qualifier/output repair (0034): all 29 platform sources compile in app/
   slice modes; dropped compilation refuses. Original/loader report checks pass
   562 each; native enum declarations pass 28/28. Analysis-only writes no files
@@ -33,7 +38,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Specialist receipts now exist; six inherited Main/header findings keep lint red.
   `/tmp/agiru-native-no-output-final.4hBhBG`, `/tmp/agiru-native-report-layouts.XcbXKD`.
   This source-only guard/recipe batch is outside snapshot 101600.
-- Latest completed frozen replay `20261004T080905Z-1761326`: slice-check/all/test exit 0;
+- Earlier frozen baseline `20261004T080905Z-1761326`: slice-check/all/test exit 0;
   UT exit 2, 2,162/2,314 passed, 152 failed, zero incomplete, 80 codeunits,
   six workers/1,256 seconds. All 2,314 identities compared with 064830: no gains,
   losses, missing/added identities or changed errors. Receipt:
