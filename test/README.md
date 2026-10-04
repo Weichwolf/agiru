@@ -78,7 +78,9 @@ active marks, unchanged setters and shared temporary Modify visibility. CursorLi
 adds Commit/rollback buffer recovery, released/surviving/absent portal cleanup, partial
 and reversed walks. DynamicRecordGate adds same-session Modify/Insert/Delete/Rename,
 ModifyAll/DeleteAll and filter admission/exclusion through typed Record/RecordRef,
-inside/across fetch blocks. Revision storage follows active readers, not historical
+inside/across fetch blocks, with uniform/mixed keys, global reversal and already-open
+backward cursors. Own-variable Modify/Delete/Rename preserve the frame/system identity
+and resume from its current key. Revision storage follows active readers, not historical
 table visits; session/table/connection isolation and failed/temporary writes are checked.
 Twenty-one compiled controls must reject; traced SQL counts reject a functional-green
 one-row fetch. Full AL dynamic-write replay and Query transaction contracts remain open;

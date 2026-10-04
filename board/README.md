@@ -13,7 +13,7 @@ and archived source branches were preserved. The current receipts below are newl
 Preserved native prototype: branch `work/native-field-metadata`, worktree
 `/home/cosmo/Git/agiru-worktrees/native-field-metadata`; not promoted to `main`.
 
-## Current verification — 2026-10-04
+## Current verification — 2026-10-05
 
 - Dynamic SQL reads (0044): successful row/bulk writes change a session/table revision;
   Next discards obsolete buffers before bounded keyset resumption. Tracking retires
@@ -28,6 +28,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   source hashes match before/after (`all-local.log`, `verified-inputs.sha256`).
   Outside frozen 210945; full AL replay, own-variable/mixed-reverse mutations,
   Query boundaries and company qualification remain open. No UT gain or G1 claim.
+- Dynamic-write continuation (0044): 5,013 checks green over all eight write kinds,
+  typed/RecordRef, uniform/mixed/global-reversed orders and pre-existing backward
+  cursors; original cases remain. Own Modify/Delete/Rename retain frame/system ID
+  and resume at the current key. Twenty-one compiled controls reject; no own analysis
+  findings, 35 existing header findings remain unsuppressed. Disposable gate DB
+  `agiru_dynamic_order_20261004_01` isolates this run from frozen AL verification.
+  `/tmp/agiru-dynamic-order.1x5qFL`, `/tmp/agiru-record-order-controls.rNkiaB`.
+  Expanded matrix is outside the 141-case local replay and frozen 210945; no UT/G1 claim.
 - Cursor lifetime (0044): transaction-aware buffers, bounded bidirectional resume
   and released/surviving/absent portal cleanup. CursorLifecycleGate: 313 checks
   green; final coherent predecessor fixture reports 14 failures. Ordering/selection
@@ -39,7 +47,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Query transaction contracts remain open.
 - Cursor/selection integration: `20261004T210945Z-2749818`, frozen HEAD `d1b4873`,
   source `92a6ba7025e7341a691de8da842698ccb9832d86f3665e6404a84f463cc7901f`;
-  `slice-check all test ut`, six jobs. Runner PID 2750430 is live; build is running.
+  `slice-check all test ut`, six jobs. Runner PID 2750430 is live; build/local tests
+  pass (140 cases/232 tooling tests). AL runner PID 2867169 is live, six workers.
   BCApps/source/System/original-notice identities match completed 193025.
   Compare all 2,314 identities/statuses/errors against 193025 and investigate losses;
   null/unsealed seed remains diagnostic, not causal A/B or G1.

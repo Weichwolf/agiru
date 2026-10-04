@@ -1,10 +1,20 @@
 # 0044 — Record operations will share one correct SQL and temporary contract
 
-Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-10-04
+Status: open | Priority: P0 | Stage: UT | Reviewed: 2026-10-05
 Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Expanded dynamic writes: 5,013 checks green retain every original case and add
+  uniform/mixed/global-reversed orders, already-open backward cursors and own
+  Modify/Delete/Rename through typed/RecordRef. Own writes preserve the frame and
+  SystemId; Rename resumes from its new key, not the old buffered ordinal.
+  Independent fixture ordering uses numeric groups/code identities, not RecordOrder.
+  Twenty-one compiled controls reject; final analysis has no own findings and 35
+  existing header findings, no suppressions. Disposable DB
+  `agiru_dynamic_order_20261004_01` prevents overlap with frozen gate/AL databases.
+  `/tmp/agiru-dynamic-order.1x5qFL`, `/tmp/agiru-record-order-controls.rNkiaB`.
+  Outside the 141-case local replay and frozen 210945; full AL replay remains pending.
 - Dynamic SQL reads: private `RecordChanges.{h,cpp}` tracks only active readers,
   with session-owned table revisions and O(1) read checks. Successful Storage row
   writes and RuntimeDeleteAll advance the matching revision; failed, temporary,
@@ -323,8 +333,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    `~/Git/BCApps/src/Layers/W1/Tests/SCM-Planning/SCMPlanningUT.Codeunit.al`.
    Preserve documented complete-prefix selection; do not restore ignored keys
    just to recover old diagnostics. Compare the full population after any fix.
-1. Replay the dynamic-write matrix above through the full AL population; qualify
-   own-variable mutation and already-open mixed/reverse cursors. Keep bounded reads
+1. Replay the expanded dynamic-write matrix above through the full AL population.
+   Keep bounded reads
    and measure write-loop overhead, including ModifyAll's current per-row traversal.
    Qualify Query.cpp's transaction-boundary
    contract separately: Query.Read does not use RuntimeNext. Route table identity
@@ -433,6 +443,11 @@ does four ModifyAll calls before traversal. User `0ff62b2266fd`,
 `business-central/ui-how-run-batch-jobs.md`. Predecessor 1573 identifies ModifyAll's
 buffer/position corruption, still separate from this shared-read invalidation;
 0889's own-insert-blindness claim contradicts the platform dynamic-set guarantee.
+Own Rename: `methods-auto/{record,recordref}/*-rename-method.md` and
+BCApps `bb7111877ff7`, `src/Layers/W1/Tests/ERM/CopyPriceDataTest.Codeunit.al::T066_CopyResourceCostInconsistentData`
+renames ResourceCost.Code while retaining Type/Work Type Code. The docs' prohibited
+table examples do not establish a blanket refusal of every option-containing key;
+retain this original source counterexample without a business-specific runtime branch.
 
 Partial/extreme steps: platform `methods-auto/{record,recordref}/*-next-method.md`; BCApps current main `src/Layers/W1/Tests/Cost Accounting/ERMCAGLTransfer.Codeunit.al::ValidateTransfer` and `src/Layers/W1/Tests/Dimension/DimensionCorrectionTests.Codeunit.al` use non-unit steps. User intent: `dynamics365smb-docs/archive/WorkingWithDynamics/sorting.md`. Preserve the selection/lifecycle matrix above; full SQL mutation and Query transaction contracts remain open.
 
