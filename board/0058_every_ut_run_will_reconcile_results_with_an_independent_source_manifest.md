@@ -5,6 +5,16 @@ Depends on: 0589 trustworthy execution; 0004 sealed seed for acceptance.
 
 ## Evidence
 
+- A refrozen source-only BC input lost the original notice and refused the local
+  layout qualifier after a successful build. `verify_snapshot.py` now requires
+  the original notice before dependency copying when `test` accompanies frozen
+  BC inputs; explicit relocated notices remain hashed/immutable. Layout refusal
+  names the missing input. Verify-check 22/tooling 228 tests pass; previous actual
+  freezer fails the new control. Original frozen inputs/failed result remain unchanged;
+  the matching original notice separately passes the frozen layout qualifier.
+  `/tmp/agiru-notice-preflight-{verify-check,previous,layout-final,all-tooling}.log`;
+  current measurements and original failure remain in README.
+
 - Latest executed configured UT replay 101600: all 80/2,314 original identities,
   2,169 passed/145 failed, zero incomplete; seven gains/zero losses/missing/added
   against 080905. Manifest and original source-file hashes are identical. Snapshot

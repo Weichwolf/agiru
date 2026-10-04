@@ -2779,6 +2779,44 @@ class SnapshotGate(unittest.TestCase):
             self.assertEqual([path.read_text().strip() for path in receipts], ['first', 'second'])
             self.assertFalse((lane / 'build/scope-inventory.json').exists())
 
+    def test_bc_test_snapshot_requires_original_notice_before_dependency_copy(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            root = base / 'agiru'
+            root.mkdir()
+            (root / 'Makefile').write_text('test ut:\n'
+                                           '\t@test -f "$$AGIRU_LAYOUT_SOURCE_NOTICE"\n'
+                                           '\t@mkdir -p build\n'
+                                           '\t@touch build/ran\n')
+            bc = base / 'relocated-source'
+            bc.mkdir()
+            (bc / 'Fixture.al').write_text('fixture\n')
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(root), '-c', 'user.name=Fixture',
+                            '-c', 'user.email=fixture@example.invalid', 'commit', '-qm',
+                            'fixture'], check=True)
+            arguments = SimpleNamespace(targets=['test', 'ut'], jobs=1, detach=False, reuse=False)
+            with patch.object(verify, 'ROOT', root), \
+                    patch.dict(os.environ, {'AGIRU_BC_SOURCE': str(bc)}):
+                os.environ.pop('AGIRU_LAYOUT_SOURCE_NOTICE', None)
+                with patch.object(verify, 'freeze_input', wraps=verify.freeze_input) as freeze:
+                    with self.assertRaisesRegex(RuntimeError, 'original BC source notice'):
+                        verify.start(arguments)
+                    freeze.assert_not_called()
+                self.assertFalse((root / 'build/ran').exists())
+                self.assertFalse((verify.verification_root(root) / 'latest').exists())
+                original = base / 'original-notice'
+                original.write_text('Original third-party notice\n')
+                os.environ['AGIRU_LAYOUT_SOURCE_NOTICE'] = str(original)
+                self.assertEqual(verify.start(arguments), 0)
+            archive = Path((verify.verification_root(root) / 'latest').read_text().strip())
+            result = json.loads((archive / 'result.json').read_text())
+            self.assertEqual(result['target_exits'], {'test': 0, 'ut': 0})
+            self.assertTrue((archive / 'source/build/ran').is_file())
+            self.assertEqual(result['layout_source_notice_sha256'], verify.input_digest(original))
+            self.assertEqual((archive / 'layout_source_notice').read_text(), original.read_text())
+
     def test_frozen_bc_revision_reaches_the_ut_runner(self):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)

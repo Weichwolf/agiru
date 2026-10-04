@@ -18,7 +18,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 - Current integration replay: `20261004T143703Z-2217132`, frozen HEAD `ad7a917`,
   source `8534a91bf87c10d8fc0ffd85f113dca46381fdda1cacbcccfad778357bfbc87e`;
   `slice-check all test ut`, six jobs. Runner PID 2217377 confirmed live;
-  slice-check passes, build is running. Includes BLOB amortization, native codeunit
+  slice-check/all pass; test exits 2 (133 cases, one refused layout qualifier,
+  227 tooling tests pass), UT is running in six disposable database clones.
+  The source-only BC input lacks its original notice; matching notice SHA256
+  `c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383`
+  from 132617 makes the separate frozen layout replay pass, without changing the
+  original red target or frozen inputs. `/tmp/agiru-layout-assets-check.z72Dwo`.
+  The current freezer rejects this missing-notice input before dependency copying;
+  relocated sources require explicit `AGIRU_LAYOUT_SOURCE_NOTICE`. Includes BLOB amortization, native codeunit
   admission and corrected Discovery registry. BC input hash matches 132617
   (`af53219b7fc9e68a58293bad9fd178232d6bef47bbab2166b390620fb38497a2`);
   refreezing the source-only snapshot cannot rediscover Git revision, so this
@@ -34,9 +41,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `85f6c9f4a6cba8dfcafc23bfe0ccae9871cac943191dd079e558b6a33044d71b`.
   Stream/Encoding retain 51/5 checks; Discovery passes. Three targeted units have
   no own findings, but each retains 25 unsuppressed Char/StringValue header findings.
-  Complete local replay pending. Native production binding, text encodings, stream
+  Full local replay: 135 cases/227 tooling tests pass, exit 0;
+  `/tmp/agiru-base64-all-local.log`. Native production binding, text encodings, stream
   input/cursors, transform-block decoder, AL diagnostics and all thirteen original
   BC tests remain open; no UT gain, performance, multi-user or WASM claim.
+- Verification notice preflight (0058): `make verify-check` passes 22 checks;
+  previous actual freezer fails the new missing-notice control. The original notice
+  override is frozen/hashed and reaches both test/UT targets. Missing notices emit
+  an explicit layout refusal; `make layout-assets-check` passes eight registry
+  checks, all three assets and integrity/ownership controls. No fallback license
+  or weakened notice guard. Complete tooling replay: 228 tests pass.
+  `/tmp/agiru-notice-preflight-{verify-check,previous,layout-final,all-tooling}.log`.
 - Native codeunit admission (0034): all 35 selected source ASTs retain signatures,
   paths and manifest identity; 72 Native methods remain individually unbound and
   the aggregate 125 inactive-source gap remains. Missing owner/duplicate identities

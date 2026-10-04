@@ -216,6 +216,11 @@ def start(arguments):
                     'created_utc': stamp, 'status': 'queued'}
         if 'ut' in arguments.targets or 'transpile' in arguments.targets:
             bc = Path(os.environ.get('AGIRU_BC_SOURCE', Path.home() / 'Git/BCApps/src'))
+            notice = Path(os.environ.get('AGIRU_LAYOUT_SOURCE_NOTICE', bc.parent / 'LICENSE'))
+            if 'test' in arguments.targets and not notice.is_file():
+                raise RuntimeError('the test target requires the original BC source notice; '
+                                   'set AGIRU_LAYOUT_SOURCE_NOTICE for a relocated source tree: '
+                                   + str(notice))
             bc_copy = run / 'bc_source'
             metadata['bc_source_sha256'] = freeze_input(bc, bc_copy, 'BCApps')
             revision = subprocess.run(['git', '-C', str(bc), 'rev-parse',
@@ -225,7 +230,6 @@ def start(arguments):
             metadata['bc_source_revision'] = (
                 lines[1] if revision.returncode == 0 and len(lines) == 2
                 and Path(lines[0]).resolve() != ROOT.resolve() else None)
-            notice = Path(os.environ.get('AGIRU_LAYOUT_SOURCE_NOTICE', bc.parent / 'LICENSE'))
             if notice.exists() or 'AGIRU_LAYOUT_SOURCE_NOTICE' in os.environ:
                 metadata['layout_source_notice_sha256'] = freeze_input(
                     notice, run / 'layout_source_notice', 'BC source notice')

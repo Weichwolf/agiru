@@ -184,6 +184,8 @@ direct build; freeze only when continued editing or reproducible isolation requi
 
 - Optional frozen run: `make verify-start JOBS=6
   VERIFY_TARGETS='slice-check all test ut'`; inspect `make verify-status` and its artifacts.
+  Relocated BC sources need `AGIRU_LAYOUT_SOURCE_NOTICE=<original-notice>` for `test`;
+  missing notices refuse before dependency copying, not after the build.
   Snapshots/lane sources under `/tmp` are immutable inputs, never development trees.
   Receipts identify Git HEAD, content/dependency hashes, target exits and test population.
 - At most one six-job integration lane. Local gates use two jobs; never overlap mutating

@@ -6,7 +6,11 @@ CXX=${CXX:-clang++-19}
 source_root=${AGIRU_BC_SOURCE:-$HOME/Git/BCApps/src}
 base="$source_root/Layers/W1/BaseApp"
 source_notice=${AGIRU_LAYOUT_SOURCE_NOTICE:-"$(dirname "$source_root")/LICENSE"}
-[[ -f "$source_notice" ]]
+if [[ ! -f "$source_notice" ]]; then
+  printf 'layout-assets: missing original BC source notice: %s; set AGIRU_LAYOUT_SOURCE_NOTICE for relocated sources\n' \
+    "$source_notice" >&2
+  exit 2
+fi
 proof=$(mktemp -d /tmp/agiru-layout-assets-check.XXXXXX)
 printf '%s\n' "$proof" > "$B/layout-assets-check.latest"
 git rev-parse HEAD > "$proof/head.txt"

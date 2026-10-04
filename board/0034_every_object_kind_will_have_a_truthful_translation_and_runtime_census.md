@@ -83,7 +83,8 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   Actual CLR transform capability is true; this does not execute native stream branches.
   Three targeted units add no own findings; each retains 25 unsuppressed Char/StringValue
   header findings. Discovery fixture includes the new Bash qualifier and passes.
-  Complete local replay pending. No production .NET dependency or hand-edited app.
+  Full local replay: 135 cases/227 tooling tests pass, exit 0;
+  `/tmp/agiru-base64-all-local.log`. No production .NET dependency or hand-edited app.
   Remaining before Native activation: source-owned index/output/module binding for
   all nine overloads; exact text encodings, stream cursor/reference/threshold semantics,
   separate transform-block decoder and native AL diagnostic contracts. Existing Encoding
@@ -106,6 +107,14 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   is not this contract. This qualifies branch eligibility, not the deployed CLR
   binary or native execution. Retain boundary/cursor/alias tests around the native
   instance's buffer threshold; never replace the two branches with one rule.
+  Actual original converter construction on CLR 10.0.12 confirms the default
+  threshold is 10,485,760 bytes; `/tmp/agiru-base64-reference.stream-contracts.txt`.
+  Direct stream execution remains unqualified: `NavStream.get_Target` needs a real
+  session/company shared-object container, not a sessionless mock owner. The original
+  Apps dependency is now available for further temporary qualification (SHA256
+  `ac30b9e1e560fd3ebdbffc14583b0e8794452f02364f6a9a04729a43e36db0f3`);
+  `/tmp/agiru-base64-reference.{fetch-apps.log,stream-root.il}`. No synthetic target
+  was injected to turn the refused fixture into an original native execution claim.
   Small stream decoding uses a BOM-detecting, leave-open reader. Native methods'
   CLR stream reference identity needs separate C++ cursor-alias qualification;
   AL parameters lack an explicit var modifier. Static source/IL inspection only,
