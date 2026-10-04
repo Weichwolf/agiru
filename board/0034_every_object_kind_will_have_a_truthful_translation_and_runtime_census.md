@@ -36,6 +36,25 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   prior milestone 101600 has two OAuth failures at ToBase64, not a gain prediction.
   No provider or BC execution proved. Predecessor 1511 requires real binary
   OutStream writes, not returned text or an invented buffer operation.
+- Native stream qualification: raw/selected codeunit population is 35/35, none
+  excluded; source loading still activates none. Original BC29 output branches use
+  raw writes with no BOM/terminator/output transcoding. `ConvertBuffer` retains a
+  76-character line counter across chunks and inserts CRLF before the next block.
+  Important counterexample: stream-to-text encoding calls `NavStream.GetBytes(true)`;
+  its parameter is `ignoreCurrentPosition`. Memory buffers supply their whole
+  content without moving the cursor; the seekable fallback resets/restores it.
+  Do not assume every overload consumes only the current suffix. The block branch
+  does consume the cursor, subject to its runtime transform capability predicate.
+  Small stream decoding uses a BOM-detecting, leave-open reader. Native methods'
+  CLR stream reference identity needs separate C++ cursor-alias qualification;
+  AL parameters lack an explicit var modifier. Static source/IL inspection only,
+  not original native execution or an implemented provider:
+  `/tmp/agiru-native-base64-streams.a3h7rs/{receipt.json,inputs-and-results.sha256}`.
+  Before activation, load all selected codeunit ASTs with original ownership;
+  make unbound Native methods refuse/count rather than emitting empty success.
+  Then bind all nine overloads and execute the thirteen original tests plus
+  cursor/encoding/binary/76-column/error controls. Local Native attribute docs
+  `ff5939a46e` describe native codeunit methods, not stream-state guarantees.
 - Selected native ASTs now supply `Database::` constants without generating a
   table class/provider. Codeunit/table/page/report execution: 13 checks; primitive
   native-binding/parser gates: 154/139 checks. Source-ID mutation fails eight
