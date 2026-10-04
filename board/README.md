@@ -15,6 +15,27 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-04
 
+- Native codeunit admission (0034): all 35 selected source ASTs retain signatures,
+  paths and manifest identity; 72 Native methods remain individually unbound and
+  the aggregate 125 inactive-source gap remains. Missing owner/duplicate identities
+  refuse; product policy retains original excluded identities. Unbound Native
+  emission now refuses before AL locals/body/events, rather than empty success.
+  Generator/authored/original-declaration execution passes 49/19/11 checks;
+  removing Native fails, previous actual generator fails nine original calls.
+  `/tmp/agiru-native-codeunits.tTdgkj`, `/tmp/agiru-native-codeunits-previous.f3GfbR`.
+  Native-source/report/enum tooling passes 54 tests. Verified-package generation
+  retains all 24,464 files byte-identical and unchanged native/property/control
+  gaps; all 14,225 slice files exist. `/tmp/agiru-transpile.vHcXmw`, exit 1;
+  `generation-comparison.json` matches all 35 independent raw codeunit identities.
+  First full local run: 133 cases, only the tooling wrapper red (226/227 tests):
+  Discovery's authored script registry omitted the new fixture. Corrected registry
+  passes its negative controls; final replay pending. New loader/refusal/gate/
+  runners/emitter analysis passes; three old gate include findings removed.
+  `make lint` retains only existing CodeunitWriter/Main/BodyWriter findings over
+  thirteen selected units; no suppression/baseline increase.
+  `/tmp/agiru-native-codeunits-{all-local,discovery-final,lint}.log`.
+  Production indexing/emission and
+  primitive activation remain open; no Base64 implementation or UT gain claimed.
 - Qualified-table recovery replay: `20261004T132617Z-2130724`, frozen HEAD
   `23d1497`, source `1dee82b25ed072be32d3b5b27f03be68d059c6bdff423b707c0e99f12c947d07`;
   `slice-check all test ut`, six jobs. Terminal: slice-check/all/test exit 0;

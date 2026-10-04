@@ -5,6 +5,33 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Native codeunit admission: `NativeSource.{h,cpp}` parses source-declared codeunits
+  and retains paths, typed methods and the original namespaced manifest owner.
+  Duplicate IDs/qualified names and missing owners refuse before output; source
+  parse failures remain counted. Bounded product exclusions retain raw identities.
+  Verified System-29 package: all 35/35 source identities match the independent
+  inventory, zero excluded/missing/unexpected/unmeasured, 72 Native methods named
+  unbound. The aggregate 125 inactive non-table sources remains unchanged.
+  `CodeunitWriter.cpp` refuses Native before AL body/local/event execution;
+  `Refused.cpp` counts each overload with original ID/namespace/types/modes/return.
+  Generator gate 49 checks, authored execution 19, original nine-overload execution
+  eleven checks green. Removing Native fails; the previous actual generator fails
+  all nine original Native calls. `/tmp/agiru-native-codeunits.tTdgkj`,
+  `/tmp/agiru-native-codeunits-previous.f3GfbR`. Missing-owner/duplicate/parse/policy
+  tooling: 54 checks green. Full verified-package generation keeps all 24,464 files
+  byte-identical; native tables remain 233 selected/18 bound/215 unbound, zero source
+  refusals, all 14,225 slice files exist. `/tmp/agiru-transpile.vHcXmw`, exit 1,
+  `generation-comparison.json`; no new exclusion or silent gap removal.
+  Native codeunits are not yet indexed/emitted by production translation; this
+  admission/refusal proof does not implement Base64 or activate a native provider.
+  First full local run: 133 cases, only the tooling wrapper red (226/227 tests);
+  its Discovery fixture omitted the new script. Registry corrected, Discovery
+  negative controls green; final full replay pending. New loader/refusal/runner/
+  emitter/gate analysis passes; three pre-existing gate include findings removed.
+  `make lint` checks thirteen of 244 available units and retains only the existing
+  CodeunitWriter/Main/BodyWriter findings, no new suppressions or baseline increase.
+  `/tmp/agiru-native-codeunits-{all-local,discovery-final,lint}.log`,
+  `lint-units.json` and final targeted `*-tidy.log` receipts under the same prefix.
 - Full native-constant replay 120802 ends at 2,100/2,314: 69 losses, zero gains,
   unchanged unique population/source hashes versus 101600. Raw identities/errors:
   run `artifacts/ut-comparison-101600.json`; null/unsealed seed, diagnostic only.
@@ -32,7 +59,7 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   `admin-manage-appsource-apps.md` adds no namespace-resolution guarantee.
 - Native Base64 authority: original System-29 `System.Runtime` codeunit
   2000000024 declares nine overloads in `src/System Codeunits/Runtime/Base64Convert.Codeunit.al`.
-  `NativeSource.cpp::DeclaredKind` leaves codeunits in `otherSources`; generated
+  Source AST admission above retains codeunits but does not yet activate them; generated
   `apps/absent/absent/Types.h` misreports this AL capability as a .NET member.
   Original BC29 NavBase64Converter byte/text cores call CLR Convert and Encoding:
   text uses GetBytes without a BOM; stream overloads remain separate contracts.
@@ -50,14 +77,21 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   content without moving the cursor; the seekable fallback resets/restores it.
   Do not assume every overload consumes only the current suffix. The block branch
   does consume the cursor, subject to its runtime transform capability predicate.
+  Ncl references System.Security.Cryptography 10.0.0.0. With CLR implementation
+  absent locally, upstream `dotnet/runtime` v10.0.0
+  [Base64Transforms.cs](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Security.Cryptography/src/System/Security/Cryptography/Base64Transforms.cs)
+  confirms both transforms support multiple blocks; historical Framework behaviour
+  is not this contract. This qualifies branch eligibility, not the deployed CLR
+  binary or native execution. Retain boundary/cursor/alias tests around the native
+  instance's buffer threshold; never replace the two branches with one rule.
   Small stream decoding uses a BOM-detecting, leave-open reader. Native methods'
   CLR stream reference identity needs separate C++ cursor-alias qualification;
   AL parameters lack an explicit var modifier. Static source/IL inspection only,
   not original native execution or an implemented provider:
   `/tmp/agiru-native-base64-streams.a3h7rs/{receipt.json,inputs-and-results.sha256}`.
-  Before activation, load all selected codeunit ASTs with original ownership;
-  make unbound Native methods refuse/count rather than emitting empty success.
-  Then bind all nine overloads and execute the thirteen original tests plus
+  Admission/refusal proof above closes source loading and empty-success generation,
+  not production indexing/output/ownership registration or a primitive binding.
+  Next bind all nine overloads and execute the thirteen original tests plus
   cursor/encoding/binary/76-column/error controls. Local Native attribute docs
   `ff5939a46e` describe native codeunit methods, not stream-state guarantees.
 - Selected native ASTs now supply `Database::` constants without generating a
@@ -206,9 +240,10 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    implementation finding. Bind real context types; 0039 owns hook/case lifecycle;
    do not turn the current explicit refusal carriers into empty success implementations.
 4. Generate complete native declarations/immutable metadata and bind Native methods to primitives or named refusals. Finish Page Table Field's live projection through 0044 and activate its own binding only with the complete UT recheck; standalone census also exposes API webhook tables and Code Coverage 2000000049. Reuse the System AST/binder and declared field/key/property vocabulary. CodeCoverage Log/Load/Refresh/Include require real instrumentation/provider lifecycle, including the declared MultiSession argument, not empty seeded rows. 0033 owns identity, 0044 providers. Never add Refused arithmetic/default construction to hide absent fields; keep unsupported tables/options visible. Share language/Scope vocabulary without importing whole tables; generic 0019 owns calculation.
-   Native codeunits: admit source ASTs/signatures/ownership through the common
-   codeunit binder; every unimplemented Native body must refuse, never emit empty
-   success. Base64Convert needs all nine source overloads over one byte codec,
+   Native codeunits: extend the common production codeunit index/output with the
+   admitted source ASTs, original module ownership and collision controls. Keep
+   all unbound methods counted/refusing; Native attribute alone grants no binding.
+   Base64Convert needs all nine source overloads over one byte codec,
    existing Encoding and bounded stream I/O. Qualify native core/error/line-break
    contracts, execute the thirteen original tests, retain every other native gap
    and compare all 2,314 UT after activation. Do not patch OAuth or base64 AL bodies.
