@@ -5,6 +5,16 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Production-reader DTD contract reproduction (2026-10-05): existing XmlReaderGate
+  grows from 71 to 131 checks; unchanged runtime has 32 failures, all in the new
+  cases. UTF-8/UTF-16LE cover default Prohibit, Ignore before entity/default-attribute
+  processing, reader/DOM consumers, fixture-owned external resources, preceding
+  PI/error timing and settings snapshots. Internal Parse and DTD-looking literals
+  remain green. `make gate GATE=XmlReaderGate JOBS=2` exits 2; this is a red
+  development contract, not a policy fix or a new green local baseline.
+  Gate analysis has zero own findings; 62 inherited header findings remain
+  unsuppressed, lint exits 2. `/tmp/agiru-xml-policy-contract.TJy7R1/{gate-qualified.log,
+  lint-qualified-detail.log,qualified-inputs.sha256}`. Outside frozen 004617.
 - Stream-copy authority (2026-10-05): original Ncl 29.0.54011.55407
   `NavInStream.ALByValue` creates a distinct wrapper, then ALAssign/Assign retain
   the same SharedNavStream target. Position belongs to that target; ALPosition

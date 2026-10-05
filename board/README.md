@@ -15,6 +15,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Development XML contract (0035): XmlReaderGate grows 71 → 131 checks. Unchanged
+  runtime has 32 failures, all in the new DTD/settings cases; the original checks
+  stay green. `make gate GATE=XmlReaderGate JOBS=2` exits 2. No new own analysis
+  findings; 62 inherited header findings remain, lint exits 2.
+  `/tmp/agiru-xml-policy-contract.TJy7R1`. Runtime repair is pending; the expanded
+  fixture is outside frozen 004617. Do not report the editable tree as all-green.
 - Rename-fix integration: `20261005T004617Z-3255614`, frozen HEAD `24af1d8`,
   source `f484500aa41dfb2037f5267c3818bebf5227cd7e39656799382d02a3a47deb7a`;
   `slice-check all test ut`, six jobs, runner PID 3257254 confirmed live.

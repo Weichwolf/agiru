@@ -2,12 +2,21 @@
 #include "dotnet/XmlNode.h"
 #include "dotnet/XmlReader.h"
 #include "runtime/ErrorValue.h"
+#include "type/Blob.h"
+#include "type/Stream.h"
+#include "type/StringValue.h"
 
 #include "Check.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 using agiru::dotnet::StringReader;
 using agiru::dotnet::XmlNodeType;
@@ -16,10 +25,162 @@ using agiru::dotnet::XmlReaderSettings;
 
 namespace {
 
+constexpr std::uint8_t kUtf16LeBomFirst = 0xff;
+constexpr std::uint8_t kUtf16LeBomSecond = 0xfe;
+
 XmlReader ReaderOver(std::string_view xml, const XmlReaderSettings &settings = {}) {
   StringReader source;
   source = source.StringReader(xml);
   return XmlReader::Create(source, settings);
+}
+
+std::string ReadFailure(XmlReader reader, bool load) {
+  try {
+    if (load) {
+      agiru::dotnet::XmlDocument document;
+      document.Load(reader);
+    } else {
+      while (reader.Read()) {}
+    }
+  } catch (const agiru::Error &error) { return error.what(); }
+  return {};
+}
+
+XmlReader ReaderOverEncoded(std::string_view xml, bool utf16, const XmlReaderSettings &settings) {
+  agiru::Blob source;
+  std::vector<std::uint8_t> bytes;
+  if (utf16) { bytes = {kUtf16LeBomFirst, kUtf16LeBomSecond}; }
+  for (const unsigned char byte : xml) {
+    bytes.push_back(byte);
+    if (utf16) { bytes.push_back(0); }
+  }
+  source.Set(std::move(bytes));
+  const agiru::InStream stream = source.CreateInStream();
+  return XmlReader::Create(stream, settings);
+}
+
+class EntityFixture {
+public:
+  EntityFixture() : path_("/tmp/agiru-xml-entity-" + std::to_string(::getpid())) {
+    const int descriptor = ::open(path_.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+    if (descriptor < 0) { throw agiru::Error("the XML entity fixture cannot be created"); }
+    const auto written = ::write(descriptor, kPayload.data(), kPayload.size());
+    const int closed = ::close(descriptor);
+    if (written != static_cast<ssize_t>(kPayload.size()) || closed != 0) {
+      static_cast<void>(::unlink(path_.c_str()));
+      throw agiru::Error("the XML entity fixture cannot be written");
+    }
+  }
+
+  EntityFixture(const EntityFixture &) = delete;
+  EntityFixture &operator=(const EntityFixture &) = delete;
+
+  ~EntityFixture() { static_cast<void>(::unlink(path_.c_str())); }
+
+  [[nodiscard]] std::string Uri() const { return "file://" + path_; }
+
+private:
+  static constexpr std::string_view kPayload = "fixture-owned-entity";
+  std::string path_;
+};
+
+void ProhibitRejectsInternalAndExternalDtdsThroughBothConsumers() {
+  const EntityFixture external;
+  const std::string outside =
+      "<!DOCTYPE root [<!ENTITY word SYSTEM '" + external.Uri() + "'>]><root>&word;</root>";
+  for (const std::string_view xml :
+       {std::string_view("<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>"),
+        std::string_view(outside)}) {
+    for (const bool utf16 : {false, true}) {
+      for (const bool load : {false, true}) {
+        const std::string error = ReadFailure(ReaderOverEncoded(xml, utf16, {}), load);
+        CHECK_TRUE("default Prohibit rejects a DTD before reader or DOM expansion",
+                   error.find("DTD") != std::string::npos);
+      }
+    }
+  }
+  XmlReader reader = ReaderOver("<?before ready?><!DOCTYPE root><root/>");
+  CHECK_TRUE("Prohibit preserves the preceding processing instruction", reader.Read());
+  CHECK_TRUE("the preceding node is a processing instruction",
+             reader.NodeType().Equals(XmlNodeType::ProcessingInstruction()));
+  CHECK_TRUE("Prohibit fails when the DTD is reached, not at Create",
+             ReadFailure(reader, false).find("DTD") != std::string::npos);
+}
+
+void IgnoreDiscardsDeclarationsBeforeEntityAndAttributeProcessing() {
+  const EntityFixture external;
+  const std::vector<std::string> declarations{
+      "<!DOCTYPE root [<!ENTITY word 'hello'><!ATTLIST root status CDATA 'default'>]>",
+      "<!DOCTYPE root [<!-- ]> is comment content --> <!ENTITY word 'quoted ]> value'>]>",
+      "<!DOCTYPE root SYSTEM '" + external.Uri() + "'>",
+      "<!DOCTYPE root [<!ENTITY % external SYSTEM '" + external.Uri() + "'> %external;]>"};
+  XmlReaderSettings settings;
+  settings.DtdProcessing(agiru::dotnet::DtdProcessing::Ignore());
+  for (const auto &declaration : declarations) {
+    for (const bool utf16 : {false, true}) {
+      XmlReader reader = ReaderOverEncoded(declaration + "<root/>", utf16, settings);
+      bool dtd = false;
+      bool root = false;
+      bool defaultAttribute = false;
+      std::string error;
+      try {
+        while (reader.Read()) {
+          dtd = dtd || reader.NodeType().Number() == 10;
+          if (reader.NodeType().Equals(XmlNodeType::Element())) {
+            root = root || reader.Name().Value() == "root";
+            defaultAttribute = defaultAttribute || reader.MoveToFirstAttribute();
+          }
+        }
+      } catch (const agiru::Error &caught) { error = caught.what(); }
+      CHECK_SILENT("Ignore never interprets the discarded DTD", error);
+      CHECK_TRUE("Ignore never reports a discarded doctype node", !dtd);
+      CHECK_TRUE("Ignore preserves the root without DTD default attributes",
+                 root && !defaultAttribute);
+      agiru::dotnet::XmlDocument document;
+      try {
+        document.Load(ReaderOverEncoded(declaration + "<root/>", utf16, settings));
+      } catch (const agiru::Error &caught) { error = caught.what(); }
+      CHECK_SILENT("DOM Load shares the reader's Ignore policy", error);
+      CHECK_TRUE("DOM Load does not resurrect a discarded DTD",
+                 document.OuterXml().Value().find("<!DOCTYPE") == std::string_view::npos);
+    }
+  }
+  for (const bool utf16 : {false, true}) {
+    for (const bool load : {false, true}) {
+      const std::string error = ReadFailure(
+          ReaderOverEncoded(
+              "<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>", utf16, settings),
+          load);
+      CHECK_TRUE("Ignore leaves DTD-defined entity references undeclared", !error.empty());
+    }
+  }
+}
+
+void ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds() {
+  XmlReaderSettings settings;
+  const std::string_view xml = "<!DOCTYPE root [<!ENTITY word 'hello'>]><root>&word;</root>";
+  const XmlReader prohibited = ReaderOver(xml, settings);
+  settings.DtdProcessing(agiru::dotnet::DtdProcessing::Parse());
+  CHECK_TRUE("later settings mutation cannot authorize an existing prohibited reader",
+             ReadFailure(prohibited, false).find("DTD") != std::string::npos);
+  const XmlReader parsed = ReaderOver(xml, settings);
+  settings.DtdProcessing(agiru::dotnet::DtdProcessing::Prohibit());
+  agiru::dotnet::XmlDocument document;
+  document.Load(parsed);
+  CHECK_TEXT("later settings mutation cannot change an existing Parse reader",
+             document.DocumentElement().InnerText().Value(),
+             "hello");
+  for (const auto mode : {agiru::dotnet::DtdProcessing::Prohibit(),
+                          agiru::dotnet::DtdProcessing::Ignore(),
+                          agiru::dotnet::DtdProcessing::Parse()}) {
+    settings.DtdProcessing(mode);
+    const std::string error =
+        ReadFailure(ReaderOver("<?work <!DOCTYPE fake?><root><!-- <!DOCTYPE fake> -->"
+                               "<![CDATA[<!DOCTYPE fake>]]></root>",
+                               settings),
+                    true);
+    CHECK_SILENT("DTD-looking PI, comment and CDATA content is ordinary XML", error);
+  }
 }
 
 void DocumentLoadConsumesTheSharedReader() {
@@ -265,5 +426,8 @@ int main() {
     ReaderLoadPreservesDtdAndWhitespaceSemantics();
     ReaderFileErrorsAreNotSuccessfulEmptyInput();
     StylesheetInstructionsAreNotXmlDeclarations();
+    ProhibitRejectsInternalAndExternalDtdsThroughBothConsumers();
+    IgnoreDiscardsDeclarationsBeforeEntityAndAttributeProcessing();
+    ReaderPolicyIsASnapshotAndMarkupLiteralsAreNotDtds();
   });
 }
