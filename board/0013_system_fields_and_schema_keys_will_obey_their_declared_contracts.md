@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: restore Integer series navigation with qualified implicit-field values;
-finish all eight original native page consumers before 0044's catalogue activation.
+resolve shared-header tidy findings before 0044's catalogue activation.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
@@ -93,6 +93,14 @@ Retain the full 2314-case UT population through replay.
   package emits ordinary/native Runtime-18 declarations. Translation remains
   exit 1: 5683 refused properties and 215 selected unbound native tables; no full
   compilation, provider or G1 claim follows from generated files.
+- `make native-consumers` now uses the production wrapper with the verified System
+  package and Runtime 18, plus independently generated source-bound declarations.
+  All eight original page units compile in each of three variants (24/24); missing/
+  duplicate consumer and wrong original field-number controls reject. Input/source
+  hashes remain unchanged. Both full translations still exit 1 on unsupported
+  declarations, so the qualifier remains red; syntax success is not live-provider,
+  business execution or G1 proof. Reproduce with `test/transpiler/native-consumers.sh`
+  and `test/transpiler/native-binding/consumers.json`, after `make native-bindings`.
 - `make gate GATE=FilterGate JOBS=2` reproduces a native Integer regression:
   `sequence provider cannot synthesize field SystemRowVersion`. The series builder
   still recognizes only five legacy audit/identity fields. Qualify computed rowversion

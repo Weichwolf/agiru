@@ -33,14 +33,14 @@ sha256sum --check --status "$audit/source-inputs.sha256"
 sha256sum --check --status "$audit/libraries.sha256"
 sha256sum --check --status "$audit/originals.sha256"
 jq -e --slurpfile provenance "$package/provenance.json" \
-  '.package_sha256 == $provenance[0].package_sha256 and
+  '.host_profile == "Runtime18" and .package_sha256 == $provenance[0].package_sha256 and
    (.tables | length) == .raw_native.objects_by_kind.table' "$audit/result.json" > /dev/null
 proof=$(mktemp -d /tmp/agiru-native-consumers.XXXXXX)
 printf '%s\n' "$proof" > "$B/native-consumers.latest"
 cp "$manifest" "$proof/consumers.json"
 cp apps.json scope.json "$proof/"
 cp "$audit/result.json" "$proof/native-audit.json"
-sha256sum test/transpiler/native-consumers.sh "$manifest" apps.json scope.json "$B/agirutc" \
+sha256sum test/transpiler/native-consumers.sh scripts/transpile.sh "$manifest" apps.json scope.json "$B/agirutc" \
   scripts/ut_manifest.py scripts/scope_inventory.py "$audit/emitter" \
   "$audit/result.json" "$audit/tables.json" > "$proof/inputs.sha256"
 rg --files src include -g '*.h' -g '*.cpp' | LC_ALL=C sort \
@@ -72,11 +72,13 @@ python3 scripts/scope_inventory.py "$proof/bc_source" --apps "$proof/apps.json" 
   > "$proof/census.log" 2>&1 || census=$?
 jq -e '.summary.unmeasured_files == 0' "$proof/scope-inventory.json" > /dev/null
 translation=0
-"$B/agirutc" "$proof/bc_source" "$proof/apps.json" "$proof/generated" \
+B="$B" AGIRU_SYSTEM_SYMBOLS="$package" AGIRU_HOST_RUNTIME=18.0 \
+  bash scripts/transpile.sh "$proof/bc_source" "$proof/apps.json" "$proof/generated" \
   > "$proof/translation.log" 2>&1 || translation=$?
 native_translation=0
 "$B/agirutc" "$proof/bc_source" "$proof/apps.json" "$proof/native-generated" \
-  --system-symbols "$package" > "$proof/native-translation.log" 2>&1 || native_translation=$?
+  --system-symbols "$package" --host-runtime 18.0 \
+  > "$proof/native-translation.log" 2>&1 || native_translation=$?
 jq '.[1:]' "$manifest" > "$proof/missing-consumer.json"
 jq '. + [.[0]]' "$manifest" > "$proof/duplicate-consumer.json"
 if validate_manifest "$proof/missing-consumer.json" || validate_manifest "$proof/duplicate-consumer.json"; then
@@ -161,7 +163,7 @@ jq -n --argjson translation "$translation" --argjson native_translation "$native
   --argjson census "$census" \
   --slurpfile inventory "$proof/scope-inventory.json" --slurpfile results "$proof/results.json" \
   --slurpfile raw "$proof/native-audit.json" --slurpfile ut "$proof/ut-manifest.json" \
-  '{translation_exit:$translation,native_translation_exit:$native_translation,
+  '{host_profile:"Runtime18",translation_exit:$translation,native_translation_exit:$native_translation,
     census_exit:$census,raw_al_inventory:$inventory[0].summary,
     census_errors:$inventory[0].errors,results:$results[0],raw_native_audit:$raw[0],ut_manifest:$ut[0],
     denominator:8,variants:3,negative_controls:{missing_consumer:"rejected",duplicate_consumer:"rejected",wrong_field_number:"rejected"},
