@@ -44,8 +44,10 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   regeneration retains the same native gaps/package bytes. Both original
   SignatureKeyImpl and ImportExportWorkflow now compile without PCH (exit 0).
   Slice-check: 14,225/zero missing. Six-job build resumes existing objects under
-  `/tmp/agiru-convert-carrier-integration.ytBvMq`; 25,283 input hashes retained,
-  compiler inputs held unchanged. Full local/UT replay waits for successful linking.
+  `/tmp/agiru-convert-carrier-integration.ytBvMq`: build exits 0 in 1,922s;
+  all 25,283 compiler input hashes match afterward. 1,383 unlinked replacement
+  bodies remain counted gaps, not full-app/G1 proof. Complete local tests are next;
+  full 2,314-method UT replay remains pending, no new pass count claimed.
 
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled

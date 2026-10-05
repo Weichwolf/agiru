@@ -45,7 +45,9 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
   Six-job `make all` resumes existing objects, inputs held unchanged;
   `/tmp/agiru-convert-carrier-integration.ytBvMq`, 25,283 input hashes, manifest
   SHA256 `4f1ebd4770631eb5b53134cbe864948da0665d3a760880bb6003c3e7db5bbfb7`.
-  Build is running; complete local tests and all 2,314 UT await successful linking.
+  Build exits 0 in 1,922 seconds; all compiler hashes agree afterward. The 1,383
+  unlinked AL replacement bodies remain gaps, not full-app/G1 proof. Complete
+  local tests and all 2,314 UT remain pending; no pass gain is claimed yet.
 
 - Convert byte-array bridge reuses the original-core-qualified Base64 codec.
   Typed formatting ordinals, checked regions and byte cells retain strict CLR
