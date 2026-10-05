@@ -239,8 +239,11 @@ Keep existing IDs when consolidating. Allocate new IDs from all Git history, nev
 open files alone. Delete completed or superseded items; Git preserves their history. Record
 consolidation mappings in the board index. Do not claim ownership through stale `active` text.
 Keep only current build recipes in the working tree; Git preserves superseded instructions.
-Commit and push every verified coherent increment (code, tests or documentation)
-immediately, before starting the next increment. This is standing authorization;
-no separate request is required.
+
+## Commits and pushes
+
+After every verified coherent increment (code, tests or documentation), commit and push
+immediately, before starting the next increment. This is standing user authorization;
+do not wait for a separate request or accumulate completed increments locally.
 Split commits by outcome; leave unrelated unfinished changes out.
 Keep pending checks and known failures explicit; a pushed commit is not an ERP milestone.
