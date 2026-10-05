@@ -30,13 +30,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   No own analysis findings, 36/62 inherited header findings remain (lint exits 2).
   Outside frozen 015114; full replay pending. QName/character validation, other
   encodings, whitespace/error states and Parse/resolver authority remain open.
-- XML integration is live: `20261005T015114Z-3424473`, frozen HEAD `3f6715e`,
+- XML integration is terminal: `20261005T015114Z-3424473`, frozen HEAD `3f6715e`,
   source `5868281d053a1fc2e797530f440b93f85a8ed23d9afb6c586225de0c19c0e193`;
-  `slice-check all test ut`, six jobs. Runner 3426036 is confirmed live;
-  slice/build/local tests pass (141 cases/232 tooling tests), full AL UT runs
-  against disposable clones. BC/source/System/original-notice hashes match 004617.
-  Compare every UT identity and error against its 2,170/2,314 result at completion;
-  a live run is not a completed verification.
+  finished 02:33:56 UTC, runner gone. Slice/build/local tests pass (141 cases/232
+  tooling tests); UT exits 2: 2,170/2,314 passed, 144 failed, zero incomplete,
+  80 codeunits/1,354 seconds. Against 004617: no gains/losses/changed errors,
+  missing/added/duplicate identities; source manifest/file hashes match
+  (`artifacts/ut-comparison-004617.json`). BC/source/System/original-notice hashes
+  match; frozen source/System/notice pre/post hashes agree. Null/unsealed seed
+  remains diagnostic, not causal A/B or G1. Later Ignore-header/stream changes
+  are outside this snapshot; investigate all remaining 144 failures.
 - First XML DTD-policy increment (0035): 134 XmlReaderGate checks green; unfiltered
   compiled control has 33 failures. Six policy/cursor/close/Load controls reject;
   the test-only loader tripwire sees no fixture request with policy and is triggered
