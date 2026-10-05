@@ -8,14 +8,19 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Last completed AL replay of `ae71f8d`: 2,173/2,314 passed, 141 failed,
-  zero incomplete; 80 codeunits, BCApps `bb7111877f`. Legacy null/unsealed seed:
+- Last completed frozen AL replay: `d3e7671` / content `15e116850819`,
+  2,173/2,314 passed, 141 failed, zero incomplete; eighty codeunits,
+  BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Legacy null/unsealed seed:
   diagnostic repeatability only, not causal A/B or G1. Reproduce through `make ut`;
   compare method identities/statuses, not only totals.
-- Frozen `ae71f8d` replay: slice/build and local 146 cases / 233 tooling
-  tests passed; UT exits nonzero. Against `a59e992`, all 2,314 identities,
+- Frozen slice/build and local 146 cases / 233 tooling tests passed; UT exits
+  nonzero (1,701 seconds, six workers). Against `ae71f8d`, all 2,314 identities,
   statuses and errors are unchanged: zero gains/losses/missing/added/duplicates.
-  Its source does not contain the later runtime/profile changes.
+  This replay covers the earlier reflection-name/profile-selection changes,
+  not `b9f35e9` materialization/current User lookups or `5a4c3be` source-write refusal.
+- Current failure concentrations: 48 Table Metadata provider refusals, thirteen
+  incoming-document conversion assertions, four Inventory Profile missing-key paths
+  and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.
 - Raw census: 36,874 AL files, 36,783 objects, 4,171 test codeunits,
   113,013 methods; fifteen approved exclusions leave 112,998 required.
   Zero unmeasured files; seven conditional assignments still refuse.
@@ -26,8 +31,7 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Other unactivated objects/properties and omitted app roots remain gaps.
 - Preserve existing primitive fixes, generated bindings and negative controls.
   Package/declaration qualifiers are not full-app linking or business execution.
-- Current frozen `slice-check all test ut` run is pending, not a new pass count.
-  BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` retains byte-identical sources
+- BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` retains byte-identical sources
   for all eighty configured UT codeunits / 2,314 methods versus `bb7111877f`.
   Existing generated apps have not been regenerated against the newer full tree.
 - `make lint` is red: 388 unique diagnostics, ninety of 267 units analysed, all
