@@ -55,8 +55,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   cases pass with parent output overrides and all 233 tooling cases pass with a
   parent UT_LOG. No parent log is created and no test identity is dropped.
   `tooling-isolation-{negative,positive,full}.log` retain the receipts. Whole Make
-  regression still needs a fresh replay. Next: shared effective field length,
-  then complete native profile/live provider.
+  regression still needs a fresh replay. Shared effective field length is qualified
+  below; next are the complete native profile and live provider.
 
 - Native implicit fields (0013/0044): original logical getters execute twice over
   all 234 tables/2,340 implicit fields, zero refused; raw identity sets and bytes
@@ -81,9 +81,11 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   pending; complete profile/provider remains guarded. No new UT gain/G1 claim.
   Pushed `a59e992` now has one direct six-job integration running under
   `/tmp/agiru-field-length-integration.Xo5JqS/result.json`: slice-check passes
-  14,225/zero missing; build is live, then complete test/lint/80-codeunit UT are
-  queued. All 25,285 compiler inputs are frozen (manifest SHA256
-  `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`).
+  14,225/zero missing; full generated slice/runtime build passes (exit 0/1,835s).
+  All 25,285 compiler input hashes still agree. Complete local tests are live;
+  lint and the full 80-codeunit/2,314-method AL replay remain queued.
+  The input manifest SHA256 is
+  `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`.
   UT_LOG is passed only to UT; its runner log and outer Make log are distinct.
   Follow-up `implicit-profile-boundaries.json`: fourteen authored original Types
   cases/replay qualify all internal kinds × LinkedObject. Only unlinked
