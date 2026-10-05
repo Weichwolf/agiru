@@ -1,5 +1,6 @@
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
 #include "platform/Field.h"
 #include "platform/ReflectionOptions.h"
@@ -22,6 +23,14 @@
 #include <string_view>
 
 namespace agiru {
+
+std::string_view detail::ReflectionFieldName(const FieldDef &def) {
+  if (!IsImplicitSystemField(def.no)) { return def.name; }
+  for (const SystemFieldDecl &field : kImplicitSystemFields) {
+    if (field.no == def.no) { return field.reflectionName; }
+  }
+  return def.name;
+}
 
 std::uint16_t detail::EffectiveFieldLength(const FieldDef &def) {
   constexpr std::uint16_t kIntegerLength = 4;
@@ -135,7 +144,7 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
-  row.FieldName = FittedFieldText(def.name, platform::Field::kNameLength);
+  row.FieldName = FittedFieldText(ReflectionFieldName(def), platform::Field::kNameLength);
   row.Type = nativeType;
   row.Len = EffectiveFieldLength(def);
   row.Class = def.fieldClass;

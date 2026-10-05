@@ -2,6 +2,7 @@
 
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/TableType.h"
 #include "type/FieldClass.h"
 
 #include <cstddef>
@@ -67,18 +68,6 @@ enum class FieldType : std::uint8_t {
 ///
 /// \note `offset` is what lets the runtime reach a field by number without a virtual call and
 ///       without a map, and it is why a generated record must be standard-layout.
-/// \brief AL's `TableType` values, `devenv-tabletype-property.md`, in the order the page lists
-/// them.
-enum class TableType : std::uint8_t {
-  Normal,
-  CRM,
-  CDS,
-  ExternalSQL,
-  Exchange,
-  MicrosoftGraph,
-  Temporary,
-};
-
 struct FieldDef {
   std::size_t offset{};       ///< `offsetof` within the generated record.
   std::string_view name{};    ///< The AL name, spaces and all: `"Work Type Code"`.

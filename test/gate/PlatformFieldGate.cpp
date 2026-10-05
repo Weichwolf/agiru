@@ -1,7 +1,8 @@
-#include "meta/Declare.h"
 #include "meta/EnumDef.h"
 #include "meta/Ids.h"
+#include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "platform/Company.h"
 #include "platform/Field.h"
 #include "platform/ReflectionOptions.h"
 #include "runtime/Catalogue.h"
@@ -9,6 +10,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Table.h"
 #include "type/FieldClass.h"
+#include "type/Guid.h"
 #include "type/Integer.h"
 #include "type/Option.h"
 #include "type/Variant.h"
@@ -274,6 +276,36 @@ void MetadataKeepsDeclaredValuesAndRecordState() {
   CHECK_TEXT("an absent caption uses the field name", row.FieldCaption.Value(), "Flow filter");
 }
 
+void ImplicitNamesFollowTheRealReflectionLookupPath() {
+  agiru::platform::Company source;
+  source.SystemId = agiru::Guid("11111111-2222-3333-4444-555555555555");
+  const std::string name{source.FieldName(source.SystemId)};
+  CHECK_TEXT("Record.FieldName uses the original getter spelling", name, "$systemId");
+  const auto &table = agiru::TableTraits<agiru::platform::Company>::kTable;
+  const auto *identity = agiru::Field(table, agiru::SystemFieldNumbers::SystemId);
+  CHECK_TRUE("the source identity declaration remains present", identity != nullptr);
+  if (identity == nullptr) { return; }
+  CHECK_TEXT("reflection does not rename the source/SQL declaration", identity->name, "SystemId");
+  Temporary<Field> catalogue;
+  for (const agiru::FieldDef &def : table.fields) {
+    agiru::detail::LoadFieldMetadata(catalogue, table, def);
+    catalogue.Insert();
+  }
+  catalogue.SetRange(catalogue.TableNo, agiru::platform::Company::kId.Value());
+  catalogue.SetRange(catalogue.FieldName, name);
+  CHECK_TRUE("the caller's FieldName finds its catalogue row", catalogue.FindFirst());
+  CHECK_TRUE("the name resolves the original reserved number",
+             catalogue.No == agiru::SystemFieldNumbers::SystemId.Value());
+  RecordRef reference;
+  reference.GetTable(source);
+  const auto field = reference.Field(catalogue.No);
+  CHECK_TEXT("FieldRef.Name shares the getter spelling", field.Name(), name);
+  const auto value = field.Value();
+  CHECK_TRUE("the name-derived field retains its exact type", value.IsGuid());
+  CHECK_TRUE("the name-derived field reads actual member storage",
+             value.IsGuid() && value.Get<agiru::Guid>() == source.SystemId);
+}
+
 void MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary() {
   Field row;
   CHECK_SILENT("an option declaration is readable", ReadMetadata(row, 3));
@@ -439,6 +471,7 @@ int main() {
     TheCompatibilityTypeKeepsItsExistingOptionVocabulary();
     NativeTypeCodesRoundtripThroughTemporaryStorageAndReflection();
     MetadataKeepsDeclaredValuesAndRecordState();
+    ImplicitNamesFollowTheRealReflectionLookupPath();
     MetadataKeepsBlankOptionsAndEnumIdentityAtTheTypeBoundary();
     MetadataLoadsRelationsAndRefusesUnknownStates();
     MetadataTypeNamesMatchTheNativePrimitiveContract();

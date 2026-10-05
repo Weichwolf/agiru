@@ -8,6 +8,9 @@ gate="$B/gate_ReflectionMetadataGate"
 "$gate" > "$proof/current.log" 2>&1
 indexed_gate="$B/gate_RecordRefGate"
 "$indexed_gate" > "$proof/indexed-fields.log" 2>&1
+field_gate="$B/gate_PlatformFieldGate"
+"$field_gate" > "$proof/field-names.log" 2>&1
+"$B/gate_PlatformSystemFieldsGate" > "$proof/system-profiles.log" 2>&1
 if [ "${AGIRU_METADATA_ID_REFERENCE+x}" = x ]; then
   "$gate" "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.log" 2>&1
   sha256sum "$AGIRU_METADATA_ID_REFERENCE" > "$proof/reference.sha256"
@@ -31,6 +34,50 @@ if ! has_typed_dependencies "$proof/Declare.d"; then
   printf 'reflection-metadata: typed declaration dependency control was not detected\n' >&2
   exit 1
 fi
+
+awk '
+  /return field.reflectionName;/ {
+    sub(/return field.reflectionName;/, "return field.name;"); changed++
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' src/rt/written/PlatformField.cpp > "$proof/source-name.cpp"
+"$CXX" "${flags[@]}" "$proof/source-name.cpp" -L"$B" -Wl,-rpath,"$B" \
+  -lagiru_rt -lagiru_net -lagiru_db -o "$proof/source-name.so"
+if LD_PRELOAD="$proof/source-name.so" "$field_gate" > "$proof/source-name.log" 2>&1; then
+  printf 'reflection-metadata: source-name substitution escaped the caller-path gate\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*Record.FieldName uses the original getter spelling' "$proof/source-name.log"
+sha256sum "$proof/source-name.cpp" "$proof/source-name.so" > "$proof/name-control.sha256"
+rm -- "$proof/source-name.cpp" "$proof/source-name.so"
+
+for control in linked-audit old-profile-lookups; do
+  mkdir -p "$proof/$control/meta"
+  awk -v control="$control" '
+    control == "linked-audit" && /return !linked &&/ {
+      sub(/return !linked &&/, "static_cast<void>(linked); return"); changed++
+    }
+    control == "old-profile-lookups" && /profile == SystemFieldProfile::Runtime18/ {
+      sub(/Runtime18/, "Runtime17"); changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/meta/SystemFields.h > "$proof/$control/meta/SystemFields.h"
+  "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+    -I"$proof/$control" -Iinclude -Itest/gate test/gate/PlatformSystemFieldsGate.cpp \
+    -L"$B" -Wl,-rpath,"$B" -lagiru_rt -lagiru_net -lagiru_db -o "$proof/$control/gate"
+  if "$proof/$control/gate" > "$proof/$control.log" 2>&1; then
+    printf 'reflection-metadata: %s escaped the complete profile gate\n' "$control" >&2
+    exit 1
+  fi
+  rg -q 'FAIL .*complete selected identity population agrees' "$proof/$control.log"
+  sha256sum "$proof/$control/meta/SystemFields.h" "$proof/$control/gate" \
+    >> "$proof/profile-controls.sha256"
+  rm -- "$proof/$control/meta/SystemFields.h" "$proof/$control/gate"
+  rmdir "$proof/$control/meta" "$proof/$control"
+done
 
 awk '
   /if \(IsImplicitSystemField\(def.no\)\) \{ continue; \}/ {
@@ -199,4 +246,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-three compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, complete profile selection, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; twenty-six compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

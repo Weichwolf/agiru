@@ -190,8 +190,8 @@ public:
   [[nodiscard]] Integer Number() const { return Def_().no.Value(); }
 
   /// \brief AL `FieldRef.Name()`.
-  /// \return The AL name, spaces and all.
-  [[nodiscard]] std::string_view Name() const { return Def_().name; }
+  /// \return The reflected AL name; implicit timestamp/SystemId retain original platform spelling.
+  [[nodiscard]] std::string_view Name() const;
 
   /// \brief AL `FieldRef.Caption()`.
   /// \return The caption an error message quotes.

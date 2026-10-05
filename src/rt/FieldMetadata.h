@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace agiru {
 
@@ -15,6 +16,8 @@ class Field;
 namespace detail {
 
 std::uint16_t EffectiveFieldLength(const FieldDef &def);
+
+std::string_view ReflectionFieldName(const FieldDef &def);
 
 std::string FieldOptionMembers(const FieldDef &def);
 

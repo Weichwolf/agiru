@@ -4,6 +4,7 @@
 #include "meta/Ids.h"
 #include "meta/SystemFields.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "runtime/Catalogue.h"
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
@@ -30,6 +31,7 @@
 #include "type/Time.h"
 
 #include "BuiltinsWritten.h"
+#include "FieldMetadata.h"
 #include "Filter.h"
 #include "RenameCascade.h"
 #include "Rows.h"
@@ -852,7 +854,7 @@ std::vector<BeforeEntry> &BeforeStack() {
 
 std::string_view FieldNameOf(const TableDef &table, FieldNo no) {
   for (const FieldDef &def : table.fields) {
-    if (def.no.Value() == no.Value()) { return def.name; }
+    if (def.no.Value() == no.Value()) { return ReflectionFieldName(def); }
   }
   throw Error("FieldName: the table declares no such field");
 }

@@ -2,6 +2,7 @@
 #include "meta/ModuleDef.h"
 #include "meta/PageDef.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/PageMetadata.h"
 #include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"

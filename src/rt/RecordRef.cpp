@@ -493,6 +493,10 @@ FieldType FieldRef::Type() const {
   return Def_().type == FieldType::Enum ? FieldType::Option : Def_().type;
 }
 
+std::string_view FieldRef::Name() const {
+  return detail::ReflectionFieldName(Def_());
+}
+
 std::string_view FieldRef::GetEnumValueName(Integer index) const {
   if (index < 1 || static_cast<std::size_t>(index) > Def_().values.size()) { return {}; }
   return Def_().values[static_cast<std::size_t>(index) - 1].name;

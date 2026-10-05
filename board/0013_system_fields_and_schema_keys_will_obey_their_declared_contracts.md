@@ -3,7 +3,8 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: qualify one complete host-selected implicit profile without renaming SQL columns.
+Next: materialize the selected implicit profile in generated and handwritten records;
+qualify computed user lookups without renaming SQL columns.
 
 ## Implementation
 
@@ -55,8 +56,14 @@ Next: qualify one complete host-selected implicit profile without renaming SQL c
   BCApps `bb7111877f`: ApplicationAreaMgmt, SLPopulateHistTables and
   ExpenseActivityLogTest; `src/gen/{TableKeys,TableWriter}.cpp`,
   `src/rt/{FieldMetadata,RecordRef,Storage}.cpp`.
-- Existing implementation commits `4dadfec` and `5a14741` remain intact.
-  Uncommitted full-profile/name work is not yet integrated/UT-qualified.
+- `make reflection-metadata` passes the source, reflection, RecordRef, Field and
+  system-profile gates plus 26 mutation controls. The canonical profile selects
+  kind/LinkedObject/host presence; all three reflection callers share original names.
+  A real Record.FieldName → Field lookup → FieldRef.Value caller detects source-name
+  substitution. The narrow identity header's typed-dependency control also passes.
+- Actual record materialization still uses the five-field compatibility view.
+  Timestamp/user lookups, host wiring and live providers are not activated by these
+  declaration tests. Full AL replay is pending; preserve `4dadfec`/`5a14741`.
 
 Absorbs prior 0080/0353/0371/0511. Previous detail and mappings:
 Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.

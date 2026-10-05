@@ -1,5 +1,7 @@
 #include "BodyWriter.h"
 
+#include "meta/SystemFields.h"
+
 #include "Ast.h"
 #include "CodeunitWriter.h"
 #include "EnumWriter.h"
@@ -1266,14 +1268,9 @@ private:
   }
 
   static bool IsSystemFieldName(std::string_view name) {
-    static constexpr std::array kSystem{std::string_view{"SystemId"},
-                                        std::string_view{"SystemCreatedAt"},
-                                        std::string_view{"SystemCreatedBy"},
-                                        std::string_view{"SystemModifiedAt"},
-                                        std::string_view{"SystemModifiedBy"},
-                                        std::string_view{"SystemRowVersion"}};
-    return std::ranges::any_of(kSystem,
-                               [name](std::string_view known) { return SameName(known, name); });
+    return std::ranges::any_of(kImplicitSystemFields, [name](const SystemFieldDecl &known) {
+      return SameName(known.name, name);
+    });
   }
 
   static bool IsEnumMethod(std::string_view name) {

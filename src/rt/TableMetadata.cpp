@@ -3,6 +3,7 @@
 #include "meta/Ids.h"
 #include "meta/ModuleDef.h"
 #include "meta/TableDef.h"
+#include "meta/TableType.h"
 #include "platform/TableMetadata.h"
 #include "runtime/Catalogue.h"
 #include "runtime/ErrorValue.h"

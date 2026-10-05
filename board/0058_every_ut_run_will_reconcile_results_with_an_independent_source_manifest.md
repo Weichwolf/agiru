@@ -26,6 +26,14 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   Other unactivated objects/properties and omitted app roots remain gaps.
 - Preserve existing primitive fixes, generated bindings and negative controls.
   Package/declaration qualifiers are not full-app linking or business execution.
+- Current frozen `slice-check all test ut` run is pending, not a new pass count.
+  BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17` retains byte-identical sources
+  for all eighty configured UT codeunits / 2,314 methods versus `bb7111877f`.
+  Existing generated apps have not been regenerated against the newer full tree.
+- `make lint` is red: 388 unique diagnostics, ninety of 267 units analysed, all
+  ninety failed. Newly introduced include/test diagnostics were repaired; focused
+  system-profile analysis still fails on common runtime/type headers. Preserve
+  zero tolerated diagnostics and current suppression limits; no baseline increase.
 
 ## Focused prerequisites
 
