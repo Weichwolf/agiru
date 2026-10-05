@@ -78,9 +78,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   No new length analysis findings; one existing RecordRef.Get value-copy finding
   and 37/33/36/33 inherited header findings remain unsuppressed. Fixture cleanup
   initializes scalar members and removes existing include/const/optional findings;
-  runtime loses two auto findings. Full generated rebuild/local/AL replay remain
-  pending; complete profile/provider remains guarded. No new UT gain/G1 claim.
-  Pushed `a59e992` now has one direct six-job integration running under
+  runtime loses two auto findings. Full slice/runtime rebuild and AL replay are
+  terminal below; complete profile/provider remains guarded. No UT gain/G1 claim.
+  Pushed `a59e992` has one terminal direct six-job integration under
   `/tmp/agiru-field-length-integration.Xo5JqS/result.json`: slice-check passes
   14,225/zero missing; full generated slice/runtime build passes (exit 0/1,835s).
   All 25,285 compiler input hashes still agree. Complete local tests are terminal:
@@ -90,10 +90,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   The exact case fails with parent overrides and passes with those overrides
   removed; `compiler-cache-{parent-negative,clean}.log` retain both observations.
   Repair fixture isolation without changing the production apps target or dropping
-  its diagnostic-slice negative control. The live compiler-input contract prevents
-  changing tooling until this integration finishes. Lint is terminal/red:
-  55 suppression places against unchanged baseline 13. The full 80-codeunit/
-  2,314-method AL replay is now live with six workers; no new UT result yet.
+  its diagnostic-slice negative control. Lint is terminal/red:
+  55 suppression places against unchanged baseline 13. The full AL replay is
+  terminal: 2,173/2,314 passed, 141 failed, zero incomplete over eighty codeunits/
+  six workers/1,455s. Runner exits 1, Make 2, no infrastructure errors. Against
+  the preceding native-defaults replay, every identity/status/error/source hash
+  agrees: zero gains/losses/missing/added/duplicates. `ut-comparison.json` retains
+  that exact comparison. All compiler-input and original dependency hashes agree
+  after UT; null/unsealed seed remains diagnostic, not causal A/B or G1.
   The input manifest SHA256 is
   `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`.
   UT_LOG is passed only to UT; its runner log and outer Make log are distinct.
