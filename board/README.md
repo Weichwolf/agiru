@@ -23,11 +23,16 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   fixture is outside frozen 004617. Do not report the editable tree as all-green.
 - Rename-fix integration: `20261005T004617Z-3255614`, frozen HEAD `24af1d8`,
   source `f484500aa41dfb2037f5267c3818bebf5227cd7e39656799382d02a3a47deb7a`;
-  `slice-check all test ut`, six jobs, runner PID 3257254 confirmed live.
+  `slice-check all test ut`, six jobs; terminal at 01:26:10 UTC, runner gone.
   Includes both ModifyAll caller preservation and the Rename cascade read anchor.
-  Source dependencies match completed 232014; compare all 2,314 original UT
-  identities/statuses/errors against its 2,167/147 result. Final target exits,
-  provenance checks and full AL results are pending; no G1 or causal A/B claim.
+  Slice/build/local tests pass (141 cases/232 tooling tests); UT exits 2:
+  2,170/2,314 passed, 144 failed, zero incomplete, 80 codeunits/1,330 seconds.
+  Against 232014: all three original invoice/credit-memo Rename tests recover;
+  no losses/changed errors/missing/added/duplicates, source manifest/file hashes
+  match (`artifacts/ut-comparison-232014.json`). Dependencies match 232014;
+  frozen source/System/original-notice pre/post hashes match. XML policy changes
+  are outside this snapshot. Null/unsealed seed remains diagnostic, not causal A/B
+  or G1; investigate the remaining 144 failures.
 - Rename cascade regression (0044): the reader must retain the old key while an
   independent record writes the related row. RenameGate retains its original cases
   and adds typed/reflected parent renames in both directions over keyed/non-key
@@ -50,7 +55,7 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   image are removed; hashes/results remain. Complete current-tree `make test JOBS=2`
   on `81c5209` passes: 141 cases/232 tooling tests, exit 0. Source/image hashes match
   before/after; all twenty-three record controls reject (`fAdRKi`).
-  `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log`. Full AL with this fix stays pending.
+  `/tmp/agiru-rename-anchor.7GvVDQ/all-local.log`. Full AL qualification is above.
 - Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
   source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
   `slice-check all test ut`, six jobs; terminal at 00:44:29 UTC, runner gone.
