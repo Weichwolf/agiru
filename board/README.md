@@ -55,7 +55,8 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   cases pass with parent output overrides and all 233 tooling cases pass with a
   parent UT_LOG. No parent log is created and no test identity is dropped.
   `tooling-isolation-{negative,positive,full}.log` retain the receipts. Whole Make
-  regression still needs a fresh replay. Shared effective field length is qualified
+  regression's fresh replay below finds a separate CompilerCacheGate isolation defect.
+  Shared effective field length is qualified
   below; next are the complete native profile and live provider.
 
 - Native implicit fields (0013/0044): original logical getters execute twice over
@@ -82,8 +83,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   Pushed `a59e992` now has one direct six-job integration running under
   `/tmp/agiru-field-length-integration.Xo5JqS/result.json`: slice-check passes
   14,225/zero missing; full generated slice/runtime build passes (exit 0/1,835s).
-  All 25,285 compiler input hashes still agree. Complete local tests are live;
-  lint and the full 80-codeunit/2,314-method AL replay remain queued.
+  All 25,285 compiler input hashes still agree. Complete local tests are terminal:
+  146 cases/one red; tooling retains 233 tests/one failure (98.355s), all other
+  local gates/qualifiers pass. CompilerCacheGate's complete-app dry-run fixture
+  inherits parent Make B=build, overriding its own absolute build directory.
+  The exact case fails with parent overrides and passes with those overrides
+  removed; `compiler-cache-{parent-negative,clean}.log` retain both observations.
+  Repair fixture isolation without changing the production apps target or dropping
+  its diagnostic-slice negative control. The live compiler-input contract prevents
+  changing tooling until this integration finishes. Lint is terminal/red:
+  55 suppression places against unchanged baseline 13. The full 80-codeunit/
+  2,314-method AL replay is now live with six workers; no new UT result yet.
   The input manifest SHA256 is
   `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`.
   UT_LOG is passed only to UT; its runner log and outer Make log are distinct.
