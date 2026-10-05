@@ -267,7 +267,7 @@ struct Declared {
   std::uint16_t width = 0;                  ///< `Width`, 0 when none is declared.
   std::string_view autoFormatType{};        ///< `AutoFormatType`.
   std::string_view autoFormatExpression{};  ///< `AutoFormatExpression`.
-  std::string_view allowInCustomizations{}; ///< `AllowInCustomizations`.
+  std::string_view allowInCustomizations{}; ///< Effective declaring-owner `AllowInCustomizations`.
   std::string_view access{};                ///< `Access`, as AL wrote it.
   std::string_view subtype{};               ///< `Subtype`, on a Blob or Media field.
   bool enabled = true;                      ///< `Enabled`, on a field.

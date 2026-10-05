@@ -46,6 +46,7 @@ constexpr agiru::TableId kMetadataTargetId{50152};
 constexpr agiru::TableId kLongMetadataId{50153};
 constexpr agiru::TableId kTypeMetadataId{50154};
 constexpr agiru::TableId kPolicyMetadataId{50156};
+constexpr agiru::TableId kCustomizationMetadataId{50157};
 constexpr agiru::Integer kTypeNameField = 9;
 constexpr FieldType kUnsupportedType = static_cast<FieldType>(250);
 constexpr agiru::Integer kNativeCodeOrdinal = 31489;
@@ -229,6 +230,41 @@ constexpr auto kPolicyMetadataFields = [] {
 }();
 constexpr agiru::TableDef kPolicyMetadataTable{
     .id = kPolicyMetadataId, .name = "Fixture Field Policies", .fields = kPolicyMetadataFields};
+
+struct CustomizationCase {
+  std::string_view property;
+  bool allowed;
+};
+
+constexpr auto kCustomizations = std::to_array<CustomizationCase>({
+    {.property = "", .allowed = true},
+    {.property = "ToBeClassified", .allowed = true},
+    {.property = "nEvEr", .allowed = false},
+    {.property = "AsReadOnly", .allowed = true},
+    {.property = "AsReadWrite", .allowed = true},
+    {.property = "Always", .allowed = true},
+    {.property = "Never", .allowed = false},
+});
+constexpr agiru::Integer kUnknownCustomization =
+    static_cast<agiru::Integer>(kCustomizations.size() + 1);
+constexpr auto kCustomizationFields = [] {
+  std::array<agiru::FieldDef, kCustomizations.size() + 1> fields{};
+  for (std::size_t i = 0; i < kCustomizations.size(); ++i) {
+    fields[i] = {.name = "Customization value",
+                 .allowInCustomizations = kCustomizations[i].property,
+                 .no = agiru::FieldNo{static_cast<agiru::Integer>(i + 1)},
+                 .type = FieldType::Integer,
+                 .editable = false};
+  }
+  fields[kCustomizations.size()] = {.name = "Unsupported customization",
+                                    .allowInCustomizations = "Undocumented",
+                                    .no = agiru::FieldNo{kUnknownCustomization},
+                                    .type = FieldType::Integer};
+  return fields;
+}();
+constexpr agiru::TableDef kCustomizationTable{.id = kCustomizationMetadataId,
+                                              .name = "Fixture Customization Policies",
+                                              .fields = kCustomizationFields};
 constexpr std::string_view kLongName = "012345678901234567890123456789😀tail";
 constexpr std::string_view kLongFieldName = "äääääääääääääääääääääääääääääätail";
 constexpr std::array<agiru::EnumValueDef, 6> kBlankOptions{{
@@ -324,6 +360,7 @@ constexpr agiru::TableEntry kTargetEntry = MetadataEntry(kMetadataTarget);
 constexpr agiru::TableEntry kLongMetadataEntry = MetadataEntry(kLongMetadataTable);
 constexpr agiru::TableEntry kTypeMetadataEntry = MetadataEntry(kTypeMetadataTable);
 constexpr agiru::TableEntry kPolicyMetadataEntry = MetadataEntry(kPolicyMetadataTable);
+constexpr agiru::TableEntry kCustomizationEntry = MetadataEntry(kCustomizationTable);
 
 std::string ReadTypeName(Field &row) {
   RecordRef ref;
@@ -356,6 +393,26 @@ void MetadataSearchAndAccessRetainDeclaredProperties() {
              row.Access == agiru::platform::FieldAccess::Local);
   CHECK_TRUE("a refused policy does not replace the preceding search flag",
              row.OptimizeForTextSearch);
+}
+
+void MetadataCustomizationsRetainDeclaredPolicies() {
+  Field row;
+  for (std::size_t i = 0; i < kCustomizations.size(); ++i) {
+    CHECK_TRUE("a declared customization policy is readable",
+               row.Get(kCustomizationMetadataId.Value(), static_cast<agiru::Integer>(i + 1)));
+    CHECK_TRUE("metadata customization retains the declared availability",
+               row.IsAllowedInCustomizations == kCustomizations[i].allowed);
+  }
+  const auto previous = row.No;
+  CHECK_TEXT("unknown field customization refuses rather than granting availability",
+             ReadMetadata(row, kUnknownCustomization, kCustomizationMetadataId),
+             "Field.AllowInCustomizations has no verified member 'Undocumented'");
+  CHECK_TRUE("a refused customization leaves preceding availability unchanged",
+             !row.IsAllowedInCustomizations);
+  CHECK_TRUE("a refused customization does not project an unsupported field name",
+             row.FieldName == "Customization value");
+  CHECK_TRUE("a refused customization still retains the searched primary key",
+             previous != row.No && row.No == kUnknownCustomization);
 }
 
 void MetadataTypeNamesMatchTheNativePrimitiveContract() {
@@ -627,7 +684,9 @@ int main() {
     agiru::RegisterTableEntry(&kLongMetadataEntry);
     agiru::RegisterTableEntry(&kTypeMetadataEntry);
     agiru::RegisterTableEntry(&kPolicyMetadataEntry);
+    agiru::RegisterTableEntry(&kCustomizationEntry);
     MetadataSearchAndAccessRetainDeclaredProperties();
+    MetadataCustomizationsRetainDeclaredPolicies();
     MetadataGetPreservesOptionalFailureContext();
     MovedReadFailuresPreserveOwnedKeyText();
     MetadataGetDefaultsAndTemporaryReadsShareTheContract();

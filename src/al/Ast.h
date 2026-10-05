@@ -68,6 +68,7 @@ struct FieldDecl {
   std::string subtype;
   int length = 0;
   std::vector<Property> properties;
+  std::string allowInCustomizationsDefault{};
   std::vector<ProcedureDecl> triggers;
 };
 
@@ -190,6 +191,7 @@ struct TableExtensionObject {
   std::string name;
   std::string extends;
   std::string nameSpace;
+  std::vector<Property> properties;
   std::vector<FieldDecl> fields;
   std::vector<FieldDecl> modified;
   std::vector<KeyDecl> keys;

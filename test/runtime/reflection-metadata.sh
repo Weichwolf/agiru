@@ -100,13 +100,19 @@ rg -q 'FAIL .*a discarded native missing-field Get carries its searched key' "$p
 sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/read-controls.sha256"
 rm -- "$proof/$control.cpp" "$proof/$control.so"
 
-for control in field-access-default field-search-default; do
+for control in field-access-default field-search-default field-customization-default field-customization-editable; do
   awk -v control="$control" '
     control == "field-access-default" && /row.Access = Option<platform::FieldAccess>/ {
       print "  row.Access = platform::FieldAccess::Public;"; changed++; next
     }
     control == "field-search-default" && /row.OptimizeForTextSearch = def.optimizeForTextSearch;/ {
       print "  row.OptimizeForTextSearch = false;"; changed++; next
+    }
+    control == "field-customization-default" && /row.IsAllowedInCustomizations = \*customizable != 0;/ {
+      print "  row.IsAllowedInCustomizations = true;"; changed++; next
+    }
+    control == "field-customization-editable" && /row.IsAllowedInCustomizations = \*customizable != 0;/ {
+      print "  row.IsAllowedInCustomizations = def.editable;"; changed++; next
     }
     { print } END { if (changed != 1) exit 2 }
   ' src/rt/written/PlatformField.cpp > "$proof/$control.cpp"
@@ -119,6 +125,7 @@ for control in field-access-default field-search-default; do
   case "$control" in
     field-access-default) claim='metadata access retains the declared native member';;
     field-search-default) claim='metadata text search retains the declared flag';;
+    field-customization-default|field-customization-editable) claim='metadata customization retains the declared availability';;
   esac
   rg -q "FAIL .*${claim}" "$proof/$control.log"
   sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/policy-controls.sha256"
@@ -407,6 +414,7 @@ for control in ordinal-cast cds-query cds-refusal default-fallback property-fall
       exit 1
     fi
     rg -q 'FAIL .*unknown field access refuses rather than granting Public' "$proof/field-access-refusal.log"
+    rg -q 'FAIL .*unknown field customization refuses rather than granting availability' "$proof/field-access-refusal.log"
   fi
 done
 
@@ -467,4 +475,4 @@ if LD_PRELOAD="$proof/unchecked-storage.so" "$gate" > "$proof/unchecked-storage.
   exit 1
 fi
 rg -q 'unqualified live metadata refuses' "$proof/unchecked-storage.log"
-printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; thirty-eight compiled controls and the typed-header dependency control refuse; %s\n' "$proof"
+printf 'reflection-metadata: source projection, original field names, selected materialized profiles, current User lookups, read-only AL assignment, stable identities, declared field indices, compiled filters, qualified defaults/company scope, CDS-to-CRM and temporary rows pass; forty compiled controls and the typed-header dependency control refuse; %s\n' "$proof"

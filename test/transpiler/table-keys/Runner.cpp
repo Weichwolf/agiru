@@ -1,6 +1,7 @@
 #include "meta/Ids.h"
 #include "meta/ModuleDef.h"
 #include "meta/TableDef.h"
+#include "platform/Field.h"
 #include "platform/ReflectionOptions.h"
 #include "platform/ReflectionTypes.h"
 #include "platform/TableMetadata.h"
@@ -120,6 +121,36 @@ void CheckSourceProjection() {
              row.AppID == *agiru::Guid::FromText("118874ab-44bc-4ccb-9daf-59763539ab16"));
 }
 
+void CheckFieldCustomizationOwnership() {
+  using namespace agiru::platform;
+  Field field;
+  const auto check = [&](agiru::FieldNo no, std::string_view expected, bool allowed) {
+    const auto *declared = agiru::Field(agiru::TableDefinition<Row>(), no);
+    CHECK_TRUE("a generated customization field is declared", declared != nullptr);
+    if (declared == nullptr) { return; }
+    CHECK_TEXT("generated customization retains the declaring owner or field override",
+               declared->allowInCustomizations,
+               expected);
+    CHECK_TRUE("generated customization is readable through installed Field.Get",
+               field.Get(Row::kId.Value(), no.Value()));
+    CHECK_TRUE("generated customization availability reaches the native Field projection",
+               field.IsAllowedInCustomizations == allowed);
+  };
+  check(Row::Field_No::Later, "Never", false);
+  check(Row::Field_No::PrimaryID, "AsReadOnly", true);
+  check(Row::Field_No::EarlierExtension, "AsReadWrite", true);
+  check(Row::Field_No::PrivateExtension, "Never", false);
+  check(Row::Field_No::UnclassifiedExtension, "", true);
+  using Defaults = agiru::Fixture::ComposedRow_Table;
+  CHECK_TRUE("an omitted owner default does not invent a source property",
+             agiru::Field(agiru::TableDefinition<Defaults>(), Defaults::Field_No::ID)
+                 ->allowInCustomizations.empty());
+  CHECK_TRUE("an omitted owner default is readable through installed Field.Get",
+             field.Get(Defaults::kId.Value(), 1));
+  CHECK_TRUE("unclassified fields are available for customization",
+             field.IsAllowedInCustomizations);
+}
+
 void CheckOmittedTableProperties() {
   using namespace agiru::platform;
   using Defaults = agiru::Fixture::ComposedRow_Table;
@@ -212,6 +243,7 @@ int main() {
     CheckKeys();
     CheckSourceIdentity();
     CheckSourceProjection();
+    CheckFieldCustomizationOwnership();
     CheckOmittedTableProperties();
     CheckNestedIdentity();
     CheckInstalledLookup();

@@ -74,7 +74,7 @@ for control in registry-missing registry-wrong-id; do
   rg -q 'installed lookup selects|installed lookup projects' "$proof/$control.run.log"
 done
 
-for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
+for control in wrong-name wrong-clustering wrong-owner wrong-classification wrong-customization-owner wrong-customization-override; do
   cp -a "$proof/generated" "$proof/$control"
   source="$proof/$control/fixture/fixture/table/ImplicitRow.def.cpp"
   if [ "$control" = wrong-name ]; then
@@ -99,10 +99,20 @@ for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
       { print }
       END { if (changed != 1) exit 2 }
     ' "$source" > "$proof/$control.cpp"
-  else
+  elif [ "$control" = wrong-classification ]; then
     awk '
       /\.dataClassification = "AccountData"/ {
         sub(/AccountData/, "CustomerContent"); changed++
+      }
+      { print }
+      END { if (changed != 1) exit 2 }
+    ' "$source" > "$proof/$control.cpp"
+  else
+    expected=AsReadWrite
+    if [ "$control" = wrong-customization-override ]; then expected=AsReadOnly; fi
+    awk -v expected="$expected" '
+      index($0, ".allowInCustomizations = \"" expected "\"") {
+        sub(expected, "Never"); changed++
       }
       { print }
       END { if (changed != 1) exit 2 }
@@ -119,6 +129,7 @@ for control in wrong-name wrong-clustering wrong-owner wrong-classification; do
     wrong-clustering) claim='the primary key is clustered by default';;
     wrong-owner) claim='table owner comes from the source manifest';;
     wrong-classification) claim='table classification is retained';;
+    wrong-customization-owner|wrong-customization-override) claim='generated customization retains the declaring owner or field override';;
   esac
   rg -q "FAIL .*${claim}" "$proof/$control.run.log"
 done

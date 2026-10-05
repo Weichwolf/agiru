@@ -55,6 +55,7 @@ public:
     extension.extends = ExpectName();
     TableObject body;
     ParseTableBody(body);
+    extension.properties = std::move(body.properties);
     extension.fields = std::move(body.fields);
     extension.modified = std::move(body.modified);
     extension.keys = std::move(body.keys);
@@ -95,6 +96,9 @@ public:
       }
     }
     Expect("}");
+    if (const Property *property = Find(table.properties, "AllowInCustomizations")) {
+      for (FieldDecl &field : table.fields) { field.allowInCustomizationsDefault = property->text; }
+    }
   }
 
   CodeunitObject ParseCodeunit() {

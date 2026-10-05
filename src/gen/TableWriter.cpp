@@ -397,9 +397,10 @@ bool CarriesConstructor(const al::TableObject &table,
   return CarriesInitValues(table, options, enums) || DeclaredTemporary(table);
 }
 
-std::string PropertyText(const al::FieldDecl &field, std::string_view name) {
+std::string
+PropertyText(const al::FieldDecl &field, std::string_view name, std::string_view fallback = {}) {
   const al::Property *found = Find(field.properties, name);
-  if (found == nullptr) { return {}; }
+  if (found == nullptr) { return std::string{fallback}; }
   for (const al::Token &token : found->value) {
     if (token.kind == al::TokenKind::String) { return token.text; }
   }
@@ -569,7 +570,8 @@ std::string DeclaredBlock(const al::FieldDecl &field,
   number("width", PropertyText(field, "Width"), "");
   text("autoFormatType", PropertyText(field, "AutoFormatType"));
   text("autoFormatExpression", PropertyText(field, "AutoFormatExpression"));
-  text("allowInCustomizations", PropertyText(field, "AllowInCustomizations"));
+  text("allowInCustomizations",
+       PropertyText(field, "AllowInCustomizations", field.allowInCustomizationsDefault));
   text("access", PropertyText(field, "Access"));
   text("subtype", PropertyText(field, "Subtype"));
   flag("enabled", PropertyIs(field, "Enabled", true), true);

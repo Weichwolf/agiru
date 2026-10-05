@@ -77,6 +77,13 @@ std::string detail::FieldOptionMembers(const FieldDef &def) {
 
 namespace {
 
+constexpr std::array kCustomizationValues{
+    EnumValueDef{.ordinal = 1, .name = "ToBeClassified", .caption = {}},
+    EnumValueDef{.ordinal = 0, .name = "Never", .caption = {}},
+    EnumValueDef{.ordinal = 1, .name = "AsReadOnly", .caption = {}},
+    EnumValueDef{.ordinal = 1, .name = "AsReadWrite", .caption = {}},
+    EnumValueDef{.ordinal = 1, .name = "Always", .caption = {}}};
+
 Option<platform::FieldDataType> NativeFieldTypeOf(const FieldDef &def) {
   using Native = platform::FieldDataType;
   switch (def.type) {
@@ -146,6 +153,12 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
                                               "Access",
                                               "Field");
   if (!access) { throw Error(access.error()); }
+  const auto customizable = MetadataPropertyOrdinal(
+      kCustomizationValues,
+      def.allowInCustomizations.empty() ? "ToBeClassified" : def.allowInCustomizations,
+      "AllowInCustomizations",
+      "Field");
+  if (!customizable) { throw Error(customizable.error()); }
   row.TableNo = table.id.Value();
   row.No = def.no.Value();
   row.TableName = FittedFieldText(table.name, platform::Field::kNameLength);
@@ -166,6 +179,7 @@ void detail::LoadFieldMetadata(platform::Field &row, const TableDef &table, cons
   row.IsPartOfPrimaryKey = InPrimaryKey(table, def.no);
   row.OptimizeForTextSearch = def.optimizeForTextSearch;
   row.Access = Option<platform::FieldAccess>{*access};
+  row.IsAllowedInCustomizations = *customizable != 0;
 }
 
 detail::Found platform::Field::Get(::agiru::Integer TableNo, ::agiru::Integer No) {

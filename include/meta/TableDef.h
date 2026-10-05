@@ -155,8 +155,9 @@ struct FieldDef {
   std::string_view autoFormatType{};
   std::string_view autoFormatExpression{}; ///< \see autoFormatType
 
-  /// \brief The `AllowInCustomizations` property, as AL wrote it: `Never`, `Always` or a value in
-  ///        between (board:0480).
+  /// \brief Effective `AllowInCustomizations`: a field override or its declaring table/extension
+  ///        default; empty when neither declares a value. An extension default never changes base
+  ///        fields. This controls customization availability, not runtime permissions.
   std::string_view allowInCustomizations{};
 
   /// \brief The `Access` property, as AL wrote it: `Public`, `Internal`, `Local` or `Protected`.

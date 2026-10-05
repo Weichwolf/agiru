@@ -3,8 +3,8 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: complete Field classification, SQLDataType, package provenance and customization
-projection, then installed Field Find/Next/Count and the
+Next: complete Field classification, SQLDataType and package provenance,
+qualify implicit-field values, then installed Field Find/Next/Count and the
 actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
 
 ## Implementation
@@ -88,12 +88,12 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   owned key text. Search flags and all four compile-time Access members preserve
   declarations, default Public and case-insensitive spelling; unknown Access refuses.
   One private ordinal decoder serves Field and Table Metadata without adding public
-  dependencies or a second mapper. `PlatformFieldGate`: 354 checks; PlatformField.cpp
+  dependencies or a second mapper. `PlatformFieldGate`: 372 checks; PlatformField.cpp
   and gate focused tidy pass. ReflectionMetadata.cpp retains four existing
   std::expected include-cleaner diagnostics; no suppression or baseline increase.
-  `make reflection-metadata JOBS=2`: all 38 compiled controls plus the header control
+  `make reflection-metadata JOBS=2`: all 40 compiled controls plus the header control
   pass, including dropped-key, silent-miss, forced-Public and false-search mutants.
-  The shared fallback mutant also fails the unknown-Field-access check.
+  The shared fallback mutant also fails unknown Field access/customization checks.
   Developer `f928288ee840`: `methods-auto/record/record-get-method.md`;
   BCApps `d99152ee35f0`: `System/RapidStart/ConfigPackageField.Table.al`
   uses both contexts. Predecessor 1136 warns against weakening strict reads to
@@ -102,6 +102,33 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   BCApps Item.Table.al declares optimized No./Description; TableWriter.cpp and
   meta/Declare.h already retain these flags. This is not an implemented text-search
   index, authorization, live navigation, complete projection or full AL replay.
+- `AllowInCustomizations` defaults stay on the declaring fields in `src/al/Ast.h` /
+  `Parser.cpp`, before extension merging. Extension properties survive parsing;
+  explicit field values override that owner's default in `src/gen/TableWriter.cpp`.
+  Existing runtime metadata carries the effective string without widening public
+  structures or adding includes. The native Field projection treats Never as unavailable;
+  ToBeClassified/AsReadOnly/AsReadWrite and deprecated Always are available, independently
+  of Editable. Unknown values refuse before replacing projected attributes.
+  `make table-keys JOBS=2`: generated execution passes 84 checks, with separate base,
+  extension, override and omitted-extension defaults; both new generated owner/override
+  mutants fail two checks, while existing controls remain. The two new runtime mutants
+  reject always-available and Editable-derived flags. This qualifies declared policy,
+  not customization editability, implicit-field flags or actual client behavior.
+  Parser/GenTable/source-binding gates pass 142/85/271 checks. Runtime mapper, Field gate
+  and generated fixture pass focused tidy; two Parser complexity, six existing TableWriter
+  complexity/concatenation and one existing AlParserGate function-size findings remain.
+  The new pointer-conversion and fixture-number findings were repaired, not suppressed.
+  Verified-package regeneration still refuses 5683 properties (exit 1); this is not G1.
+  Developer `f928288ee840`: `properties/devenv-allowincustomizations-property.md`;
+  BCApps `d99152ee35f0`: `Apps/W1/Subcontracting/App/src/Purchase/SubcPurchaseHeader.TableExt.al`
+  declares AsReadOnly for its new fields. Predecessor `board/docaudit/03_properties.tsv`
+  treats this as UI-only; do not discard the required native metadata flag.
+  Predecessor 1310 records lost extension modifications; modification precedence
+  remains a separate merger qualification. DataClassification's linked AL property page
+  is absent locally and redirects online: retain the onprem/classifying-data.md and
+  analyzers/appsourcecop-as0016.md guarantees for new/Flow fields, but do not invent
+  table/extension or implicit defaults. Four declared Field attributes remain unprojected:
+  DataClassification, SQLDataType, AppPackageID and AppRuntimePackageID.
 - Temporary record arrays now share one row store across dimensions, not their
   field buffers or filters; distinct arrays and ordinary/scalar elements stay
   independent. `TemporaryGate` passes 95 checks and `AlArrayGate` seventeen.
