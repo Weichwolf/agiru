@@ -96,6 +96,14 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
    and shared typed/reflected calculation primitives. Keep timestamp/implicit fields
    out of declared FieldCount/index loops. Verify actual FieldName → virtual Field
    lookup → FieldRef.Value callers, not expected-name literals (predecessor 1114).
+   Preserve source minimum runtime separately from the host profile: `NativeSource.h`,
+   `NativeManifest.cpp`, `AppManifest.cpp` and `meta/ModuleDef.h` currently discard it.
+   Derive generator system-name recognition (`BodyWriter.cpp::IsSystemFieldName`)
+   from the same profile instead of its separate six-name list.
+   Guard AL assignment and `FieldRef::SetValue`, not the common `SetFieldText`:
+   `Table.cpp::Store`/`CalcField` and SQL navigation also use that internal writer.
+   Reuse the existing Lookup formula for current User names; prove changed/missing
+   users, calculated values and refused external writes through typed and reflected paths.
 3. Activate the shared default/key projection only with 0034/0058 proof. Complete unsupported default eligibility from platform evidence; never select a later field silently. Implement SqlIndex as separate SQL fields, not SetCurrentKey fields; keep its refusal until supported. Enforce Unique, MaintainSqlIndex, IncludedFields, Enabled, AutoIncrement and SqlTimestamp restrictions. No SQL Server physical-clustering promise for PostgreSQL.
 4. Return platform-owned fields from writes and preserve identity on Rename. Coordinate version checks with 0012 and company-qualified sequences with its company work.
 5. Use typed generated metadata for constraints and migration comparisons; never infer a field number from display order.
