@@ -14,6 +14,9 @@ struct ModuleDef {
   std::string_view name;      ///< The application name.
   std::string_view publisher; ///< The application publisher.
   std::string_view version;   ///< The source application version.
+  /// The explicitly declared AL runtime, distinct from the app version and host runtime.
+  /// Empty means the source omitted it; compiler-default resolution remains a separate policy.
+  std::string_view minimumRuntime{};
 };
 
 }

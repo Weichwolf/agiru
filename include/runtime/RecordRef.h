@@ -768,8 +768,7 @@ public:
   [[nodiscard]] std::string_view Name() const;
 
   /// \brief AL `RecordRef.FieldCount()`.
-  /// \return How many fields the table declares -- the AL declarations, and NOT the five the
-  ///         platform adds.
+  /// \return How many fields the table declares, excluding timestamp and reserved system fields.
   /// \throws Error when the RecordRef points at nothing.
   ///
   /// \warning THE SYSTEM FIELDS ARE NOT IN THE INDEX. `ApplicationAreaMgmt` walks

@@ -481,6 +481,25 @@ void AppIdentityComesFromTheRootManifest() {
              app.publisher,
              "agiru tests\nwith tabs\tand slashes\\");
   CHECK_TEXT("the manifest version remains exact", app.version, "2.3.4.5");
+  CHECK_TRUE("an omitted runtime is not guessed from the application version",
+             app.minimumRuntime.empty());
+  const std::string explicitRuntime =
+      std::string(valid.substr(0, valid.find_last_of('}'))) + R"(,"runtime":"18.0"})";
+  CHECK_TEXT("the declared minimum runtime survives separately from the app version",
+             agiru::gen::ParseAppIdentity(explicitRuntime).minimumRuntime,
+             "18.0");
+  for (const std::string_view runtime :
+       {R"("")", "null", "false", "18", R"("18.0","runtime":"17.0")"}) {
+    const std::string invalidRuntime = std::string(valid.substr(0, valid.find_last_of('}'))) +
+                                       ",\"runtime\":" + std::string(runtime) + "}";
+    bool refused = false;
+    try {
+      static_cast<void>(agiru::gen::ParseAppIdentity(invalidRuntime));
+    } catch (const std::runtime_error &error) {
+      refused = std::string_view(error.what()).contains("runtime");
+    }
+    CHECK_TRUE("present invalid or duplicate runtime declarations refuse", refused);
+  }
   for (
       const std::string_view invalid :
       {"[]",

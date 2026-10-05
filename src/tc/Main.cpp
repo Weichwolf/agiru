@@ -2105,7 +2105,9 @@ void EmitModule(Run &run,
   header += "    .id = " + agiru::gen::Literal(identity.id) + ",\n";
   header += "    .name = " + agiru::gen::Literal(identity.name) + ",\n";
   header += "    .publisher = " + agiru::gen::Literal(identity.publisher) + ",\n";
-  header += "    .version = " + agiru::gen::Literal(identity.version) + ",\n};\n\n}\n";
+  header += "    .version = " + agiru::gen::Literal(identity.version) + ",\n";
+  header +=
+      "    .minimumRuntime = " + agiru::gen::Literal(identity.minimumRuntime) + ",\n};\n\n}\n";
   if (!run.output.empty()) {
     Keep(run, Output{.directory = run.output, .relative = identifier + "Module.h"}, header);
   }

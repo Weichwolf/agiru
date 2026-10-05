@@ -25,7 +25,7 @@ bool IsAppGuid(std::string_view value) {
 
 namespace {
 
-std::string IdentityField(yyjson_val *root, std::string_view name) {
+std::string IdentityField(yyjson_val *root, std::string_view name, bool required = true) {
   yyjson_obj_iter iterator = yyjson_obj_iter_with(root);
   yyjson_val *found = nullptr;
   while (yyjson_val *key = yyjson_obj_iter_next(&iterator)) {
@@ -35,6 +35,7 @@ std::string IdentityField(yyjson_val *root, std::string_view name) {
     }
     found = yyjson_obj_iter_get_val(key);
   }
+  if (found == nullptr && !required) { return {}; }
   if (found == nullptr || !yyjson_is_str(found) || yyjson_get_len(found) == 0) {
     throw std::runtime_error("app.json lacks nonempty string identity field " + std::string(name));
   }
@@ -53,7 +54,8 @@ NativeAppIdentity ParseAppIdentity(std::string_view text) {
   NativeAppIdentity identity{.id = IdentityField(root, "id"),
                              .name = IdentityField(root, "name"),
                              .publisher = IdentityField(root, "publisher"),
-                             .version = IdentityField(root, "version")};
+                             .version = IdentityField(root, "version"),
+                             .minimumRuntime = IdentityField(root, "runtime", false)};
   if (!IsAppGuid(identity.id)) { throw std::runtime_error("app.json has invalid app id"); }
   return identity;
 }

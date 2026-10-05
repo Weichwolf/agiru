@@ -15,6 +15,17 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Source-runtime prerequisite (0013): app.json/NavxManifest.xml now retain the
+  declared AL runtime in immutable module metadata, separately from app version;
+  omission remains unspecified. Generator build, 85 GenTableGate checks and eleven
+  tooling methods pass; wrong-runtime compiled metadata rejects. Original System
+  29/Runtime 18 and BaseApp 30/no-runtime declarations pass compiled assertions.
+  `/tmp/agiru-system-field-write.UYh59R/` retains receipts. Both parser analyses
+  pass; gate/Main analysis remains red on inherited/existing findings. Host/default
+  resolution, full implicit profile, live provider and full replay remain open.
+  Original reflected setter IL writes timestamp/buffer fields without an Editable
+  check; preserve its distinction from typed source readonly semantics (0013).
+
 - System-field index prerequisite (0013/0044): base identities now live in narrow
   `meta/SystemFields.h`; consumers no longer include typed declaration helpers
   merely for numbers/names. Timestamp 0 stays out of RecordRef's AL index.

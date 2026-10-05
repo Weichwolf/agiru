@@ -618,6 +618,13 @@ class NativeReportSourceCompilerGate(unittest.TestCase):
         return self.generated / 'platform/system/fixture/report/NativeFixture.def.cpp'
 
     def test_original_ast_and_extension_keep_separate_source_owned_modules(self):
+        original_manifest = self.manifest.read_text()
+        self.manifest.write_text(original_manifest.replace('Version="1.2.3.4"',
+            'Version="1.2.3.4" Runtime="18.0"'))
+        app_path = self.source / 'app.json'
+        identity = json.loads(app_path.read_text())
+        identity['runtime'] = '16.0'
+        app_path.write_text(json.dumps(identity))
         result = self.run_compiler()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('1 report sources bound; 3 objects written into the platform app', result.stdout)
@@ -630,11 +637,38 @@ class NativeReportSourceCompilerGate(unittest.TestCase):
         module = (self.generated / 'platform/PlatformModule.h').read_text()
         self.assertIn('Native & Fixture', module)
         self.assertIn('1.2.3.4', module)
+        self.assertIn('.minimumRuntime = "18.0"', module)
+        ordinary_module = self.generated / 'fixture/FixtureModule.h'
+        self.assertIn('.minimumRuntime = "16.0"', ordinary_module.read_text())
         arguments = [os.environ.get('CXX', 'clang++-19'), '-std=c++23', '-stdlib=libc++',
             '-Wall', '-Wextra', '-Wpedantic', '-Werror', '-fsyntax-only',
             f'-I{self.repository / "include"}', f'-I{self.generated / "platform"}']
-        arguments += [str(path) for path in sorted((self.generated / 'platform').rglob('*.cpp'))]
-        compiled = subprocess.run(arguments, text=True, capture_output=True, timeout=30)
+        sources = [str(path) for path in sorted((self.generated / 'platform').rglob('*.cpp'))]
+        compiled = subprocess.run(arguments + sources, text=True, capture_output=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        contract = ('#include "PlatformModule.h"\n#include "FixtureModule.h"\n'
+            'static_assert(agiru::app::Platform::kModule.minimumRuntime == "18.0");\n'
+            'static_assert(agiru::app::Fixture::kModule.minimumRuntime == "16.0");\n'
+            'static_assert(agiru::app::Platform::kModule.version == "1.2.3.4");\n'
+            'static_assert(agiru::app::Fixture::kModule.version == "1.0.0.0");\n')
+        consumer = arguments + [f'-I{self.generated / "fixture"}', '-x', 'c++', '-']
+        compiled = subprocess.run(consumer, input=contract, text=True, capture_output=True, timeout=30)
+        self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
+        native_module = self.generated / 'platform/PlatformModule.h'
+        control = module.replace('.minimumRuntime = "18.0"', '.minimumRuntime = "17.0"')
+        self.assertNotEqual(module, control)
+        native_module.write_text(control)
+        compiled = subprocess.run(consumer, input=contract, text=True, capture_output=True, timeout=30)
+        self.assertNotEqual(compiled.returncode, 0, 'wrong native runtime escaped the compiled contract')
+        self.assertIn('static assertion failed', compiled.stderr)
+        native_module.write_text(module)
+        self.manifest.write_text(original_manifest)
+        del identity['runtime']
+        app_path.write_text(json.dumps(identity))
+        result = self.run_compiler()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        omitted = contract.replace('"18.0"', '""').replace('"16.0"', '""')
+        compiled = subprocess.run(consumer, input=omitted, text=True, capture_output=True, timeout=30)
         self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
 
     def test_source_only_retains_layouts_without_claiming_emission(self):
@@ -644,8 +678,11 @@ class NativeReportSourceCompilerGate(unittest.TestCase):
         self.assertFalse(self.generated.exists())
 
     def test_missing_or_malformed_native_identity_refuses_before_output(self):
+        empty_runtime = self.manifest.read_text().replace('Version="1.2.3.4"',
+            'Version="1.2.3.4" Runtime=""')
         for text in (None, '<Package>', '<Package><App/></Package>',
-                     '<Package xmlns="http://schemas.microsoft.com/navx/2015/manifest"><App/></Package>'):
+                     '<Package xmlns="http://schemas.microsoft.com/navx/2015/manifest"><App/></Package>',
+                     empty_runtime):
             with self.subTest(text=text):
                 if text is None:
                     self.manifest.unlink()

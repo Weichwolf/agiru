@@ -30,6 +30,7 @@ struct NativeAppIdentity {
   std::string name;
   std::string publisher;
   std::string version;
+  std::string minimumRuntime{};
 };
 
 bool IsAppGuid(std::string_view value);

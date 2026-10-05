@@ -23,9 +23,10 @@ bool Named(const xmlNode &node, const char *name) {
          kNamespace == reinterpret_cast<const char *>(node.ns->href);
 }
 
-std::string Attribute(const xmlNode &node, const char *name) {
+std::string Attribute(const xmlNode &node, const char *name, bool required = true) {
   const std::unique_ptr<xmlChar, decltype(xmlFree)> value{
       xmlGetProp(&node, reinterpret_cast<const xmlChar *>(name)), xmlFree};
+  if (value == nullptr && !required) { return {}; }
   if (value == nullptr || *value == '\0') {
     throw std::runtime_error("System manifest lacks App attribute " + std::string(name));
   }
@@ -68,7 +69,8 @@ NativeAppIdentity ReadNativeIdentity(const std::filesystem::path &package) {
   NativeAppIdentity identity{.id = Attribute(app, "Id"),
                              .name = Attribute(app, "Name"),
                              .publisher = Attribute(app, "Publisher"),
-                             .version = Attribute(app, "Version")};
+                             .version = Attribute(app, "Version"),
+                             .minimumRuntime = Attribute(app, "Runtime", false)};
   if (!IsAppGuid(identity.id)) { throw std::runtime_error("System manifest has invalid App Id"); }
   return identity;
 }

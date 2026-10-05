@@ -5,6 +5,31 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 ## Evidence
 
+- App/native manifest readers and emitted `ModuleDef.minimumRuntime` now preserve
+  the explicit AL runtime separately from application version. Omission stays empty;
+  present empty/nonstring/duplicate JSON and empty XML declarations refuse.
+  `make tc` passes; GenTableGate retains all cases and passes 85 checks;
+  all eleven NativeReportSourceCompilerGate methods pass, including compiled
+  ordinary/native declarations and a wrong-runtime compile control.
+  Original System 29/Runtime 18 and BaseApp 30/no-runtime modules also compile
+  against separate runtime/version assertions. Receipts:
+  `/tmp/agiru-system-field-write.UYh59R/` and
+  `/tmp/agiru-native-report-layouts.Le25iF/`. Both readers pass targeted lint;
+  gate/Main analysis remains red on inherited BodyWriter and existing Main
+  complexity/size findings. Host selection, omitted-runtime default resolution,
+  runtime-string compatibility and complete implicit-profile activation remain open.
+
+- Original reflected writes are not a blanket readonly boundary. Ncl SHA256
+  `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
+  `NavFieldRef.set_ALValue` RVA 33c00 reaches `NavRecord.SetFieldValue` RVA 4b89c;
+  field index 0 reaches `SetRecordTimestamp` RVA 8ec8f and mutable buffer storage.
+  Nonzero writes reach `StoreFieldValue` RVA 910e0; neither chain checks Editable.
+  ValidateAsync RVA 296ce8 sets a value only when a new argument exists.
+  Static IL receipts in `/tmp/agiru-system-field-write.UYh59R/original-*.il`,
+  not executed original business/SQL or cross-version proof. Keep typed source
+  assignment, reflected buffer changes, UI Editable and persisted platform values
+  separate; do not invent a common FieldRef readonly ban from UI metadata.
+
 - `meta/SystemFields.h` now owns base identities and reserved/implicit predicates
   without typed record helpers. RecordRef's declared index excludes timestamp 0;
   132 checks retain all previous cases and exercise an authored ten-field Runtime-18
@@ -108,8 +133,8 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
    and shared typed/reflected calculation primitives. Keep timestamp/implicit fields
    out of declared FieldCount/index loops. Verify actual FieldName → virtual Field
    lookup → FieldRef.Value callers, not expected-name literals (predecessor 1114).
-   Preserve source minimum runtime separately from the host profile: `NativeSource.h`,
-   `NativeManifest.cpp`, `AppManifest.cpp` and `meta/ModuleDef.h` currently discard it.
+   Resolve the host profile and omitted-runtime compiler default separately from
+   the preserved source minimum runtime; never infer either from app version.
    Derive generator system-name recognition (`BodyWriter.cpp::IsSystemFieldName`)
    from the same profile instead of its separate six-name list.
    Extend the narrow `meta/SystemFields.h` identities into the complete versioned
@@ -118,10 +143,11 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
    `meta/Declare.h` consumer. Three no-PCH rounds measure standalone SystemFields
    474.6 ms versus Declare 1,825.6 ms; `/tmp/agiru-include-cost.veRnns/results.tsv`.
    Concurrent-host header measurements, not a production/build speedup claim.
-   Guard AL assignment and `FieldRef::SetValue`, not the common `SetFieldText`:
-   `Table.cpp::Store`/`CalcField` and SQL navigation also use that internal writer.
+   Qualify source-language assignment refusal and dynamic FieldRef buffer behaviour
+   independently against original callers. Do not gate `FieldRef::SetValue` by
+   Editable alone or change the internal `SetFieldText` used by Store/CalcField/SQL.
    Reuse the existing Lookup formula for current User names; prove changed/missing
-   users, calculated values and refused external writes through typed and reflected paths.
+   users, calculated values and the separately qualified typed/reflected write policies.
 3. Activate the shared default/key projection only with 0034/0058 proof. Complete unsupported default eligibility from platform evidence; never select a later field silently. Implement SqlIndex as separate SQL fields, not SetCurrentKey fields; keep its refusal until supported. Enforce Unique, MaintainSqlIndex, IncludedFields, Enabled, AutoIncrement and SqlTimestamp restrictions. No SQL Server physical-clustering promise for PostgreSQL.
 4. Return platform-owned fields from writes and preserve identity on Rename. Coordinate version checks with 0012 and company-qualified sequences with its company work.
 5. Use typed generated metadata for constraints and migration comparisons; never infer a field number from display order.
@@ -144,7 +170,15 @@ this repair leaves those bounds unchanged. Receipts:
 
 Code: `src/rt/Storage.cpp`, `src/gen/TableWriter.cpp`, `include/meta/TableDef.h`.
 
-Base field declarations: `include/meta/Declare.h::SystemFieldNumbers`, `test/gate/PlatformSystemFieldsGate.cpp`, `test/transpiler/native-bindings.sh`; developer `ff5939a46e`, `devenv-table-system-fields.md` separates the five base fields from Runtime-18's additional Normal/Temporary FlowFields. Typed-member/metadata availability does not prove SQL audit generation or provider contents.
+Base field declarations: `include/meta/SystemFields.h::SystemFieldNumbers`, `test/gate/PlatformSystemFieldsGate.cpp`, `test/transpiler/native-bindings.sh`; developer `ff5939a46e`, `devenv-table-system-fields.md` separates the five base fields from Runtime-18's additional Normal/Temporary FlowFields. Typed-member/metadata availability does not prove SQL audit generation or provider contents.
+
+Runtime selection/write boundaries: developer `ff5939a46e`,
+`devenv-{choosing-runtime,json-files,table-system-fields}.md`,
+`properties/devenv-editable-property.md`,
+`methods-auto/fieldref/fieldref-{value,validate}-method.md`;
+BCApps `bb7111877f`, `Layers/W1/BaseApp/app.json`; original System
+`NavxManifest.xml` Runtime 18.0. Predecessor 1150 requires local/global/var
+resolution before system-name recognition; 867/967 separate UI and AL writes.
 
 Implicit profile: developer `ff5939a46e`, `methods-auto/recordref/recordref-{fieldcount,fieldindex}-method.md`;
 BCApps `bb7111877f`, `Layers/W1/BaseApp/Modules/System/ApplicationArea/ApplicationAreaMgmt.Codeunit.al`
