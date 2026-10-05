@@ -5,6 +5,22 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- InStream cursor increment: bound wrappers share a private cursor state; default
+  wrappers allocate nothing. Copies/by-value calls share reads/reset; CreateInStream
+  creates a fresh target and rebinding changes only its wrapper. StreamGate retains
+  its original 51 checks and adds 22: 73 green; preceding runtime has 16 failures.
+  Production-generated AL: 12 green. Read-local/reset-local compiled controls fail
+  both C++ (16/6 failures) and AL (5/3). `/tmp/agiru-stream-alias.hjKWK3`,
+  `/tmp/agiru-streams.QdtX0X`; input hashes match. All local gate consumers rebuild;
+  Base64Gate 79 and XmlReaderGate 220 remain green. Source/gate have no own analysis
+  findings; 25/47 inherited header findings remain (lint exits 2), AL runner lint
+  passes. Stream.h standalone frontend cost: before 1,124 ms, after 1,118 ms, three
+  no-PCH rounds each under concurrent UT load; no build-speed or scale claim.
+  Outside frozen 015114; full local/AL replay pending. BLOB/provider ownership,
+  nonseekable/BigInteger positions, encoding/line handling and Native activation
+  remain open. Authority: native stream-copy receipt below; developer
+  `methods-auto/instream/{instream-position,instream-resetposition}-method.md`;
+  original AL stream/by-value usage and predecessor 1045/1658 preserve argument modes.
 - Ignore header/closing increment: require whitespace after DOCTYPE and external-ID
   keywords, a nonempty name token, quoted SYSTEM/PUBLIC literals and the closing
   `>` after the internal subset. Do not interpret declarations inside that subset.
@@ -47,9 +63,9 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 - Stream-copy authority (2026-10-05): original Ncl 29.0.54011.55407
   `NavInStream.ALByValue` creates a distinct wrapper, then ALAssign/Assign retain
   the same SharedNavStream target. Position belongs to that target; ALPosition
-  adds one (or returns -1 for nonseekable input). Current `Stream.h` copies its
-  scalar position independently and borrows Blob through a raw pointer. Qualify
-  alias/owner lifetime before activating Native stream overloads; do not change
+  adds one (or returns -1 for nonseekable input). The preceding `Stream.h` copied its
+  scalar position independently; the increment above fixes that, but still borrows
+  Blob through a raw pointer. Qualify owner lifetime before Native activation; do not change
   their source by-value signatures to var. Static IL only, no native execution
   or UT gain; keep System 29.0.55365.0 separate. Receipts/hashes:
   `/tmp/agiru-stream-alias-authority.eE5zod/{receipt.json,stream-alias.il,inputs.sha256}`.
@@ -179,9 +195,9 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
    Chart: close the original consumer's declared link dependencies under the LLVM stack; execute its twelve retained checks and the original AL numeric conversions. Keep BusinessChartBuilder refusals and all missing checks counted; establish CLR enum Format behaviour separately. Primitive gates alone are not chart workflow proof.
    Feed the resulting exact typed series/dimensions into one shared chart model: C++ vector scenes for PDF/SVG (0063), interactive selection/drilldown through the common CLI/web command contract (0720). Preserve all declared chart kinds and events; neither a static image nor an empty builder closes the chart requirement.
 3. Reproduce or refute XML stream lifetime paths with focused ASan/UBSan cases. Keep shared engines behind AL and .NET-specific public contracts; gate identity/copying, disposal, out parameters, null, encoding and exception differences. Delegate JSON node/number representation to 0722.
-   AL streams: `Stream.h`/`Stream.cpp` need separately owned handles over shared
-   cursor/provider state, not copied scalar positions. Prove assignment/by-value
-   calls, resets, rebinding independence and escaped BLOB/codeunit owner lifetimes
+   AL streams: retain the qualified shared cursor and wrapper-local rebinding;
+   replace borrowed BLOB providers with owned lifetime-safe state. Prove escaped
+   BLOB/codeunit owner lifetimes, independent BLOB values and assignment/replacement
    through StreamGate and generated AL before Native Base64 activation (0034).
    Preserve one-based BigInteger Position and nonseekable refusal/results; do not
    borrow a dead owner or transplant the native session/tree implementation.

@@ -15,6 +15,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Shared InStream cursor (0035): 73 C++ checks green, preceding runtime 16 red;
+  12 production-generated AL checks green. Read/reset cursor controls fail both
+  consumers (C++ 16/6 red; AL 5/3). All gate consumers rebuilt; Base64 79 and XML
+  reader 220 remain green. `/tmp/agiru-stream-alias.hjKWK3`,
+  `/tmp/agiru-streams.QdtX0X`, hashes match. No own analysis findings; 25/47 inherited
+  source/gate header findings remain (lint exits 2); AL runner lint passes.
+  Outside frozen 015114; full replay pending. BLOB/provider ownership, positions,
+  encoding/line handling and Native stream activation remain open.
 - XML Ignore header/closing fix (0035): 220 checks green; preceding runtime has
   53 failures on the same expanded gate. Seven compiled controls reject (header
   bypass: 79 failures); fixture-resource tripwire remains qualified. Input hashes
@@ -24,8 +32,9 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   encodings, whitespace/error states and Parse/resolver authority remain open.
 - XML integration is live: `20261005T015114Z-3424473`, frozen HEAD `3f6715e`,
   source `5868281d053a1fc2e797530f440b93f85a8ed23d9afb6c586225de0c19c0e193`;
-  `slice-check all test ut`, six jobs. Runner 3426036 is confirmed live; local
-  tests are executing. BC/source/System/original-notice hashes match 004617.
+  `slice-check all test ut`, six jobs. Runner 3426036 is confirmed live;
+  slice/build/local tests pass (141 cases/232 tooling tests), full AL UT runs
+  against disposable clones. BC/source/System/original-notice hashes match 004617.
   Compare every UT identity and error against its 2,170/2,314 result at completion;
   a live run is not a completed verification.
 - First XML DTD-policy increment (0035): 134 XmlReaderGate checks green; unfiltered

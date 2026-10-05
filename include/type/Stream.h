@@ -8,6 +8,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -156,6 +157,9 @@ private:
 };
 
 /// \brief AL `InStream` -- what a BLOB is read through.
+/// \note Copies and by-value calls share a cursor. CreateInStream binds a fresh cursor;
+///       rebinding one wrapper leaves existing aliases on their original target.
+/// \warning The BLOB must still outlive its streams; provider ownership remains unqualified.
 class InStream {
 public:
   /// \brief A stream bound to nothing yet.
@@ -169,7 +173,7 @@ public:
 
   /// \brief A stream that reads from a BLOB.
   /// \param from The BLOB.
-  explicit InStream(const Blob &from) : blob_(&from) {}
+  explicit InStream(const Blob &from);
 
   /// \brief AL `InStream.EOS()`.
   /// \return True when nothing is left to read.
@@ -181,13 +185,10 @@ public:
 
   /// \brief AL `InStream.Position()`.
   /// \return How far into the stream the next read starts, counting from one as AL counts.
-  [[nodiscard]] Integer Position() const { return static_cast<Integer>(position_) + 1; }
+  [[nodiscard]] Integer Position() const;
 
   /// \brief AL `InStream.ResetPosition()` -- starts again from the beginning.
-  ::agiru::Boolean ResetPosition() {
-    position_ = 0;
-    return true;
-  }
+  ::agiru::Boolean ResetPosition();
 
   /// \brief AL `InStream.ReadText(var Text [, Length])`.
   ///
@@ -254,8 +255,8 @@ private:
 
   [[noreturn]] static void RefuseTyped();
 
-  const Blob *blob_ = nullptr;
-  std::size_t position_ = 0;
+  struct State;
+  std::shared_ptr<State> state_;
 };
 
 }

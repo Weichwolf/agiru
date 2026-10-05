@@ -189,6 +189,50 @@ void WritesPreserveBorrowedSelfInput() {
   CHECK_TRUE("even empty writes require a bound source", refused);
 }
 
+std::string ReadByValue(InStream input, agiru::Integer count) {
+  return input.ReadBytes(count);
+}
+
+void InputAliasesShareOneCursorButNewBindingsAreIndependent() {
+  constexpr std::size_t kInputLength = 7;
+  constexpr agiru::Integer kAfterTextRead = 6;
+  constexpr agiru::Integer kAfterByValueRead = 7;
+  Blob blob;
+  auto output = blob.CreateOutStream();
+  static_cast<void>(output.WriteBytes(std::string_view("ab\0cdef", kInputLength)));
+  auto input = blob.CreateInStream();
+  auto alias = input;
+  CHECK_TEXT("an alias consumes raw bytes", alias.ReadBytes(1), "a");
+  CHECK_TRUE("raw reads advance the original cursor", input.Position() == 2);
+  agiru::Text<0> text;
+  CHECK_TRUE("terminated reads consume the shared terminator", input.Read(text) == 2);
+  CHECK_TEXT("terminated reads start at the shared cursor", text.Value(), "b");
+  CHECK_TRUE("terminated reads advance every alias", alias.Position() == 4);
+  CHECK_TRUE("text reads start at the shared cursor", alias.ReadText(text, 2) == 2);
+  CHECK_TEXT("text reads retain the exact next bytes", text.Value(), "cd");
+  CHECK_TRUE("text reads advance the original", input.Position() == kAfterTextRead);
+  CHECK_TEXT("by-value calls consume the same target", ReadByValue(input, 1), "e");
+  CHECK_TRUE("by-value reads advance every alias", alias.Position() == kAfterByValueRead);
+  CHECK_TEXT("the original sees the by-value call's remaining bytes", input.ReadBytes(1), "f");
+  CHECK_TRUE("EOF is shared by aliases", input.EOS() && alias.EOS());
+  CHECK_TRUE("reset succeeds on the bound target", alias.ResetPosition());
+  CHECK_TRUE("reset changes every alias", input.Position() == 1 && !input.EOS());
+  auto independent = blob.CreateInStream();
+  CHECK_TEXT("a fresh binding starts at the beginning", independent.ReadBytes(1), "a");
+  CHECK_TRUE("a fresh binding has a separate cursor", input.Position() == 1);
+  Blob replacement;
+  static_cast<void>(replacement.CreateOutStream().WriteBytes("new"));
+  blob.CreateInStream(alias);
+  CHECK_TEXT("rebinding one wrapper creates a new cursor", alias.ReadBytes(1), "a");
+  CHECK_TRUE("rebinding does not mutate the old shared target", input.Position() == 1);
+  alias = replacement.CreateInStream();
+  CHECK_TEXT("reassignment selects the new source", alias.ReadBytes(3), "new");
+  CHECK_TEXT("reassignment preserves the old target", input.ReadBytes(1), "a");
+  independent = input;
+  CHECK_TEXT("assignment binds to the existing cursor", independent.ReadBytes(1), "b");
+  CHECK_TRUE("assigned wrappers advance the existing target", input.Position() == 3);
+}
+
 /// A NOTE ON A RECORD LINK IS A .NET STRING: `BinaryWriter.Write(string)` puts a 7-bit length
 /// prefix before the UTF-8 bytes and `BinaryReader.ReadString` takes it off again, which is how
 /// `Record Link Management` writes and reads a note (board:0645). The constructor is spelled the
@@ -241,6 +285,7 @@ int main() {
     WritesRetainStorageAndExactBytes();
     SmallWritesGrowAmortizedStorage();
     WritesPreserveBorrowedSelfInput();
+    InputAliasesShareOneCursorButNewBindingsAreIndependent();
     ABinaryWriterAndReaderRoundTripANote();
   });
 }
