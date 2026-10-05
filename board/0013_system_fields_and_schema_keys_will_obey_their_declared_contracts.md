@@ -1,6 +1,6 @@
 # 0013 — Complete implicit fields and schema/key metadata
 
-Status: in progress | Priority: P0
+Status: queued | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: restore Integer series navigation with qualified implicit-field values;

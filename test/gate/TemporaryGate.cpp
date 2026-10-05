@@ -3,6 +3,7 @@
 #include "runtime/RecordRef.h"
 #include "runtime/Session.h"
 #include "runtime/Table.h"
+#include "type/AlArray.h"
 #include "type/Decimal.h"
 #include "type/Integer.h"
 #include "type/Variant.h"
@@ -25,6 +26,68 @@ using ResourceCostType = agiru::options::OptionResourceGroupResourceAll;
 namespace {
 
 constexpr agiru::Integer kTens = 10;
+
+void TemporaryArrayElementsShareRowsNotViews() {
+  agiru::AlArray<Temporary<LineNumberBuffer>, 2> rows;
+  auto &first = rows[1];
+  auto &second = rows[2];
+  first.OldLineNumber = 1;
+  first.NewLineNumber = kTens;
+  first.Insert();
+  CHECK_TRUE("temporary array elements share inserted rows", second.Count() == 1);
+  CHECK_TRUE("temporary array elements retain independent field buffers",
+             second.OldLineNumber == 0);
+  second.OldLineNumber = 2;
+  second.NewLineNumber = 2 * kTens;
+  second.Insert();
+  CHECK_TRUE("temporary array writes are visible in both directions", first.Count() == 2);
+  first.SetRange(first.OldLineNumber, 1);
+  second.SetRange(second.OldLineNumber, 2);
+  CHECK_TRUE("temporary array filters are independent", first.Count() == 1 && second.Count() == 1);
+  CHECK_TRUE("temporary array Get sees shared rows despite different filters", second.Get(1));
+  CHECK_TRUE("temporary array Get preserves the selected filter", second.Count() == 1);
+  second.NewLineNumber = 3 * kTens;
+  if (second.Modify()) {
+    CHECK_TRUE("temporary array modifications reach the other view",
+               first.Get(1) && first.NewLineNumber == 3 * kTens);
+  } else {
+    CHECK_TRUE("temporary array modification finds the shared row", false);
+  }
+  agiru::AlArray<Temporary<LineNumberBuffer>, 2> separate;
+  CHECK_TRUE("different temporary arrays never share rows",
+             separate[1].Count() == 0 && separate[2].Count() == 0);
+  first.Reset();
+  first.DeleteAll();
+  second.Reset();
+  CHECK_TRUE("temporary array deletion reaches every view", second.Count() == 0);
+}
+
+void MultidimensionalTemporaryArraysShareOneTable() {
+  agiru::AlArray<agiru::AlArray<Temporary<LineNumberBuffer>, 2>, 2> rows;
+  rows[1][1].OldLineNumber = 1;
+  rows[1][1].Insert();
+  CHECK_TRUE("temporary array sharing crosses dimension boundaries",
+             rows[1][2].Count() == 1 && rows[2][1].Count() == 1 && rows[2][2].Count() == 1);
+  rows[2][2].OldLineNumber = 2;
+  rows[2][2].Insert();
+  CHECK_TRUE("multidimensional temporary writes reach the first element", rows[1][1].Count() == 2);
+  rows[2][1].DeleteAll();
+  CHECK_TRUE("multidimensional temporary deletion reaches all elements",
+             rows[1][1].Count() == 0 && rows[1][2].Count() == 0 && rows[2][2].Count() == 0);
+}
+
+void OrdinaryArrayElementsRemainIndependent() {
+  agiru::AlArray<LineNumberBuffer, 2> rows;
+  rows[1].OldLineNumber = 1;
+  rows[1].SetRange(rows[1].OldLineNumber, 1);
+  CHECK_TRUE("ordinary record arrays retain independent fields and filters",
+             rows[2].OldLineNumber == 0 && !rows[2].HasFilter());
+  CHECK_TRUE("ordinary record arrays do not become temporary",
+             !rows[1].IsTemporary() && !rows[2].IsTemporary());
+  agiru::AlArray<agiru::Integer, 2> values;
+  values[1] = 1;
+  CHECK_TRUE("scalar array values remain independent", values[2] == 0);
+}
 
 Temporary<LineNumberBuffer> With(const std::vector<agiru::Integer> &numbers) {
   Temporary<LineNumberBuffer> buffer;
@@ -450,6 +513,9 @@ void RowsAddedByABorrowerAreTheOwnersRows() {
 
 int main() {
   return gate::Run("Temporary", [] {
+    TemporaryArrayElementsShareRowsNotViews();
+    MultidimensionalTemporaryArraysShareOneTable();
+    OrdinaryArrayElementsRemainIndependent();
     RowsAddedByABorrowerAreTheOwnersRows();
     SharedThroughAnInstanceAndByValue();
     SharedFromAGlobalMadeInTheCall();

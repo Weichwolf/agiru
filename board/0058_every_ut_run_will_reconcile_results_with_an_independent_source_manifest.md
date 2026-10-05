@@ -8,11 +8,15 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Current frozen replay: `9dca232` / content `fde18ee95496`, slice check and
-  complete slice build pass. Local test remains red: the native-codeunit qualifier
-  lacks a public-header include and three tooling checks have stale fixtures.
-  Its 2,314-method/eighty-codeunit AL run is underway; no final result yet.
-  These inputs do not contain the later native Runtime-18 migration or API repairs.
+- Latest completed frozen replay: `9dca232` / content `fde18ee95496`, slice check
+  and complete slice build pass. Local test remains red: the native-codeunit
+  qualifier lacks a public-header include and three tooling checks have stale fixtures.
+  AL execution: 2173/2314 passed, 141 failed, eighty codeunits, zero incomplete
+  or duplicates (1719 seconds, six workers). Source manifest and result identities
+  match; every identity/status/error matches the preceding `d3e767` replay.
+  Canonical result hash: `b754b24c37ece93879414fdfc8061754d6238a5d1c2daf6d2c746334f6b4a358`.
+  These inputs do not contain the later native Runtime-18 migration, API repairs
+  or shared temporary-array storage fix. They are not current-tree G1 proof.
 - Current tree: `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling
   tests. Discovery independently includes system-profile.sh and refuses each missing
   script/binary without shrinking totals. Attribute-census positives use legal Normal
@@ -32,7 +36,7 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   not `b9f35e9` materialization/current User lookups, `5a4c3be` source-write refusal
   or subsequent rowversion allocation/SQL integration.
 - Last measured AL failure concentrations: 48 Table Metadata provider refusals, thirteen
-  incoming-document conversion assertions, four Inventory Profile missing-key paths
+  incoming-document conversion assertions, four Inventory Profile missing temporary rows
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.
 - Raw census: 36,883 AL files, 36,792 objects, 4,171 test codeunits,
   113,111 methods; fifteen approved exclusions leave 113,096 required.

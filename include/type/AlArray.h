@@ -32,6 +32,28 @@ namespace agiru {
 ///       dimension in the type, C++ sees one member declared twice.
 template <typename T, std::size_t N> class AlArray;
 
+namespace detail {
+
+/// \brief Shares rows between temporary record array elements without joining their views.
+template <typename T> void ShareArrayRows(T &into, const T &from) {
+  if constexpr (requires {
+                  T::kId;
+                  into.IsTemporary();
+                  from.IsTemporary();
+                  into.Copy(from, true);
+                }) {
+    if (into.IsTemporary() && from.IsTemporary()) { into.Copy(from, true); }
+  }
+}
+
+/// \brief Every dimension of one temporary record array references the same table.
+template <typename T, std::size_t N>
+void ShareArrayRows(AlArray<T, N> &into, const AlArray<T, N> &from) {
+  for (Integer item = 1; item <= into.Length(); ++item) { ShareArrayRows(into[item], from[1]); }
+}
+
+}
+
 /// \brief AL's array as a `var` PARAMETER sees it -- the elements and how many, without the size
 ///        in the type.
 ///
@@ -167,8 +189,12 @@ private:
 
 template <typename T, std::size_t N> class AlArray : public AlArray<T, 0> {
 public:
-  /// \brief An array of the declared size, empty.
-  AlArray() : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {}
+  /// \brief An array of the declared size, empty, with independent element buffers.
+  /// \note Temporary record elements share one table across all dimensions, as specified
+  ///       by `methods/devenv-array-methods.md`; distinct arrays retain distinct tables.
+  AlArray() : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
+    for (std::size_t item = 1; item < N; ++item) { detail::ShareArrayRows(held_[item], held_[0]); }
+  }
 
   /// \brief A copy, pointing at ITS OWN storage.
   /// \param other The array copied.

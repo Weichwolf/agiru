@@ -14,6 +14,10 @@ dynamic="$B/gate_DynamicRecordGate"
 "$dynamic" > "$proof/dynamic.log" 2>&1
 rename="$B/gate_RenameGate"
 "$rename" > "$proof/rename.log" 2>&1
+temporary="$B/gate_TemporaryGate"
+"$temporary" > "$proof/temporary.log" 2>&1
+array="$B/gate_AlArrayGate"
+"$array" > "$proof/array.log" 2>&1
 fetch_block=$(sed -n 's/^inline constexpr std::size_t kFetchBlock = \([0-9]*\);$/\1/p' src/rt/Cursor.h)
 [[ "$fetch_block" =~ ^[1-9][0-9]*$ ]]
 bounded_walks() {
@@ -234,12 +238,39 @@ fi
 rg -q 'FAIL .*every referring row follows the renamed key' "$proof/$control.log"
 sha256sum "$proof/$control.cpp" "$proof/$control.so" >> "$proof/controls.sha256"
 rm -- "$proof/$control.cpp" "$proof/$control.so"
+control=temporary-array-store
+mkdir -p "$proof/$control/type"
+awk '
+  /if \(into.IsTemporary\(\) && from.IsTemporary\(\)\) \{ into.Copy\(from, true\); \}/ {
+    print "    static_cast<void>(into); static_cast<void>(from);"; changed++; next
+  }
+  { print }
+  END { if (changed != 1) exit 2 }
+' include/type/AlArray.h > "$proof/$control/type/AlArray.h"
+"$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+  --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19 \
+  "-DAGIRU_TEST_DSN=\"$dsn\"" -I"$proof/$control" -Iinclude -Isrc/rt \
+  -Itest/transpiler/golden test/gate/TemporaryGate.cpp \
+  "$image/LineNumberBuffer.cpp.o" "$image/ResourceCost.cpp.o" \
+  "$image/ResourceCost.def.cpp.o" "$image/TransferOldExtTextLines.cpp.o" \
+  "$image/WorkType.cpp.o" "$image/WorkType.def.cpp.o" \
+  -L"$B" -Wl,-rpath,"$B" -lagiru_gen -lagiru_rt -lagiru_al -lagiru_net -lagiru_db \
+  -o "$proof/$control-gate"
+if "$proof/$control-gate" > "$proof/$control.log" 2>&1; then
+  printf 'record-order: separate element stores escaped the temporary array gate\n' >&2
+  exit 1
+fi
+rg -q 'FAIL .*temporary array elements share inserted rows' "$proof/$control.log"
+sha256sum "$proof/$control/type/AlArray.h" "$proof/$control-gate" >> "$proof/controls.sha256"
+rm -- "$proof/$control/type/AlArray.h" "$proof/$control-gate"
+rmdir "$proof/$control/type" "$proof/$control"
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   src/rt/Cursor.h src/rt/Cursor.cpp \
   src/rt/RecordChanges.h src/rt/RecordChanges.cpp src/rt/SessionState.h src/rt/Storage.cpp \
   src/rt/Selection.cpp src/rt/Temporary.cpp src/rt/RecordState.cpp \
-  include/runtime/RecordState.h include/runtime/Table.h \
+  include/runtime/RecordState.h include/runtime/Table.h include/type/AlArray.h \
   test/gate/MixedOrderGate.cpp test/gate/SelectionChangeGate.cpp test/gate/CursorLifecycleGate.cpp \
   test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
-  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle, dynamic writes and rename cascades pass; twenty-three controls reject; %s\n' "$proof"
+  test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp \
+  "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" > "$proof/inputs.sha256"
+printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades and temporary arrays pass; twenty-four controls reject; %s\n' "$proof"

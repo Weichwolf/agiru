@@ -1,9 +1,10 @@
 # 0044 — Share correct records and live metadata providers
 
-Status: queued | Priority: P0
+Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: implement Field Get/Find/Next/Count over installed metadata and prove the
+Next: remove the false noexcept contract on copying AlArray moves and qualify
+throwing elements; then implement installed Field Get/Find/Next/Count and the
 actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
 
 ## Implementation
@@ -78,6 +79,21 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 ## Acceptance
 
+- Temporary record arrays now share one row store across dimensions, not their
+  field buffers or filters; distinct arrays and ordinary/scalar elements stay
+  independent. `TemporaryGate` passes 95 checks and `AlArrayGate` fourteen.
+  `make record-order JOBS=2` retains all prior controls and adds a compiled
+  separate-store mutant: all twenty-four reject. `include/type/AlArray.h` adds no
+  include and passes standalone `make include-cost HEADERS=type/AlArray.h`.
+  Developer `f928288ee840`: `methods/devenv-array-methods.md` explicitly specifies
+  shared temporary array rows; record-copy/get preserve views and primary-key lookup.
+  BCApps `d99152ee35f0`: InventoryProfileOffsetting.CalculatePlanFromWorksheet
+  populates element one and passes both views to planning. Predecessor board 1079
+  identifies the same storage boundary. The older frozen replay still has all four
+  SCMPlanningUT missing temporary row `3` failures; this repair needs full AL replay.
+  Focused tidy remains red: twelve existing TemporaryGate/header findings and
+  fifteen AlArrayGate/header findings, including copying moves declared noexcept.
+  No new helper/test finding, suppression or baseline increase; full tidy is open.
 - Record boxes expose borrowing accessors, not writable ownership/table/identity slots.
   `RecordRefGate` qualifies independent snapshots, typed writes, SetTable and clearing
   one copied slot, plus state self-assignment versus explicit Copy; 147 checks pass.
