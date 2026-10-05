@@ -3322,7 +3322,7 @@ class MilestoneGate(unittest.TestCase):
         self.ninja.chmod(0o755)
         self.env = dict(os.environ, AGIRU_BC_SOURCE=str(self.root / 'al'),
                         PATH=str(self.root / 'build') + os.pathsep + os.environ['PATH'])
-        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES'):
+        for name in ('MAKEFLAGS', 'MFLAGS', 'MAKEOVERRIDES', 'B', 'UT_LOG'):
             self.env.pop(name, None)
         self.command = ['sh', str(self.root / 'scripts/ut-milestone.sh'),
                         str(self.root / 'build/ut.log'), '1']
@@ -3455,11 +3455,16 @@ esac
         self.assert_preflight_population(result, 'build exited 19')
 
     def test_parent_make_output_directory_cannot_relocate_fixture_evidence(self):
-        with patch.dict(os.environ, {'MAKEFLAGS': '-- B=parent-build'}):
+        parent_build = self.root / 'parent-build'
+        parent_log = self.root / 'parent-ut.log'
+        with patch.dict(os.environ, {'MAKEFLAGS': f'-- B={parent_build}',
+                                    'B': str(parent_build), 'UT_LOG': str(parent_log)}):
             fixture = MilestoneGate('test_failed_build_keeps_the_source_population')
             self.addCleanup(fixture.doCleanups)
             fixture.setUp()
             fixture.test_failed_build_keeps_the_source_population()
+        self.assertFalse(parent_build.exists(), 'fixture wrote into the parent build')
+        self.assertFalse(parent_log.exists(), 'fixture wrote into the parent UT log')
 
     def test_successful_build_runs_the_same_source_population(self):
         self.runner_output('2 of 2 passed')

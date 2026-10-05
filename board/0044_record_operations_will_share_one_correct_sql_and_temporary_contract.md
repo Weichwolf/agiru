@@ -54,8 +54,11 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
   infrastructure errors. All identities/statuses/errors/source hashes match
   the preceding full replay: zero gains/losses/missing/added/duplicates.
   `/tmp/agiru-native-defaults-integration.0S8HWX/{result,ut-comparison}.json`.
-  Null/unsealed seed is diagnostic, not causal A/B/G1. Fix fixture output
-  isolation and shared effective field length before the next integration.
+  Null/unsealed seed is diagnostic, not causal A/B/G1. Fixture output isolation
+  now strips parent B/UT_LOG: the strengthened existing case fails before the
+  repair, thirteen overridden cases and all 233 tooling cases pass afterward.
+  No parent log is created. Whole Make regression needs a new replay; shared
+  effective field length is next before integration.
 
 - Complete UT replays through `cd61d73` retain 48 Table Metadata provider
   refusals, unchanged against the preceding full population; 2,173/2,314 pass,

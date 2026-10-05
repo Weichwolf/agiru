@@ -49,8 +49,14 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   baseline: zero gains/losses/missing/added/duplicates. Null/unsealed seed remains
   diagnostic, not causal A/B/G1. Receipts:
   `/tmp/agiru-native-defaults-integration.0S8HWX/{result,interim-verification}.json`.
-  `ut-comparison.json` retains the exact comparison. Next: fixture output isolation,
-  shared effective field length, then complete native profile/live provider.
+  `ut-comparison.json` retains the exact comparison. Tooling isolation is now
+  repaired: MilestoneGate strips parent B/UT_LOG as well as Make override flags.
+  Its strengthened existing control fails before the repair; afterward all thirteen
+  cases pass with parent output overrides and all 233 tooling cases pass with a
+  parent UT_LOG. No parent log is created and no test identity is dropped.
+  `tooling-isolation-{negative,positive,full}.log` retain the receipts. Whole Make
+  regression still needs a fresh replay. Next: shared effective field length,
+  then complete native profile/live provider.
 
 - Native implicit fields (0013/0044): original logical getters execute twice over
   all 234 tables/2,340 implicit fields, zero refused; raw identity sets and bytes
