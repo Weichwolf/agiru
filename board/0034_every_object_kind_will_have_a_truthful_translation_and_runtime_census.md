@@ -142,40 +142,37 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
   are independently qualified in 0035; unknown pages now refuse. Other codepages
   and locale defaults remain gaps. Run all thirteen original tests and compare
   the unchanged full 2,314 UT population. No UT gain/performance/WASM claim.
-- Native stream qualification: raw/selected codeunit population is 35/35, none
-  excluded; all declarations are emitted, but primitives remain unbound. Original BC29 output branches use
-  raw writes with no BOM/terminator/output transcoding. `ConvertBuffer` retains a
-  76-character line counter across chunks and inserts CRLF before the next block.
-  Important counterexample: stream-to-text encoding calls `NavStream.GetBytes(true)`;
-  its parameter is `ignoreCurrentPosition`. Memory buffers supply their whole
-  content without moving the cursor; the seekable fallback resets/restores it.
-  Do not assume every overload consumes only the current suffix. The block branch
-  does consume the cursor, subject to its runtime transform capability predicate.
-  Ncl references System.Security.Cryptography 10.0.0.0. With CLR implementation
-  absent locally, upstream `dotnet/runtime` v10.0.0
-  [Base64Transforms.cs](https://github.com/dotnet/runtime/blob/v10.0.0/src/libraries/System.Security.Cryptography/src/System/Security/Cryptography/Base64Transforms.cs)
-  confirms both transforms support multiple blocks; historical Framework behaviour
-  is not this contract. This qualifies branch eligibility, not the deployed CLR
-  binary or native execution. Retain boundary/cursor/alias tests around the native
-  instance's buffer threshold; never replace the two branches with one rule.
-  Actual original converter construction on CLR 10.0.12 confirms the default
-  threshold is 10,485,760 bytes; `/tmp/agiru-base64-reference.stream-contracts.txt`.
-  Direct stream execution remains unqualified: `NavStream.get_Target` needs a real
-  session/company shared-object container, not a sessionless mock owner. The original
-  Apps dependency is now available for further temporary qualification (SHA256
-  `ac30b9e1e560fd3ebdbffc14583b0e8794452f02364f6a9a04729a43e36db0f3`);
-  `/tmp/agiru-base64-reference.{fetch-apps.log,stream-root.il}`. No synthetic target
-  was injected to turn the refused fixture into an original native execution claim.
-  Small stream decoding uses a BOM-detecting, leave-open reader. Native methods'
-  CLR stream reference identity needs separate C++ cursor-alias qualification;
-  AL parameters lack an explicit var modifier. Static source/IL inspection only,
-  not original native execution or an implemented provider:
-  `/tmp/agiru-native-base64-streams.a3h7rs/{receipt.json,inputs-and-results.sha256}`.
-  Declaration/index/output proof above closes source loading and empty-success
-  generation, not a primitive binding or native business execution.
-  Next bind all nine overloads and execute the thirteen original tests plus
-  cursor/encoding/binary/76-column/error controls. Local Native attribute docs
-  `ff5939a46e` describe native codeunit methods, not stream-state guarantees.
+- Native stream contracts: 35/35 codeunits emitted, five text signatures bound;
+  four stream signatures remain refusals. Original BC29 uses raw output without
+  BOM/terminator/transcoding; whole-buffer encoding preserves the shared cursor,
+  while block conversion consumes it. Default threshold: 10,485,760;
+  `/tmp/agiru-base64-reference.stream-contracts.txt`. Actual CLR transforms support
+  multiple blocks; kernel execution is qualified above, not original stream/session
+  execution. `NavStream.get_Target` requires a real session/company shared-object
+  container; no synthetic target was injected. Original IL/hashes:
+  `/tmp/agiru-native-base64-streams.a3h7rs/{receipt.json,inputs-and-results.sha256}`;
+  original Apps DLL SHA256 `ac30b9e1e560fd3ebdbffc14583b0e8794452f02364f6a9a04729a43e36db0f3`.
+
+  | Overload | Branch selector | Small path | Large path |
+  | --- | --- | --- | --- |
+  | InStream → encoded Text | No threshold | Whole buffer, preserve cursor | Same |
+  | InStream → encoded OutStream | Remaining bytes | Whole buffer, preserve cursor | Raw blocks, consume cursor |
+  | InStream → decoded Text | Total byte length | BOM reader from cursor → Convert → UTF8 | Raw transform from cursor → UTF8 |
+  | InStream → decoded OutStream | Remaining bytes | BOM reader from cursor → Convert | Raw transform from cursor |
+  | Text → encoded OutStream | UTF16 character count | Strict encoding option → Convert | GetEncoding fallback → raw blocks |
+  | Text → decoded OutStream | UTF16 character count | Convert | Transform |
+
+- Small-decoder dependency proof: original reader arguments `(null, true, -1,
+  true)` are measured on CLR 10.0.12: 1,429 distinct cases/2,858 executions,
+  zero closed streams. Disabling encoding autodetection changes 469 cases;
+  UTF8 preamble stripping is independent of that flag. Full-block reads detect
+  UTF8/UTF16/UTF32 LE/BE at the current cursor; 126 groups change decoded characters
+  under short reads. `/tmp/agiru-native-base64-reader.Vox0Bd/receipt.json`.
+  Authored seekable stream and char-array async overload, not original Native AL
+  or its Memory/session-cancellation overload. Qualify each production adapter;
+  this is no activation, diagnostic/cancellation contract or UT gain. Local Native
+  attribute docs `ff5939a46e` do not supply stream-state guarantees. Run all thirteen
+  original AL tests and compare all 2,314 UT after binding.
 - Selected native ASTs now supply `Database::` constants without generating a
   table class/provider. Codeunit/table/page/report execution: 13 checks; primitive
   native-binding/parser gates: 154/139 checks. Source-ID mutation fails eight
