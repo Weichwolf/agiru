@@ -85,6 +85,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   queued. All 25,285 compiler inputs are frozen (manifest SHA256
   `05b5e649890236d1b260f03f1373b2d0ecae3812d19d4d2fa67c27da3b3ded6e`).
   UT_LOG is passed only to UT; its runner log and outer Make log are distinct.
+  Follow-up `implicit-profile-boundaries.json`: fourteen authored original Types
+  cases/replay qualify all internal kinds × LinkedObject. Only unlinked
+  Normal/Temporary carry both audit families; controls fail two/twelve cases.
+  Original CLR enums prove source CDS=5 and native Query=5 are distinct; emitter
+  conversion stays open. Original ordinary NCL creation remains refused; no
+  business/SQL lookup/Runtime-17 equivalence or new AL UT gain is claimed.
 
 - Preceding full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.

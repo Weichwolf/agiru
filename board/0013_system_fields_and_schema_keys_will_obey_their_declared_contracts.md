@@ -22,6 +22,15 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
   User lookup execution and SQL identifier resolution remain unproved; failed
   NavEnvironment probes are retained, not counted as passes. Raw `$systemId`,
   native byte lengths and classification getters are distinct from AL API contracts.
+  Applicability is now executed across all seven original internal table kinds
+  and both LinkedObject values: fourteen authored original Types-creation cases
+  match twice. Timestamp/SystemId are always present; both audit families require
+  `!IsLinked && (Normal || Temporary)`. Ignoring LinkedObject fails two cases;
+  universally appending audit fields fails twelve. Original CLR enums prove
+  compiler CDS=5 versus native Query=5: numeric casts are invalid; actual emitter
+  conversion remains open. `implicit-profile-boundaries.json` retains all hashes
+  and failed attempts. Ordinary NCL creation still refuses without NavEnvironment;
+  no ordinary business, SQL lookup or Runtime-17 equivalence is claimed.
 
 - Field length authority now covers every original native field: 234 tables/4,477
   fields, zero refused. Original FieldRef.Length and virtual Field.Len both use
@@ -81,7 +90,7 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 1. Use one database-wide sequence for rowversion; include the returned version in RecordState and expose it to 0012 without widening every generated field wrapper.
 2. Audit SystemId uniqueness, supplied-ID Insert overloads, created/modified stamps and database-wide monotonic SystemRowVersion. Assign versions in PostgreSQL so independent tiers cannot collide.
-   Implement Runtime-18's read-only SystemCreatedBy/SystemModifiedBy user-name/full-name FlowFields for Normal/Temporary tables from the verified declaration profile. Preserve reserved IDs 2000000005–2000000008, Text[50]/Text[80], current User lookup and nonstored/read-only semantics; do not add them to Runtime-17 or infer virtual-table applicability from an absent TableType property.
+   Implement Runtime-18's read-only SystemCreatedBy/SystemModifiedBy user-name/full-name FlowFields for unlinked Normal/Temporary tables from the verified declaration profile. Preserve reserved IDs 2000000005–2000000008, Text[50]/Text[80], current User lookup and nonstored/read-only semantics; do not add them to Runtime-17 or infer virtual-table applicability from an absent TableType property.
    Retain one immutable runtime-version field profile, standard-layout member offsets
    and shared typed/reflected calculation primitives. Keep timestamp/implicit fields
    out of declared FieldCount/index loops. Verify actual FieldName → virtual Field

@@ -535,6 +535,14 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    complete timestamp and four Runtime-18 FlowFields before enabling the live
    provider. Provider kind
    is separate from TableType; folder names are not runtime proof.
+   `implicit-profile-boundaries.json` qualifies every original internal kind ×
+   LinkedObject pair through Types creation: fourteen cases/replay match; ignored
+   LinkedObject/universal audit controls fail two/twelve. Keep timestamp/SystemId
+   for every kind; audit families require unlinked Normal/Temporary. Original
+   compiler CDS and native Query both have ordinal 5 but are different contracts;
+   qualify emitter conversion before replacing the existing CDS refusal.
+   Ordinary NCL creation remains unexecuted after a dependency/finalizer refusal;
+   do not promote the Types declaration matrix to live business proof.
    Validate table Scope eligibility at source admission: the reference compiler
    rejects an ordinary extension's Scope=OnPrem (AL0850), irrespective of its
    OnPrem deployment target. Preserve permitted original platform declarations;
