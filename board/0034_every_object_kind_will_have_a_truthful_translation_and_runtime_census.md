@@ -5,6 +5,17 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
 
 ## Evidence
 
+- Native transform kernel: original BC29 `NavBase64Converter.ConvertBuffer`
+  executes on CLR 10.0.12 with its real noncancelled token: 2,699 calls/2,696
+  distinct case identities, 102 encode/2,597 decode. Whole-buffer Convert differs at
+  104 decoder cases, zero encoder cases. Transform decoding rejects nonzero
+  unused padding bits, accepts repeated padded groups/VT/FF and discards short
+  final input; a completed chunk precedes later aligned-invalid refusal.
+  `/tmp/agiru-native-base64-blocks.MPyne6/{receipt.json,qualified-inputs.sha256}`;
+  reference SHA256 `17a836d2783fb93277aca693e22a72ff700525d985dc0642bbe0e1f233aed48f`.
+  The outer I/O loop is authored from original IL, not original stream execution.
+  No Native activation/UT gain; keep Convert and transform decoder profiles distinct.
+
 - Native Base64 text increment: `src/gen/NativeMethods.{h,cpp}` binds five original
   text-input signatures through the shared emitter/refusal/census paths. Match ID,
   namespace/name, Native attribute, scalar types, lengths, argument modes and return;
@@ -316,6 +327,8 @@ Depends on: none. Activation requires 0033 identities, 0044 native providers and
    Keep all unbound methods counted/refusing; Native attribute alone grants no binding.
    Complete Base64Convert's remaining four InStream overloads and above-threshold
    text-output transform branches over the byte codec/Encoding and bounded I/O.
+   Use separate validated Convert/transform decoder policies; carry partial groups
+   and the 76-column counter across chunks, preserving chunk-level error effects.
    Preserve the qualified shared cursor/provider semantics (0035), declared argument
    modes and small/large native branch distinctions; implement locale-default authority.
    Qualify native core/error/line-break

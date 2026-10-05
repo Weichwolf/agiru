@@ -15,6 +15,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Native Base64 transform authority (0034): original `ConvertBuffer` executes
+  on CLR 10.0.12, 2,699 calls/2,696 distinct case identities. Whole-buffer Convert
+  differs at 104 decode cases, zero encode cases; padded groups, unused bits,
+  VT/FF, incomplete tails and chunk error effects require a separate decoder
+  policy. `/tmp/agiru-native-base64-blocks.MPyne6`, original binary/source hashes
+  retained. Outer I/O loop is authored; no original stream execution or UT gain.
 - Native Base64 text bindings (0034): five signatures execute through the common
   emitter; four InStream signatures remain counted refusals. 166 generator and 61
   original-declaration checks green; encoding/terminated-output controls fail 6/2.
