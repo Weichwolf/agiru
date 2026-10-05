@@ -8,12 +8,18 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
 
 ## Current evidence
 
-- Latest frozen attempt: `89f0125` / content `1ba53399d1c1`, slice check passed;
-  build, local test and UT Make targets failed. No AL UT ran: all 2,314 methods
-  across eighty codeunits remain unexecuted. The stale generated Table Metadata
-  contract counted new implicit fields as source fields; `make transpile` now
-  regenerates its canonical identity predicate. Record-order mutation anchors also
-  missed the new SQL write helpers. Repairs require a fresh build/test/UT replay.
+- Current frozen replay: `9dca232` / content `fde18ee95496`, slice check and
+  complete slice build pass. Local test remains red: the native-codeunit qualifier
+  lacks a public-header include and three tooling checks have stale fixtures.
+  Its 2,314-method/eighty-codeunit AL run is underway; no final result yet.
+  These inputs do not contain the later native Runtime-18 migration or API repairs.
+- Current tree: `make verify-check VERIFY_CHECKS='' JOBS=2` passes all 235 tooling
+  tests. Discovery independently includes system-profile.sh and refuses each missing
+  script/binary without shrinking totals. Attribute-census positives use legal Normal
+  TryFunction methods; two malformed declarations remain counted and exit 1.
+  Developer `f928288ee840`: attributes/devenv-{tryfunction,normal}-attribute.md.
+  `test/tooling/toolchain.py` owns DiscoveryGate/TranspilerAttributeCensusGate;
+  the frozen failures are not suppressed and still need current-tree integration.
 - Last completed frozen AL replay: `d3e7671` / content `15e116850819`,
   2,173/2,314 passed, 141 failed, zero incomplete; eighty codeunits,
   BCApps `d99152ee35f0ca8cfec43ba6334b7247a0ee6b17`. Legacy null/unsealed seed:
@@ -44,10 +50,10 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   package; 215 unbound native tables, 67 native methods and 5,683 refused property
   declarations keep translation nonzero. Generation is not successful full-tree
   compilation or AL execution.
-- `make lint` is red: 388 unique diagnostics, ninety of 267 units analysed, all
-  ninety failed. Newly introduced include/test diagnostics were repaired; focused
-  system-profile analysis still fails on common runtime/type headers. Preserve
-  zero tolerated diagnostics and current suppression limits; no baseline increase.
+- Last aggregate tidy measurement: 388 unique diagnostics, ninety of 267 units
+  analysed, all ninety failed. Subsequent shared-header repairs make focused
+  PlatformSourceGate analysis pass; the aggregate was not rerun and remains unproven.
+  Preserve zero tolerated diagnostics and suppression limits; no baseline increase.
 
 ## Focused prerequisites
 

@@ -1426,12 +1426,24 @@ class TranspilerAttributeCensusGate(unittest.TestCase):
                            '[Normal] procedure B() begin end;', (0, 1, 2, 0, 0))
 
     def test_acted_kind_counts_once_despite_repeated_declarations(self):
-        self.assert_census('[TryFunction] procedure A() begin end;\n'
-                           '[TryFunction] procedure B() begin end;', (1, 1, 0, 0, 0))
+        self.assert_census('[Normal] [TryFunction] procedure A() begin end;\n'
+                           '[Normal] [TryFunction] procedure B() begin end;', (1, 2, 2, 0, 0))
 
     def test_known_mixture_partitions_observed_kinds(self):
-        self.assert_census('[TryFunction] procedure A() begin end;\n'
-                           '[Normal] procedure B() begin end;', (1, 2, 1, 0, 0))
+        self.assert_census('[Normal] [TryFunction] procedure A() begin end;\n'
+                           '[Normal] procedure B() begin end;', (1, 2, 2, 0, 0))
+
+    def test_try_function_without_normal_remains_counted_and_refuses(self):
+        result = self.assert_census('[TryFunction] procedure A() begin end;',
+                                    (1, 1, 0, 0, 0), status=1)
+        self.assertIn('[TryFunction] applies to [Normal] methods only', result.stdout)
+        self.assertRegex(result.stdout, r'refused\s+1 property declaration')
+
+    def test_try_function_on_test_remains_counted_and_refuses(self):
+        result = self.assert_census('[Test] [TryFunction] procedure A() begin end;',
+                                    (2, 2, 0, 0, 0), status=1)
+        self.assertIn('[TryFunction] applies to [Normal] methods only', result.stdout)
+        self.assertRegex(result.stdout, r'codeunits\s+1 of 1 parsed \(1 procedures, 1 \[Test\] methods\)')
 
     def test_unknown_kind_remains_counted_and_fails(self):
         result = self.assert_census('[FutureAttribute] procedure A() begin end;\n'
@@ -1440,10 +1452,10 @@ class TranspilerAttributeCensusGate(unittest.TestCase):
         self.assertIn('ABORT     2 attribute declaration(s)', result.stdout)
 
     def test_unknown_mixture_cannot_disappear_into_known_catalogues(self):
-        result = self.assert_census('[TryFunction] procedure A() begin end;\n'
+        result = self.assert_census('[Normal] [TryFunction] procedure A() begin end;\n'
                                     '[Normal] procedure B() begin end;\n'
                                     '[FutureAttribute] procedure C() begin end;',
-                                    (1, 3, 1, 1, 1), status=1)
+                                    (1, 3, 2, 1, 1), status=1)
         self.assertIn('ABORT     1 attribute declaration(s)', result.stdout)
 
 
@@ -3284,7 +3296,7 @@ class DiscoveryGate(unittest.TestCase):
                        'runtime/boolean-expressions.sh', 'transpiler/control-extensions.sh',
                        'transpiler/native-table-ids.sh', 'transpiler/native-codeunits.sh',
                        'runtime/base64.sh', 'runtime/encoding.sh', 'runtime/hashing.sh', 'runtime/conversion.sh', 'runtime/record-order.sh',
-                       'runtime/streams.sh')
+                       'runtime/streams.sh', 'transpiler/system-profile.sh')
             for name in scripts:
                 script = root / 'test' / name
                 script.parent.mkdir(parents=True, exist_ok=True)

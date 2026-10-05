@@ -4,7 +4,7 @@ Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
 Next: restore Integer series navigation with qualified implicit-field values;
-qualify catalogue activation under 0044 after the unchanged-population UT replay.
+replay the unchanged UT population and qualify catalogue activation under 0044.
 Retain the full 2314-case UT population through replay.
 
 ## Implementation
