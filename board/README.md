@@ -15,6 +15,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- `9a60a46` is pushed. Production regeneration activates original Hash→Convert
+  bodies; package bytes agree pre/post. Translation remains red: 67 Native methods,
+  215 native tables and 90 other native sources unactivated, 5,683 unacted properties;
+  numeric Convert keeps four separate runtime refusals (0035). Slice-check retains
+  14,225 sources/zero missing. Direct six-job integration build is running under
+  `/tmp/agiru-hash-convert-integration.Qzx26W`; 25,282 compiler input hashes retained,
+  development inputs held unchanged. Local/full UT replay follows a successful build;
+  no new UT result yet. Previous complete 2,172/2,314 measurement remains below.
+
 - Convert byte-array integration passes: 16,469 C++/14,615 generated-AL checks,
   10,051 original-core and 710 CLR-region reference rows agree; four compiled
   controls reject both consumers. Shared ByteArray/converter primitives and

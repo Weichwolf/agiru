@@ -5,6 +5,20 @@ Depends on: 0073 typed calls; 0066 culture; 0722 JSON engine safety.
 
 ## Evidence
 
+- Production regeneration on `9a60a46` activates both ordinary HashAlgorithm and
+  Convert calls in the original CryptographyManagementImpl body; generated includes
+  name their real headers and neither type remains in absent/Types.h. Make exits 2,
+  translator 1: 67 Native methods, 215 selected native tables and 90 other native
+  sources remain unactivated, with 5,683 unacted properties and the remaining
+  393 absent .NET types/1,363 members. The four runtime numeric Convert refusals
+  remain separate explicit gaps, not hidden by that generated absent-type census.
+  `/tmp/agiru-transpile.puKdvp`; original System package pre/post bytes agree.
+  Slice-check retains 14,225 identities/zero missing. Six-job direct `make all`
+  is running on frozen compiler inputs (editable tree held unchanged):
+  `/tmp/agiru-hash-convert-integration.Qzx26W`, 25,282 input hashes, manifest SHA256
+  `50de38cdfff45409f9820771610993fdb13428d5e2fc301f4c3e6edafe515aec`.
+  Build/local/full UT terminal results remain pending; this is not G1 or a UT gain.
+
 - Convert byte-array bridge reuses the original-core-qualified Base64 codec.
   Typed formatting ordinals, checked regions and byte cells retain strict CLR
   padding/whitespace policy; the transform decoder is not substituted. Encoding
