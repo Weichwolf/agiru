@@ -15,6 +15,13 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
 
 ## Current verification — 2026-10-05
 
+- Native property authority (0044/0013): original embedded System 29.0.55365.0
+  matches all 398 verified AL sources; all 234 original compiled tables execute
+  both XML creation and production NCL assignment with zero refused/static overrides.
+  Missing-source/wrong-version controls reject. Original Table Metadata has 33
+  fields, not agiru's current 28; complete implicit profile/live activation remain
+  open. `/tmp/agiru-table-provider-authority.CyvRCA/native-profile.json`.
+
 - Current full UT replay is terminal on `2ecc31e`, source batch `e96f649`:
   2,173/2,314 passed, 141 failed, zero incomplete; 80 codeunits/six workers/1,342s.
   Make exits 2, runner 1; no infrastructure errors. Against the preceding

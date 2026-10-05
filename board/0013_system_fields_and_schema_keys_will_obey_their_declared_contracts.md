@@ -5,6 +5,13 @@ Depends on: 0033 declaring-app identity. Activation: 0034/0058 unchanged-populat
 
 ## Evidence
 
+- Exact original native creation is now executed for all 234 tables (0044).
+  Original Table Metadata has 33 effective fields: 23 declared plus timestamp 0,
+  SystemId, four audit fields and four Runtime-18 user-name/full-name FlowFields;
+  NCL assignment confirms virtual kind and audit applicability. agiru has 28,
+  so timestamp/FlowField implementation and row values remain open, not an absent
+  authority blocker. `/tmp/agiru-table-provider-authority.CyvRCA/native-profile.json`.
+
 - Native virtual-buffer authority: original BC 29.0.54011.55407 Ncl SHA256
   `277e35cbdfb87f17b979813e46fb73c2e84f5b04b85ed806c40367acf72b48b7`:
   `VirtualDataProvider::.cctor` RVA addf3 sets VirtualTimeStamp to 1, not 0.

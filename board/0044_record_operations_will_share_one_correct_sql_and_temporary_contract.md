@@ -5,6 +5,21 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
 
 ## Evidence
 
+- Original native runtime package is now source-qualified:
+  SystemApp.dll's embedded System 29.0.55365.0/Runtime 18 matches all 398
+  verified AL sources byte-for-byte; all 234 compiled tables remain inventoried.
+  Missing-source/wrong-version controls refuse. Original `MetaTable` XML creation
+  and production `PlatformMetadataProvider::GetMetaTableFromXml` each process
+  all 234 originals on CLR 10.0.12: zero refused, no field removal/stubs,
+  zero static XML overrides. `NCLMetaTable::AssignFromMetaTable` copies the
+  qualified defaults but sets company scope only for non-system Normal tables.
+  Native Table Metadata is Normal, independently virtual, and has audit fields;
+  its 23 source fields become 33: timestamp 0, SystemId, four audit fields and
+  four Runtime-18 user-name/full-name FlowFields. agiru still exposes only 28.
+  `/tmp/agiru-table-provider-authority.CyvRCA/native-profile.json` retains full
+  populations, original hashes and successful/failed probes. This qualifies the
+  native property/creation path, not agiru's complete profile/provider or G1.
+
 - Current complete UT replay on `2ecc31e` retains 48 Table Metadata provider
   refusals, unchanged against the preceding full population; 2,173/2,314 pass,
   141 fail, zero incomplete. README retains the source/image/package hashes and
@@ -448,7 +463,8 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    Qualify each provider's creation path against 0013's original virtual-buffer
    evidence: virtual timestamp 1, conditional audit defaults and supplied versus
    default SystemId. Table Metadata's keyed creation/identity path is qualified
-   above; native omitted properties and implicit-field visibility remain unproved.
+   above; native original omitted properties and field visibility are qualified
+   by `native-profile.json`; agiru's complete effective profile remains open.
    Do not substitute persisted-row SQL defaults.
    Share Page/Table Metadata, Field and AllObj live projections over immutable installed metadata. Populate every represented source property from qualified declarations/app identity, keep Name separate from Caption, and refuse missing authority rather than default values. Reuse `ReflectionMetadata` mappings; CDS is not Query. Prove typed/reflected filtering, count/navigation, permissions, read-only writes and temporary independence before removing the guards. 0013 owns explicit legacy-snapshot/schema activation.
    Native ownership: start at `Main::WriteNativeObjects`, `NativeSources::app` and
@@ -458,10 +474,10 @@ Depends on: 0718 images; 0013 schema metadata; 0034 native declarations.
    catalogue freeze; no competing metadata registry or silent duplicate replacement.
    Preserve the implemented typed Record/RecordRef canonical binding and qualify
    the complete selected production image after 0725 retirement; no compiling-only
-   subset or stale ABI consumer is integration proof. Resolve absent
-   classification, native virtual TableType and implicit-field semantics from
-   authority before enabling the live provider; folder names
-   and blank/default enum values are not runtime proof.
+   subset or stale ABI consumer is integration proof. Apply the qualified native
+   effective defaults and non-system Normal company predicate; complete timestamp
+   and four Runtime-18 FlowFields before enabling the live provider. Provider kind
+   is separate from TableType; folder names are not runtime proof.
    Validate table Scope eligibility at source admission: the reference compiler
    rejects an ordinary extension's Scope=OnPrem (AL0850), irrespective of its
    OnPrem deployment target. Preserve permitted original platform declarations;
