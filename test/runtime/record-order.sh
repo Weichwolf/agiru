@@ -264,6 +264,32 @@ rg -q 'FAIL .*temporary array elements share inserted rows' "$proof/$control.log
 sha256sum "$proof/$control/type/AlArray.h" "$proof/$control-gate" >> "$proof/controls.sha256"
 rm -- "$proof/$control/type/AlArray.h" "$proof/$control-gate"
 rmdir "$proof/$control/type" "$proof/$control"
+for control in array-move-construction array-move-assignment; do
+  mkdir -p "$proof/$control/type"
+  awk -v control="$control" '
+    control == "array-move-construction" && /^  ~AlArray\(\) \{/ {
+      print "  AlArray(AlArray &&other) noexcept : AlArray(static_cast<const AlArray &>(other)) {}";
+      changed++
+    }
+    control == "array-move-assignment" && /^  ~AlArray\(\) \{/ {
+      print "  AlArray &operator=(AlArray &&other) noexcept { return *this = static_cast<const AlArray &>(other); }";
+      changed++
+    }
+    { print }
+    END { if (changed != 1) exit 2 }
+  ' include/type/AlArray.h > "$proof/$control/type/AlArray.h"
+  if "$CXX" -std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror \
+    -fsyntax-only -I"$proof/$control" -Iinclude -Isrc/rt -Itest/gate \
+    test/gate/AlArrayGate.cpp > "$proof/$control.log" 2>&1; then
+    printf 'record-order: %s escaped the array move contract\n' "$control" >&2
+    exit 1
+  fi
+  expected=${control#array-move-}
+  rg -q "static assertion failed.*array move $expected must propagate element copy errors" "$proof/$control.log"
+  sha256sum "$proof/$control/type/AlArray.h" >> "$proof/controls.sha256"
+  rm -- "$proof/$control/type/AlArray.h"
+  rmdir "$proof/$control/type" "$proof/$control"
+done
 sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   src/rt/Cursor.h src/rt/Cursor.cpp \
   src/rt/RecordChanges.h src/rt/RecordChanges.cpp src/rt/SessionState.h src/rt/Storage.cpp \
@@ -273,4 +299,4 @@ sha256sum src/rt/RecordOrder.h src/rt/RecordOrder.cpp src/rt/Navigate.cpp \
   test/gate/DynamicRecordGate.cpp src/rt/Rename.cpp test/gate/RenameGate.cpp \
   test/gate/TemporaryGate.cpp test/gate/AlArrayGate.cpp \
   "$B/libagiru_rt.so" "$gate" "$selection" "$lifecycle" "$dynamic" "$rename" "$temporary" "$array" > "$proof/inputs.sha256"
-printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades and temporary arrays pass; twenty-four controls reject; %s\n' "$proof"
+printf 'record-order: order, selections, cursor lifecycle, dynamic writes, rename cascades and temporary arrays pass; twenty-six controls reject; %s\n' "$proof"

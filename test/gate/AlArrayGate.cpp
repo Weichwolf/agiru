@@ -7,12 +7,50 @@
 #include "Check.h"
 
 #include <string>
+#include <type_traits>
 
 using agiru::AlArray;
 using agiru::Error;
 using agiru::Integer;
 
 namespace {
+
+struct RefusingCopy {
+  RefusingCopy() = default;
+
+  RefusingCopy(const RefusingCopy &source) {
+    static_cast<void>(source);
+    throw Error("array element copy refused");
+  }
+
+  RefusingCopy &operator=(const RefusingCopy &) = default;
+};
+
+using RefusingArray = AlArray<RefusingCopy, 2>;
+static_assert(std::is_move_constructible_v<RefusingArray>, "array rvalues remain constructible");
+static_assert(std::is_move_assignable_v<RefusingArray>, "array rvalues remain assignable");
+static_assert(!std::is_nothrow_move_constructible_v<RefusingArray>,
+              "array move construction must propagate element copy errors");
+static_assert(!std::is_nothrow_move_assignable_v<RefusingArray>,
+              "array move assignment must propagate element copy errors");
+
+void ArrayCopiesPropagateErrors() {
+  const RefusingArray source;
+  std::string said;
+  try {
+    RefusingArray copied(source);
+    copied[1] = RefusingCopy{};
+  } catch (const Error &error) { said = error.what(); }
+  CHECK_TEXT(
+      "array copy construction propagates element errors", said, "array element copy refused");
+  RefusingArray destination;
+  said.clear();
+  try {
+    destination = source;
+  } catch (const Error &error) { said = error.what(); }
+  CHECK_TEXT("array assignment propagates element errors", said, "array element copy refused");
+  CHECK_TRUE("failed array assignment retains valid destination bounds", destination.Length() == 2);
+}
 
 /// A PARAMETER TAKES THE SHAPE OF ITS ARGUMENT AND NOT OF ITS DECLARATION (board:0633):
 /// `array[10, 10]` given an `array[10, 100]` is walked to column 100 in the BaseApp, and BC runs
@@ -122,6 +160,7 @@ void ADeadViewIsRefusedByName() {
 
 int main() {
   return gate::Run("AlArray", [] {
+    ArrayCopiesPropagateErrors();
     CompressArrayMovesTheFullEntriesForward();
     AParameterKeepsTheArgumentsLength();
     TwoDimensionsConvertRowByRow();

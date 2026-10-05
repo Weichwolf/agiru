@@ -3,8 +3,8 @@
 Status: in progress | Priority: P0
 Depends on: 0013's effective field/schema profile for catalogue activation;
 existing record ownership and declaration bindings. Other record repairs can proceed independently.
-Next: remove the false noexcept contract on copying AlArray moves and qualify
-throwing elements; then implement installed Field Get/Find/Next/Count and the
+Next: qualify Field.Get consumed/discarded missing-row behavior; then complete
+installed Field Find/Next/Count and the
 actual FieldName → catalogue → FieldRef caller before retiring seed snapshots.
 
 ## Implementation
@@ -81,9 +81,12 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 - Temporary record arrays now share one row store across dimensions, not their
   field buffers or filters; distinct arrays and ordinary/scalar elements stay
-  independent. `TemporaryGate` passes 95 checks and `AlArrayGate` fourteen.
+  independent. `TemporaryGate` passes 95 checks and `AlArrayGate` seventeen.
   `make record-order JOBS=2` retains all prior controls and adds a compiled
-  separate-store mutant: all twenty-four reject. `include/type/AlArray.h` adds no
+  separate-store mutant: all twenty-six reject, including two restored-noexcept
+  overloads rejected by typed assertions. Copying rvalues uses the existing copy
+  path; throwing-element checks prove error propagation, not process termination.
+  `include/type/AlArray.h` adds no
   include and passes standalone `make include-cost HEADERS=type/AlArray.h`.
   Developer `f928288ee840`: `methods/devenv-array-methods.md` explicitly specifies
   shared temporary array rows; record-copy/get preserve views and primary-key lookup.
@@ -92,7 +95,7 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
   identifies the same storage boundary. The older frozen replay still has all four
   SCMPlanningUT missing temporary row `3` failures; this repair needs full AL replay.
   Focused tidy remains red: twelve existing TemporaryGate/header findings and
-  fifteen AlArrayGate/header findings, including copying moves declared noexcept.
+  fourteen AlArrayGate/header findings; the false noexcept overloads are removed.
   No new helper/test finding, suppression or baseline increase; full tidy is open.
 - Record boxes expose borrowing accessors, not writable ownership/table/identity slots.
   `RecordRefGate` qualifies independent snapshots, typed writes, SetTable and clearing

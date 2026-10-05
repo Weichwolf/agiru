@@ -200,6 +200,8 @@ public:
   /// \param other The array copied.
   /// \note THE BASE'S POINTER IS NOT COPIED, IT IS REMADE. A defaulted copy would leave two arrays
   ///       referring to one buffer, and the second write would land in the first array.
+  ///       Expiring arrays use this same copy path; element errors propagate rather than
+  ///       terminating through a noexcept move overload.
   AlArray(const AlArray &other) : AlArray<T, 0>(this, N, &Element_<T>), first_(held_.data()) {
     Take(other);
   }
@@ -245,15 +247,6 @@ public:
   AlArray &operator=(const AlArray &other) {
     if (this != &other) { Take(other); }
     return *this;
-  }
-
-  AlArray(AlArray &&other) noexcept : AlArray(static_cast<const AlArray &>(other)) {}
-
-  /// \brief Takes another array's elements.
-  /// \param other The array moved from.
-  /// \return This array.
-  AlArray &operator=(AlArray &&other) noexcept {
-    return *this = static_cast<const AlArray &>(other);
   }
 
   ~AlArray() { delete[] spill_; }
