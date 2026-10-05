@@ -150,8 +150,8 @@ number-sequences: comments db ## prove atomic SQL reservations, process parity a
 	@"$(B)/gate_NumberSequenceGate"
 	@B="$(B)" bash "$(SELF)/test/runtime/number-sequences.sh"
 
-rowversions: comments db ## prove database-wide allocation, active fences and negative controls
-	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RowVersionGate
+rowversions: comments db ## prove database-wide allocation, active fences, SQL records/aliases and negative controls
+	@cmake --build "$(B)" -j "$(JOBS)" --target gate_RowVersionGate gate_SqlRowVersionGate
 	@B="$(B)" bash "$(SELF)/test/runtime/rowversions.sh"
 
 table-keys: comments db tc ## prove implicit primary keys before extension merging and generated operations

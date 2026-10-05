@@ -4,6 +4,8 @@
 #include "meta/TableDef.h"
 #include "runtime/RecordState.h"
 
+#include "SqlColumn.h"
+
 #include <optional>
 #include <string>
 #include <string_view>
@@ -26,8 +28,6 @@ struct Selection {
 [[nodiscard]] std::string ColumnZero(const FieldDef &field);
 
 [[nodiscard]] std::string Name(const TableDef &table);
-
-[[nodiscard]] std::string Quoted(std::string_view identifier);
 
 [[nodiscard]] std::string SequenceName(const TableDef &table, const FieldDef &field);
 

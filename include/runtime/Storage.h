@@ -24,7 +24,18 @@ void RequireTableProvider(const TableDef &table);
 /// Identifiers keep their AL spelling and are quoted, so a column is `"Work Type Code"`. That is
 /// BC's own convention, and matching it is what will let the CRONUS load map column for column
 /// (board:0004).
+/// \note SqlTimestamp fields share one bigint timestamp column and its database-owned allocator;
+///       their source names never create independent columns or accept supplied versions.
 void CreateTable(const Connection &connection, const TableDef &table);
+
+/// \brief Synchronizes one visible table with its immutable declaration.
+/// \param connection The database being explicitly provisioned.
+/// \param table The declaration; the connection's search path selects its schema.
+/// \note Creates absent storage, adds missing columns and widens bounded Text/Code fields.
+///       Preserves existing data and obsolete columns. Rowversion aliases share one allocator
+///       column; incompatible existing timestamp storage requires an explicit migration.
+/// \throws Error for incompatible declarations/storage; DatabaseError for failed SQL.
+void ProvisionTable(const Connection &connection, const TableDef &table);
 
 /// \brief Drops the table if it exists.
 /// \param connection The database.
@@ -36,6 +47,9 @@ void DropTable(const Connection &connection, const TableDef &table);
 /// \note Adds missing stored fields and widens existing bounded Text/Code columns to the
 ///       declared length without truncating values or narrowing wider columns. Other type
 ///       migrations are not implemented by this bootstrap operation.
+/// \note Missing rowversion storage is populated once per existing row by PostgreSQL, without
+///       overwriting ordinary or audit fields. Existing incompatible timestamp storage refuses;
+///       provisioning never resets the database-wide counter.
 ///
 /// \param into The database.
 /// \throws DatabaseError when a statement fails.

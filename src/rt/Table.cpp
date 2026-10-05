@@ -36,6 +36,7 @@
 #include "RenameCascade.h"
 #include "Rows.h"
 #include "Selection.h"
+#include "SqlColumn.h"
 #include "Temporary.h"
 #include "Where.h"
 
@@ -692,6 +693,14 @@ void AutoIncrement(void *record, const TableDef &table) {
 
 }
 
+namespace {
+
+bool TakePlatformOwned(void *record,
+                       const TableDef &table,
+                       const std::optional<FieldValues> &owned);
+
+}
+
 bool RuntimeInsert(void *record, const TableDef &table) {
   return RuntimeInsert(record, table, false);
 }
@@ -706,7 +715,7 @@ bool RuntimeInsert(void *record, const TableDef &table, bool withSystemId) {
   StampInserted(record, table, withSystemId);
   AutoIncrement(record, table);
   const FieldValues values = ValuesOf(record, table);
-  return InsertRow(Session::Current().Database(), table, values);
+  return TakePlatformOwned(record, table, InsertRow(Session::Current().Database(), table, values));
 }
 
 namespace {
@@ -718,7 +727,9 @@ bool TakePlatformOwned(void *record,
   std::size_t column = 0;
   for (const FieldDef &def : table.fields) {
     if (!Stored(def) || !PlatformOwned(def)) { continue; }
-    if (column >= owned->size()) { break; }
+    if (column >= owned->size()) {
+      throw Error("Storage: returned platform field count does not match the declaration");
+    }
     SetFieldText(record, def, Required((*owned)[column], def));
     ++column;
   }
@@ -1415,7 +1426,7 @@ std::string OrderByPrimaryKey(const TableDef &target) {
     const FieldDef *def = Field(target, no);
     if (def == nullptr) { continue; }
     out += out.empty() ? " ORDER BY " : ", ";
-    out += detail::Quoted(def->name);
+    out += detail::SqlColumn(*def);
   }
   return out;
 }
@@ -1473,7 +1484,7 @@ void CalcField(void *record, const TableDef &table, const RecordState *state, Fi
       throw Error("the CalcFormula of " + std::string(def->name) + " reads " +
                   std::string(target.name) + "." + formula.field + ", which it does not declare");
     }
-    column = Quoted(of->name);
+    column = SqlColumn(*of);
   }
   const Predicate predicate = PredicateOf(formula, target, record, table, state, *def);
   const std::string where = predicate.sql.empty() ? std::string{} : " WHERE " + predicate.sql;
@@ -1533,10 +1544,10 @@ Predicate CorrelatedPredicateOf(const FlowFormula &formula,
           }
           break;
         }
-        const std::string outer = detail::Name(table) + "." + detail::Quoted(source->name);
+        const std::string outer = detail::Name(table) + "." + detail::SqlColumn(*source);
         const bool upper = term.how == FlowTerm::How::FieldUpperLimit;
         Add(made,
-            detail::Clause{.sql = detail::Quoted(at->name) + (upper ? " <= " : " = ") + outer,
+            detail::Clause{.sql = detail::SqlColumn(*at) + (upper ? " <= " : " = ") + outer,
                            .binds = {}});
       }
     }
@@ -1558,7 +1569,7 @@ Clause FlowFieldColumn(const TableDef &table,
       throw Error("the CalcFormula of " + std::string(def.name) + " reads " +
                   std::string(target.name) + "." + formula.field + ", which it does not declare");
     }
-    column = Quoted(of->name);
+    column = SqlColumn(*of);
   }
   const Predicate predicate = CorrelatedPredicateOf(formula, target, table, state, def, first);
   const std::string where = predicate.sql.empty() ? std::string{} : " WHERE " + predicate.sql;
@@ -1687,7 +1698,7 @@ void CalcSum(void *record, const TableDef &table, const RecordState *state, Fiel
     return;
   }
   const Selection selection = Select(state, table);
-  const std::string sql = "SELECT COALESCE(SUM(" + Quoted(def->name) + "), 0) FROM " + Name(table) +
+  const std::string sql = "SELECT COALESCE(SUM(" + SqlColumn(*def) + "), 0) FROM " + Name(table) +
                           (selection.where.empty() ? std::string{} : " WHERE " + selection.where);
   const Result result = Session::Current().Database().Execute(sql, selection.binds);
   Store(record, *def, result.Rows() == 0 ? std::nullopt : result.Value(0, 0));

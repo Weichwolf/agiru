@@ -16,9 +16,10 @@ using FieldValues = std::vector<std::optional<std::string>>;
 [[nodiscard]] std::string_view Required(const std::optional<std::string> &value,
                                         const FieldDef &def);
 
-[[nodiscard]] bool InsertRow(const Connection &connection,
-                             const TableDef &table,
-                             std::span<const std::optional<std::string>> values);
+[[nodiscard]] std::optional<FieldValues>
+InsertRow(const Connection &connection,
+          const TableDef &table,
+          std::span<const std::optional<std::string>> values);
 
 [[nodiscard]] std::optional<FieldValues> GetRow(const Connection &connection,
                                                 const TableDef &table,

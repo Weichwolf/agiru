@@ -17,6 +17,7 @@
 #include "runtime/Database.h"
 #include "runtime/ErrorValue.h"
 #include "runtime/NumberSequenceStorage.h"
+#include "runtime/RowVersionStorage.h"
 #include "runtime/Session.h"
 #include "runtime/Transaction.h"
 #include "type/Date.h"
@@ -27,6 +28,7 @@
 #include "RecordChanges.h"
 #include "Rows.h"
 #include "Selection.h"
+#include "SqlColumn.h"
 
 #include <algorithm>
 #include <array>
@@ -79,7 +81,7 @@ std::string KeyPredicate(const TableDef &table, std::size_t firstPlaceholder) {
   std::size_t n = firstPlaceholder;
   for (const FieldNo no : table.keys[0].fields) {
     if (!out.empty()) { out += " AND "; }
-    out += Quoted(table.fields[IndexOf(table, no)].name) + " = " + Placeholder(n);
+    out += detail::SqlColumn(table.fields[IndexOf(table, no)]) + " = " + Placeholder(n);
     ++n;
   }
   return out;
@@ -173,16 +175,31 @@ void EnsureSequences(const Connection &connection, const TableDef &table) {
 
 }
 
-void CreateTable(const Connection &connection, const TableDef &table) {
+namespace {
+
+std::string ColumnDefault(const FieldDef &field) {
+  return field.sqlTimestamp ? std::string("agiru_platform.next_rowversion_v1()")
+                            : detail::ColumnZero(field);
+}
+
+bool FirstPhysicalColumn(std::set<std::string_view> &physical, const FieldDef &field) {
+  if (physical.insert(detail::ColumnName(field)).second) { return true; }
+  if (!field.sqlTimestamp) { throw Error("Storage: duplicate physical column declaration"); }
+  return false;
+}
+
+void CreateStorageTable(const Connection &connection, const TableDef &table) {
   RequireTableProvider(table);
   std::string sql = "CREATE TABLE " + Quoted(table.name) + " (";
   bool written = false;
+  std::set<std::string_view> physical;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
+    if (!FirstPhysicalColumn(physical, field)) { continue; }
     if (written) { sql += ", "; }
     written = true;
-    sql += Quoted(field.name) + " " + ColumnType(field) + " NOT NULL DEFAULT " +
-           detail::ColumnZero(field);
+    sql += detail::SqlColumn(field) + " " + ColumnType(field) + " NOT NULL DEFAULT " +
+           ColumnDefault(field);
   }
   if (!table.keys.empty()) {
     sql += ", PRIMARY KEY (";
@@ -190,7 +207,7 @@ void CreateTable(const Connection &connection, const TableDef &table) {
     for (const FieldNo no : table.keys[0].fields) {
       if (!first) { sql += ", "; }
       first = false;
-      sql += Quoted(table.fields[IndexOf(table, no)].name);
+      sql += detail::SqlColumn(table.fields[IndexOf(table, no)]);
     }
     sql += ")";
   }
@@ -207,12 +224,20 @@ void CreateTable(const Connection &connection, const TableDef &table) {
     for (const FieldNo no : table.keys[k].fields) {
       if (!first) { index += ", "; }
       first = false;
-      index += Quoted(table.fields[IndexOf(table, no)].name);
+      index += detail::SqlColumn(table.fields[IndexOf(table, no)]);
     }
     index += ")";
     connection.Run(index);
   }
   EnsureSequences(connection, table);
+}
+
+}
+
+void CreateTable(const Connection &connection, const TableDef &table) {
+  RequireTableProvider(table);
+  if (detail::HasRowVersion(table)) { ProvisionRowVersions(connection); }
+  CreateStorageTable(connection, table);
 }
 
 void DropTable(const Connection &connection, const TableDef &table) {
@@ -238,7 +263,7 @@ std::string StoredColumns(const TableDef &table) {
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
     if (!columns.empty()) { columns += ", "; }
-    columns += Quoted(field.name);
+    columns += detail::SqlColumn(field);
   }
   return columns;
 }
@@ -257,26 +282,45 @@ std::size_t StoredIndexOf(const TableDef &table, FieldNo no) {
 }
 }
 
-bool InsertRow(const Connection &connection,
-               const TableDef &table,
-               std::span<const std::optional<std::string>> values) {
+namespace {
+
+std::string OwnedColumns(const TableDef &table);
+
+}
+
+std::optional<FieldValues> InsertRow(const Connection &connection,
+                                     const TableDef &table,
+                                     std::span<const std::optional<std::string>> values) {
   RequireTableProvider(table);
   if (values.size() != StoredCount(table)) {
     throw Error("Insert: the value count does not match the declaration");
   }
-  const std::string columns = StoredColumns(table);
+  std::string columns;
   std::string placeholders;
-  for (std::size_t i = 0; i < values.size(); ++i) {
-    if (i != 0) { placeholders += ", "; }
-    placeholders += Placeholder(i + 1);
+  FieldValues bound;
+  std::size_t column = 0;
+  for (const FieldDef &field : table.fields) {
+    if (!Stored(field)) { continue; }
+    const std::size_t index = column++;
+    if (field.sqlTimestamp) { continue; }
+    if (!columns.empty()) {
+      columns += ", ";
+      placeholders += ", ";
+    }
+    bound.push_back(values[index]);
+    columns += detail::SqlColumn(field);
+    placeholders += Placeholder(bound.size());
   }
+  const std::string insertion = columns.empty()
+                                    ? std::string(" DEFAULT VALUES")
+                                    : " (" + columns + ") VALUES (" + placeholders + ")";
   const Result written =
-      connection.Execute("INSERT INTO " + Quoted(table.name) + " (" + columns + ") VALUES (" +
-                             placeholders + ") ON CONFLICT DO NOTHING",
-                         values);
-  const bool inserted = written.Affected() == 1;
-  if (inserted) { detail::RecordWritten(connection, table.id); }
-  return inserted;
+      connection.Execute("INSERT INTO " + Quoted(table.name) + insertion +
+                             " ON CONFLICT DO NOTHING RETURNING " + OwnedColumns(table),
+                         bound);
+  if (written.Rows() == 0) { return std::nullopt; }
+  detail::RecordWritten(connection, table.id);
+  return RowOf(written, 0);
 }
 
 std::optional<FieldValues> GetRow(const Connection &connection,
@@ -300,14 +344,14 @@ std::optional<FieldValues> GetRowWhere(const Connection &connection,
   const std::optional<std::string> bound{std::string(value)};
   const Result result =
       connection.Execute("SELECT " + columns + " FROM " + Quoted(table.name) + " WHERE " +
-                             Quoted(column.name) + " = " + Placeholder(1),
+                             detail::SqlColumn(column) + " = " + Placeholder(1),
                          std::span<const std::optional<std::string>>(&bound, 1));
   if (result.Rows() == 0) { return std::nullopt; }
   return RowOf(result, 0);
 }
 
 bool PlatformOwned(const FieldDef &field) {
-  return field.no == SystemFieldNumbers::SystemId ||
+  return field.sqlTimestamp || field.no == SystemFieldNumbers::SystemId ||
          field.no == SystemFieldNumbers::SystemCreatedAt ||
          field.no == SystemFieldNumbers::SystemCreatedBy;
 }
@@ -325,7 +369,11 @@ std::string WrittenAssignments(const TableDef &table,
     if (PlatformOwned(field)) { continue; }
     if (!bound.empty()) { assignments += ", "; }
     bound.push_back(values[index]);
-    assignments += Quoted(field.name) + " = " + Placeholder(bound.size());
+    assignments += detail::SqlColumn(field) + " = " + Placeholder(bound.size());
+  }
+  if (detail::HasRowVersion(table)) {
+    if (!assignments.empty()) { assignments += ", "; }
+    assignments += Quoted(detail::kRowVersionColumn) + " = agiru_platform.next_rowversion_v1()";
   }
   return assignments;
 }
@@ -335,7 +383,7 @@ std::string OwnedColumns(const TableDef &table) {
   for (const FieldDef &field : table.fields) {
     if (!Stored(field) || !PlatformOwned(field)) { continue; }
     if (!columns.empty()) { columns += ", "; }
-    columns += Quoted(field.name);
+    columns += detail::SqlColumn(field);
   }
   return columns.empty() ? std::string("1") : columns;
 }
@@ -426,31 +474,52 @@ struct SchemaChanges {
   std::size_t widened = 0;
 };
 
+struct ExistingColumn {
+  std::size_t length = 0;
+  std::string type;
+  std::string initial;
+  bool nullable = false;
+};
+
 SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
-  const std::array<std::optional<std::string>, 1> named{std::string(table.name)};
+  const std::array<std::optional<std::string>, 1> named{Quoted(table.name)};
   const Result columns = into.Execute(
-      "SELECT column_name, data_type, character_maximum_length FROM information_schema.columns "
-      "WHERE table_schema = 'public' AND "
-      "table_name = $1",
+      "SELECT column_name, data_type, character_maximum_length, column_default, is_nullable "
+      "FROM information_schema.columns "
+      "WHERE (table_schema, table_name) = (SELECT schema.nspname, relation.relname "
+      "FROM pg_catalog.pg_class AS relation JOIN pg_catalog.pg_namespace AS schema "
+      "ON schema.oid = relation.relnamespace WHERE relation.oid = pg_catalog.to_regclass($1))",
       named);
-  std::map<std::string, std::size_t, std::less<>> there;
+  std::map<std::string, ExistingColumn, std::less<>> there;
   for (std::size_t row = 0; row < columns.Rows(); ++row) {
     const std::optional<std::string_view> name = columns.Value(row, 0);
     if (!name.has_value()) { continue; }
     const auto length = columns.Value(row, 2);
     const bool bounded = columns.Value(row, 1) == "character varying" && length.has_value();
-    there.emplace(*name, bounded ? std::stoull(std::string(*length)) : 0);
+    there.emplace(*name,
+                  ExistingColumn{.length = bounded ? std::stoull(std::string(*length)) : 0,
+                                 .type = std::string(columns.Value(row, 1).value_or("")),
+                                 .initial = std::string(columns.Value(row, 3).value_or("")),
+                                 .nullable = columns.Value(row, 4) == "YES"});
   }
   SchemaChanges changes;
+  std::set<std::string_view> physical;
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
-    const auto column = there.find(field.name);
+    if (!FirstPhysicalColumn(physical, field)) { continue; }
+    const auto column = there.find(detail::ColumnName(field));
     if (column == there.end()) {
-      into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + Quoted(field.name) + " " +
-               ColumnType(field) + " NOT NULL DEFAULT " + detail::ColumnZero(field));
+      into.Run("ALTER TABLE " + Quoted(table.name) + " ADD COLUMN " + detail::SqlColumn(field) +
+               " " + ColumnType(field) + " NOT NULL DEFAULT " + ColumnDefault(field));
       ++changes.added;
+    } else if (field.sqlTimestamp) {
+      const auto &shape = column->second;
+      if (shape.type != "bigint" || shape.nullable || shape.initial != ColumnDefault(field)) {
+        throw Error("RowVersion: incompatible timestamp column; explicit migration required: " +
+                    std::string(table.name));
+      }
     } else if ((field.type == FieldType::Code || field.type == FieldType::Text) &&
-               column->second != 0 && column->second < field.length) {
+               column->second.length != 0 && column->second.length < field.length) {
       into.Run("ALTER TABLE " + Quoted(table.name) + " ALTER COLUMN " + Quoted(field.name) +
                " TYPE " + ColumnType(field));
       ++changes.widened;
@@ -459,6 +528,19 @@ SchemaChanges EnsureColumns(const Connection &into, const TableDef &table) {
   return changes;
 }
 
+}
+
+void ProvisionTable(const Connection &connection, const TableDef &table) {
+  RequireTableProvider(table);
+  if (detail::HasRowVersion(table)) { ProvisionRowVersions(connection); }
+  const std::array<std::optional<std::string>, 1> named{Quoted(table.name)};
+  const Result relation = connection.Execute("SELECT pg_catalog.to_regclass($1)", named);
+  if (!relation.Value(0, 0).has_value()) {
+    CreateStorageTable(connection, table);
+    return;
+  }
+  static_cast<void>(EnsureColumns(connection, table));
+  EnsureSequences(connection, table);
 }
 
 namespace {
@@ -480,6 +562,7 @@ void ProvisionSchema(const Connection &into) {
           "TABLE PROVIDER REFUSED: {}: {}", entry->table->name, entry->table->providerRefusal);
       continue;
     }
+    static_cast<void>(detail::HasRowVersion(*entry->table));
     if (there.contains(std::string(entry->table->name))) {
       const auto changes = EnsureColumns(into, *entry->table);
       added += changes.added;
@@ -487,7 +570,7 @@ void ProvisionSchema(const Connection &into) {
       EnsureSequences(into, *entry->table);
       continue;
     }
-    CreateTable(into, *entry->table);
+    CreateStorageTable(into, *entry->table);
     ++made;
   }
   if (made != 0) { std::println("{} table(s) created in the runner's database", made); }
@@ -585,6 +668,7 @@ void ProvisionDates() {
 
 void ProvisionInstalled(const Connection &into) {
   ProvisionNumberSequences(into);
+  ProvisionRowVersions(into);
   ProvisionSchema(into);
   if (!Session::HasCurrent() || &Session::Current().Database() != &into) { return; }
   const std::string_view company = Session::Current().CompanyName();

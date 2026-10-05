@@ -11,6 +11,7 @@
 #include "RecordChanges.h"
 #include "RecordOrder.h"
 #include "Selection.h"
+#include "SqlColumn.h"
 #include "Temporary.h"
 
 #include <algorithm>
@@ -85,7 +86,7 @@ std::string Reversed(const RecordOrder &by, bool descending) {
   std::string order;
   for (const RecordOrder::Column &column : by.Columns()) {
     if (!order.empty()) { order += ", "; }
-    order += Quoted(column.field->name);
+    order += SqlColumn(*column.field);
     if (descending == column.ascending) { order += " DESC"; }
   }
   return order;
@@ -102,7 +103,7 @@ std::string TuplePredicate(Selection &made,
       columns += ", ";
       values += ", ";
     }
-    columns += Quoted(column.field->name);
+    columns += SqlColumn(*column.field);
     made.binds.emplace_back(StorageText(record, *column.field));
     values += "$" + std::to_string(made.binds.size());
   }
@@ -119,7 +120,7 @@ std::string MixedPredicate(Selection &made,
   std::string predicate;
   for (const RecordOrder::Column &column : order) {
     const FieldDef &def = *column.field;
-    const std::string name = Quoted(def.name);
+    const std::string name = SqlColumn(def);
     made.binds.emplace_back(StorageText(record, def));
     const std::string value = "$" + std::to_string(made.binds.size());
     if (!predicate.empty()) { predicate += " OR "; }

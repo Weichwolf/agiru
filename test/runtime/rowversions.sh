@@ -5,11 +5,14 @@ B=$(realpath "${B:-build}")
 CXX=${CXX:-clang++-19}
 proof=$(mktemp -d /tmp/agiru-rowversions.XXXXXX)
 gate="$B/gate_RowVersionGate"
+record_gate="$B/gate_SqlRowVersionGate"
 flags=(-std=c++23 -stdlib=libc++ -Wall -Wextra -Wpedantic -Werror -fPIC -shared -Iinclude
   --rtlib=compiler-rt --unwindlib=libunwind -fuse-ld=lld-19
   "-L$B" "-Wl,-rpath,$B" -lagiru_rt -lagiru_db)
 trap 'find "$proof" -maxdepth 1 -type f \( -name "*.cpp" -o -name "*.so" \) -delete' EXIT
-sha256sum src/rt/RowVersionStorage.cpp test/gate/RowVersionGate.cpp "$gate" > "$proof/inputs.sha256"
+sha256sum src/rt/RowVersionStorage.cpp src/rt/{Storage,SqlColumn,Table,Query,Where,Selection,Navigate}.cpp \
+  src/rt/SqlColumn.h src/rt/Selection.h src/rt/Rows.h include/runtime/Storage.h test/gate/{RowVersionGate,SqlRowVersionGate}.cpp \
+  test/gate/OwnedDatabase.h "$gate" "$record_gate" "$B/libagiru_rt.so" > "$proof/inputs.sha256"
 "$CXX" --version > "$proof/compiler.txt"
 
 build_overlay() {
@@ -124,5 +127,80 @@ build_overlay minimum-cancellation-leak
 expect_red minimum-cancellation-leak "lock timeout" --minimum-cancellation
 
 "$gate" > "$proof/restored.log" 2>&1
+
+"$record_gate" > "$proof/sql-record-baseline.log" 2>&1
+gate="$record_gate"
+flags+=(-Isrc/rt)
+
+awk '
+  / = agiru_platform.next_rowversion_v1\(\)";/ { sub(/next_rowversion_v1\(\)/, "last_rowversion_v1()"); matches++ }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Storage.cpp > "$proof/reused-update-version.cpp"
+build_overlay reused-update-version
+expect_red reused-update-version "SystemRowVersion is the stored platform version"
+
+awk '
+  /SetFieldText\(record, def, Required\(\(\*owned\)/ {
+    print "    if (def.sqlTimestamp) { ++column; continue; }"; matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Table.cpp > "$proof/stale-record-buffer.cpp"
+build_overlay stale-record-buffer
+expect_red stale-record-buffer "SystemRowVersion is the stored platform version"
+
+awk '
+  /return Quoted\(ColumnName\(field\)\)/ { sub(/ColumnName\(field\)/, "field.name"); matches++ }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/SqlColumn.cpp > "$proof/source-name-column.cpp"
+build_overlay source-name-column
+expect_red source-name-column 'column "Version" does not exist'
+
+awk '
+  /return Where\(def, expr, first, SqlColumn\(def\)\)/ {
+    sub(/SqlColumn\(def\)/, "SqlColumn(FieldDef{.name = def.name})"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Where.cpp > "$proof/source-name-filter.cpp"
+build_overlay source-name-filter
+expect_red source-name-filter 'column "Version" does not exist'
+
+awk '
+  /return Alias\(column.dataItem\) .*SqlColumn\(FieldIn/ {
+    sub(/SqlColumn\(FieldIn\(def, item, column.field\)\)/, "Quoted(FieldIn(def, item, column.field).name)"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Query.cpp > "$proof/source-name-query.cpp"
+build_overlay source-name-query
+expect_red source-name-query 'column d0.Version does not exist'
+
+awk '
+  /SqlColumn\(\*column.field\)/ {
+    sub(/SqlColumn\(\*column.field\)/, "Quoted(column.field->name)"); matches++
+  }
+  /const std::string name = SqlColumn\(def\)/ {
+    sub(/SqlColumn\(def\)/, "Quoted(def.name)"); matches++
+  }
+  { print }
+  END { if (matches != 3) exit 2 }
+' src/rt/Navigate.cpp > "$proof/source-name-navigation.cpp"
+build_overlay source-name-navigation
+expect_red source-name-navigation 'column "Version" does not exist'
+
+awk '
+  /field.sqlTimestamp \? std::string\("agiru_platform.next_rowversion_v1\(\)"\)/ {
+    sub(/agiru_platform.next_rowversion_v1\(\)/, "0"); matches++
+  }
+  { print }
+  END { if (matches != 1) exit 2 }
+' src/rt/Storage.cpp > "$proof/zero-backfill.cpp"
+build_overlay zero-backfill
+expect_red zero-backfill "migration allocates one nonzero version per existing row"
+
+"$record_gate" > "$proof/sql-record-restored.log" 2>&1
 sha256sum --check "$proof/inputs.sha256" > "$proof/integrity.log"
-printf 'rowversions: fences, bounds, cross-database isolation, publication and cancellation controls proved; %s\n' "$proof"
+printf 'rowversions: allocator fences, SQL record/alias paths and fifteen compiled negative controls proved; %s\n' "$proof"

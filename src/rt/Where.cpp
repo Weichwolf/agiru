@@ -5,6 +5,7 @@
 #include "type/StringValue.h"
 
 #include "Filter.h"
+#include "SqlColumn.h"
 
 #include <cstddef>
 #include <string>
@@ -13,16 +14,6 @@
 namespace agiru::detail {
 
 namespace {
-
-std::string Quoted(std::string_view identifier) {
-  std::string out = "\"";
-  for (const char c : identifier) {
-    if (c == '"') { out += '"'; }
-    out += c;
-  }
-  out += '"';
-  return out;
-}
 
 std::string Placeholder(std::size_t oneBased) {
   return "$" + std::to_string(oneBased);
@@ -120,7 +111,7 @@ void One(const Atom &atom,
 }
 
 Clause Where(const FieldDef &def, const Expression &expr, std::size_t first) {
-  return Where(def, expr, first, Quoted(def.name));
+  return Where(def, expr, first, SqlColumn(def));
 }
 
 Clause

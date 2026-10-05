@@ -10,6 +10,7 @@
 
 #include "Filter.h"
 #include "RecordOrder.h"
+#include "SqlColumn.h"
 #include "Where.h"
 
 #include <algorithm>
@@ -193,7 +194,7 @@ std::string Columns(const TableDef &table) {
   for (const FieldDef &field : table.fields) {
     if (!Stored(field)) { continue; }
     if (!columns.empty()) { columns += ", "; }
-    columns += Quoted(field.name);
+    columns += SqlColumn(field);
   }
   return columns;
 }
@@ -213,7 +214,7 @@ Selection Select(const RecordState *state, const TableDef &table) {
   for (const RecordOrder::Column &column : order.Columns()) {
     made.sorted.push_back(column.field->no);
     if (!made.order.empty()) { made.order += ", "; }
-    made.order += Quoted(column.field->name);
+    made.order += SqlColumn(*column.field);
     if (!column.ascending) { made.order += " DESC"; }
   }
   return made;

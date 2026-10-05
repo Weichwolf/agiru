@@ -13,6 +13,7 @@
 #include "Cursor.h"
 #include "Filter.h"
 #include "Selection.h"
+#include "SqlColumn.h"
 #include "Where.h"
 
 #include <cctype>
@@ -91,7 +92,7 @@ const FieldDef &FieldNamed(const QueryDef &def, const QueryDataItem &item, std::
 
 std::string SourceOf(const QueryDef &def, const QueryColumn &column) {
   const QueryDataItem &item = def.dataItems[column.dataItem];
-  return Alias(column.dataItem) + "." + Quoted(FieldIn(def, item, column.field).name);
+  return Alias(column.dataItem) + "." + SqlColumn(FieldIn(def, item, column.field));
 }
 
 bool IsIntegral(const FieldDef &field) {
@@ -316,7 +317,7 @@ Statement Build(const QueryDef &def, const QueryState &state) {
           Where(field,
                 ParseFilter(term.filter),
                 made.binds.size() + 1,
-                Alias(i) + "." + Quoted(field.name)),
+                Alias(i) + "." + SqlColumn(field)),
           made.binds);
     }
   };
@@ -333,8 +334,8 @@ Statement Build(const QueryDef &def, const QueryState &state) {
     for (const QueryLink &link : item.links) {
       if (!on.empty()) { on += " AND "; }
       const QueryDataItem &upper = def.dataItems[link.dataItem];
-      on += Alias(i) + "." + Quoted(FieldIn(def, item, link.field).name) + " = " +
-            Alias(link.dataItem) + "." + Quoted(FieldIn(def, upper, link.reference).name);
+      on += Alias(i) + "." + SqlColumn(FieldIn(def, item, link.field)) + " = " +
+            Alias(link.dataItem) + "." + SqlColumn(FieldIn(def, upper, link.reference));
     }
     tableFilterOf(i, on);
     from += " ON " + (on.empty() ? std::string("TRUE") : on);

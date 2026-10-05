@@ -17,7 +17,8 @@ close remaining source/seed/runner/safety gaps. Clients remain queued in 0720.
   nonzero (1,701 seconds, six workers). Against `ae71f8d`, all 2,314 identities,
   statuses and errors are unchanged: zero gains/losses/missing/added/duplicates.
   This replay covers the earlier reflection-name/profile-selection changes,
-  not `b9f35e9` materialization/current User lookups or `5a4c3be` source-write refusal.
+  not `b9f35e9` materialization/current User lookups, `5a4c3be` source-write refusal
+  or subsequent rowversion allocation/SQL integration.
 - Current failure concentrations: 48 Table Metadata provider refusals, thirteen
   incoming-document conversion assertions, four Inventory Profile missing-key paths
   and four WorkbookWriter.Create refusals. Fix their shared contracts, not callers.

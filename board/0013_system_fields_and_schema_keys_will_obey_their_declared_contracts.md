@@ -3,9 +3,9 @@
 Status: in progress | Priority: P0
 Depends on: existing source-owned app/native declarations and minimum-runtime metadata.
 Activation: 0044's live Field catalogue and 0058's unchanged full UT replay.
-Next: wire explicit host selection into generated/native records, migrate remaining
-five-field declarations and integrate the qualified rowversion primitive with SQL DML
-under 0044 before catalogue activation.
+Next: wire explicit host selection into generated/native records and migrate remaining
+five-field declarations; qualify original source consumers and SQL profiles before
+0044's catalogue activation.
 
 ## Implementation
 
@@ -78,13 +78,16 @@ under 0044 before catalogue activation.
 - Original-package audit: eighteen bound candidates compile without PCH; original
   page/source-library and offset/type/number/drop/namespace controls pass. All 215
   selected unbound tables remain red. Other native/generated records still use the
-  five-field view; host wiring, durable timestamp and live providers remain gaps.
+  five-field view; host wiring and live providers remain gaps.
   No AL replay yet covers this materialization. Preserve `4dadfec`/`5a14741`.
 - `runtime/RowVersionStorage.h`, `src/rt/RowVersionStorage.cpp` and
   `test/gate/RowVersionGate.cpp` qualify the PostgreSQL allocation/fence foundation.
-  `make rowversions` passes 114 checks, concurrent SQL writes and eight compiled
-  negative controls. Existing AL methods still refuse: ordinary/native DML,
-  SqlTimestamp aliases, observed-version checks and server-restart proof remain 0044.
+  The SQL record integration in `test/gate/SqlRowVersionGate.cpp` exercises an
+  authored Runtime-17 profile and source SqlTimestamp alias through production
+  storage, Record/RecordRef, query, FlowField and navigation primitives. Generated
+  app/native host selection is not activated by this fixture. Existing AL database
+  methods still refuse; 0044 owns remaining DML/profile coverage, observed-version
+  checks and server-restart proof. Reproduce both gates/controls with `make rowversions`.
 
 Absorbs prior 0080/0353/0371/0511. Previous detail and mappings:
 Git `356dadda4a4aa435899bc8aa9e9c4f24a8c0fa21:board/`.
