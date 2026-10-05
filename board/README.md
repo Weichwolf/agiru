@@ -36,6 +36,15 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   `make table-keys` passes 34/166/61 checks, seven compiled/five source controls
   reject, and fixture analysis passes. Full corrected local/AL replay is pending.
   `native-defaults-table-keys{,-lint}.log` in the same receipt directory.
+  Corrected source batch `cd61d73`: slice/build pass; complete local replay has
+  146 cases/one red from two tooling fixture errors. The temporary orchestrator
+  wrongly exported UT_LOG to all targets; a parent-log control reproduces both
+  errors, ordinary MilestoneGate passes 13 and the full clean-environment tooling
+  replay passes all 233. Keep the failed Make receipt, not a rewritten green run.
+  Lint remains red: 55 silent places against the unchanged baseline 13.
+  All compiler input hashes still agree. Full 80/2,314 AL replay is running;
+  source manifest/file hashes match the preceding complete baseline. Receipts:
+  `/tmp/agiru-native-defaults-integration.0S8HWX/{result,interim-verification}.json`.
 
 - Native implicit fields (0013/0044): original logical getters execute twice over
   all 234 tables/2,340 implicit fields, zero refused; raw identity sets and bytes
