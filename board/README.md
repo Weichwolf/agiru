@@ -29,11 +29,12 @@ Preserved native prototype: branch `work/native-field-metadata`, worktree
   (`/tmp/agiru-record-order-controls.aUoxgz`). The image retains all seven non-runtime hashes from
   completed 223110 and replaces only libagiru_rt; it does not qualify rebuilt
   generated callers of the new ModifyAll template or the full UT population.
-  Original Invoice Aggregate UT (134396) is terminal: 55/57 passed, two unchanged
-  Table Metadata failures; its Rename test is recovered. Source count stays 57;
-  one gain, no losses/changed errors/missing/added/duplicates (`134396-comparison.json`).
-  Completed diagnostic DB is removed; the source template is unchanged. The other
-  two codeunits and complete local/AL replay remain pending.
+  Three original codeunits are terminal: 55/57 invoice, 43/44 sales credit memo,
+  37/38 purchase credit memo; 135/139 passed, four unchanged Table Metadata failures.
+  All three Rename tests recover; source count stays 139, no losses/changed errors/
+  missing/added/duplicates (`three-codeunits-comparison.json`). Source/image hashes
+  match after execution. Owned diagnostic databases and the disposable 903 MiB
+  image are removed; hashes/results remain. Complete local/AL replay stays pending.
 - Caller-fix integration: `20261004T232014Z-3101267`, frozen HEAD `e9be54d`,
   source `74b27d9d9fe48dbdfdc95a03895d9873db1e29bd87d8b2f430c8170ecd984375`;
   `slice-check all test ut`, six jobs, runner PID 3102678 confirmed live.
