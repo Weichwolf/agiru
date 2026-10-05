@@ -38,6 +38,22 @@ Next: qualify installed native layouts/dataset rows, then bind one request-page 
 
 ## Acceptance and references
 
+- Direct sandbox reference (2026-10-05, CH BC 28.5/application 28.5.54151.54951):
+  report 1306 exposes eleven installed
+  layouts across multiple declaring extensions, including RDLC, Word, QR-enabled,
+  theme and email-body variants. Preserve owner-qualified identity, status/default
+  selection and subtype; report ID alone cannot select a layout.
+  Exported RDLC and standard Word inputs, a single-record A4 PDF and its XML
+  `ReportDataSet` are retained privately outside Git. Real request page exposes
+  options, posted-invoice filters, printer/layout choice and PDF/XML/Word/data-only
+  Excel outputs. Reopening after Send to restores the record filter in this sample;
+  Preview/Cancel/scheduling persistence remains to qualify separately.
+  Sources: user `ui-manage-report-layouts.md`, `ui-work-report.md`; AL
+  `Foundation/Reporting/ReportLayouts.page.al` and report 1306 declarations.
+  New composite Word body/theme/header-footer overrides are documented requirements,
+  not proven by the captured stand-alone Word sample. Do not copy an obsolete
+  custom-layout export restriction onto the modern extension-layout catalogue.
+
 - Existing `make native-report-layouts`, `native-bindings`, `layout-assets-check`
   and `test/reporting/` controls remain; qualified original package retains
   sixteen assets and ordinary/source-bound 562+562 fixture checks.

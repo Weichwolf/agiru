@@ -38,6 +38,17 @@ actual FieldName → catalogue → FieldRef caller before retiring seed snapshot
 
 ## Useful implementation details
 
+- Direct sandbox metadata (2026-10-05, CH BC 28.5/platform 28.0.54688.0;
+  not the frozen SDK/demo version): table viewer 2000000041 exposes
+  `FieldName=$systemId`, but `FieldName=SystemCreatedAt`; the missing-index page's
+  SQL include list instead uses `$systemCreatedAt`. Do not normalize AL catalogue
+  names to SQL storage names. Table Metadata 2000000136 exposes virtual rowversion
+  1 and deterministic SystemIds in sampled rows; this is not storage/DML proof.
+  Table Information 8700 includes company/global rows, counts, sizes and compression;
+  Database Locks 9511 was empty, Wait Statistics 9520 had 19 categories, Missing
+  Indexes 9521 had one recommendation. PostgreSQL providers need their own qualified
+  metrics; do not fake Azure SQL waits/recommendations. Plain `table=<id>` works;
+  adding the sampled `filter` URL parameter refuses with unknown RunTable parameters.
 - `~/Git/openerp/openerp/runtime/base/table/{_table,_temp_table}.py`:
   distinguish AL dynamic navigation from client `_display_window`.
   Refreshed display uses OFFSET/LIMIT; predecessor 1868 still requires keyset,

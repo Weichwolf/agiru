@@ -54,6 +54,29 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 
 ## Implementation order
 
+- First-release presentation follows BC's page structure, navigation, controls and
+  dialogs closely; defer an independent agiru redesign. Implement with agiru-owned
+  code, not copied proprietary client sources. Retain the shared HTML/ASCII contract.
+- Adopt BC-compatible URL semantics using agiru deployment origins: `company`,
+  `page|query|report|table`, `mode`, `profile`, `bookmark`, `filter`, layout and
+  documented presentation flags. Keep authentication/cloud routing separate.
+  Use one typed parser/builder for AL `GetUrl`, browser history and CMD/MCP open.
+  Preserve bookmark record identity, parameter escaping, field-name filter syntax,
+  company isolation and permission checks. Never treat a deep link as authority.
+  Observed list → card navigation retains the same bookmark but changes page 22 → 21;
+  creating a sales order removes `mode=Create` and gains a bookmark after validation.
+  Encode spaces as `%20`: the observed BC entrypoint treats `company=CRONUS+CH`
+  as a literal plus and refuses the company. Do not use form-encoded URL builders.
+  `node`/`dc` are observed navigation hints, not yet established portable contracts.
+  Test malformed/duplicate/conflicting selectors, Unicode/quoted filters, stale
+  bookmarks, reload/back/forward and links across permitted/forbidden companies.
+  Reference: local developer `devenv-web-client-urls.md` and
+  `methods-auto/system/system-geturl-clienttype-string-objecttype-integer-recordref-boolean-string-method.md`.
+  Direct sandbox: 2026-10-05, CH BC 28.5, platform `28.0.54688.0`, application
+  `28.5.54151.54951` (Help & Support). Keep this host distinct from frozen SDK/demo
+  versions. Credentials/raw captures stay outside Git; private archive:
+  `~/.local/share/agiru/bc-reference/2026-10-05/manifest.json`.
+
 1. Extract a C++ `PageDispatcher`/`PageSession` below the TestPage adapter.
    Move production control contracts out of `runtime/test/`; reuse generated
    factories/control accessors. One model owns modes, current key/version,
@@ -94,6 +117,27 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
    in PostgreSQL by user/company/page; bound scans/pivots/memory and cancellation.
    Share query/FlowField plans, not browser-local whole-ledger aggregation.
    SVG chart interaction shares scenes with report export under 0721.
+   Role-center 9022/part 1392 sandbox sample renders an SVG aged-payables chart:
+   Week has 14 bars, Day has 16. Period actions recompute buckets; clicking Older
+   opens page 29 with Due Date/Open filters. Preserve AL DataPointClicked/index
+   semantics and typed filters; independently reconcile totals before parity claims.
+   Sources: `HelpAndChartWrapper.Page.al`, `BusinessChartBuffer.Table.al`.
+   Analysis views persist independent column/group/pivot/filter/sort definitions;
+   support create/save/rename/duplicate/reorder/delete and definition import/export.
+   Copying must not alias the original mutable definition. Share links reopen an
+   authorized copy and retain explicit company binding (or an explicit unbound
+   choice), not grant data access. Prove persistence across reconnect and isolation
+   across users/companies. Reference: user `business-central/analysis-mode.md`.
+   Sandbox proof (2026-10-05, page 20): rename with description, account grouping,
+   pivot mode and Duplicate work. Adding document-type grouping to the copy leaves
+   the original unchanged; both definitions survive a full page reload. Original
+   also pivots Document Type into column labels; the copy retains its own row groups.
+   Exported
+   `.analysis.json` preserves target object, column state, filters, pivot mode and
+   dependencies. Share exposes company binding; recipient permissions remain untested.
+   Packaged `analysisviews`/`DefinitionFile` on pages/extensions/customizations are
+   documented, not yet exercised: immutable shared definitions, editable private
+   copies and profile ownership. Read developer `devenv-analysis-view-package.md`.
 10. Recreate the reviewed ten scenarios in `test/ui/` for actual shell CMD,
     MCP transport and htmx HTTP on equivalent disposable committed clones;
     use independently queried SQL effects. Sample the real browser/DOM separately.
@@ -125,6 +169,30 @@ unknown fields; use qualified identities and explicit version/mapping refusals.
 - Ledger/chart parity includes more data than a fetch block, authorized related
   fields and separate users/companies; unsupported expressions explicitly refuse.
   No speed or 99%-business claim from page-open counts or transcript equality.
+- Reference/acceptance matrix includes attachment upload/download/delete and exact
+  bytes; list filters/views and analysis grouping/pivots; FactBox selection refresh
+  and drilldowns; nested lookup selection/cancel; Option/Enum identity versus caption
+  and Code normalization; role-center business charts/periods/legends/drilldowns;
+  report request/layout selection; workflows/approvals; and Database*/Table
+  Information pages with authorized metadata and bounded live operational providers.
+  Track observed, documented-only, refused and unexecuted cases separately.
+- Workflow reference: pages 1500/1501/1505 and
+  `System/Workflow/WorkflowSubpage.Page.al`. Copied purchase-approval template
+  `MS-POAPW` has six conditional steps; its first response chain restricts the
+  record, sets Pending Approval, creates and sends approval requests. Event filters
+  include header and line tables and open through OnAssistEdit, only when editable.
+  Own disabled copy was renamed (Code uppercasing plus related-record confirmation)
+  and exported as XML; existing enabled workflows were untouched. Import overwrites
+  an existing Code per `across-how-to-export-and-import-workflows.md`: require an
+  explicit overwrite decision. Approval execution/delegation/job-queue recovery and
+  posting restrictions remain unexecuted; XML export is not workflow execution proof.
+- Attachment reference: own marked sales order → Attachments → page 1173;
+  upload dialog accepts a local UTF-8 file, stores extension/type/user/time and
+  Flow to Sales Trx. Download reproduced all 116 bytes (SHA256
+  `99c3ef35b467e1484dd6b508b8eadd80f21cf66c8ee159c97eb6df5a1fd20281`);
+  own attachment was deleted with confirmation and its downloaded copy retained.
+  OneDrive was not exercised and is excluded. Native attachment/media ownership,
+  posting transfer and independent user/company access still need qualification.
 
 ## References and consolidation
 
